@@ -7,6 +7,7 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import { getPaginationParams, type PaginationQuery } from "../schemas/pagination.schemas.js";
 
 export type NcmServicePrisma = typeof prismaClient;
 
@@ -50,6 +51,22 @@ export interface UpdateNcmRequest extends NcmAuthContext {
   information_source?: string;
   reference_legislation?: string;
   validity_end_date?: Date;
+}
+
+export interface DeleteNcmRequest extends NcmAuthContext {
+  ncm_id: string;
+}
+
+export interface ListNcmRequest extends PaginationQuery {
+  ncmCodes?: string[];
+}
+
+export interface NcmListResult {
+  data: unknown[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
 }
 
 const NCM_SELECT = {
@@ -177,6 +194,40 @@ export class NcmService {
     }
   }
 
+  async delete(data: DeleteNcmRequest): Promise<{ deleted: unknown }> {
+    try {
+      const exists = await this.prisma.ncm.findFirst({
+        where: { id: data.ncm_id, organization_id: data.organizationId },
+        select: NCM_SELECT,
+      });
+
+      if (!exists) {
+        throw new ServiceError(404, "NCM nao existe.");
+      }
+
+      const deleted = await this.prisma.ncm.delete({
+        where: { id: data.ncm_id },
+        select: NCM_SELECT,
+      });
+
+      await this.audit.createLog({
+        userId: data.userId,
+        organizationId: data.organizationId,
+        permission: data.permission ?? null,
+        action: "Exclusao",
+        referring: "fiscal.ncm",
+        referringId: data.ncm_id,
+        changes: exists as unknown as Record<string, unknown>,
+      });
+
+      return { deleted };
+    } catch (err: unknown) {
+      logError("Erro ao excluir NCM", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao excluir.", err);
+    }
+  }
+
   async detail(ncmId: string, organizationId: string): Promise<{ detail: unknown }> {
     const detail = await this.prisma.ncm.findFirst({
       where: { id: ncmId, organization_id: organizationId },
@@ -190,18 +241,37 @@ export class NcmService {
     return { detail };
   }
 
-  async list(ncmCodes: string[], organizationId: string): Promise<unknown[]> {
-    if (!ncmCodes || ncmCodes.length === 0) {
-      return [];
-    }
+  async list(query: ListNcmRequest, organizationId: string): Promise<NcmListResult> {
+    const page = query.page ?? 1;
+    const { skip, take } = getPaginationParams(query);
+    const terms = query.ncmCodes?.map((code) => code.trim()).filter(Boolean) ?? [];
+    const where = {
+      organization_id: organizationId,
+      ...(terms.length > 0
+        ? {
+            OR: terms.map((code) => ({
+              ncm_code: { contains: code, mode: "insensitive" as const },
+            })),
+          }
+        : {}),
+    };
+    const [total, data] = await Promise.all([
+      this.prisma.ncm.count({ where }),
+      this.prisma.ncm.findMany({
+        where,
+        select: NCM_SELECT,
+        orderBy: { ncm_code: "asc" },
+        skip,
+        take,
+      }),
+    ]);
 
-    return this.prisma.ncm.findMany({
-      where: {
-        organization_id: organizationId,
-        ncm_code: { in: ncmCodes },
-      },
-      select: NCM_SELECT,
-      orderBy: { ncm_code: "asc" },
-    });
+    return {
+      data,
+      total,
+      page,
+      limit: take,
+      hasMore: page * take < total,
+    };
   }
 }

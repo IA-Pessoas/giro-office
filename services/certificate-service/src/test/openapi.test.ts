@@ -65,8 +65,12 @@ describe("certificate-service OpenAPI", () => {
 
     expect(spec.paths["/certificate/pj/list"].get?.security).toEqual([{ bearerAuth: [] }]);
     expect(spec.paths["/certificate/pj/{id}"].get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(spec.paths["/certificate/pj/{id}"].delete).toBeDefined();
+    expect(spec.paths["/certificate/pj/{id}"].delete?.security).toEqual([{ bearerAuth: [] }]);
     expect(spec.paths["/certificate/pf/list"].get?.security).toEqual([{ bearerAuth: [] }]);
     expect(spec.paths["/certificate/pf/{id}"].get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(spec.paths["/certificate/pf/{id}"].delete).toBeDefined();
+    expect(spec.paths["/certificate/pf/{id}"].delete?.security).toEqual([{ bearerAuth: [] }]);
     expect(spec.paths["/certificate/notifications"].get?.security).toEqual([{ bearerAuth: [] }]);
   });
 
@@ -94,6 +98,8 @@ describe("certificate-service OpenAPI", () => {
     expect(spec.paths["/certificate/pf/{id}/file"]?.post).toBeDefined();
     expect(spec.paths["/certificate/pf/{id}/file"]?.get).toBeDefined();
     expect(spec.paths["/certificate/pf/{id}/file"]?.delete).toBeDefined();
+    expect(spec.paths["/certificate/pj/{id}"]?.delete?.responses["500"]).toBeDefined();
+    expect(spec.paths["/certificate/pf/{id}"]?.delete?.responses["500"]).toBeDefined();
 
     expect(spec.paths["/certificate/pj/{id}/file"]?.post?.requestBody?.content).toHaveProperty(
       "multipart/form-data",

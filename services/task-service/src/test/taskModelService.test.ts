@@ -7,6 +7,7 @@ const { prismaMock, auditMock } = vi.hoisted(() => ({
       create: vi.fn(),
       update: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
       delete: vi.fn(),
     },
     user: {
@@ -26,7 +27,7 @@ import { TaskModelService } from "../services/taskModelService.js";
 
 describe("TaskModelService", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("createModel lança 409 quando já existe modelo com mesmo nome", async () => {
@@ -42,8 +43,57 @@ describe("TaskModelService", () => {
         responsible_id: "user-1",
         billing: "Realizar",
         prevision: 2,
+        integracaoLevel: 3,
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("createModel rejeita responsável 3 sem responsável 2 antes de consultar o banco", async () => {
+    const service = new TaskModelService();
+
+    await expect(
+      service.createModel({
+        user_id: "user-1",
+        organization_id: "org-1",
+        name: "Modelo",
+        department_id: "dep-1",
+        responsible_id: "user-1",
+        responsible2_id: null,
+        responsible3_id: "user-3",
+        billing: "Realizar",
+        prevision: 2,
+        integracaoLevel: 3,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Responsável 2 é obrigatório antes do responsável 3.",
+    });
+
+    expect(prismaMock.taskModel.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("updateModel rejeita responsável 2 quando o responsável principal está ausente", async () => {
+    const service = new TaskModelService();
+
+    await expect(
+      service.updateModel({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "model-1",
+        name: "Modelo",
+        department_id: "dep-1",
+        responsible_id: "",
+        responsible2_id: "user-2",
+        billing: "Realizar",
+        prevision: 2,
+        integracaoLevel: 3,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Responsável é obrigatório.",
+    });
+
+    expect(prismaMock.taskModel.findFirst).not.toHaveBeenCalled();
   });
 
   it("detailModel lança 404 quando modelo não existe", async () => {
@@ -59,7 +109,15 @@ describe("TaskModelService", () => {
     prismaMock.taskModel.findMany.mockResolvedValue([{ id: "model-1", name: "Modelo" }]);
     const service = new TaskModelService();
 
-    const result = await service.listModel(undefined, undefined, "org-1");
+    const result = await service.listModel({
+      organizationId: "org-1",
+      paginationRequested: false,
+      search: "",
+      page: 1,
+      limit: 20,
+      userId: "user-1",
+      integracaoLevel: 2,
+    });
 
     expect(result).toEqual([{ id: "model-1", name: "Modelo" }]);
     expect(prismaMock.taskModel.findMany).toHaveBeenCalledWith({
@@ -70,8 +128,45 @@ describe("TaskModelService", () => {
         id: true,
         name: true,
         department_id: true,
+        department: { select: { id: true, name: true } },
       },
       orderBy: { name: "asc" },
+    });
+  });
+
+  it("listModel busca por modelo ou departamento antes de paginar", async () => {
+    const row = { id: "model-21", name: "Fiscal 21", department_id: "dep-1" };
+    prismaMock.taskModel.findMany.mockResolvedValue([row]);
+    prismaMock.taskModel.count.mockResolvedValue(21);
+    const service = new TaskModelService();
+
+    const result = await service.listModel({
+      organizationId: "org-1",
+      paginationRequested: true,
+      search: "fiscal",
+      page: 2,
+      limit: 20,
+      userId: "user-1",
+      integracaoLevel: 2,
+    });
+
+    const where = {
+      organization_id: "org-1",
+      OR: [
+        { name: { contains: "fiscal", mode: "insensitive" } },
+        { department: { name: { contains: "fiscal", mode: "insensitive" } } },
+      ],
+    };
+    expect(prismaMock.taskModel.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where, skip: 20, take: 20 }),
+    );
+    expect(prismaMock.taskModel.count).toHaveBeenCalledWith({ where });
+    expect(result).toEqual({
+      data: [row],
+      total: 21,
+      page: 2,
+      limit: 20,
+      hasMore: false,
     });
   });
 
@@ -89,12 +184,13 @@ describe("TaskModelService", () => {
         responsible_id: "user-1",
         billing: "Realizar",
         prevision: 2,
+        integracaoLevel: 2,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it("updateModel lança 403 quando usuário não tem permissão", async () => {
-    prismaMock.taskModel.findFirst.mockResolvedValueOnce({
+    prismaMock.taskModel.findFirst.mockResolvedValue({
       id: "model-1",
       organization_id: "org-1",
     });
@@ -111,12 +207,13 @@ describe("TaskModelService", () => {
         responsible_id: "user-1",
         billing: "Realizar",
         prevision: 2,
+        integracaoLevel: 1,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it("deleteModel lança 403 quando usuário não tem permissão", async () => {
-    prismaMock.taskModel.findFirst.mockResolvedValueOnce({
+    prismaMock.taskModel.findFirst.mockResolvedValue({
       id: "model-1",
       organization_id: "org-1",
     });
@@ -128,6 +225,7 @@ describe("TaskModelService", () => {
         task_id: "model-1",
         user_id: "user-1",
         organization_id: "org-1",
+        integracaoLevel: 1,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });

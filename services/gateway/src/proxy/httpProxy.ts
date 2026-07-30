@@ -4,8 +4,10 @@ import {
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_SESSION_VERSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  INTEGRACAO_PERMISSION_LEVEL,
   INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
   ServiceError,
@@ -38,7 +40,7 @@ interface HttpProxyOptions {
   permissionModule?: string;
 }
 
-const GLOBAL_ADMIN_PERMISSION = 2;
+const OWNER_MODULE_PERMISSION = 3;
 
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -78,7 +80,8 @@ function getConnectionHeaderTokens(request: Request): Set<string> {
 
 function resolveForwardedPermission(
   permission: number | undefined,
-  modules: Record<string, number | null> | undefined,
+  modules: Record<string, number> | undefined,
+  modulePermissionsPresent: boolean | undefined,
   type: unknown,
   permissionModule?: string,
 ): number | undefined {
@@ -86,20 +89,19 @@ function resolveForwardedPermission(
     return permission;
   }
 
-  const modulePermission = modules?.[permissionModule];
-  if (typeof modulePermission === "number") {
-    return modulePermission;
+  const isExplicitOwner = type === "owner";
+  if (isExplicitOwner) {
+    return OWNER_MODULE_PERMISSION;
   }
 
-  const isExplicitOwner = type === "owner";
-  const isLegacyGlobalAdmin = type === undefined && typeof permission === "number";
+  if (modulePermissionsPresent === false) {
+    return INTEGRACAO_PERMISSION_LEVEL.BASIC;
+  }
 
-  if (
-    (isExplicitOwner || isLegacyGlobalAdmin) &&
-    typeof permission === "number" &&
-    permission >= GLOBAL_ADMIN_PERMISSION
-  ) {
-    return GLOBAL_ADMIN_PERMISSION;
+  const modulePermission = modules?.[permissionModule];
+
+  if (typeof modulePermission === "number") {
+    return modulePermission;
   }
 
   return undefined;
@@ -115,6 +117,7 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     FORWARDED_AUTH_PERMISSION_HEADER,
     FORWARDED_AUTH_TYPE_HEADER,
     FORWARDED_AUTH_MODULES_HEADER,
+    FORWARDED_AUTH_SESSION_VERSION_HEADER,
   ]);
 
   Object.entries(request.headers).forEach(([key, value]) => {
@@ -145,10 +148,11 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     headers.set(FORWARDED_AUTH_USER_ID_HEADER, request.auth.userId);
     headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
 
-    const modules = request.auth.claims.modules as Record<string, number | null> | undefined;
+    const modules = request.auth.claims.modules as Record<string, number> | undefined;
     const forwardedPermission = resolveForwardedPermission(
       request.auth.claims.permission,
       modules,
+      request.auth.claims.modulePermissionsPresent,
       request.auth.claims.type,
       options.permissionModule,
     );
@@ -164,6 +168,13 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
 
     if (modules) {
       headers.set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify(modules));
+    }
+
+    if (typeof request.auth.claims.session_version === "number") {
+      headers.set(
+        FORWARDED_AUTH_SESSION_VERSION_HEADER,
+        String(request.auth.claims.session_version),
+      );
     }
   }
 

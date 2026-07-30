@@ -15,7 +15,7 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const locationId = "30000000-0000-4000-8000-000000000001";
 const TI_REQUESTER_PERMISSION = 1;
-const TI_ADMIN_PERMISSION = 2;
+const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -27,10 +27,23 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti inventory location routes", () => {
-  it("GET /ti/inventory-locations/list lists locations", async () => {
+  it("GET /ti/inventory-locations/list requires admin permission", async () => {
     const response = await request(createTestApp())
       .get("/ti/inventory-locations/list")
       .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /ti/inventory-locations/list lists locations with admin permission", async () => {
+    const response = await request(createTestApp())
+      .get("/ti/inventory-locations/list")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ success: true, data: [] });

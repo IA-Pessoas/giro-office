@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   parseWithZod,
   requireAuthenticatedRequestContext,
   ServiceError,
@@ -11,6 +12,7 @@ import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { integracaoTaskCreateBodySchema } from "../schemas/integracaoTaskCreate.schema.js";
 import { integracaoTaskUpdateBodySchema } from "../schemas/integracaoTaskUpdate.schema.js";
+import { taskListQuerySchema } from "../schemas/taskList.schemas.js";
 import { TaskCrudService } from "../services/taskCrudService.js";
 
 const router: ReturnType<typeof Router> = Router();
@@ -28,8 +30,18 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
       project_id: body.project_id,
       client_id: body.client_id,
       prospecting_status: body.prospecting_status,
+      name: body.name,
+      status: body.status,
+      department_id: body.department_id,
       observations: body.observations,
+      billing: body.billing,
       urgency: body.urgency,
+      responsible_id: body.responsible_id,
+      responsible2_id: body.responsible2_id,
+      responsible3_id: body.responsible3_id,
+      prevision_date: body.prevision_date,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.status(201).json(createSuccessResponse(result));
@@ -41,25 +53,15 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
 
 router.get("/list", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { organization_id } = requireAuthenticatedRequestContext(req);
-    const status = String(req.query.status ?? "Todos");
-    const ref = String(req.query.ref ?? "");
-    const ref_id = String(req.query.ref_id ?? "");
-    const search = String(req.query.search ?? "");
-    const page = Math.max(1, Number.parseInt(String(req.query.page ?? "1"), 10) || 1);
-    const limit = Math.max(
-      1,
-      Math.min(100, Number.parseInt(String(req.query.limit ?? "20"), 10) || 20),
-    );
+    const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+    const query = parseWithZod(taskListQuerySchema, req.query);
 
     const result = await taskCrudService.listTasks({
       organization_id,
-      status,
-      ref,
-      ref_id,
-      search,
-      page,
-      limit,
+      user_id,
+      ...query,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.json(createSuccessResponse(result));
@@ -80,6 +82,8 @@ router.put("/", isAuthenticated, async (req: Request, res: Response, next: NextF
       organization_id,
       task_id,
       ...patch,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.json(createSuccessResponse(result));
@@ -92,13 +96,17 @@ router.put("/", isAuthenticated, async (req: Request, res: Response, next: NextF
 router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const task_id = (req.body.task_id ?? req.query.task_id) as string;
-    const { organization_id } = requireAuthenticatedRequestContext(req);
+    const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
 
     if (!task_id) {
       throw new ServiceError(400, "task_id Ã© obrigatÃ³rio (body ou query).");
     }
 
-    const result = await taskCrudService.detailTask(task_id, organization_id);
+    const result = await taskCrudService.detailTask(task_id, organization_id, {
+      user_id,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
+    });
     res.json(createSuccessResponse(result));
   } catch (err) {
     logError("Erro ao detalhar tarefa", { err });
@@ -119,6 +127,8 @@ router.delete("/", isAuthenticated, async (req: Request, res: Response, next: Ne
       task_id,
       user_id,
       organization_id,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.json(createSuccessResponse(result));

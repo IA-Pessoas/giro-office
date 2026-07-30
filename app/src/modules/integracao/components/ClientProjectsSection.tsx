@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { useMe } from "@shared/hooks";
+import { useModuleAccess } from "@modules/auth";
 
 import {
   useDeleteProjectMutation,
@@ -27,7 +27,7 @@ export function ClientProjectsSection({
   description = "Projetos vinculados a este cliente.",
   showCreateButton = true,
 }: ClientProjectsSectionProps) {
-  const meQuery = useMe();
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const projectsQuery = useProjectsList({ ref: "client", id: clientId });
   const deleteProjectMutation = useDeleteProjectMutation();
   const recalculateProgressMutation = useRecalculateProjectProgressMutation();
@@ -55,7 +55,7 @@ export function ClientProjectsSection({
           : null;
 
       if (statusCode === 403) {
-        toast.error("Somente usuários com permissão 2 podem excluir projetos.");
+      toast.error("Somente usuários com permissão administrativa na Integração podem excluir projetos.");
         return;
       }
 
@@ -100,7 +100,7 @@ export function ClientProjectsSection({
           <p className="text-sm text-slate-600 dark:text-slate-400">{description}</p>
         </div>
 
-        {showCreateButton ? (
+        {showCreateButton && integracaoAccess.canEdit ? (
           <button
             type="button"
             onClick={() => setIsCreateModalOpen(true)}
@@ -121,7 +121,8 @@ export function ClientProjectsSection({
         onEdit={(project) => setEditingProjectId(project.id)}
         onDelete={handleDelete}
         onRecalculateProgress={handleRecalculate}
-        canDelete={meQuery.data?.permission === 2}
+        canEdit={integracaoAccess.canEdit}
+        canDelete={integracaoAccess.isAdmin}
         actionsDisabled={deleteProjectMutation.isPending || recalculateProgressMutation.isPending}
       />
     </div>

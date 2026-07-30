@@ -21,7 +21,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `DEPARTMENT_SERVICE_URL`
 - `TASK_SERVICE_URL`
 - `PROJECT_SERVICE_URL`
-- `CLIENT_SERVICE_URL`
+- `CLIENT_SERVICE_URL`, `CLIENT_SERVICE_INTERNAL_TOKEN` (token compartilhado no contexto gateway -> client-service; em desenvolvimento, usa `AUDIT_SERVICE_TOKEN` quando omitido)
 - `FISCAL_SERVICE_URL`
 - `CONTABIL_SERVICE_URL`
 - `REGULARIZE_SERVICE_URL`
@@ -60,6 +60,7 @@ Para servicos que validam contexto autenticado encaminhado internamente, o gatew
 
 - `/ti` usa `TI_SERVICE_INTERNAL_TOKEN`.
 - `/certificate` usa `CERTIFICATE_SERVICE_INTERNAL_TOKEN`.
+- `/client` usa `CLIENT_SERVICE_INTERNAL_TOKEN` para autenticação do contexto encaminhado.
 
 Quando `AUDIT_ENABLED=true`, o gateway tambem proxya `/audit` para `AUDIT_SERVICE_URL` e injeta o header interno com `AUDIT_SERVICE_TOKEN`.
 

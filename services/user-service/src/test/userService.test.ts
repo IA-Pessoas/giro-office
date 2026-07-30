@@ -147,7 +147,7 @@ describe("UserService", () => {
       permission: 1,
       organization_id: "org-1",
       type: "admin",
-      modules: { fiscal: 1 },
+      modules: { atendimento: 2, fiscal: 1, pec: 2, wiki: 1 },
     });
 
     expect(prismaMock.department.findFirst).toHaveBeenCalledWith({
@@ -155,8 +155,123 @@ describe("UserService", () => {
       select: { id: true, name: true },
     });
     expect(permissionServiceMock.create).toHaveBeenCalledWith("user-1", "org-1");
-    expect(permissionServiceMock.update).toHaveBeenCalledWith("user-1", { fiscal: 1 }, "org-1");
+    expect(permissionServiceMock.update).toHaveBeenCalledWith(
+      "user-1",
+      { fiscal: 1, rh: 1, ti: 1 },
+      "org-1",
+    );
     expect(result).toMatchObject({ id: "user-1", permission_id: "permission-1" });
+  });
+
+  it("create concede RH e TI self-service para usuario elegivel", async () => {
+    bcryptMock.hash.mockResolvedValue("hashed");
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-fiscal", name: "Fiscal" });
+    prismaMock.user.create.mockResolvedValue({
+      id: "user-self-service",
+      name: "Usuario",
+      login: "usuario",
+      permission: 1,
+      status: "active",
+      department_id: "dep-fiscal",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+      permission_id: null,
+    });
+    permissionServiceMock.create.mockResolvedValue({ id: "permission-1" });
+    prismaMock.user.update.mockResolvedValue({});
+    const service = new UserService();
+
+    await service.create({
+      name: "Usuario",
+      login: "usuario",
+      password: "secret",
+      department_id: "dep-fiscal",
+      permission: 1,
+      organization_id: "org-1",
+      type: "user",
+    });
+
+    expect(permissionServiceMock.update).toHaveBeenCalledWith(
+      "user-self-service",
+      { rh: 1, ti: 1 },
+      "org-1",
+    );
+  });
+
+  it("create preserva RH e TI gestao explicitos para usuario elegivel", async () => {
+    bcryptMock.hash.mockResolvedValue("hashed");
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-fiscal", name: "Fiscal" });
+    prismaMock.user.create.mockResolvedValue({
+      id: "user-management",
+      name: "Gestor",
+      login: "gestor",
+      permission: 1,
+      status: "active",
+      department_id: "dep-fiscal",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+      permission_id: null,
+    });
+    permissionServiceMock.create.mockResolvedValue({ id: "permission-1" });
+    prismaMock.user.update.mockResolvedValue({});
+    const service = new UserService();
+
+    await service.create({
+      name: "Gestor",
+      login: "gestor",
+      password: "secret",
+      department_id: "dep-fiscal",
+      permission: 1,
+      organization_id: "org-1",
+      type: "user",
+      modules: { rh: 2, ti: 2 },
+    });
+
+    expect(permissionServiceMock.update).toHaveBeenCalledWith(
+      "user-management",
+      { rh: 2, ti: 2 },
+      "org-1",
+    );
+  });
+
+  it("create nao concede RH ou TI automaticamente para visualizador", async () => {
+    bcryptMock.hash.mockResolvedValue("hashed");
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-fiscal", name: "Fiscal" });
+    prismaMock.user.create.mockResolvedValue({
+      id: "viewer-1",
+      name: "Viewer",
+      login: "viewer",
+      permission: 0,
+      status: "active",
+      department_id: "dep-fiscal",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+      permission_id: null,
+    });
+    permissionServiceMock.create.mockResolvedValue({ id: "permission-1" });
+    prismaMock.user.update.mockResolvedValue({});
+    const service = new UserService();
+
+    await service.create({
+      name: "Viewer",
+      login: "viewer",
+      password: "secret",
+      department_id: "dep-fiscal",
+      permission: 0,
+      organization_id: "org-1",
+      type: "user",
+    });
+
+    expect(permissionServiceMock.update).not.toHaveBeenCalled();
   });
 
   it("create normaliza admin departamental para permissao modular do departamento", async () => {
@@ -201,7 +316,7 @@ describe("UserService", () => {
     );
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
       "user-admin-contabil",
-      { financeiro: 1, contabil: 2 },
+      { financeiro: 1, contabil: 3, rh: 1, ti: 1 },
       "org-1",
     );
   });
@@ -240,7 +355,7 @@ describe("UserService", () => {
 
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
       "owner-1",
-      expect.objectContaining({ ti: 2 }),
+      expect.objectContaining({ ti: 3, rh: 3, certificado: 3 }),
       "org-1",
     );
   });
@@ -287,7 +402,7 @@ describe("UserService", () => {
     expect(prismaMock.user.update).toHaveBeenCalled();
   });
 
-  it("update ao rebaixar para usuario limpa permissoes modulares antigas", async () => {
+  it("update ao rebaixar para usuario limpa permissoes modulares antigas e mantem RH self-service", async () => {
     prismaMock.user.findFirst.mockResolvedValue({
       id: "user-1",
       permission_id: "permission-1",
@@ -315,9 +430,37 @@ describe("UserService", () => {
     expect(permissionServiceMock.update).toHaveBeenCalledWith(
       "user-1",
       expect.objectContaining({
-        rh: null,
-        ti: null,
-        contabil: null,
+        rh: 1,
+        ti: 1,
+        contabil: 0,
+      }),
+      "org-1",
+    );
+  });
+
+  it("update concede RH e TI self-service para usuario elegivel sem modules explicito", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-viewer",
+      permission_id: "permission-1",
+      department_id: "dep-fiscal",
+      permission: 0,
+      type: "user",
+    });
+    prismaMock.user.update.mockResolvedValue({
+      id: "user-viewer",
+      name: "Viewer promovido",
+      permission: 1,
+      type: "user",
+    });
+    const service = new UserService();
+
+    await service.update("user-viewer", { permission: 1 }, "org-1");
+
+    expect(permissionServiceMock.update).toHaveBeenCalledWith(
+      "user-viewer",
+      expect.objectContaining({
+        rh: 1,
+        ti: 1,
       }),
       "org-1",
     );

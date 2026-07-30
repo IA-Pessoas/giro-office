@@ -60,6 +60,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.rhServiceUrl,
       auditTarget: "rh-service",
       routePrefixes: [...RH_SERVICE_PREFIXES],
+      permissionModule: "rh",
     },
     {
       key: "user-service",
@@ -90,6 +91,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.clientServiceUrl,
       auditTarget: "client-service",
       routePrefixes: [...CLIENT_SERVICE_PREFIXES],
+      internalServiceToken: env.clientServiceInternalToken,
     },
     {
       key: "regularize-service",
@@ -102,12 +104,16 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.fiscalServiceUrl,
       auditTarget: "fiscal-service",
       routePrefixes: [...FISCAL_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
+      permissionModule: "fiscal",
     },
     {
       key: "contabil-service",
       targetUrl: env.contabilServiceUrl,
       auditTarget: "contabil-service",
       routePrefixes: [...CONTABIL_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
+      permissionModule: "contabil",
     },
     {
       key: "ti-service",

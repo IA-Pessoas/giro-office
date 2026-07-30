@@ -25,12 +25,12 @@ export const regularizeTestEnv: RegularizeServiceEnv = {
   allowedOrigins: ["*"],
 };
 
-export function gatewayHeaders() {
+export function gatewayHeaders(options: { permission?: number } = {}) {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: regularizeTestEnv.auditServiceToken,
     [FORWARDED_AUTH_USER_ID_HEADER]: "user-1",
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "a0000000-0000-4000-8000-000000000001",
-    [FORWARDED_AUTH_PERMISSION_HEADER]: "10",
+    [FORWARDED_AUTH_PERMISSION_HEADER]: String(options.permission ?? 10),
   };
 }
 

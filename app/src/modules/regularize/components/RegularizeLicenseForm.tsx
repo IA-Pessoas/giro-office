@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizeLicensePayload,
@@ -18,7 +19,6 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
-  type RegularizeFormOption,
   getRegularizePresetOptions,
   regularizeLicenseStatusOptions,
   regularizeTextareaClassName,
@@ -109,7 +109,6 @@ function buildLicensePayload(formState: RegularizeLicenseFormState): CreateRegul
 }
 
 export function RegularizeLicenseForm({
-  clientOptions,
   defaultClientId,
   isLoadingInitialValue = false,
   isSubmitting,
@@ -119,7 +118,6 @@ export function RegularizeLicenseForm({
   onSubmit,
   open,
 }: {
-  clientOptions: RegularizeFormOption[];
   defaultClientId: string;
   isLoadingInitialValue?: boolean;
   isSubmitting: boolean;
@@ -220,18 +218,7 @@ export function RegularizeLicenseForm({
 
           <div className="grid gap-4 md:grid-cols-3">
             <RegularizeFormField label="Cliente" className="md:col-span-2">
-              <RegularizeNativeSelect
-                value={formState.client_id}
-                onChange={(event) => handleChange("client_id", event.target.value)}
-              >
-                <option value="">Sem cliente vinculado</option>
-                {clientOptions.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.label}
-                    {client.description ? `, ${client.description}` : ""}
-                  </option>
-                ))}
-              </RegularizeNativeSelect>
+              <ClientSelectionField clientId={formState.client_id} />
             </RegularizeFormField>
 
             <RegularizeFormField label="Possui ?">

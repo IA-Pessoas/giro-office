@@ -21,7 +21,12 @@ export interface MeApiResponse {
   user?: MeSessionUser;
 }
 
-export interface UpdateCurrentUserPayload {
-  name: string;
-  password?: string;
-}
+export type UpdateCurrentUserPayload =
+  | {
+      password: string;
+      name?: never;
+    }
+  | {
+      name: string;
+      password?: string;
+    };

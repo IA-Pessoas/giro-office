@@ -3,7 +3,13 @@ import { error as logError, ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreatePayrollBody, UpdatePayrollBody } from "../schemas/payroll.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
-import { omitUndefined, type PessoalAuthContext, requireUserId } from "./pessoalServiceTypes.js";
+import {
+  omitUndefined,
+  PESSOAL_WRITE_PERMISSION,
+  type PessoalAuthContext,
+  requireMinimumPermission,
+  requireUserId,
+} from "./pessoalServiceTypes.js";
 
 const payrollSelect = {
   id: true,
@@ -63,6 +69,7 @@ export class PayrollService {
 
   async create(context: PessoalAuthContext, body: CreatePayrollBody): Promise<PayrollRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       await this.ensureRelationships(context.organizationId, body);
 
@@ -112,17 +119,11 @@ export class PayrollService {
   async detail(
     context: Pick<PessoalAuthContext, "organizationId">,
     clientId: string,
-  ): Promise<PayrollRecord> {
-    const detail = await this.prisma.payroll.findFirst({
+  ): Promise<PayrollRecord | null> {
+    return this.prisma.payroll.findFirst({
       where: { client_id: clientId, organization_id: context.organizationId },
       select: payrollSelect,
     });
-
-    if (!detail) {
-      throw new ServiceError(404, "Folha de pessoal nao encontrada.");
-    }
-
-    return detail;
   }
 
   async update(
@@ -131,6 +132,7 @@ export class PayrollService {
     body: UpdatePayrollBody,
   ): Promise<PayrollRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const existing = await this.prisma.payroll.findFirst({
         where: { client_id: clientId, organization_id: context.organizationId },

@@ -16,15 +16,16 @@ import type {
   RegularizeClientPfDetail,
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
+  RegularizeDashboard,
   RegularizeGuidance,
   RegularizeGuidanceListFilters,
   RegularizeId,
   RegularizeLicenseDetail,
   RegularizeLicenseListFilters,
   RegularizeLicenseListItem,
-  RegularizeMunicipalTaxesClientSummary,
   RegularizeMunicipalTaxesDetail,
   RegularizeMunicipalTaxesListFilters,
+  RegularizeMunicipalTaxesPage,
   RegularizePartner,
   RegularizePartnerListFilters,
   RegularizePasswordDetail,
@@ -45,8 +46,10 @@ import type {
   UpdateRegularizeProcessPayload,
   UpdateRegularizeSitePasswordPayload,
 } from "../types";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 import {
   buildRegularizeClientPfListParams,
+  buildRegularizeDashboardParams,
   buildRegularizeGuidanceListParams,
   buildRegularizeIdParams,
   buildRegularizeLicenseListParams,
@@ -58,6 +61,7 @@ import {
   REGULARIZE_ENDPOINTS,
   unwrapRegularizeEntity,
   unwrapRegularizeEnvelope,
+  unwrapRegularizePage,
 } from "./regularizeService.contract";
 
 type RegularizeSitePasswordApiListItem = RegularizeSitePasswordListItem & {
@@ -73,6 +77,15 @@ function stripSitePasswordSecret(
 }
 
 export const regularizeService = {
+  async getDashboard(year: number): Promise<RegularizeDashboard> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.dashboard, {
+      params: buildRegularizeDashboardParams(year),
+    });
+
+    return unwrapRegularizeEnvelope<RegularizeDashboard>(response.data);
+  },
+
   async listPasswords(
     filters: RegularizePasswordListFilters,
   ): Promise<RegularizePasswordListItem[]> {
@@ -124,6 +137,21 @@ export const regularizeService = {
     return rows.map(stripSitePasswordSecret);
   },
 
+  async listSitePasswordsPage(
+    filters: RegularizeSitePasswordListFilters & { page: number; limit: number },
+  ): Promise<PaginatedResult<RegularizeSitePasswordListItem>> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.sitesPass, {
+      params: buildRegularizeSitePasswordListParams(filters),
+    });
+    const page = unwrapRegularizePage<RegularizeSitePasswordApiListItem>(
+      response.data,
+      filters,
+    );
+
+    return { ...page, data: page.data.map(stripSitePasswordSecret) };
+  },
+
   async getSitePassword(id: RegularizeId): Promise<RegularizeSitePasswordDetail> {
     const api = setupAPIClient();
     const response = await api.get(REGULARIZE_ENDPOINTS.sitesPassDetail, {
@@ -151,15 +179,15 @@ export const regularizeService = {
     return unwrapRegularizeEnvelope<RegularizeSitePasswordDetail>(response.data);
   },
 
-  async listClientPfs(
-    filters: RegularizeClientPfListFilters,
-  ): Promise<RegularizeClientPfListItem[]> {
+  async listClientPfsPage(
+    filters: RegularizeClientPfListFilters & { page: number; limit: number },
+  ): Promise<PaginatedResult<RegularizeClientPfListItem>> {
     const api = setupAPIClient();
     const response = await api.get(REGULARIZE_ENDPOINTS.pfs, {
       params: buildRegularizeClientPfListParams(filters),
     });
 
-    return unwrapRegularizeEnvelope<RegularizeClientPfListItem[]>(response.data) ?? [];
+    return unwrapRegularizePage<RegularizeClientPfListItem>(response.data, filters);
   },
 
   async getClientPf(id: RegularizeId): Promise<RegularizeClientPfDetail> {
@@ -223,13 +251,13 @@ export const regularizeService = {
 
   async listMunicipalTaxes(
     filters: RegularizeMunicipalTaxesListFilters,
-  ): Promise<RegularizeMunicipalTaxesClientSummary[]> {
+  ): Promise<RegularizeMunicipalTaxesPage> {
     const api = setupAPIClient();
     const response = await api.get(REGULARIZE_ENDPOINTS.municipalTaxes, {
       params: buildRegularizeMunicipalTaxesListParams(filters),
     });
 
-    return unwrapRegularizeEnvelope<RegularizeMunicipalTaxesClientSummary[]>(response.data) ?? [];
+    return unwrapRegularizeEnvelope<RegularizeMunicipalTaxesPage>(response.data);
   },
 
   async getMunicipalTax(id: RegularizeId): Promise<RegularizeMunicipalTaxesDetail> {
@@ -268,6 +296,17 @@ export const regularizeService = {
     });
 
     return unwrapRegularizeEnvelope<RegularizeProcessListItem[]>(response.data) ?? [];
+  },
+
+  async listProcessesPage(
+    filters: RegularizeProcessListFilters & { page: number; limit: number },
+  ): Promise<PaginatedResult<RegularizeProcessListItem>> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.processes, {
+      params: buildRegularizeProcessListParams(filters),
+    });
+
+    return unwrapRegularizePage<RegularizeProcessListItem>(response.data, filters);
   },
 
   async getProcess(id: RegularizeId): Promise<RegularizeProcessDetail> {

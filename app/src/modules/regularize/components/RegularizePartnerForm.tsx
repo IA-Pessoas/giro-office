@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizePartnerPayload,
@@ -16,10 +17,10 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
-  type RegularizeFormOption,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
+import { RegularizeClientPfSelect } from "./RegularizeClientPfSelect";
 
 type RegularizePartnerFormState = {
   pj_id: string;
@@ -60,17 +61,16 @@ function buildPartnerFormState(
 }
 
 export function RegularizePartnerForm({
-  clientOptions,
   defaultPfId,
+  defaultPjId,
   isSubmitting,
   onClose,
   onSubmit,
   open,
   partner,
-  pfOptions,
 }: {
-  clientOptions: RegularizeFormOption[];
   defaultPfId: string;
+  defaultPjId: string;
   isSubmitting: boolean;
   onClose: () => void;
   onSubmit: (
@@ -78,9 +78,7 @@ export function RegularizePartnerForm({
   ) => Promise<void>;
   open: boolean;
   partner: RegularizePartner | null;
-  pfOptions: RegularizeFormOption[];
 }) {
-  const defaultPjId = clientOptions[0]?.id ?? "";
   const [formState, setFormState] = useState<RegularizePartnerFormState>(
     buildPartnerFormState(partner, defaultPfId, defaultPjId),
   );
@@ -162,34 +160,19 @@ export function RegularizePartnerForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <RegularizeFormField label="Cliente PJ" required>
-            <RegularizeNativeSelect
-              value={formState.pj_id}
-              onChange={(event) => handleChange("pj_id", event.target.value)}
-            >
-              <option value="">Selecione</option>
-              {clientOptions.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.label}
-                  {client.description ? `, ${client.description}` : ""}
-                </option>
-              ))}
-            </RegularizeNativeSelect>
+            <ClientSelectionField clientId={formState.pj_id} />
           </RegularizeFormField>
 
-          <RegularizeFormField label="Cliente PF" required>
-            <RegularizeNativeSelect
+          <fieldset className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <legend className="inline-flex items-center gap-1">
+              <span>Cliente PF</span>
+              <span className="text-red-500">*</span>
+            </legend>
+            <RegularizeClientPfSelect
               value={formState.pf_id}
-              onChange={(event) => handleChange("pf_id", event.target.value)}
-            >
-              <option value="">Selecione</option>
-              {pfOptions.map((clientPf) => (
-                <option key={clientPf.id} value={clientPf.id}>
-                  {clientPf.label}
-                  {clientPf.description ? `, ${clientPf.description}` : ""}
-                </option>
-              ))}
-            </RegularizeNativeSelect>
-          </RegularizeFormField>
+              onChange={(id) => handleChange("pf_id", id)}
+            />
+          </fieldset>
 
           <RegularizeFormField label="Participação" required>
             <input

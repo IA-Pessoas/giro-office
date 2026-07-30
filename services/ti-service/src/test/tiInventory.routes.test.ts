@@ -9,15 +9,15 @@ import {
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { createTestApp } from "./tiServiceTestUtils.js";
+import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const categoryId = "20000000-0000-4000-8000-000000000001";
 const locationId = "30000000-0000-4000-8000-000000000001";
 const assetId = "40000000-0000-4000-8000-000000000001";
-const TI_REQUESTER_PERMISSION = 1;
-const TI_ADMIN_PERMISSION = 2;
+const TI_VIEWER_PERMISSION = 1;
+const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -29,6 +29,67 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti inventory routes", () => {
+  it.each([
+    "/ti/inventory/list",
+    `/ti/inventory/${assetId}`,
+  ])("GET %s rejects viewer permission", async (path) => {
+    const response = await request(createTestApp())
+      .get(path)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /ti/inventory/list lists assets with admin permission", async () => {
+    const response = await request(createTestApp())
+      .get("/ti/inventory/list")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: [],
+    });
+  });
+
+  it("GET /ti/inventory/list accepts available status for term selectors", async () => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .get("/ti/inventory/list")
+      .query({ status: "available", page_size: "100" })
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: [],
+    });
+    expect(prisma.inventoryTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          user_id: null,
+        }),
+        take: 100,
+      }),
+    );
+  });
+
+  it("GET /ti/inventory/list rejects unknown availability status", async () => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
+      .get("/ti/inventory/list")
+      .query({ status: "retired" })
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(response.status).toBe(400);
+    expect(prisma.inventoryTecnologia.findMany).not.toHaveBeenCalled();
+  });
+
   it("POST /ti/inventory creates an asset", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory")
@@ -55,7 +116,7 @@ describe("ti inventory routes", () => {
   it("POST /ti/inventory requires admin permission", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
       .send({
         asset_code: "NB-001",
         category_id: categoryId,

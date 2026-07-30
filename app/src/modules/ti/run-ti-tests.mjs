@@ -1,16 +1,18 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const moduleUrl = new URL("./", import.meta.url);
-const moduleRoot =
-  moduleUrl.pathname.startsWith("/") && /^[A-Za-z]:/.test(moduleUrl.pathname.slice(1))
-    ? moduleUrl.pathname.slice(1)
-    : moduleUrl.pathname;
+const moduleRoot = fileURLToPath(new URL("./", import.meta.url));
 const appRoot = join(moduleRoot, "../../..");
 const moduleRootRelative = "src/modules/ti";
+const testPattern = process.env.TI_TEST_PATTERN;
 
 async function runTest(name, fn) {
+  if (testPattern && !name.includes(testPattern)) {
+    return;
+  }
+
   try {
     await fn();
     console.log(`PASS ${name}`);
@@ -20,12 +22,135 @@ async function runTest(name, fn) {
   }
 }
 
+await runTest("ti request message attachments accept supported images without trusting arbitrary URL hosts", async () => {
+  const {
+    MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES,
+    validateTiRequestMessageImage,
+  } = await import("./utils/requestMessageAttachment.ts");
+
+  assert.equal(MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES, 5 * 1024 * 1024);
+  assert.equal(
+    validateTiRequestMessageImage({
+      type: "image/png",
+      size: MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES,
+    }),
+    null,
+  );
+  assert.equal(
+    validateTiRequestMessageImage({ type: "image/gif", size: 10 }),
+    "Selecione uma imagem PNG, JPEG ou WebP.",
+  );
+  assert.equal(
+    validateTiRequestMessageImage({
+      type: "image/webp",
+      size: MAX_TI_REQUEST_MESSAGE_IMAGE_BYTES + 1,
+    }),
+    "A imagem deve ter no máximo 5 MB.",
+  );
+});
+
+await runTest("ti request messages use multipart only when an image is attached", async () => {
+  const { buildTiRequestMessageSubmission } = await import(
+    "./utils/requestMessageAttachment.ts"
+  );
+  const attachment = new File(["test image"], "evidence.png", { type: "image/png" });
+
+  const multipartSubmission = buildTiRequestMessageSubmission({
+    message: "Segue a evidência.",
+    attachment,
+  });
+
+  assert.equal(multipartSubmission instanceof FormData, true);
+  assert.equal(multipartSubmission.get("message"), "Segue a evidência.");
+  assert.equal(multipartSubmission.get("file"), attachment);
+
+  assert.deepEqual(buildTiRequestMessageSubmission({ message: "Mensagem sem anexo." }), {
+    message: "Mensagem sem anexo.",
+  });
+});
+
+await runTest("ti request message uploads prefer domain errors and hide technical Axios messages", async () => {
+  const { getTiRequestMessageActionError } = await import(
+    "./utils/requestMessageAttachment.ts"
+  );
+
+  assert.equal(
+    getTiRequestMessageActionError({
+      message: "Request failed with status code 413",
+      response: { data: { error: "A imagem excede o limite permitido." } },
+    }),
+    "A imagem excede o limite permitido.",
+  );
+  assert.equal(
+    getTiRequestMessageActionError(new Error("Request failed with status code 500")),
+    "Não foi possível enviar a mensagem. Tente novamente.",
+  );
+});
+
+await runTest("ti request attachment UI retains the accessible upload flow and clears context-bound drafts", async () => {
+  const requestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(requestsTabSource, /type="file"/);
+  assert.match(requestsTabSource, /accept="image\/png,image\/jpeg,image\/webp"/);
+  assert.match(requestsTabSource, /focus-within:ring-2/);
+  assert.match(requestsTabSource, /onChange=\{handleMessageAttachmentChange\}/);
+  assert.match(requestsTabSource, /URL\.createObjectURL\(messageAttachment\)/);
+  assert.match(requestsTabSource, /URL\.revokeObjectURL\(previewUrl\)/);
+  assert.match(requestsTabSource, /alt=\{`Prévia de \$\{messageAttachment\.name\}`\}/);
+  assert.match(requestsTabSource, /onClick=\{handleRemoveMessageAttachment\}/);
+  assert.match(requestsTabSource, /disabled=\{createMessageMutation\.isPending\}/);
+  assert.doesNotMatch(requestsTabSource, /getTiRequestMessageAttachmentUrl\(/);
+  assert.match(requestsTabSource, /target="_blank"/);
+  assert.match(requestsTabSource, /rel="noreferrer"/);
+  assert.match(requestsTabSource, /toast\.error\(validationError\)/);
+  assert.match(requestsTabSource, /toast\.error\(feedback\)/);
+  assert.match(
+    requestsTabSource,
+    /function resetMessageComposer\(\) \{[\s\S]*setMessageDraft\(""\);[\s\S]*setMessageAttachment\(null\);[\s\S]*setActionError\(null\);[\s\S]*\}/,
+  );
+  assert.match(requestsTabSource, /if \(!nextOpen\) \{[\s\S]*resetMessageComposer\(\);/);
+  assert.match(
+    requestsTabSource,
+    /onClick=\{\(\) => \{[\s\S]*resetMessageComposer\(\);[\s\S]*setSelectedRequestId\(request\.id\);/,
+  );
+});
+
+await runTest("ti request transfer UI uses request-scoped candidates and preserves authorized actors", async () => {
+  const tiRequestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const tiRequestsServiceSource = await readModuleSource("services/tiRequestsService.ts");
+
+  assert.match(tiRequestsTabSource, /Transferir responsabilidade/);
+  assert.match(tiRequestsTabSource, /useTiRequestTransferCandidates/);
+  assert.doesNotMatch(tiRequestsTabSource, /listAdminUsers/);
+  assert.doesNotMatch(tiRequestsTabSource, /departmentService/);
+  assert.match(tiRequestsTabSource, /Tecnologia/);
+  assert.match(tiRequestsTabSource, /assigned_to_id/);
+  assert.match(tiRequestsTabSource, /assignRequestMutation\.mutateAsync/);
+  assert.match(
+    tiRequestsTabSource,
+    /function canTransferRequest\(request: TiRequest\)[\s\S]*access\.isAdmin[\s\S]*currentUser\?\.type === "owner"[\s\S]*assigned_to_id/,
+  );
+  assert.match(tiRequestsTabSource, /<TiNativeSelect[\s\S]*label="Novo responsável"/);
+  assert.doesNotMatch(tiRequestsTabSource, /type="text"[^>]*name="assigned_to_id"/);
+  assert.match(tiRequestsServiceSource, /listTransferCandidates\(id: TiId\)/);
+  assert.match(tiRequestsServiceSource, /TI_ENDPOINTS\.requests\.transferCandidates/);
+  assert.doesNotMatch(tiRequestsTabSource, /resolveDepartmentModuleKey\(departmentName\)/);
+  assert.match(
+    tiRequestsTabSource,
+    /await assignRequestMutation\.mutateAsync\([\s\S]*setIsTransferDialogOpen\(false\);[\s\S]*setSelectedAssigneeId\(""\);[\s\S]*setActionError\(null\);/,
+  );
+});
+
 async function readModuleSource(relativePath) {
   return readFile(join(moduleRoot, relativePath), "utf8");
 }
 
 async function readAppSource(relativePath) {
   return readFile(join(appRoot, relativePath), "utf8");
+}
+
+async function readWorkspaceSource(relativePath) {
+  return readFile(join(appRoot, "..", relativePath), "utf8");
 }
 
 async function collectSourceFiles(directory) {
@@ -47,6 +172,149 @@ async function collectSourceFiles(directory) {
 
   return files;
 }
+
+await runTest("issue 509 ti robot form utilities preserve validation and payload semantics", async () => {
+  const {
+    buildCreateRobotPayload,
+    buildUpdateRobotPayload,
+    getFirstInvalidRobotField,
+    getRobotMutationErrorMessage,
+    validateRobotDraft,
+  } = await import("./utils/robotForm.ts");
+
+  const emptyDraft = {
+    name: "   ",
+    description: "   ",
+    type: "",
+    status: "active",
+    active: true,
+    schedule: "   ",
+  };
+
+  assert.deepEqual(validateRobotDraft(emptyDraft), {
+    name: "Informe o nome do robô.",
+    type: "Selecione o tipo do robô.",
+  });
+  assert.deepEqual(
+    validateRobotDraft({ ...emptyDraft, name: "Backup diário" }),
+    { type: "Selecione o tipo do robô." },
+  );
+  assert.equal(
+    getFirstInvalidRobotField(validateRobotDraft(emptyDraft)),
+    "name",
+  );
+  assert.equal(
+    getFirstInvalidRobotField(
+      validateRobotDraft({ ...emptyDraft, name: "Backup diário" }),
+    ),
+    "type",
+  );
+
+  const validDraft = {
+    ...emptyDraft,
+    name: "  Backup diário  ",
+    type: "Backup",
+  };
+  assert.deepEqual(validateRobotDraft(validDraft), {});
+  assert.deepEqual(buildCreateRobotPayload(validDraft), {
+    name: "Backup diário",
+    type: "Backup",
+    status: "active",
+    active: true,
+  });
+  assert.deepEqual(buildUpdateRobotPayload(validDraft), {
+    name: "Backup diário",
+    description: null,
+    type: "Backup",
+    status: "active",
+    active: true,
+    schedule: null,
+  });
+
+  const filledDraft = {
+    ...validDraft,
+    description: "  Arquivos internos  ",
+    schedule: "  diariamente às 02:00  ",
+  };
+  assert.deepEqual(buildCreateRobotPayload(filledDraft), {
+    name: "Backup diário",
+    description: "Arquivos internos",
+    type: "Backup",
+    status: "active",
+    active: true,
+    schedule: "diariamente às 02:00",
+  });
+
+  const responseError = Object.assign(new Error("Request failed with status code 400"), {
+    response: {
+      data: {
+        error: "Selecione o tipo do robô.",
+        message: "Mensagem secundária.",
+      },
+    },
+  });
+  assert.equal(
+    getRobotMutationErrorMessage(responseError),
+    "Selecione o tipo do robô.",
+  );
+  assert.equal(
+    getRobotMutationErrorMessage({ response: { data: { message: "Falha legível da API." } } }),
+    "Falha legível da API.",
+  );
+  assert.equal(
+    getRobotMutationErrorMessage(new Error("Falha legível do cliente.")),
+    "Falha legível do cliente.",
+  );
+  assert.equal(
+    getRobotMutationErrorMessage({}),
+    "Não foi possível concluir a ação.",
+  );
+
+  const typeSource = await readModuleSource("types/robots.ts");
+  const payloadTypeSource =
+    typeSource.match(/export interface TiRobotPayload \{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(payloadTypeSource, /name: string/);
+  assert.match(payloadTypeSource, /type: TiRobotType \| string/);
+  assert.doesNotMatch(payloadTypeSource, /name\?: string/);
+  assert.doesNotMatch(payloadTypeSource, /type\?: TiRobotType \| string/);
+});
+
+await runTest("issue 509 ti robot dialog exposes accessible required field errors", async () => {
+  const tabSource = await readModuleSource("components/TiRobotsTab.tsx");
+
+  assert.match(tabSource, /useEffect/);
+  assert.match(tabSource, /useRef/);
+  assert.match(tabSource, /type: ""/);
+  assert.match(
+    tabSource,
+    /\{\s*value: "",\s*label: "Selecione o tipo",\s*disabled: true\s*\}/,
+  );
+  assert.match(tabSource, /validateRobotDraft\(robotDraft\)/);
+  assert.match(tabSource, /getFirstInvalidRobotField\(nextFieldErrors\)/);
+  assert.match(tabSource, /buildCreateRobotPayload\(robotDraft\)/);
+  assert.match(tabSource, /buildUpdateRobotPayload\(robotDraft\)/);
+  assert.match(tabSource, /getRobotMutationErrorMessage\(error\)/);
+  assert.match(tabSource, /robotFormRef\.current\?\.elements\.namedItem\(focusField\)/);
+  assert.match(tabSource, /control\.focus\(\)/);
+  assert.match(tabSource, /setFocusField\(null\)/);
+  assert.match(tabSource, /ref=\{robotFormRef\}/);
+  assert.match(tabSource, /noValidate/);
+  assert.match(tabSource, /id="ti-robot-name"/);
+  assert.match(tabSource, /name="name"/);
+  assert.match(tabSource, /id="ti-robot-type"/);
+  assert.match(tabSource, /name="type"/);
+  assert.match(tabSource, /htmlFor="ti-robot-type"/);
+  assert.match(tabSource, /required/);
+  assert.match(tabSource, /aria-invalid=\{Boolean\(fieldErrors\.name\)\}/);
+  assert.match(tabSource, /aria-invalid=\{Boolean\(fieldErrors\.type\)\}/);
+  assert.match(tabSource, /aria-describedby=\{fieldErrors\.name/);
+  assert.match(tabSource, /aria-describedby=\{fieldErrors\.type/);
+  assert.match(tabSource, /id="ti-robot-name-error"/);
+  assert.match(tabSource, /id="ti-robot-type-error"/);
+  assert.match(tabSource, /role="alert"/);
+  assert.match(tabSource, /clearRobotFieldError\("name"\)/);
+  assert.match(tabSource, /clearRobotFieldError\("type"\)/);
+});
 
 await runTest("ti endpoints stay centralized in the frontend contract", async () => {
   const contractSource = await readModuleSource("services/tiService.contract.ts");
@@ -210,6 +478,195 @@ await runTest("ti stock hooks expose mutations and invalidate stock plus dashboa
   assert.match(hookSource, /tiQueryKeys\.dashboard\(\)/);
 });
 
+await runTest("ti stock list preserves server pagination metadata", async () => {
+  const serviceSource = await readModuleSource("services/tiStockService.ts");
+  const hookSource = await readModuleSource("hooks/useTiStock.ts");
+
+  assert.match(serviceSource, /PaginatedResult<TiStockItem>/);
+  assert.match(serviceSource, /normalizePaginatedResult/);
+  assert.match(serviceSource, /page:\s*Number\(filters\?\.page\s*\?\?\s*1\)/);
+  assert.match(serviceSource, /limit:\s*Number\(filters\?\.page_size\s*\?\?\s*DEFAULT_PAGE_SIZE\)/);
+  assert.match(hookSource, /UseQueryResult<PaginatedResult<TiStockItem>, Error>/);
+});
+
+await runTest("ti stock location display never falls back to a raw id", async () => {
+  const { resolveTiStockLocationName } = await import("./utils/stockDisplay.ts");
+  const locations = [{ id: 24, name: "Almoxarifado TI" }];
+
+  assert.equal(
+    resolveTiStockLocationName(
+      { id: 1, location_id: 24, location: { id: 24, name: "Sala de Equipamentos" } },
+      locations,
+    ),
+    "Sala de Equipamentos",
+  );
+  assert.equal(
+    resolveTiStockLocationName({ id: 2, location_id: 24 }, locations),
+    "Almoxarifado TI",
+  );
+  assert.equal(
+    resolveTiStockLocationName({ id: 3, location_id: 99 }, locations),
+    "Local não informado",
+  );
+});
+
+await runTest("ti stock mutation error preserves the domain message returned by the API", async () => {
+  const { getTiStockMutationErrorMessage } = await import("./utils/stockMutationError.ts");
+  const axiosStyleError = {
+    isAxiosError: true,
+    message: "Request failed with status code 409",
+    response: {
+      status: 409,
+      data: {
+        success: false,
+        error: "Saldo insuficiente no estoque de TI.",
+        code: "CONFLICT",
+      },
+    },
+  };
+
+  const message = getTiStockMutationErrorMessage(
+    axiosStyleError,
+    "Não foi possível registrar a saída.",
+  );
+
+  assert.equal(message, "Saldo insuficiente no estoque de TI.");
+  assert.notEqual(message, "Request failed with status code 409");
+});
+
+await runTest("ti stock mutation error rejects a technical API error message for a 409", async () => {
+  const { getTiStockMutationErrorMessage } = await import("./utils/stockMutationError.ts");
+  const axiosStyleError = {
+    isAxiosError: true,
+    message: "Request failed with status code 409",
+    response: {
+      status: 409,
+      data: {
+        success: false,
+        error: "Request failed with status code 409",
+        code: "CONFLICT",
+      },
+    },
+  };
+
+  const message = getTiStockMutationErrorMessage(
+    axiosStyleError,
+    "Não foi possível registrar a saída.",
+  );
+
+  assert.equal(message, "Não foi possível registrar a saída: o saldo disponível é insuficiente.");
+  assert.notEqual(message, "Request failed with status code 409");
+});
+
+await runTest("ti stock mutation error uses an actionable fallback for a 409 without domain message", async () => {
+  const { getTiStockMutationErrorMessage } = await import("./utils/stockMutationError.ts");
+  const axiosStyleError = {
+    isAxiosError: true,
+    message: "Request failed with status code 409",
+    response: {
+      status: 409,
+      data: {
+        success: false,
+        error: "   ",
+        code: "CONFLICT",
+      },
+    },
+  };
+
+  const message = getTiStockMutationErrorMessage(
+    axiosStyleError,
+    "Não foi possível registrar a saída.",
+  );
+
+  assert.equal(message, "Não foi possível registrar a saída: o saldo disponível é insuficiente.");
+  assert.notEqual(message, "Request failed with status code 409");
+});
+
+await runTest("ti stock exit feedback uses the scoped mutation error normalizer", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+  const exitHandlerStart = tabSource.indexOf("async function handleSubmitExit");
+  const exitHandlerEnd = tabSource.indexOf("async function handleSubmitCategory", exitHandlerStart);
+  const exitHandlerSource = tabSource.slice(exitHandlerStart, exitHandlerEnd);
+
+  assert.match(
+    tabSource,
+    /import \{ getTiStockMutationErrorMessage \} from "\.\.\/utils\/stockMutationError"/,
+  );
+  assert.match(
+    exitHandlerSource,
+    /getTiStockMutationErrorMessage\(error, "Não foi possível registrar a saída\."\)/,
+  );
+});
+
+await runTest("ti stock category dialog filters matches and makes new category creation explicit", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+
+  assert.match(tabSource, /function normalizeStockCategoryName\(value: unknown\): string/);
+  assert.match(tabSource, /const normalizedCategorySearch = normalizeStockCategoryName\(categoryName\)/);
+  assert.match(tabSource, /const filteredStockCategories = useMemo\(/);
+  assert.match(
+    tabSource,
+    /stockCategories\.filter\(\(category\) =>\s*normalizeStockCategoryName\(category\.name\)\.includes\(normalizedCategorySearch\)/,
+  );
+  assert.match(tabSource, /const hasExactCategoryName = stockCategories\.some\(/);
+  assert.match(tabSource, /rows=\{filteredStockCategories\}/);
+  assert.match(tabSource, /Nenhuma categoria correspondente\. Você pode criar uma nova categoria\./);
+  assert.match(tabSource, /disabled=\{!canEditStock \|\| createCategoryMutation\.isPending \|\| hasExactCategoryName\}/);
+});
+
+await runTest("ti stock locations filter progressively and identify normalized active duplicates", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+  const {
+    filterTiStockLocations,
+    hasActiveTiStockLocation,
+    normalizeTiStockLocationName,
+  } = await import("./utils/stockDisplay.ts");
+  const locations = [
+    { id: 1, name: "Almoxarifado São", status: true },
+    { id: 2, name: "Sala de reuniões", status: true },
+    { id: 3, name: "Almoxarifado antigo", status: false },
+  ];
+
+  assert.equal(typeof normalizeTiStockLocationName, "function");
+  assert.equal(normalizeTiStockLocationName("  Almoxarifado   São  "), "almoxarifado sao");
+  assert.deepEqual(
+    filterTiStockLocations(locations, "almox"),
+    [locations[0], locations[2]],
+  );
+  assert.equal(hasActiveTiStockLocation(locations, "ALMOXARIFADO SAO"), true);
+  assert.equal(hasActiveTiStockLocation(locations, "Sala"), false);
+  assert.match(tabSource, /hasActiveTiStockLocation\(stockLocations, name\)/);
+  assert.match(tabSource, /rows=\{filteredStockLocations\}/);
+});
+
+await runTest("ti stock filters reset and render server pagination", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+
+  assert.match(tabSource, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
+  assert.match(tabSource, /const STOCK_PAGE_SIZE = DEFAULT_PAGE_SIZE;/);
+  assert.match(tabSource, /const \[stockPage, setStockPage\] = useState\(1\)/);
+  assert.match(tabSource, /page:\s*stockPage/);
+  assert.match(tabSource, /page_size:\s*STOCK_PAGE_SIZE/);
+  assert.match(tabSource, /setStockPage\(1\)/);
+  assert.match(tabSource, /<PaginationControls/);
+  assert.match(tabSource, /resolveTiStockLocationName/);
+  assert.doesNotMatch(
+    tabSource,
+    /getRelatedName\(item\.location,\s*item\.location_id\)/,
+  );
+});
+
+await runTest("ti stock pagination stays outside the scrollable table", async () => {
+  const tabSource = await readModuleSource("components/TiStockTab.tsx");
+  const tableIndex = tabSource.indexOf("<TiDataTable");
+  const tableCloseIndex = tabSource.indexOf("</TiDataTable>", tableIndex);
+  const paginationIndex = tabSource.indexOf("<PaginationControls", tableIndex);
+
+  assert.ok(tableIndex > 0);
+  assert.ok(tableCloseIndex > tableIndex);
+  assert.ok(paginationIndex > tableCloseIndex);
+});
+
 await runTest("ti stock tab renders operational item, movement, category and location workflows", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
 
@@ -276,7 +733,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /const selectedListItem = stockItems\.find/);
   assert.match(tabSource, /const selectedItem = selectedItemQuery\.data \?\? selectedListItem/);
   assert.match(tabSource, /headers=\{\["Item", "Categoria", "Local", "Saldo", "Status", ""\]\}/);
-  assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
+  assert.match(tabSource, /className=\{cn\(tiFiveRowTableClassName/);
   assert.match(tabSource, /xl:min-h-\[280px\]/);
   assert.match(tabSource, /Saldo atual/);
   assert.match(tabSource, /Movimentacoes/);
@@ -324,6 +781,8 @@ await runTest("ti stock passwords and extensions reuse shared card and table con
 
   assert.match(controlsSource, /Carregando informações/);
   assert.match(controlsSource, /Não conseguimos carregar as informações/);
+  assert.match(controlsSource, /type TiListQueryData<T> = T\[\] \| \{ items\?: T\[\] \}/);
+  assert.doesNotMatch(controlsSource, /UseQueryResult/);
   assert.doesNotMatch(controlsSource, /Carregando dados/);
   assert.doesNotMatch(controlsSource, /Nao foi possivel/);
 
@@ -368,6 +827,219 @@ await runTest("ti password contracts separate list data from explicit reveal det
   assert.match(hookSource, /enabled:\s*Boolean\(id\)\s*&&\s*Boolean\(canReveal\)/);
 });
 
+await runTest("ti password deactivation exposes typed lifecycle contract", async () => {
+  const typesSource = await readModuleSource("types/passwords.ts");
+  const serviceSource = await readModuleSource("services/tiPasswordsService.ts");
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+  const listInterfaceSource = typesSource.slice(
+    typesSource.indexOf("export interface TiPasswordListItem"),
+    typesSource.indexOf("export interface TiPasswordDetail"),
+  );
+  const listFiltersSource = typesSource.slice(
+    typesSource.indexOf("export type TiPasswordListFilters"),
+    typesSource.indexOf("export interface TiPasswordUser"),
+  );
+  const listServiceSource = serviceSource.slice(
+    serviceSource.indexOf("async listPasswords"),
+    serviceSource.indexOf("async createPassword"),
+  );
+  const listHookSource = hookSource.slice(
+    hookSource.indexOf("export function useTiPasswords"),
+    hookSource.indexOf("export function useTiPassword("),
+  );
+
+  assert.match(typesSource, /export type TiPasswordStatusFilter = "active" \| "inactive" \| "all"/);
+  assert.match(listFiltersSource, /status\?: TiPasswordStatusFilter/);
+  assert.match(listInterfaceSource, /active: boolean/);
+  assert.match(listInterfaceSource, /deactivated_at\?: string \| null/);
+  assert.match(listInterfaceSource, /deactivated_by_user_id\?: TiId \| null/);
+  assert.match(listInterfaceSource, /deactivation_reason\?: string \| null/);
+  assert.match(typesSource, /export interface TiPasswordDeactivatePayload/);
+  assert.match(typesSource, /reason: string/);
+  assert.match(listHookSource, /filters\?: TiPasswordListFilters/);
+  assert.match(listHookSource, /tiPasswordsService\.listPasswords\(filters\)/);
+  assert.match(listServiceSource, /filters\?: TiPasswordListFilters/);
+  assert.match(listServiceSource, /params: buildTiListParams\(filters\)/);
+});
+
+await runTest("ti password deactivation uses the centralized endpoint and safe payload", async () => {
+  const contractSource = await readModuleSource("services/tiService.contract.ts");
+  const serviceSource = await readModuleSource("services/tiPasswordsService.ts");
+  const deactivateServiceSource = serviceSource.slice(
+    serviceSource.indexOf("async deactivatePassword"),
+  );
+
+  assert.match(contractSource, /deactivate: "\/ti\/passwords\/\{id\}\/deactivate"/);
+  assert.match(deactivateServiceSource, /async deactivatePassword\(/);
+  assert.match(
+    deactivateServiceSource,
+    /api\.post<TiEnvelope<TiPasswordListItem>>\(\s*buildTiPath\(TI_ENDPOINTS\.passwords\.deactivate, id\),\s*\{ reason: payload\.reason \},/,
+  );
+  assert.doesNotMatch(
+    deactivateServiceSource,
+    /buildTiPath\(TI_ENDPOINTS\.passwords\.deactivate, id\),\s*payload/,
+  );
+});
+
+await runTest("ti password deactivation mutation evicts detail and invalidates lists", async () => {
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+  const deactivateVariablesStart = hookSource.indexOf("export type TiPasswordDeactivateVariables");
+  const deactivateVariablesEnd = hookSource.indexOf(
+    "\n\nexport function useTiPasswords",
+    deactivateVariablesStart,
+  );
+  const deactivateVariablesSource = hookSource.slice(
+    deactivateVariablesStart,
+    deactivateVariablesEnd,
+  );
+  const deactivateHookStart = hookSource.indexOf("export function useDeactivateTiPasswordMutation");
+  const deactivateHookEnd = hookSource.indexOf("\n}", deactivateHookStart) + 2;
+  const deactivateHookSource = hookSource.slice(
+    deactivateHookStart,
+    deactivateHookEnd,
+  );
+
+  assert.notEqual(deactivateVariablesStart, -1);
+  assert.notEqual(deactivateVariablesEnd, -1);
+  assert.notEqual(deactivateHookStart, -1);
+  assert.notEqual(deactivateHookEnd, 1);
+  assert.match(
+    deactivateVariablesSource,
+    /export type TiPasswordDeactivateVariables = \{\s*id: TiId;\s*payload: TiPasswordDeactivatePayload;\s*\}/,
+  );
+  assert.doesNotMatch(deactivateVariablesSource, /export function/);
+  assert.equal([...deactivateHookSource.matchAll(/export function/g)].length, 1);
+  assert.match(
+    deactivateHookSource,
+    /UseMutationResult<\s*TiPasswordListItem,\s*Error,\s*TiPasswordDeactivateVariables\s*>/,
+  );
+  assert.match(deactivateHookSource, /return useMutation\(/);
+  assert.match(
+    deactivateHookSource,
+    /mutationFn: \(\{ id, payload \}\) => tiPasswordsService\.deactivatePassword\(id, payload\)/,
+  );
+  assert.match(
+    deactivateHookSource,
+    /queryClient\.removeQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.detail\(variables\.id\),\s*exact: true,?\s*\}\)/,
+  );
+  assert.match(
+    deactivateHookSource,
+    /queryClient\.invalidateQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.all\(\),?\s*\}\)/,
+  );
+  assert.doesNotMatch(deactivateHookSource, /setQueryData\(\s*tiQueryKeys\.passwords\.detail/);
+});
+
+await runTest("ti password administration is admin-only and defaults to active", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /const canManagePasswords = access\.isAdmin/);
+  assert.match(
+    tabSource,
+    /useState<TiPasswordListFilters>\(\{\s*status: "active",\s*page: 1,\s*page_size: PASSWORD_PAGE_SIZE/,
+  );
+  assert.match(tabSource, /useTiPasswords\(filters, \{ enabled: canManagePasswords \}\)/);
+  assert.match(tabSource, /value: "active", label: "Ativas"/);
+  assert.match(tabSource, /value: "inactive", label: "Inativas"/);
+  assert.match(tabSource, /value: "all", label: "Todas"/);
+  assert.match(tabSource, /page: 1/);
+});
+
+await runTest("ti password inactive rows expose metadata without secret actions", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /const isActive = item\.active !== false/);
+  assert.match(tabSource, /<StatusBadge/);
+  assert.match(tabSource, /label: isActive \? "Ativa" : "Inativa"/);
+  assert.match(tabSource, /deactivation_reason/);
+  assert.match(tabSource, /isActive \? \(/);
+  assert.match(tabSource, /label="Inativar"/);
+  assert.doesNotMatch(tabSource, /setRevealPasswordId\(item\.id\)[\s\S]*item\.active === false/);
+});
+
+await runTest("ti password deactivation dialog requires reason and warns about external access", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /const \[deactivatingPassword, setDeactivatingPassword\]/);
+  assert.match(tabSource, /const \[deactivationReason, setDeactivationReason\]/);
+  assert.match(tabSource, /deactivationReason\.trim\(\)/);
+  assert.match(tabSource, /maxLength=\{500\}/);
+  assert.match(tabSource, /Inativar credencial/);
+  assert.match(
+    tabSource,
+    /inativar este registro no Giro Office[\s\S]*não revoga nem altera a senha no sistema externo/i,
+  );
+  assert.match(tabSource, /clearPasswordRevealCache\(deactivatingPassword\.id\)/);
+  assert.match(tabSource, /setRevealPasswordId\(null\)/);
+  assert.match(tabSource, /toast\.success\("Credencial inativada\."\)/);
+});
+
+await runTest("ti password reveal cleanup cancels cache on permission loss and unmount", async () => {
+  const hookSource = await readModuleSource("hooks/useTiPasswords.ts");
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(hookSource, /import \{ useCallback \} from "react"/);
+  assert.match(
+    hookSource,
+    /return useCallback\(\s*\(id\) => \{[\s\S]*?queryClient\.cancelQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.detail\(id\),\s*exact: true,?\s*\}\);[\s\S]*?queryClient\.removeQueries\(\{\s*queryKey: tiQueryKeys\.passwords\.detail\(id\),\s*exact: true,?\s*\}\);[\s\S]*?\},\s*\[queryClient\],?\s*\)/,
+  );
+  assert.match(
+    tabSource,
+    /useEffect\(\(\) => \{\s*if \(!canRevealPasswords && revealPasswordId\) \{\s*clearPasswordRevealCache\(revealPasswordId\);\s*setRevealPasswordId\(null\);\s*\}\s*return \(\) => \{\s*clearPasswordRevealCache\(revealPasswordId\);\s*\};\s*\}, \[canRevealPasswords, clearPasswordRevealCache, revealPasswordId\]\)/,
+  );
+});
+
+await runTest("ti sensitive clipboard helper copies the exact value", async () => {
+  const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
+  const writes = [];
+  const revealedPassword = "S3nh@ com espaços ";
+
+  const copied = await copySensitiveText(revealedPassword, {
+    writeText: async (value) => {
+      writes.push(value);
+    },
+  });
+
+  assert.equal(copied, true);
+  assert.deepEqual(writes, [revealedPassword]);
+});
+
+await runTest("ti sensitive clipboard helper handles a rejected write", async () => {
+  const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
+
+  assert.equal(
+    await copySensitiveText("segredo de teste", {
+      writeText: async () => {
+        throw new Error("NotAllowedError");
+      },
+    }),
+    false,
+  );
+});
+
+await runTest("ti sensitive clipboard helper handles an unavailable writer", async () => {
+  const { copySensitiveText } = await import("./utils/copySensitiveText.ts");
+
+  assert.equal(await copySensitiveText("segredo de teste", undefined), false);
+});
+
+await runTest("ti password copy uses the safe helper and generic feedback", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /import \{ copySensitiveText \} from "\.\.\/utils\/copySensitiveText"/);
+  assert.match(
+    tabSource,
+    /const clipboard = typeof navigator === "undefined" \? undefined : navigator\.clipboard/,
+  );
+  assert.match(tabSource, /const copied = await copySensitiveText\(secret, clipboard\)/);
+  assert.match(tabSource, /toast\.success\("Senha copiada\."\)/);
+  assert.match(
+    tabSource,
+    /toast\.error\(\s*"Não foi possível copiar a senha\. Verifique a permissão da área de transferência\.",?\s*\)/,
+  );
+  assert.doesNotMatch(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
+  assert.doesNotMatch(tabSource, /document\.execCommand/);
+});
+
 await runTest("ti passwords tab never renders secrets in list and reveals only by explicit action", async () => {
   const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
 
@@ -379,23 +1051,38 @@ await runTest("ti passwords tab never renders secrets in list and reveals only b
   assert.match(tabSource, /<MaskedSecret\s*\/>/);
   assert.match(tabSource, /setRevealPasswordId\(item\.id\)/);
   assert.match(tabSource, /setRevealPasswordId\(null\)/);
+  assert.match(tabSource, /headers=\{\["Local", "Usuário", "Notas", ""\]\}/);
+  assert.match(tabSource, /open=\{Boolean\(revealPasswordId\)\}/);
+  assert.match(tabSource, /title="Revelar senha"/);
+  assert.doesNotMatch(tabSource, /"Segredo"/);
+  assert.doesNotMatch(tabSource, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(280px,360px\)\]/);
   assert.doesNotMatch(tabSource, /\.map\(\(item[^]*?item\.password[^]*?\)\)/);
   assert.doesNotMatch(tabSource, /passwordRows[^]*?\.password/);
 });
 
-await runTest("ti passwords tab keeps create edit flows in a dialog and filters by local", async () => {
+await runTest("ti passwords tab keeps create edit flows in a dialog and searches paginated results", async () => {
   const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
   const dialogSource = await readAppSource("src/shared/components/ui/Dialog.tsx");
 
   assert.match(tabSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog"/);
-  assert.match(tabSource, /const \[filters, setFilters\] = useState<TiListFilters>\(\{\}\)/);
-  assert.match(tabSource, /const \[localSearchDraft, setLocalSearchDraft\] = useState\(""\)/);
+  assert.match(tabSource, /const PASSWORD_PAGE_SIZE = \d+/);
+  assert.match(tabSource, /const PASSWORD_SEARCH_DEBOUNCE_MS = \d+/);
+  assert.match(tabSource, /const \[filters, setFilters\] = useState<TiPasswordListFilters>\(\{\s*status: "active",\s*page: 1,\s*page_size: PASSWORD_PAGE_SIZE,\s*\}\)/);
+  assert.match(tabSource, /const \[searchDraft, setSearchDraft\] = useState\(""\)/);
   assert.match(tabSource, /const \[isPasswordDialogOpen, setIsPasswordDialogOpen\] = useState\(false\)/);
-  assert.match(tabSource, /function applyPasswordFilters/);
-  assert.match(tabSource, /local: toOptionalText\(localSearchDraft\)/);
+  assert.match(tabSource, /useEffect\(\(\) => \{/);
+  assert.match(tabSource, /window\.setTimeout\(\(\) => \{/);
+  assert.match(tabSource, /PASSWORD_SEARCH_DEBOUNCE_MS/);
+  assert.match(tabSource, /window\.clearTimeout\(timeoutId\)/);
+  assert.match(tabSource, /search: toOptionalText\(searchDraft\)/);
+  assert.match(tabSource, /page: 1/);
+  assert.match(tabSource, /page_size: PASSWORD_PAGE_SIZE/);
   assert.match(tabSource, /aria-label="Filtros de senhas"/);
-  assert.match(tabSource, /label="Buscar local"/);
-  assert.match(tabSource, /placeholder="Local da senha"/);
+  assert.match(tabSource, /label="Buscar por local, usuário ou notas"/);
+  assert.match(tabSource, /placeholder="Local, usuário ou notas"/);
+  assert.match(tabSource, /pageInfoText/);
+  assert.match(tabSource, /onClick=\{\(\) => setPasswordPage\(currentPasswordPage - 1\)\}/);
+  assert.match(tabSource, /onClick=\{\(\) => setPasswordPage\(currentPasswordPage \+ 1\)\}/);
   assert.match(tabSource, /open=\{isPasswordDialogOpen\}/);
   assert.match(tabSource, /title=\{editingPassword \? "Editar senha" : "Nova senha"\}/);
   assert.doesNotMatch(dialogSource, /@shared\/ui\/newLayout\/utils/);
@@ -403,7 +1090,8 @@ await runTest("ti passwords tab keeps create edit flows in a dialog and filters 
   assert.match(tabSource, /aria-label="Conteúdo de senhas"/);
   assert.match(tabSource, /<form className="space-y-2" onSubmit=\{handleSubmitPassword\}>/);
   assert.match(tabSource, /onClick=\{openCreateForm\}/);
-  assert.match(tabSource, /<span>Buscar<\/span>/);
+  assert.doesNotMatch(tabSource, /<span>Buscar<\/span>/);
+  assert.doesNotMatch(tabSource, /onSubmit=\{applyPasswordFilters\}/);
   assert.doesNotMatch(
     tabSource,
     /<form className="space-y-2" onSubmit=\{handleSubmitPassword\}>[\s\S]*?className="grid gap-3 md:grid-cols-2"/,
@@ -412,6 +1100,16 @@ await runTest("ti passwords tab keeps create edit flows in a dialog and filters 
     tabSource,
     /<form\s+className=\{`\$\{tiCardClassName\} space-y-3`\}\s+onSubmit=\{handleSubmitPassword\}/,
   );
+});
+
+await runTest("ti password reveal copy uses copy icon without toggling visibility", async () => {
+  const tabSource = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(tabSource, /Copy,/);
+  assert.match(tabSource, /<Copy className="h-4 w-4" \/>/);
+  assert.match(tabSource, /const copied = await copySensitiveText\(secret, clipboard\)/);
+  assert.doesNotMatch(tabSource, /navigator\.clipboard\.writeText\(secret\)/);
+  assert.doesNotMatch(tabSource, /<EyeOff className="h-4 w-4" \/>[\s\S]*?<span>Copiar senha<\/span>/);
 });
 
 await runTest("ti password reveal clears sensitive detail cache when hidden", async () => {
@@ -428,10 +1126,16 @@ await runTest("ti password reveal clears sensitive detail cache when hidden", as
   assert.match(tabSource, /setRevealPasswordId\(null\)/);
 });
 
-await runTest("ti user selects reuse the paginated assignable users source", async () => {
+await runTest("ti user selects reuse the operational users source", async () => {
   const hookSource = await readAppSource("src/modules/rh/hooks/useAssignableUsers.ts");
+  const rhTypesSource = await readAppSource("src/modules/rh/types.ts");
+  const userTypesSource = await readAppSource("src/modules/users/types/index.ts");
 
-  assert.match(hookSource, /listAdminUsers\("active"\)/);
+  assert.match(hookSource, /api\.get\(RH_ENDPOINTS\.operationalUsers\)/);
+  assert.match(hookSource, /unwrapRhEnvelope<RhOperationalUser\[\]>/);
+  assert.doesNotMatch(hookSource, /cpf: user\.cpf \?\? null/);
+  assert.doesNotMatch(rhTypesSource, /cpf\?: string \| null/);
+  assert.doesNotMatch(userTypesSource, /cpf\?: string \| null/);
   assert.doesNotMatch(hookSource, /const page = await userService\.listPage\(\{\s*skip:\s*0,/);
 
   for (const componentPath of [
@@ -443,6 +1147,50 @@ await runTest("ti user selects reuse the paginated assignable users source", asy
 
     assert.match(source, /useAssignableUsers/);
   }
+});
+
+await runTest("ti extension numbers use an exact four-digit contract", async () => {
+  const {
+    TI_EXTENSION_NUMBER_LENGTH,
+    isValidTiExtensionNumber,
+    sanitizeTiExtensionNumber,
+  } = await import("./utils/extensionNumber.ts");
+
+  assert.equal(TI_EXTENSION_NUMBER_LENGTH, 4);
+  assert.equal(isValidTiExtensionNumber("1001"), true);
+  assert.equal(isValidTiExtensionNumber("0007"), true);
+
+  for (const invalid of ["", "123", "12345", "12A4", "12-4", " 1234 "]) {
+    assert.equal(isValidTiExtensionNumber(invalid), false);
+  }
+
+  assert.equal(sanitizeTiExtensionNumber("12A4"), "124");
+  assert.equal(sanitizeTiExtensionNumber("12-34-56"), "1234");
+});
+
+await runTest("ti extension form validates digits and hides the internal id", async () => {
+  const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
+
+  assert.match(
+    tabSource,
+    /import \{[\s\S]*TI_EXTENSION_NUMBER_LENGTH,[\s\S]*isValidTiExtensionNumber,[\s\S]*sanitizeTiExtensionNumber,[\s\S]*\} from "\.\.\/utils\/extensionNumber"/,
+  );
+  assert.equal([...tabSource.matchAll(/isValidTiExtensionNumber\(number\)/g)].length, 2);
+  assert.equal(
+    [
+      ...tabSource.matchAll(
+        /toast\.error\("Informe um ramal com exatamente 4 dígitos\."\)/g,
+      ),
+    ].length,
+    2,
+  );
+  assert.match(tabSource, /inputMode="numeric"/);
+  assert.match(tabSource, /maxLength=\{TI_EXTENSION_NUMBER_LENGTH\}/);
+  assert.match(
+    tabSource,
+    /updateExtensionField\(\s*"number",\s*sanitizeTiExtensionNumber\(event\.target\.value\),?\s*\)/,
+  );
+  assert.doesNotMatch(tabSource, /<TiFieldLine label="ID"/);
 });
 
 await runTest("ti extension hooks and tab expose ramal mutations", async () => {
@@ -461,6 +1209,15 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(hookSource, /tiQueryKeys\.extensions\.all\(\)/);
   assert.match(tabSource, /useTiExtensions/);
   assert.match(tabSource, /useTiExtension/);
+  assert.match(
+    tabSource,
+    /const canManageExtensions = access\.isAdmin/,
+  );
+  assert.match(
+    tabSource,
+    /assignableUsersQuery = useAssignableUsers\(\{ enabled: canManageExtensions \}\)/,
+  );
+  assert.match(tabSource, /\{!canManageExtensions \? \(/);
   assert.match(tabSource, /<TiEmptyState/);
   const sectionHeaderMatch = tabSource.match(/<TiSectionHeader[\s\S]*?\/>/);
   assert.ok(sectionHeaderMatch);
@@ -471,6 +1228,20 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(tabSource, /placeholder="Ex: 1001"/);
   assert.doesNotMatch(tabSource, /placeholder="1001"/);
   assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
+});
+
+await runTest("ti extension controls stay hidden for technician level 2", async () => {
+  const { resolveModuleAccess } = await import("../auth/utils/moduleAccess.ts");
+  const technicianAccess = resolveModuleAccess({
+    module: "ti",
+    additionalModulePermissions: { ti: 2 },
+  });
+  const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
+
+  assert.equal(technicianAccess.canView, true);
+  assert.equal(technicianAccess.canEdit, true);
+  assert.equal(technicianAccess.isAdmin, false);
+  assert.match(tabSource, /const canManageExtensions = access\.isAdmin;/);
 });
 
 await runTest("ti visible copy stays product-facing and avoids implementation handoff terms", async () => {
@@ -508,6 +1279,23 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.match(pageSource, /from-blue-500 to-blue-600/);
   assert.match(pageSource, /bg-blue-100 text-blue-700/);
   assert.doesNotMatch(`${pageSource}\n${workspaceUiSource}`, /indigo-/);
+});
+
+await runTest("ti shell exposes ramais but hides sensitive tabs for self-service users", async () => {
+  const pageSource = await readModuleSource("components/TiPage.tsx");
+  const selfServiceTabsSource =
+    pageSource.match(/const SELF_SERVICE_TI_TABS[\s\S]*?\n\];/)?.[0] ?? "";
+
+  assert.match(pageSource, /SELF_SERVICE_TI_TABS/);
+  assert.match(pageSource, /const canManageTi = access\.isAdmin/);
+  assert.match(pageSource, /const visibleTabs = canManageTi \? TI_TABS : SELF_SERVICE_TI_TABS/);
+  assert.match(selfServiceTabsSource, /id: "dashboard"/);
+  assert.match(selfServiceTabsSource, /id: "extensions"[\s\S]*label: "Ramais"/);
+  assert.match(selfServiceTabsSource, /label: "Meus termos"/);
+
+  for (const sensitiveTabId of ["inventory", "stock", "passwords", "robots"]) {
+    assert.doesNotMatch(selfServiceTabsSource, new RegExp(`id: "${sensitiveTabId}"`));
+  }
 });
 
 await runTest("ti requests hooks expose mutations and invalidate requests plus dashboard caches", async () => {
@@ -569,9 +1357,23 @@ await runTest("ti request detail opens in a dialog instead of a stretched side p
   assert.doesNotMatch(tabSource, /title="Selecione um chamado"/);
 });
 
+await runTest("issue 495 ti request messages preserve line breaks and wrap long text", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const messageDisplay =
+    tabSource.match(
+      /<p className="[^"]*">\s*\{message\.message \?\? getStringField\(message, \["content", "body"\], ""\)\}\s*<\/p>/,
+    )?.[0] ?? "";
+
+  assert.match(messageDisplay, /whitespace-pre-wrap/);
+  assert.match(messageDisplay, /break-words/);
+});
+
 await runTest("ti request detail keeps secondary actions compact", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 
+  assert.match(tabSource, /const canManageRequests = access\.isAdmin/);
+  assert.match(tabSource, /canManageRequests && !hasAssignee/);
+  assert.match(tabSource, /canManageRequests \? \(/);
   assert.doesNotMatch(tabSource, /<details/);
   assert.doesNotMatch(tabSource, /<summary/);
   assert.match(tabSource, /Editar chamado/);
@@ -583,7 +1385,7 @@ await runTest("ti request detail keeps secondary actions compact", async () => {
   assert.doesNotMatch(tabSource, /Editar t.tulo/);
 });
 
-await runTest("ti request detail does not fetch admin users for assignment automatically", async () => {
+await runTest("ti request detail loads transfer candidates only when the dialog opens", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 
   assert.match(tabSource, /useAssignTiRequest/);
@@ -594,7 +1396,12 @@ await runTest("ti request detail does not fetch admin users for assignment autom
   assert.doesNotMatch(tabSource, /useTiAssignableUsers/);
   assert.doesNotMatch(tabSource, /assignableUserOptions/);
   assert.doesNotMatch(tabSource, /Atribuir à equipe de TI/);
-  assert.doesNotMatch(tabSource, /listAdminUsers/);
+  assert.match(
+    tabSource,
+    /useTiRequestTransferCandidates\(activeRequestId,\s*\{\s*enabled: isTransferDialogOpen,?\s*\}\)/,
+  );
+  assert.doesNotMatch(tabSource, /listAdminUsers\("active"\)/);
+  assert.doesNotMatch(tabSource, /departmentService\.list\(\)/);
   assert.doesNotMatch(tabSource, /placeholder="ID do usuário"/);
   assert.doesNotMatch(tabSource, /assignedUserId/);
 });
@@ -668,6 +1475,16 @@ await runTest("ti requests tab exposes request category management actions", asy
   assert.doesNotMatch(tabSource, /editingCategoryId/);
 });
 
+await runTest("ti request categories are managed by users and hidden from viewers", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(tabSource, /const canManageCategories = access\.canEdit/);
+  assert.match(tabSource, /\{canManageCategories \? \(/);
+  assert.match(tabSource, /label="Categorias"/);
+  assert.match(tabSource, /open=\{isCategoryDialogOpen\}/);
+  assert.match(tabSource, /categoriesQuery\.data \?\? \[\]/);
+});
+
 await runTest("ti native select uses a centered chevron instead of the browser default arrow", async () => {
   const selectSource = await readModuleSource("components/TiNativeSelect.tsx");
 
@@ -687,18 +1504,38 @@ await runTest("ti dashboard tab consumes the consolidated backend summary", asyn
   const dashboardTypesSource = await readModuleSource("types/dashboard.ts");
 
   assert.match(tabSource, /useTiDashboard\(/);
+  assert.match(tabSource, /summary\?\.scope === "self"/);
   assert.match(tabSource, /openRequests/);
   assert.match(tabSource, /criticalRequests/);
   assert.match(tabSource, /resolvedLastSevenDays/);
+  assert.match(tabSource, /closedRequests/);
+  assert.match(tabSource, /Não foi possível carregar seu resumo de chamados\. Tente novamente\./);
   assert.match(tabSource, /inventoryAssets/);
   assert.match(tabSource, /lowStockItems/);
   assert.match(tabSource, /activeRobots/);
+  assert.match(dashboardTypesSource, /scope: "self"/);
+  assert.match(dashboardTypesSource, /scope: "organization"/);
   assert.match(dashboardTypesSource, /openRequests: number/);
+  assert.match(dashboardTypesSource, /closedRequests: number/);
   assert.match(dashboardTypesSource, /inventoryAssets: number/);
   assert.doesNotMatch(tabSource, /requests_open/);
   assert.doesNotMatch(tabSource, /inventory_total/);
   assert.match(tabSource, /isLoading|isFetching/);
   assert.match(tabSource, /isError/);
+});
+
+await runTest("ti dashboard error keeps technical API messages out of the viewer UI", async () => {
+  const tabSource = await readModuleSource("components/TiDashboardTab.tsx");
+  const errorState =
+    tabSource.match(
+      /if \(dashboardQuery\.isError\) \{\s*return \(\s*<DashboardStatePanel[\s\S]*?\/>\s*\);\s*\}/,
+    )?.[0] ?? "";
+
+  assert.doesNotMatch(errorState, /dashboardQuery\.error/);
+  assert.match(
+    errorState,
+    /description="Não foi possível carregar seu resumo de chamados\. Tente novamente\."/,
+  );
 });
 
 await runTest("ti inventory and terms expose PR4 mutations through hooks", async () => {
@@ -904,7 +1741,22 @@ await runTest("ti terms tab exposes term create, edit, detail and signing action
   assert.match(source, /useTiTerms\(/);
   assert.match(source, /useTiTerm\(/);
   assert.match(source, /useTiInventory\(/);
+  assert.match(source, /const canManage = access\.isAdmin/);
+  assert.match(source, /useTiInventory\([\s\S]*status: "available"[\s\S]*page_size: 100[\s\S]*enabled: canManage/);
+  assert.doesNotMatch(source, /useTiInventory\(undefined, \{ enabled: canManage \}\)/);
+  assert.match(source, /departmentService\.list\(\),\s*\{ retry: false, enabled: canManage \}/);
   assert.match(source, /confirm\(/);
+});
+
+await runTest("ti inventory list exposes availability status for term asset selectors", async () => {
+  const schemaSource = await readWorkspaceSource("services/ti-service/src/schemas/tiInventory.schemas.ts");
+  const serviceSource = await readWorkspaceSource("services/ti-service/src/services/tiInventoryService.ts");
+  const openApiSource = await readWorkspaceSource("services/ti-service/src/openapi/spec.ts");
+
+  assert.match(schemaSource, /status: z\.enum\(\["available", "assigned"\]\)\.optional\(\)/);
+  assert.match(serviceSource, /query\.status === "available"[\s\S]*\{ user_id: null \}/);
+  assert.match(serviceSource, /query\.status === "assigned"[\s\S]*\{ user_id: \{ not: null \} \}/);
+  assert.match(openApiSource, /enumQueryParameter\("status", "Disponibilidade do ativo", \["available", "assigned"\]\)/);
 });
 
 await runTest("ti terms keeps primary action clear and opens term detail in a dialog", async () => {
@@ -915,6 +1767,11 @@ await runTest("ti terms keeps primary action clear and opens term detail in a di
   assert.match(source, /function handlePrintTerm\(term: TiTerm\)/);
   assert.match(source, /function buildPrintableTermHtml\(term: TiTerm, departmentName: string\)/);
   assert.match(source, /window\.open\("", "_blank", "width=900,height=1100"\)/);
+  assert.match(source, /import \{ toast \} from "react-toastify";/);
+  assert.match(
+    source,
+    /toast\.error\(\s*"Não foi possível abrir a janela de impressão\. Verifique o bloqueador de pop-ups do navegador\."\s*,?\s*\)/,
+  );
   assert.match(source, /printWindow\.print\(\)/);
   assert.match(source, /Imprimir \/ PDF/);
   assert.match(source, /const \[isDetailDialogOpen, setIsDetailDialogOpen\] = useState\(false\)/);
@@ -951,8 +1808,49 @@ await runTest("ti terms filters stay local because the backend list only support
   assert.doesNotMatch(source, /status,\s*inventory_id/);
 });
 
+await runTest("ti terms list paginates locally and keeps actions compact", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+  const controlsSource = await readModuleSource("components/tiFormControls.tsx");
+
+  assert.match(source, /import \{ PaginationControls \} from "@shared\/components";/);
+  assert.match(source, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
+  assert.match(source, /const TERMS_PAGE_SIZE = DEFAULT_PAGE_SIZE;/);
+  assert.match(source, /const \[termsPage, setTermsPage\] = useState\(1\);/);
+  assert.match(source, /useEffect\(\(\) => \{\s*setTermsPage\(1\);/);
+  assert.match(source, /const paginatedTerms = useMemo\(/);
+  assert.match(source, /filteredTerms\.slice\(/);
+  assert.match(source, /paginatedTerms\.map\(\(term\)/);
+  assert.doesNotMatch(source, /filteredTerms\.map\(\(term\)/);
+  assert.match(source, /<PaginationControls/);
+  assert.match(source, /total=\{filteredTerms\.length\}/);
+  assert.match(source, /totalPages=\{termsPageCount\}/);
+  assert.match(source, /onPageChange=\{\(page\) => setTermsPage\(page\)\}/);
+  assert.match(source, /iconOnly/);
+  assert.match(controlsSource, /iconOnly \? "w-8 px-0" : "px-2\.5"/);
+});
+
+await runTest("ti terms create uses assignable user selection and edit keeps identity read-only", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /name="user_id"/);
+  assert.match(source, /label="Usuario"|label="Usu\u00e1rio"/);
+  assert.match(source, /isEditingTerm/);
+  assert.match(source, /readOnly/);
+  assert.doesNotMatch(
+    source,
+    /name="user_name"[\s\S]*label="Nome do usuario"|name="user_name"[\s\S]*label="Nome do usu\u00e1rio"/,
+  );
+  assert.doesNotMatch(
+    source,
+    /name="user_cpf"[\s\S]*label="CPF do usuario"|name="user_cpf"[\s\S]*label="CPF do usu\u00e1rio"/,
+  );
+});
+
 await runTest("ti terms form sends the backend term contract", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
+  const hookSource = await readModuleSource("hooks/useTiTerms.ts");
+  const serviceSource = await readModuleSource("services/tiTermsService.ts");
   const typesSource = await readModuleSource("types/terms.ts");
   const termPayloadSource = typesSource.slice(
     typesSource.indexOf("export interface TiTermPayload"),
@@ -962,9 +1860,6 @@ await runTest("ti terms form sends the backend term contract", async () => {
 
   for (const expected of [
     "date",
-    "user_name",
-    "user_cpf",
-    "user_id",
     "department_id",
     "address",
     "reason",
@@ -976,11 +1871,25 @@ await runTest("ti terms form sends the backend term contract", async () => {
     assert.match(source, new RegExp(`${expected}: getFormText\\(formData, "${expected}"\\)`));
   }
 
+  assert.match(source, /const payload: TiTermUpdatePayload = compactPayload/);
+  assert.match(source, /createTermMutation\.mutateAsync\(\{\s*\.\.\.payload,\s*user_id: selectedUserId,?\s*\}\)/);
+  assert.match(
+    typesSource,
+    /export type TiTermUpdatePayload = Omit<TiTermPayload, "user_id">/,
+  );
+  assert.match(serviceSource, /updateTerm\(id: TiId, payload: TiTermUpdatePayload\)/);
+  assert.match(hookSource, /payload: TiTermUpdatePayload/);
   assert.match(source, /name="selected_asset_id"/);
+  assert.match(source, /name="user_id"/);
   assert.match(source, /name="department_id"/);
   assert.match(source, /departmentService\.list\(\)/);
   assert.match(source, /reason: getFormText\(formData, "reason"\)/);
   assert.match(signPayloadSource, /reason\?: string/);
+  assert.doesNotMatch(source, /payload\.user_name/);
+  assert.doesNotMatch(source, /payload\.user_cpf/);
+  assert.doesNotMatch(source, /user_name: getFormText\(formData, "user_name"\)/);
+  assert.doesNotMatch(source, /user_cpf: getFormText\(formData, "user_cpf"\)/);
+  assert.doesNotMatch(source, /user_id: getFormText\(formData, "user_id"\)/);
   assert.doesNotMatch(source, /title: getFormText\(formData, "title"\)/);
   assert.doesNotMatch(source, /description: getFormText\(formData, "description"\)/);
   assert.doesNotMatch(source, /inventory_id: selectedAssetId/);
@@ -1103,9 +2012,15 @@ await runTest("ti robots hooks expose write flows and invalidate robots plus das
     assert.match(serviceSource, new RegExp(`${serviceMethod}\\s*\\(`));
   }
 
+  const payloadTypeSource =
+    typeSource.match(/export interface TiRobotPayload \{[\s\S]*?\n\}/)?.[0] ?? "";
+
   assert.match(typeSource, /interface TiRobotPayload/);
   assert.match(typeSource, /interface TiRobotRunPayload/);
-  assert.match(typeSource, /type\?: TiRobotType \| string/);
+  assert.match(payloadTypeSource, /name: string/);
+  assert.match(payloadTypeSource, /type: TiRobotType \| string/);
+  assert.doesNotMatch(payloadTypeSource, /name\?: string/);
+  assert.doesNotMatch(payloadTypeSource, /type\?: TiRobotType \| string/);
   assert.match(typeSource, /active\?: boolean/);
   assert.match(typeSource, /message\?: string/);
   assert.match(typeSource, /metadata_json\?: Record<string, unknown>/);
@@ -1141,8 +2056,9 @@ await runTest("ti robots tab exposes operational list detail forms and run actio
   assert.match(tabSource, /TiNativeSelect/);
   assert.match(tabSource, /ROBOT_TYPE_OPTIONS/);
   assert.match(tabSource, /ROBOT_ACTIVE_FILTER_OPTIONS/);
-  assert.match(tabSource, /type: draft\.type/);
-  assert.match(tabSource, /active: draft\.active/);
+  assert.match(tabSource, /buildCreateRobotPayload\(robotDraft\)/);
+  assert.match(tabSource, /buildUpdateRobotPayload\(robotDraft\)/);
+  assert.doesNotMatch(tabSource, /function buildRobotPayload/);
   assert.match(tabSource, /message: draft\.message\.trim\(\)/);
   assert.match(tabSource, /Tempo gasto/);
   assert.match(tabSource, /placeholder="12 min ou 00:12:00"/);
@@ -1266,4 +2182,13 @@ await runTest("ti automation metrics stay inside the robots tab for this PR", as
   assert.doesNotMatch(dashboardTypeSource, /robot_runs_recent\?: number/);
   assert.doesNotMatch(dashboardTypeSource, /robot_runs_failed\?: number/);
   assert.doesNotMatch(dashboardSource, /api\.(get|post|patch|put|delete)\(/);
+});
+
+await runTest("new TI request discloses required fields before submission", async () => {
+  const source = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /id="ti-request-title"[\s\S]*aria-required/);
+  assert.match(source, /value=\{requestDraft\.category_id\}[\s\S]*aria-required/);
+  assert.match(source, /<textarea[\s\S]*aria-required/);
 });

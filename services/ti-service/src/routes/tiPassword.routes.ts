@@ -11,6 +11,7 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import { requireTiPermission, TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import {
   createTiPasswordBodySchema,
+  deactivateTiPasswordBodySchema,
   listTiPasswordsQuerySchema,
   tiPasswordIdParamsSchema,
   updateTiPasswordBodySchema,
@@ -39,7 +40,7 @@ export function createTiPasswordRoutes(
 
   router.get(
     "/list",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Admin),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -56,7 +57,7 @@ export function createTiPasswordRoutes(
 
   router.get(
     "/:id",
-    requireTiPermission(TiPermissionLevel.Requester),
+    requireTiPermission(TiPermissionLevel.Admin),
     async (request, response, next) => {
       try {
         const context = getContext(request);
@@ -101,6 +102,24 @@ export function createTiPasswordRoutes(
         response.status(200).json(createSuccessResponse(result));
       } catch (err: unknown) {
         logError("Erro ao atualizar senha de TI", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/:id/deactivate",
+    requireTiPermission(TiPermissionLevel.Admin),
+    async (request, response, next) => {
+      try {
+        const context = getContext(request);
+        const params = parseWithZod(tiPasswordIdParamsSchema, request.params);
+        const body = parseWithZod(deactivateTiPasswordBodySchema, request.body);
+        const result = await service.deactivate(context, params.id, body);
+
+        response.status(200).json(createSuccessResponse(result));
+      } catch (err: unknown) {
+        logError("Erro ao inativar senha de TI", { err });
         next(err);
       }
     },

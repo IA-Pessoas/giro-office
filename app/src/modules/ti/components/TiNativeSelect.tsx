@@ -1,4 +1,4 @@
-import type { SelectHTMLAttributes } from "react";
+import type { ReactNode, SelectHTMLAttributes } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@shared/ui/newLayout/utils";
@@ -13,7 +13,7 @@ type TiNativeSelectOption = {
 
 export interface TiNativeSelectProps
   extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "style"> {
-  label?: string;
+  label?: ReactNode;
   helperText?: string;
   options?: readonly TiNativeSelectOption[];
 }

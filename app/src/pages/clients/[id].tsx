@@ -4,7 +4,6 @@ import { useRouter } from "next/router";
 import { useEffect, useState, type ChangeEvent } from "react";
 import {
   ArrowLeft,
-  BriefcaseBusiness,
   Calculator,
   CircleDollarSign,
   FileText,
@@ -17,7 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { canSSRAuth, isAdminPermission } from "@modules/auth";
+import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientForm } from "@modules/clients/components/ClientForm";
 import { getContabilCardState, useContabilPermissions } from "@modules/contabil";
 import {
@@ -29,7 +28,6 @@ import {
 import type { ClientFormValues } from "@modules/clients/types";
 import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
 import { mapClientStatusFromApi, mapClientStatusToApi } from "@modules/clients/utils/statusMapper";
-import { useAuth } from "@/context/AuthContext";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -68,16 +66,17 @@ function createInitialFormValues(): ClientFormValues {
 
 export default function ClientDetailPage() {
   const router = useRouter();
-  const { user } = useAuth();
   const clientId = typeof router.query.id === "string" ? router.query.id : undefined;
   const clientQuery = useClient(clientId);
   const updateClientMutation = useUpdateClientMutation(clientId ?? "");
   const activateClientMutation = useActivateClientMutation(clientId ?? "");
   const deactivateClientMutation = useDeactivateClientMutation(clientId ?? "");
   const { canViewContabil, isLoading: isContabilAccessLoading } = useContabilPermissions();
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const [formValues, setFormValues] = useState<ClientFormValues>(createInitialFormValues());
 
-  const isAdmin = isAdminPermission(user?.permission);
+  const canEditClient = integracaoAccess.canEdit;
+  const canAdminClient = integracaoAccess.isAdmin;
   const client = clientQuery.data;
   const uiStatus = mapClientStatusFromApi(client?.status);
   const contabilCardState = getContabilCardState(client?.contabil, canViewContabil);
@@ -256,37 +255,51 @@ export default function ClientDetailPage() {
                   <SummaryItem label="CPF/CNPJ" value={formatCpfCnpj(client.cpf_cnpj)} />
                   <SummaryItem label="Regime" value={client.regime || "A definir"} />
                   <SummaryItem label="Organização" value={organizationName} />
-                  <SummaryItem label="Razão social" value={client.company_name || "Não informado"} />
-                  <SummaryItem label="Nome fantasia" value={client.fantasy_name || "Não informado"} />
+                  <SummaryItem
+                    label="Razão social"
+                    value={client.company_name || "Não informado"}
+                  />
+                  <SummaryItem
+                    label="Nome fantasia"
+                    value={client.fantasy_name || "Não informado"}
+                  />
                 </div>
               </div>
 
               <div className={`${PANEL_CLASSNAME} p-6`}>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Ciclo de vida</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Ciclo de vida
+                </h2>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                   Ações disponíveis apenas para administradores.
                 </p>
 
                 <div className="mt-5 flex flex-1 flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void handleActivate()}
-                    disabled={!isAdmin || activateClientMutation.isPending || uiStatus === "Ativo"}
-                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    {activateClientMutation.isPending ? "Reativando..." : "Reativar cliente"}
-                  </button>
+                  {canAdminClient ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void handleActivate()}
+                        disabled={activateClientMutation.isPending || uiStatus === "Ativo"}
+                        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        {activateClientMutation.isPending ? "Reativando..." : "Reativar cliente"}
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => void handleDeactivate()}
-                    disabled={!isAdmin || deactivateClientMutation.isPending || uiStatus === "Inativo"}
-                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-950/30"
-                  >
-                    <Power className="h-4 w-4" />
-                    {deactivateClientMutation.isPending ? "Desativando..." : "Desativar cliente"}
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeactivate()}
+                        disabled={deactivateClientMutation.isPending || uiStatus === "Inativo"}
+                        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                      >
+                        <Power className="h-4 w-4" />
+                        {deactivateClientMutation.isPending
+                          ? "Desativando..."
+                          : "Desativar cliente"}
+                      </button>
+                    </>
+                  ) : null}
 
                   <div className="mt-auto grid gap-4 pt-1">
                     <SummaryItem label="Situação" value={uiStatus} />
@@ -301,32 +314,36 @@ export default function ClientDetailPage() {
               </div>
             </section>
 
-            <section className={`${PANEL_CLASSNAME} p-6`}>
-              <div className="mb-5">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Editar cliente</h2>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  Atualize os dados principais do cliente.
-                </p>
-              </div>
+            {canEditClient ? (
+              <section className={`${PANEL_CLASSNAME} p-6`}>
+                <div className="mb-5">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Editar cliente
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    Atualize os dados principais do cliente.
+                  </p>
+                </div>
 
-              <ClientForm
-                values={formValues}
-                onChange={handleInputChange}
-                onSubmit={() => void handleUpdate()}
-                onCancel={() =>
-                  setFormValues({
-                    name: client.name ?? "",
-                    company_name: client.company_name ?? "",
-                    fantasy_name: client.fantasy_name ?? "",
-                    cpf_cnpj: client.cpf_cnpj ?? "",
-                    status: mapClientStatusFromApi(client.status),
-                    service_unique: client.service_unique ?? false,
-                  })
-                }
-                submitLabel={updateClientMutation.isPending ? "Salvando..." : "Salvar alterações"}
-                disabled={updateClientMutation.isPending}
-              />
-            </section>
+                <ClientForm
+                  values={formValues}
+                  onChange={handleInputChange}
+                  onSubmit={() => void handleUpdate()}
+                  onCancel={() =>
+                    setFormValues({
+                      name: client.name ?? "",
+                      company_name: client.company_name ?? "",
+                      fantasy_name: client.fantasy_name ?? "",
+                      cpf_cnpj: client.cpf_cnpj ?? "",
+                      status: mapClientStatusFromApi(client.status),
+                      service_unique: client.service_unique ?? false,
+                    })
+                  }
+                  submitLabel={updateClientMutation.isPending ? "Salvando..." : "Salvar alterações"}
+                  disabled={updateClientMutation.isPending}
+                />
+              </section>
+            ) : null}
 
             <section className={`${PANEL_CLASSNAME} p-6`}>
               <div className="mb-5">
@@ -351,14 +368,6 @@ export default function ClientDetailPage() {
                   href={`/clients/${client.id}/integration`}
                   actionLabel="Abrir integração"
                   icon={Workflow}
-                />
-
-                <ClientAccessCard
-                  title="Comercial"
-                  description="Atualize o status de prospecção e os dados comerciais do cliente."
-                  href={`/clients/${client.id}/commercial`}
-                  actionLabel="Abrir comercial"
-                  icon={BriefcaseBusiness}
                 />
 
                 <ClientAccessCard
@@ -389,19 +398,23 @@ export default function ClientDetailPage() {
                   icon={ShieldCheck}
                 />
 
-                <ClientAccessCard
-                  title="Inativação"
-                  description="Inicie o processo de inativação do cliente."
-                  href={`/clients/${client.id}/termination`}
-                  actionLabel="Abrir inativação"
-                  icon={XCircle}
-                />
+                {canAdminClient ? (
+                  <ClientAccessCard
+                    title="Inativação"
+                    description="Inicie o processo de inativação do cliente."
+                    href={`/clients/${client.id}/termination`}
+                    actionLabel="Abrir inativação"
+                    icon={XCircle}
+                  />
+                ) : null}
               </div>
             </section>
 
             <section className={`${PANEL_CLASSNAME} p-6`}>
               <div className="mb-5">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Acompanhamento</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Acompanhamento
+                </h2>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                   Consulte registros e eventos relacionados ao cliente.
                 </p>

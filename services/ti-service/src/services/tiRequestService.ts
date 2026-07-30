@@ -10,11 +10,13 @@ import type {
   UpdateTiRequestBody,
   UpdateTiRequestStatusBody,
 } from "../schemas/tiRequest.schemas.js";
+import { TiDepartmentResolverService } from "./tiDepartmentResolverService.js";
 
 export interface TiAuthContext {
   organizationId: string;
   userId: string;
   permission: number;
+  isOrganizationOwner?: boolean;
 }
 
 const allowedTransitions = new Map<string, string[]>([
@@ -33,11 +35,20 @@ const SAFE_USER_SELECT = {
   organization_id: true,
 } as const;
 
+const TRANSFER_CANDIDATE_SELECT = {
+  id: true,
+  name: true,
+  full_name: true,
+  department_id: true,
+} as const;
+
 export class TiRequestService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async list(context: TiAuthContext, query: ListTiRequestsQuery): Promise<unknown[]> {
     const { skip, take } = getPaginationParams(query);
+    const requesterId =
+      context.permission < TiPermissionLevel.Technician ? context.userId : query.requester_id;
 
     return this.prisma.tIRequest.findMany({
       where: {
@@ -45,7 +56,7 @@ export class TiRequestService {
         ...(query.status ? { status: query.status } : {}),
         ...(query.urgency ? { urgency: query.urgency } : {}),
         ...(query.category_id ? { category_id: query.category_id } : {}),
-        ...(query.requester_id ? { requester_id: query.requester_id } : {}),
+        ...(requesterId ? { requester_id: requesterId } : {}),
         ...(query.assigned_to_id ? { assigned_to_id: query.assigned_to_id } : {}),
         ...(query.created_from || query.created_to
           ? {
@@ -86,6 +97,13 @@ export class TiRequestService {
     });
 
     if (!request) {
+      throw new ServiceError(404, "Chamado de TI nao encontrado.");
+    }
+
+    if (
+      context.permission < TiPermissionLevel.Technician &&
+      request.requester_id !== context.userId
+    ) {
       throw new ServiceError(404, "Chamado de TI nao encontrado.");
     }
 
@@ -149,20 +167,85 @@ export class TiRequestService {
   }
 
   async assign(context: TiAuthContext, id: string, body: AssignTiRequestBody): Promise<unknown> {
-    if (context.permission < TiPermissionLevel.Admin) {
-      throw new ServiceError(403, "Permissao insuficiente para atribuir chamado.");
+    const request = await this.prisma.tIRequest.findFirst({
+      where: { id, organization_id: context.organizationId },
+      select: { assigned_to_id: true },
+    });
+
+    if (!request) {
+      throw new ServiceError(404, "Chamado de TI nao encontrado.");
     }
 
-    await this.getById(context, id);
-    await this.ensureUser(
+    this.assertTransferorPermission(context, request.assigned_to_id);
+
+    const destination = await this.ensureUser(
       context.organizationId,
       body.assigned_to_id,
       "Responsavel nao encontrado.",
     );
+    const technologyDepartmentId = await new TiDepartmentResolverService(
+      this.prisma,
+    ).resolveTechnologyDepartmentId(context.organizationId);
 
-    return this.prisma.tIRequest.update({
-      where: { id },
+    if (destination.status !== "active" || destination.department_id !== technologyDepartmentId) {
+      throw new ServiceError(400, "Responsavel deve pertencer ao departamento Tecnologia.");
+    }
+
+    const updateResult = await this.prisma.tIRequest.updateMany({
+      where: {
+        id,
+        organization_id: context.organizationId,
+        ...(request.assigned_to_id === context.userId &&
+        context.permission < TiPermissionLevel.Admin &&
+        !context.isOrganizationOwner
+          ? { assigned_to_id: request.assigned_to_id }
+          : {}),
+      },
       data: { assigned_to_id: body.assigned_to_id },
+    });
+
+    if (updateResult.count === 0) {
+      throw new ServiceError(409, "Chamado de TI foi transferido por outro usuario.");
+    }
+
+    return { id, assigned_to_id: body.assigned_to_id };
+  }
+
+  async listTransferCandidates(
+    context: TiAuthContext,
+    id: string,
+  ): Promise<
+    Array<{ id: string; name: string | null; full_name: string | null; department_id: string }>
+  > {
+    const request = await this.prisma.tIRequest.findFirst({
+      where: { id, organization_id: context.organizationId },
+      select: { assigned_to_id: true },
+    });
+
+    if (!request) {
+      throw new ServiceError(404, "Chamado de TI nao encontrado.");
+    }
+
+    this.assertTransferorPermission(context, request.assigned_to_id);
+
+    const technologyDepartmentId = await new TiDepartmentResolverService(
+      this.prisma,
+    ).resolveTechnologyDepartmentId(context.organizationId);
+
+    return this.prisma.user.findMany({
+      where: {
+        organization_id: context.organizationId,
+        department_id: technologyDepartmentId,
+        status: "active",
+        permissions: {
+          some: {
+            organization_id: context.organizationId,
+            ti: { gte: TiPermissionLevel.Requester },
+          },
+        },
+      },
+      select: TRANSFER_CANDIDATE_SELECT,
+      orderBy: { full_name: "asc" },
     });
   }
 
@@ -194,7 +277,21 @@ export class TiRequestService {
     }
   }
 
-  private async ensureUser(organizationId: string, userId: string, message: string): Promise<void> {
+  private assertTransferorPermission(context: TiAuthContext, assignedToId: string | null): void {
+    if (
+      assignedToId !== context.userId &&
+      context.permission < TiPermissionLevel.Admin &&
+      !context.isOrganizationOwner
+    ) {
+      throw new ServiceError(403, "Permissao insuficiente para transferir chamado.");
+    }
+  }
+
+  private async ensureUser(
+    organizationId: string,
+    userId: string,
+    message: string,
+  ): Promise<{ status: string; department_id: string }> {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, organization_id: organizationId },
     });
@@ -202,5 +299,7 @@ export class TiRequestService {
     if (!user) {
       throw new ServiceError(404, message);
     }
+
+    return user;
   }
 }

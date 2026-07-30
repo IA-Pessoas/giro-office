@@ -74,7 +74,10 @@ export function createMunicipalTaxesRoutes(deps: RegularizeRouteDeps): Router {
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listMunicipalTaxesQuerySchema, request.query);
-        const list = await municipalTaxesService.list(request.organization_id, query.year);
+        const list = await municipalTaxesService.list({
+          organizationId: request.organization_id,
+          ...query,
+        });
         response.json(createSuccessResponse(list));
       } catch (err) {
         logError("Erro ao listar tributos municipais do regularize", { err });

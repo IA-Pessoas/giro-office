@@ -11,6 +11,7 @@ import { toast } from "react-toastify";
 
 import { api } from "@shared/services/apiClient";
 import { ME_QUERY_KEY } from "./useMe";
+import { PROFILE_UPDATE_ERROR_MESSAGE } from "@shared/utils/meProfileUpdate";
 
 function shouldSkipToastForServerError(error: unknown): boolean {
   return (
@@ -56,8 +57,7 @@ export function useUpdateMe(): UseMutationResult<
         return;
       }
 
-      toast.error("Nao foi possivel atualizar o perfil.");
-      console.log(error);
+      toast.error(PROFILE_UPDATE_ERROR_MESSAGE);
     },
   });
 }

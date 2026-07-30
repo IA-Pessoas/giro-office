@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { UseQueryResult } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   Activity,
   ArrowRight,
@@ -15,6 +14,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Search,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -25,8 +25,11 @@ import {
 import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
-import { useClients } from "@modules/clients";
+import { ClientPickerModal, ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
+import { PaginationControls } from "@shared/components";
+import { useDebouncedValue } from "@shared/hooks";
+import { getLastPage } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
 import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
@@ -41,6 +44,7 @@ import { RegularizePartnerForm } from "./RegularizePartnerForm";
 import { RegularizePasswordForm } from "./RegularizePasswordForm";
 import { RegularizeProcessForm } from "./RegularizeProcessForm";
 import { RegularizeSitePasswordForm } from "./RegularizeSitePasswordForm";
+import { useRegularizeDashboard } from "../hooks/useRegularizeDashboard";
 import {
   useCreateRegularizePasswordMutation,
   useCreateRegularizeSitePasswordMutation,
@@ -48,6 +52,7 @@ import {
   useRegularizePasswords,
   useRegularizeSitePasswordDetail,
   useRegularizeSitePasswords,
+  usePaginatedRegularizeSitePasswords,
   useUpdateRegularizePasswordMutation,
   useUpdateRegularizeSitePasswordMutation,
 } from "../hooks/useRegularizeCredentials";
@@ -55,7 +60,7 @@ import {
   useCreateRegularizeClientPfMutation,
   useCreateRegularizePartnerMutation,
   useRegularizeClientPfDetail,
-  useRegularizeClientPfs,
+  usePaginatedRegularizeClientPfs,
   useRegularizePartners,
   useUpdateRegularizeClientPfMutation,
   useUpdateRegularizePartnerMutation,
@@ -74,6 +79,7 @@ import {
   useRegularizeMunicipalTaxes,
   useRegularizeProcessDetail,
   useRegularizeProcesses,
+  usePaginatedRegularizeProcesses,
   useRemoveRegularizeGuidanceActivityMutation,
   useRemoveRegularizeGuidancePartnerMutation,
   useUpdateRegularizeGuidanceMutation,
@@ -113,21 +119,21 @@ import type {
   UpdateRegularizeProcessPayload,
   UpdateRegularizeSitePasswordPayload,
 } from "../types";
-import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
+import { getRegularizeRequestId } from "../utils/regularizeApiError";
+import {
+  getRegularizeErrorMessage,
+  getRegularizeMutationErrorMessage,
+} from "../utils/regularizeForm";
+import {
+  getRegularizeQueryPolicy,
+  type RegularizeTabId,
+} from "../utils/regularizeQueryPolicy";
 import {
   type RegularizeFormOption,
   regularizePrimaryButtonClassName,
 } from "./regularizeFormControls";
 
-type RegularizeTabId =
-  | "dashboard"
-  | "processes"
-  | "licenses"
-  | "pf"
-  | "partners"
-  | "passwords"
-  | "sites"
-  | "taxes";
+const REGULARIZE_PAGE_SIZE = 20;
 
 type RegularizeTab = {
   id: RegularizeTabId;
@@ -155,10 +161,16 @@ type RegularizeFormState =
   | { type: "license"; mode: "create" }
   | { type: "license"; mode: "edit"; id: RegularizeId };
 
-type ListQuery<T> = Pick<
-  UseQueryResult<T[], Error>,
-  "data" | "error" | "isError" | "isFetching" | "isLoading" | "refetch"
->;
+type ListQuery<T> = {
+  data?: T[];
+  error: Error | null;
+  isError: boolean;
+  isFetching: boolean;
+  isLoading: boolean;
+  refetch: () => Promise<unknown>;
+};
+
+type ProcessSelectionOrigin = "automatic" | "manual";
 
 const REGULARIZE_TABS: RegularizeTab[] = [
   { id: "dashboard", label: "Dashboard", icon: BarChart3 },
@@ -345,7 +357,8 @@ function PrimaryActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={regularizePrimaryButtonClassName}
+      className={cn(regularizePrimaryButtonClassName, "disabled:cursor-not-allowed disabled:opacity-60")}
+      title={disabled ? "Selecione um cliente antes de iniciar este cadastro." : undefined}
     >
       <Icon className="h-4 w-4 shrink-0" />
       <span>{label}</span>
@@ -588,9 +601,21 @@ function DataTable({
   );
 }
 
-function DetailPanel({ children, title }: { children: ReactNode; title: string }) {
+function DetailPanel({
+  children,
+  panelRef,
+  title,
+}: {
+  children: ReactNode;
+  panelRef?: RefObject<HTMLElement | null>;
+  title: string;
+}) {
   return (
-    <aside className="flex h-full min-h-32 flex-col rounded-lg border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+    <aside
+      ref={panelRef}
+      tabIndex={panelRef ? -1 : undefined}
+      className="flex h-full min-h-32 flex-col rounded-lg border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+    >
       <h3 className="text-sm font-semibold text-gray-950 dark:text-white">{title}</h3>
       <div className="mt-3 flex flex-1 flex-col space-y-2 text-sm text-gray-600 dark:text-slate-300">
         {children}
@@ -652,26 +677,112 @@ function MaskedValue() {
   return <span className="font-mono text-gray-500 dark:text-slate-400">********</span>;
 }
 
+function getSiteCredentialDetailStatus(error: unknown): string {
+  const message = getRegularizeErrorMessage(error, "Credencial indisponivel para revelacao.");
+
+  if (/403|forbidden|permission|permiss|acesso negado/i.test(message)) {
+    return "Acesso negado para revelar credenciais.";
+  }
+
+  return "Credencial indisponivel para revelacao.";
+}
+
 export function RegularizePage() {
   const [activeTab, setActiveTab] = useState<RegularizeTabId>("dashboard");
   const [selectedClientPfId, setSelectedClientPfId] = useState<RegularizeId>();
   const [selectedCredentialClientId, setSelectedCredentialClientId] = useState<RegularizeId>();
+  const [selectedCredentialClient, setSelectedCredentialClient] =
+    useState<ClientPickerOption | null>(null);
   const [selectedProcessId, setSelectedProcessId] = useState<RegularizeId>();
+  const [processSelectionOrigin, setProcessSelectionOrigin] = useState<ProcessSelectionOrigin>(
+    "automatic",
+  );
+  const selectedProcessDetailRef = useRef<HTMLElement | null>(null);
   const [activePasswordId, setActivePasswordId] = useState<RegularizeId>();
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
   const [activeForm, setActiveForm] = useState<RegularizeFormState | null>(null);
+  const [processSearch, setProcessSearch] = useState("");
+  const [processStatus, setProcessStatus] = useState("Todos");
+  const [processPage, setProcessPage] = useState(1);
+  const [siteSearch, setSiteSearch] = useState("");
+  const [siteStatus, setSiteStatus] = useState(true);
+  const [sitePage, setSitePage] = useState(1);
+  const [pfSearch, setPfSearch] = useState("");
+  const [pfStatus, setPfStatus] = useState("Todos");
+  const [pfPage, setPfPage] = useState(1);
+  const [taxSearch, setTaxSearch] = useState("");
+  const [taxStatus, setTaxStatus] = useState<"Todos" | "Criado" | "Pendente">("Todos");
+  const [taxType, setTaxType] = useState<"Todos" | "TFF" | "TLP" | "TLL">("Todos");
+  const [taxYear, setTaxYear] = useState(() => new Date().getFullYear());
+  const [taxPage, setTaxPage] = useState(1);
+  const debouncedProcessSearch = useDebouncedValue(processSearch.trim(), 300);
+  const debouncedSiteSearch = useDebouncedValue(siteSearch.trim(), 300);
+  const debouncedPfSearch = useDebouncedValue(pfSearch.trim(), 300);
+  const debouncedTaxSearch = useDebouncedValue(taxSearch.trim(), 300);
+  const isProcessSearchPending = processSearch.trim() !== debouncedProcessSearch;
+  const isSiteSearchPending = siteSearch.trim() !== debouncedSiteSearch;
+  const isPfSearchPending = pfSearch.trim() !== debouncedPfSearch;
+  const isTaxSearchPending = taxSearch.trim() !== debouncedTaxSearch;
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const { access: regularizeAccess } = useModuleAccess("regularize");
   const canRevealCredentials = regularizeAccess.canEdit;
   const canManageRegularizeCore = regularizeAccess.canEdit;
 
-  const clientQuery = useClients({ status: "Ativo", page: 1, limit: 100 });
-  const pfQuery = useRegularizeClientPfs({ status: "Ativo" });
-  const siteQuery = useRegularizeSitePasswords({ status: true });
-  const taxQuery = useRegularizeMunicipalTaxes({ year: currentYear });
-  const processQuery = useRegularizeProcesses({ status: "Todos" });
-  const licenseQuery = useRegularizeLicenses({ status: "Ativo" });
+  const queryPolicy = getRegularizeQueryPolicy(activeTab);
+  const dashboardQuery = useRegularizeDashboard(currentYear, {
+    enabled: queryPolicy.dashboard,
+  });
+  const pfPageQuery = usePaginatedRegularizeClientPfs(
+    {
+      status: pfStatus,
+      search: debouncedPfSearch,
+      page: pfPage,
+      limit: REGULARIZE_PAGE_SIZE,
+    },
+    { enabled: queryPolicy.clientPfs },
+  );
+  const siteQuery = useRegularizeSitePasswords(
+    { status: true },
+    { enabled: queryPolicy.sitePasswords },
+  );
+  const taxQuery = useRegularizeMunicipalTaxes(
+    {
+      year: taxYear,
+      search: debouncedTaxSearch,
+      status: taxStatus,
+      type: taxType === "Todos" ? undefined : taxType,
+      page: taxPage,
+      limit: REGULARIZE_PAGE_SIZE,
+    },
+    { enabled: queryPolicy.municipalTaxes },
+  );
+  const processQuery = useRegularizeProcesses(
+    { status: "Todos" },
+    { enabled: queryPolicy.processes },
+  );
+  const licenseQuery = useRegularizeLicenses(
+    { status: "Ativo" },
+    { enabled: queryPolicy.licenses },
+  );
+  const processPageQuery = usePaginatedRegularizeProcesses(
+    {
+      status: processStatus,
+      search: debouncedProcessSearch,
+      page: processPage,
+      limit: REGULARIZE_PAGE_SIZE,
+    },
+    { enabled: activeTab === "processes" },
+  );
+  const sitePageQuery = usePaginatedRegularizeSitePasswords(
+    {
+      status: siteStatus,
+      search: debouncedSiteSearch,
+      page: sitePage,
+      limit: REGULARIZE_PAGE_SIZE,
+    },
+    { enabled: activeTab === "sites" },
+  );
 
   const createSitePasswordMutation = useCreateRegularizeSitePasswordMutation();
   const updateSitePasswordMutation = useUpdateRegularizeSitePasswordMutation();
@@ -694,21 +805,25 @@ export function RegularizePage() {
   const createLicenseMutation = useCreateRegularizeLicenseMutation();
   const updateLicenseMutation = useUpdateRegularizeLicenseMutation();
 
-  const firstCredentialClientId = clientQuery.data?.items[0]?.id;
-  const firstClientPfId = pfQuery.data?.[0]?.id;
-  const firstProcessId = processQuery.data?.[0]?.id;
-  const currentCredentialClientId = selectedCredentialClientId ?? firstCredentialClientId;
+  const visiblePfRows = isPfSearchPending ? [] : pfPageQuery.data?.data ?? [];
+  const firstClientPfId = visiblePfRows[0]?.id;
+  const visibleProcessRows = isProcessSearchPending ? [] : processPageQuery.data?.data ?? [];
+  const automaticProcessId = visibleProcessRows[0]?.id;
+  const currentCredentialClientId = selectedCredentialClientId;
   const currentClientPfId = selectedClientPfId ?? firstClientPfId;
-  const currentProcessId = selectedProcessId ?? firstProcessId;
+  const currentProcessId = selectedProcessId ?? automaticProcessId;
 
   const partnerQuery = useRegularizePartners(
     currentClientPfId ? { type: "pf", client_id: currentClientPfId } : undefined,
+    { enabled: queryPolicy.partners },
   );
   const credentialQuery = useRegularizePasswords(
     currentCredentialClientId ? { client_id: currentCredentialClientId } : undefined,
+    { enabled: queryPolicy.passwords },
   );
   const guidanceQuery = useRegularizeGuidance(
     currentProcessId ? { process_id: currentProcessId } : undefined,
+    { enabled: queryPolicy.guidance },
   );
   const clientPfDetailQuery = useRegularizeClientPfDetail(currentClientPfId, {
     enabled: activeTab === "pf",
@@ -744,60 +859,60 @@ export function RegularizePage() {
   }, [firstClientPfId, selectedClientPfId]);
 
   useEffect(() => {
-    if (!selectedCredentialClientId && firstCredentialClientId) {
-      setSelectedCredentialClientId(firstCredentialClientId);
+    const result = processPageQuery.data;
+    if (result && result.data.length === 0 && result.total > 0 && processPage > 1) {
+      setSelectedProcessId(undefined);
+      setProcessSelectionOrigin("automatic");
+      setProcessPage(getLastPage(result.total, REGULARIZE_PAGE_SIZE));
     }
-  }, [firstCredentialClientId, selectedCredentialClientId]);
+  }, [processPage, processPageQuery.data]);
 
   useEffect(() => {
-    if (!selectedProcessId && firstProcessId) {
-      setSelectedProcessId(firstProcessId);
+    const result = sitePageQuery.data;
+    if (result && result.data.length === 0 && result.total > 0 && sitePage > 1) {
+      setSitePage(getLastPage(result.total, REGULARIZE_PAGE_SIZE));
     }
-  }, [firstProcessId, selectedProcessId]);
+  }, [sitePage, sitePageQuery.data]);
 
-  const metricData = useMemo(() => {
-    const taxRows = taxQuery.data ?? [];
-    const processRows = processQuery.data ?? [];
-    const completedTaxRows = taxRows.filter((item) => (item.municipalTaxes?.length ?? 0) > 0);
-    const openProcessRows = processRows.filter((item) => {
-      const normalized = normalizeStatus(item.status);
+  useEffect(() => {
+    const result = pfPageQuery.data;
+    if (result && result.data.length === 0 && result.total > 0 && pfPage > 1) {
+      setSelectedClientPfId(undefined);
+      setPfPage(getLastPage(result.total, REGULARIZE_PAGE_SIZE));
+    }
+  }, [pfPage, pfPageQuery.data]);
 
-      return !["cancelado", "concluido", "encerrado"].includes(normalized);
-    });
+  useEffect(() => {
+    const result = taxQuery.data;
+    if (result && result.data.length === 0 && result.total > 0 && taxPage > 1) {
+      setTaxPage(getLastPage(result.total, REGULARIZE_PAGE_SIZE));
+    }
+  }, [taxPage, taxQuery.data]);
 
-    return {
-      activePfs: pfQuery.data?.length ?? 0,
-      activeLicenses: licenseQuery.data?.length ?? 0,
-      openProcesses: openProcessRows.length,
-      processTotal: processRows.length,
-      siteTotal: siteQuery.data?.length ?? 0,
-      taxesDone: completedTaxRows.length,
-      taxesPending: Math.max(taxRows.length - completedTaxRows.length, 0),
-      taxesTotal: taxRows.length,
-    };
-  }, [licenseQuery.data, pfQuery.data, processQuery.data, siteQuery.data, taxQuery.data]);
-  const hasProcessRows = (processQuery.data?.length ?? 0) > 0;
+  const processTableQuery: ListQuery<RegularizeProcessListItem> = {
+    ...processPageQuery,
+    data: isProcessSearchPending ? undefined : visibleProcessRows,
+    isLoading: isProcessSearchPending || processPageQuery.isLoading,
+  };
+  const siteTableQuery: ListQuery<RegularizeSitePasswordListItem> = {
+    ...sitePageQuery,
+    data: isSiteSearchPending ? undefined : sitePageQuery.data?.data,
+    isLoading: isSiteSearchPending || sitePageQuery.isLoading,
+  };
+  const pfTableQuery: ListQuery<RegularizeClientPfListItem> = {
+    ...pfPageQuery,
+    data: isPfSearchPending ? undefined : visiblePfRows,
+    isLoading: isPfSearchPending || pfPageQuery.isLoading,
+  };
+  const taxTableQuery: ListQuery<RegularizeMunicipalTaxesClientSummary> = {
+    ...taxQuery,
+    data: isTaxSearchPending ? undefined : taxQuery.data?.data,
+    isLoading: isTaxSearchPending || taxQuery.isLoading,
+  };
+
+  const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
+  const hasProcessRows = visibleProcessRows.length > 0;
   const hasSiteRows = (siteQuery.data?.length ?? 0) > 0;
-
-  const clientOptions = useMemo<RegularizeFormOption[]>(
-    () =>
-      (clientQuery.data?.items ?? []).map((client) => ({
-        id: client.id,
-        label: client.name || client.company_name || client.id,
-        description: formatDocumentDescription(client.cpf_cnpj),
-      })),
-    [clientQuery.data],
-  );
-
-  const pfOptions = useMemo<RegularizeFormOption[]>(
-    () =>
-      (pfQuery.data ?? []).map((clientPf) => ({
-        id: clientPf.id,
-        label: clientPf.name || clientPf.id,
-        description: formatDocumentDescription(clientPf.cpf),
-      })),
-    [pfQuery.data],
-  );
 
   const siteOptions = useMemo<RegularizeFormOption[]>(
     () =>
@@ -824,7 +939,7 @@ export function RegularizePage() {
       ? municipalTaxDetailQuery.data ?? null
       : null;
   const activeMunicipalTaxDefaultClientId =
-    activeForm?.type === "municipal-tax" ? activeForm.clientId ?? clientOptions[0]?.id ?? "" : "";
+    activeForm?.type === "municipal-tax" ? activeForm.clientId ?? currentCredentialClientId ?? "" : "";
   const activeProcessForForm =
     activeForm?.type === "process" && activeForm.mode === "edit"
       ? processDetailQuery.data ?? null
@@ -854,18 +969,39 @@ export function RegularizePage() {
   const activePartnerForForm =
     activeForm?.type === "partner" && activeForm.mode === "edit" ? activeForm.partner : null;
 
+  function resetProcessSelection() {
+    setSelectedProcessId(undefined);
+    setProcessSelectionOrigin("automatic");
+  }
+
+  function selectProcessManually(processId: RegularizeId) {
+    setSelectedProcessId(processId);
+    setProcessSelectionOrigin("manual");
+
+    if (typeof window === "undefined" || window.matchMedia("(min-width: 1280px)").matches) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      selectedProcessDetailRef.current?.focus({ preventScroll: true });
+      selectedProcessDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   function handleRefreshRegularize() {
-    void Promise.all([
-      clientQuery.refetch(),
-      pfQuery.refetch(),
-      siteQuery.refetch(),
-      taxQuery.refetch(),
-      processQuery.refetch(),
-      licenseQuery.refetch(),
-      partnerQuery.refetch(),
-      credentialQuery.refetch(),
-      guidanceQuery.refetch(),
-    ]);
+    const refreshes: Promise<unknown>[] = [];
+
+    if (queryPolicy.dashboard) refreshes.push(dashboardQuery.refetch());
+    if (queryPolicy.clientPfs) refreshes.push(pfPageQuery.refetch());
+    if (queryPolicy.sitePasswords) refreshes.push(siteQuery.refetch());
+    if (queryPolicy.municipalTaxes) refreshes.push(taxQuery.refetch());
+    if (queryPolicy.processes) refreshes.push(processQuery.refetch());
+    if (queryPolicy.licenses) refreshes.push(licenseQuery.refetch());
+    if (queryPolicy.partners) refreshes.push(partnerQuery.refetch());
+    if (queryPolicy.passwords) refreshes.push(credentialQuery.refetch());
+    if (queryPolicy.guidance) refreshes.push(guidanceQuery.refetch());
+
+    void Promise.all(refreshes);
   }
 
   function closeCoreForm() {
@@ -906,6 +1042,9 @@ export function RegularizePage() {
       }
 
       setSelectedCredentialClientId(payload.client_id);
+      setSelectedCredentialClient((current) =>
+        current?.id === payload.client_id ? current : null,
+      );
       setActivePasswordId(undefined);
       closeCoreForm();
     } catch (error) {
@@ -991,6 +1130,7 @@ export function RegularizePage() {
           : await createProcessMutation.mutateAsync(payload);
 
       setSelectedProcessId(savedProcess.id);
+      setProcessSelectionOrigin("manual");
       toast.success("Processo salvo com sucesso.");
       closeCoreForm();
     } catch (error) {
@@ -1125,9 +1265,18 @@ export function RegularizePage() {
     }
   }
 
+  function openClientScopedForm(form: RegularizeFormState) {
+    if (!currentCredentialClientId) {
+      toast.info("Selecione um cliente no cabeçalho antes de iniciar este cadastro.");
+      return;
+    }
+
+    setActiveForm(form);
+  }
+
   return (
     <div className="mx-auto max-w-[1600px] space-y-6">
-      <header className="flex items-center justify-between gap-4">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
@@ -1140,14 +1289,25 @@ export function RegularizePage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleRefreshRegularize}
-          className="hidden items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:flex"
-        >
-          <RefreshCw className="h-4 w-4" />
-          <span>Atualizar dados</span>
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <ClientPickerModal
+            selectedClient={selectedCredentialClient}
+            onSelectClient={(client) => {
+              setSelectedCredentialClient(client);
+              setSelectedCredentialClientId(client?.id);
+            }}
+            filters={{ status: "Ativo", legacyIntegrationStatusFilter: false }}
+            allowClearSelection
+          />
+          <button
+            type="button"
+            onClick={handleRefreshRegularize}
+            className="hidden items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:flex"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span>Atualizar dados</span>
+          </button>
+        </div>
       </header>
 
       <nav
@@ -1169,19 +1329,57 @@ export function RegularizePage() {
         </div>
       </nav>
 
-      {activeTab === "dashboard" ? (
+      {activeTab === "dashboard" && dashboardQuery.isLoading ? (
+        <div className="flex min-h-64 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-10 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Carregando visão geral...
+        </div>
+      ) : null}
+
+      {activeTab === "dashboard" && dashboardQuery.isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5 shadow-sm dark:border-red-900/40 dark:bg-red-950/20">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-base font-semibold text-red-700 dark:text-red-300">
+                Não foi possível carregar o dashboard.
+              </p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-300/80">
+                Tente novamente. Se o problema continuar, informe o código da solicitação ao
+                suporte.
+              </p>
+              {dashboardRequestId ? (
+                <p className="mt-2 font-mono text-xs text-red-600 dark:text-red-300/80">
+                  Solicitação: {dashboardRequestId}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void dashboardQuery.refetch();
+              }}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200 dark:hover:bg-red-950/50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "dashboard" && dashboardQuery.data ? (
         <section className="space-y-5">
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] xl:items-stretch">
             <DashboardHeroCard
               icon={ClipboardList}
               label={
-                metricData.openProcesses > 0
+                dashboardQuery.data.metrics.openProcesses > 0
                   ? "Processos em acompanhamento"
                   : "Fluxo operacional em dia"
               }
-              value={processQuery.isLoading ? "--" : metricData.openProcesses}
+              value={dashboardQuery.data.metrics.openProcesses}
               description={
-                metricData.openProcesses > 0
+                dashboardQuery.data.metrics.openProcesses > 0
                   ? "Processos que ainda exigem acompanhamento, retorno ou conclusão dentro do Regularize."
                   : "Nenhum processo aberto no momento. Novas demandas passam a aparecer aqui quando entrarem no fluxo."
               }
@@ -1191,23 +1389,23 @@ export function RegularizePage() {
               <MetricTile
                 icon={BadgeCheck}
                 label="Licenças ativas"
-                value={licenseQuery.isLoading ? "--" : metricData.activeLicenses}
+                value={dashboardQuery.data.metrics.activeLicenses}
               />
               <MetricTile
                 icon={UserRound}
                 label="PF ativos"
-                value={pfQuery.isLoading ? "--" : metricData.activePfs}
+                value={dashboardQuery.data.metrics.activeClientPfs}
               />
               <MetricTile
                 icon={Landmark}
                 label="Tributos pendentes"
-                value={taxQuery.isLoading ? "--" : metricData.taxesPending}
-                supporting={`${metricData.taxesDone}/${metricData.taxesTotal} criados em ${currentYear}`}
+                value={dashboardQuery.data.metrics.municipalTaxesPending}
+                supporting={`${dashboardQuery.data.metrics.municipalTaxesCompleted}/${dashboardQuery.data.metrics.municipalTaxesTotal} criados em ${dashboardQuery.data.year}`}
               />
               <MetricTile
                 icon={ShieldCheck}
                 label="Sites ativos"
-                value={siteQuery.isLoading ? "--" : metricData.siteTotal}
+                value={dashboardQuery.data.metrics.activeSites}
               />
             </div>
           </div>
@@ -1219,22 +1417,24 @@ export function RegularizePage() {
               actionLabel="Ver processos"
               onAction={() => setActiveTab("processes")}
             >
-              <QueryStatePanel query={processQuery} emptyTitle="Nenhum processo encontrado.">
-                {(processRows) => (
-                  <DataTable headers={["Processo", "Cliente", "Documento", "Status"]}>
-                    {processRows.slice(0, 6).map((item) => (
-                      <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                        <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
-                        <td className="px-4 py-3">{getProcessClientName(item)}</td>
-                        <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
-                        <td className="px-4 py-3">
-                          <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
-                        </td>
-                      </tr>
-                    ))}
-                  </DataTable>
-                )}
-              </QueryStatePanel>
+              {dashboardQuery.data.recentProcesses.length === 0 ? (
+                <div className="flex min-h-32 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                  Nenhum processo encontrado.
+                </div>
+              ) : (
+                <DataTable headers={["Processo", "Cliente", "Documento", "Status"]}>
+                  {dashboardQuery.data.recentProcesses.map((item) => (
+                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                      <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
+                      <td className="px-4 py-3">{getProcessClientName(item)}</td>
+                      <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
+                      </td>
+                    </tr>
+                  ))}
+                </DataTable>
+              )}
             </DashboardSectionCard>
 
             <DashboardSectionCard
@@ -1243,19 +1443,21 @@ export function RegularizePage() {
               actionLabel="Ver licenças"
               onAction={() => setActiveTab("licenses")}
             >
-              <QueryStatePanel query={licenseQuery} emptyTitle="Nenhuma licença encontrada.">
-                {(licenseRows) => (
-                  <DataTable headers={["Licença", "Protocolo", "Vencimento"]}>
-                    {licenseRows.slice(0, 6).map((item) => (
-                      <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                        <td className="px-4 py-3 font-medium">{formatText(item.type_license)}</td>
-                        <td className="px-4 py-3">{formatText(item.protocol)}</td>
-                        <td className="px-4 py-3">{formatDate(item.due_date)}</td>
-                      </tr>
-                    ))}
-                  </DataTable>
-                )}
-              </QueryStatePanel>
+              {dashboardQuery.data.trackedLicenses.length === 0 ? (
+                <div className="flex min-h-32 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                  Nenhuma licença encontrada.
+                </div>
+              ) : (
+                <DataTable headers={["Licença", "Protocolo", "Vencimento"]}>
+                  {dashboardQuery.data.trackedLicenses.map((item) => (
+                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                      <td className="px-4 py-3 font-medium">{formatText(item.type_license)}</td>
+                      <td className="px-4 py-3">{formatText(item.protocol)}</td>
+                      <td className="px-4 py-3">{formatDate(item.due_date)}</td>
+                    </tr>
+                  ))}
+                </DataTable>
+              )}
             </DashboardSectionCard>
           </div>
         </section>
@@ -1272,21 +1474,70 @@ export function RegularizePage() {
                   icon={Plus}
                   label="Novo processo"
                   onClick={() => setActiveForm({ type: "process", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
           />
 
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_220px] dark:border-gray-700 dark:bg-gray-800">
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Buscar processo
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={processSearch}
+                  onChange={(event) => {
+                    resetProcessSelection();
+                    setProcessSearch(event.target.value);
+                    setProcessPage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="Processo, cliente ou documento"
+                />
+              </div>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Status</span>
+              <RegularizeNativeSelect
+                value={processStatus}
+                onChange={(event) => {
+                  resetProcessSelection();
+                  setProcessStatus(event.target.value);
+                  setProcessPage(1);
+                }}
+              >
+                {["Todos", "Aberto", "Em andamento", "Pendente", "Concluído", "Cancelado"].map(
+                  (status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ),
+                )}
+              </RegularizeNativeSelect>
+            </label>
+          </div>
+
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
             <QueryStatePanel
-              query={processQuery}
+              query={processTableQuery}
               emptyTitle="Nenhum processo encontrado."
               emptyClassName="xl:col-span-2 min-h-[220px] items-center justify-center"
             >
               {(processRows) => (
-                <DataTable headers={["Processo", "Cliente", "Documento", "Status", ""]}>
-                  {processRows.map((item) => (
-                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                <div>
+                  <DataTable headers={["Processo", "Cliente", "Documento", "Status", ""]}>
+                    {processRows.map((item) => (
+                    <tr
+                      key={item.id}
+                      aria-selected={currentProcessId === item.id}
+                      className={cn(
+                        "text-gray-700 transition-colors dark:text-slate-200",
+                        currentProcessId === item.id && "bg-blue-50 dark:bg-blue-950/30",
+                      )}
+                    >
                       <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
                       <td className="px-4 py-3">{getProcessClientName(item)}</td>
                       <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
@@ -1298,14 +1549,14 @@ export function RegularizePage() {
                           <TableActionButton
                             icon={Eye}
                             title="Ver detalhe"
-                            onClick={() => setSelectedProcessId(item.id)}
+                            onClick={() => selectProcessManually(item.id)}
                           />
                           {canManageRegularizeCore ? (
                             <TableActionButton
                               icon={Pencil}
                               title="Editar processo"
                               onClick={() => {
-                                setSelectedProcessId(item.id);
+                                selectProcessManually(item.id);
                                 setActiveForm({ type: "process", mode: "edit", id: item.id });
                               }}
                             />
@@ -1313,13 +1564,39 @@ export function RegularizePage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </DataTable>
+                    ))}
+                  </DataTable>
+                  <PaginationControls
+                    page={processPage}
+                    limit={REGULARIZE_PAGE_SIZE}
+                    total={processPageQuery.data?.total ?? 0}
+                    count={processRows.length}
+                    hasMore={processPageQuery.data?.hasMore ?? false}
+                    isFetching={processPageQuery.isFetching || isProcessSearchPending}
+                    onPrevious={() => {
+                      resetProcessSelection();
+                      setProcessPage((current) => Math.max(1, current - 1));
+                    }}
+                    onNext={() => {
+                      resetProcessSelection();
+                      setProcessPage((current) => current + 1);
+                    }}
+                  />
+                </div>
               )}
             </QueryStatePanel>
 
             {hasProcessRows ? (
-              <DetailPanel title="Processo selecionado">
+              <DetailPanel title="Processo selecionado" panelRef={selectedProcessDetailRef}>
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="text-xs font-medium text-gray-500 dark:text-slate-400"
+                >
+                  {processSelectionOrigin === "manual"
+                    ? "Processo selecionado manualmente."
+                    : "Primeiro processo desta página selecionado automaticamente."}
+                </p>
                 {processDetailQuery.isLoading ? (
                   <FieldLine label="Status" value="Carregando..." />
                 ) : processDetailQuery.data ? (
@@ -1513,7 +1790,8 @@ export function RegularizePage() {
                 <PrimaryActionButton
                   icon={Plus}
                   label="Nova licença"
-                  onClick={() => setActiveForm({ type: "license", mode: "create" })}
+                  onClick={() => openClientScopedForm({ type: "license", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
@@ -1563,16 +1841,61 @@ export function RegularizePage() {
                   icon={Plus}
                   label="Novo PF"
                   onClick={() => setActiveForm({ type: "client-pf", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
           />
 
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_180px] dark:border-gray-700 dark:bg-gray-900">
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Buscar</span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={pfSearch}
+                  onChange={(event) => {
+                    setSelectedClientPfId(undefined);
+                    setPfSearch(event.target.value);
+                    setPfPage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="Buscar por nome, código ou CPF"
+                />
+              </div>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Status</span>
+              <RegularizeNativeSelect
+                value={pfStatus}
+                onChange={(event) => {
+                  setSelectedClientPfId(undefined);
+                  setPfStatus(event.target.value);
+                  setPfPage(1);
+                }}
+              >
+                {["Todos", "Ativo", "Inativo"].map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
+          </div>
+
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-            <QueryStatePanel query={pfQuery} emptyTitle="Nenhum cliente PF encontrado.">
+            <QueryStatePanel
+              query={pfTableQuery}
+              emptyTitle={
+                pfSearch || pfStatus !== "Todos"
+                  ? "Nenhum cliente PF corresponde aos filtros."
+                  : "Nenhum cliente PF cadastrado."
+              }
+            >
               {(pfRows) => (
-                <DataTable headers={["Código", "Nome", "CPF", ""]}>
-                  {pfRows.map((item: RegularizeClientPfListItem) => (
+                <div>
+                  <DataTable headers={["Código", "Nome", "CPF", ""]}>
+                    {pfRows.map((item: RegularizeClientPfListItem) => (
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3">{formatText(item.code)}</td>
                       <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
@@ -1597,8 +1920,25 @@ export function RegularizePage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </DataTable>
+                    ))}
+                  </DataTable>
+                  <PaginationControls
+                    page={pfPage}
+                    limit={REGULARIZE_PAGE_SIZE}
+                    total={pfPageQuery.data?.total ?? 0}
+                    count={pfRows.length}
+                    hasMore={pfPageQuery.data?.hasMore ?? false}
+                    isFetching={pfPageQuery.isFetching || isPfSearchPending}
+                    onPrevious={() => {
+                      setSelectedClientPfId(undefined);
+                      setPfPage((current) => Math.max(1, current - 1));
+                    }}
+                    onNext={() => {
+                      setSelectedClientPfId(undefined);
+                      setPfPage((current) => current + 1);
+                    }}
+                  />
+                </div>
               )}
             </QueryStatePanel>
 
@@ -1631,7 +1971,8 @@ export function RegularizePage() {
                 <PrimaryActionButton
                   icon={Plus}
                   label="Novo sócio"
-                  onClick={() => setActiveForm({ type: "partner", mode: "create" })}
+                  onClick={() => openClientScopedForm({ type: "partner", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
@@ -1678,7 +2019,8 @@ export function RegularizePage() {
                 <PrimaryActionButton
                   icon={Plus}
                   label="Nova senha"
-                  onClick={() => setActiveForm({ type: "password", mode: "create" })}
+                  onClick={() => openClientScopedForm({ type: "password", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
@@ -1689,17 +2031,10 @@ export function RegularizePage() {
               <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <label className="flex w-full flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
                   <span>Cliente</span>
-                  <RegularizeNativeSelect
-                    value={currentCredentialClientId ?? ""}
-                    onChange={(event) => setSelectedCredentialClientId(event.target.value)}
-                  >
-                    <option value="">Selecione</option>
-                    {clientOptions.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {formatOptionLabel(client.label, client.description)}
-                      </option>
-                    ))}
-                  </RegularizeNativeSelect>
+                  <ClientSelectionField
+                    client={selectedCredentialClient}
+                    clientId={currentCredentialClientId}
+                  />
                 </label>
               </div>
 
@@ -1750,7 +2085,13 @@ export function RegularizePage() {
               {passwordDetailQuery.isLoading ? (
                 <FieldLine label="Status" value="Carregando..." />
               ) : passwordDetailQuery.isError ? (
-                <FieldLine label="Status" value="Acesso negado ou indisponível." />
+                <FieldLine
+                  label="Status"
+                  value={getRegularizeErrorMessage(
+                    passwordDetailQuery.error,
+                    "Acesso negado ou indisponível.",
+                  )}
+                />
               ) : passwordDetailQuery.data ? (
                 <>
                   <FieldLine label="Login" value={formatText(passwordDetailQuery.data.login)} />
@@ -1776,20 +2117,55 @@ export function RegularizePage() {
                   icon={Plus}
                   label="Novo site"
                   onClick={() => setActiveForm({ type: "site-password", mode: "create" })}
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
           />
 
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_220px] dark:border-gray-700 dark:bg-gray-800">
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Buscar site
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={siteSearch}
+                  onChange={(event) => {
+                    setSiteSearch(event.target.value);
+                    setSitePage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="Site, esfera, link ou usuário"
+                />
+              </div>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Status</span>
+              <RegularizeNativeSelect
+                value={String(siteStatus)}
+                onChange={(event) => {
+                  setSiteStatus(event.target.value === "true");
+                  setSitePage(1);
+                }}
+              >
+                <option value="true">Ativo</option>
+                <option value="false">Inativo</option>
+              </RegularizeNativeSelect>
+            </label>
+          </div>
+
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)] xl:items-stretch">
             <QueryStatePanel
-              query={siteQuery}
+              query={siteTableQuery}
               emptyTitle="Nenhum site encontrado."
               emptyClassName="xl:col-span-2"
             >
               {(siteRows) => (
-                <DataTable headers={["Site", "Escopo", "Usuário", "Status", ""]}>
-                  {siteRows.map((item: RegularizeSitePasswordListItem) => (
+                <div>
+                  <DataTable headers={["Site", "Escopo", "Usuário", "Status", ""]}>
+                    {siteRows.map((item: RegularizeSitePasswordListItem) => (
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
                       <td className="px-4 py-3">{formatText(item.sphere)}</td>
@@ -1802,7 +2178,11 @@ export function RegularizePage() {
                           <TableActionButton
                             disabled={!canRevealCredentials}
                             icon={Eye}
-                            title="Revelar credencial"
+                            title={
+                              canRevealCredentials
+                                ? "Revelar credencial"
+                                : "Acesso negado para revelar credenciais"
+                            }
                             onClick={() => setActiveSitePasswordId(item.id)}
                           />
                           {canManageRegularizeCore ? (
@@ -1823,8 +2203,19 @@ export function RegularizePage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </DataTable>
+                    ))}
+                  </DataTable>
+                  <PaginationControls
+                    page={sitePage}
+                    limit={REGULARIZE_PAGE_SIZE}
+                    total={sitePageQuery.data?.total ?? 0}
+                    count={siteRows.length}
+                    hasMore={sitePageQuery.data?.hasMore ?? false}
+                    isFetching={sitePageQuery.isFetching || isSiteSearchPending}
+                    onPrevious={() => setSitePage((current) => Math.max(1, current - 1))}
+                    onNext={() => setSitePage((current) => current + 1)}
+                  />
+                </div>
               )}
             </QueryStatePanel>
 
@@ -1832,8 +2223,13 @@ export function RegularizePage() {
               <DetailPanel title="Site selecionado">
                 {sitePasswordDetailQuery.isLoading ? (
                   <FieldLine label="Status" value="Carregando..." />
+                ) : !canRevealCredentials ? (
+                  <DetailEmptyState message="Acesso negado para revelar credenciais." />
                 ) : sitePasswordDetailQuery.isError ? (
-                  <FieldLine label="Status" value="Acesso negado ou indisponível." />
+                  <FieldLine
+                    label="Status"
+                    value={getSiteCredentialDetailStatus(sitePasswordDetailQuery.error)}
+                  />
                 ) : sitePasswordDetailQuery.data ? (
                   <>
                     <FieldLine
@@ -1847,7 +2243,7 @@ export function RegularizePage() {
                     <FieldLine label="Link" value={formatText(sitePasswordDetailQuery.data.link)} />
                   </>
                 ) : (
-                  <DetailEmptyState message="Sem revelação ativa." />
+                  <DetailEmptyState message="Selecione um site para revelar credenciais." />
                 )}
               </DetailPanel>
             ) : null}
@@ -1859,85 +2255,173 @@ export function RegularizePage() {
         <section className="space-y-4">
           <TabActionHeader
             title="Tributos municipais"
-            description={`Controle de TFF, TLP e TLL para ${currentYear}.`}
+            description={`Controle de TFF, TLP e TLL para ${taxYear}.`}
             action={
               canManageRegularizeCore ? (
                 <PrimaryActionButton
                   icon={Plus}
                   label="Novo tributo"
                   onClick={() =>
-                    setActiveForm({
+                    openClientScopedForm({
                       type: "municipal-tax",
                       mode: "create",
-                      clientId: clientOptions[0]?.id,
+                      clientId: currentCredentialClientId,
                     })
                   }
+                  disabled={!currentCredentialClientId}
                 />
               ) : null
             }
           />
 
-          <QueryStatePanel query={taxQuery} emptyTitle="Nenhum tributo encontrado.">
-            {(taxRows) => (
-              <DataTable headers={["Cliente", "Documento", "Cidade", "Ano", "Registro", "Ação"]}>
-                {taxRows.map((item: RegularizeMunicipalTaxesClientSummary) => {
-                  const municipalTaxId = getMunicipalTaxId(item);
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_160px_160px_180px] dark:border-gray-700 dark:bg-gray-800">
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Buscar tributo
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={taxSearch}
+                  onChange={(event) => {
+                    setTaxSearch(event.target.value);
+                    setTaxPage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="Cliente, documento ou cidade"
+                />
+              </div>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Ano</span>
+              <RegularizeNativeSelect
+                value={String(taxYear)}
+                onChange={(event) => {
+                  setTaxYear(Number(event.target.value));
+                  setTaxPage(1);
+                }}
+              >
+                {[currentYear - 1, currentYear, currentYear + 1].map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Status</span>
+              <RegularizeNativeSelect
+                value={taxStatus}
+                onChange={(event) => {
+                  setTaxStatus(event.target.value as "Todos" | "Criado" | "Pendente");
+                  setTaxPage(1);
+                }}
+              >
+                {["Todos", "Criado", "Pendente"].map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Tipo</span>
+              <RegularizeNativeSelect
+                value={taxType}
+                onChange={(event) => {
+                  setTaxType(event.target.value as "Todos" | "TFF" | "TLP" | "TLL");
+                  setTaxPage(1);
+                }}
+              >
+                {["Todos", "TFF", "TLP", "TLL"].map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
+          </div>
 
-                  return (
-                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                      <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                      <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
-                      <td className="px-4 py-3">
-                        {item.city ? (
-                          formatText(item.city)
-                        ) : (
-                          <span className="block text-center text-gray-500 dark:text-slate-400">
-                            -
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{currentYear}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge
-                          config={
-                            municipalTaxId
-                              ? { label: "Criado", variant: "success", icon: CheckCircle2 }
-                              : { label: "Pendente", variant: "warning", icon: CalendarDays }
-                          }
-                          size="sm"
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex justify-center">
-                          {canManageRegularizeCore ? (
-                            <TableTextActionButton
-                              icon={Pencil}
-                              title="Editar tributo"
-                              label="Editar"
-                              onClick={() =>
-                                setActiveForm(
-                                  municipalTaxId
-                                    ? {
-                                        type: "municipal-tax",
-                                        mode: "edit",
-                                        id: municipalTaxId,
-                                        clientId: item.id,
-                                      }
-                                    : {
-                                        type: "municipal-tax",
-                                        mode: "create",
-                                        clientId: item.id,
-                                      },
-                                )
-                              }
-                            />
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </DataTable>
+          <QueryStatePanel
+            query={taxTableQuery}
+            emptyTitle={
+              taxSearch || taxStatus !== "Todos" || taxType !== "Todos" || taxYear !== currentYear
+                ? "Nenhum tributo corresponde aos filtros."
+                : "Nenhum tributo encontrado."
+            }
+          >
+            {(taxRows) => (
+              <div>
+                <DataTable headers={["Cliente", "Documento", "Cidade", "Ano", "Registro", "Ação"]}>
+                  {taxRows.map((item: RegularizeMunicipalTaxesClientSummary) => {
+                    const municipalTaxId = getMunicipalTaxId(item);
+
+                    return (
+                      <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                        <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
+                        <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
+                        <td className="px-4 py-3">
+                          {item.city ? (
+                            formatText(item.city)
+                          ) : (
+                            <span className="block text-center text-gray-500 dark:text-slate-400">
+                              -
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">{taxYear}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge
+                            config={
+                              municipalTaxId
+                                ? { label: "Criado", variant: "success", icon: CheckCircle2 }
+                                : { label: "Pendente", variant: "warning", icon: CalendarDays }
+                            }
+                            size="sm"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex justify-center">
+                            {canManageRegularizeCore ? (
+                              <TableTextActionButton
+                                icon={Pencil}
+                                title="Editar tributo"
+                                label="Editar"
+                                onClick={() =>
+                                  setActiveForm(
+                                    municipalTaxId
+                                      ? {
+                                          type: "municipal-tax",
+                                          mode: "edit",
+                                          id: municipalTaxId,
+                                          clientId: item.id,
+                                        }
+                                      : {
+                                          type: "municipal-tax",
+                                          mode: "create",
+                                          clientId: item.id,
+                                        },
+                                  )
+                                }
+                              />
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </DataTable>
+                <PaginationControls
+                  page={taxPage}
+                  limit={REGULARIZE_PAGE_SIZE}
+                  total={taxQuery.data?.total ?? 0}
+                  count={taxRows.length}
+                  hasMore={taxQuery.data?.hasMore ?? false}
+                  isFetching={taxQuery.isFetching || isTaxSearchPending}
+                  onPrevious={() => setTaxPage((current) => Math.max(1, current - 1))}
+                  onNext={() => setTaxPage((current) => current + 1)}
+                />
+              </div>
             )}
           </QueryStatePanel>
         </section>
@@ -1961,8 +2445,7 @@ export function RegularizePage() {
         open={activeForm?.type === "partner"}
         partner={activePartnerForForm}
         defaultPfId={currentClientPfId ?? ""}
-        clientOptions={clientOptions}
-        pfOptions={pfOptions}
+        defaultPjId={currentCredentialClientId ?? ""}
         isSubmitting={createPartnerMutation.isPending || updatePartnerMutation.isPending}
         onClose={closeCoreForm}
         onSubmit={handleSubmitPartner}
@@ -1973,7 +2456,6 @@ export function RegularizePage() {
         mode={activeForm?.type === "password" ? activeForm.mode : "create"}
         password={activePasswordForForm}
         defaultClientId={currentCredentialClientId ?? ""}
-        clientOptions={clientOptions}
         siteOptions={siteOptions}
         isLoadingInitialValue={
           activeForm?.type === "password" &&
@@ -2004,8 +2486,7 @@ export function RegularizePage() {
         mode={activeForm?.type === "municipal-tax" ? activeForm.mode : "create"}
         municipalTax={activeMunicipalTaxForForm}
         defaultClientId={activeMunicipalTaxDefaultClientId}
-        clientOptions={clientOptions}
-        currentYear={currentYear}
+        currentYear={taxYear}
         isLoadingInitialValue={
           activeForm?.type === "municipal-tax" &&
           activeForm.mode === "edit" &&
@@ -2020,9 +2501,7 @@ export function RegularizePage() {
         open={activeForm?.type === "process"}
         mode={activeForm?.type === "process" ? activeForm.mode : "create"}
         process={activeProcessForForm}
-        defaultClientId={clientOptions[0]?.id ?? ""}
-        clientOptions={clientOptions}
-        pfOptions={pfOptions}
+        defaultClientId={currentCredentialClientId ?? ""}
         isLoadingInitialValue={
           activeForm?.type === "process" &&
           activeForm.mode === "edit" &&
@@ -2070,8 +2549,7 @@ export function RegularizePage() {
         open={activeForm?.type === "license"}
         mode={activeForm?.type === "license" ? activeForm.mode : "create"}
         license={activeLicenseForForm}
-        defaultClientId={clientOptions[0]?.id ?? ""}
-        clientOptions={clientOptions}
+        defaultClientId={currentCredentialClientId ?? ""}
         isLoadingInitialValue={
           activeForm?.type === "license" &&
           activeForm.mode === "edit" &&

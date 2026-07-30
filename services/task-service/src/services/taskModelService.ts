@@ -1,8 +1,16 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  INTEGRACAO_PERMISSION_LEVEL,
+  type IntegracaoPermissionLevel,
+  error as logError,
+  requireIntegracaoRouteAccess,
+  ServiceError,
+} from "@workspace/shared";
+import type { Prisma } from "../generated/prisma/client.js";
 import type { TaskModelGetPayload } from "../generated/prisma/models/TaskModel.js";
 
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
+import { parseTaskModelResponsibleSequence } from "../schemas/taskModelResponsibleSequence.schemas.js";
 
 export interface CreateModelRequest {
   user_id: string;
@@ -16,6 +24,8 @@ export interface CreateModelRequest {
   billing: string;
   prevision: number;
   type?: string | null;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
 }
 
 export interface UpdateModelRequest {
@@ -31,12 +41,16 @@ export interface UpdateModelRequest {
   billing: string;
   prevision: number;
   type?: string | null;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
 }
 
 export interface DeleteModelRequest {
   task_id: string;
   user_id: string;
   organization_id?: string | null;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
 }
 
 const TASK_MODEL_SELECT = {
@@ -56,28 +70,53 @@ const TASK_MODEL_LIST_SELECT = {
   id: true,
   name: true,
   department_id: true,
+  department: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
 } as const;
 
 export type TaskModelRow = TaskModelGetPayload<{ select: typeof TASK_MODEL_SELECT }>;
 export type TaskModelListItem = TaskModelGetPayload<{ select: typeof TASK_MODEL_LIST_SELECT }>;
 
+export interface ListTaskModelsParams {
+  organizationId: string;
+  type?: string;
+  billing?: string;
+  search: string;
+  page: number;
+  limit: number;
+  paginationRequested: boolean;
+  userId: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
+}
+
+export interface PaginatedTaskModels {
+  data: TaskModelListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
 export class TaskModelService {
-  async #requireManagerPermission(userId: string): Promise<void> {
-    const user = await prismaClient.user.findFirst({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new ServiceError(404, "Usuário não encontrado.");
-    }
-
-    if (user.permission < 2) {
-      throw new ServiceError(403, "Usuário não tem permissão.");
-    }
-  }
-
   async createModel(data: CreateModelRequest): Promise<{ create: TaskModelRow }> {
     try {
+      requireIntegracaoRouteAccess("POST", "/task/model", {
+        userId: data.user_id,
+        level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId: data.organization_id,
+        isOwner: data.isOwner === true,
+      });
+
+      const responsibleSequence = parseTaskModelResponsibleSequence({
+        responsible_id: data.responsible_id,
+        responsible2_id: data.responsible2_id ?? null,
+        responsible3_id: data.responsible3_id ?? null,
+      });
       const exists = await prismaClient.taskModel.findFirst({
         where: {
           name: data.name,
@@ -90,15 +129,13 @@ export class TaskModelService {
         throw new ServiceError(409, "Tarefa com esse nome nesse departamento já foi cadastrada.");
       }
 
-      await this.#requireManagerPermission(data.user_id);
-
       const create = await prismaClient.taskModel.create({
         data: {
           name: data.name,
           department_id: data.department_id,
-          responsible_id: data.responsible_id,
-          responsible2_id: data.responsible2_id ?? null,
-          responsible3_id: data.responsible3_id ?? null,
+          responsible_id: responsibleSequence.responsible_id,
+          responsible2_id: responsibleSequence.responsible2_id,
+          responsible3_id: responsibleSequence.responsible3_id,
           observations: data.observations ?? null,
           billing: data.billing,
           prevision: data.prevision,
@@ -125,7 +162,15 @@ export class TaskModelService {
     }
   }
 
-  async detailModel(taskId: string, organizationId: string): Promise<{ detail: TaskModelRow }> {
+  async detailModel(
+    taskId: string,
+    organizationId: string,
+    authorization: {
+      userId: string;
+      integracaoLevel?: IntegracaoPermissionLevel;
+      isOwner?: boolean;
+    } = { userId: "" },
+  ): Promise<{ detail: TaskModelRow }> {
     try {
       const detail = await prismaClient.taskModel.findFirst({
         where: { id: taskId, organization_id: organizationId },
@@ -135,6 +180,14 @@ export class TaskModelService {
       if (!detail) {
         throw new ServiceError(404, "Tarefa não encontrada.");
       }
+
+      requireIntegracaoRouteAccess("GET", "/task/model", {
+        userId: authorization.userId,
+        level: authorization.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId,
+        resourceOrganizationId: organizationId,
+        isOwner: authorization.isOwner === true,
+      });
 
       return { detail };
     } catch (err: unknown) {
@@ -146,6 +199,11 @@ export class TaskModelService {
 
   async updateModel(data: UpdateModelRequest): Promise<TaskModelRow> {
     try {
+      const responsibleSequence = parseTaskModelResponsibleSequence({
+        responsible_id: data.responsible_id,
+        responsible2_id: data.responsible2_id ?? null,
+        responsible3_id: data.responsible3_id ?? null,
+      });
       const organizationId = data.organization_id ?? "";
       const exists = await prismaClient.taskModel.findFirst({
         where: { id: data.task_id, organization_id: organizationId },
@@ -155,16 +213,33 @@ export class TaskModelService {
         throw new ServiceError(404, "Tarefa não existe.");
       }
 
-      await this.#requireManagerPermission(data.user_id);
+      requireIntegracaoRouteAccess("PUT", "/task/model", {
+        userId: data.user_id,
+        level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId,
+        resourceOrganizationId: organizationId,
+        isOwner: data.isOwner === true,
+        requestedFields: [
+          "name",
+          "department_id",
+          "responsible_id",
+          "responsible2_id",
+          "responsible3_id",
+          "observations",
+          "billing",
+          "prevision",
+          "type",
+        ],
+      });
 
       const updated = await prismaClient.taskModel.update({
         where: { id: data.task_id, organization_id: organizationId },
         data: {
           name: data.name,
           department_id: data.department_id,
-          responsible_id: data.responsible_id,
-          responsible2_id: data.responsible2_id ?? null,
-          responsible3_id: data.responsible3_id ?? null,
+          responsible_id: responsibleSequence.responsible_id,
+          responsible2_id: responsibleSequence.responsible2_id,
+          responsible3_id: responsibleSequence.responsible3_id,
           observations: data.observations ?? null,
           billing: data.billing,
           prevision: data.prevision,
@@ -192,22 +267,58 @@ export class TaskModelService {
   }
 
   async listModel(
-    type: string | undefined,
-    billing: string | undefined,
-    organizationId: string,
-  ): Promise<TaskModelListItem[]> {
+    params: ListTaskModelsParams,
+  ): Promise<TaskModelListItem[] | PaginatedTaskModels> {
     try {
-      const list = await prismaClient.taskModel.findMany({
-        where: {
-          organization_id: organizationId,
-          ...(type ? { type } : {}),
-          ...(billing ? { billing } : {}),
-        },
-        select: TASK_MODEL_LIST_SELECT,
-        orderBy: { name: "asc" },
+      requireIntegracaoRouteAccess("GET", "/task/model/list", {
+        userId: params.userId,
+        level: params.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId: params.organizationId,
+        isOwner: params.isOwner === true,
       });
 
-      return list;
+      const where: Prisma.TaskModelWhereInput = {
+        organization_id: params.organizationId,
+        ...(params.type ? { type: params.type } : {}),
+        ...(params.billing ? { billing: params.billing } : {}),
+        ...(params.search
+          ? {
+              OR: [
+                { name: { contains: params.search, mode: "insensitive" } },
+                {
+                  department: {
+                    name: { contains: params.search, mode: "insensitive" },
+                  },
+                },
+              ],
+            }
+          : {}),
+      };
+      const findManyArgs = {
+        where,
+        select: TASK_MODEL_LIST_SELECT,
+        orderBy: { name: "asc" as const },
+        ...(params.paginationRequested
+          ? { skip: (params.page - 1) * params.limit, take: params.limit }
+          : {}),
+      };
+
+      if (!params.paginationRequested) {
+        return prismaClient.taskModel.findMany(findManyArgs);
+      }
+
+      const [list, total] = await Promise.all([
+        prismaClient.taskModel.findMany(findManyArgs),
+        prismaClient.taskModel.count({ where }),
+      ]);
+
+      return {
+        data: list,
+        total,
+        page: params.page,
+        limit: params.limit,
+        hasMore: params.page * params.limit < total,
+      };
     } catch (err: unknown) {
       logError("Erro ao listar modelos de tarefa", { err });
       if (err instanceof ServiceError) throw err;
@@ -226,10 +337,36 @@ export class TaskModelService {
         throw new ServiceError(404, "Tarefa não existe.");
       }
 
-      await this.#requireManagerPermission(data.user_id);
+      requireIntegracaoRouteAccess("DELETE", "/task/model", {
+        userId: data.user_id,
+        level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+        organizationId,
+        resourceOrganizationId: organizationId,
+        isOwner: data.isOwner === true,
+      });
 
-      await prismaClient.taskModel.delete({
-        where: { id: data.task_id, organization_id: organizationId },
+      try {
+        await prismaClient.taskModel.delete({
+          where: { id: data.task_id, organization_id: organizationId },
+        });
+      } catch (err: unknown) {
+        logError("Erro ao excluir modelo de tarefa no banco", { err });
+        if (typeof err === "object" && err !== null && "code" in err && err.code === "P2003") {
+          throw new ServiceError(
+            409,
+            "Não é possível excluir o modelo enquanto houver dependências.",
+          );
+        }
+        throw err;
+      }
+
+      await audit.createLog({
+        userId: data.user_id,
+        organizationId: data.organization_id,
+        action: "Exclusão",
+        referring: "integracao.tasksModel",
+        referringId: data.task_id,
+        changes: "{}",
       });
 
       return { response: true };

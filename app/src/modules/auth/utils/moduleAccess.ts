@@ -1,10 +1,9 @@
 export const GLOBAL_ADMIN_PERMISSION = 2;
-export const MODULE_VIEW_PERMISSION = 0;
-export const MODULE_EDIT_PERMISSION = 1;
-export const MODULE_ADMIN_PERMISSION = 2;
+export const MODULE_VIEW_PERMISSION = 1;
+export const MODULE_EDIT_PERMISSION = 2;
+export const MODULE_ADMIN_PERMISSION = 3;
 
 export const MODULE_KEYS = [
-  "atendimento",
   "certificado",
   "comercial",
   "contabil",
@@ -13,21 +12,30 @@ export const MODULE_KEYS = [
   "integracao",
   "marketing",
   "parcelamento",
-  "pec",
   "pessoal",
   "regularize",
   "rh",
   "ti",
   "triagem",
-  "wiki",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
-export const DISABLED_MODULE_KEYS = ["marketing", "triagem"] as const satisfies
-  readonly ModuleKey[];
+export const DISABLED_MODULE_KEYS = [
+  "comercial",
+  "marketing",
+  "triagem",
+] as const satisfies readonly ModuleKey[];
 const DISABLED_MODULE_KEY_SET = new Set<ModuleKey>(DISABLED_MODULE_KEYS);
 export type AccessLevel = "none" | "view" | "edit" | "admin";
 export type AccessSource = "admin" | "department" | "additional-module" | "none";
+
+export type ModulePermissionSubject =
+  | {
+      type?: "owner" | "admin" | "user" | null;
+      modules?: Record<string, number> | null;
+    }
+  | null
+  | undefined;
 
 export type ModuleAccess = {
   level: AccessLevel;
@@ -37,7 +45,7 @@ export type ModuleAccess = {
   source: AccessSource;
 };
 
-export type AdditionalModulePermissions = Record<string, number | null>;
+export type AdditionalModulePermissions = Record<string, number>;
 
 export interface ResolveModuleAccessParams {
   userPermission?: number | null;
@@ -48,7 +56,10 @@ export interface ResolveModuleAccessParams {
 }
 
 export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
-  "/comercial": "comercial",
+  "/clients": "integracao",
+  "/projects": "integracao",
+  "/tasks": "integracao",
+  "/configs/integracao": "integracao",
   "/certificados": "certificado",
   "/regularize": "regularize",
   "/fiscal": "fiscal",
@@ -59,8 +70,68 @@ export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/tecnologia": "ti",
 };
 
+function isWithinRoute(routePath: string, basePath: string): boolean {
+  return routePath === basePath || routePath.startsWith(`${basePath}/`);
+}
+
+export function normalizeRoutePath(routePath: string): string {
+  const pathWithoutQuery = routePath.split("?")[0]?.split("#")[0] ?? "";
+  const normalizedPath =
+    pathWithoutQuery.length > 1 ? pathWithoutQuery.replace(/\/+$/, "") : pathWithoutQuery;
+
+  return normalizedPath || "/";
+}
+
+export function getModulePermissionLevel(
+  subject: ModulePermissionSubject,
+  module: ModuleKey,
+): number | null {
+  if (subject?.type === "owner") {
+    return MODULE_ADMIN_PERMISSION;
+  }
+
+  const permission = subject?.modules?.[module];
+
+  return permission === 0 || permission === 1 || permission === 2 || permission === 3
+    ? permission
+    : null;
+}
+
+export function canViewIntegrationRoute(
+  routePath: string,
+  subject: ModulePermissionSubject,
+): boolean {
+  const integrationLevel = getModulePermissionLevel(subject, "integracao");
+
+  if (integrationLevel === null) {
+    return false;
+  }
+
+  const normalizedPath = normalizeRoutePath(routePath);
+
+  if (isWithinRoute(normalizedPath, "/tasks")) {
+    return true;
+  }
+
+  if (isWithinRoute(normalizedPath, "/configs/integracao")) {
+    return integrationLevel >= MODULE_VIEW_PERMISSION;
+  }
+
+  return integrationLevel >= MODULE_VIEW_PERMISSION;
+}
+
+export function canViewTasksOnlyIntegrationRoute(
+  routePath: string,
+  subject: ModulePermissionSubject,
+): boolean {
+  if (getModulePermissionLevel(subject, "integracao") !== 0) {
+    return true;
+  }
+
+  return isWithinRoute(normalizeRoutePath(routePath), "/tasks");
+}
+
 const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
-  atendimento: "atendimento",
   certificado: "certificado",
   comercial: "comercial",
   contabil: "contabil",
@@ -68,15 +139,14 @@ const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
   "contabil societario": "contabil",
   "contabil societário": "contabil",
   "contabil tributario": "contabil",
-  "contábil": "contabil",
+  contábil: "contabil",
   financeiro: "financeiro",
   fiscal: "fiscal",
   integracao: "integracao",
   "integracao de sistemas": "integracao",
-  "integração": "integracao",
+  integração: "integracao",
   marketing: "marketing",
   parcelamento: "parcelamento",
-  pec: "pec",
   pessoal: "pessoal",
   "departamento pessoal": "pessoal",
   regularize: "regularize",
@@ -85,7 +155,6 @@ const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
   tecnologia: "ti",
   ti: "ti",
   triagem: "triagem",
-  wiki: "wiki",
 };
 
 function createModuleAccess(level: AccessLevel, source: AccessSource): ModuleAccess {
@@ -102,19 +171,6 @@ export function isModuleDisabled(module: ModuleKey): boolean {
   return DISABLED_MODULE_KEY_SET.has(module);
 }
 
-const ACCESS_LEVEL_RANK: Record<AccessLevel, number> = {
-  none: 0,
-  view: 1,
-  edit: 2,
-  admin: 3,
-};
-
-function getHighestAccessLevel(firstLevel: AccessLevel, secondLevel: AccessLevel): AccessLevel {
-  return ACCESS_LEVEL_RANK[secondLevel] > ACCESS_LEVEL_RANK[firstLevel]
-    ? secondLevel
-    : firstLevel;
-}
-
 function normalizeDepartmentName(value?: string | null): string {
   if (!value) {
     return "";
@@ -127,24 +183,8 @@ function normalizeDepartmentName(value?: string | null): string {
     .toLowerCase();
 }
 
-function resolveAccessLevelFromGlobalPermission(permission?: number | null): AccessLevel {
-  if (typeof permission === "number" && permission >= GLOBAL_ADMIN_PERMISSION) {
-    return "admin";
-  }
-
-  if (permission === MODULE_EDIT_PERMISSION) {
-    return "edit";
-  }
-
-  if (permission === MODULE_VIEW_PERMISSION) {
-    return "view";
-  }
-
-  return "none";
-}
-
 export function resolveAccessLevelFromAdditionalPermission(
-  permission: number | null | undefined,
+  permission: number | undefined,
 ): AccessLevel {
   if (permission === MODULE_ADMIN_PERMISSION) {
     return "admin";
@@ -172,8 +212,6 @@ export function resolveDepartmentModuleKey(departmentName?: string | null): Modu
 }
 
 export function resolveModuleAccess({
-  userPermission,
-  departmentModule,
   module,
   additionalModulePermissions,
   isGlobalAdmin = false,
@@ -188,16 +226,6 @@ export function resolveModuleAccess({
 
   const additionalPermission = additionalModulePermissions?.[module];
   const additionalLevel = resolveAccessLevelFromAdditionalPermission(additionalPermission);
-
-  if (departmentModule === module) {
-    return createModuleAccess(
-      getHighestAccessLevel(
-        resolveAccessLevelFromGlobalPermission(userPermission),
-        additionalLevel,
-      ),
-      "department",
-    );
-  }
 
   if (additionalLevel !== "none") {
     return createModuleAccess(additionalLevel, "additional-module");

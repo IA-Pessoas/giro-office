@@ -5,14 +5,17 @@ import type {
   TaskModelDetail,
   TaskModelListItem,
   TaskModelListParams,
+  TaskModelOptions,
   UpdateTaskModelData,
 } from "../types/taskModel";
 import { unwrapServiceEnvelope } from "./envelope.contract.js";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 export const TASK_MODEL_ENDPOINTS = {
   crud: "/task/model",
   list: "/task/model/list",
   dependent: "/task/model/dependent",
+  options: "/task/deps/options",
 } as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -23,16 +26,32 @@ export function buildTaskModelListParams(params: TaskModelListParams = {}) {
   return {
     ...(params.type ? { type: params.type } : {}),
     ...(params.billing ? { billing: params.billing } : {}),
+    ...(params.search ? { search: params.search.trim() } : {}),
+    ...(params.page !== undefined ? { page: params.page } : {}),
+    ...(params.limit !== undefined ? { limit: params.limit } : {}),
   };
 }
 
+export function normalizeTaskModelResponsibleSequence(payload: Pick<
+  CreateTaskModelData,
+  "responsible_id" | "responsible2_id" | "responsible3_id"
+>) {
+  const responsible_id = payload.responsible_id;
+  const responsible2_id = responsible_id ? payload.responsible2_id : "";
+  const responsible3_id = responsible2_id ? payload.responsible3_id : "";
+
+  return { responsible_id, responsible2_id, responsible3_id };
+}
+
 export function buildCreateTaskModelPayload(payload: CreateTaskModelData) {
+  const responsibleSequence = normalizeTaskModelResponsibleSequence(payload);
+
   return {
     name: payload.name,
     department_id: payload.department_id,
-    responsible_id: payload.responsible_id,
-    responsible2_id: payload.responsible2_id || null,
-    responsible3_id: payload.responsible3_id || null,
+    responsible_id: responsibleSequence.responsible_id,
+    responsible2_id: responsibleSequence.responsible2_id || null,
+    responsible3_id: responsibleSequence.responsible3_id || null,
     observations: payload.observations || null,
     billing: payload.billing,
     prevision: payload.prevision,
@@ -41,13 +60,15 @@ export function buildCreateTaskModelPayload(payload: CreateTaskModelData) {
 }
 
 export function buildUpdateTaskModelPayload(payload: UpdateTaskModelData) {
+  const responsibleSequence = normalizeTaskModelResponsibleSequence(payload);
+
   return {
     task_id: payload.id,
     name: payload.name,
     department_id: payload.department_id,
-    responsible_id: payload.responsible_id,
-    responsible2_id: payload.responsible2_id || null,
-    responsible3_id: payload.responsible3_id || null,
+    responsible_id: responsibleSequence.responsible_id,
+    responsible2_id: responsibleSequence.responsible2_id || null,
+    responsible3_id: responsibleSequence.responsible3_id || null,
     observations: payload.observations || null,
     billing: payload.billing,
     prevision: payload.prevision,
@@ -69,6 +90,31 @@ export function buildDeleteDependentPayload(id: string) {
 
 export function unwrapTaskModelList(body: unknown): TaskModelListItem[] {
   return unwrapServiceEnvelope(body) as TaskModelListItem[];
+}
+
+export function unwrapTaskModelOptions(body: unknown): TaskModelOptions {
+  return unwrapServiceEnvelope(body) as TaskModelOptions;
+}
+
+export function unwrapTaskModelPage(
+  body: unknown,
+  fallback: { page: number; limit: number },
+): PaginatedResult<TaskModelListItem> {
+  const data = unwrapServiceEnvelope(body) as
+    | TaskModelListItem[]
+    | PaginatedResult<TaskModelListItem>;
+
+  if (Array.isArray(data)) {
+    return {
+      data,
+      total: data.length,
+      page: fallback.page,
+      limit: fallback.limit,
+      hasMore: false,
+    };
+  }
+
+  return data;
 }
 
 export function unwrapTaskModelDetail(body: unknown): TaskModelDetail {

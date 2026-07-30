@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import {
@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { canSSRAdmin } from "@modules/auth";
+import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import {
   TaskModelModal,
   canManageTaskModelConfig,
@@ -47,65 +47,66 @@ import {
   TASK_TABLE_HEAD_CELL_CLASSNAME,
 } from "@modules/integracao/components/taskWorkspaceUi";
 import { Dialog } from "@shared/components/ui/Dialog";
-import { useMe } from "@shared/hooks";
+import { PaginationControls } from "@shared/components";
+import { useDebouncedValue, useMe } from "@shared/hooks";
+import { getLastPage } from "@shared/pagination/pagination";
+
+const TASK_MODEL_PAGE_SIZE = 20;
 
 export default function TaskModelsConfig() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
+  const isSearchPending = searchTerm.trim() !== debouncedSearch;
   const {
     models,
+    total,
+    hasMore,
     isLoading,
     isError,
     createModel,
     updateModel,
     deleteModel,
     refresh,
-  } = useTaskModels();
+  } = useTaskModels({
+    search: debouncedSearch,
+    page,
+    limit: TASK_MODEL_PAGE_SIZE,
+  });
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const meQuery = useMe();
-  const canManageTaskModels = canManageTaskModelConfig(meQuery.data?.permission);
+  const canManageTaskModels = canManageTaskModelConfig(integracaoAccess);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<TaskModel | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [modelToDelete, setModelToDelete] = useState<TaskModel | null>(null);
 
-  const filteredModels = useMemo(() => {
-    const lowerSearch = searchTerm.trim().toLowerCase();
-
-    if (!lowerSearch) {
-      return models;
+  useEffect(() => {
+    if (!isLoading && models.length === 0 && total > 0 && page > 1) {
+      setPage(getLastPage(total, TASK_MODEL_PAGE_SIZE));
     }
-
-    return models.filter((model) => {
-      const departmentLabel = getTaskModelDepartmentLabel(model).toLowerCase();
-
-      return (
-        model.name.toLowerCase().includes(lowerSearch) ||
-        departmentLabel.includes(lowerSearch) ||
-        model.department_id.toLowerCase().includes(lowerSearch)
-      );
-    });
-  }, [models, searchTerm]);
+  }, [isLoading, models.length, page, total]);
 
   const stats = useMemo(() => {
     const departmentsCount = new Set(models.map((model) => model.department_id)).size;
-    const unresolvedDepartments = models.filter((model) => !model.department?.name).length;
 
     return [
       {
         label: "Modelos",
-        value: models.length,
-        description: "Templates disponíveis para criação de tarefas de integração.",
+        value: total,
+        description: "Templates em todo o resultado filtrado.",
       },
       {
-        label: "Departamentos",
+        label: "Departamentos na página",
         value: departmentsCount,
-        description: "Áreas vinculadas aos modelos carregados.",
+        description: "Áreas representadas nos registros exibidos.",
       },
       {
-        label: "Sem nome de departamento",
-        value: unresolvedDepartments,
-        description: "Modelos carregados sem enriquecimento da lista de departamentos.",
+        label: "Exibidos",
+        value: models.length,
+        description: "Registros presentes nesta página.",
       },
     ];
-  }, [models]);
+  }, [models, total]);
 
   function handleOpenCreate() {
     if (!canManageTaskModels) {
@@ -149,7 +150,8 @@ export default function TaskModelsConfig() {
   }
 
   const hasSearch = Boolean(searchTerm.trim());
-  const showEmptyState = !isLoading && filteredModels.length === 0;
+  const showLoading = isLoading || isSearchPending;
+  const showEmptyState = !showLoading && models.length === 0;
 
   return (
     <>
@@ -181,7 +183,11 @@ export default function TaskModelsConfig() {
           </div>
 
           {canManageTaskModels ? (
-            <button type="button" onClick={handleOpenCreate} className={PROJECT_PRIMARY_BUTTON_CLASSNAME}>
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
+            >
               <Plus className="h-4 w-4" />
               Novo modelo
             </button>
@@ -195,7 +201,9 @@ export default function TaskModelsConfig() {
                 <ShieldAlert className="h-5 w-5" />
               </div>
               <div>
-                <p className="font-semibold text-slate-900 dark:text-white">Acesso somente leitura</p>
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  Acesso somente leitura
+                </p>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   A criação e manutenção de modelos exige permissão administrativa.
                 </p>
@@ -208,7 +216,9 @@ export default function TaskModelsConfig() {
           {stats.map((stat) => (
             <section key={stat.label} className={`${PROJECT_PANEL_CLASSNAME} p-5`}>
               <p className="text-sm text-slate-500 dark:text-slate-400">{stat.label}</p>
-              <p className="mt-1 text-3xl font-semibold text-slate-900 dark:text-white">{stat.value}</p>
+              <p className="mt-1 text-3xl font-semibold text-slate-900 dark:text-white">
+                {stat.value}
+              </p>
               <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{stat.description}</p>
             </section>
           ))}
@@ -225,7 +235,10 @@ export default function TaskModelsConfig() {
                 <input
                   type="text"
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                    setPage(1);
+                  }}
                   className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
                   placeholder="Buscar por nome ou departamento"
                 />
@@ -264,27 +277,36 @@ export default function TaskModelsConfig() {
                 </tr>
               </thead>
               <tbody>
-                {isLoading ? (
+                {showLoading ? (
                   <tr>
-                    <td colSpan={3} className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400">
+                    <td
+                      colSpan={3}
+                      className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400"
+                    >
                       <LoaderCircle className="mr-2 inline h-4 w-4 animate-spin" />
                       Carregando modelos...
                     </td>
                   </tr>
                 ) : showEmptyState ? (
                   <tr>
-                    <td colSpan={3} className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400">
+                    <td
+                      colSpan={3}
+                      className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400"
+                    >
                       {getTaskModelEmptyStateMessage({ hasSearch, isError })}
                     </td>
                   </tr>
                 ) : (
-                  filteredModels.map((model) => (
+                  models.map((model) => (
                     <tr
                       key={model.id}
                       className="border-b border-slate-200/80 last:border-b-0 dark:border-slate-800"
                     >
                       <td className={`${TASK_TABLE_CELL_CLASSNAME} pl-5`}>
-                        <p className="font-semibold text-slate-900 dark:text-white" title={model.name}>
+                        <p
+                          className="font-semibold text-slate-900 dark:text-white"
+                          title={model.name}
+                        >
                           {model.name}
                         </p>
                       </td>
@@ -325,6 +347,16 @@ export default function TaskModelsConfig() {
               </tbody>
             </table>
           </div>
+          <PaginationControls
+            page={page}
+            limit={TASK_MODEL_PAGE_SIZE}
+            total={total}
+            count={models.length}
+            hasMore={hasMore}
+            isFetching={isLoading || isSearchPending}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+            onNext={() => setPage((current) => current + 1)}
+          />
         </section>
       </div>
 
@@ -365,8 +397,7 @@ export default function TaskModelsConfig() {
         }
       >
         <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Tem certeza que deseja excluir o modelo
-          {" "}
+          Tem certeza que deseja excluir o modelo{" "}
           <span className="font-semibold text-slate-900 dark:text-white">
             {modelToDelete?.name}
           </span>
@@ -377,6 +408,6 @@ export default function TaskModelsConfig() {
   );
 }
 
-export const getServerSideProps = canSSRAdmin(async () => {
+export const getServerSideProps = canSSRAuth(async () => {
   return { props: {} };
 });

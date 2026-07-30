@@ -27,6 +27,9 @@ const tiTestEnv = {
   auditServiceToken: "audit-service-token-test",
   internalServiceToken: "ti-service-internal-token-test",
   passwordEncryptionKey: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
+  supabaseUrl: "https://example.supabase.co",
+  supabaseServiceRoleKey: "test-supabase-service-role-key",
+  tiRequestImageBucket: "ti-request-attachments-private",
   allowedOrigins: ["*"],
   enableApiDocs: false,
   logLevel: "info",
@@ -57,6 +60,7 @@ const tiPublicOpenApiOperations = {
   "/ti/passwords/list": ["get"],
   "/ti/passwords": ["post"],
   "/ti/passwords/{id}": ["get", "patch"],
+  "/ti/passwords/{id}/deactivate": ["post"],
   "/ti/extensions/list": ["get"],
   "/ti/extensions": ["post"],
   "/ti/extensions/{id}": ["get", "patch"],
@@ -166,7 +170,7 @@ describe("ti-service app", () => {
       .set(INTERNAL_SERVICE_TOKEN_HEADER, "ti-service-internal-token-test")
       .set(FORWARDED_AUTH_USER_ID_HEADER, "00000000-0000-4000-8000-000000000001")
       .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, "10000000-0000-4000-8000-000000000001")
-      .set(FORWARDED_AUTH_PERMISSION_HEADER, "1")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "2")
       .expect(200);
 
     expect(response.body.success).toBe(true);
@@ -185,6 +189,57 @@ describe("ti-service app", () => {
     for (const path of tiPublicOpenApiPaths) {
       expect(response.body.paths).toHaveProperty(path);
     }
+
+    const extensionNumberSchema = {
+      type: "string",
+      minLength: 4,
+      maxLength: 4,
+      pattern: "^[0-9]{4}$",
+      example: "1001",
+    };
+
+    expect(response.body.components.schemas.TiExtensionInput.properties.number).toEqual(
+      extensionNumberSchema,
+    );
+    expect(response.body.components.schemas.TiExtensionUpdateInput.properties.number).toEqual(
+      extensionNumberSchema,
+    );
+
+    const passwordStatusParameter = response.body.paths["/ti/passwords/list"].get.parameters.find(
+      (parameter: { name?: string }) => parameter.name === "status",
+    );
+    expect(passwordStatusParameter).toMatchObject({
+      in: "query",
+      required: false,
+      schema: {
+        type: "string",
+        enum: ["active", "inactive", "all"],
+        default: "active",
+      },
+    });
+
+    expect(response.body.components.schemas.TiPasswordDeactivateInput).toEqual({
+      type: "object",
+      required: ["reason"],
+      properties: {
+        reason: { type: "string", minLength: 1, maxLength: 500 },
+      },
+      additionalProperties: false,
+    });
+
+    expect(response.body.paths["/ti/passwords/{id}/deactivate"].post.responses).toEqual(
+      expect.objectContaining({
+        "200": expect.any(Object),
+        "400": expect.any(Object),
+        "401": expect.any(Object),
+        "403": expect.any(Object),
+        "404": expect.any(Object),
+        "409": expect.any(Object),
+      }),
+    );
+    expect(response.body.paths["/ti/passwords/{id}"].get.responses).toHaveProperty("409");
+    expect(response.body.paths["/ti/passwords/{id}"].patch.responses).toHaveProperty("409");
+    expect(response.body.paths["/ti/passwords/{id}"]).not.toHaveProperty("delete");
 
     const operationIds = new Set<string>();
     for (const [path, expectedMethods] of Object.entries(tiPublicOpenApiOperations)) {
@@ -222,18 +277,64 @@ describe("ti-service app", () => {
         },
       },
     });
+
+    expect(
+      response.body.paths["/ti/stock/items/list"].get.responses["200"].content["application/json"]
+        .schema,
+    ).toMatchObject({
+      type: "object",
+      required: ["success", "data"],
+      properties: {
+        success: { type: "boolean", enum: [true] },
+        data: {
+          type: "object",
+          required: ["data", "total", "page", "limit", "hasMore"],
+          properties: {
+            data: { type: "array" },
+            total: { type: "integer", minimum: 0 },
+            page: { type: "integer", minimum: 1 },
+            limit: { type: "integer", minimum: 1 },
+            hasMore: { type: "boolean" },
+          },
+        },
+      },
+    });
+
+    const createMessageOperation = response.body.paths["/ti/requests/{id}/messages"].post;
+
+    expect(createMessageOperation.requestBody.content["application/json"].schema).toEqual({
+      $ref: "#/components/schemas/TiMessageInput",
+    });
+    expect(createMessageOperation.requestBody.content["multipart/form-data"]).toMatchObject({
+      schema: {
+        type: "object",
+        required: ["message"],
+        properties: {
+          message: { type: "string", minLength: 1 },
+          file: { type: "string", format: "binary" },
+        },
+      },
+      encoding: {
+        file: {
+          contentType: "image/jpeg, image/png, image/webp",
+        },
+      },
+    });
+    expect(createMessageOperation.responses).toHaveProperty("400");
+    expect(createMessageOperation.responses).toHaveProperty("413");
+    expect(createMessageOperation.responses).toHaveProperty("500");
   });
 });
 
 describe("ti-service permission middleware", () => {
-  it("aceita permissao 2 como nivel administrativo do TI", async () => {
+  it("aceita permissao 3 como nivel administrativo do TI", async () => {
     const app = createPermissionTestApp();
 
     const response = await request(app)
       .get("/admin")
       .set(FORWARDED_AUTH_USER_ID_HEADER, "user-1")
       .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, "org-1")
-      .set(FORWARDED_AUTH_PERMISSION_HEADER, "2")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "3")
       .expect(200);
 
     expect(response.body).toEqual({ ok: true });

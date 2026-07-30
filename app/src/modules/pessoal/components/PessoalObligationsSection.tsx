@@ -1,6 +1,18 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AlertCircle, CheckSquare, Loader2, PlusCircle, RefreshCw, Save } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  AlertCircle,
+  CheckSquare,
+  ChevronDown,
+  Loader2,
+  PlusCircle,
+  RefreshCw,
+  Save,
+} from "lucide-react";
 
+import { resolveDepartmentModuleKey } from "@modules/auth";
+import { departmentService } from "@modules/departments";
+import { listAdminUsers } from "@modules/users";
+import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -9,7 +21,9 @@ import {
   usePessoalObligation,
   useUpdatePessoalObligationMutation,
 } from "../hooks/usePessoalObligations";
+import { pessoalQueryKey } from "../hooks/queryKeys";
 import type { PessoalObligationUpdatePayload } from "../types/obligations";
+import { formatPessoalObligationGenerationSummary } from "../utils/obligationGenerationSummary";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
   pessoalCheckboxCardClassName,
@@ -59,6 +73,16 @@ export function PessoalObligationsSection({
     selectedClientId,
     competence,
   );
+  const responsibleUsersQuery = useFetch(
+    pessoalQueryKey("obligations", "users", "active"),
+    () => listAdminUsers("active"),
+    { enabled: canEdit && Boolean(obligation) },
+  );
+  const departmentsQuery = useFetch(
+    pessoalQueryKey("obligations", "departments"),
+    () => departmentService.list(),
+    { enabled: canEdit && Boolean(obligation) },
+  );
   const [responsibleId, setResponsibleId] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -66,6 +90,28 @@ export function PessoalObligationsSection({
   const isMutating =
     createMutation.isPending || updateMutation.isPending || generateMutation.isPending;
   const isFormDisabled = !canEdit || obligationQuery.isLoading || isMutating;
+  const departmentNameById = useMemo(
+    () =>
+      new Map(
+        (departmentsQuery.data ?? []).map((department) => [department.id, department.name]),
+      ),
+    [departmentsQuery.data],
+  );
+  const responsibleUsers = useMemo(
+    () =>
+      (responsibleUsersQuery.data ?? []).filter((user) => {
+        const departmentName =
+          departmentNameById.get(user.department_id) ?? user.department?.name ?? null;
+
+        return resolveDepartmentModuleKey(departmentName) === "pessoal";
+      }),
+    [departmentNameById, responsibleUsersQuery.data],
+  );
+  const hasSelectedResponsible = responsibleUsers.some((user) => user.id === responsibleId);
+  const areResponsibleOptionsLoading =
+    responsibleUsersQuery.isLoading || departmentsQuery.isLoading;
+  const hasResponsibleOptionsError =
+    responsibleUsersQuery.isError || departmentsQuery.isError;
 
   function clearSuccessTimeout() {
     if (successTimeoutRef.current !== null) {
@@ -94,20 +140,8 @@ export function PessoalObligationsSection({
     return () => clearSuccessTimeout();
   }, []);
 
-  if (!hasClient) {
-    return (
-      <PessoalPlaceholderSection
-        icon={CheckSquare}
-        title="Obrigações"
-        description="Selecione um cliente para continuar."
-        requiresClient
-        hasClient={false}
-      />
-    );
-  }
-
   async function handleCreate() {
-    if (!canEdit) {
+    if (!canEdit || !hasClient) {
       return;
     }
 
@@ -139,13 +173,7 @@ export function PessoalObligationsSection({
     try {
       const result = await generateMutation.mutateAsync();
 
-      showTemporarySuccess(
-        [
-          `Geração concluída: ${result.created} criadas`,
-          `${result.skippedExisting} existentes`,
-          `${result.skippedNoPayroll} sem folha.`,
-        ].join(", "),
-      );
+      showTemporarySuccess(formatPessoalObligationGenerationSummary(result));
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível gerar as obrigações."));
     }
@@ -177,6 +205,18 @@ export function PessoalObligationsSection({
     void updateField({ responsavel_id: optional(responsibleId) });
   }
 
+  function getResponsiblePlaceholder() {
+    if (areResponsibleOptionsLoading) {
+      return "Carregando responsáveis";
+    }
+
+    if (hasResponsibleOptionsError) {
+      return "Responsáveis indisponíveis";
+    }
+
+    return "Sem responsável";
+  }
+
   return (
     <section
       className={cn(
@@ -194,7 +234,7 @@ export function PessoalObligationsSection({
               </h2>
             </div>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Controle mensal gerado a partir da configuração de folha do cliente.
+              A geração em massa avalia todos os clientes ativos de Departamento Pessoal.
             </p>
           </div>
 
@@ -208,19 +248,21 @@ export function PessoalObligationsSection({
                 className={pessoalTextFieldClassName}
               />
             </label>
-            <button
-              type="button"
-              onClick={() => obligationQuery.refetch()}
-              disabled={obligationQuery.isFetching}
-              className={pessoalSecondaryButtonClassName}
-            >
-              {obligationQuery.isFetching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Atualizar
-            </button>
+            {hasClient ? (
+              <button
+                type="button"
+                onClick={() => obligationQuery.refetch()}
+                disabled={obligationQuery.isFetching}
+                className={pessoalSecondaryButtonClassName}
+              >
+                {obligationQuery.isFetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Atualizar
+              </button>
+            ) : null}
             {canEdit ? (
               <>
                 <button
@@ -234,39 +276,51 @@ export function PessoalObligationsSection({
                   ) : (
                     <RefreshCw className="h-4 w-4" />
                   )}
-                  Gerar
+                  Gerar todos
                 </button>
-                <button
-                  type="button"
-                  onClick={handleCreate}
-                  disabled={!competence || Boolean(obligation) || isMutating}
-                  className={pessoalPrimaryButtonClassName}
-                >
-                  {createMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <PlusCircle className="h-4 w-4" />
-                  )}
-                  Criar
-                </button>
+                {hasClient ? (
+                  <button
+                    type="button"
+                    onClick={handleCreate}
+                    disabled={!competence || Boolean(obligation) || isMutating}
+                    className={pessoalPrimaryButtonClassName}
+                  >
+                    {createMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <PlusCircle className="h-4 w-4" />
+                    )}
+                    Criar
+                  </button>
+                ) : null}
               </>
             ) : null}
           </div>
         </div>
 
-        {obligationQuery.isLoading ? (
+        {!hasClient ? (
+          <PessoalPlaceholderSection
+            icon={CheckSquare}
+            title="Obrigação individual"
+            description="Selecione um cliente para consultar ou editar a obrigação individual."
+            requiresClient
+            hasClient={false}
+          />
+        ) : null}
+
+        {hasClient && obligationQuery.isLoading ? (
           <StateMessage icon={Loader2} title="Carregando obrigação" tone="loading">
             Buscando a competência selecionada.
           </StateMessage>
         ) : null}
 
-        {obligationQuery.isError ? (
+        {hasClient && obligationQuery.isError ? (
           <StateMessage icon={AlertCircle} title="Não foi possível carregar" tone="danger">
             {getPessoalErrorMessage(obligationQuery.error, "Falha ao carregar obrigação.")}
           </StateMessage>
         ) : null}
 
-        {!obligationQuery.isLoading && !obligationQuery.isError && !obligation ? (
+        {hasClient && !obligationQuery.isLoading && !obligationQuery.isError && !obligation ? (
           <StateMessage icon={CheckSquare} title="Obrigação não cadastrada">
             Nenhuma obrigação cadastrada para este cliente nesta competência.
           </StateMessage>
@@ -294,14 +348,30 @@ export function PessoalObligationsSection({
               className="grid gap-3 md:grid-cols-[1fr_auto]"
             >
               <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-                Responsável ID
-                <input
-                  type="text"
-                  value={responsibleId}
-                  onChange={(event) => setResponsibleId(event.target.value)}
-                  disabled={isFormDisabled}
-                  className={pessoalTextFieldClassName}
-                />
+                Responsável
+                <div className="relative">
+                  <select
+                    value={responsibleId}
+                    onChange={(event) => setResponsibleId(event.target.value)}
+                    disabled={
+                      isFormDisabled ||
+                      areResponsibleOptionsLoading ||
+                      hasResponsibleOptionsError
+                    }
+                    className={`${pessoalTextFieldClassName} appearance-none pr-12`}
+                  >
+                    <option value="">{getResponsiblePlaceholder()}</option>
+                    {responsibleId && !hasSelectedResponsible ? (
+                      <option value={responsibleId}>Responsável atual</option>
+                    ) : null}
+                    {responsibleUsers.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name || user.login}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                </div>
               </label>
               {canEdit ? (
                 <button

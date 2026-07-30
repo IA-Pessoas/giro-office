@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 import { regularizeService } from "../services/regularizeService";
 import type {
@@ -26,13 +27,26 @@ type RegularizeReadQueryOptions = {
   enabled?: boolean;
 };
 
-export function useRegularizeClientPfs(
-  filters: RegularizeClientPfListFilters,
+async function invalidateRegularizePeople(
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: regularizeQueryKeys.people(),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: regularizeQueryKeys.dashboardRoot(),
+    }),
+  ]);
+}
+
+export function usePaginatedRegularizeClientPfs(
+  filters: RegularizeClientPfListFilters & { page: number; limit: number },
   options?: RegularizeReadQueryOptions,
-): UseQueryResult<RegularizeClientPfListItem[], Error> {
+): UseQueryResult<PaginatedResult<RegularizeClientPfListItem>, Error> {
   return useFetch(
-    regularizeQueryKeys.clientPfs(filters),
-    () => regularizeService.listClientPfs(filters),
+    regularizeQueryKeys.clientPfsPage(filters),
+    () => regularizeService.listClientPfsPage(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
     },
@@ -61,11 +75,7 @@ export function useCreateRegularizeClientPfMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createClientPf(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.people(),
-      });
-    },
+    onSuccess: () => invalidateRegularizePeople(queryClient),
   });
 }
 
@@ -78,11 +88,7 @@ export function useUpdateRegularizeClientPfMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updateClientPf(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.people(),
-      });
-    },
+    onSuccess: () => invalidateRegularizePeople(queryClient),
   });
 }
 
@@ -110,11 +116,7 @@ export function useCreateRegularizePartnerMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.createPartner(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.people(),
-      });
-    },
+    onSuccess: () => invalidateRegularizePeople(queryClient),
   });
 }
 
@@ -127,11 +129,7 @@ export function useUpdateRegularizePartnerMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updatePartner(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: regularizeQueryKeys.people(),
-      });
-    },
+    onSuccess: () => invalidateRegularizePeople(queryClient),
   });
 }
 

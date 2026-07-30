@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizePasswordPayload,
@@ -61,7 +62,6 @@ function buildPasswordFormState(
 }
 
 export function RegularizePasswordForm({
-  clientOptions,
   defaultClientId,
   isLoadingInitialValue = false,
   isSubmitting,
@@ -72,7 +72,6 @@ export function RegularizePasswordForm({
   password,
   siteOptions,
 }: {
-  clientOptions: RegularizeFormOption[];
   defaultClientId: string;
   isLoadingInitialValue?: boolean;
   isSubmitting: boolean;
@@ -177,20 +176,9 @@ export function RegularizePasswordForm({
           <RegularizeFormError message={formError} />
 
           <div className="grid gap-4 md:grid-cols-2">
-            <RegularizeFormField label="Cliente" required>
-              <RegularizeNativeSelect
-                value={formState.client_id}
-                onChange={(event) => handleChange("client_id", event.target.value)}
-              >
-                <option value="">Selecione</option>
-                {clientOptions.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.label}
-                    {client.description ? `, ${client.description}` : ""}
-                  </option>
-                ))}
-              </RegularizeNativeSelect>
-            </RegularizeFormField>
+          <RegularizeFormField label="Cliente" required>
+              <ClientSelectionField clientId={formState.client_id} />
+          </RegularizeFormField>
 
             <RegularizeFormField label="Site" required>
               <RegularizeNativeSelect

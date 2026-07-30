@@ -95,6 +95,33 @@ const TI_TABS: TiTabConfig[] = [
   },
 ];
 
+const SELF_SERVICE_TI_TABS: TiTabConfig[] = [
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    panel: TiDashboardTab,
+  },
+  {
+    id: "requests",
+    label: "Chamados",
+    icon: Ticket,
+    panel: TiRequestsTab,
+  },
+  {
+    id: "terms",
+    label: "Meus termos",
+    icon: FileCheck2,
+    panel: TiTermsTab,
+  },
+  {
+    id: "extensions",
+    label: "Ramais",
+    icon: Phone,
+    panel: TiExtensionsTab,
+  },
+];
+
 function TiAccessDenied() {
   return (
     <section className={cn(tiPanelClassName, "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100")}>
@@ -126,7 +153,12 @@ export function TiPage() {
   const { access, isLoading: isModuleAccessLoading } = useModuleAccess("ti");
   const [activeTab, setActiveTab] = useState<TiTabId>("dashboard");
 
-  const activeTabConfig = TI_TABS.find((tab) => tab.id === activeTab) ?? TI_TABS[0];
+  const canManageTi = access.isAdmin;
+  const visibleTabs = canManageTi ? TI_TABS : SELF_SERVICE_TI_TABS;
+  const visibleActiveTab = visibleTabs.some((tab) => tab.id === activeTab)
+    ? activeTab
+    : visibleTabs[0].id;
+  const activeTabConfig = visibleTabs.find((tab) => tab.id === visibleActiveTab) ?? visibleTabs[0];
   const ActivePanel = activeTabConfig.panel;
 
   return (
@@ -156,9 +188,9 @@ export function TiPage() {
           >
             <div className={cn("overflow-x-auto px-2 pb-1", tiThinScrollbarClassName)}>
               <div role="tablist" className="flex min-w-max items-center justify-center gap-1 pl-7 md:min-w-full">
-                {TI_TABS.map((tab) => {
+                {visibleTabs.map((tab) => {
                   const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
+                  const isActive = visibleActiveTab === tab.id;
 
                   return (
                     <button
@@ -186,7 +218,11 @@ export function TiPage() {
             </div>
           </nav>
 
-          <div role="tabpanel" id={`ti-panel-${activeTab}`} aria-labelledby={`ti-tab-${activeTab}`}>
+          <div
+            role="tabpanel"
+            id={`ti-panel-${visibleActiveTab}`}
+            aria-labelledby={`ti-tab-${visibleActiveTab}`}
+          >
             <ActivePanel />
           </div>
         </>

@@ -54,12 +54,48 @@ async function runTest(name, fn) {
   }
 }
 
+function readWorkspaceSource(relativePath) {
+  return readFileSync(new URL(relativePath, import.meta.url), "utf8");
+}
+
+const contabilServiceSources = {
+  authMiddleware: readWorkspaceSource(
+    "../../../../services/contabil-service/src/middlewares/isAuthenticated.ts",
+  ),
+  controlRoute: readWorkspaceSource(
+    "../../../../services/contabil-service/src/routes/control.routes.ts",
+  ),
+  responsibleRoute: readWorkspaceSource(
+    "../../../../services/contabil-service/src/routes/responsible.routes.ts",
+  ),
+  relationshipRoute: readWorkspaceSource(
+    "../../../../services/contabil-service/src/routes/relationship.routes.ts",
+  ),
+  controlRouteTest: readWorkspaceSource(
+    "../../../../services/contabil-service/src/test/control.routes.test.ts",
+  ),
+  responsibleRouteTest: readWorkspaceSource(
+    "../../../../services/contabil-service/src/test/responsible.routes.test.ts",
+  ),
+  relationshipRouteTest: readWorkspaceSource(
+    "../../../../services/contabil-service/src/test/relationship.routes.test.ts",
+  ),
+  gatewayServiceRegistry: readWorkspaceSource(
+    "../../../../services/gateway/src/config/serviceRegistry.ts",
+  ),
+};
+
 await (async () => {
   await runTest("contabil page filters the client picker by accounting department", () => {
     const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
 
-    assert.match(source, /useClients\(\{[\s\S]*ref:\s*"deps"/);
-    assert.match(source, /useClients\(\{[\s\S]*status:\s*"Departamento contabil"/);
+    assert.match(source, /ClientPickerModal/);
+    assert.match(source, /headerAction=\{/);
+    assert.doesNotMatch(source, /clientPickerContent=/);
+    assert.match(source, /ref:\s*"deps"/);
+    assert.match(source, /status:\s*"Departamento contabil"/);
+    assert.doesNotMatch(source, /useClients\(/);
+    assert.doesNotMatch(source, /page:\s*1/);
   });
 
   await runTest("contabil endpoints use the expected contract", () => {
@@ -75,6 +111,38 @@ await (async () => {
     );
   });
 
+  await runTest("contabil-service blocks viewer writes and allows editor writes", () => {
+    assert.match(contabilServiceSources.authMiddleware, /const CONTABIL_WRITE_PERMISSION = 2;/);
+    assert.match(contabilServiceSources.authMiddleware, /requireContabilWritePermission/);
+
+    assert.equal(
+      contabilServiceSources.controlRoute.match(/requireContabilWritePermission/g)?.length,
+      3,
+    );
+    assert.equal(
+      contabilServiceSources.responsibleRoute.match(/requireContabilWritePermission/g)?.length,
+      4,
+    );
+    assert.equal(
+      contabilServiceSources.relationshipRoute.match(/requireContabilWritePermission/g)?.length,
+      4,
+    );
+
+    for (const source of [
+      contabilServiceSources.controlRouteTest,
+      contabilServiceSources.responsibleRouteTest,
+      contabilServiceSources.relationshipRouteTest,
+    ]) {
+      assert.match(source, /function gatewayHeaders\(permission = 2\)/);
+      assert.match(source, /gatewayHeaders\(1\)/);
+    }
+
+    assert.match(
+      contabilServiceSources.gatewayServiceRegistry,
+      /key:\s*"contabil-service",[\s\S]*internalServiceToken:\s*env\.auditServiceToken,[\s\S]*permissionModule:\s*"contabil"/,
+    );
+  });
+
   await runTest("buildContabilControlParams maps clientId and competence to API params", () => {
     assert.deepEqual(
       buildContabilControlParams({
@@ -86,6 +154,23 @@ await (async () => {
         competence: "2026-05",
       },
     );
+  });
+
+  await runTest("viewer control section reads existing control without bootstrap write", () => {
+    const componentSource = readFileSync(
+      new URL("./components/ContabilControlSection.tsx", import.meta.url),
+      "utf8",
+    );
+    const hookSource = readFileSync(
+      new URL("./hooks/useContabilControl.ts", import.meta.url),
+      "utf8",
+    );
+
+    assert.match(hookSource, /useContabilControlDetail/);
+    assert.match(componentSource, /enabled:\s*!canEdit/);
+    assert.match(componentSource, /canEdit\s*\?\s*bootstrapMutation\.data\s*:\s*detailQuery\.data/);
+    assert.match(componentSource, /if\s*\(!canEdit\)\s*\{/);
+    assert.match(hookSource, /contabilControlService\.getControl/);
   });
 
   await runTest("unwrapContabilEnvelope extracts data directly from the backend response", () => {
@@ -258,12 +343,37 @@ await (async () => {
     ]);
   });
 
-  await runTest("relationship field registry matches the backend contract", () => {
+  await runTest("relationship field registry keeps bidding beside system in the UI order", () => {
     assert.deepEqual(
       CONTABIL_RELATIONSHIP_FIELDS.map((field) => field.field),
-      ["bidding", "chart_accounts", "tool", "system", "note"],
+      ["chart_accounts", "tool", "system", "bidding", "note"],
     );
-    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[0].requiredOnCreate, true);
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.field, "bidding");
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.requiredOnCreate, true);
+  });
+
+  await runTest("relationship bidding checkbox uses compact form proportions", () => {
+    const source = readFileSync(
+      new URL("./components/ContabilRelationshipSection.tsx", import.meta.url),
+      "utf8",
+    );
+    const textFieldsStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXT_FIELDS.map");
+    const textareaStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXTAREA_FIELDS.map");
+    const checkboxStart = source.indexOf("{CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map");
+    const checkboxSource = source.slice(
+      checkboxStart,
+      source.indexOf("{submitError", checkboxStart),
+    );
+
+    assert.ok(textFieldsStart < textareaStart);
+    assert.ok(textFieldsStart < checkboxStart);
+    assert.ok(checkboxStart < textareaStart);
+    assert.match(checkboxSource, /className="flex h-11 items-center gap-3/);
+    assert.match(checkboxSource, /className="h-4 w-4/);
+    assert.doesNotMatch(
+      checkboxSource,
+      /rounded-xl border border-gray-200 bg-gray-50\/70 px-4 py-3/,
+    );
   });
 
   await runTest("responsible and relationship form helpers normalize nullable backend values", () => {
@@ -282,7 +392,7 @@ await (async () => {
     });
   });
 
-  await runTest("assignable user helper maps active users into select labels", () => {
+  await runTest("assignable user helper limits selector options to accounting users", () => {
     const options = mapAssignableUsersToContabilOptions([
       {
         id: "user-1",
@@ -295,6 +405,20 @@ await (async () => {
         id: "user-2",
         name: "Bruno",
         status: "active",
+        departmentName: "RH",
+        photoUrl: null,
+      },
+      {
+        id: "user-3",
+        name: "Carla",
+        status: "active",
+        departmentName: "Contabil Fiscal",
+        photoUrl: null,
+      },
+      {
+        id: "user-4",
+        name: "Diego",
+        status: "active",
         departmentName: null,
         photoUrl: null,
       },
@@ -305,13 +429,46 @@ await (async () => {
         value: "user-1",
         label: "Ana - Contábil",
       },
-      {
-        value: "user-2",
-        label: "Bruno",
-      },
+      { value: "user-3", label: "Carla - Contabil Fiscal" },
     ]);
     assert.equal(getContabilSelectLabel("user-1", options), "Ana - Contábil");
     assert.equal(getContabilSelectLabel(null, options), "Não informado");
+    assert.equal(getContabilSelectLabel("missing-user", options), "Usuário não encontrado");
+    assert.deepEqual(
+      mapAssignableUsersToContabilOptions([
+        {
+          id: "user-2",
+          name: "Bruno",
+          status: "active",
+          departmentName: "RH",
+          photoUrl: null,
+        },
+      ], ["user-2"]),
+      [{ value: "user-2", label: "Bruno - RH" }],
+    );
+  });
+
+  await runTest("responsible display loads user labels without exposing IDs", () => {
+    const source = readFileSync(
+      new URL("./components/ContabilResponsibleSection.tsx", import.meta.url),
+      "utf8",
+    );
+
+    assert.match(source, /enabled:\s*Boolean\([\s\S]*responsible\?\./);
+    assert.doesNotMatch(source, /return options\.find\(\(option\) => option\.value === value\)\?\.label \?\? value/);
+  });
+
+  await runTest("client accounting page shows unavailable service before opening the shell", () => {
+    const source = readFileSync(
+      new URL("../../pages/clients/[id]/contabil.tsx", import.meta.url),
+      "utf8",
+    );
+    const unavailableIndex = source.indexOf("client.contabil === false");
+    const shellIndex = source.indexOf("<ContabilShell");
+
+    assert.ok(unavailableIndex >= 0);
+    assert.ok(shellIndex >= 0);
+    assert.ok(unavailableIndex < shellIndex);
   });
 
   await runTest("text helper distinguishes filled and blank values", () => {
@@ -329,7 +486,7 @@ await (async () => {
     });
   });
 
-  await runTest("resolveModuleAccess enables read-only mode for the module of the current department", () => {
+  await runTest("resolveModuleAccess ignores the current department without a module grant", () => {
     assert.deepEqual(
       resolveModuleAccess({
         module: "contabil",
@@ -337,16 +494,16 @@ await (async () => {
         departmentModule: "contabil",
       }),
       {
-        level: "view",
-        canView: true,
+        level: "none",
+        canView: false,
         canEdit: false,
         isAdmin: false,
-        source: "department",
+        source: "none",
       },
     );
   });
 
-  await runTest("resolveModuleAccess enables edit mode for department users", () => {
+  await runTest("resolveModuleAccess ignores legacy user permission levels", () => {
     assert.deepEqual(
       resolveModuleAccess({
         module: "contabil",
@@ -354,22 +511,22 @@ await (async () => {
         departmentModule: "contabil",
       }),
       {
-        level: "edit",
-        canView: true,
-        canEdit: true,
+        level: "none",
+        canView: false,
+        canEdit: false,
         isAdmin: false,
-        source: "department",
+        source: "none",
       },
     );
   });
 
-  await runTest("resolveModuleAccess uses additional modules outside the primary department", () => {
+  await runTest("resolveModuleAccess uses persisted module permissions", () => {
     assert.deepEqual(
       resolveModuleAccess({
         module: "contabil",
         userPermission: 1,
         departmentModule: "rh",
-        additionalModulePermissions: { contabil: 0 },
+        additionalModulePermissions: { contabil: 1 },
       }),
       {
         level: "view",
@@ -381,7 +538,7 @@ await (async () => {
     );
   });
 
-  await runTest("resolveModuleAccess keeps department precedence over matching additional module values", () => {
+  await runTest("resolveModuleAccess does not restore department access when module permission is absent", () => {
     assert.deepEqual(
       resolveModuleAccess({
         module: "contabil",
@@ -390,11 +547,11 @@ await (async () => {
         additionalModulePermissions: { contabil: null },
       }),
       {
-        level: "edit",
-        canView: true,
-        canEdit: true,
+        level: "none",
+        canView: false,
+        canEdit: false,
         isAdmin: false,
-        source: "department",
+        source: "none",
       },
     );
   });

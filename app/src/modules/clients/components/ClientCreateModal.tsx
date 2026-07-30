@@ -6,7 +6,11 @@ import { useMe } from "@shared/hooks/useMe";
 
 import { useCreateClientMutation } from "../hooks/useClients";
 import { mapClientStatusToApi } from "../utils/statusMapper";
-import { validateCpfCnpjDocument } from "../utils/documentValidation";
+import {
+  formatCpfCnpjInput,
+  normalizeDocumentValue,
+  validateCpfCnpjDocument,
+} from "../utils/documentValidation";
 import type { Client, ClientFormValues } from "../types";
 import { ClientForm } from "./ClientForm";
 
@@ -21,6 +25,7 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
   const createClientMutation = useCreateClientMutation();
   const initialValues = useMemo<ClientFormValues>(
     () => ({
+      type: "PJ",
       name: "",
       company_name: "",
       fantasy_name: "",
@@ -31,10 +36,33 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
     [],
   );
   const [formValues, setFormValues] = useState<ClientFormValues>(initialValues);
+  const [showDocumentError, setShowDocumentError] = useState(false);
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = event.target;
-    const nextValue = type === "checkbox" ? (event.target as HTMLInputElement).checked : value;
+    const { name, value, type: inputType } = event.target;
+
+    if (name === "type") {
+      const nextType = value === "PF" ? "PF" : "PJ";
+
+      setShowDocumentError(false);
+      setFormValues((current) => ({
+        ...current,
+        type: nextType,
+        cpf_cnpj: formatCpfCnpjInput(current.cpf_cnpj, nextType),
+      }));
+      return;
+    }
+
+    if (name === "cpf_cnpj") {
+      setShowDocumentError(false);
+      setFormValues((current) => ({
+        ...current,
+        cpf_cnpj: formatCpfCnpjInput(value, current.type ?? "PJ"),
+      }));
+      return;
+    }
+
+    const nextValue = inputType === "checkbox" ? (event.target as HTMLInputElement).checked : value;
 
     setFormValues((current) => ({
       ...current,
@@ -44,6 +72,7 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
 
   const handleClose = () => {
     setFormValues(initialValues);
+    setShowDocumentError(false);
     onClose();
   };
 
@@ -55,12 +84,19 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
       return;
     }
 
+    const documentError = formValues.cpf_cnpj.trim()
+      ? validateCpfCnpjDocument(formValues.cpf_cnpj, formValues.type)
+      : null;
+    if (documentError) {
+      setShowDocumentError(true);
+    } else {
+      setShowDocumentError(false);
+    }
+
     if (!formValues.name.trim() || !formValues.cpf_cnpj.trim()) {
       toast.error("Preencha nome e CPF/CNPJ para continuar.");
       return;
     }
-
-    const documentError = validateCpfCnpjDocument(formValues.cpf_cnpj);
 
     if (documentError) {
       toast.error(documentError);
@@ -70,10 +106,11 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
     try {
       const createdClient = await createClientMutation.mutateAsync({
         organization_id: organizationId,
+        type: formValues.type,
         name: formValues.name.trim(),
         company_name: formValues.company_name.trim() || null,
         fantasy_name: formValues.fantasy_name.trim() || null,
-        cpf_cnpj: formValues.cpf_cnpj.replace(/\D/g, ""),
+        cpf_cnpj: normalizeDocumentValue(formValues.cpf_cnpj),
         status: mapClientStatusToApi(formValues.status),
         service_unique: formValues.service_unique,
       });
@@ -112,6 +149,8 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
         onChange={handleInputChange}
         onSubmit={() => void handleCreate()}
         onCancel={handleClose}
+        showPersonType
+        showDocumentError={showDocumentError}
         submitLabel={createClientMutation.isPending ? "Salvando..." : "Salvar"}
         disabled={createClientMutation.isPending || meQuery.isLoading}
       />

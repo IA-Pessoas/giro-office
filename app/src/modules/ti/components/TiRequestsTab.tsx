@@ -1,18 +1,23 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  ImagePlus,
   MessageSquare,
   Plus,
   Send,
   Tags,
   Ticket,
   UserCheck,
+  X,
 } from "lucide-react";
+import { toast } from "react-toastify";
 
 import { Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";
+import { useModuleAccess } from "@modules/auth";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -22,6 +27,7 @@ import {
   useAssignTiRequest,
   useTiRequest,
   useTiRequestCategories,
+  useTiRequestTransferCandidates,
   useTiRequestMessages,
   useTiRequests,
   useUpdateTiRequest,
@@ -29,6 +35,10 @@ import {
   useUpdateTiRequestStatus,
 } from "../hooks";
 import type { TiId, TiListFilters, TiRequest, TiRequestCategory } from "../types";
+import {
+  getTiRequestMessageActionError,
+  validateTiRequestMessageImage,
+} from "../utils/requestMessageAttachment";
 import { TiNativeSelect } from "./TiNativeSelect";
 import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
 import {
@@ -275,18 +285,41 @@ function hasAssignee(request: TiRequest): boolean {
 
 export function TiRequestsTab() {
   const { user: currentUser } = useAuth();
+  const { access } = useModuleAccess("ti");
+  const canManageRequests = access.isAdmin;
+  const canManageCategories = access.canEdit;
   const [filters, setFilters] = useState<TiListFilters>({ status: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRequestId, setSelectedRequestId] = useState<TiId | undefined>();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
   const [requestDraft, setRequestDraft] = useState<RequestDraft>(INITIAL_REQUEST_DRAFT);
   const [categoryDraft, setCategoryDraft] = useState<CategoryDraft>(INITIAL_CATEGORY_DRAFT);
   const [createFormError, setCreateFormError] = useState<string | null>(null);
   const [categoryFormError, setCategoryFormError] = useState<string | null>(null);
   const [messageDraft, setMessageDraft] = useState("");
+  const [messageAttachment, setMessageAttachment] = useState<File | null>(null);
+  const [messageAttachmentPreviewUrl, setMessageAttachmentPreviewUrl] = useState<string | null>(
+    null,
+  );
   const [actionError, setActionError] = useState<string | null>(null);
+
+  function canTransferRequest(request: TiRequest) {
+    const hasElevatedAccess = access.isAdmin || currentUser?.type === "owner";
+
+    return (
+      hasElevatedAccess ||
+      Boolean(
+        currentUser?.id &&
+          request.assigned_to_id !== undefined &&
+          request.assigned_to_id !== null &&
+          String(request.assigned_to_id) === currentUser.id,
+      )
+    );
+  }
 
   const requestsQuery = useTiRequests(filters);
   const categoriesQuery = useTiRequestCategories();
@@ -294,6 +327,9 @@ export function TiRequestsTab() {
   const selectedRequest = requests.find((request) => request.id === selectedRequestId);
   const activeRequestId = selectedRequestId;
   const requestDetailQuery = useTiRequest(activeRequestId);
+  const transferCandidatesQuery = useTiRequestTransferCandidates(activeRequestId, {
+    enabled: isTransferDialogOpen,
+  });
   const messagesQuery = useTiRequestMessages(activeRequestId);
   const activeRequest = requestDetailQuery.data ?? selectedRequest;
   const categories = categoriesQuery.data ?? [];
@@ -312,6 +348,23 @@ export function TiRequestsTab() {
       categories.map((category) => [String(category.id), category] as const),
     );
   }, [categories]);
+
+  const transferAssigneeOptions = useMemo(
+    () => [
+      {
+        value: "",
+        label:
+          transferCandidatesQuery.isLoading
+            ? "Carregando responsáveis..."
+            : "Selecione um responsável",
+      },
+      ...(transferCandidatesQuery.data ?? []).map((user) => ({
+        value: String(user.id),
+        label: user.full_name || user.name || "Usuário sem nome",
+      })),
+    ],
+    [transferCandidatesQuery.data, transferCandidatesQuery.isLoading],
+  );
 
   const filteredRequests = useMemo(() => {
     const normalizedSearchTerm = normalizeSearchText(searchTerm);
@@ -357,6 +410,8 @@ export function TiRequestsTab() {
   const isRequestsLoading = requestsQuery.isLoading || requestsQuery.isFetching;
   const isDetailLoading = requestDetailQuery.isLoading || requestDetailQuery.isFetching;
   const isMessagesLoading = messagesQuery.isLoading || messagesQuery.isFetching;
+  const isTransferAssigneeOptionsLoading = transferCandidatesQuery.isLoading;
+  const isTransferAssigneeOptionsUnavailable = transferCandidatesQuery.isError;
   const isSaving =
     createRequestMutation.isPending ||
     updateRequestMutation.isPending ||
@@ -364,6 +419,25 @@ export function TiRequestsTab() {
     updateStatusMutation.isPending ||
     createMessageMutation.isPending;
   const isCategorySaving = createCategoryMutation.isPending || updateCategoryMutation.isPending;
+
+  useEffect(() => {
+    if (!messageAttachment) {
+      setMessageAttachmentPreviewUrl(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(messageAttachment);
+    setMessageAttachmentPreviewUrl(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [messageAttachment]);
+
+  function resetMessageComposer() {
+    setMessageDraft("");
+    setMessageAttachment(null);
+    setMessageAttachmentPreviewUrl(null);
+    setActionError(null);
+  }
 
   function handleCloseCreateDialog() {
     setIsCreateDialogOpen(false);
@@ -439,6 +513,7 @@ export function TiRequestsTab() {
         urgency: requestDraft.urgency,
       });
 
+      resetMessageComposer();
       setSelectedRequestId(createdRequest.id);
       setIsDetailDialogOpen(true);
       handleCloseCreateDialog();
@@ -520,6 +595,41 @@ export function TiRequestsTab() {
     }
   }
 
+  function handleOpenTransferDialog() {
+    setSelectedAssigneeId("");
+    setActionError(null);
+    setIsTransferDialogOpen(true);
+  }
+
+  function handleCloseTransferDialog() {
+    setIsTransferDialogOpen(false);
+    setSelectedAssigneeId("");
+    setActionError(null);
+  }
+
+  async function handleTransferRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setActionError(null);
+
+    if (!activeRequestId || !selectedAssigneeId) {
+      setActionError("Selecione o novo responsável pelo chamado.");
+      return;
+    }
+
+    try {
+      await assignRequestMutation.mutateAsync({
+        id: activeRequestId,
+        payload: { assigned_to_id: selectedAssigneeId },
+      });
+      setIsTransferDialogOpen(false);
+      setSelectedAssigneeId("");
+      setActionError(null);
+      toast.success("Responsabilidade transferida com sucesso.");
+    } catch (error) {
+      setActionError(getErrorMessage(error));
+    }
+  }
+
   async function handleCreateMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setActionError(null);
@@ -532,30 +642,66 @@ export function TiRequestsTab() {
     try {
       await createMessageMutation.mutateAsync({
         id: activeRequestId,
-        payload: { message: messageDraft.trim() },
+        payload: {
+          message: messageDraft.trim(),
+          ...(messageAttachment ? { attachment: messageAttachment } : {}),
+        },
       });
-      setMessageDraft("");
+      resetMessageComposer();
     } catch (error) {
-      setActionError(getErrorMessage(error));
+      const feedback = getTiRequestMessageActionError(error);
+      setActionError(feedback);
+      toast.error(feedback);
     }
+  }
+
+  function handleMessageAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
+    setActionError(null);
+
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const validationError = validateTiRequestMessageImage(file);
+
+    if (validationError) {
+      setActionError(validationError);
+      toast.error(validationError);
+      return;
+    }
+
+    setMessageAttachment(file);
+  }
+
+  function handleRemoveMessageAttachment() {
+    setMessageAttachment(null);
   }
 
   return (
     <TiPanel className="space-y-5">
       <TiSectionHeader
         title="Chamados"
-        description="Gerencie solicitações, responsáveis, status e conversas do atendimento."
+        description={
+          canManageRequests
+            ? "Gerencie solicitações, responsáveis, status e conversas do atendimento."
+            : "Abra chamados e acompanhe as conversas do atendimento."
+        }
         action={
           <div className="flex flex-col gap-2 sm:flex-row">
-            <TiIconAction
-              icon={Tags}
-              label="Categorias"
-              disabled={isCategorySaving}
-              onClick={() => {
-                setCategoryFormError(null);
-                setIsCategoryDialogOpen(true);
-              }}
-            />
+            {canManageCategories ? (
+              <TiIconAction
+                icon={Tags}
+                label="Categorias"
+                disabled={isCategorySaving}
+                onClick={() => {
+                  setCategoryFormError(null);
+                  setIsCategoryDialogOpen(true);
+                }}
+              />
+            ) : null}
             <TiIconAction
               icon={Plus}
               label={createRequestMutation.isPending ? "Criando..." : "Novo chamado"}
@@ -723,7 +869,9 @@ export function TiRequestsTab() {
               </p>
             </div>
             <label className="flex min-w-0 flex-col gap-2 md:col-span-2">
-              <span className={tiLabelClassName}>Título</span>
+              <RequiredFieldLabel className={tiLabelClassName} required>
+                Título
+              </RequiredFieldLabel>
               <input
                 id="ti-request-title"
                 className={tiInputClassName}
@@ -735,10 +883,11 @@ export function TiRequestsTab() {
                     title: event.target.value,
                   }))
                 }
+                aria-required="true"
               />
             </label>
             <TiNativeSelect
-              label="Categoria"
+              label={<RequiredFieldLabel required>Categoria</RequiredFieldLabel>}
               value={requestDraft.category_id}
               options={createCategoryOptions}
               onChange={(event) =>
@@ -747,6 +896,7 @@ export function TiRequestsTab() {
                   category_id: event.target.value,
                 }))
               }
+              aria-required="true"
             />
             <TiNativeSelect
               label="Urgência"
@@ -760,7 +910,9 @@ export function TiRequestsTab() {
               }
             />
             <label className="flex min-w-0 flex-col gap-2 md:col-span-2">
-              <span className={tiLabelClassName}>Descrição</span>
+              <RequiredFieldLabel className={tiLabelClassName} required>
+                Descrição
+              </RequiredFieldLabel>
               <textarea
                 className={cn(tiInputClassName, "h-auto min-h-24 py-2")}
                 value={requestDraft.description}
@@ -771,6 +923,7 @@ export function TiRequestsTab() {
                     description: event.target.value,
                   }))
                 }
+                aria-required="true"
               />
             </label>
           </div>
@@ -881,8 +1034,8 @@ export function TiRequestsTab() {
                             isSelected ? "bg-blue-50 dark:bg-blue-950/30" : null,
                           )}
                           onClick={() => {
+                            resetMessageComposer();
                             setSelectedRequestId(request.id);
-                            setActionError(null);
                             setIsDetailDialogOpen(true);
                           }}
                         >
@@ -921,7 +1074,7 @@ export function TiRequestsTab() {
           onOpenChange={(nextOpen) => {
             setIsDetailDialogOpen(nextOpen);
             if (!nextOpen) {
-              setActionError(null);
+              resetMessageComposer();
             }
           }}
           title={activeRequest ? getRequestTitle(activeRequest) : "Detalhe do chamado"}
@@ -977,7 +1130,7 @@ export function TiRequestsTab() {
                       <dt className={tiLabelClassName}>Responsável</dt>
                       <dd className="mt-1 flex flex-col items-start gap-2 text-slate-700 dark:text-slate-200">
                         <span>{getAssigneeLabel(activeRequest)}</span>
-                        {!hasAssignee(activeRequest) ? (
+                        {canManageRequests && !hasAssignee(activeRequest) ? (
                           <button
                             type="button"
                             className={cn(
@@ -991,6 +1144,20 @@ export function TiRequestsTab() {
                             <span>
                               {assignRequestMutation.isPending ? "Assumindo..." : "Assumir"}
                             </span>
+                          </button>
+                        ) : null}
+                        {canTransferRequest(activeRequest) ? (
+                          <button
+                            type="button"
+                            className={cn(
+                              tiSecondaryButtonClassName,
+                              "h-8 min-w-[104px] justify-center px-3 text-xs whitespace-nowrap",
+                            )}
+                            disabled={assignRequestMutation.isPending}
+                            onClick={handleOpenTransferDialog}
+                          >
+                            <UserCheck className="h-3.5 w-3.5" />
+                            <span>Transferir responsabilidade</span>
                           </button>
                         ) : null}
                       </dd>
@@ -1009,6 +1176,7 @@ export function TiRequestsTab() {
                     </div>
                   </dl>
 
+                  {canManageRequests ? (
                   <form
                     key={`edit-${activeRequest.id}`}
                     className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800"
@@ -1068,6 +1236,7 @@ export function TiRequestsTab() {
                       </button>
                     </div>
                   </form>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -1097,20 +1266,43 @@ export function TiRequestsTab() {
               ) : null}
 
               <div className="space-y-3">
-                {(messagesQuery.data ?? []).map((message) => (
-                  <div
-                    key={message.id}
-                    className={tiDialogSubsectionClassName}
-                  >
-                    <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
-                      <span>{message.author_name ?? getStringField(message, ["author"], "Autor")}</span>
-                      <span>{formatDate(message.created_at)}</span>
+                {(messagesQuery.data ?? []).map((message) => {
+                  const attachmentUrl =
+                    typeof message.attachment === "string" && message.attachment
+                      ? message.attachment
+                      : undefined;
+
+                  return (
+                    <div key={message.id} className={tiDialogSubsectionClassName}>
+                      <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span>{message.author_name ?? getStringField(message, ["author"], "Autor")}</span>
+                        <span>{formatDate(message.created_at)}</span>
+                      </div>
+                      <p className="text-sm leading-6 text-slate-700 dark:text-slate-200 whitespace-pre-wrap break-words">
+                        {message.message ?? getStringField(message, ["content", "body"], "")}
+                      </p>
+                      {attachmentUrl ? (
+                        <a
+                          href={attachmentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 block w-fit rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          <img
+                            src={attachmentUrl}
+                            alt="Imagem anexada à mensagem"
+                            loading="lazy"
+                            decoding="async"
+                            className="max-h-64 max-w-full rounded-md border border-slate-200 object-contain dark:border-slate-700"
+                          />
+                          <span className="mt-1 block text-xs font-medium text-blue-700 dark:text-blue-300">
+                            Abrir imagem em outra guia
+                          </span>
+                        </a>
+                      ) : null}
                     </div>
-                    <p className="text-sm leading-6 text-slate-700 dark:text-slate-200">
-                      {message.message ?? getStringField(message, ["content", "body"], "")}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <form className="mt-4 space-y-3" onSubmit={handleCreateMessage}>
@@ -1123,6 +1315,51 @@ export function TiRequestsTab() {
                     onChange={(event) => setMessageDraft(event.target.value)}
                   />
                 </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label
+                    className={cn(
+                      tiSecondaryButtonClassName,
+                      "cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 dark:focus-within:ring-blue-400",
+                    )}
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                    <span>Anexar imagem</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="sr-only"
+                      onChange={handleMessageAttachmentChange}
+                      disabled={createMessageMutation.isPending}
+                    />
+                  </label>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    PNG, JPEG ou WebP de até 5 MB.
+                  </span>
+                </div>
+                {messageAttachment ? (
+                  <div className="flex items-center gap-3 rounded-md border border-slate-200 p-2 dark:border-slate-700">
+                    {messageAttachmentPreviewUrl ? (
+                      <img
+                        src={messageAttachmentPreviewUrl}
+                        alt={`Prévia de ${messageAttachment.name}`}
+                        decoding="async"
+                        className="h-16 w-16 rounded object-cover"
+                      />
+                    ) : null}
+                    <span className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-200">
+                      {messageAttachment.name}
+                    </span>
+                    <button
+                      type="button"
+                      className={tiSecondaryButtonClassName}
+                      onClick={handleRemoveMessageAttachment}
+                      disabled={createMessageMutation.isPending}
+                    >
+                      <X className="h-4 w-4" />
+                      <span>Remover</span>
+                    </button>
+                  </div>
+                ) : null}
                 <button
                   type="submit"
                   className={tiPrimaryButtonClassName}
@@ -1135,6 +1372,67 @@ export function TiRequestsTab() {
             </div>
           ) : null}
           </div>
+        </Dialog>
+
+        <Dialog
+          open={isTransferDialogOpen}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              handleCloseTransferDialog();
+            }
+          }}
+          title="Transferir responsabilidade"
+          description="Selecione um usuário ativo do departamento Tecnologia."
+          contentClassName="w-[min(94vw,460px)]"
+        >
+          <form className="space-y-4" onSubmit={handleTransferRequest}>
+            {actionError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
+                {actionError}
+              </div>
+            ) : null}
+
+            {isTransferAssigneeOptionsUnavailable ? (
+              <p className="text-sm text-red-600 dark:text-red-300">
+                Não foi possível carregar os responsáveis disponíveis.
+              </p>
+            ) : null}
+
+            <TiNativeSelect
+              label="Novo responsável"
+              value={selectedAssigneeId}
+              options={transferAssigneeOptions}
+              disabled={
+                assignRequestMutation.isPending ||
+                isTransferAssigneeOptionsLoading ||
+                isTransferAssigneeOptionsUnavailable
+              }
+              onChange={(event) => setSelectedAssigneeId(event.target.value)}
+            />
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className={tiSecondaryButtonClassName}
+                onClick={handleCloseTransferDialog}
+                disabled={assignRequestMutation.isPending}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className={tiPrimaryButtonClassName}
+                disabled={
+                  assignRequestMutation.isPending ||
+                  !selectedAssigneeId ||
+                  isTransferAssigneeOptionsLoading ||
+                  isTransferAssigneeOptionsUnavailable
+                }
+              >
+                {assignRequestMutation.isPending ? "Transferindo..." : "Transferir"}
+              </button>
+            </div>
+          </form>
         </Dialog>
       </div>
     </TiPanel>

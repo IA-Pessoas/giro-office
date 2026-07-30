@@ -31,6 +31,8 @@ const errorDescriptions: Record<number, string> = {
   403: "Permissao insuficiente",
   404: "Recurso nao encontrado",
   409: "Conflito de dominio",
+  413: "Arquivo excede o limite permitido",
+  500: "Falha ao armazenar imagem",
 };
 
 function successResponse(description: string, schema?: OpenApiSchema): OpenApiResponse {
@@ -137,6 +139,41 @@ function jsonRequestBody(schemaRef: string): Record<string, unknown> {
     content: {
       "application/json": {
         schema: { $ref: schemaRef },
+      },
+    },
+  };
+}
+
+function tiMessageRequestBody(): Record<string, unknown> {
+  return {
+    required: true,
+    content: {
+      "application/json": {
+        schema: { $ref: "#/components/schemas/TiMessageInput" },
+      },
+      "multipart/form-data": {
+        schema: {
+          type: "object",
+          required: ["message"],
+          properties: {
+            message: { type: "string", minLength: 1 },
+            type: {
+              type: "string",
+              enum: ["Message", "Solution", "Rejection", "Acceptance"],
+            },
+            file: {
+              type: "string",
+              format: "binary",
+              description: "Imagem JPEG, PNG ou WebP de ate 5 MiB.",
+            },
+          },
+          additionalProperties: false,
+        },
+        encoding: {
+          file: {
+            contentType: "image/jpeg, image/png, image/webp",
+          },
+        },
       },
     },
   };
@@ -317,6 +354,17 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: false,
   },
+  TiTransferCandidate: {
+    type: "object",
+    required: ["id", "department_id"],
+    properties: {
+      id: { type: "string", format: "uuid" },
+      name: { type: "string", nullable: true },
+      full_name: { type: "string", nullable: true },
+      department_id: { type: "string", format: "uuid" },
+    },
+    additionalProperties: false,
+  },
   TiRequestStatusInput: {
     type: "object",
     required: ["status"],
@@ -333,7 +381,6 @@ const schemas: Record<string, OpenApiSchema> = {
     required: ["message"],
     properties: {
       message: { type: "string", minLength: 1 },
-      attachment: { type: "string", format: "uri" },
       type: {
         type: "string",
         enum: ["Message", "Solution", "Rejection", "Acceptance"],
@@ -381,12 +428,26 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: false,
   },
+  TiPasswordDeactivateInput: {
+    type: "object",
+    required: ["reason"],
+    properties: {
+      reason: { type: "string", minLength: 1, maxLength: 500 },
+    },
+    additionalProperties: false,
+  },
   TiExtensionInput: {
     type: "object",
     required: ["user_id", "number"],
     properties: {
       user_id: { type: "string", format: "uuid" },
-      number: { type: "string", minLength: 1 },
+      number: {
+        type: "string",
+        minLength: 4,
+        maxLength: 4,
+        pattern: "^[0-9]{4}$",
+        example: "1001",
+      },
     },
     additionalProperties: false,
   },
@@ -395,17 +456,21 @@ const schemas: Record<string, OpenApiSchema> = {
     minProperties: 1,
     properties: {
       user_id: { type: "string", format: "uuid" },
-      number: { type: "string", minLength: 1 },
+      number: {
+        type: "string",
+        minLength: 4,
+        maxLength: 4,
+        pattern: "^[0-9]{4}$",
+        example: "1001",
+      },
     },
     additionalProperties: false,
   },
   TiTermInput: {
     type: "object",
-    required: ["date", "user_name", "user_cpf"],
+    required: ["date", "user_id"],
     properties: {
       date: { type: "string", format: "date-time" },
-      user_name: { type: "string", minLength: 1 },
-      user_cpf: { type: "string", minLength: 1 },
       user_id: { type: "string", format: "uuid" },
       department_id: { type: "string", format: "uuid" },
       address: { type: "string" },
@@ -422,9 +487,6 @@ const schemas: Record<string, OpenApiSchema> = {
     minProperties: 1,
     properties: {
       date: { type: "string", format: "date-time" },
-      user_name: { type: "string", minLength: 1 },
-      user_cpf: { type: "string", minLength: 1 },
-      user_id: { type: "string", format: "uuid" },
       department_id: { type: "string", format: "uuid" },
       address: { type: "string" },
       reason: { type: "string" },
@@ -619,28 +681,54 @@ const schemas: Record<string, OpenApiSchema> = {
     additionalProperties: false,
   },
   TiDashboardSummary: {
-    type: "object",
-    required: [
-      "openRequests",
-      "criticalRequests",
-      "resolvedLastSevenDays",
-      "inventoryAssets",
-      "assignedInventoryAssets",
-      "pendingTerms",
-      "lowStockItems",
-      "activeRobots",
+    oneOf: [
+      {
+        type: "object",
+        required: [
+          "scope",
+          "openRequests",
+          "criticalRequests",
+          "resolvedLastSevenDays",
+          "closedRequests",
+        ],
+        properties: {
+          scope: { type: "string", enum: ["self"] },
+          openRequests: { type: "integer", minimum: 0 },
+          criticalRequests: { type: "integer", minimum: 0 },
+          resolvedLastSevenDays: { type: "integer", minimum: 0 },
+          closedRequests: { type: "integer", minimum: 0 },
+        },
+        additionalProperties: false,
+      },
+      {
+        type: "object",
+        required: [
+          "scope",
+          "openRequests",
+          "criticalRequests",
+          "resolvedLastSevenDays",
+          "closedRequests",
+          "inventoryAssets",
+          "assignedInventoryAssets",
+          "pendingTerms",
+          "lowStockItems",
+          "activeRobots",
+        ],
+        properties: {
+          scope: { type: "string", enum: ["organization"] },
+          openRequests: { type: "integer", minimum: 0 },
+          criticalRequests: { type: "integer", minimum: 0 },
+          resolvedLastSevenDays: { type: "integer", minimum: 0 },
+          closedRequests: { type: "integer", minimum: 0 },
+          inventoryAssets: { type: "integer", minimum: 0 },
+          assignedInventoryAssets: { type: "integer", minimum: 0 },
+          pendingTerms: { type: "integer", minimum: 0 },
+          lowStockItems: { type: "integer", minimum: 0 },
+          activeRobots: { type: "integer", minimum: 0 },
+        },
+        additionalProperties: false,
+      },
     ],
-    properties: {
-      openRequests: { type: "integer", minimum: 0 },
-      criticalRequests: { type: "integer", minimum: 0 },
-      resolvedLastSevenDays: { type: "integer", minimum: 0 },
-      inventoryAssets: { type: "integer", minimum: 0 },
-      assignedInventoryAssets: { type: "integer", minimum: 0 },
-      pendingTerms: { type: "integer", minimum: 0 },
-      lowStockItems: { type: "integer", minimum: 0 },
-      activeRobots: { type: "integer", minimum: 0 },
-    },
-    additionalProperties: false,
   },
 };
 
@@ -703,6 +791,15 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           operationId: "getTiDashboardSummary",
           tags: ["TI Dashboard"],
           summary: "Busca resumo consolidado do modulo de TI",
+          successSchema: {
+            type: "object",
+            required: ["success", "data"],
+            properties: {
+              success: { type: "boolean", enum: [true] },
+              data: { $ref: "#/components/schemas/TiDashboardSummary" },
+            },
+            additionalProperties: true,
+          },
           successDescription: "Resumo do dashboard de TI",
           errors: [401, 403],
         }),
@@ -717,6 +814,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
             uuidQueryParameter("location_id", "Local do ativo"),
             uuidQueryParameter("user_id", "Usuario vinculado ao ativo"),
             stringQueryParameter("asset_code", "Codigo patrimonial"),
+            enumQueryParameter("status", "Disponibilidade do ativo", ["available", "assigned"]),
             ...paginationParameters(),
           ],
           successDescription: "Ativos listados",
@@ -849,6 +947,29 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
             enumQueryParameter("status", "Filtro de item ativo", ["true", "false"]),
             ...paginationParameters(),
           ],
+          successSchema: {
+            type: "object",
+            required: ["success", "data"],
+            properties: {
+              success: { type: "boolean", enum: [true] },
+              data: {
+                type: "object",
+                required: ["data", "total", "page", "limit", "hasMore"],
+                properties: {
+                  data: {
+                    type: "array",
+                    items: { type: "object", additionalProperties: true },
+                  },
+                  total: { type: "integer", minimum: 0 },
+                  page: { type: "integer", minimum: 1 },
+                  limit: { type: "integer", minimum: 1 },
+                  hasMore: { type: "boolean" },
+                },
+                additionalProperties: false,
+              },
+            },
+            additionalProperties: true,
+          },
           successDescription: "Itens de estoque listados",
           errors: [400, 401, 403, 404],
         }),
@@ -957,7 +1078,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Categoria de estoque de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiStockCategoryUpdateInput"),
           successDescription: "Categoria de estoque atualizada",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 409],
         }),
       },
       "/ti/stock/locations/list": {
@@ -1135,6 +1256,29 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Chamado de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiRequestAssignInput"),
           successDescription: "Chamado atribuido",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/requests/{id}/transfer-candidates": {
+        get: publicTiOperation({
+          operationId: "listTiRequestTransferCandidates",
+          tags: ["TI Requests"],
+          summary:
+            "Lista candidatos ativos do departamento Tecnologia para transferencia de um chamado",
+          parameters: [pathIdParameter("Chamado de TI")],
+          successSchema: {
+            type: "object",
+            required: ["success", "data"],
+            properties: {
+              success: { type: "boolean", enum: [true] },
+              data: {
+                type: "array",
+                items: { $ref: "#/components/schemas/TiTransferCandidate" },
+              },
+            },
+            additionalProperties: true,
+          },
+          successDescription: "Candidatos permitidos para transferencia",
           errors: [400, 401, 403, 404],
         }),
       },
@@ -1168,10 +1312,10 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           tags: ["TI Requests"],
           summary: "Cria mensagem em chamado de TI",
           parameters: [pathIdParameter("Chamado de TI")],
-          requestBody: jsonRequestBody("#/components/schemas/TiMessageInput"),
+          requestBody: tiMessageRequestBody(),
           successStatus: 201,
           successDescription: "Mensagem criada",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 413, 500],
         }),
       },
       "/ti/request-categories/list": {
@@ -1215,6 +1359,20 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           summary: "Lista senhas de TI",
           parameters: [
             uuidQueryParameter("user_id", "Usuario vinculado a senha"),
+            stringQueryParameter("search", "Busca por local, usuario ou notas"),
+            stringQueryParameter("local", "Filtro legado por local da senha"),
+            {
+              ...enumQueryParameter("status", "Filtro de status da credencial", [
+                "active",
+                "inactive",
+                "all",
+              ]),
+              schema: {
+                type: "string",
+                enum: ["active", "inactive", "all"],
+                default: "active",
+              },
+            },
             ...paginationParameters(),
           ],
           successDescription: "Senhas listadas",
@@ -1239,7 +1397,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           summary: "Busca senha de TI",
           parameters: [pathIdParameter("Senha de TI")],
           successDescription: "Senha encontrada",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 409],
         }),
         patch: publicTiOperation({
           operationId: "updateTiPassword",
@@ -1248,7 +1406,18 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Senha de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiPasswordUpdateInput"),
           successDescription: "Senha atualizada",
-          errors: [400, 401, 403, 404],
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/passwords/{id}/deactivate": {
+        post: publicTiOperation({
+          operationId: "deactivateTiPassword",
+          tags: ["TI Passwords"],
+          summary: "Inativa uma senha de TI",
+          parameters: [pathIdParameter("Senha de TI")],
+          requestBody: jsonRequestBody("#/components/schemas/TiPasswordDeactivateInput"),
+          successDescription: "Senha de TI inativada",
+          errors: [400, 401, 403, 404, 409],
         }),
       },
       "/ti/extensions/list": {

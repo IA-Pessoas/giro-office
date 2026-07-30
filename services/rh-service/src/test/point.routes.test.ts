@@ -1,4 +1,5 @@
 import request from "supertest";
+import { FORWARDED_AUTH_PERMISSION_HEADER } from "@workspace/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createTestApp, pointServiceMock, resetRhRouteMocks } from "./rhTestUtils.js";
@@ -23,6 +24,21 @@ describe("point routes", () => {
       expect.objectContaining({
         date_from: expect.any(Date),
         date_to: expect.any(Date),
+      }),
+    );
+  });
+
+  it("GET /rh/point restringe RH self-service ao proprio usuario", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .get("/rh/point?user_id=00000000-0000-4000-8000-000000000099")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "1");
+
+    expect(res.status).toBe(200);
+    expect(pointServiceMock.listPoints).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({
+        user_id: "00000000-0000-4000-8000-000000000001",
       }),
     );
   });
@@ -72,5 +88,15 @@ describe("point routes", () => {
 
     expect(res.status).toBe(200);
     expect(pointServiceMock.calculateDailyHours).toHaveBeenCalledWith(pointId, organizationId);
+  });
+
+  it("POST /rh/point/:pointId/calculate bloqueia RH self-service", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .post(`/rh/point/${pointId}/calculate`)
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "1");
+
+    expect(res.status).toBe(403);
+    expect(pointServiceMock.calculateDailyHours).not.toHaveBeenCalled();
   });
 });

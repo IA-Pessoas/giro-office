@@ -16,8 +16,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
-import { useClients } from "@modules/clients";
-import { useMe } from "@shared/hooks";
+import { useModuleAccess } from "@modules/auth";
+import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 
 import {
   useDeleteProjectMutation,
@@ -108,26 +108,27 @@ function formatDeadlineHint(daysUntil: number | null) {
 
 export function ProjectsWorkspace() {
   const router = useRouter();
-  const meQuery = useMe();
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const { access: integracaoAccess } = useModuleAccess("integracao");
+  const canEdit = integracaoAccess.canEdit;
+  const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const clientsQuery = useClients({
-    page: 1,
-    limit: 100,
-  });
+  const selectedClientId = selectedClient?.id ?? null;
 
   useEffect(() => {
-    if (typeof router.query.clientId === "string") {
-      setSelectedClientId(router.query.clientId);
+    const routeClientId = router.query.clientId;
+
+    if (typeof routeClientId === "string") {
+      setSelectedClient((current) =>
+        current?.id === routeClientId
+          ? current
+          : { id: routeClientId, name: "Cliente selecionado" },
+      );
     }
   }, [router.query.clientId]);
-
-  const selectedClient =
-    clientsQuery.data?.items.find((client) => client.id === selectedClientId) ?? null;
 
   const projectsQuery = useProjectsList(
     selectedClientId ? { ref: "client", id: selectedClientId } : null,
@@ -158,7 +159,9 @@ export function ProjectsWorkspace() {
   }, [projectSearch, projects, statusFilter]);
 
   const highlightedProjects = useMemo(() => {
-    return [...filteredProjects].sort((left, right) => getHighlightScore(right) - getHighlightScore(left));
+    return [...filteredProjects].sort(
+      (left, right) => getHighlightScore(right) - getHighlightScore(left),
+    );
   }, [filteredProjects]);
 
   const highlightedProjectsGridClassName = useMemo(() => {
@@ -174,13 +177,15 @@ export function ProjectsWorkspace() {
   }, [highlightedProjects.length]);
 
   const upcomingProject = useMemo(() => {
-    return [...projects]
-      .filter((project) => !isCompletedStatus(project.status) && project.end_date)
-      .sort((left, right) => {
-        const leftDays = resolveDaysUntil(left.end_date) ?? Number.POSITIVE_INFINITY;
-        const rightDays = resolveDaysUntil(right.end_date) ?? Number.POSITIVE_INFINITY;
-        return leftDays - rightDays;
-      })[0] ?? null;
+    return (
+      [...projects]
+        .filter((project) => !isCompletedStatus(project.status) && project.end_date)
+        .sort((left, right) => {
+          const leftDays = resolveDaysUntil(left.end_date) ?? Number.POSITIVE_INFINITY;
+          const rightDays = resolveDaysUntil(right.end_date) ?? Number.POSITIVE_INFINITY;
+          return leftDays - rightDays;
+        })[0] ?? null
+    );
   }, [projects]);
 
   const averageProgress = useMemo(() => {
@@ -194,10 +199,7 @@ export function ProjectsWorkspace() {
 
   const pausedProjects = useMemo(
     () =>
-      countByStatus(
-        projects,
-        (status) => status.includes("paus") || status.includes("paralis"),
-      ),
+      countByStatus(projects, (status) => status.includes("paus") || status.includes("paralis")),
     [projects],
   );
 
@@ -281,7 +283,7 @@ export function ProjectsWorkspace() {
           : null;
 
       if (statusCode === 403) {
-        toast.error("Somente usuários com permissão 2 podem excluir projetos.");
+      toast.error("Somente usuários com permissão administrativa na Integração podem excluir projetos.");
         return;
       }
 
@@ -305,8 +307,10 @@ export function ProjectsWorkspace() {
     }
   }
 
-  function handleClientChange(nextClientId: string) {
-    setSelectedClientId(nextClientId || null);
+  function handleClientChange(client: ClientPickerOption | null) {
+    const nextClientId = client?.id ?? "";
+
+    setSelectedClient(client);
     router
       .replace(
         {
@@ -321,11 +325,13 @@ export function ProjectsWorkspace() {
 
   return (
     <div className="space-y-6">
-      <ProjectFormModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-        clientId={selectedClientId}
-      />
+      {canEdit ? (
+        <ProjectFormModal
+          open={isCreateModalOpen}
+          onOpenChange={setIsCreateModalOpen}
+          clientId={selectedClientId}
+        />
+      ) : null}
 
       <ProjectFormModal
         open={Boolean(editingProjectId)}
@@ -338,7 +344,7 @@ export function ProjectsWorkspace() {
         projectId={editingProjectId}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)] xl:items-end">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20">
@@ -351,38 +357,26 @@ export function ProjectsWorkspace() {
           </p>
         </div>
 
-        <div
-          className={`${PROJECT_SUBPANEL_CLASSNAME} flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between`}
-        >
-          <label className="min-w-0 flex-1 space-y-2">
-            <span className="block text-sm font-medium text-slate-700 dark:text-white">Cliente</span>
-            <select
-              value={selectedClientId ?? ""}
-              onChange={(event) => handleClientChange(event.target.value)}
-              className={PROJECT_SELECT_CLASSNAME}
-              style={PROJECT_SELECT_ARROW_STYLE}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <ClientPickerModal
+            selectedClient={selectedClient}
+            onSelectClient={handleClientChange}
+            filters={{}}
+            allowClearSelection
+          />
+          {canEdit ? (
+            <button
+              type="button"
+              disabled={!selectedClientId}
+              onClick={() => setIsCreateModalOpen(true)}
+              className={`${PROJECT_PRIMARY_BUTTON_CLASSNAME} min-h-10 px-3.5 py-2 text-sm shadow-none`}
             >
-              <option value="">Selecione um cliente</option>
-              {(clientsQuery.data?.items ?? []).map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <button
-            type="button"
-            disabled={!selectedClientId}
-            onClick={() => setIsCreateModalOpen(true)}
-            className={`${PROJECT_PRIMARY_BUTTON_CLASSNAME} min-h-10 px-3.5 py-2 text-sm shadow-none`}
-          >
-            <Plus className="h-4 w-4" />
-            Novo projeto
-          </button>
+              <Plus className="h-4 w-4" />
+              Novo projeto
+            </button>
+          ) : null}
         </div>
-      </div>
-
+      </header>
 
       <section className={`${PROJECT_PANEL_CLASSNAME} p-5`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -516,7 +510,9 @@ export function ProjectsWorkspace() {
                     Status atual
                   </p>
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-white">{upcomingProject.status}</span>
+                    <span className="text-sm font-semibold text-white">
+                      {upcomingProject.status}
+                    </span>
                     <span className="text-xs text-slate-200/75">
                       Início em {formatProjectDate(upcomingProject.start_date)}
                     </span>
@@ -527,7 +523,8 @@ export function ProjectsWorkspace() {
                 </div>
               ) : (
                 <div className="mt-auto rounded-2xl border border-dashed border-white/15 px-4 py-5 text-sm leading-6 text-slate-200/70">
-                  Defina datas finais nos projetos para transformar este painel em um radar real de prazo.
+                  Defina datas finais nos projetos para transformar este painel em um radar real de
+                  prazo.
                 </div>
               )}
             </div>
@@ -654,7 +651,7 @@ export function ProjectsWorkspace() {
                           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                             {project.name}
                           </h3>
-                          <p className="mt-1 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
                             {project.objective || "Sem objetivo detalhado para este projeto."}
                           </p>
                         </div>
@@ -693,26 +690,30 @@ export function ProjectsWorkspace() {
                         Detalhe
                       </Link>
 
-                      <button
-                        type="button"
-                        onClick={() => setEditingProjectId(project.id)}
-                        className={PROJECT_COMPACT_BUTTON_CLASSNAME}
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                        Editar
-                      </button>
+                      {canEdit ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setEditingProjectId(project.id)}
+                            className={PROJECT_COMPACT_BUTTON_CLASSNAME}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                            Editar
+                          </button>
 
-                      <button
-                        type="button"
-                        onClick={() => void handleRecalculate(project)}
-                        disabled={recalculateProgressMutation.isPending}
-                        className={PROJECT_COMPACT_BUTTON_CLASSNAME}
-                      >
-                        <RefreshCcw className="h-3.5 w-3.5" />
-                        Recalcular
-                      </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleRecalculate(project)}
+                            disabled={recalculateProgressMutation.isPending}
+                            className={PROJECT_COMPACT_BUTTON_CLASSNAME}
+                          >
+                            <RefreshCcw className="h-3.5 w-3.5" />
+                            Recalcular
+                          </button>
+                        </>
+                      ) : null}
 
-                      {meQuery.data?.permission === 2 ? (
+                      {integracaoAccess.isAdmin ? (
                         <button
                           type="button"
                           onClick={() => void handleDelete(project)}

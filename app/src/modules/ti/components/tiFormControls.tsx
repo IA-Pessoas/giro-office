@@ -1,5 +1,4 @@
 import type { HTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
-import type { UseQueryResult } from "@tanstack/react-query";
 import { Loader2, RefreshCw, type LucideIcon } from "lucide-react";
 
 import { cn } from "@shared/ui/newLayout/utils";
@@ -39,13 +38,20 @@ type TiTableActionProps = {
   icon: LucideIcon;
   label: string;
   disabled?: boolean;
+  iconOnly?: boolean;
   onClick?: () => void;
 };
 
-type TiListQuery<T> = Pick<
-  UseQueryResult<T[], Error>,
-  "data" | "error" | "isError" | "isFetching" | "isLoading" | "refetch"
->;
+type TiListQueryData<T> = T[] | { items?: T[] };
+
+type TiListQuery<T> = {
+  data?: TiListQueryData<T>;
+  error: Error | null;
+  isError: boolean;
+  isFetching: boolean;
+  isLoading: boolean;
+  refetch: () => Promise<unknown>;
+};
 
 type TiTextFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
@@ -151,17 +157,27 @@ export function TiIconAction({
   );
 }
 
-export function TiTableAction({ disabled, icon: Icon, label, onClick }: TiTableActionProps) {
+export function TiTableAction({
+  disabled,
+  icon: Icon,
+  iconOnly = false,
+  label,
+  onClick,
+}: TiTableActionProps) {
   return (
     <button
       type="button"
-      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+      aria-label={label}
+      className={cn(
+        "inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+        iconOnly ? "w-8 px-0" : "px-2.5",
+      )}
       disabled={disabled}
       onClick={onClick}
       title={label}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" />
-      <span>{label}</span>
+      <span className={iconOnly ? "sr-only" : undefined}>{label}</span>
     </button>
   );
 }
@@ -211,7 +227,7 @@ export function TiQueryStatePanel<T>({
     );
   }
 
-  const rows = query.data ?? [];
+  const rows = Array.isArray(query.data) ? query.data : query.data?.items ?? [];
 
   if (rows.length === 0) {
     return <>{emptyState}</>;

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   buildClientListParams,
@@ -13,6 +14,7 @@ import {
   hasCommercialChanges,
 } from "./utils/commercialForm.ts";
 import {
+  formatCpfCnpjInput,
   validateCpfCnpjDocument,
   validateOptionalCpfDocument,
 } from "./utils/documentValidation.ts";
@@ -116,6 +118,25 @@ runTest("buildClientListParams uses legacy integration filter for active and ina
     page: 1,
     limit: 10,
   });
+});
+
+runTest("buildClientListParams keeps the Regularize active-client query out of the legacy integration filter", () => {
+  assert.deepEqual(
+    buildClientListParams({
+      status: "Ativo",
+      page: 1,
+      limit: 50,
+      legacyIntegrationStatusFilter: false,
+    }),
+    { status: "Ativo", page: 1, limit: 50 },
+  );
+});
+
+runTest("client integration filters use backend-supported not-contracted token", () => {
+  const filters = readFileSync("src/modules/clients/components/ClientFilters.tsx", "utf8");
+
+  assert.match(filters, /status: 'Não Contradados e Paralisados'/);
+  assert.doesNotMatch(filters, /status: 'Não Contradado e Paralisado'/);
 });
 
 runTest("unwrapClientEnvelope normalizes response.data.data", () => {
@@ -247,6 +268,13 @@ runTest("document validation enforces integration person type length", () => {
   assert.equal(validateCpfCnpjDocument("123.456.789-10", "PJ"), "CNPJ deve ter 14 dígitos.");
 });
 
+runTest("document input formatter masks and limits by person type", () => {
+  assert.equal(formatCpfCnpjInput("123456789101112", "PF"), "123.456.789-10");
+  assert.equal(formatCpfCnpjInput("123456789101112", "PJ"), "12.345.678/9101-11");
+  assert.equal(formatCpfCnpjInput("abc1234", "PF"), "123.4");
+  assert.equal(formatCpfCnpjInput("1234567", "PJ"), "12.345.67");
+});
+
 runTest("optional cpf validation accepts empty values and rejects invalid lengths", () => {
   assert.equal(validateOptionalCpfDocument("CPF do responsável", ""), null);
   assert.equal(validateOptionalCpfDocument("CPF do responsável", "123.456.789-10"), null);
@@ -261,6 +289,19 @@ runTest("commercial options separate backend value from UI label", () => {
     value: "Análise/Agendamento",
     label: "Análise/Agendamento",
   });
+});
+
+runTest("commercial warning explains the client-status impact without technical wording", () => {
+  const commercialForm = readFileSync(
+    "src/modules/clients/components/ClientCommercialForm.tsx",
+    "utf8",
+  );
+
+  assert.match(
+    commercialForm,
+    /Alterar o status de prospecção pode impactar o status geral do cliente\./,
+  );
+  assert.doesNotMatch(commercialForm, /backend/i);
 });
 
 runTest("commercial initial values normalize dates to input format", () => {
@@ -431,4 +472,86 @@ runTest("termination helpers validate competence_output and build payload", () =
       competence_output: "2026-05",
     },
   );
+});
+
+runTest("client picker keeps paginated remote search and accessible feedback", () => {
+  const picker = readFileSync("src/modules/clients/components/ClientPickerModal.tsx", "utf8");
+  const moduleIndex = readFileSync("src/modules/clients/index.ts", "utf8");
+
+  assert.match(moduleIndex, /ClientPickerModal/);
+  assert.match(picker, /useDeferredValue/);
+  assert.match(picker, /useClients\(\{[\s\S]*?\.\.\.filters,[\s\S]*?search: deferredSearch,[\s\S]*?page,[\s\S]*?limit: CLIENT_PICKER_LIMIT/);
+  assert.match(picker, /client\.company_name \|\| client\.name/);
+  assert.match(picker, /role="dialog"/);
+  assert.match(picker, /role="alert"/);
+  assert.match(picker, /htmlFor=\{searchInputId\}/);
+  assert.match(picker, /role="listbox"/);
+  assert.match(picker, /handleSelect\(null\)/);
+});
+
+runTest("client create modal binds person type to document validation and payload", () => {
+  const modal = readFileSync("src/modules/clients/components/ClientCreateModal.tsx", "utf8");
+  const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+
+  assert.match(modal, /type: "PJ"/);
+  assert.match(modal, /setShowDocumentError\(true\)/);
+  assert.match(modal, /setShowDocumentError\(false\)/);
+  assert.match(modal, /formatCpfCnpjInput/);
+  assert.match(modal, /validateCpfCnpjDocument\(formValues\.cpf_cnpj,\s*formValues\.type\)/);
+  assert.match(modal, /type: formValues\.type/);
+  assert.match(modal, /showPersonType/);
+  assert.match(modal, /showDocumentError/);
+  assert.match(form, /name="type"/);
+  assert.match(form, /showDocumentError && showPersonType && values\.cpf_cnpj/);
+  assert.ok(form.indexOf(">Nome</span>") < form.indexOf(">Razão social</span>"));
+  assert.ok(form.indexOf(">Razão social</span>") < form.indexOf(">Tipo de pessoa</span>"));
+  assert.ok(form.indexOf(">Tipo de pessoa</span>") < form.indexOf("{documentLabel}"));
+  assert.ok(form.indexOf(">Nome fantasia</span>") < form.indexOf(">Status</span>"));
+  assert.doesNotMatch(form, /rounded-2xl border border-slate-200 bg-slate-50/);
+});
+
+runTest("clients list exposes compact page jump input", () => {
+  const clients = readFileSync("src/shared/components/newLayout/Clients.tsx", "utf8");
+
+  assert.match(clients, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
+  assert.match(clients, /const limit = DEFAULT_PAGE_SIZE;/);
+  assert.match(clients, /useEffect/);
+  assert.match(clients, /const \[pageInputValue, setPageInputValue\] = useState\(String\(page\)\)/);
+  assert.match(clients, /setPageInputValue\(String\(currentPage\)\)/);
+  assert.match(clients, /const pageInputSize = Math\.max\(1, pageInputValue\.length\)/);
+  assert.match(clients, /const pageInputWidthClassName =/);
+  assert.match(clients, /"w-\[3ch\]"/);
+  assert.match(clients, /function goToPage\(value: string\)/);
+  assert.match(clients, /Math\.min\(pageCount, Math\.max\(1, nextPage\)\)/);
+  assert.match(clients, /setPageInputValue\(String\(clampedPage\)\)/);
+  assert.match(clients, /aria-label="Ir para página"/);
+  assert.match(clients, /type="text"/);
+  assert.match(clients, /inputMode="numeric"/);
+  assert.match(clients, /pattern="\[0-9\]\*"/);
+  assert.match(clients, /size=\{pageInputSize\}/);
+  assert.match(clients, /value=\{pageInputValue\}/);
+  assert.match(clients, /setPageInputValue\(event\.target\.value\.replace\(\/\\D\/g, ""\)\)/);
+  assert.match(clients, /pageInputWidthClassName/);
+  assert.doesNotMatch(clients, /style=\{\{ width:/);
+  assert.doesNotMatch(clients, /min-w-\[/);
+  assert.doesNotMatch(clients, /w-16/);
+  assert.match(clients, /onBlur=\{\(event\) => goToPage\(event\.target\.value\)\}/);
+  assert.match(clients, /onKeyDown=\{\(event\) =>/);
+});
+
+runTest("clients list hides organization from the main table", () => {
+  const clients = readFileSync("src/shared/components/newLayout/Clients.tsx", "utf8");
+
+  assert.doesNotMatch(clients, /<th[^>]*>Organiza\u00e7\u00e3o<\/th>/);
+  assert.doesNotMatch(clients, /client\.organization\?\.name/);
+  assert.match(clients, /colSpan=\{4\}/);
+  assert.doesNotMatch(clients, /colSpan=\{5\}/);
+});
+
+runTest("client creation discloses name and document as required", () => {
+  const source = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+
+  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /name="name"[\s\S]*aria-required/);
+  assert.match(source, /name="cpf_cnpj"[\s\S]*aria-required/);
 });

@@ -2,16 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { departmentService, type DepItem } from "@modules/departments";
-import { listAdminUsers, type UserItem } from "@modules/users";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
 import { taskModelService } from "../services/taskModelService";
+import { normalizeTaskModelResponsibleSequence } from "../services/taskModelService.contract";
 import type {
   CreateTaskModelData,
   TaskDependent,
   TaskModel,
   TaskModelListItem,
+  TaskModelOption,
 } from "../types";
 import {
   PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME,
@@ -87,8 +88,8 @@ export function TaskModelModal({
 }: TaskModelModalProps) {
   const isEditing = Boolean(initialData?.id);
   const [formData, setFormData] = useState<CreateTaskModelData>(EMPTY_FORM_DATA);
-  const [users, setUsers] = useState<UserItem[]>([]);
-  const [departments, setDepartments] = useState<DepItem[]>([]);
+  const [users, setUsers] = useState<TaskModelOption[]>([]);
+  const [departments, setDepartments] = useState<TaskModelOption[]>([]);
   const [allTasks, setAllTasks] = useState<TaskModelListItem[]>([]);
   const [dependents, setDependents] = useState<TaskDependent[]>([]);
   const [newDependent, setNewDependent] = useState({
@@ -102,6 +103,9 @@ export function TaskModelModal({
   const [saving, setSaving] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [optionsWarning, setOptionsWarning] = useState<string | null>(null);
+  const [optionsRetryKey, setOptionsRetryKey] = useState(0);
+  const [requiredOptionsWarning, setRequiredOptionsWarning] = useState(false);
+  const [taskModelsWarning, setTaskModelsWarning] = useState(false);
 
   const availableDependentTasks = useMemo(
     () => allTasks.filter((task) => task.id !== initialData?.id),
@@ -115,6 +119,9 @@ export function TaskModelModal({
       setNewDependent({ dependent_id: "", wait: false, observation: "" });
       setDetailError(false);
       setOptionsWarning(null);
+      setOptionsRetryKey(0);
+      setRequiredOptionsWarning(false);
+      setTaskModelsWarning(false);
       return;
     }
 
@@ -123,10 +130,11 @@ export function TaskModelModal({
     async function loadOptions() {
       setLoadingOptions(true);
       setOptionsWarning(null);
+      setRequiredOptionsWarning(false);
+      setTaskModelsWarning(false);
 
-      const [usersResult, departmentsResult, taskModelsResult] = await Promise.allSettled([
-        listAdminUsers("active"),
-        departmentService.list({ status: "Ativo" }),
+      const [optionsResult, taskModelsResult] = await Promise.allSettled([
+        taskModelService.listOptions(),
         taskModelService.list({ type: "Projeto" }),
       ]);
 
@@ -136,24 +144,21 @@ export function TaskModelModal({
 
       const failedLists: string[] = [];
 
-      if (usersResult.status === "fulfilled") {
-        setUsers(usersResult.value);
+      if (optionsResult.status === "fulfilled") {
+        setUsers(optionsResult.value.users);
+        setDepartments(optionsResult.value.departments);
       } else {
         setUsers([]);
-        failedLists.push("usuários");
-      }
-
-      if (departmentsResult.status === "fulfilled") {
-        setDepartments(departmentsResult.value);
-      } else {
         setDepartments([]);
-        failedLists.push("departamentos");
+        setRequiredOptionsWarning(true);
+        failedLists.push("usuários e departamentos");
       }
 
       if (taskModelsResult.status === "fulfilled") {
         setAllTasks(taskModelsResult.value);
       } else {
         setAllTasks([]);
+        setTaskModelsWarning(true);
         failedLists.push("modelos");
       }
 
@@ -170,7 +175,7 @@ export function TaskModelModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, optionsRetryKey]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -199,12 +204,16 @@ export function TaskModelModal({
           return;
         }
 
-        setFormData({
-          name: detail.name ?? "",
-          department_id: detail.department_id ?? "",
+        const responsibleSequence = normalizeTaskModelResponsibleSequence({
           responsible_id: detail.responsible_id ?? "",
           responsible2_id: detail.responsible2_id ?? "",
           responsible3_id: detail.responsible3_id ?? "",
+        });
+
+        setFormData({
+          name: detail.name ?? "",
+          department_id: detail.department_id ?? "",
+          ...responsibleSequence,
           observations: detail.observations ?? "",
           billing: detail.billing || EMPTY_FORM_DATA.billing,
           prevision: Number.isFinite(detail.prevision) ? detail.prevision : 0,
@@ -247,10 +256,25 @@ export function TaskModelModal({
     field: Key,
     value: CreateTaskModelData[Key],
   ) {
-    setFormData((currentData) => ({
-      ...currentData,
-      [field]: value,
-    }));
+    setFormData((currentData) => {
+      const updatedData: CreateTaskModelData = {
+        ...currentData,
+        [field]: value,
+      };
+
+      if (
+        field === "responsible_id" ||
+        field === "responsible2_id" ||
+        field === "responsible3_id"
+      ) {
+        return {
+          ...updatedData,
+          ...normalizeTaskModelResponsibleSequence(updatedData),
+        };
+      }
+
+      return updatedData;
+    });
   }
 
   function shouldRenderCurrentDepartmentOption() {
@@ -391,7 +415,9 @@ export function TaskModelModal({
     }
   }
 
-  const saveDisabled = saving || loadingDetail || detailError;
+  const optionsUnavailable = loadingOptions || requiredOptionsWarning;
+  const taskModelsUnavailable = loadingOptions || taskModelsWarning;
+  const saveDisabled = saving || loadingDetail || detailError || optionsUnavailable;
 
   return (
     <Dialog
@@ -445,31 +471,47 @@ export function TaskModelModal({
           }}
         >
           {optionsWarning ? (
-            <div className={TASK_FORM_AUXILIARY_WARNING_CLASSNAME}>{optionsWarning}</div>
+            <div
+              className={`${TASK_FORM_AUXILIARY_WARNING_CLASSNAME} flex items-center justify-between gap-3`}
+            >
+              <span>{optionsWarning}</span>
+              <button
+                type="button"
+                onClick={() => setOptionsRetryKey((currentKey) => currentKey + 1)}
+                className="shrink-0 rounded-lg border border-current px-2.5 py-1 text-xs font-semibold"
+                disabled={loadingOptions}
+              >
+                Tentar novamente
+              </button>
+            </div>
           ) : null}
 
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">Nome</span>
+              <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
+                Nome
+              </RequiredFieldLabel>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(event) => updateFormValue("name", event.target.value)}
                 className={PROJECT_INPUT_CLASSNAME}
                 placeholder="Nome do modelo"
+                aria-required="true"
               />
             </label>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">
+              <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
                 Departamento
-              </span>
+              </RequiredFieldLabel>
               <select
                 value={formData.department_id}
                 onChange={(event) => updateFormValue("department_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={loadingOptions && departments.length === 0}
+                disabled={optionsUnavailable}
+                aria-required="true"
               >
                 <option value="">{getDepartmentPlaceholder()}</option>
                 {shouldRenderCurrentDepartmentOption() ? (
@@ -486,15 +528,16 @@ export function TaskModelModal({
 
           <div className={TASK_FORM_THREE_COLUMN_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">
+              <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
                 Responsável
-              </span>
+              </RequiredFieldLabel>
               <select
                 value={formData.responsible_id}
                 onChange={(event) => updateFormValue("responsible_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={loadingOptions && users.length === 0}
+                disabled={optionsUnavailable}
+                aria-required="true"
               >
                 <option value="">{getUserPlaceholder(false)}</option>
                 {shouldRenderCurrentUserOption(formData.responsible_id) ? (
@@ -517,7 +560,10 @@ export function TaskModelModal({
                 onChange={(event) => updateFormValue("responsible2_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={loadingOptions && users.length === 0}
+                disabled={!formData.responsible_id || optionsUnavailable}
+                aria-describedby={
+                  !formData.responsible_id ? "task-model-responsible2-help" : undefined
+                }
               >
                 <option value="">{getUserPlaceholder(true)}</option>
                 {shouldRenderCurrentUserOption(formData.responsible2_id) ? (
@@ -529,6 +575,14 @@ export function TaskModelModal({
                   </option>
                 ))}
               </select>
+              {!formData.responsible_id ? (
+                <span
+                  id="task-model-responsible2-help"
+                  className="text-xs text-slate-500 dark:text-slate-400"
+                >
+                  Selecione o responsável antes de definir o responsável 2.
+                </span>
+              ) : null}
             </label>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
@@ -540,7 +594,10 @@ export function TaskModelModal({
                 onChange={(event) => updateFormValue("responsible3_id", event.target.value)}
                 className={PROJECT_SELECT_CLASSNAME}
                 style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={loadingOptions && users.length === 0}
+                disabled={!formData.responsible2_id || optionsUnavailable}
+                aria-describedby={
+                  !formData.responsible2_id ? "task-model-responsible3-help" : undefined
+                }
               >
                 <option value="">{getUserPlaceholder(true)}</option>
                 {shouldRenderCurrentUserOption(formData.responsible3_id) ? (
@@ -552,6 +609,14 @@ export function TaskModelModal({
                   </option>
                 ))}
               </select>
+              {!formData.responsible2_id ? (
+                <span
+                  id="task-model-responsible3-help"
+                  className="text-xs text-slate-500 dark:text-slate-400"
+                >
+                  Selecione o responsável 2 antes de definir o responsável 3.
+                </span>
+              ) : null}
             </label>
           </div>
 
@@ -630,7 +695,7 @@ export function TaskModelModal({
                     }
                     className={PROJECT_SELECT_CLASSNAME}
                     style={PROJECT_SELECT_ARROW_STYLE}
-                    disabled={loadingOptions && allTasks.length === 0}
+                    disabled={taskModelsUnavailable}
                   >
                     <option value="">{getDependentPlaceholder()}</option>
                     {availableDependentTasks.map((task) => (

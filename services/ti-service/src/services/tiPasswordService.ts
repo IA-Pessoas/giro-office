@@ -1,16 +1,25 @@
 import { type EncryptionService, error as logError, ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
-import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type {
   CreateTiPasswordBody,
+  DeactivateTiPasswordBody,
   ListTiPasswordsQuery,
+  TiPasswordStatusFilter,
   UpdateTiPasswordBody,
 } from "../schemas/tiPassword.schemas.js";
 import type { TiAuthContext } from "./tiRequestService.js";
 
 type PasswordRecord = Record<string, unknown>;
+
+interface TiPasswordListResult {
+  items: unknown[];
+  total: number;
+  page: number;
+  page_size: number;
+  hasMore: boolean;
+}
 
 const SAFE_USER_INCLUDE = {
   user: {
@@ -49,43 +58,88 @@ function withoutPassword(record: unknown): unknown {
   return withoutNestedUserPassword(safeRecord);
 }
 
+function getSearchTerm(query: ListTiPasswordsQuery): string | undefined {
+  const term = (query.search ?? query.local)?.trim();
+
+  return term || undefined;
+}
+
+function getActivePredicate(
+  status: TiPasswordStatusFilter | undefined,
+): Prisma.PasswordTecnologiaWhereInput {
+  if (status === "all") {
+    return {};
+  }
+
+  return { active: status !== "inactive" };
+}
+
+function buildPasswordWhere(
+  context: TiAuthContext,
+  query: ListTiPasswordsQuery,
+): Prisma.PasswordTecnologiaWhereInput {
+  const search = getSearchTerm(query);
+
+  return {
+    organization_id: context.organizationId,
+    ...getActivePredicate(query.status),
+    ...(query.user_id ? { user_id: query.user_id } : {}),
+    ...(search
+      ? {
+          OR: [
+            { local: { contains: search, mode: "insensitive" } },
+            { notes: { contains: search, mode: "insensitive" } },
+            {
+              user: {
+                is: {
+                  OR: [
+                    { name: { contains: search, mode: "insensitive" } },
+                    { full_name: { contains: search, mode: "insensitive" } },
+                  ],
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
+}
+
 export class TiPasswordService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly encryption: EncryptionService,
   ) {}
 
-  async list(context: TiAuthContext, query: ListTiPasswordsQuery): Promise<unknown[]> {
+  async list(context: TiAuthContext, query: ListTiPasswordsQuery): Promise<TiPasswordListResult> {
     const { skip, take } = getPaginationParams(query);
-    const passwords = await this.prisma.passwordTecnologia.findMany({
-      where: {
-        organization_id: context.organizationId,
-        ...(query.user_id ? { user_id: query.user_id } : {}),
-      },
-      include: SAFE_USER_INCLUDE,
-      orderBy: { local: "asc" },
-      skip,
-      take,
-    });
+    const page = query.page ?? 1;
+    const where = buildPasswordWhere(context, query);
+    const [total, passwords] = await Promise.all([
+      this.prisma.passwordTecnologia.count({ where }),
+      this.prisma.passwordTecnologia.findMany({
+        where,
+        include: SAFE_USER_INCLUDE,
+        orderBy: { local: "asc" },
+        skip,
+        take,
+      }),
+    ]);
 
-    return passwords.map((password) => withoutPassword(password));
+    return {
+      items: passwords.map((password) => withoutPassword(password)),
+      total,
+      page,
+      page_size: take,
+      hasMore: skip + passwords.length < total,
+    };
   }
 
   async getById(context: TiAuthContext, id: string): Promise<unknown> {
-    const password = await this.prisma.passwordTecnologia.findFirst({
-      where: { id, organization_id: context.organizationId },
-      include: SAFE_USER_INCLUDE,
-    });
+    const password = await this.findPasswordOrThrow(context, id);
+    this.assertActive(password);
 
-    if (!password) {
-      throw new ServiceError(404, "Senha de TI nao encontrada.");
-    }
-
-    if (context.permission < TiPermissionLevel.Admin) {
-      return withoutPassword(password);
-    }
-
-    return this.withDecryptedPassword(withoutNestedUserPassword(password as PasswordRecord));
+    return this.withDecryptedPassword(password);
   }
 
   async create(context: TiAuthContext, body: CreateTiPasswordBody): Promise<unknown> {
@@ -112,7 +166,8 @@ export class TiPasswordService {
 
   async update(context: TiAuthContext, id: string, body: UpdateTiPasswordBody): Promise<unknown> {
     try {
-      await this.getById(context, id);
+      const current = await this.findPasswordOrThrow(context, id);
+      this.assertActive(current);
 
       if (body.user_id) {
         await this.ensureUser(context.organizationId, body.user_id);
@@ -122,16 +177,71 @@ export class TiPasswordService {
         ...body,
         ...(body.password ? { password: this.encryption.encrypt(body.password) } : {}),
       };
-      const password = await this.prisma.passwordTecnologia.update({
-        where: { id },
+      const updateResult = await this.prisma.passwordTecnologia.updateMany({
+        where: { id, organization_id: context.organizationId, active: true },
         data,
       });
 
-      return withoutPassword(password);
+      if (updateResult.count === 0) {
+        throw new ServiceError(409, "Senha de TI inativa.");
+      }
+
+      return withoutPassword(await this.findPasswordOrThrow(context, id));
     } catch (err: unknown) {
       logError("Erro ao atualizar senha de TI", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao atualizar senha de TI.", err);
+    }
+  }
+
+  async deactivate(
+    context: TiAuthContext,
+    id: string,
+    body: DeactivateTiPasswordBody,
+  ): Promise<unknown> {
+    try {
+      const current = await this.findPasswordOrThrow(context, id);
+      this.assertActive(current);
+      const deactivatedAt = new Date();
+
+      const updateResult = await this.prisma.passwordTecnologia.updateMany({
+        where: { id, organization_id: context.organizationId, active: true },
+        data: {
+          active: false,
+          deactivated_at: deactivatedAt,
+          deactivated_by_user_id: context.userId,
+          deactivation_reason: body.reason,
+        },
+      });
+
+      if (updateResult.count === 0) {
+        throw new ServiceError(409, "Senha de TI ja esta inativa.");
+      }
+
+      return withoutPassword(await this.findPasswordOrThrow(context, id));
+    } catch (err: unknown) {
+      logError("Erro ao inativar senha de TI", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao inativar senha de TI.", err);
+    }
+  }
+
+  private async findPasswordOrThrow(context: TiAuthContext, id: string): Promise<PasswordRecord> {
+    const password = await this.prisma.passwordTecnologia.findFirst({
+      where: { id, organization_id: context.organizationId },
+      include: SAFE_USER_INCLUDE,
+    });
+
+    if (!password) {
+      throw new ServiceError(404, "Senha de TI nao encontrada.");
+    }
+
+    return withoutNestedUserPassword(password as PasswordRecord);
+  }
+
+  private assertActive(password: PasswordRecord): void {
+    if (password.active === false) {
+      throw new ServiceError(409, "Senha de TI inativa.");
     }
   }
 

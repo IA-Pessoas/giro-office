@@ -17,8 +17,9 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const departmentId = "20000000-0000-4000-8000-000000000001";
 const termId = "30000000-0000-4000-8000-000000000001";
 const otherUserId = "90000000-0000-4000-8000-000000000001";
+const TI_VIEWER_PERMISSION = 1;
 const TI_REQUESTER_PERMISSION = 1;
-const TI_ADMIN_PERMISSION = 2;
+const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -34,6 +35,9 @@ function createPrismaMock(): PrismaClient {
     user: {
       findFirst: vi.fn(async ({ where }) => ({
         id: where.id,
+        name: "Maria Silva",
+        full_name: "Maria Silva",
+        cpf: "12345678900",
         organization_id: where.organization_id,
       })),
     },
@@ -58,6 +62,63 @@ function createPrismaMock(): PrismaClient {
 }
 
 describe("ti term routes", () => {
+  it("GET /ti/terms/list allows viewer to list own terms", async () => {
+    const response = await request(createTestApp(createPrismaMock()))
+      .get("/ti/terms/list")
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: [] });
+  });
+
+  it("GET /ti/terms/:id allows viewer to read own term", async () => {
+    const response = await request(createTestApp(createPrismaMock()))
+      .get(`/ti/terms/${termId}`)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, data: { id: termId, user_id: userId } });
+  });
+
+  it("PATCH /ti/terms/:id/sign allows viewer to sign own term", async () => {
+    const response = await request(createTestApp(createPrismaMock()))
+      .patch(`/ti/terms/${termId}/sign`)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: { id: termId, reason: "Termo assinado pelo usuario." },
+    });
+  });
+
+  it("POST /ti/terms keeps viewer from creating terms", async () => {
+    const response = await request(createTestApp(createPrismaMock()))
+      .post("/ti/terms")
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
+      .send({ date: "2026-05-19", asset_code: "NB-001" });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("PATCH /ti/terms/:id keeps viewer from updating terms", async () => {
+    const prisma = createPrismaMock();
+
+    const response = await request(createTestApp(prisma))
+      .patch(`/ti/terms/${termId}`)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
+      .send({ asset_code: "NB-002" });
+
+    expect(response.status).toBe(403);
+    expect(prisma.termTecnologia.update).not.toHaveBeenCalled();
+  });
+
   it("POST /ti/terms creates a term", async () => {
     const response = await request(createTestApp(createPrismaMock()))
       .post("/ti/terms")
@@ -65,8 +126,6 @@ describe("ti term routes", () => {
       .send({
         date: "2026-05-19",
         user_id: userId,
-        user_name: "Maria Silva",
-        user_cpf: "12345678900",
         department_id: departmentId,
         asset_code: "NB-001",
       });
@@ -86,6 +145,22 @@ describe("ti term routes", () => {
     });
   });
 
+  it("PATCH /ti/terms/:id rejects manual user identity changes", async () => {
+    const prisma = createPrismaMock();
+
+    const response = await request(createTestApp(prisma))
+      .patch(`/ti/terms/${termId}`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({
+        user_id: otherUserId,
+        user_name: "Outro Usuario",
+        user_cpf: "00000000000",
+      });
+
+    expect(response.status).toBe(400);
+    expect(prisma.termTecnologia.update).not.toHaveBeenCalled();
+  });
+
   it("PATCH /ti/terms/:id/sign signs a term", async () => {
     const response = await request(createTestApp(createPrismaMock()))
       .patch(`/ti/terms/${termId}/sign`)
@@ -102,7 +177,7 @@ describe("ti term routes", () => {
     });
   });
 
-  it("PATCH /ti/terms/:id/sign allows admin level 2 to sign another user's term", async () => {
+  it("PATCH /ti/terms/:id/sign allows admin level 3 to sign another user's term", async () => {
     const prisma = createPrismaMock();
     vi.mocked(prisma.termTecnologia.findFirst).mockResolvedValueOnce({
       id: termId,
@@ -124,5 +199,23 @@ describe("ti term routes", () => {
         reason: "Termo assinado pelo usuario.",
       },
     });
+  });
+
+  it("PATCH /ti/terms/:id/sign hides another user's term from viewer", async () => {
+    const prisma = createPrismaMock();
+    vi.mocked(prisma.termTecnologia.findFirst).mockResolvedValueOnce({
+      id: termId,
+      user_id: otherUserId,
+      organization_id: organizationId,
+      reason: null,
+    } as never);
+
+    const response = await request(createTestApp(prisma))
+      .patch(`/ti/terms/${termId}/sign`)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
+      .send({});
+
+    expect(response.status).toBe(404);
+    expect(prisma.termTecnologia.update).not.toHaveBeenCalled();
   });
 });

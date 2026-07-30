@@ -9,6 +9,12 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
+  canManageRh,
+  RH_MANAGEMENT_PERMISSION,
+  RH_SELF_SERVICE_PERMISSION,
+  requireRhPermission,
+} from "../middlewares/requireRhPermission.js";
+import {
   generateQuarterBodySchema,
   scoreQuarterIdParamSchema,
   updateNitroBodySchema,
@@ -21,6 +27,7 @@ const scoreQuarterService = new ScoreQuarterService();
 router.post(
   "/generate",
   isAuthenticated,
+  requireRhPermission(RH_MANAGEMENT_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = req.organization_id;
@@ -48,76 +55,93 @@ router.post(
   },
 );
 
-router.patch("/nitro", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const organizationId = req.organization_id;
-    const userId = req.user_id;
-    if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
+router.patch(
+  "/nitro",
+  isAuthenticated,
+  requireRhPermission(RH_MANAGEMENT_PERMISSION),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = req.organization_id;
+      const userId = req.user_id;
+      if (!organizationId) {
+        throw new ServiceError(400, "organization_id é obrigatório.");
+      }
+      if (!userId) {
+        throw new ServiceError(400, "user_id é obrigatório.");
+      }
+
+      const body = parseWithZod(updateNitroBodySchema, req.body);
+
+      const result = await scoreQuarterService.updateNitro({
+        organization_id: organizationId,
+        score_id: body.score_id,
+        type: body.type,
+        value: body.value,
+      });
+
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao atualizar Nitro do score", { err });
+      next(err);
     }
-    if (!userId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
+  },
+);
+
+router.get(
+  "/me",
+  isAuthenticated,
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = req.organization_id;
+      const userId = req.user_id;
+      if (!organizationId) {
+        throw new ServiceError(400, "organization_id é obrigatório.");
+      }
+      if (!userId) {
+        throw new ServiceError(400, "user_id é obrigatório.");
+      }
+
+      const result = await scoreQuarterService.listForUser(organizationId, userId);
+
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao listar scores do usuário", { err });
+      next(err);
     }
+  },
+);
 
-    const body = parseWithZod(updateNitroBodySchema, req.body);
+router.get(
+  "/:id",
+  isAuthenticated,
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = req.organization_id;
+      const userId = req.user_id;
+      if (!organizationId) {
+        throw new ServiceError(400, "organization_id é obrigatório.");
+      }
+      if (!userId) {
+        throw new ServiceError(400, "user_id é obrigatório.");
+      }
 
-    const result = await scoreQuarterService.updateNitro({
-      organization_id: organizationId,
-      score_id: body.score_id,
-      type: body.type,
-      value: body.value,
-    });
+      const { id } = parseWithZod(scoreQuarterIdParamSchema, req.params);
 
-    res.status(200).json(createSuccessResponse(result));
-  } catch (err) {
-    logError("Erro ao atualizar Nitro do score", { err });
-    next(err);
-  }
-});
+      const result = await scoreQuarterService.getDetail({
+        organization_id: organizationId,
+        score_id: id,
+        user_id: userId,
+        can_manage: canManageRh(req),
+      });
 
-router.get("/me", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const organizationId = req.organization_id;
-    const userId = req.user_id;
-    if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao obter detalhe do score trimestral", { err });
+      next(err);
     }
-    if (!userId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
-    }
-
-    const result = await scoreQuarterService.listForUser(organizationId, userId);
-
-    res.status(200).json(createSuccessResponse(result));
-  } catch (err) {
-    logError("Erro ao listar scores do usuário", { err });
-    next(err);
-  }
-});
-
-router.get("/:id", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const organizationId = req.organization_id;
-    const userId = req.user_id;
-    if (!organizationId) {
-      throw new ServiceError(400, "organization_id é obrigatório.");
-    }
-    if (!userId) {
-      throw new ServiceError(400, "user_id é obrigatório.");
-    }
-
-    const { id } = parseWithZod(scoreQuarterIdParamSchema, req.params);
-
-    const result = await scoreQuarterService.getDetail({
-      organization_id: organizationId,
-      score_id: id,
-    });
-
-    res.status(200).json(createSuccessResponse(result));
-  } catch (err) {
-    logError("Erro ao obter detalhe do score trimestral", { err });
-    next(err);
-  }
-});
+  },
+);
 
 export default router;

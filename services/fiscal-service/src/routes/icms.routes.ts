@@ -7,16 +7,21 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import {
+  isAuthenticated,
+  requireFiscalAdminPermission,
+  requireFiscalWritePermission,
+} from "../middlewares/isAuthenticated.js";
 import {
   createIcmsBodySchema,
+  deleteIcmsQuerySchema,
   detailIcmsQuerySchema,
   listIcmsQuerySchema,
   updateIcmsBodySchema,
 } from "../schemas/icms.schemas.js";
 import type { IcmsService } from "../services/icmsService.js";
 
-export type IcmsRouteDeps = Pick<IcmsService, "create" | "update" | "detail" | "list">;
+export type IcmsRouteDeps = Pick<IcmsService, "create" | "update" | "delete" | "detail" | "list">;
 
 function firstQueryValue(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : value;
@@ -25,43 +30,78 @@ function firstQueryValue(value: unknown): unknown {
 export function createIcmsRoutes(service: IcmsRouteDeps): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
-  router.post("/icms", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const body = parseWithZod(createIcmsBodySchema, req.body);
-      const auth = requireAuthenticatedRequestContext(req);
+  router.post(
+    "/icms",
+    isAuthenticated,
+    requireFiscalWritePermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(createIcmsBodySchema, req.body);
+        const auth = requireAuthenticatedRequestContext(req);
 
-      const result = await service.create({
-        userId: auth.user_id,
-        organizationId: auth.organization_id,
-        permission: auth.permission,
-        ...body,
-      });
+        const result = await service.create({
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+          ...body,
+        });
 
-      res.status(201).json(createSuccessResponse(result));
-    } catch (err) {
-      logError("Erro ao criar ICMS", { err });
-      next(err);
-    }
-  });
+        res.status(201).json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao criar ICMS", { err });
+        next(err);
+      }
+    },
+  );
 
-  router.put("/icms", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const body = parseWithZod(updateIcmsBodySchema, req.body);
-      const auth = requireAuthenticatedRequestContext(req);
+  router.put(
+    "/icms",
+    isAuthenticated,
+    requireFiscalWritePermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(updateIcmsBodySchema, req.body);
+        const auth = requireAuthenticatedRequestContext(req);
 
-      const result = await service.update({
-        userId: auth.user_id,
-        organizationId: auth.organization_id,
-        permission: auth.permission,
-        ...body,
-      });
+        const result = await service.update({
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+          ...body,
+        });
 
-      res.json(createSuccessResponse(result));
-    } catch (err) {
-      logError("Erro ao atualizar ICMS", { err });
-      next(err);
-    }
-  });
+        res.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao atualizar ICMS", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.delete(
+    "/icms",
+    isAuthenticated,
+    requireFiscalAdminPermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const rawObj = { icms_id: firstQueryValue(req.query.icms_id) };
+        const query = parseWithZod(deleteIcmsQuerySchema, rawObj);
+        const auth = requireAuthenticatedRequestContext(req);
+
+        const result = await service.delete({
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+          icms_id: query.icms_id,
+        });
+
+        res.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao excluir ICMS", { err });
+        next(err);
+      }
+    },
+  );
 
   router.get("/icms", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -83,11 +123,22 @@ export function createIcmsRoutes(service: IcmsRouteDeps): ReturnType<typeof Rout
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const rawObj = { icmsCodes: req.query.icmsCodes };
+        const rawObj = {
+          icmsCodes: req.query.icmsCodes,
+          page: req.query.page,
+          page_size: req.query.page_size,
+        };
         const query = parseWithZod(listIcmsQuerySchema, rawObj);
         const auth = requireAuthenticatedRequestContext(req);
 
-        const result = await service.list(query.icmsCodes, auth.organization_id);
+        const result = await service.list(
+          {
+            icmsCodes: query.icmsCodes,
+            page: query.page,
+            page_size: query.page_size,
+          },
+          auth.organization_id,
+        );
 
         res.json(createSuccessResponse(result));
       } catch (err) {

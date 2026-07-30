@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Building2, ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 
+import { useModuleAccess } from "@modules/auth";
 import { ClientCreateModal } from "@modules/clients/components/ClientCreateModal";
 import { useClients } from "@modules/clients/hooks/useClients";
 import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 
 const CLIENTS_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
@@ -48,12 +50,15 @@ function formatCpfCnpj(value: string): string {
 }
 
 export function Clients() {
+  const { access: integracaoAccess } = useModuleAccess("integracao");
+  const canCreateClient = integracaoAccess.canEdit;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [pageInputValue, setPageInputValue] = useState(String(page));
   const deferredSearch = useDeferredValue(search);
-  const limit = 10;
+  const limit = DEFAULT_PAGE_SIZE;
 
   const filters = useMemo(
     () => ({
@@ -72,13 +77,38 @@ export function Clients() {
   const currentPage = clientsPage?.page ?? page;
   const pageSize = clientsPage?.pageSize ?? limit;
   const pageCount = total > 0 ? Math.ceil(total / pageSize) : 1;
+  const pageInputSize = Math.max(1, pageInputValue.length);
+  const pageInputWidthClassName =
+    pageInputSize <= 1 ? "w-[3ch]" : pageInputSize === 2 ? "w-[4ch]" : "w-[5ch]";
+
+  useEffect(() => {
+    setPageInputValue(String(currentPage));
+  }, [currentPage]);
+
+  function goToPage(value: string) {
+    if (!value.trim()) {
+      setPageInputValue(String(currentPage));
+      return;
+    }
+
+    const nextPage = Math.trunc(Number(value));
+
+    if (!Number.isFinite(nextPage)) {
+      setPageInputValue(String(currentPage));
+      return;
+    }
+
+    const clampedPage = Math.min(pageCount, Math.max(1, nextPage));
+
+    setPage(clampedPage);
+    setPageInputValue(String(clampedPage));
+  }
 
   return (
     <div className="space-y-6">
-      <ClientCreateModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-      />
+      {canCreateClient ? (
+        <ClientCreateModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+      ) : null}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -94,31 +124,33 @@ export function Clients() {
         </div>
 
         <div className="flex flex-wrap justify-end gap-3">
-          <Link
-            href="/clients/integration/new"
-            className={`inline-flex w-fit items-center gap-2 rounded-xl px-4 py-2.5 text-white ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
-          >
-            <Plus className="h-5 w-5" />
-            Nova integração
-          </Link>
+          {canCreateClient ? (
+            <>
+              <Link
+                href="/clients/integration/new"
+                className={`inline-flex w-fit items-center gap-2 rounded-xl px-4 py-2.5 text-white ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
+              >
+                <Plus className="h-5 w-5" />
+                Nova integração
+              </Link>
 
-          <button
-            type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className={`self-end lg:self-auto w-fit flex items-center gap-2 rounded-xl px-4 py-2.5 text-white ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
-          >
-            <Plus className="h-5 w-5" />
-            Novo cliente
-          </button>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(true)}
+                className={`self-end lg:self-auto w-fit flex items-center gap-2 rounded-xl px-4 py-2.5 text-white ${CLIENTS_GRADIENT_BUTTON_CLASSNAME}`}
+              >
+                <Plus className="h-5 w-5" />
+                Novo cliente
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_180px]">
         <div className={`${CLIENTS_SUBPANEL_CLASSNAME} p-4`}>
           <label className="space-y-2">
-            <span className="block text-sm font-medium text-slate-700 dark:text-white">
-              Busca
-            </span>
+            <span className="block text-sm font-medium text-slate-700 dark:text-white">Busca</span>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -137,9 +169,7 @@ export function Clients() {
 
         <div className={`${CLIENTS_SUBPANEL_CLASSNAME} p-4`}>
           <label className="space-y-2">
-            <span className="block text-sm font-medium text-slate-700 dark:text-white">
-              Status
-            </span>
+            <span className="block text-sm font-medium text-slate-700 dark:text-white">Status</span>
             <select
               value={status}
               onChange={(event) => {
@@ -172,26 +202,25 @@ export function Clients() {
                 <th className="px-6 py-4 font-medium">Cliente</th>
                 <th className="px-6 py-4 font-medium">Cpf/Cnpj</th>
                 <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Organização</th>
                 <th className="px-6 py-4 font-medium text-center">Ação</th>
               </tr>
             </thead>
             <tbody>
               {clientsQuery.isLoading ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={4}>
                     Carregando clientes...
                   </td>
                 </tr>
               ) : clientsQuery.isError ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={4}>
                     Não foi possível carregar a listagem no momento.
                   </td>
                 </tr>
               ) : clients.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={4}>
                     Nenhum cliente encontrado para os filtros atuais.
                   </td>
                 </tr>
@@ -200,12 +229,19 @@ export function Clients() {
                   const uiStatus = mapClientStatusFromApi(client.status);
 
                   return (
-                    <tr key={client.id} className="border-b border-slate-200/80 last:border-b-0 dark:border-slate-800">
+                    <tr
+                      key={client.id}
+                      className="border-b border-slate-200/80 last:border-b-0 dark:border-slate-800"
+                    >
                       <td className="px-6 py-4">
                         <div>
-                          <p className="font-medium text-slate-900 dark:text-white">{client.name}</p>
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            {client.name}
+                          </p>
                           {client.company_name ? (
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{client.company_name}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                              {client.company_name}
+                            </p>
                           ) : null}
                         </div>
                       </td>
@@ -220,9 +256,6 @@ export function Clients() {
                         >
                           {uiStatus}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
-                        {client.organization?.name ?? "Organização atual"}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <Link
@@ -241,9 +274,27 @@ export function Clients() {
         </div>
 
         <div className="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            Página {currentPage} de {pageCount}
-          </p>
+          <label className="flex items-center gap-2">
+            <span>Página</span>
+            <input
+              aria-label="Ir para página"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              size={pageInputSize}
+              value={pageInputValue}
+              onChange={(event) => setPageInputValue(event.target.value.replace(/\D/g, ""))}
+              onBlur={(event) => goToPage(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  goToPage(event.currentTarget.value);
+                  event.currentTarget.blur();
+                }
+              }}
+              className={`${pageInputWidthClassName} h-7 rounded-md border border-slate-200 bg-white px-0.5 text-center text-sm font-medium text-slate-700 outline-none transition-colors focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200`}
+            />
+            <span>de {pageCount}</span>
+          </label>
 
           <div className="flex items-center gap-2">
             <button

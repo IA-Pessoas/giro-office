@@ -51,4 +51,15 @@ describe("auth routes", () => {
       "a0000000-0000-4000-8000-000000000001",
     );
   });
+
+  it("GET /user/session/validate confirma o contexto autenticado", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/user/session/validate")
+      .set(gatewayAuthHeaders({ userId: "user-1" }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.valid).toBe(true);
+  });
 });

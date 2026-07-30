@@ -1,3 +1,5 @@
+import { DEFAULT_CERTIFICATE_PAGE_SIZE } from "../services/certificateService.contract.ts";
+
 export const CERTIFICATE_QUERY_KEY = ["certificates"] as const;
 
 function boolToQueryValue(value?: boolean) {
@@ -24,7 +26,7 @@ export function certificatePjListQueryKey(filters: {
     "pj",
     "list",
     filters.page ?? 1,
-    filters.page_size ?? 50,
+    filters.page_size ?? DEFAULT_CERTIFICATE_PAGE_SIZE,
     filters.name ?? "",
     filters.cnpj ?? "",
     filters.responsible ?? "",
@@ -54,7 +56,7 @@ export function certificatePfListQueryKey(filters: {
     "pf",
     "list",
     filters.page ?? 1,
-    filters.page_size ?? 50,
+    filters.page_size ?? DEFAULT_CERTIFICATE_PAGE_SIZE,
     filters.search ?? "",
     filters.name ?? "",
     filters.cpf ?? "",
@@ -82,6 +84,6 @@ export function certificateNotificationsQueryKey(params: { page?: number; page_s
     "notifications",
     "list",
     params.page ?? 1,
-    params.page_size ?? 50,
+    params.page_size ?? DEFAULT_CERTIFICATE_PAGE_SIZE,
   ] as const;
 }

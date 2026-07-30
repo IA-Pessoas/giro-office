@@ -1,4 +1,11 @@
-import { type AuthUserType, ServiceError } from "@workspace/shared";
+import {
+  ACTIVE_MODULE_KEYS,
+  type AuthIdentity,
+  type AuthUserType,
+  ServiceError,
+  type ModulePermissionKey,
+  type ModulePermissions,
+} from "@workspace/shared";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -10,44 +17,7 @@ interface LoginRequest {
   password: string;
 }
 
-type ModulePermissionKey =
-  | "atendimento"
-  | "certificado"
-  | "comercial"
-  | "contabil"
-  | "financeiro"
-  | "fiscal"
-  | "integracao"
-  | "marketing"
-  | "parcelamento"
-  | "pec"
-  | "pessoal"
-  | "regularize"
-  | "rh"
-  | "ti"
-  | "triagem"
-  | "wiki";
-
-type ModulePermissions = Record<ModulePermissionKey, number | null>;
-
-const MODULE_PERMISSION_KEYS: ModulePermissionKey[] = [
-  "atendimento",
-  "certificado",
-  "comercial",
-  "contabil",
-  "financeiro",
-  "fiscal",
-  "integracao",
-  "marketing",
-  "parcelamento",
-  "pec",
-  "pessoal",
-  "regularize",
-  "rh",
-  "ti",
-  "triagem",
-  "wiki",
-];
+const MODULE_PERMISSION_KEYS: readonly ModulePermissionKey[] = ACTIVE_MODULE_KEYS;
 
 function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
   return value === "owner" || value === "admin" || value === "user" ? value : undefined;
@@ -104,7 +74,7 @@ class AuthService {
       (permission) => permission.organization_id === organizationId,
     );
     const modules = MODULE_PERMISSION_KEYS.reduce<ModulePermissions>((acc, key) => {
-      acc[key] = permissionRecord?.[key] ?? null;
+      acc[key] = permissionRecord?.[key] ?? 0;
       return acc;
     }, {} as ModulePermissions);
     const type = normalizeAuthUserType(user.type);
@@ -117,6 +87,7 @@ class AuthService {
         login: user.login,
         permission: user.permission,
         type,
+        session_version: user.session_version,
         modules,
       },
       jwtSecret,
@@ -167,6 +138,7 @@ class AuthService {
           login: "Admin",
           password: passwordHash,
           permission: 2,
+          type: "owner",
           status: "active",
           department_id: dep.id,
         },
@@ -190,6 +162,23 @@ class AuthService {
         throw new ServiceError(409, "Login já cadastrado");
       }
       throw err;
+    }
+  }
+
+  async validateSession(
+    identity: Pick<AuthIdentity, "user_id" | "session_version">,
+  ): Promise<void> {
+    if (typeof identity.session_version !== "number") {
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+    }
+
+    const user = await prismaClient.user.findUnique({
+      where: { id: identity.user_id },
+      select: { session_version: true, status: true },
+    });
+
+    if (!user || user.status !== "active" || user.session_version !== identity.session_version) {
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
     }
   }
 }

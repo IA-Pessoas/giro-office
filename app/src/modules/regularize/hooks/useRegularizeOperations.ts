@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 import { regularizeService } from "../services/regularizeService";
 import type {
@@ -23,9 +24,9 @@ import type {
   RegularizeLicenseDetail,
   RegularizeLicenseListFilters,
   RegularizeLicenseListItem,
-  RegularizeMunicipalTaxesClientSummary,
   RegularizeMunicipalTaxesDetail,
   RegularizeMunicipalTaxesListFilters,
+  RegularizeMunicipalTaxesPage,
   RegularizeProcessDetail,
   RegularizeProcessListFilters,
   RegularizeProcessListItem,
@@ -40,16 +41,23 @@ type RegularizeReadQueryOptions = {
   enabled?: boolean;
 };
 
-function invalidateRegularizeOperations(queryClient: ReturnType<typeof useQueryClient>) {
-  return queryClient.invalidateQueries({
-    queryKey: regularizeQueryKeys.operations(),
-  });
+async function invalidateRegularizeOperations(
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: regularizeQueryKeys.operations(),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: regularizeQueryKeys.dashboardRoot(),
+    }),
+  ]);
 }
 
 export function useRegularizeMunicipalTaxes(
   filters: RegularizeMunicipalTaxesListFilters,
   options?: RegularizeReadQueryOptions,
-): UseQueryResult<RegularizeMunicipalTaxesClientSummary[], Error> {
+): UseQueryResult<RegularizeMunicipalTaxesPage, Error> {
   return useFetch(
     regularizeQueryKeys.municipalTaxes(filters),
     () => regularizeService.listMunicipalTaxes(filters),
@@ -105,6 +113,19 @@ export function useRegularizeProcesses(
   return useFetch(
     regularizeQueryKeys.processes(filters),
     () => regularizeService.listProcesses(filters),
+    {
+      enabled: Boolean(filters.status) && (options?.enabled ?? true),
+    },
+  );
+}
+
+export function usePaginatedRegularizeProcesses(
+  filters: RegularizeProcessListFilters & { page: number; limit: number },
+  options?: RegularizeReadQueryOptions,
+): UseQueryResult<PaginatedResult<RegularizeProcessListItem>, Error> {
+  return useFetch(
+    regularizeQueryKeys.processesPage(filters),
+    () => regularizeService.listProcessesPage(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
     },

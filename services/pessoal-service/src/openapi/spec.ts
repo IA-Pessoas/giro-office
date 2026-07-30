@@ -47,11 +47,58 @@ const mutationResponses = {
   "409": { description: "Conflict", ...errorJson },
 } as const;
 
+const deleteResponses = {
+  "200": { description: "OK", ...successJson },
+  "400": { description: "Bad request", ...errorJson },
+  "401": { description: "Unauthorized", ...errorJson },
+  "403": { description: "Forbidden", ...errorJson },
+  "404": { description: "Not found", ...errorJson },
+} as const;
+
 const readResponses = {
   "200": { description: "OK", ...successJson },
   "400": { description: "Bad request", ...errorJson },
   "401": { description: "Unauthorized", ...errorJson },
   "404": { description: "Not found", ...errorJson },
+} as const;
+
+const unionListResponses = {
+  ...readResponses,
+  "200": {
+    description: "Array completo ou pagina de sindicatos",
+    content: {
+      "application/json": {
+        schema: {
+          oneOf: [
+            {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                data: { type: "array", items: { type: "object" } },
+              },
+            },
+            {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                data: {
+                  type: "object",
+                  required: ["data", "total", "page", "limit", "hasMore"],
+                  properties: {
+                    data: { type: "array", items: { type: "object" } },
+                    total: { type: "integer", minimum: 0 },
+                    page: { type: "integer", minimum: 1 },
+                    limit: { type: "integer", minimum: 1, maximum: 100 },
+                    hasMore: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+  },
 } as const;
 
 const jsonRequestBody = (schema: Record<string, unknown>) =>
@@ -78,7 +125,7 @@ const uuidSchema = { type: "string", format: "uuid" } as const;
 const textSchema = { type: "string", minLength: 1 } as const;
 const nullableTextSchema = { type: "string", minLength: 1, nullable: true } as const;
 const nullableDateSchema = { type: "string", format: "date-time", nullable: true } as const;
-const nullableNumberSchema = { type: "number", nullable: true } as const;
+const nullableNonNegativeNumberSchema = { type: "number", minimum: 0, nullable: true } as const;
 const nullableBooleanSchema = { type: "boolean", nullable: true } as const;
 const competenceSchema = { type: "string", pattern: "^\\d{4}-\\d{2}$" } as const;
 
@@ -88,7 +135,7 @@ const createLddRequestSchema = strictObjectSchema(
     type: textSchema,
     period: nullableTextSchema,
     due_date: nullableDateSchema,
-    balance_amount: nullableNumberSchema,
+    balance_amount: nullableNonNegativeNumberSchema,
     registration_status: nullableTextSchema,
     status: nullableTextSchema,
   },
@@ -99,7 +146,7 @@ const updateLddRequestSchema = strictObjectSchema({
   type: textSchema,
   period: nullableTextSchema,
   due_date: nullableDateSchema,
-  balance_amount: nullableNumberSchema,
+  balance_amount: nullableNonNegativeNumberSchema,
   registration_status: nullableTextSchema,
   status: nullableTextSchema,
 });
@@ -140,13 +187,13 @@ const createPayrollRequestSchema = strictObjectSchema(
     responsible_id: { ...uuidSchema, nullable: true },
     advance: { type: "boolean" },
     advance_type: nullableTextSchema,
-    advance_amount: nullableNumberSchema,
+    advance_amount: nullableNonNegativeNumberSchema,
     info: textSchema,
     previous: { type: "boolean" },
     onvio: { type: "boolean" },
     group: textSchema,
     vt: { type: "boolean" },
-    vt_value: nullableNumberSchema,
+    vt_value: nullableNonNegativeNumberSchema,
     vt_type: nullableTextSchema,
     va: { type: "boolean" },
     assistance_fee: { type: "boolean" },
@@ -178,13 +225,13 @@ const updatePayrollRequestSchema = strictObjectSchema({
   responsible_id: { ...uuidSchema, nullable: true },
   advance: { type: "boolean" },
   advance_type: nullableTextSchema,
-  advance_amount: nullableNumberSchema,
+  advance_amount: nullableNonNegativeNumberSchema,
   info: textSchema,
   previous: { type: "boolean" },
   onvio: { type: "boolean" },
   group: textSchema,
   vt: { type: "boolean" },
-  vt_value: nullableNumberSchema,
+  vt_value: nullableNonNegativeNumberSchema,
   vt_type: nullableTextSchema,
   va: { type: "boolean" },
   assistance_fee: { type: "boolean" },
@@ -290,6 +337,56 @@ const passwordMutationResponses = {
   },
 } as const;
 
+const obligationGenerationResponses = {
+  ...mutationResponses,
+  "200": {
+    description: "Resumo da geracao global de obrigacoes",
+    ...successJsonWithData({ $ref: "#/components/schemas/PessoalObligationGenerationResult" }),
+  },
+} as const;
+
+const optionalDetailResponses = {
+  "200": {
+    description: "OK; data e null quando o registro ainda nao existe",
+    ...successJsonWithData({ type: "object", nullable: true, additionalProperties: true }),
+  },
+  "400": { description: "Bad request", ...errorJson },
+  "401": { description: "Unauthorized", ...errorJson },
+} as const;
+
+const pessoalOverviewResponses = {
+  "200": {
+    description: "Resumo consolidado da visao geral de pessoal",
+    ...successJsonWithData({
+      type: "object",
+      required: ["unions", "ldd"],
+      properties: {
+        unions: {
+          type: "object",
+          required: ["total", "withBaseDate", "withoutBaseDate", "withCnpj"],
+          properties: {
+            total: { type: "integer", minimum: 0 },
+            withBaseDate: { type: "integer", minimum: 0 },
+            withoutBaseDate: { type: "integer", minimum: 0 },
+            withCnpj: { type: "integer", minimum: 0 },
+          },
+        },
+        ldd: {
+          type: "object",
+          required: ["total", "open", "overdue", "paid"],
+          properties: {
+            total: { type: "integer", minimum: 0 },
+            open: { type: "integer", minimum: 0 },
+            overdue: { type: "integer", minimum: 0 },
+            paid: { type: "integer", minimum: 0 },
+          },
+        },
+      },
+    }),
+  },
+  "401": { description: "Unauthorized", ...errorJson },
+} as const;
+
 export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiDocument {
   return {
     openapi: "3.0.3",
@@ -368,6 +465,26 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
             },
           ],
         },
+        PessoalObligationGenerationResult: {
+          type: "object",
+          description: "Contadores retornados pela geracao global de obrigacoes.",
+          required: [
+            "clients",
+            "payrollRows",
+            "existing",
+            "created",
+            "skippedExisting",
+            "skippedNoPayroll",
+          ],
+          properties: {
+            clients: { type: "integer", minimum: 0 },
+            payrollRows: { type: "integer", minimum: 0 },
+            existing: { type: "integer", minimum: 0 },
+            created: { type: "integer", minimum: 0 },
+            skippedExisting: { type: "integer", minimum: 0 },
+            skippedNoPayroll: { type: "integer", minimum: 0 },
+          },
+        },
       },
     },
     paths: {
@@ -406,7 +523,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Criar LDD",
           operationId: "createPessoalLdd",
           requestBody: jsonRequestBody(createLddRequestSchema),
-          responses: mutationResponses,
+          responses: obligationGenerationResponses,
         },
       },
       "/pessoal/ldd/{id}": {
@@ -426,6 +543,15 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           operationId: "deletePessoalLdd",
           parameters: [idParam("id")],
           responses: mutationResponses,
+        },
+      },
+      "/pessoal/overview": {
+        get: {
+          tags: ["Pessoal Overview"],
+          security: bearerSecurity,
+          summary: "Resumo consolidado da visao geral",
+          operationId: "getPessoalOverview",
+          responses: pessoalOverviewResponses,
         },
       },
       "/pessoal/situations": {
@@ -464,6 +590,14 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           requestBody: jsonRequestBody(updateSituationRequestSchema),
           responses: mutationResponses,
         },
+        delete: {
+          tags: ["Pessoal Situations"],
+          security: bearerSecurity,
+          summary: "Remover situacao",
+          operationId: "deletePessoalSituation",
+          parameters: [idParam("id")],
+          responses: deleteResponses,
+        },
       },
       "/pessoal/unions": {
         get: {
@@ -471,7 +605,22 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           security: bearerSecurity,
           summary: "Listar sindicatos",
           operationId: "listPessoalUnions",
-          responses: readResponses,
+          parameters: [
+            queryParam("search", undefined, false),
+            {
+              name: "page",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1 },
+            },
+            {
+              name: "limit",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+          ],
+          responses: unionListResponses,
         },
         post: {
           tags: ["Pessoal Unions"],
@@ -500,6 +649,14 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           requestBody: jsonRequestBody(updateUnionRequestSchema),
           responses: mutationResponses,
         },
+        delete: {
+          tags: ["Pessoal Unions"],
+          security: bearerSecurity,
+          summary: "Excluir sindicato",
+          operationId: "deletePessoalUnion",
+          parameters: [idParam("id")],
+          responses: mutationResponses,
+        },
       },
       "/pessoal/payroll": {
         post: {
@@ -518,7 +675,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Detalhar configuracao de folha",
           operationId: "getPessoalPayroll",
           parameters: [idParam("client_id")],
-          responses: readResponses,
+          responses: optionalDetailResponses,
         },
         patch: {
           tags: ["Pessoal Payroll"],
@@ -537,7 +694,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Detalhar obrigacao por cliente e competencia",
           operationId: "getPessoalObligation",
           parameters: [queryParam("client_id", "uuid"), queryParam("competence")],
-          responses: readResponses,
+          responses: optionalDetailResponses,
         },
         post: {
           tags: ["Pessoal Obligations"],

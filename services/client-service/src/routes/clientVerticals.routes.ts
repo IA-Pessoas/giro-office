@@ -15,6 +15,11 @@ import { updateCommercialClient } from "../services/clientCommercialService.js";
 import { updateFinanceClient } from "../services/clientFinanceService.js";
 import { updateRegularizeClient } from "../services/clientRegularizeService.js";
 import { terminateClient } from "../services/clientTerminationService.js";
+import {
+  CLIENT_DOMAIN_EDIT_PERMISSION,
+  requireClientDomainAccess,
+  requireClientDomainModule,
+} from "../utils/moduleAuthorization.js";
 import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
@@ -28,6 +33,7 @@ export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
       try {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const body = parseWithZod(updateCommercialBodySchema, request.body);
+        requireClientDomainModule(request, "comercial", CLIENT_DOMAIN_EDIT_PERMISSION);
         const organizationId = resolveOrganizationId(request, undefined);
         const updated = await updateCommercialClient(
           prisma,
@@ -51,6 +57,7 @@ export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
       try {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const body = parseWithZod(terminationBodySchema, request.body);
+        requireClientDomainAccess(request, CLIENT_DOMAIN_EDIT_PERMISSION);
         const organizationId = resolveOrganizationId(request, undefined);
         const created = await terminateClient(
           prisma,
@@ -74,6 +81,7 @@ export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
       try {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const body = parseWithZod(updateFinanceBodySchema, request.body);
+        requireClientDomainModule(request, "financeiro", CLIENT_DOMAIN_EDIT_PERMISSION);
         const organizationId = resolveOrganizationId(request, undefined);
         const updated = await updateFinanceClient(prisma, params.id, organizationId, body);
         response.json(createSuccessResponse(updated));
@@ -91,6 +99,7 @@ export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
       try {
         const params = parseWithZod(clientIdParamsSchema, request.params);
         const body = parseWithZod(updateRegularizeBodySchema, request.body);
+        requireClientDomainModule(request, "regularize", CLIENT_DOMAIN_EDIT_PERMISSION);
         const organizationId = resolveOrganizationId(request, undefined);
         const updated = await updateRegularizeClient(
           prisma,

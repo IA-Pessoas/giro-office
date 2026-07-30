@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  buildRegularizeClientPfListParams,
+  buildRegularizeMunicipalTaxesListParams,
+  buildRegularizeProcessListParams,
+  buildRegularizeSitePasswordListParams,
+  unwrapRegularizePage,
+} from "./services/regularizeService.contract.ts";
 
 const moduleRoot = fileURLToPath(new URL("./", import.meta.url));
 const appRoot = join(moduleRoot, "../../..");
@@ -69,6 +76,316 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   ]) {
     assert.match(contractSource, new RegExp(endpoint.replaceAll("/", "\\/")));
   }
+});
+
+await runTest("regularize PF list contract preserves explicit search status and pagination", async () => {
+  assert.deepEqual(
+    buildRegularizeClientPfListParams({
+      status: "Ativo",
+      search: "ana",
+      page: 2,
+      limit: 20,
+    }),
+    { status: "Ativo", search: "ana", page: 2, limit: 20 },
+  );
+
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const peopleSource = await readModuleSource("hooks/useRegularizePeople.ts");
+  const queryKeysSource = await readModuleSource("hooks/queryKeys.ts");
+
+  assert.match(pageSource, /const \[pfSearch, setPfSearch\] = useState\(""\)/);
+  assert.match(pageSource, /const \[pfStatus, setPfStatus\] = useState\("Todos"\)/);
+  assert.match(pageSource, /usePaginatedRegularizeClientPfs/);
+  assert.match(pageSource, /placeholder="Buscar por nome, código ou CPF"/);
+  assert.match(pageSource, /label="Status"/);
+  assert.match(pageSource, /<PaginationControls/);
+  assert.match(peopleSource, /usePaginatedRegularizeClientPfs/);
+  assert.match(queryKeysSource, /clientPfsPage/);
+});
+
+await runTest("regularize PF forms search every paginated PF option and preserve linked clients", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.doesNotMatch(pageSource, /limit: 100/);
+
+  const [partnerFormSource, processFormSource] = await Promise.all([
+    readModuleSource("components/RegularizePartnerForm.tsx"),
+    readModuleSource("components/RegularizeProcessForm.tsx"),
+  ]);
+  assert.match(partnerFormSource, /RegularizeClientPfSelect/);
+  assert.match(processFormSource, /RegularizeClientPfSelect/);
+  assert.match(partnerFormSource, /<fieldset/);
+  assert.match(partnerFormSource, /<legend[^>]*>[\s\S]*<span>Cliente PF<\/span>/);
+  assert.match(processFormSource, /<fieldset/);
+  assert.doesNotMatch(partnerFormSource, /<RegularizeFormField label="Cliente PF"/);
+  assert.match(partnerFormSource, /onChange=\{\(id\) => handleChange\("pf_id", id\)\}/);
+  assert.match(processFormSource, /handleClientPfChange\(id, option\?\.cpf\)/);
+
+  const selectSource = await readModuleSource("components/RegularizeClientPfSelect.tsx");
+  assert.match(selectSource, /usePaginatedRegularizeClientPfs/);
+  assert.match(selectSource, /useRegularizeClientPfDetail/);
+  assert.match(selectSource, /placeholder="Buscar PF por nome, código ou CPF"/);
+  assert.match(selectSource, /page: pfPage/);
+  assert.match(selectSource, /onNext/);
+  assert.match(selectSource, /selectedPfQuery\.data/);
+  assert.match(selectSource, /aria-label="Buscar cliente PF"/);
+  assert.match(selectSource, /aria-label="Selecionar cliente PF"/);
+  assert.match(selectSource, /role="status"/);
+  assert.match(selectSource, /role="alert"/);
+  assert.match(selectSource, /Tentar novamente/);
+  assert.match(selectSource, /const error = listQuery\.error \?\? selectedPfQuery\.error/);
+  assert.match(selectSource, /listQuery\.refetch/);
+});
+
+await runTest("regularize dashboard has a centralized aggregate data contract", async () => {
+  const contractSource = await readModuleSource("services/regularizeService.contract.ts");
+  const serviceSource = await readModuleSource("services/regularizeService.ts");
+  const hookSource = await readModuleSource("hooks/useRegularizeDashboard.ts");
+  const queryKeysSource = await readModuleSource("hooks/queryKeys.ts");
+
+  assert.match(contractSource, /dashboard: "\/regularize\/dashboard"/);
+  assert.match(contractSource, /buildRegularizeDashboardParams/);
+  assert.match(serviceSource, /async getDashboard\(year: number\)/);
+  assert.match(serviceSource, /REGULARIZE_ENDPOINTS\.dashboard/);
+  assert.match(hookSource, /useRegularizeDashboard/);
+  assert.match(hookSource, /regularizeQueryKeys\.dashboard\(year\)/);
+  assert.match(queryKeysSource, /dashboardRoot/);
+  assert.match(queryKeysSource, /dashboard: \(year: number\)/);
+});
+
+await runTest("regularize mutations invalidate aggregate dashboard data", async () => {
+  for (const hookPath of [
+    "hooks/useRegularizeCredentials.ts",
+    "hooks/useRegularizePeople.ts",
+    "hooks/useRegularizeOperations.ts",
+  ]) {
+    const source = await readModuleSource(hookPath);
+    assert.match(source, /regularizeQueryKeys\.dashboardRoot\(\)/);
+  }
+});
+
+await runTest("regularize dashboard enables only its aggregate query", async () => {
+  const { getRegularizeQueryPolicy } = await import("./utils/regularizeQueryPolicy.ts");
+
+  assert.deepEqual(getRegularizeQueryPolicy("dashboard"), {
+    dashboard: true,
+    clientPfs: false,
+    sitePasswords: false,
+    municipalTaxes: false,
+    processes: false,
+    licenses: false,
+    partners: false,
+    passwords: false,
+    guidance: false,
+  });
+});
+
+await runTest("regularize tab query policy enables only owning contexts", async () => {
+  const { getRegularizeQueryPolicy } = await import("./utils/regularizeQueryPolicy.ts");
+
+  assert.deepEqual(getRegularizeQueryPolicy("passwords"), {
+    dashboard: false,
+    clientPfs: false,
+    sitePasswords: true,
+    municipalTaxes: false,
+    processes: false,
+    licenses: false,
+    partners: false,
+    passwords: true,
+    guidance: false,
+  });
+  assert.equal(getRegularizeQueryPolicy("processes").clientPfs, true);
+  assert.equal(getRegularizeQueryPolicy("processes").guidance, true);
+  assert.equal(getRegularizeQueryPolicy("partners").partners, true);
+  assert.equal(getRegularizeQueryPolicy("taxes").municipalTaxes, true);
+});
+
+await runTest("regularize safely extracts requestId for contextual errors", async () => {
+  const { getRegularizeRequestId } = await import("./utils/regularizeApiError.ts");
+
+  assert.equal(
+    getRegularizeRequestId({ response: { data: { requestId: "request-dashboard-1" } } }),
+    "request-dashboard-1",
+  );
+  assert.equal(getRegularizeRequestId(new Error("network")), undefined);
+  assert.equal(getRegularizeRequestId({ response: { data: { requestId: 10 } } }), undefined);
+});
+
+await runTest("simultaneous server errors produce one active toast", async () => {
+  const { SERVER_ERROR_TOAST_ID, notifyServerError } = await import(
+    "../../shared/services/serverErrorToast.ts"
+  );
+  let active = false;
+  const calls = [];
+  const adapter = {
+    isActive(id) {
+      assert.equal(id, SERVER_ERROR_TOAST_ID);
+      return active;
+    },
+    error(message, options) {
+      calls.push({ message, options });
+      active = true;
+    },
+  };
+
+  notifyServerError(adapter);
+  notifyServerError(adapter);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.toastId, SERVER_ERROR_TOAST_ID);
+
+  active = false;
+  notifyServerError(adapter);
+  assert.equal(calls.length, 2);
+});
+
+await runTest("API client delegates 5xx feedback to the deduplicated notifier", async () => {
+  const apiSource = await readFile(join(appRoot, "src/shared/services/api.ts"), "utf8");
+
+  assert.match(apiSource, /notifyServerError\(toast\)/);
+  assert.doesNotMatch(apiSource, /toast\.error\(SERVER_ERROR_TOAST_MESSAGE\)/);
+});
+
+await runTest("regularize page renders aggregate dashboard and lazy list options", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(
+    pageSource,
+    /useRegularizeDashboard\(currentYear, \{\s*enabled: queryPolicy\.dashboard,\s*\}\)/,
+  );
+  assert.match(pageSource, /getRegularizeQueryPolicy\(activeTab\)/);
+  assert.match(pageSource, /enabled: queryPolicy\.clientPfs/);
+  assert.match(pageSource, /enabled: queryPolicy\.sitePasswords/);
+  assert.match(pageSource, /enabled: queryPolicy\.municipalTaxes/);
+  assert.match(pageSource, /enabled: queryPolicy\.processes/);
+  assert.match(pageSource, /enabled: queryPolicy\.licenses/);
+  assert.match(pageSource, /dashboardQuery\.data\.metrics/);
+  assert.match(pageSource, /getRegularizeRequestId\(dashboardQuery\.error\)/);
+  assert.doesNotMatch(pageSource, /const metricData = useMemo/);
+});
+
+await runTest("regularize list params carry server search and pagination", async () => {
+  assert.deepEqual(
+    buildRegularizeProcessListParams({
+      status: "Aberto",
+      search: " Acme ",
+      page: 2,
+      limit: 20,
+    }),
+    { status: "Aberto", search: "Acme", page: 2, limit: 20 },
+  );
+  assert.deepEqual(
+    buildRegularizeSitePasswordListParams({
+      status: true,
+      search: " Gov ",
+      page: 2,
+      limit: 20,
+    }),
+    { status: true, search: "Gov", page: 2, limit: 20 },
+  );
+  const page = { data: [{ id: "row-21" }], total: 21, page: 2, limit: 20, hasMore: false };
+  assert.deepEqual(unwrapRegularizePage({ data: page }, { page: 2, limit: 20 }), page);
+});
+
+await runTest("regularize municipal tax contract carries filters and unwraps a page", async () => {
+  for (const type of ["TFF", "TLP", "TLL"]) {
+    assert.deepEqual(
+      buildRegularizeMunicipalTaxesListParams({
+        year: 2026,
+        search: " Castelo ",
+        status: "Criado",
+        type,
+        page: 2,
+        limit: 20,
+      }),
+      { year: 2026, search: "Castelo", status: "Criado", type, page: 2, limit: 20 },
+    );
+  }
+
+  const [queryKeysSource, serviceSource, hookSource] = await Promise.all([
+    readModuleSource("hooks/queryKeys.ts"),
+    readModuleSource("services/regularizeService.ts"),
+    readModuleSource("hooks/useRegularizeOperations.ts"),
+  ]);
+
+  assert.match(
+    queryKeysSource,
+    /"municipal-taxes",\s*filters\.year,\s*filters\.search \?\? "",\s*filters\.status \?\? "Todos",\s*filters\.type \?\? "Todos",\s*filters\.page \?\? 1,\s*filters\.limit \?\? 20/,
+  );
+  assert.match(serviceSource, /Promise<RegularizeMunicipalTaxesPage>/);
+  assert.match(serviceSource, /unwrapRegularizeEnvelope<RegularizeMunicipalTaxesPage>\(response\.data\)/);
+  assert.match(hookSource, /UseQueryResult<RegularizeMunicipalTaxesPage, Error>/);
+});
+
+await runTest("regularize municipal tax tab uses debounced filters and paginated rows", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /const \[taxSearch, setTaxSearch\] = useState\(""\)/);
+  assert.match(
+    pageSource,
+    /const \[taxStatus, setTaxStatus\] = useState(?:<"Todos" \| "Criado" \| "Pendente">)?\("Todos"\)/,
+  );
+  assert.match(pageSource, /const \[taxYear, setTaxYear\] = useState\(\(\) => new Date\(\)\.getFullYear\(\)\)/);
+  assert.match(pageSource, /const \[taxType, setTaxType\] = useState<"Todos" \| "TFF" \| "TLP" \| "TLL">\("Todos"\)/);
+  assert.match(pageSource, /useDebouncedValue\(taxSearch\.trim\(\), 300\)/);
+  assert.match(pageSource, /setTaxPage\(1\)/);
+  assert.match(pageSource, /year: taxYear/);
+  assert.match(pageSource, /search: debouncedTaxSearch/);
+  assert.match(pageSource, /status: taxStatus/);
+  assert.match(pageSource, /type: taxType/);
+  assert.match(pageSource, /limit: REGULARIZE_PAGE_SIZE/);
+  assert.match(pageSource, /data: isTaxSearchPending \? undefined : taxQuery\.data\?\.data/);
+  assert.match(pageSource, /total=\{taxQuery\.data\?\.total \?\? 0\}/);
+  assert.match(pageSource, /hasMore=\{taxQuery\.data\?\.hasMore \?\? false\}/);
+  assert.match(pageSource, /<span className="text-sm font-medium text-gray-700 dark:text-gray-200">Tipo<\/span>/);
+  assert.match(pageSource, /value=\{taxType\}[\s\S]{0,180}setTaxType\(event\.target\.value as "Todos" \| "TFF" \| "TLP" \| "TLL"\);[\s\S]{0,80}setTaxPage\(1\)/);
+  for (const type of ["Todos", "TFF", "TLP", "TLL"]) {
+    assert.match(pageSource, new RegExp(`\\["Todos", "TFF", "TLP", "TLL"\\]|<option[^>]*>${type}<\\/option>`));
+  }
+});
+
+await runTest("regularize management tables use debounced paginated hooks", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /usePaginatedRegularizeProcesses/);
+  assert.match(pageSource, /usePaginatedRegularizeSitePasswords/);
+  assert.match(pageSource, /useDebouncedValue\(processSearch\.trim\(\), 300\)/);
+  assert.match(pageSource, /useDebouncedValue\(siteSearch\.trim\(\), 300\)/);
+  assert.match(pageSource, /<PaginationControls/);
+  assert.doesNotMatch(pageSource, /selectedCredentialClientId[\s\S]{0,120}sitePageQuery/);
+});
+
+await runTest("regularize process selection follows the visible page and gives explicit feedback", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(
+    pageSource,
+    /const visibleProcessRows = isProcessSearchPending \? \[\] : processPageQuery\.data\?\.data \?\? \[\];/,
+  );
+  assert.match(pageSource, /const automaticProcessId = visibleProcessRows\[0\]\?\.id;/);
+  assert.match(pageSource, /const currentProcessId = selectedProcessId \?\? automaticProcessId;/);
+  assert.match(pageSource, /type ProcessSelectionOrigin = "automatic" \| "manual";/);
+  assert.match(
+    pageSource,
+    /const \[processSelectionOrigin, setProcessSelectionOrigin\] = useState<ProcessSelectionOrigin>\(\s*"automatic",?\s*\);/,
+  );
+  assert.match(pageSource, /function resetProcessSelection\(\)/);
+  assert.match(pageSource, /function selectProcessManually\(processId: RegularizeId\)/);
+  assert.match(pageSource, /aria-selected=\{currentProcessId === item\.id\}/);
+  assert.match(pageSource, /bg-blue-50 dark:bg-blue-950\/30/);
+  assert.match(pageSource, /role="status"\s+aria-live="polite"/);
+  assert.match(pageSource, /processSelectionOrigin === "manual"/);
+});
+
+await runTest("regularize manually selected process detail is safely focused on narrow viewports", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /const selectedProcessDetailRef = useRef<HTMLElement \| null>\(null\);/);
+  assert.match(pageSource, /typeof window === "undefined"/);
+  assert.match(pageSource, /window\.matchMedia\("\(min-width: 1280px\)"\)\.matches/);
+  assert.match(pageSource, /window\.requestAnimationFrame\(\(\) => \{/);
+  assert.match(pageSource, /selectedProcessDetailRef\.current\?\.focus\(\{ preventScroll: true \}\);/);
+  assert.match(pageSource, /selectedProcessDetailRef\.current\?\.scrollIntoView\(\{ behavior: "smooth", block: "start" \}\);/);
+  assert.match(pageSource, /panelRef=\{selectedProcessDetailRef\}/);
 });
 
 await runTest("regularize service is the only module file importing the API client", async () => {
@@ -275,7 +592,7 @@ await runTest("regularize core forms are wired in the page", async () => {
   }
 });
 
-await runTest("regularize password creation opens the form before required field validation", async () => {
+await runTest("regularize password creation requires a selected client", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
   const passwordLabelIndex = pageSource.indexOf('label="Nova senha"');
   const passwordActionStart = pageSource.lastIndexOf("<PrimaryActionButton", passwordLabelIndex);
@@ -285,7 +602,7 @@ await runTest("regularize password creation opens the form before required field
   assert.notEqual(passwordLabelIndex, -1);
   assert.notEqual(passwordActionStart, -1);
   assert.notEqual(passwordActionEnd, -1);
-  assert.doesNotMatch(passwordActionSource, /disabled=\{/);
+  assert.match(passwordActionSource, /disabled=\{!currentCredentialClientId\}/);
 });
 
 await runTest("regularize process empty state is centered across the process view", async () => {
@@ -297,18 +614,18 @@ await runTest("regularize process empty state is centered across the process vie
 
 await runTest("regularize client documents are consistently formatted", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const pfSelectSource = await readModuleSource("components/RegularizeClientPfSelect.tsx");
   const rawDocumentMatches = pageSource.match(/formatText\(item\.cpf_cnpj\)/g) ?? [];
   const formattedDocumentMatches = pageSource.match(/formatDocument\(item\.cpf_cnpj\)/g) ?? [];
 
   assert.match(pageSource, /import \{ formatCPF_CNPJ \} from "@shared\/utils\/formatters";/);
   assert.match(pageSource, /function formatDocument/);
-  assert.match(pageSource, /function formatDocumentDescription/);
   assert.deepEqual(rawDocumentMatches, []);
   assert.ok(formattedDocumentMatches.length >= 3);
   assert.doesNotMatch(pageSource, /description: client\.cpf_cnpj/);
-  assert.doesNotMatch(pageSource, /description: clientPf\.cpf/);
-  assert.match(pageSource, /description: formatDocumentDescription\(client\.cpf_cnpj\)/);
-  assert.match(pageSource, /description: formatDocumentDescription\(clientPf\.cpf\)/);
+  assert.match(pfSelectSource, /import \{ formatCPF_CNPJ \} from "@shared\/utils\/formatters";/);
+  assert.match(pfSelectSource, /cpf: clientPf\.cpf/);
+  assert.match(pfSelectSource, /formatCPF_CNPJ\(option\.cpf\)/);
   assert.match(
     pageSource,
     /return item\.clientPJ\?\.name \?\? item\.clientPF\?\.name \?\? formatDocument\(item\.cpf_cnpj\);/,
@@ -460,14 +777,49 @@ await runTest("regularize credential detail panels stretch with their grids", as
   assert.ok((credentialGridMatches?.length ?? 0) >= 2);
 });
 
+await runTest("regularize password reveal panel shows API error message", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const utilsSource = await readModuleSource("utils/regularizeForm.ts");
+  const passwordsStart = pageSource.indexOf('<DetailPanel title="Senha selecionada">');
+  const sitesStart = pageSource.indexOf('{activeTab === "sites"', passwordsStart);
+  const passwordsSource = pageSource.slice(passwordsStart, sitesStart);
+
+  assert.match(utilsSource, /export function getRegularizeErrorMessage/);
+  assert.match(utilsSource, /response\?\.data\?\.error/);
+  assert.notEqual(passwordsStart, -1);
+  assert.notEqual(sitesStart, -1);
+  assert.match(
+    passwordsSource,
+    /getRegularizeErrorMessage\(\s*passwordDetailQuery\.error,\s*"Acesso negado ou indisponível\.",?\s*\)/,
+  );
+  assert.doesNotMatch(passwordsSource, /value="Acesso negado ou indisponível\."/);
+});
+
 await runTest("regularize credential empty detail states are centered", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
   const emptyStateMatches = pageSource.match(/<DetailEmptyState message="Sem revelação ativa\." \/>/g);
 
   assert.match(pageSource, /function DetailEmptyState/);
   assert.match(pageSource, /items-center justify-center text-center/);
-  assert.ok((emptyStateMatches?.length ?? 0) >= 2);
+  assert.ok((emptyStateMatches?.length ?? 0) >= 1);
   assert.doesNotMatch(pageSource, /<FieldLine label="Status" value="Sem revelação ativa\." \/>/);
+});
+
+await runTest("regularize site credential detail states are explicit", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const sitesStart = pageSource.indexOf('{activeTab === "sites"');
+  const taxesStart = pageSource.indexOf('{activeTab === "taxes"', sitesStart);
+  const sitesSource = pageSource.slice(sitesStart, taxesStart);
+
+  assert.notEqual(sitesStart, -1);
+  assert.notEqual(taxesStart, -1);
+  assert.match(sitesSource, /Selecione um site para revelar credenciais/);
+  assert.match(sitesSource, /Acesso negado para revelar credenciais/);
+  assert.match(pageSource, /Credencial indispon[iÃ­]vel para revela[cÃ§][aÃ£]o/);
+  assert.match(sitesSource, /getSiteCredentialDetailStatus\(sitePasswordDetailQuery\.error\)/);
+  assert.match(pageSource, /getRegularizeErrorMessage\(error, "Credencial indisponivel para revelacao\."\)/);
+  assert.match(pageSource, /403\|forbidden\|permission\|permiss\|acesso negado/);
+  assert.doesNotMatch(sitesSource, /Acesso negado ou indispon[iÃ­]vel/);
 });
 
 await runTest("regularize credential empty layouts keep intentional detail behavior", async () => {
@@ -490,7 +842,7 @@ await runTest("regularize credential empty layouts keep intentional detail behav
   assert.doesNotMatch(passwordsSource, /hasCredentialRows \? \(/);
   assert.doesNotMatch(passwordsSource, /emptyClassName="[^"]*xl:col-span-2[^"]*"/);
   assert.match(pageSource, /hasSiteRows \? \(\s*<DetailPanel title="Site selecionado">/);
-  assert.match(pageSource, /<QueryStatePanel\s+query=\{siteQuery\}\s+emptyTitle="Nenhum site encontrado\."\s+emptyClassName="[^"]*xl:col-span-2[^"]*"/);
+  assert.match(pageSource, /<QueryStatePanel\s+query=\{siteTableQuery\}\s+emptyTitle="Nenhum site encontrado\."\s+emptyClassName="[^"]*xl:col-span-2[^"]*"/);
 });
 
 await runTest("regularize page uses the new module instead of the legacy mock screen", async () => {
@@ -561,4 +913,28 @@ await runTest("RegularizePage does not define primary mock arrays", async () => 
 
   assert.doesNotMatch(pageSource, /const\s+(processes|permits|clients|passwords|partners)\s*=/);
   assert.doesNotMatch(pageSource, /api\.(get|post|put|delete)/);
+});
+
+await runTest("regularize selects clients in the header and shows the bound client in forms", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const formSources = await Promise.all(
+    [
+      "RegularizeLicenseForm.tsx",
+      "RegularizeMunicipalTaxesForm.tsx",
+      "RegularizePartnerForm.tsx",
+      "RegularizePasswordForm.tsx",
+      "RegularizeProcessForm.tsx",
+    ].map((fileName) => readModuleSource(`components/${fileName}`)),
+  );
+
+  assert.match(pageSource, /ClientPickerModal/);
+  assert.match(pageSource, /function openClientScopedForm/);
+  assert.match(pageSource, /Selecione um cliente no cabeçalho antes de iniciar este cadastro\./);
+  assert.equal((pageSource.match(/disabled=\{!currentCredentialClientId\}/g) ?? []).length, 7);
+  assert.doesNotMatch(pageSource, /RegularizeClientPickerField/);
+  assert.doesNotMatch(pageSource, /useClients\(/);
+  formSources.forEach((formSource) => {
+    assert.match(formSource, /ClientSelectionField/);
+    assert.doesNotMatch(formSource, /RegularizeClientPickerField/);
+  });
 });

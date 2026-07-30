@@ -5,7 +5,9 @@ import { toast } from "react-toastify";
 
 import {
   useDeleteCertificatePfFileMutation,
+  useDeleteCertificatePfMutation,
   useDeleteCertificatePjFileMutation,
+  useDeleteCertificatePjMutation,
   useDownloadCertificatePfFileMutation,
   useDownloadCertificatePjFileMutation,
   useUploadCertificatePfFileMutation,
@@ -16,6 +18,7 @@ import {
   isAcceptedCertificateFileName,
 } from "@modules/certificates/services";
 import type { CertificateDownloadResult, CertificateKind } from "@modules/certificates/types";
+import { Dialog } from "@shared/components/ui/Dialog";
 
 import {
   CERTIFICATE_COMPACT_BUTTON_CLASSNAME,
@@ -33,10 +36,13 @@ type CertificateFileActionsProps = {
   certificateId: string;
   hasCertificate: boolean;
   canEdit: boolean;
+  canDeleteFile: boolean;
+  canDeleteRecord: boolean;
   variant?: CertificateFileActionsVariant;
   onUploadSuccess?: () => void | Promise<void>;
   onDownloadSuccess?: () => void | Promise<void>;
   onDeleteSuccess?: () => void | Promise<void>;
+  onDeleteRecordSuccess?: () => void | Promise<void>;
 };
 
 type CertificateFileErrorBody = {
@@ -91,25 +97,32 @@ export function CertificateFileActions({
   certificateId,
   hasCertificate,
   canEdit,
+  canDeleteFile,
+  canDeleteRecord,
   variant = "panel",
   onUploadSuccess,
   onDownloadSuccess,
   onDeleteSuccess,
+  onDeleteRecordSuccess,
 }: CertificateFileActionsProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [localError, setLocalError] = useState("");
+  const [isRecordDeleteDialogOpen, setIsRecordDeleteDialogOpen] = useState(false);
   const uploadPjMutation = useUploadCertificatePjFileMutation();
   const uploadPfMutation = useUploadCertificatePfFileMutation();
   const downloadPjMutation = useDownloadCertificatePjFileMutation();
   const downloadPfMutation = useDownloadCertificatePfFileMutation();
   const deletePjMutation = useDeleteCertificatePjFileMutation();
   const deletePfMutation = useDeleteCertificatePfFileMutation();
+  const deleteRecordPjMutation = useDeleteCertificatePjMutation();
+  const deleteRecordPfMutation = useDeleteCertificatePfMutation();
 
   const isUploading = kind === "pj" ? uploadPjMutation.isPending : uploadPfMutation.isPending;
   const isDownloading =
     kind === "pj" ? downloadPjMutation.isPending : downloadPfMutation.isPending;
   const isDeleting = kind === "pj" ? deletePjMutation.isPending : deletePfMutation.isPending;
-  const isBusy = isUploading || isDownloading || isDeleting;
+  const isDeletingRecord = kind === "pj" ? deleteRecordPjMutation.isPending : deleteRecordPfMutation.isPending;
+  const isBusy = isUploading || isDownloading || isDeleting || isDeletingRecord;
   const inputId = `certificate-${kind}-${certificateId}-${variant}-file`;
 
   function resetFileInput() {
@@ -182,13 +195,6 @@ export function CertificateFileActions({
       return;
     }
 
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm("Remover o arquivo deste certificado?")
-    ) {
-      return;
-    }
-
     try {
       setLocalError("");
       if (kind === "pj") {
@@ -203,6 +209,24 @@ export function CertificateFileActions({
         error,
         "Não foi possível remover o arquivo do certificado.",
       );
+      setLocalError(message);
+      toast.error(message);
+    }
+  }
+
+  async function handleDeleteRecord() {
+    try {
+      setLocalError("");
+      if (kind === "pj") {
+        await deleteRecordPjMutation.mutateAsync({ id: certificateId });
+      } else {
+        await deleteRecordPfMutation.mutateAsync({ id: certificateId });
+      }
+      setIsRecordDeleteDialogOpen(false);
+      toast.success("Certificado excluído com sucesso.");
+      void onDeleteRecordSuccess?.();
+    } catch (error) {
+      const message = getCertificateFileErrorMessage(error, "Não foi possível excluir o certificado.");
       setLocalError(message);
       toast.error(message);
     }
@@ -252,15 +276,17 @@ export function CertificateFileActions({
         >
           {isDownloading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         </button>
-        <button
-          type="button"
-          onClick={() => void handleDelete()}
-          className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
-          disabled={!hasCertificate || isBusy}
-          title="Remover arquivo"
-        >
-          {isDeleting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-        </button>
+        {canDeleteFile ? (
+          <button
+            type="button"
+            onClick={() => void handleDelete()}
+            className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
+            disabled={!(canDeleteFile && hasCertificate) || isBusy}
+            title="Remover arquivo"
+          >
+            {isDeleting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -302,20 +328,47 @@ export function CertificateFileActions({
           {isDownloading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           {isDownloading ? "Baixando..." : "Baixar"}
         </button>
-        <button
-          type="button"
-          onClick={() => void handleDelete()}
-          className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}
-          disabled={!hasCertificate || isBusy}
-        >
-          {isDeleting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-          {isDeleting ? "Removendo..." : "Remover"}
-        </button>
+        {canDeleteFile ? (
+          <button
+            type="button"
+            onClick={() => void handleDelete()}
+            className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}
+            disabled={!(canDeleteFile && hasCertificate) || isBusy}
+          >
+            {isDeleting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            {isDeleting ? "Removendo..." : "Remover"}
+          </button>
+        ) : null}
+        {canDeleteRecord ? (
+          <button
+            type="button"
+            onClick={() => setIsRecordDeleteDialogOpen(true)}
+            className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}
+            disabled={isBusy}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Excluir certificado
+          </button>
+        ) : null}
       </div>
 
       {localError ? (
         <p className="text-sm font-medium text-rose-600 dark:text-rose-300">{localError}</p>
       ) : null}
+      <Dialog
+        open={isRecordDeleteDialogOpen}
+        onOpenChange={setIsRecordDeleteDialogOpen}
+        title="Excluir certificado"
+        description="Confirmação de exclusão do certificado"
+        footer={
+          <>
+            <button type="button" onClick={() => setIsRecordDeleteDialogOpen(false)} disabled={isDeletingRecord} className={CERTIFICATE_COMPACT_BUTTON_CLASSNAME}>Cancelar</button>
+            <button type="button" onClick={() => void handleDeleteRecord()} disabled={isDeletingRecord} className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}>{isDeletingRecord ? "Excluindo..." : "Excluir certificado"}</button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-600 dark:text-slate-300">Esta ação remove o cadastro e o arquivo associado, quando existir.</p>
+      </Dialog>
     </div>
   );
 }

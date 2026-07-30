@@ -48,11 +48,32 @@ const payrollBody = {
 };
 
 describe("PayrollService", () => {
+  it("bloqueia mutacoes de folha para Viewer antes de acessar a persistencia", async () => {
+    const prisma = createPrismaMock();
+    const audit = createAuditMock();
+    const service = new PayrollService(prisma as never, audit);
+    const viewerContext = { organizationId, userId, permission: 1 };
+    const operations = [
+      () => service.create(viewerContext, payrollBody),
+      () => service.update(viewerContext, clientId, { info: "Novo prazo" }),
+    ];
+
+    for (const operation of operations) {
+      await expect(operation()).rejects.toMatchObject({ statusCode: 403 });
+    }
+
+    expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    expect(prisma.payroll.findFirst).not.toHaveBeenCalled();
+    expect(prisma.payroll.create).not.toHaveBeenCalled();
+    expect(prisma.payroll.update).not.toHaveBeenCalled();
+    expect(audit.recordChange).not.toHaveBeenCalled();
+  });
+
   it("cria folha apos validar relacionamentos", async () => {
     const prisma = createPrismaMock();
     const service = new PayrollService(prisma as never, createAuditMock());
 
-    await service.create({ organizationId, userId }, payrollBody);
+    await service.create({ organizationId, userId, permission: 2 }, payrollBody);
 
     expect(prisma.client.findFirst).toHaveBeenCalledWith({
       where: { id: clientId, organization_id: organizationId },
@@ -73,9 +94,19 @@ describe("PayrollService", () => {
     prisma.payroll.findFirst.mockResolvedValueOnce({ id: "payroll-existing" });
     const service = new PayrollService(prisma as never, createAuditMock());
 
-    await expect(service.create({ organizationId, userId }, payrollBody)).rejects.toMatchObject({
+    await expect(
+      service.create({ organizationId, userId, permission: 2 }, payrollBody),
+    ).rejects.toMatchObject({
       statusCode: 409,
     });
+  });
+
+  it("retorna null ao detalhar cliente sem folha cadastrada", async () => {
+    const prisma = createPrismaMock();
+    prisma.payroll.findFirst.mockResolvedValueOnce(null);
+    const service = new PayrollService(prisma as never, createAuditMock());
+
+    await expect(service.detail({ organizationId }, clientId)).resolves.toBeNull();
   });
 
   it("atualiza folha escopada por cliente e organizacao", async () => {
@@ -87,7 +118,9 @@ describe("PayrollService", () => {
     });
     const service = new PayrollService(prisma as never, createAuditMock());
 
-    await service.update({ organizationId, userId }, clientId, { info: "Novo prazo" });
+    await service.update({ organizationId, userId, permission: 2 }, clientId, {
+      info: "Novo prazo",
+    });
 
     expect(prisma.payroll.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { client_id: clientId, organization_id: organizationId } }),

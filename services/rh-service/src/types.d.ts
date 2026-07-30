@@ -3,5 +3,6 @@ declare namespace Express {
     user_id: string;
     requestId?: string;
     organization_id?: string;
+    rh_permission?: number;
   }
 }

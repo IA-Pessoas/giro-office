@@ -1,27 +1,33 @@
 import { ChevronDown } from "lucide-react";
 
-import type { RhCategory, RhRequestStatus } from "../types";
+import type { AssignableUser, RhCategory, RhRequestStatus } from "../types";
 import { formatRhCategoryLabel, RH_REQUEST_STATUS_META } from "../utils/rhRequestUi";
 
 interface RhRequestsFiltersProps {
   categories: RhCategory[];
+  requesters?: AssignableUser[];
   selectedStatus: RhRequestStatus | "all";
   selectedCategoryId: string;
+  selectedRequesterId?: string;
   title: string;
   description: string;
   onStatusChange: (value: RhRequestStatus | "all") => void;
   onCategoryChange: (value: string) => void;
+  onRequesterChange?: (value: string) => void;
   onOpenCreate: () => void;
 }
 
 export function RhRequestsFilters({
   categories,
+  requesters,
   selectedStatus,
   selectedCategoryId,
+  selectedRequesterId,
   title,
   description,
   onStatusChange,
   onCategoryChange,
+  onRequesterChange,
   onOpenCreate,
 }: RhRequestsFiltersProps) {
   return (
@@ -52,6 +58,27 @@ export function RhRequestsFilters({
             <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           </div>
         </label>
+
+        {requesters && onRequesterChange ? (
+          <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
+            <span>Solicitante</span>
+            <div className="relative">
+              <select
+                value={selectedRequesterId ?? ""}
+                onChange={(event) => onRequesterChange(event.target.value)}
+                className="min-w-[220px] appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Todos</option>
+                {requesters.map((requester) => (
+                  <option key={requester.id} value={requester.id}>
+                    {requester.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            </div>
+          </label>
+        ) : null}
 
         <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
           <span>Categoria</span>

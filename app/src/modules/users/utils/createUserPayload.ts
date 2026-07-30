@@ -1,5 +1,11 @@
 import type { ModuleKey } from "@modules/auth";
 
+import {
+  KNOWN_PERMISSION_MODULE_KEYS,
+  MINIMUM_PERMISSION_LEVEL_BY_MODULE,
+  getMinimumPermissionLevel,
+  type PermissionLevel,
+} from "../constants/permissionConfig";
 import type { AdminCreateUserData, UpdateUserData, UserPermission, UserType } from "../types";
 
 export interface CreateUserFormState {
@@ -7,13 +13,13 @@ export interface CreateUserFormState {
   login: string;
   password: string;
   department_id: string;
-  departmentPermission: UserPermission;
+  departmentPermission: PermissionLevel;
   isOrganizationOwner: boolean;
 }
 
 export type CreateUserModuleSelection = {
   enabled: boolean;
-  level: UserPermission;
+  level: PermissionLevel;
 };
 
 export type CreateUserModuleSelectionState = Record<string, CreateUserModuleSelection>;
@@ -28,7 +34,7 @@ interface BuildAdminCreateUserPayloadInput {
 }
 
 export function resolveCreateUserTopLevelPermission(
-  departmentPermission: UserPermission,
+  departmentPermission: PermissionLevel,
   isOrganizationOwner: boolean,
 ): UserPermission {
   if (isOrganizationOwner) {
@@ -39,7 +45,7 @@ export function resolveCreateUserTopLevelPermission(
 }
 
 export function resolveCreateUserType(
-  departmentPermission: UserPermission,
+  departmentPermission: PermissionLevel,
   isOrganizationOwner: boolean,
 ): UserType {
   if (isOrganizationOwner) {
@@ -52,9 +58,11 @@ export function resolveCreateUserType(
 export function buildCreateUserModulesPayload(
   moduleSelections: CreateUserModuleSelectionState,
   departmentModuleKey: ModuleKey | null | undefined,
-  departmentPermission: UserPermission,
-): Record<string, number | null> {
-  const modules: Record<string, number | null> = {};
+  departmentPermission: PermissionLevel,
+): Record<string, number> {
+  const modules: Record<string, number> = Object.fromEntries(
+    KNOWN_PERMISSION_MODULE_KEYS.map((moduleKey) => [moduleKey, 0]),
+  );
 
   if (departmentModuleKey) {
     modules[departmentModuleKey] = departmentPermission;
@@ -68,6 +76,23 @@ export function buildCreateUserModulesPayload(
     if (selection.enabled) {
       modules[moduleKey] = selection.level;
     }
+  }
+
+  for (const [moduleKey, minimumLevel] of Object.entries(
+    MINIMUM_PERMISSION_LEVEL_BY_MODULE,
+  )) {
+    const currentLevel = modules[moduleKey];
+
+    if (typeof currentLevel !== "number" || currentLevel < minimumLevel) {
+      modules[moduleKey] = minimumLevel;
+    }
+  }
+
+  if (departmentPermission >= 1) {
+    if ((modules.ti ?? 0) < 1) {
+      modules.ti = 1;
+    }
+    modules.rh = typeof modules.rh === "number" && modules.rh > 1 ? modules.rh : 1;
   }
 
   return modules;
@@ -122,14 +147,12 @@ export function buildAdminUpdateUserAccessPayload(
 
 export function buildDepartmentPermissionSyncPayload(
   departmentModuleKey: string,
-  modules: Record<string, number | null>,
+  modules: Record<string, number>,
 ): Pick<UpdateUserData, "permission" | "type" | "modules"> {
   const departmentModuleLevel = modules[departmentModuleKey];
   let permission: UserPermission = 0;
 
-  if (departmentModuleLevel === null) {
-    permission = -1;
-  } else if (departmentModuleLevel === 2) {
+  if (departmentModuleLevel === 2 || departmentModuleLevel === 3) {
     permission = 2;
   } else if (departmentModuleLevel === 1) {
     permission = 1;
@@ -143,14 +166,42 @@ export function buildDepartmentPermissionSyncPayload(
 
 export function needsDepartmentPermissionSync(
   departmentModuleKey: string | null | undefined,
-  modules: Record<string, number | null>,
+  modules: Record<string, number>,
   user: Pick<UpdateUserData, "permission" | "type"> | null | undefined,
+  baselineModules?: Readonly<Record<string, unknown>>,
 ): boolean {
   if (!departmentModuleKey || !user) {
     return false;
   }
 
   const syncPayload = buildDepartmentPermissionSyncPayload(departmentModuleKey, modules);
+  const needsSync =
+    user.permission !== syncPayload.permission || user.type !== syncPayload.type;
 
-  return user.permission !== syncPayload.permission || user.type !== syncPayload.type;
+  if (!needsSync || !baselineModules) {
+    return needsSync;
+  }
+
+  const minimumLevel = getMinimumPermissionLevel(departmentModuleKey);
+  const baselineWasNoAccess =
+    !Object.prototype.hasOwnProperty.call(baselineModules, departmentModuleKey) ||
+    baselineModules[departmentModuleKey] === null;
+
+  if (
+    minimumLevel === null ||
+    !baselineWasNoAccess ||
+    modules[departmentModuleKey] !== minimumLevel
+  ) {
+    return true;
+  }
+
+  const baselineSyncPayload = buildDepartmentPermissionSyncPayload(departmentModuleKey, {
+    ...modules,
+    [departmentModuleKey]: null,
+  });
+
+  return (
+    user.permission !== baselineSyncPayload.permission ||
+    user.type !== baselineSyncPayload.type
+  );
 }

@@ -17,6 +17,8 @@ import {
   PERMISSION_MODULE_GROUPS,
   PERMISSION_SELECT_OPTIONS,
   getPermissionModuleLabel,
+  getPermissionSelectOptions,
+  normalizePermissionForModule,
 } from "@modules/users/constants/permissionConfig";
 import { permissionService } from "@modules/users/services/permissionService";
 import {
@@ -52,13 +54,16 @@ const ADMIN_ACTIVE_TAB_CLASSNAME =
   "bg-[var(--colors-brand-soft)] text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300";
 
 const ADMIN_PANEL_CLASSNAME =
-  "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
+  "rounded-3xl bg-white shadow-sm dark:bg-slate-900";
 
 const ADMIN_SUBPANEL_CLASSNAME =
-  "rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/40";
+  "rounded-2xl bg-slate-50/70 dark:bg-slate-950/40";
 
 const ADMIN_FEEDBACK_PANEL_CLASSNAME =
-  "rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40";
+  "rounded-2xl bg-slate-50/70 p-4 dark:bg-slate-950/40";
+
+const ADMIN_EMPTY_STATE_CLASSNAME =
+  "rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-center dark:border-slate-700 dark:bg-slate-950/30";
 
 const ADMIN_LABEL_CLASSNAME = "dialog-neutral-label block text-sm font-medium text-slate-700 dark:text-white";
 
@@ -86,11 +91,11 @@ const adminUsersSummaryRootQueryKey = ["admin-users-summary"] as const;
 const adminUsersQueryKey = (status: AdminUserStatus) => [...adminUsersRootQueryKey, status] as const;
 
 function getPermissionSelectValue(value: number | null | undefined): PermissionSelectValue {
-  if (value === 0 || value === 1 || value === 2) {
+  if (value === 0 || value === 1 || value === 2 || value === 3) {
     return String(value) as Exclude<PermissionSelectValue, "null">;
   }
 
-  return "null";
+  return "0";
 }
 
 function getPermissionErrorMessage(error: unknown, fallbackMessage: string): string {
@@ -133,6 +138,9 @@ export function Administracao() {
   const [permissionSnapshot, setPermissionSnapshot] = useState<Readonly<PermissionDraft> | null>(
     null,
   );
+  const [permissionBaseline, setPermissionBaseline] = useState<
+    Readonly<Record<string, unknown>> | null
+  >(null);
   const [permissionExtraKeys, setPermissionExtraKeys] = useState<string[]>([]);
   const [loadedPermissionUserId, setLoadedPermissionUserId] = useState<string | null>(null);
   const [permissionSaveError, setPermissionSaveError] = useState<string | null>(null);
@@ -141,7 +149,7 @@ export function Administracao() {
   const { access: rhAccess, isLoading: isRhAccessLoading } = useModuleAccess("rh");
   const canManageOrganizationOwners = canCreateOrganizationOwner(user);
   const hasAdminAccess = canAccessAdministration(user, { rhAccess });
-  const canManagePermissions = hasAdminAccess;
+  const canManagePermissions = canManageOrganizationOwners;
   const isAdministrationAccessLoading =
     !canManageOrganizationOwners && isRhAccessLoading;
   const queryClient = useQueryClient();
@@ -272,10 +280,12 @@ export function Administracao() {
         selectedPermissionDepartmentModule,
         normalizedPermissionDraft,
         selectedPermissionUser,
+        permissionBaseline ?? undefined,
       )
     );
   }, [
     normalizedPermissionDraft,
+    permissionBaseline,
     permissionSnapshot,
     selectedPermissionDepartmentModule,
     selectedPermissionUser,
@@ -419,6 +429,7 @@ export function Administracao() {
     if (!selectedPermissionUserId) {
       setPermissionDraft(normalizePermissionDraft({}));
       setPermissionSnapshot(null);
+      setPermissionBaseline(null);
       setPermissionExtraKeys([]);
       setLoadedPermissionUserId(null);
       setPermissionSaveError(null);
@@ -428,6 +439,7 @@ export function Administracao() {
     if (selectedPermissionUserId !== loadedPermissionUserId) {
       setPermissionDraft(normalizePermissionDraft({}));
       setPermissionSnapshot(null);
+      setPermissionBaseline(null);
       setPermissionExtraKeys([]);
       setPermissionSaveError(null);
     }
@@ -475,6 +487,7 @@ export function Administracao() {
 
     setPermissionDraft(nextDraft);
     setPermissionSnapshot(freezePermissionSnapshot(nextDraft));
+    setPermissionBaseline(permissionQuery.data.raw);
     setPermissionExtraKeys(nextExtraKeys);
     setLoadedPermissionUserId(permissionQuery.data.userId);
     setPermissionSaveError(null);
@@ -529,11 +542,16 @@ export function Administracao() {
     setSelectedPermissionUserId(nextUserId);
   };
   const handlePermissionChange = (moduleKey: string, nextValue: PermissionSelectValue) => {
+    const normalizedValue = normalizePermissionForModule(
+      moduleKey,
+      Number(nextValue),
+    );
+
     setPermissionDraft((currentDraft) =>
       normalizePermissionDraft(
         {
           ...currentDraft,
-          [moduleKey]: nextValue === "null" ? null : Number(nextValue),
+          [moduleKey]: normalizedValue,
         },
         permissionExtraKeys,
       ),
@@ -567,7 +585,7 @@ export function Administracao() {
       const raw = shouldSyncDepartmentPermission
         ? await (async () => {
             if (!selectedPermissionDepartmentModule) {
-              throw new Error("Modulo do departamento nao encontrado.");
+              throw new Error("Módulo do departamento não encontrado.");
             }
 
             await userService.update(
@@ -590,6 +608,7 @@ export function Administracao() {
 
       setPermissionDraft(nextDraft);
       setPermissionSnapshot(freezePermissionSnapshot(nextDraft));
+      setPermissionBaseline(raw);
       setPermissionExtraKeys(nextExtraKeys);
       setLoadedPermissionUserId(selectedPermissionUserId);
       setPermissionSaveError(null);
@@ -644,9 +663,9 @@ export function Administracao() {
 
   const adminTabs = [
     { key: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { key: "users", label: "Usuarios", icon: Users },
+    { key: "users", label: "Usuários", icon: Users },
     ...(canManagePermissions
-      ? [{ key: "permissions", label: "Permissoes", icon: Lock }]
+      ? [{ key: "permissions", label: "Permissões", icon: Lock }]
       : []),
   ] as const;
 
@@ -677,7 +696,7 @@ export function Administracao() {
         </button>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-2xl bg-white p-1 shadow-sm dark:bg-slate-900">
         <div className="flex items-center gap-1 overflow-x-auto">
           {adminTabs.map((tab) => {
             const Icon = tab.icon;
@@ -710,7 +729,7 @@ export function Administracao() {
             return (
               <div
                 key={card.title}
-                className="h-full rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"
+                className="h-full rounded-2xl bg-white p-5 shadow-sm dark:bg-slate-900"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -754,7 +773,7 @@ export function Administracao() {
               ) : !isDepartmentsLoading && departments.length === 0 ? (
                 <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    Nenhum departamento foi retornado pelo backend. A criação de usuários está indisponível.
+                    Ainda não há departamentos cadastrados. Cadastre um departamento para criar usuários.
                   </p>
                   <button
                     type="button"
@@ -821,17 +840,17 @@ export function Administracao() {
 
                 <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
                   {isUsersLoading ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuários...</p>
                     </div>
                   ) : usersError ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>
                         A listagem não está disponível no momento.
                       </p>
                     </div>
                   ) : filteredUsers.length === 0 ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_TEXT_CLASSNAME}>
                         Nenhum usuário encontrado.
                       </p>
@@ -849,10 +868,10 @@ export function Administracao() {
                           key={candidate.id}
                           type="button"
                           onClick={() => setSelectedUserId(candidate.id)}
-                          className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                          className={`w-full rounded-2xl p-4 text-left transition-all ${
                             isSelected
-                              ? "border-[var(--colors-brand-gradient-end)] bg-slate-50 shadow-sm dark:bg-slate-950/60"
-                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800/70"
+                              ? "bg-slate-50 shadow-sm ring-1 ring-[var(--colors-brand-gradient-end)] dark:bg-slate-950/60"
+                              : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/70"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -943,21 +962,21 @@ export function Administracao() {
 
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                   {isPermissionUsersLoading ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>Carregando usuários ativos...</p>
                     </div>
                   ) : permissionUsersError ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_MUTED_CLASSNAME}>
                         A listagem de usuários ativos não está disponível.
                       </p>
                     </div>
                   ) : permissionUsers.length === 0 ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_TEXT_CLASSNAME}>Nenhum usuário ativo encontrado.</p>
                     </div>
                   ) : filteredPermissionUsers.length === 0 ? (
-                    <div className={`${ADMIN_FEEDBACK_PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+                    <div className={ADMIN_EMPTY_STATE_CLASSNAME}>
                       <p className={ADMIN_TEXT_CLASSNAME}>
                         Nenhum usuário ativo corresponde à busca.
                       </p>
@@ -971,10 +990,10 @@ export function Administracao() {
                           key={candidate.id}
                           type="button"
                           onClick={() => handleSelectPermissionUser(candidate.id)}
-                          className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                          className={`w-full rounded-2xl p-4 text-left transition-all ${
                             isSelected
-                              ? "border-[var(--colors-brand-gradient-end)] bg-slate-50 shadow-sm dark:bg-slate-950/60"
-                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800/70"
+                              ? "bg-slate-50 shadow-sm ring-1 ring-[var(--colors-brand-gradient-end)] dark:bg-slate-950/60"
+                              : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/70"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -1063,7 +1082,7 @@ export function Administracao() {
                       Níveis da permissão por módulo
                     </p>
                     <p className={ADMIN_MUTED_CLASSNAME}>
-                      Ajuste apenas acessos complementares ao modulo principal do usuario selecionado.
+                      Ajuste apenas acessos complementares ao módulo principal do usuário selecionado.
                     </p>
                   </div>
                   <button
@@ -1152,7 +1171,7 @@ export function Administracao() {
                                   style={ADMIN_SELECT_ARROW_STYLE}
                                   disabled={isSelectedPermissionOwner || isSavingPermissions}
                                 >
-                                  {PERMISSION_SELECT_OPTIONS.map((option) => (
+                                  {getPermissionSelectOptions(moduleKey).map((option) => (
                                     <option key={option.value} value={option.value}>
                                       {option.label}
                                     </option>

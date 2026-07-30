@@ -34,7 +34,29 @@ describe("task model routes", () => {
       billing: "Realizar",
       prevision: 2,
       type: null,
+      integracaoLevel: 0,
+      isOwner: false,
     });
+  });
+
+  it("POST /task/model rejeita responsável 3 sem responsável 2", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).post("/task/model").send({
+      name: "Modelo",
+      department_id: "dep-1",
+      responsible_id: "user-1",
+      responsible3_id: "user-3",
+      billing: "Realizar",
+      prevision: 2,
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({
+      success: false,
+      error: "Responsável 2 é obrigatório antes do responsável 3.",
+    });
+    expect(taskModelServiceMock.createModel).not.toHaveBeenCalled();
   });
 
   it("GET /task/model busca modelo", async () => {
@@ -43,7 +65,11 @@ describe("task model routes", () => {
     const res = await request(app).get("/task/model").query({ task_id: "model-1" });
 
     expect(res.status).toBe(200);
-    expect(taskModelServiceMock.detailModel).toHaveBeenCalledWith("model-1", "org-1");
+    expect(taskModelServiceMock.detailModel).toHaveBeenCalledWith("model-1", "org-1", {
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
+    });
   });
 
   it("PUT /task/model atualiza modelo", async () => {
@@ -73,6 +99,8 @@ describe("task model routes", () => {
       billing: "Realizar",
       prevision: 4,
       type: null,
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -84,7 +112,18 @@ describe("task model routes", () => {
       .query({ type: "fiscal", billing: "Realizar" });
 
     expect(res.status).toBe(200);
-    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith("fiscal", "Realizar", "org-1");
+    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith({
+      type: "fiscal",
+      billing: "Realizar",
+      search: "",
+      organizationId: "org-1",
+      paginationRequested: false,
+      page: 1,
+      limit: 20,
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
+    });
   });
 
   it("GET /task/model/list lista todos os modelos quando type e billing nao sao enviados", async () => {
@@ -93,7 +132,82 @@ describe("task model routes", () => {
     const res = await request(app).get("/task/model/list");
 
     expect(res.status).toBe(200);
-    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith(undefined, undefined, "org-1");
+    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith({
+      type: undefined,
+      billing: undefined,
+      search: "",
+      organizationId: "org-1",
+      paginationRequested: false,
+      page: 1,
+      limit: 20,
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
+    });
+  });
+
+  it("GET /task/model/list preserva filtros legados enviados no corpo", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/task/model/list")
+      .send({ type: "fiscal", billing: "Realizar" });
+
+    expect(res.status).toBe(200);
+    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith({
+      type: "fiscal",
+      billing: "Realizar",
+      search: "",
+      organizationId: "org-1",
+      paginationRequested: false,
+      page: 1,
+      limit: 20,
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
+    });
+  });
+
+  it("GET /task/model/list pagina busca remota", async () => {
+    taskModelServiceMock.listModel.mockResolvedValueOnce({
+      data: [{ id: "model-21", name: "Fiscal 21", department_id: "dep-1" }],
+      total: 21,
+      page: 2,
+      limit: 20,
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
+      hasMore: false,
+    });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/task/model/list")
+      .query({ search: "fiscal", page: "2", limit: "20" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.total).toBe(21);
+    expect(taskModelServiceMock.listModel).toHaveBeenCalledWith({
+      type: undefined,
+      billing: undefined,
+      search: "fiscal",
+      organizationId: "org-1",
+      paginationRequested: true,
+      page: 2,
+      limit: 20,
+      userId: "user-1",
+      integracaoLevel: 0,
+      isOwner: false,
+    });
+  });
+
+  it("GET /task/model/list rejeita limite invalido", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).get("/task/model/list").query({ limit: "101" });
+
+    expect(res.status).toBe(400);
+    expect(taskModelServiceMock.listModel).not.toHaveBeenCalled();
   });
 
   it("DELETE /task/model remove modelo", async () => {
@@ -107,6 +221,8 @@ describe("task model routes", () => {
       task_id: "model-1",
       user_id: "user-1",
       organization_id: "org-1",
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 

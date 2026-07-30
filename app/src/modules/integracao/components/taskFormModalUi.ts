@@ -19,8 +19,6 @@ export const TASK_FORM_AUXILIARY_WARNING_CLASSNAME =
 export const TASK_CREATE_REQUIRED_FIELDS_MESSAGE =
   "Preencha cliente, projeto, modelo, status de prospecção e urgência.";
 
-export const TASK_CREATE_OBSERVATIONS_REQUIRED_MESSAGE = "Preencha as observações da tarefa.";
-
 export const TASK_URGENCY_OPTIONS = ["Baixa", "Normal", "Alta", "Urgente"] as const;
 
 export type TaskUrgencyOption = (typeof TASK_URGENCY_OPTIONS)[number];
@@ -66,14 +64,9 @@ export function getTaskCreateValidationMessage({
   modelId,
   prospectingStatus,
   urgency,
-  observations,
 }: GetTaskCreateValidationMessageParams): string | null {
   if (!clientId || !projectId || !modelId || !prospectingStatus || !urgency) {
     return TASK_CREATE_REQUIRED_FIELDS_MESSAGE;
-  }
-
-  if (!observations.trim()) {
-    return TASK_CREATE_OBSERVATIONS_REQUIRED_MESSAGE;
   }
 
   return null;

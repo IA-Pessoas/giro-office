@@ -15,11 +15,15 @@ import {
 import {
   buildCreateTaskModelPayload,
   buildDeleteTaskModelPayload,
+  buildTaskModelListParams,
   buildUpdateTaskModelPayload,
+  normalizeTaskModelResponsibleSequence,
   TASK_MODEL_ENDPOINTS,
   unwrapCreatedTaskModel,
   unwrapTaskModelDetail,
   unwrapTaskModelList,
+  unwrapTaskModelOptions,
+  unwrapTaskModelPage,
 } from "./services/taskModelService.contract.ts";
 import {
   buildCreateProjectPayload,
@@ -38,6 +42,7 @@ import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
+  canViewTaskModelConfig,
 } from "./navigation/taskModelConfigNavigation.ts";
 import {
   TASK_TABLE_ACTION_BUTTON_CLASSNAME,
@@ -48,6 +53,7 @@ import {
   TASK_TABLE_NAME_CELL_CLASSNAME,
   TASK_TABLE_NAME_HEAD_CELL_CLASSNAME,
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
+  canEditIntegracaoTask,
   formatTasksFooterSummary,
 } from "./components/taskWorkspaceUi.ts";
 import {
@@ -73,13 +79,9 @@ import {
   getTaskModelDepartmentLabel,
   getTaskModelEmptyStateMessage,
 } from "./components/taskModelConfigUi.ts";
-import {
-  fetchTaskModelsWithOptionalDepartments,
-} from "./hooks/useTaskModels.helpers.ts";
+import { fetchTaskModelsWithOptionalDepartments } from "./hooks/useTaskModels.helpers.ts";
 import { projectMetricsQueryKey } from "./hooks/queryKeys.ts";
-import {
-  collectAdminUsersFromPages,
-} from "../users/services/adminUsersService.helpers.ts";
+import { collectAdminUsersFromPages } from "../users/services/adminUsersService.helpers.ts";
 
 function runTest(name, fn) {
   try {
@@ -107,7 +109,6 @@ runTest("project endpoints use only the v1 project contract", () => {
   assert.equal(PROJECT_ENDPOINTS.progress, "/project/progress");
   assert.equal(PROJECT_ENDPOINTS.metrics, "/project/metrics");
 });
-
 
 runTest("project metrics query key is stable and global", () => {
   assert.deepEqual(projectMetricsQueryKey(), ["projects", "metrics"]);
@@ -174,7 +175,6 @@ runTest("unwrapUpdatedProject accepts direct object payload", () => {
   assert.deepEqual(unwrapUpdatedProject(project), project);
   assert.deepEqual(unwrapUpdatedProject({ success: true, data: project }), project);
 });
-
 
 runTest("unwrapProjectMetrics returns global metrics from envelope", () => {
   const metrics = {
@@ -247,6 +247,43 @@ runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
   );
 });
 
+runTest("buildCreateIntegracaoTaskPayload preserves optional operational details", () => {
+  assert.deepEqual(
+    buildCreateIntegracaoTaskPayload({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      name: "Revisar documentação assinada",
+      status: "Em Espera",
+      department_id: "department-1",
+      observations: "Aguardar o retorno do cliente.",
+      billing: "Não Realizar",
+      urgency: "Alta",
+      responsible_id: "user-1",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+      prevision_date: "2026-08-15",
+    }),
+    {
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      name: "Revisar documentação assinada",
+      status: "Em Espera",
+      department_id: "department-1",
+      observations: "Aguardar o retorno do cliente.",
+      billing: "Não Realizar",
+      urgency: "Alta",
+      responsible_id: "user-1",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+      prevision_date: "2026-08-15",
+    },
+  );
+});
+
 runTest("buildUpdateIntegracaoTaskPayload keeps task_id", () => {
   assert.deepEqual(
     buildUpdateIntegracaoTaskPayload({
@@ -261,12 +298,12 @@ runTest("buildDeleteIntegracaoTaskPayload maps task_id body", () => {
   assert.deepEqual(buildDeleteIntegracaoTaskPayload("task-1"), { task_id: "task-1" });
 });
 
-runTest("unwrapIntegracaoTaskList extracts data and hasMore", () => {
+runTest("unwrapIntegracaoTaskList preserves global totals and a later-page record", () => {
   const payload = {
     data: [
       {
-        id: "t1",
-        name: "Tarefa",
+        id: "task-21",
+        name: "Registro 21",
         status: "A Realizar",
         billing: "Não Realizar",
         charge_comercial: false,
@@ -276,7 +313,9 @@ runTest("unwrapIntegracaoTaskList extracts data and hasMore", () => {
         charge_financeiro: false,
       },
     ],
+    total: 41,
     hasMore: true,
+    summary: { inProgress: 9, billable: 14 },
   };
   assert.deepEqual(unwrapIntegracaoTaskList({ success: true, data: payload }), payload);
 });
@@ -288,7 +327,10 @@ runTest("unwrapIntegracaoTaskDetail extracts nested detail", () => {
 
 runTest("unwrapCreatedIntegracaoTask extracts nested create", () => {
   const created = { id: "t1", name: "Tarefa" };
-  assert.deepEqual(unwrapCreatedIntegracaoTask({ success: true, data: { create: created } }), created);
+  assert.deepEqual(
+    unwrapCreatedIntegracaoTask({ success: true, data: { create: created } }),
+    created,
+  );
 });
 
 runTest("unwrapUpdatedIntegracaoTask accepts direct object payload", () => {
@@ -301,6 +343,42 @@ runTest("task model endpoints match task-service contract", () => {
   assert.equal(TASK_MODEL_ENDPOINTS.crud, "/task/model");
   assert.equal(TASK_MODEL_ENDPOINTS.list, "/task/model/list");
   assert.equal(TASK_MODEL_ENDPOINTS.dependent, "/task/model/dependent");
+  assert.equal(TASK_MODEL_ENDPOINTS.options, "/task/deps/options");
+});
+
+runTest("task model options keep active users and departments in one response", () => {
+  const options = {
+    users: [{ id: "user-1", name: "Ana" }],
+    departments: [{ id: "dep-1", name: "Fiscal" }],
+  };
+
+  assert.deepEqual(unwrapTaskModelOptions({ success: true, data: options }), options);
+  assert.doesNotMatch(
+    readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8"),
+    /listAdminUsers|departmentService\.list/,
+  );
+});
+
+runTest("task edit form loads auxiliary selects from integration task options", () => {
+  const source = readFileSync(new URL("./components/TaskFormModal.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /taskModelService\.listOptions/);
+  assert.doesNotMatch(source, /listAdminUsers|departmentService\.list/);
+});
+
+runTest("task model deletion preserves actionable dependency conflicts", () => {
+  const source = readFileSync(new URL("./hooks/useTaskModels.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /response\?\.status === 409/);
+  assert.match(source, /response\.data\?\.error \?\? response\.data\?\.message/);
+});
+
+runTest("task model list params include remote search and pagination", () => {
+  assert.deepEqual(buildTaskModelListParams({ search: " Fiscal ", page: 2, limit: 20 }), {
+    search: "Fiscal",
+    page: 2,
+    limit: 20,
+  });
 });
 
 runTest("buildUpdateTaskModelPayload maps id to task_id", () => {
@@ -359,6 +437,90 @@ runTest("buildCreateTaskModelPayload maps nullable fields", () => {
   );
 });
 
+runTest("task model responsible sequence clears descendants without their predecessor", () => {
+  assert.deepEqual(
+    normalizeTaskModelResponsibleSequence({
+      responsible_id: "",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+    }),
+    {
+      responsible_id: "",
+      responsible2_id: "",
+      responsible3_id: "",
+    },
+  );
+  assert.deepEqual(
+    normalizeTaskModelResponsibleSequence({
+      responsible_id: "user-1",
+      responsible2_id: "",
+      responsible3_id: "user-3",
+    }),
+    {
+      responsible_id: "user-1",
+      responsible2_id: "",
+      responsible3_id: "",
+    },
+  );
+});
+
+runTest("task model payloads omit responsible descendants without their predecessor", () => {
+  assert.deepEqual(
+    buildCreateTaskModelPayload({
+      name: "Modelo",
+      department_id: "dep-1",
+      responsible_id: "",
+      responsible2_id: "user-2",
+      responsible3_id: "user-3",
+      observations: "",
+      billing: "Realizar",
+      prevision: 5,
+      type: "Projeto",
+    }),
+    {
+      name: "Modelo",
+      department_id: "dep-1",
+      responsible_id: "",
+      responsible2_id: null,
+      responsible3_id: null,
+      observations: null,
+      billing: "Realizar",
+      prevision: 5,
+      type: "Projeto",
+    },
+  );
+});
+
+runTest("task model modal gates dependent responsible controls", () => {
+  const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
+
+  assert.match(
+    source,
+    /disabled=\{!formData\.responsible_id \|\| optionsUnavailable\}/,
+  );
+  assert.match(
+    source,
+    /disabled=\{!formData\.responsible2_id \|\| optionsUnavailable\}/,
+  );
+  assert.match(source, /Selecione o responsável antes de definir o responsável 2\./);
+  assert.match(source, /Selecione o responsável 2 antes de definir o responsável 3\./);
+});
+
+runTest("task model modal allows retrying failed options before saving", () => {
+  const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /const \[optionsRetryKey, setOptionsRetryKey\] = useState\(0\)/);
+  assert.match(source, /const \[requiredOptionsWarning, setRequiredOptionsWarning\] = useState\(false\)/);
+  assert.match(source, /const \[taskModelsWarning, setTaskModelsWarning\] = useState\(false\)/);
+  assert.match(source, /onClick=\{\(\) => setOptionsRetryKey\(\(currentKey\) => currentKey \+ 1\)\}/);
+  assert.match(source, />\s*Tentar novamente\s*<\/button>/);
+  assert.match(
+    source,
+    /const optionsUnavailable = loadingOptions \|\| requiredOptionsWarning;[\s\S]*const taskModelsUnavailable = loadingOptions \|\| taskModelsWarning;[\s\S]*const saveDisabled = saving \|\| loadingDetail \|\| detailError \|\| optionsUnavailable;/,
+  );
+  assert.match(source, /disabled=\{taskModelsUnavailable\}/);
+});
+
 runTest("buildDeleteTaskModelPayload maps task_id body", () => {
   assert.deepEqual(buildDeleteTaskModelPayload("model-1"), { task_id: "model-1" });
 });
@@ -366,6 +528,20 @@ runTest("buildDeleteTaskModelPayload maps task_id body", () => {
 runTest("unwrapTaskModelList returns array from envelope", () => {
   const payload = [{ id: "model-1", name: "Modelo", department_id: "dep-1" }];
   assert.deepEqual(unwrapTaskModelList({ success: true, data: payload }), payload);
+});
+
+runTest("unwrapTaskModelPage preserves later-page metadata", () => {
+  const payload = {
+    data: [{ id: "model-21", name: "Fiscal 21", department_id: "dep-1" }],
+    total: 21,
+    page: 2,
+    limit: 20,
+    hasMore: false,
+  };
+  assert.deepEqual(
+    unwrapTaskModelPage({ success: true, data: payload }, { page: 2, limit: 20 }),
+    payload,
+  );
 });
 
 runTest("unwrapTaskModelDetail extracts nested detail", () => {
@@ -383,9 +559,47 @@ runTest("task model config entry is discoverable in product workflows", () => {
   assert.equal(TASK_MODEL_CONFIG_ENTRY.label, "Modelos de tarefas");
   assert.equal(TASK_MODEL_CONFIG_ENTRY.shortLabel, "Modelos");
   assert.equal(canManageTaskModelConfig(null), false);
-  assert.equal(canManageTaskModelConfig(1), false);
-  assert.equal(canManageTaskModelConfig(2), true);
-  assert.equal(canManageTaskModelConfig(3), true);
+  assert.equal(canManageTaskModelConfig({ isAdmin: false }), false);
+  assert.equal(canManageTaskModelConfig({ isAdmin: true }), true);
+  assert.equal(canViewTaskModelConfig(null), false);
+  assert.equal(canViewTaskModelConfig({ canView: false }), false);
+  assert.equal(canViewTaskModelConfig({ canView: true }), true);
+});
+
+runTest("integration write actions use the modular access level", () => {
+  const tasksSource = readFileSync(
+    new URL("./components/TasksWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+  const taskFormSource = readFileSync(
+    new URL("./components/TaskFormModal.tsx", import.meta.url),
+    "utf8",
+  );
+  const projectsSource = readFileSync(
+    new URL("./components/ProjectsWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+  const clientsSource = readFileSync(
+    new URL("../../shared/components/newLayout/Clients.tsx", import.meta.url),
+    "utf8",
+  );
+  const configSource = readFileSync(
+    new URL("../../pages/configs/integracao/tasks/index.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(tasksSource, /const canCreate = integracaoAccess\.canEdit;/);
+  assert.match(tasksSource, /const canManageTaskModels = integracaoAccess\.isAdmin;/);
+  assert.match(tasksSource, /canEditIntegracaoTask\(integracaoAccess, task\)/);
+  assert.match(taskFormSource, /const isRestrictedEdit =/);
+  assert.match(taskFormSource, /enabled: open && isEditing && !isRestrictedEdit/);
+  assert.match(taskFormSource, /task_id: taskId,\s*status,\s*observations/);
+  assert.match(taskFormSource, /hasRestrictedTaskAccessDenied/);
+  assert.match(projectsSource, /const canEdit = integracaoAccess\.canEdit;/);
+  assert.match(clientsSource, /useModuleAccess\("integracao"\)/);
+  assert.match(clientsSource, /const canCreateClient = integracaoAccess\.canEdit;/);
+  assert.match(configSource, /useModuleAccess\("integracao"\)/);
+  assert.match(configSource, /canManageTaskModelConfig\(integracaoAccess\)/);
 });
 
 runTest("task model config links back to the tasks workspace", () => {
@@ -398,6 +612,20 @@ runTest("task model config links back to the tasks workspace", () => {
   assert.equal(source.includes("ArrowLeft"), true);
   assert.equal(source.includes('href="/tasks"'), true);
   assert.equal(source.includes("Voltar para tarefas"), true);
+});
+
+runTest("issue 495 project task observations preserve line breaks and wrap long tokens", () => {
+  const source = readFileSync(
+    new URL("./components/ProjectDetailView.tsx", import.meta.url),
+    "utf8",
+  );
+  const observationsDisplay =
+    source.match(
+      /<p className="[^"]*">\s*\{task\.observations \|\| task\.observation \|\| "Sem observações específicas\."\}\s*<\/p>/,
+    )?.[0] ?? "";
+
+  assert.match(observationsDisplay, /whitespace-pre-wrap/);
+  assert.match(observationsDisplay, /break-words/);
 });
 
 runTest("tasks footer summary uses natural Portuguese copy", () => {
@@ -417,15 +645,19 @@ runTest("tasks table actions use inline square icon buttons", () => {
   assert.equal(TASK_TABLE_DANGER_ACTION_BUTTON_CLASSNAME.includes("w-9"), true);
 });
 
-runTest("tasks delete permission follows shared admin helper", () => {
+runTest("tasks delete permission follows integration module admin level", () => {
   const source = readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8");
 
-  assert.equal(source.includes('import { isAdminPermission } from "@modules/auth";'), true);
-  assert.equal(
-    source.includes("const canDelete = isAdminPermission(meQuery.data?.permission);"),
-    true,
-  );
+  assert.equal(source.includes('import { useModuleAccess } from "@modules/auth";'), true);
+  assert.equal(source.includes("const canDelete = integracaoAccess.isAdmin;"), true);
   assert.equal(source.includes("const canDelete = meQuery.data?.permission === 2;"), false);
+});
+
+runTest("task list hides restricted edit actions from non-responsible users", () => {
+  assert.equal(canEditIntegracaoTask({ level: "view" }, { isOwn: true }), true);
+  assert.equal(canEditIntegracaoTask({ level: "view" }, { isOwn: false }), false);
+  assert.equal(canEditIntegracaoTask({ level: "edit" }, { isOwn: false }), true);
+  assert.equal(canEditIntegracaoTask({ level: "admin" }, { isOwn: false }), true);
 });
 
 runTest("task form modal uses compact layout classes", () => {
@@ -503,7 +735,7 @@ runTest("task edit form only blocks while the task detail is loading", () => {
   );
 });
 
-runTest("task create validation requires observations before submit", () => {
+runTest("task create validation accepts blank observations before submit", () => {
   const validValues = {
     clientId: "client-1",
     projectId: "project-1",
@@ -514,10 +746,27 @@ runTest("task create validation requires observations before submit", () => {
   };
 
   assert.equal(getTaskCreateValidationMessage(validValues), null);
-  assert.equal(
-    getTaskCreateValidationMessage({ ...validValues, observations: "   " }),
-    "Preencha as observações da tarefa.",
-  );
+  assert.equal(getTaskCreateValidationMessage({ ...validValues, observations: "   " }), null);
+});
+
+runTest("task create form marks observations as optional", () => {
+  const source = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
+  const observationsField = source.match(
+    /<textarea\s+value=\{createValues\.observations\}[\s\S]*?\/>/,
+  )?.[0];
+
+  assert.ok(observationsField, "create observations textarea not found");
+  assert.doesNotMatch(observationsField, /\srequired(?:\s|>|$)/);
+});
+
+runTest("task create OpenAPI contract keeps observations optional", () => {
+  const source = readFileSync("../services/task-service/src/openapi/spec.ts", "utf8");
+  const createTaskRequired = source.match(
+    /const createTaskRequestBody = createObjectRequestBody\(\{[\s\S]*?required: \[([\s\S]*?)\]/,
+  )?.[1];
+
+  assert.ok(createTaskRequired, "create task required list not found");
+  assert.doesNotMatch(createTaskRequired, /"observations"/);
 });
 
 runTest("task model config uses clear empty and department fallback copy", () => {
@@ -530,7 +779,10 @@ runTest("task model config uses clear empty and department fallback copy", () =>
     "Não foi possível carregar os modelos.",
   );
   assert.equal(getTaskModelDepartmentLabel({ department: { name: "Fiscal" } }), "Fiscal");
-  assert.equal(getTaskModelDepartmentLabel({ department_id: "dep-1" }), "Departamento não carregado");
+  assert.equal(
+    getTaskModelDepartmentLabel({ department_id: "dep-1" }),
+    "Departamento não carregado",
+  );
 });
 
 runTest("task model config table locks visible column alignment", () => {
@@ -541,41 +793,55 @@ runTest("task model config table locks visible column alignment", () => {
   assert.equal(TASK_MODEL_TABLE_ACTION_COLUMN_CLASSNAME, "w-24");
 });
 
-await runAsyncTest("active users for task selects are loaded without unsupported user query params", async () => {
-  const calls = [];
-  const users = await collectAdminUsersFromPages({
-    status: "active",
-    listPage: async (params) => {
-      calls.push(params);
-      return {
-        users: [
-          {
-            id: "user-active",
-            name: "Usuario ativo",
-            login: "ativo",
-            permission: 1,
-            department_id: "dep-1",
-            status: "active",
-          },
-          {
-            id: "user-inactive",
-            name: "Usuario inativo",
-            login: "inativo",
-            permission: 1,
-            department_id: "dep-1",
-            status: "inactive",
-          },
-        ],
-        total: 2,
-        skip: 0,
-        take: 100,
-      };
-    },
-  });
+runTest("task model config delegates search and pagination to the server", () => {
+  const source = readFileSync("src/pages/configs/integracao/tasks/index.tsx", "utf8");
 
-  assert.deepEqual(calls, [{ skip: 0, take: 100 }]);
-  assert.deepEqual(users.map((user) => user.id), ["user-active"]);
+  assert.match(source, /useDebouncedValue\(searchTerm\.trim\(\), 300\)/);
+  assert.match(source, /<PaginationControls/);
+  assert.doesNotMatch(source, /filteredModels/);
 });
+
+await runAsyncTest(
+  "active users for task selects are loaded without unsupported user query params",
+  async () => {
+    const calls = [];
+    const users = await collectAdminUsersFromPages({
+      status: "active",
+      listPage: async (params) => {
+        calls.push(params);
+        return {
+          users: [
+            {
+              id: "user-active",
+              name: "Usuario ativo",
+              login: "ativo",
+              permission: 1,
+              department_id: "dep-1",
+              status: "active",
+            },
+            {
+              id: "user-inactive",
+              name: "Usuario inativo",
+              login: "inativo",
+              permission: 1,
+              department_id: "dep-1",
+              status: "inactive",
+            },
+          ],
+          total: 2,
+          skip: 0,
+          take: 100,
+        };
+      },
+    });
+
+    assert.deepEqual(calls, [{ skip: 0, take: 100 }]);
+    assert.deepEqual(
+      users.map((user) => user.id),
+      ["user-active"],
+    );
+  },
+);
 
 await runAsyncTest("task models still load when department enrichment fails", async () => {
   let capturedError = null;
@@ -599,4 +865,54 @@ await runAsyncTest("task models still load when department enrichment fails", as
   assert.equal(models[0].name, "Revisar documentos");
   assert.equal(models[0].department, undefined);
   assert.equal(capturedError instanceof Error, true);
+});
+
+runTest(
+  "integration client selection lives in workspace headers and forms show the selected client",
+  () => {
+    const projects = readFileSync(
+      "src/modules/integracao/components/ProjectsWorkspace.tsx",
+      "utf8",
+    );
+    const tasks = readFileSync("src/modules/integracao/components/TasksWorkspace.tsx", "utf8");
+    const taskForm = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
+
+    assert.match(projects, /ClientPickerModal/);
+    assert.match(
+      projects,
+      /<header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">/,
+    );
+    assert.match(tasks, /ClientPickerModal/);
+    assert.match(tasks, /disabled=\{!selectedClient\}/);
+    assert.match(taskForm, /ClientSelectionField/);
+    assert.doesNotMatch(taskForm, /<ClientPickerModal/);
+    assert.doesNotMatch(projects, /useClients\(/);
+    assert.doesNotMatch(tasks, /useClients\(/);
+    assert.doesNotMatch(projects, /page:\s*1/);
+    assert.doesNotMatch(tasks, /page:\s*1/);
+  },
+);
+runTest("project and task model forms disclose their required fields", () => {
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+  const taskModelForm = readFileSync("src/modules/integracao/components/TaskModelModal.tsx", "utf8");
+
+  for (const source of [projectForm, taskModelForm]) {
+    assert.match(source, /RequiredFieldLabel/);
+    assert.match(source, /aria-required/);
+  }
+});
+
+runTest("project date fields handle native input events", () => {
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+
+  assert.equal(
+    (projectForm.match(/onInput=\{\(event\) => updateValue\("start_date", event\.currentTarget\.value\)\}/g) ?? [])
+      .length,
+    1,
+  );
+  assert.equal(
+    (projectForm.match(/onInput=\{\(event\) => updateValue\("end_date", event\.currentTarget\.value\)\}/g) ?? [])
+      .length,
+    1,
+  );
 });

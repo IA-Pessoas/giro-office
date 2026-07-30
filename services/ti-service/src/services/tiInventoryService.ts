@@ -35,13 +35,20 @@ export class TiInventoryService {
 
   async list(context: TiAuthContext, query: ListTiInventoryQuery): Promise<unknown[]> {
     const { skip, take } = getPaginationParams(query);
+    const userFilter = query.user_id
+      ? { user_id: query.user_id }
+      : query.status === "available"
+        ? { user_id: null }
+        : query.status === "assigned"
+          ? { user_id: { not: null } }
+          : {};
 
     return this.prisma.inventoryTecnologia.findMany({
       where: {
         organization_id: context.organizationId,
         ...(query.category_id ? { category_id: query.category_id } : {}),
         ...(query.location_id ? { location_id: query.location_id } : {}),
-        ...(query.user_id ? { user_id: query.user_id } : {}),
+        ...userFilter,
         ...(query.asset_code ? { asset_code: { contains: query.asset_code } } : {}),
       },
       include: INVENTORY_INCLUDE,

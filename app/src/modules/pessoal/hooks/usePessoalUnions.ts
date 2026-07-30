@@ -6,15 +6,29 @@ import {
 } from "@tanstack/react-query";
 
 import { useFetch } from "@shared/hooks";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 import { pessoalService } from "../services/pessoalService";
-import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
+import type {
+  PessoalUnion,
+  PessoalUnionListParams,
+  PessoalUnionPayload,
+} from "../types/unions";
 import { pessoalQueryKey } from "./queryKeys";
 
 const unionsKey = pessoalQueryKey("unions");
 
 export function usePessoalUnions(): UseQueryResult<PessoalUnion[], Error> {
   return useFetch(unionsKey, () => pessoalService.listUnions());
+}
+
+export function usePaginatedPessoalUnions(
+  params: PessoalUnionListParams,
+): UseQueryResult<PaginatedResult<PessoalUnion>, Error> {
+  return useFetch(
+    pessoalQueryKey("unions", "page", params.search?.trim() ?? "", params.page, params.limit),
+    () => pessoalService.listUnionsPage(params),
+  );
 }
 
 export function useCreatePessoalUnionMutation(): UseMutationResult<
@@ -39,6 +53,17 @@ export function useUpdatePessoalUnionMutation(
 
   return useMutation({
     mutationFn: (payload) => pessoalService.updateUnion(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: unionsKey });
+    },
+  });
+}
+
+export function useDeletePessoalUnionMutation(): UseMutationResult<PessoalUnion, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => pessoalService.deleteUnion(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: unionsKey });
     },

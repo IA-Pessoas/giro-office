@@ -1,7 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
-import { isAdminPermission, useAccessStore } from "@modules/auth";
-
-const RH_ADMIN_PERMISSION = 2;
+import { isOrganizationOwner, useAccessStore } from "@modules/auth";
+import { resolveRhPermissionCapabilities } from "../utils/rhPermissions";
 
 interface RhPermissionState {
   isLoading: boolean;
@@ -28,21 +27,9 @@ export function useRhPermissions(scope: string): UseRhPermissionsResult {
   const isLoading = useAccessStore((snapshot) => snapshot.isLoading);
   const permissionError = useAccessStore((snapshot) => snapshot.error);
   const explicitRhPermission = user?.modules?.rh;
-  const hasRhAdminPermission = Boolean(
-    explicitRhPermission !== null &&
-      explicitRhPermission !== undefined &&
-      explicitRhPermission >= RH_ADMIN_PERMISSION,
-  );
-  const isGlobalAdmin = isAdminPermission(user?.permission);
-  const isRhResponsible = hasRhAdminPermission;
-  const canManageRh = hasRhAdminPermission || isGlobalAdmin;
-  const canViewRhDashboard = canManageRh;
-  const canManageRhRequests = canManageRh;
-  const canManageRhScore = canManageRh;
-  const canManageRhTimeBank = canManageRh;
-  const canManageRhTimesheets = canManageRh;
-  // Mantemos workday separado para permitir divergencia futura sem refactor transversal nas telas de ponto.
-  const canManageRhWorkday = canManageRh;
+  const isGlobalAdmin = isOrganizationOwner(user);
+  const capabilities = resolveRhPermissionCapabilities(explicitRhPermission, isGlobalAdmin);
+  const isRhResponsible = capabilities.canManageRh;
   void scope;
 
   return {
@@ -51,15 +38,15 @@ export function useRhPermissions(scope: string): UseRhPermissionsResult {
       isLoading,
       error: permissionError,
     },
-    canAccessRhPortal: Boolean(user),
-    canViewRhDashboard,
+    canAccessRhPortal: Boolean(user) && capabilities.canAccessRhPortal,
+    canViewRhDashboard: capabilities.canViewRhDashboard,
     isRhResponsible,
     isGlobalAdmin,
-    canManageRh,
-    canManageRhRequests,
-    canManageRhScore,
-    canManageRhTimeBank,
-    canManageRhTimesheets,
-    canManageRhWorkday,
+    canManageRh: capabilities.canManageRh,
+    canManageRhRequests: capabilities.canManageRhRequests,
+    canManageRhScore: capabilities.canManageRhScore,
+    canManageRhTimeBank: capabilities.canManageRhTimeBank,
+    canManageRhTimesheets: capabilities.canManageRhTimesheets,
+    canManageRhWorkday: capabilities.canManageRhWorkday,
   };
 }

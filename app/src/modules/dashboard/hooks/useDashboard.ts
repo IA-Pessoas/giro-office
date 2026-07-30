@@ -1,34 +1,37 @@
-import { useState, useEffect } from 'react';
-import { dashboardService } from '../services/dashboardService';
-import type { DashboardStats } from '../types';
+import { useQuery } from "@tanstack/react-query";
 
-export const useDashboard = () => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+import { useAuth } from "@/context/AuthContext";
 
-  const fetchStats = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await dashboardService.getStats();
-      setStats(data);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch dashboard stats'));
-      console.error('Error fetching dashboard stats:', err);
-    } finally {
-      setIsLoading(false);
-    }
+import { dashboardService } from "../services/dashboardService";
+import type { DashboardStats } from "../types";
+
+interface UseDashboardResult {
+  stats: DashboardStats | null;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+}
+
+export const useDashboard = (): UseDashboardResult => {
+  const { user } = useAuth();
+  const cacheScope = user?.organization_id ?? user?.id ?? "anonymous";
+  const query = useQuery<DashboardStats, Error>({
+    queryKey: ["dashboard", "stats", cacheScope],
+    queryFn: () => dashboardService.getStats(),
+    enabled: Boolean(user),
+    refetchInterval: 60_000,
+    gcTime: Infinity,
+  });
+  const refetch = async (): Promise<void> => {
+    await query.refetch();
   };
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
   return {
-    stats,
-    isLoading,
-    error,
-    refetch: fetchStats,
+    stats: query.data ?? null,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    error: query.error,
+    refetch,
   };
 };

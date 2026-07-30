@@ -1,5 +1,6 @@
 import { createExpressErrorHandler } from "@workspace/shared";
 import {
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -14,7 +15,7 @@ import { createDepsTasksRoutes } from "../routes/depsTasks.routes.js";
 
 process.env.DATABASE_URL ??= "postgresql://localhost:5432/task-service-test";
 process.env.JWT_SECRET ??= "task-service-secret";
-process.env.AUDIT_SERVICE_TOKEN ??= "audit-service-token";
+process.env.AUDIT_SERVICE_TOKEN = "audit-service-token";
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -32,6 +33,7 @@ function gatewayHeaders(): Record<string, string> {
     [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORG_ID,
+    [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 2 }),
   };
 }
 
@@ -45,6 +47,9 @@ function createTestApp() {
     createDepsTasksRoutes({
       async listDepartmentsWithTaskModels() {
         return [];
+      },
+      async listTaskModelOptions() {
+        return { users: [], departments: [] };
       },
     }),
   );
@@ -73,5 +78,35 @@ describe("depsTasks routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty("success", true);
+  });
+
+  it("GET /task/deps/options retorna opções para o formulário de modelos", async () => {
+    const app = createTestApp();
+    const response = await request(app).get("/task/deps/options").set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: { users: [], departments: [] },
+    });
+  });
+
+  it("GET /task/deps/options sem autenticacao retorna 401", async () => {
+    const app = createTestApp();
+    const response = await request(app).get("/task/deps/options");
+
+    expect(response.status).toBe(401);
+  });
+
+  it("GET /task/deps/options exige ao menos nível 1 da Integração", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .get("/task/deps/options")
+      .set({
+        ...gatewayHeaders(),
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 0 }),
+      });
+
+    expect(response.status).toBe(403);
   });
 });

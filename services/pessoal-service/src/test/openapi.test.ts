@@ -14,6 +14,20 @@ describe("pessoal-service OpenAPI", () => {
     expect(spec.info.title).toBe("pessoal-service");
     expect(paths["/health"]?.get).toBeDefined();
     expect(paths["/ready"]?.get).toBeDefined();
+    expect(paths["/pessoal/overview"]?.get).toBeDefined();
+  });
+
+  it("documenta detalhes opcionais de folha e obrigacao sem 404 esperado", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const paths = spec.paths as Record<
+      string,
+      Record<string, { responses?: Record<string, unknown> }>
+    >;
+
+    expect(paths["/pessoal/payroll/{client_id}"]?.get?.responses?.["200"]).toBeDefined();
+    expect(paths["/pessoal/payroll/{client_id}"]?.get?.responses?.["404"]).toBeUndefined();
+    expect(paths["/pessoal/obrigations"]?.get?.responses?.["200"]).toBeDefined();
+    expect(paths["/pessoal/obrigations"]?.get?.responses?.["404"]).toBeUndefined();
   });
 
   it("documenta gatilho interno de notificacoes de sindicato", () => {
@@ -64,5 +78,67 @@ describe("pessoal-service OpenAPI", () => {
         properties: expect.any(Object),
       });
     }
+  });
+
+  it("documenta busca e resposta dual de sindicatos", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const operation = (spec.paths as Record<string, { get?: Record<string, unknown> }>)[
+      "/pessoal/unions"
+    ]?.get as {
+      parameters?: Array<{ name?: string }>;
+      responses?: Record<string, { content?: Record<string, { schema?: { oneOf?: unknown[] } }> }>;
+    };
+
+    expect(operation.parameters?.map((parameter) => parameter.name)).toEqual([
+      "search",
+      "page",
+      "limit",
+    ]);
+    expect(operation.responses?.["200"]?.content?.["application/json"]?.schema?.oneOf).toHaveLength(
+      2,
+    );
+  });
+
+  it("documenta exclusao de sindicato e seus erros de contrato", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const operation = (
+      spec.paths as Record<
+        string,
+        {
+          delete?: {
+            operationId?: string;
+            parameters?: unknown[];
+            responses?: Record<string, unknown>;
+          };
+        }
+      >
+    )["/pessoal/unions/{id}"]?.delete;
+
+    expect(operation?.operationId).toBe("deletePessoalUnion");
+    expect(operation?.parameters).toHaveLength(1);
+    expect(operation?.responses?.["200"]).toBeDefined();
+    expect(operation?.responses?.["400"]).toBeDefined();
+    expect(operation?.responses?.["404"]).toBeDefined();
+    expect(operation?.responses?.["409"]).toBeDefined();
+  });
+
+  it("documenta a exclusao de situacao sem conflito de dominio", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const operation = (
+      spec.paths as Record<
+        string,
+        { delete?: { parameters?: Array<{ name?: string }>; responses?: Record<string, unknown> } }
+      >
+    )["/pessoal/situations/{id}"]?.delete;
+
+    expect(operation?.parameters).toEqual([
+      expect.objectContaining({ name: "id", in: "path", required: true }),
+    ]);
+    expect(operation?.responses).toMatchObject({
+      "200": expect.any(Object),
+      "400": expect.any(Object),
+      "404": expect.any(Object),
+    });
+    expect(operation?.responses?.["409"]).toBeUndefined();
   });
 });

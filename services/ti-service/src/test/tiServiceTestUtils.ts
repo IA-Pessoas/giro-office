@@ -5,6 +5,7 @@ import { vi } from "vitest";
 import { createTiApplication } from "../app.js";
 import type { TiServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import type { TiRequestImageStorage } from "../services/tiRequestImageStorage.js";
 
 export function createPrismaMock(): PrismaClient {
   const organizationId = "10000000-0000-4000-8000-000000000001";
@@ -107,7 +108,16 @@ export function createPrismaMock(): PrismaClient {
           throw new Error("Stock location list missing Tecnologia department scope.");
         }
 
-        return [];
+        return [
+          {
+            id: "70000000-0000-4000-8000-000000000099",
+            name: "Almoxarifado São",
+            floor: 1,
+            department_id: departmentId,
+            status: true,
+            organization_id: organizationId,
+          },
+        ];
       }),
       findFirst: vi.fn(async ({ where }) => {
         if (
@@ -136,6 +146,10 @@ export function createPrismaMock(): PrismaClient {
           throw new Error("Stock category list missing Tecnologia department scope.");
         }
 
+        if (where.status === true) {
+          return [{ name: "Perifericos" }];
+        }
+
         return [];
       }),
       findFirst: vi.fn(async ({ where }) => {
@@ -156,7 +170,13 @@ export function createPrismaMock(): PrismaClient {
         };
       }),
       create: vi.fn(async ({ data }) => ({ id: "stock-cat-1", ...data })),
-      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      update: vi.fn(async ({ where, data }) => {
+        if (data.name === "Categoria em conflito" || data.status === true) {
+          throw { code: "P2002" };
+        }
+
+        return { id: where.id, ...data };
+      }),
     },
     stock: {
       count: vi.fn(async ({ where }) => {
@@ -329,6 +349,8 @@ export function createPrismaMock(): PrismaClient {
       findFirst: vi.fn(async ({ where }) => ({
         id: where.id,
         organization_id: where.organization_id,
+        department_id: departmentId,
+        status: "active",
       })),
     },
     tIRequest: {
@@ -348,11 +370,14 @@ export function createPrismaMock(): PrismaClient {
       findMany: vi.fn(async () => []),
       findFirst: vi.fn(async ({ where }) => ({
         id: where.id,
+        requester_id: userId,
+        assigned_to_id: userId,
         status: "New",
         organization_id: where.organization_id,
       })),
       create: vi.fn(async ({ data }) => ({ id: "req-1", ...data })),
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     tIMessage: {
       findMany: vi.fn(async () => []),
@@ -414,7 +439,10 @@ export function createPrismaMock(): PrismaClient {
   } as unknown as PrismaClient;
 }
 
-export function createTestApp(prisma = createPrismaMock()) {
+export function createTestApp(
+  prisma = createPrismaMock(),
+  options?: { requestImageStorage?: TiRequestImageStorage },
+) {
   const env = {
     nodeEnv: "test",
     port: 3040,
@@ -423,6 +451,9 @@ export function createTestApp(prisma = createPrismaMock()) {
     auditServiceToken: "audit-service-token-test",
     internalServiceToken: "ti-service-internal-token-test",
     passwordEncryptionKey: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
+    supabaseUrl: "https://example.supabase.co",
+    supabaseServiceRoleKey: "test-supabase-service-role-key",
+    tiRequestImageBucket: "ti-request-attachments-private",
     allowedOrigins: ["*"],
     enableApiDocs: false,
     logLevel: "info",
@@ -439,5 +470,6 @@ export function createTestApp(prisma = createPrismaMock()) {
     env,
     logger,
     prisma,
+    ...(options?.requestImageStorage ? { requestImageStorage: options.requestImageStorage } : {}),
   });
 }

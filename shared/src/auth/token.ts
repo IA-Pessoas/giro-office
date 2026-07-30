@@ -1,22 +1,7 @@
 import jwt, { type JwtPayload } from "jsonwebtoken";
 
+import { normalizeModulePermissions } from "./modules.js";
 import type { AuthContext, AuthIdentity, AuthUserType } from "./types.js";
-
-function normalizePermissionModules(value: unknown): Record<string, number | null> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const modules: Record<string, number | null> = {};
-
-  for (const [key, modulePermission] of Object.entries(value)) {
-    if (typeof modulePermission === "number" || modulePermission === null) {
-      modules[key] = modulePermission;
-    }
-  }
-
-  return modules;
-}
 
 function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
   return value === "owner" || value === "admin" || value === "user" ? value : undefined;
@@ -31,6 +16,8 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
     throw new Error("Token JWT inválido: payload em formato inesperado.");
   }
 
+  const modulePermissionsPresent = Object.prototype.hasOwnProperty.call(payload, "modules");
+
   const user_id =
     (typeof payload.user_id === "string" ? payload.user_id : undefined) ??
     (typeof payload.sub === "string" ? payload.sub : undefined);
@@ -44,7 +31,14 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
     organization_id:
       typeof payload.organization_id === "string" ? payload.organization_id : undefined,
     permission: typeof payload.permission === "number" ? payload.permission : undefined,
-    modules: normalizePermissionModules(payload.modules),
+    modules: normalizeModulePermissions(payload.modules),
+    modulePermissionsPresent,
+    session_version:
+      typeof payload.session_version === "number" &&
+      Number.isInteger(payload.session_version) &&
+      payload.session_version >= 0
+        ? payload.session_version
+        : undefined,
     type: normalizeAuthUserType(payload.type),
     name: typeof payload.name === "string" ? payload.name : undefined,
     login: typeof payload.login === "string" ? payload.login : undefined,

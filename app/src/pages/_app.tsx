@@ -9,14 +9,11 @@ import '../styles/global.css'
 
 import { useAccessStoreSync } from "@modules/auth";
 import { AuthProvider, useAuth } from "../context/AuthContext";
-import { ChatProvider } from "@modules/chat";
-import { ChatControllerUI } from '@shared/components/ChatControllerUI';
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { SocketProvider } from '../context/SocketContext'
 import { AppShell } from "../shared/components/newLayout/AppShell";
 
-function AppLayout({ children }) {
-  const [isChatOpen, setIsChatOpen] = useState(false);
+function AppLayout({ children, isIframeView = false }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   useAccessStoreSync();
@@ -24,6 +21,14 @@ function AppLayout({ children }) {
     router.pathname === "/login" ||
     router.pathname === "/" ||
     router.pathname === "/solicitar-acesso";
+
+  useEffect(() => {
+    if (isPublicRoute || loading || user) {
+      return;
+    }
+
+    void router.push("/login");
+  }, [isPublicRoute, loading, router, user]);
 
   // Se está na página de login ou index, não mostra layout
   if (isPublicRoute) {
@@ -41,12 +46,8 @@ function AppLayout({ children }) {
   }
 
   return (
-    <AppShell>
+    <AppShell isIframeView={isIframeView}>
       {children}
-      <ChatControllerUI
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-      />
     </AppShell>
   );
 }
@@ -109,21 +110,15 @@ function MyApp({ Component, pageProps }: AppProps) {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <SocketProvider>
-            <ChatProvider>
-              {isIframeView ? (
-                <Component {...pageProps} />
-              ) : (
-                <AppLayout>
-                  <Component {...pageProps} />
-                </AppLayout>
-              )}
-              <ToastContainer
-                position="bottom-right"
-                autoClose={5000}
-                pauseOnHover
-                closeOnClick={false}
-              />
-            </ChatProvider>
+            <AppLayout isIframeView={isIframeView}>
+              <Component {...pageProps} />
+            </AppLayout>
+            <ToastContainer
+              position="bottom-right"
+              autoClose={5000}
+              pauseOnHover
+              closeOnClick={false}
+            />
           </SocketProvider>
         </AuthProvider>
       </QueryClientProvider>

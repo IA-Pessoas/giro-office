@@ -1,4 +1,9 @@
-import { ServiceError } from "@workspace/shared";
+import {
+  INTEGRACAO_PERMISSION_LEVEL,
+  type IntegracaoServiceAuthorization,
+  requireIntegracaoRouteAccess,
+  ServiceError,
+} from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import {
   type ClientListStatus,
@@ -21,6 +26,8 @@ export type OrganizationPublic = {
   subscription_plan: string;
 };
 
+type ClientPublicExtraValue = string | number | boolean | null;
+
 export type ClientPublic = {
   id: string;
   name: string;
@@ -32,7 +39,7 @@ export type ClientPublic = {
   service_unique: boolean;
   deletion_date: string | null;
   organization: OrganizationPublic;
-};
+} & Partial<Record<(typeof EXTENDED_CLIENT_KEYS)[number], ClientPublicExtraValue>>;
 
 export type ClientListPage = {
   items: ClientPublic[];
@@ -40,6 +47,12 @@ export type ClientListPage = {
   page: number;
   pageSize: number;
   hasMore: boolean;
+};
+
+type ClientAuthorization = IntegracaoServiceAuthorization & {
+  userId: string;
+  hasClientListAccess?: boolean;
+  permission?: number;
 };
 
 const organizationSelect = {
@@ -69,6 +82,54 @@ const clientSelect = {
 
 type ClientRow = Prisma.ClientGetPayload<{
   select: typeof clientSelect;
+}>;
+
+const clientDetailSelect = {
+  ...clientSelect,
+  dominio_code: true,
+  address: true,
+  cep: true,
+  neighborhood: true,
+  state: true,
+  city: true,
+  customer_since: true,
+  municipal_registration: true,
+  state_registration: true,
+  commercial_board_registration: true,
+  competence_entry: true,
+  competence_output: true,
+  opening_date: true,
+  instagram: true,
+  indication: true,
+  regime: true,
+  size: true,
+  segment: true,
+  start_strike: true,
+  end_strike: true,
+  cnae: true,
+  cnae_secondary: true,
+  responsible: true,
+  cpf_responsible: true,
+  agent: true,
+  cpf_agent: true,
+  number: true,
+  email: true,
+  contabil: true,
+  fiscal: true,
+  pessoal: true,
+  infoproduto: true,
+  consultoria: true,
+  castelo_med: true,
+  contract: true,
+  date_status: true,
+  description_prospecting: true,
+  participants_meet: true,
+  meet_type: true,
+  register_date_prospecting: true,
+} satisfies Prisma.ClientSelect;
+
+type ClientDetailRow = Prisma.ClientGetPayload<{
+  select: typeof clientDetailSelect;
 }>;
 
 const EXTENDED_CLIENT_KEYS = [
@@ -136,8 +197,40 @@ function toOrganizationPublic(row: OrganizationRow): OrganizationPublic {
   };
 }
 
-function toPublic(row: ClientRow, organization: OrganizationPublic): ClientPublic {
-  return {
+function serializePublicExtra(value: unknown): ClientPublicExtraValue {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value === null
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
+function appendPublicExtras(row: ClientRow | ClientDetailRow, out: ClientPublic): ClientPublic {
+  const source = row as Record<string, unknown>;
+
+  for (const key of EXTENDED_CLIENT_KEYS) {
+    if (key in source) {
+      out[key] = serializePublicExtra(source[key]);
+    }
+  }
+
+  return out;
+}
+
+function toPublic(
+  row: ClientRow | ClientDetailRow,
+  organization: OrganizationPublic,
+): ClientPublic {
+  return appendPublicExtras(row, {
     id: row.id,
     name: row.name,
     organization_id: row.organization_id,
@@ -148,7 +241,7 @@ function toPublic(row: ClientRow, organization: OrganizationPublic): ClientPubli
     service_unique: row.service_unique ?? false,
     deletion_date: row.deletion_date ? row.deletion_date.toISOString() : null,
     organization,
-  };
+  });
 }
 
 function buildListStatusWhere(filters: ListClientsFilters): Prisma.ClientWhereInput | undefined {
@@ -163,12 +256,36 @@ function buildListStatusWhere(filters: ListClientsFilters): Prisma.ClientWhereIn
 }
 
 export interface IClientService {
-  listByOrganization(organizationId: string, filters: ListClientsFilters): Promise<ClientListPage>;
-  getById(id: string, organizationId: string): Promise<ClientPublic | null>;
-  create(input: CreateClientBody & { organization_id: string }): Promise<ClientPublic>;
-  update(id: string, organizationId: string, input: UpdateClientBody): Promise<ClientPublic>;
-  deactivate(id: string, organizationId: string): Promise<ClientPublic>;
-  activate(id: string, organizationId: string): Promise<ClientPublic>;
+  listByOrganization(
+    organizationId: string,
+    filters: ListClientsFilters,
+    authorization?: ClientAuthorization,
+  ): Promise<ClientListPage>;
+  getById(
+    id: string,
+    organizationId: string,
+    authorization?: ClientAuthorization,
+  ): Promise<ClientPublic>;
+  create(
+    input: CreateClientBody & { organization_id: string },
+    authorization?: ClientAuthorization,
+  ): Promise<ClientPublic>;
+  update(
+    id: string,
+    organizationId: string,
+    input: UpdateClientBody,
+    authorization?: ClientAuthorization,
+  ): Promise<ClientPublic>;
+  deactivate(
+    id: string,
+    organizationId: string,
+    authorization?: ClientAuthorization,
+  ): Promise<ClientPublic>;
+  activate(
+    id: string,
+    organizationId: string,
+    authorization?: ClientAuthorization,
+  ): Promise<ClientPublic>;
 }
 
 export class ClientService implements IClientService {
@@ -193,7 +310,22 @@ export class ClientService implements IClientService {
   async listByOrganization(
     organizationId: string,
     filters: ListClientsFilters,
+    authorization: ClientAuthorization = {
+      userId: "",
+      level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      isOwner: false,
+    },
   ): Promise<ClientListPage> {
+    const hasClientListAccess =
+      authorization.hasClientListAccess === true ||
+      authorization.isOwner ||
+      (authorization.permission ?? 0) >= 1 ||
+      authorization.level >= INTEGRACAO_PERMISSION_LEVEL.VIEWER;
+
+    if (!hasClientListAccess) {
+      throw new ServiceError(403, "Usuário não possui permissão para este domínio.");
+    }
+
     const statusWhere = buildListStatusWhere(filters);
     const where = mergeClientListSearchWhere(
       { organization_id: organizationId, ...(statusWhere ?? {}) },
@@ -202,17 +334,15 @@ export class ClientService implements IClientService {
     const skip = (filters.page - 1) * filters.pageSize;
     const take = filters.pageSize;
 
-    const [organization, rows, total] = await Promise.all([
-      this.getOrganizationPublic(organizationId),
-      this.prisma.client.findMany({
-        where,
-        orderBy: { name: "asc" },
-        skip,
-        take,
-        select: clientSelect,
-      }),
-      this.prisma.client.count({ where }),
-    ]);
+    const organization = await this.getOrganizationPublic(organizationId);
+    const rows = await this.prisma.client.findMany({
+      where,
+      orderBy: { name: "asc" },
+      skip,
+      take,
+      select: clientSelect,
+    });
+    const total = await this.prisma.client.count({ where });
 
     const hasMore = filters.page * filters.pageSize < total;
 
@@ -225,21 +355,53 @@ export class ClientService implements IClientService {
     };
   }
 
-  async getById(id: string, organizationId: string): Promise<ClientPublic | null> {
+  async getById(
+    id: string,
+    organizationId: string,
+    authorization: ClientAuthorization = {
+      userId: "",
+      level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      isOwner: false,
+    },
+  ): Promise<ClientPublic> {
     const row = await this.prisma.client.findFirst({
       where: { id, organization_id: organizationId },
-      select: clientSelect,
+      select: clientDetailSelect,
     });
 
     if (!row) {
-      return null;
+      throw new ServiceError(404, "Cliente não encontrado.");
     }
+
+    requireIntegracaoRouteAccess("GET", "/client/:id", {
+      userId: authorization.userId,
+      level: authorization.level,
+      organizationId,
+      resourceOrganizationId: row.organization_id,
+      isOwner: authorization.isOwner,
+    });
 
     const organization = await this.getOrganizationPublic(organizationId);
     return toPublic(row, organization);
   }
 
-  async create(input: CreateClientBody & { organization_id: string }): Promise<ClientPublic> {
+  async create(
+    input: CreateClientBody & { organization_id: string },
+    authorization: ClientAuthorization = {
+      userId: "",
+      level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      isOwner: false,
+    },
+  ): Promise<ClientPublic> {
+    requireIntegracaoRouteAccess("POST", "/client", {
+      userId: authorization.userId,
+      level: authorization.level,
+      organizationId: input.organization_id,
+      resourceOrganizationId: input.organization_id,
+      isOwner: authorization.isOwner,
+      requestedFields: Object.keys(input).filter((field) => field !== "organization_id"),
+    });
+
     const org = await this.prisma.organization.findUnique({
       where: { id: input.organization_id },
       select: { id: true },
@@ -272,7 +434,16 @@ export class ClientService implements IClientService {
     return toPublic(row, organization);
   }
 
-  async update(id: string, organizationId: string, input: UpdateClientBody): Promise<ClientPublic> {
+  async update(
+    id: string,
+    organizationId: string,
+    input: UpdateClientBody,
+    authorization: ClientAuthorization = {
+      userId: "",
+      level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      isOwner: false,
+    },
+  ): Promise<ClientPublic> {
     const existing = await this.prisma.client.findFirst({
       where: { id, organization_id: organizationId },
       select: { id: true },
@@ -280,6 +451,15 @@ export class ClientService implements IClientService {
     if (!existing) {
       throw new ServiceError(404, "Cliente não encontrado.");
     }
+
+    requireIntegracaoRouteAccess("PATCH", "/client/:id", {
+      userId: authorization.userId,
+      level: authorization.level,
+      organizationId,
+      resourceOrganizationId: organizationId,
+      isOwner: authorization.isOwner,
+      requestedFields: Object.keys(input),
+    });
 
     const extended = takeExtendedFields(input);
     const data: Record<string, unknown> = {};
@@ -334,7 +514,15 @@ export class ClientService implements IClientService {
     return toPublic(row, organization);
   }
 
-  async deactivate(id: string, organizationId: string): Promise<ClientPublic> {
+  async deactivate(
+    id: string,
+    organizationId: string,
+    authorization: ClientAuthorization = {
+      userId: "",
+      level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      isOwner: false,
+    },
+  ): Promise<ClientPublic> {
     const existing = await this.prisma.client.findFirst({
       where: { id, organization_id: organizationId },
       select: { id: true, status: true },
@@ -342,6 +530,13 @@ export class ClientService implements IClientService {
     if (!existing) {
       throw new ServiceError(404, "Cliente não encontrado.");
     }
+    requireIntegracaoRouteAccess("DELETE", "/client/:id", {
+      userId: authorization.userId,
+      level: authorization.level,
+      organizationId,
+      resourceOrganizationId: organizationId,
+      isOwner: authorization.isOwner,
+    });
     if (existing.status === "Inativo") {
       throw new ServiceError(409, "Cliente já está inativo.");
     }
@@ -358,7 +553,15 @@ export class ClientService implements IClientService {
     return toPublic(row, organization);
   }
 
-  async activate(id: string, organizationId: string): Promise<ClientPublic> {
+  async activate(
+    id: string,
+    organizationId: string,
+    authorization: ClientAuthorization = {
+      userId: "",
+      level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      isOwner: false,
+    },
+  ): Promise<ClientPublic> {
     const existing = await this.prisma.client.findFirst({
       where: { id, organization_id: organizationId },
       select: { id: true, status: true },
@@ -366,6 +569,13 @@ export class ClientService implements IClientService {
     if (!existing) {
       throw new ServiceError(404, "Cliente não encontrado.");
     }
+    requireIntegracaoRouteAccess("POST", "/client/:id/activate", {
+      userId: authorization.userId,
+      level: authorization.level,
+      organizationId,
+      resourceOrganizationId: organizationId,
+      isOwner: authorization.isOwner,
+    });
     if (existing.status === "Ativo") {
       throw new ServiceError(409, "Cliente já está ativo.");
     }

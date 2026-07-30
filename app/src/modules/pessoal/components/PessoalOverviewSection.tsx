@@ -8,8 +8,7 @@ import {
   WalletCards,
 } from "lucide-react";
 
-import { usePessoalLdd } from "../hooks/usePessoalTracking";
-import { usePessoalUnions } from "../hooks/usePessoalUnions";
+import { usePessoalOverview } from "../hooks/usePessoalOverview";
 import type { PessoalTabId } from "../types";
 
 type OverviewCard = {
@@ -29,47 +28,33 @@ function formatCount(value: number, isLoading: boolean) {
   return isLoading ? "..." : String(value);
 }
 
-function normalizeStatus(value: string | null) {
-  return value
-    ?.normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
 export function PessoalOverviewSection({ onSelectTab }: PessoalOverviewSectionProps) {
-  const {
-    data: unions = [],
-    isError: isUnionsError,
-    isLoading: isUnionsLoading,
-  } = usePessoalUnions();
-  const { data: ldd = [], isError: isLddError, isLoading: isLddLoading } = usePessoalLdd("", true);
-  const withBaseDateCount = unions.filter((union) => Boolean(union.base_date)).length;
-  const withoutBaseDateCount = unions.length - withBaseDateCount;
-  const cnpjCount = unions.filter((union) => Boolean(union.cnpj)).length;
-  const paidLddCount = ldd.filter((item) => normalizeStatus(item.status) === "pago").length;
-  const overdueLddCount = ldd.filter((item) => normalizeStatus(item.status) === "vencido").length;
-  const openLddCount = Math.max(ldd.length - paidLddCount - overdueLddCount, 0);
+  const overviewQuery = usePessoalOverview();
+  const summary = overviewQuery.data;
+  const isOverviewLoading = overviewQuery.isLoading;
+  const unions = summary?.unions;
+  const ldd = summary?.ldd;
   const featureCards: OverviewCard[] = [
     {
       label: "Sindicatos",
-      value: formatCount(unions.length, isUnionsLoading),
+      value: formatCount(unions?.total ?? 0, isOverviewLoading),
       description: "Folha e data-base.",
       details: [
-        `${formatCount(withBaseDateCount, isUnionsLoading)} com base`,
-        `${formatCount(withoutBaseDateCount, isUnionsLoading)} sem base`,
-        `${formatCount(cnpjCount, isUnionsLoading)} CNPJs`,
+        `${formatCount(unions?.withBaseDate ?? 0, isOverviewLoading)} com base`,
+        `${formatCount(unions?.withoutBaseDate ?? 0, isOverviewLoading)} sem base`,
+        `${formatCount(unions?.withCnpj ?? 0, isOverviewLoading)} CNPJs`,
       ],
       icon: Landmark,
       tabId: "unions",
     },
     {
       label: "Acompanhamentos",
-      value: formatCount(ldd.length, isLddLoading),
+      value: formatCount(ldd?.total ?? 0, isOverviewLoading),
       description: "LDD do departamento.",
       details: [
-        `${formatCount(openLddCount, isLddLoading)} abertos`,
-        `${formatCount(overdueLddCount, isLddLoading)} vencidos`,
-        `${formatCount(paidLddCount, isLddLoading)} pagos`,
+        `${formatCount(ldd?.open ?? 0, isOverviewLoading)} abertos`,
+        `${formatCount(ldd?.overdue ?? 0, isOverviewLoading)} vencidos`,
+        `${formatCount(ldd?.paid ?? 0, isOverviewLoading)} pagos`,
       ],
       icon: ClipboardList,
       tabId: "tracking",
@@ -89,7 +74,7 @@ export function PessoalOverviewSection({ onSelectTab }: PessoalOverviewSectionPr
       tabId: "obligations",
     },
   ];
-  const hasError = isUnionsError || isLddError;
+  const hasError = overviewQuery.isError;
 
   function renderCard(card: OverviewCard) {
     const Icon = card.icon;

@@ -9,7 +9,7 @@ import {
 import { prismaClient } from "../integrations/prisma.js";
 
 /** Heurística herdada do legado (`ScoreController.listPendingEvaluations`). */
-const RH_PERMISSION_ADMIN_LEVEL = 2;
+const RH_PERMISSION_ADMIN_LEVEL = 3;
 const USER_PERMISSION_TI = 1;
 const USER_PERMISSION_DIRECTOR = 2;
 
@@ -30,6 +30,7 @@ export type ScoreEvaluationAnswerItem = {
 export interface SubmitScoreEvaluationInput {
   organization_id: string;
   user_id: string;
+  can_manage: boolean;
   evaluation_id: string;
   answers: ScoreEvaluationAnswerItem[];
 }
@@ -84,14 +85,19 @@ export class ScoreEvaluationService {
   private async userCanActOnEvaluation(
     organizationId: string,
     userId: string,
+    canManage: boolean,
     evaluation: {
       organization_id: string;
       evaluator_id: string | null;
       evaluator_role: ScoreEvaluatorRole;
+      scoreQuarter: { user_id: string };
     },
   ): Promise<boolean> {
     if (evaluation.organization_id !== organizationId) {
       return false;
+    }
+    if (!canManage) {
+      return evaluation.evaluator_id === userId && evaluation.scoreQuarter.user_id === userId;
     }
     if (evaluation.evaluator_id === userId) {
       return true;
@@ -190,6 +196,7 @@ export class ScoreEvaluationService {
   async listPendingEvaluations(
     organizationId: string,
     userId: string,
+    canManage: boolean,
   ): Promise<
     Prisma.ScoreEvaluationGetPayload<{
       include: typeof LIST_PENDING_INCLUDE;
@@ -198,6 +205,19 @@ export class ScoreEvaluationService {
     try {
       const orgId = assertNonEmptyString(organizationId, "organization_id");
       const uid = assertNonEmptyString(userId, "user_id");
+
+      if (!canManage) {
+        return this.prisma.scoreEvaluation.findMany({
+          where: {
+            organization_id: orgId,
+            status: ScoreEvaluationStatus.Pending,
+            evaluator_id: uid,
+            scoreQuarter: { user_id: uid },
+          },
+          include: LIST_PENDING_INCLUDE,
+          orderBy: { id: "asc" },
+        });
+      }
 
       const genericRoles = await this.resolveGenericEvaluatorRoles(orgId, uid);
 
@@ -243,7 +263,7 @@ export class ScoreEvaluationService {
         throw new ServiceError(409, "Avaliação já concluída.");
       }
 
-      const allowed = await this.userCanActOnEvaluation(orgId, uid, evaluation);
+      const allowed = await this.userCanActOnEvaluation(orgId, uid, input.can_manage, evaluation);
       if (!allowed) {
         throw new ServiceError(403, "Sem permissão para submeter esta avaliação.");
       }

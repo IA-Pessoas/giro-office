@@ -4,7 +4,9 @@ const { prismaMock, bcryptMock, jwtMock } = vi.hoisted(() => ({
   prismaMock: {
     user: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
     },
     organization: {
       findFirst: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock("jsonwebtoken", () => ({
 }));
 
 import { AuthService } from "../services/authService.js";
+import { UserService } from "../services/userService.js";
 
 describe("AuthService", () => {
   beforeEach(() => {
@@ -71,7 +74,6 @@ describe("AuthService", () => {
       permissions: [
         {
           organization_id: "org-1",
-          atendimento: null,
           certificado: null,
           comercial: null,
           contabil: null,
@@ -80,13 +82,11 @@ describe("AuthService", () => {
           integracao: null,
           marketing: null,
           parcelamento: null,
-          pec: null,
           pessoal: null,
           regularize: null,
           rh: null,
           ti: 2,
           triagem: null,
-          wiki: null,
         },
       ],
     });
@@ -103,22 +103,19 @@ describe("AuthService", () => {
       permission: 2,
       type: "admin",
       modules: {
-        atendimento: null,
-        certificado: null,
-        comercial: null,
-        contabil: null,
-        financeiro: null,
-        fiscal: null,
-        integracao: null,
-        marketing: null,
-        parcelamento: null,
-        pec: null,
-        pessoal: null,
-        regularize: null,
-        rh: null,
+        certificado: 0,
+        comercial: 0,
+        contabil: 0,
+        financeiro: 0,
+        fiscal: 0,
+        integracao: 0,
+        marketing: 0,
+        parcelamento: 0,
+        pessoal: 0,
+        regularize: 0,
+        rh: 0,
         ti: 2,
-        triagem: null,
-        wiki: null,
+        triagem: 0,
       },
       department_id: "dep-1",
       organization_id: "org-1",
@@ -135,6 +132,80 @@ describe("AuthService", () => {
       "jwt-secret",
       expect.any(Object),
     );
+  });
+
+  it("login carrega somente a permissão da organização ativa", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      name: "Usuário",
+      login: "user",
+      password: "hash",
+      permission: 0,
+      type: "user",
+      department_id: "dep-1",
+      organization_id: "org-b",
+      department: { organization_id: "org-b" },
+      permissions: [
+        { organization_id: "org-a", fiscal: 3 },
+        { organization_id: "org-b", fiscal: 1 },
+      ],
+    });
+    bcryptMock.compare.mockResolvedValue(true);
+    jwtMock.sign.mockReturnValue("jwt-token");
+    const service = new AuthService();
+
+    const result = await service.login({ login: "user", password: "secret" });
+
+    expect(result.organization_id).toBe("org-b");
+    expect(result.modules.fiscal).toBe(1);
+    expect(result.modules.comercial).toBe(0);
+  });
+
+  it("login autentica a nova senha persistida pelo fluxo de atualização", async () => {
+    const user = {
+      id: "user-1",
+      name: "Usuário",
+      login: "user",
+      password: "hash:senha-antiga",
+      permission: 0,
+      type: "user",
+      status: "active",
+      department_id: "dep-1",
+      organization_id: "org-1",
+      photo_url: null,
+      joined_at: null,
+      first_owner_flag: false,
+      permission_id: "permission-1",
+      session_version: 1,
+      department: { organization_id: "org-1" },
+      permissions: [{ organization_id: "org-1" }],
+    };
+    prismaMock.user.findFirst.mockResolvedValue(user);
+    prismaMock.user.update.mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) => {
+        Object.assign(user, data);
+        return user;
+      },
+    );
+    bcryptMock.hash.mockImplementation(async (password: string) => `hash:${password}`);
+    bcryptMock.compare.mockImplementation(
+      async (password: string, hash: string) => hash === `hash:${password}`,
+    );
+    jwtMock.sign.mockReturnValue("jwt-token");
+
+    await new UserService().update("user-1", { password: "nova-senha" }, "org-1", "user-1");
+
+    await expect(
+      new AuthService().login({ login: "user", password: "nova-senha" }),
+    ).resolves.toMatchObject({
+      id: "user-1",
+      token: "jwt-token",
+    });
+    await expect(
+      new AuthService().login({ login: "user", password: "senha-antiga" }),
+    ).rejects.toMatchObject({
+      statusCode: 401,
+    });
   });
 
   it("firstCreate cria admin inicial quando banco está vazio", async () => {
@@ -161,6 +232,17 @@ describe("AuthService", () => {
         permission: 2,
         department_id: "dep-1",
       },
+    });
+  });
+
+  it("rejeita token quando a versão persistida da sessão mudou", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ status: "active", session_version: 2 });
+    const service = new AuthService();
+
+    await expect(
+      service.validateSession({ user_id: "user-1", session_version: 1 }),
+    ).rejects.toMatchObject({
+      statusCode: 401,
     });
   });
 });

@@ -18,12 +18,18 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { canCreateOrganizationOwner } from "@modules/auth";
-import { TASK_MODEL_CONFIG_ENTRY, canManageTaskModelConfig } from "@modules/integracao";
+import { useAuth } from "@/context/AuthContext";
+import { canCreateOrganizationOwner, canCreateUsers, useModuleAccess } from "@modules/auth";
+import {
+  TASK_MODEL_CONFIG_ENTRY,
+  canManageTaskModelConfig,
+  canViewTaskModelConfig,
+} from "@modules/integracao";
 import { MyOrganizationSection } from "@modules/organizations";
 import { Dialog } from "@shared/components";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
+import { buildSelfProfileUpdatePayload } from "@shared/utils/meProfileUpdate";
 
 const SETTINGS_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
@@ -85,7 +91,9 @@ function applyTheme(nextTheme: "light" | "dark"): void {
 
 export function Configuracoes() {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
   const meQuery = useMe();
+  const { access: integracaoAccess } = useModuleAccess("integracao");
   const updateMeMutation = useUpdateMe();
   const uploadPhotoMutation = useUploadMePhoto();
   const deletePhotoMutation = useDeleteMePhoto();
@@ -127,12 +135,14 @@ export function Configuracoes() {
   const currentName = meQuery.data?.name ?? "";
   const currentLogin = meQuery.data?.login ?? "";
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
+  const canManageUsers = canCreateUsers(user);
   const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário";
   const managedOrganizationId =
     canCreateOrganizationOwner(meQuery.data) && meQuery.data.organization_id
       ? meQuery.data.organization_id
       : null;
-  const canManageTaskModels = canManageTaskModelConfig(meQuery.data?.permission);
+  const canManageTaskModels = canManageTaskModelConfig(integracaoAccess);
+  const canViewTaskModels = canViewTaskModelConfig(integracaoAccess);
   const resolvedCurrentPhotoUrl = resolvePhotoUrl(currentPhotoUrl);
 
   const displayedAvatar = pendingPhotoPreviewUrl ?? resolvedCurrentPhotoUrl;
@@ -142,18 +152,20 @@ export function Configuracoes() {
   );
 
   const hasPendingPhotoChanges = pendingPhotoFile !== null;
-  const hasPendingAccessChanges =
-    Boolean(meQuery.data) && (name.trim() !== currentName || password.trim().length > 0);
+  const accessUpdatePayload = meQuery.data
+    ? buildSelfProfileUpdatePayload({
+        canManageUsers,
+        currentName,
+        name,
+        password,
+      })
+    : null;
 
   const isSaving =
     updateMeMutation.isPending || uploadPhotoMutation.isPending || deletePhotoMutation.isPending;
 
   const canSavePhoto = Boolean(meQuery.data) && !isSaving && hasPendingPhotoChanges;
-  const canSaveAccessData =
-    Boolean(meQuery.data) &&
-    !isSaving &&
-    name.trim().length > 0 &&
-    hasPendingAccessChanges;
+  const canSaveAccessData = Boolean(accessUpdatePayload) && !isSaving;
 
   useEffect(() => {
     setHasPhotoLoadError(false);
@@ -190,7 +202,9 @@ export function Configuracoes() {
       return;
     }
 
-    if (!ACCEPTED_PHOTO_TYPES.includes(selectedFile.type as (typeof ACCEPTED_PHOTO_TYPES)[number])) {
+    if (
+      !ACCEPTED_PHOTO_TYPES.includes(selectedFile.type as (typeof ACCEPTED_PHOTO_TYPES)[number])
+    ) {
       toast.error("Use uma imagem JPEG, PNG ou WebP.");
       event.target.value = "";
       return;
@@ -228,18 +242,8 @@ export function Configuracoes() {
       return;
     }
 
-    const trimmedName = name.trim();
-
-    if (trimmedName.length === 0) {
-      toast.error("Informe um nome para salvar o perfil.");
-      return;
-    }
-
     try {
-      await updateMeMutation.mutateAsync({
-        name: trimmedName,
-        ...(password.trim() ? { password: password.trim() } : {}),
-      });
+      await updateMeMutation.mutateAsync(accessUpdatePayload);
       setPassword("");
       setIsAccessDialogOpen(false);
     } catch {
@@ -400,7 +404,11 @@ export function Configuracoes() {
                     className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                     disabled={isSaving}
                   >
-                    {pendingPhotoFile ? <Camera className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
+                    {pendingPhotoFile ? (
+                      <Camera className="h-4 w-4" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
                     {pendingPhotoFile ? "Trocar foto" : "Escolher foto"}
                   </button>
 
@@ -420,7 +428,7 @@ export function Configuracoes() {
                     </button>
                   ) : null}
 
-                  {(pendingPhotoFile || currentPhotoUrl) ? (
+                  {pendingPhotoFile || currentPhotoUrl ? (
                     <button
                       type="button"
                       onClick={() => void handlePhotoSecondaryAction()}
@@ -507,12 +515,15 @@ export function Configuracoes() {
                         onChange={(event) => setName(event.target.value)}
                         placeholder="Digite o nome exibido no sistema"
                         className={SETTINGS_INPUT_CLASSNAME}
-                        disabled={isSaving}
+                        disabled={isSaving || !canManageUsers}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label className={SETTINGS_LABEL_CLASSNAME} htmlFor="settings-access-password">
+                      <label
+                        className={SETTINGS_LABEL_CLASSNAME}
+                        htmlFor="settings-access-password"
+                      >
                         Nova senha
                       </label>
                       <input
@@ -537,7 +548,7 @@ export function Configuracoes() {
           <MyOrganizationSection organizationId={managedOrganizationId} userEmail={currentLogin} />
         ) : null}
 
-        {canManageTaskModels ? (
+        {canViewTaskModels ? (
           <section className={`${SETTINGS_PANEL_CLASSNAME} p-6 lg:p-8`}>
             <div className="space-y-5">
               <div className="space-y-1">
@@ -548,7 +559,7 @@ export function Configuracoes() {
                   </h2>
                 </div>
                 <p className={SETTINGS_MUTED_CLASSNAME}>
-                  Ajustes administrativos usados pelos fluxos de tarefas e projetos.
+                  Ajustes usados pelos fluxos de tarefas e projetos.
                 </p>
               </div>
 
@@ -565,7 +576,9 @@ export function Configuracoes() {
                       {TASK_MODEL_CONFIG_ENTRY.label}
                     </p>
                     <p className={SETTINGS_MUTED_CLASSNAME}>
-                      {TASK_MODEL_CONFIG_ENTRY.description}
+                      {canManageTaskModels
+                        ? TASK_MODEL_CONFIG_ENTRY.description
+                        : "Consulte os modelos usados na criação das tarefas de integração."}
                     </p>
                   </div>
                 </div>
@@ -596,7 +609,9 @@ export function Configuracoes() {
                     {isDark ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Modo escuro</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      Modo escuro
+                    </p>
                     <p className={SETTINGS_MUTED_CLASSNAME}>{isDark ? "Ativado" : "Desativado"}</p>
                   </div>
                 </div>
@@ -624,7 +639,9 @@ export function Configuracoes() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5 text-[var(--colors-brand-gradient-end)]" />
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Segurança</h2>
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Segurança
+                  </h2>
                 </div>
                 <p className={SETTINGS_MUTED_CLASSNAME}>Recursos extras de proteção da conta.</p>
               </div>
@@ -648,7 +665,9 @@ export function Configuracoes() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <Bell className="h-5 w-5 text-[var(--colors-brand-gradient-end)]" />
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Notificações</h2>
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Notificações
+                  </h2>
                 </div>
                 <p className={SETTINGS_MUTED_CLASSNAME}>Alertas e avisos por e-mail.</p>
               </div>

@@ -6,6 +6,7 @@ import type {
   TiListFilters,
   TiRequest,
   TiRequestAssignPayload,
+  TiTransferCandidate,
   TiRequestCategory,
   TiRequestCategoryPayload,
   TiRequestMessage,
@@ -13,6 +14,7 @@ import type {
   TiRequestPayload,
   TiRequestStatusPayload,
 } from "../types";
+import { buildTiRequestMessageSubmission } from "../utils/requestMessageAttachment";
 import {
   buildTiListParams,
   buildTiPath,
@@ -62,6 +64,14 @@ export const tiRequestsService = {
     return unwrapTiEnvelope<TiRequest>(response.data);
   },
 
+  async listTransferCandidates(id: TiId): Promise<TiTransferCandidate[]> {
+    const response = await api.get<TiEnvelope<TiTransferCandidate[]>>(
+      buildTiPath(TI_ENDPOINTS.requests.transferCandidates, id),
+    );
+
+    return unwrapTiEnvelope<TiTransferCandidate[]>(response.data);
+  },
+
   async updateStatus(id: TiId, payload: TiRequestStatusPayload): Promise<TiRequest> {
     const response = await api.patch<TiEnvelope<TiRequest>>(
       buildTiPath(TI_ENDPOINTS.requests.status, id),
@@ -78,9 +88,10 @@ export const tiRequestsService = {
   },
 
   async createMessage(id: TiId, payload: TiRequestMessagePayload): Promise<TiRequestMessage> {
+    const submission = buildTiRequestMessageSubmission(payload);
     const response = await api.post<TiEnvelope<TiRequestMessage>>(
       buildTiPath(TI_ENDPOINTS.requests.messages, id),
-      payload,
+      submission,
     );
 
     return unwrapTiEnvelope<TiRequestMessage>(response.data);

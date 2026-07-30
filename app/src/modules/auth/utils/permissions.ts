@@ -10,7 +10,7 @@ export type AuthUserType = "owner" | "admin" | "user";
 type PermissionCarrier = {
   permission?: number | null;
   type?: AuthUserType | null;
-  modules?: Record<string, number | null> | null;
+  modules?: Record<string, number>;
 } | null | undefined;
 
 type AdministrationAccessOptions = {
@@ -30,14 +30,14 @@ export function isOrganizationOwner(subject?: number | PermissionCarrier): boole
   }
 
   if (typeof subject === "number") {
-    return isAdminPermission(subject);
+    return false;
   }
 
   if (subject.type === "owner" || subject.type === "admin" || subject.type === "user") {
     return subject.type === "owner";
   }
 
-  return isAdminPermission(subject.permission);
+  return false;
 }
 
 export function canCreateOrganizationOwner(subject?: number | PermissionCarrier): boolean {
@@ -60,11 +60,7 @@ export function canCreateUsers(
     return true;
   }
 
-  if (options.departmentModule === "rh" && isAdminPermission(subject.permission)) {
-    return true;
-  }
-
-  return subject.modules?.rh === ADMIN_PERMISSION;
+  return subject.modules?.rh === 3;
 }
 
 export function canAccessAdministration(

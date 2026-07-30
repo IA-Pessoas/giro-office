@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { ClientSelectionField } from "@modules/clients";
 
 import type {
   CreateRegularizeProcessPayload,
@@ -19,7 +20,6 @@ import {
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
-  type RegularizeFormOption,
   getRegularizePresetOptions,
   regularizeProcessStatusOptions,
   regularizeTextareaClassName,
@@ -27,6 +27,7 @@ import {
   regularizeUrgencyOptions,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
+import { RegularizeClientPfSelect } from "./RegularizeClientPfSelect";
 
 type RegularizeProcessClientKind = "pj" | "pf";
 
@@ -105,16 +106,7 @@ function buildProcessPayload(formState: RegularizeProcessFormState): CreateRegul
   };
 }
 
-function getProcessClientOptions(
-  clientKind: RegularizeProcessClientKind,
-  clientOptions: RegularizeFormOption[],
-  pfOptions: RegularizeFormOption[],
-) {
-  return clientKind === "pj" ? clientOptions : pfOptions;
-}
-
 export function RegularizeProcessForm({
-  clientOptions,
   defaultClientId,
   isLoadingInitialValue = false,
   isSubmitting,
@@ -122,10 +114,8 @@ export function RegularizeProcessForm({
   onClose,
   onSubmit,
   open,
-  pfOptions,
   process,
 }: {
-  clientOptions: RegularizeFormOption[];
   defaultClientId: string;
   isLoadingInitialValue?: boolean;
   isSubmitting: boolean;
@@ -135,7 +125,6 @@ export function RegularizeProcessForm({
     payload: CreateRegularizeProcessPayload | UpdateRegularizeProcessPayload,
   ) => Promise<void>;
   open: boolean;
-  pfOptions: RegularizeFormOption[];
   process: RegularizeProcessDetail | null;
 }) {
   const [formState, setFormState] = useState<RegularizeProcessFormState>(
@@ -143,11 +132,6 @@ export function RegularizeProcessForm({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const isEditing = mode === "edit";
-  const currentClientOptions = getProcessClientOptions(
-    formState.clientKind,
-    clientOptions,
-    pfOptions,
-  );
 
   useEffect(() => {
     if (open) {
@@ -167,23 +151,18 @@ export function RegularizeProcessForm({
   }
 
   function handleClientKindChange(value: RegularizeProcessClientKind) {
-    const options = getProcessClientOptions(value, clientOptions, pfOptions);
-
     setFormState((current) => ({
       ...current,
       clientKind: value,
-      client_id: options[0]?.id ?? "",
-      cpf_cnpj: options[0]?.description ?? current.cpf_cnpj,
+      client_id: "",
     }));
   }
 
-  function handleClientChange(clientId: string) {
-    const selected = currentClientOptions.find((option) => option.id === clientId);
-
+  function handleClientPfChange(clientId: string, cpf?: string | null) {
     setFormState((current) => ({
       ...current,
       client_id: clientId,
-      cpf_cnpj: selected?.description ?? current.cpf_cnpj,
+      cpf_cnpj: cpf ?? current.cpf_cnpj,
     }));
   }
 
@@ -261,20 +240,20 @@ export function RegularizeProcessForm({
               </RegularizeNativeSelect>
             </RegularizeFormField>
 
-            <RegularizeFormField label="Cliente" required className="md:col-span-2">
-              <RegularizeNativeSelect
-                value={formState.client_id}
-                onChange={(event) => handleClientChange(event.target.value)}
-              >
-                <option value="">Selecione</option>
-                {currentClientOptions.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.label}
-                    {client.description ? `, ${client.description}` : ""}
-                  </option>
-                ))}
-              </RegularizeNativeSelect>
-            </RegularizeFormField>
+            <fieldset className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
+              <legend className="inline-flex items-center gap-1">
+                <span>Cliente</span>
+                <span className="text-red-500">*</span>
+              </legend>
+              {formState.clientKind === "pj" ? (
+                <ClientSelectionField clientId={formState.client_id} />
+              ) : (
+                <RegularizeClientPfSelect
+                  value={formState.client_id}
+                  onChange={(id, option) => handleClientPfChange(id, option?.cpf)}
+                />
+              )}
+            </fieldset>
 
             <RegularizeFormField label="CPF/CNPJ" required>
               <input

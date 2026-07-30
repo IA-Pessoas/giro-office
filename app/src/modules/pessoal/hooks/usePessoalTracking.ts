@@ -146,3 +146,19 @@ export function useUpdatePessoalSituationMutation(
     },
   });
 }
+
+export function useDeletePessoalSituationMutation(
+  clientId: string,
+): UseMutationResult<PessoalSituation, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => pessoalService.deleteSituation(id),
+    onSuccess: async (_situation, id) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: situationsKey(clientId) }),
+        queryClient.invalidateQueries({ queryKey: situationDetailKey(id) }),
+      ]);
+    },
+  });
+}

@@ -9,13 +9,13 @@ import {
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { createTestApp } from "./tiServiceTestUtils.js";
+import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const robotId = "90000000-0000-4000-8000-000000000001";
-const TI_REQUESTER_PERMISSION = 1;
-const TI_ADMIN_PERMISSION = 2;
+const TI_VIEWER_PERMISSION = 1;
+const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
   return {
@@ -27,10 +27,27 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti robot routes", () => {
-  it("GET /ti/robots/list lists robots with permission 1", async () => {
+  it.each([
+    "/ti/robots/list",
+    `/ti/robots/${robotId}`,
+    `/ti/robots/${robotId}/runs/list`,
+  ])("GET %s rejects viewer permission", async (path) => {
+    const response = await request(createTestApp())
+      .get(path)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para acessar o ti-service.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /ti/robots/list lists robots with admin permission", async () => {
     const response = await request(createTestApp())
       .get("/ti/robots/list")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -39,7 +56,7 @@ describe("ti robot routes", () => {
     });
   });
 
-  it("POST /ti/robots creates a robot with admin level 2", async () => {
+  it("POST /ti/robots creates a robot with admin level 3", async () => {
     const response = await request(createTestApp())
       .post("/ti/robots")
       .set(gatewayHeaders(TI_ADMIN_PERMISSION))
@@ -68,7 +85,7 @@ describe("ti robot routes", () => {
   it("POST /ti/robots requires admin permission", async () => {
     const response = await request(createTestApp())
       .post("/ti/robots")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
       .send({
         name: "Backup diario",
         type: "Backup",
@@ -82,23 +99,68 @@ describe("ti robot routes", () => {
     });
   });
 
-  it("POST /ti/robots validates body", async () => {
-    const response = await request(createTestApp())
+  it.each([
+    {
+      label: "a missing name",
+      body: { type: "Backup" },
+      error: "Informe o nome do robô.",
+    },
+    {
+      label: "a blank name",
+      body: { name: "   ", type: "Backup" },
+      error: "Informe o nome do robô.",
+    },
+    {
+      label: "a missing type",
+      body: { name: "Backup diario" },
+      error: "Selecione o tipo do robô.",
+    },
+    {
+      label: "an invalid type",
+      body: { name: "Backup diario", type: "Outro" },
+      error: "Tipo de robô inválido.",
+    },
+  ])("POST /ti/robots rejects $label before persistence", async ({ body, error }) => {
+    const prisma = createPrismaMock();
+    const response = await request(createTestApp(prisma))
       .post("/ti/robots")
       .set(gatewayHeaders(TI_ADMIN_PERMISSION))
-      .send({ name: "", type: "Backup" });
+      .send(body);
 
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
+      error,
       code: "BAD_REQUEST",
+    });
+    expect(prisma.tIRobot.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /ti/robots accepts the minimal required create body", async () => {
+    const response = await request(createTestApp())
+      .post("/ti/robots")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({
+        name: "Backup diario",
+        type: "Backup",
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        name: "Backup diario",
+        type: "Backup",
+        status: "active",
+        active: true,
+      },
     });
   });
 
   it("GET /ti/robots/:id/runs/list lists robot runs", async () => {
     const response = await request(createTestApp())
       .get(`/ti/robots/${robotId}/runs/list`)
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({

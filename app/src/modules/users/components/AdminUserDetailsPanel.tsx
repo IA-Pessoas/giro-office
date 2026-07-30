@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 
 import { canAccessAdministration } from "@modules/auth";
 import { useAuth } from "@/context/AuthContext";
+import { Dialog } from "@shared/components/ui/Dialog";
 import { CREATE_USER_PERMISSION_OPTIONS } from "../constants/createUserConfig";
 import { ADMIN_USER_STATUS_LABELS, type AdminUserStatus, normalizeAdminUserStatus } from "../services/adminUsersService";
 import { userService } from "../services/userService";
@@ -32,11 +33,22 @@ const SELECT_ARROW_STYLE = {
 const PRIMARY_ACTION_CLASSNAME =
   "rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:opacity-70";
 
+const SECONDARY_ACTION_CLASSNAME =
+  "rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
+
+const PASSWORD_CONFIRM_DIALOG_CLASSNAME =
+  "!w-[min(92vw,520px)] !rounded-lg [&_footer]:!px-4 [&_footer]:!py-3 [&_h2]:!text-base [&_header]:!px-4 [&_header]:!py-3";
+
+const PASSWORD_CONFIRM_ACTION_CLASSNAME = "!rounded-lg !px-3.5 !py-2";
+
 const PANEL_CLASSNAME =
-  "rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/40";
+  "rounded-2xl bg-slate-50/70 dark:bg-slate-950/40";
 
 const FEEDBACK_PANEL_CLASSNAME =
-  "rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40";
+  "rounded-2xl bg-slate-50/70 p-4 dark:bg-slate-950/40";
+
+const EMPTY_STATE_CLASSNAME =
+  "flex h-full min-h-[480px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-center dark:border-slate-700 dark:bg-slate-950/30";
 
 const LABEL_CLASSNAME = "dialog-neutral-label block text-sm font-medium text-slate-700 dark:text-white";
 
@@ -78,6 +90,7 @@ export function AdminUserDetailsPanel({
   const [formData, setFormData] = useState<FormState | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPasswordConfirmationOpen, setIsPasswordConfirmationOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -101,7 +114,7 @@ export function AdminUserDetailsPanel({
 
       setUser(null);
       setFormData(null);
-      setLoadError("Nao foi possivel carregar os detalhes do usuario.");
+      setLoadError("Não foi possível carregar os detalhes do usuário.");
       console.error(error);
     } finally {
       setIsLoadingUser(false);
@@ -157,7 +170,7 @@ export function AdminUserDetailsPanel({
     });
   };
 
-  const handleSave = async () => {
+  const persistUserUpdate = async () => {
     if (!userId || !formData) {
       return;
     }
@@ -178,7 +191,7 @@ export function AdminUserDetailsPanel({
       setUser(updatedUser);
       setFormData(buildFormState(updatedUser));
       await onUserUpdated();
-      toast.success("Usuario atualizado com sucesso!");
+      toast.success("Usuário atualizado com sucesso!");
       await loadUser(userId);
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 403) {
@@ -186,21 +199,39 @@ export function AdminUserDetailsPanel({
         return;
       }
 
-      setSaveError("Nao foi possivel salvar as alteracoes do usuario.");
-      toast.error("Erro ao atualizar usuario.");
+      setSaveError("Não foi possível salvar as alterações do usuário.");
+      toast.error("Erro ao atualizar usuário.");
       console.error(error);
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleSave = async () => {
+    if (!formData) {
+      return;
+    }
+
+    if (formData.password.trim()) {
+      setIsPasswordConfirmationOpen(true);
+      return;
+    }
+
+    await persistUserUpdate();
+  };
+
+  const handleConfirmPasswordUpdate = async () => {
+    setIsPasswordConfirmationOpen(false);
+    await persistUserUpdate();
+  };
+
   if (!userId) {
     return (
-      <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+      <div className={EMPTY_STATE_CLASSNAME}>
         <div className="space-y-2">
-          <p className={TEXT_CLASSNAME}>Nenhum usuario selecionado.</p>
+          <p className={TEXT_CLASSNAME}>Nenhum usuário selecionado.</p>
           <p className={MUTED_CLASSNAME}>
-            Selecione um usuario na lista para abrir o painel de detalhes.
+            Selecione um usuário na lista para abrir o painel de detalhes.
           </p>
         </div>
       </div>
@@ -213,7 +244,7 @@ export function AdminUserDetailsPanel({
 
   if (loadError) {
     return (
-      <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
+      <div className={EMPTY_STATE_CLASSNAME}>
         <div className="space-y-2">
           <p className={TEXT_CLASSNAME}>{loadError}</p>
           <button
@@ -230,8 +261,8 @@ export function AdminUserDetailsPanel({
 
   if (isLoadingUser || !formData) {
     return (
-      <div className={`flex h-full min-h-[480px] items-center justify-center ${PANEL_CLASSNAME} border-dashed p-6 text-center`}>
-        <p className={MUTED_CLASSNAME}>Carregando detalhes do usuario...</p>
+      <div className={EMPTY_STATE_CLASSNAME}>
+        <p className={MUTED_CLASSNAME}>Carregando detalhes do usuário...</p>
       </div>
     );
   }
@@ -241,7 +272,7 @@ export function AdminUserDetailsPanel({
       <div className="space-y-1 pb-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{user?.name}</h2>
         <p className={MUTED_CLASSNAME}>
-          Atualize os dados do usuario selecionado usando os contratos atuais do backend.
+          Revise e atualize os dados do usuário selecionado.
         </p>
       </div>
 
@@ -250,7 +281,7 @@ export function AdminUserDetailsPanel({
           {departmentsError ? (
             <div className={FEEDBACK_PANEL_CLASSNAME}>
               <p className={TEXT_CLASSNAME}>
-                Nao foi possivel carregar os departamentos. A edicao foi bloqueada ate a lista estar disponivel.
+                Não foi possível carregar os departamentos. A edição foi bloqueada até a lista estar disponível.
               </p>
             </div>
           ) : null}
@@ -307,7 +338,7 @@ export function AdminUserDetailsPanel({
             </div>
 
             <div className="space-y-2">
-              <label className={LABEL_CLASSNAME}>Permissao</label>
+              <label className={LABEL_CLASSNAME}>Permissão</label>
               <select
                 name="permission"
                 value={formData.permission}
@@ -316,7 +347,7 @@ export function AdminUserDetailsPanel({
                 style={SELECT_ARROW_STYLE}
               >
                 {!hasKnownPermission ? (
-                  <option value={formData.permission}>Permissao atual ({formData.permission})</option>
+                  <option value={formData.permission}>Permissão atual ({formData.permission})</option>
                 ) : null}
                 {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -350,7 +381,7 @@ export function AdminUserDetailsPanel({
             <div className="space-y-1">
               <p className={LABEL_CLASSNAME}>Status atual</p>
               <p className={MUTED_CLASSNAME}>
-                Estado aplicado ao usuario selecionado.
+                Estado aplicado ao usuário selecionado.
               </p>
             </div>
             <span className="rounded-full bg-[var(--colors-brand-soft)] px-3 py-1.5 text-sm font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
@@ -363,10 +394,47 @@ export function AdminUserDetailsPanel({
       <div className="pt-6">
         <div className="flex justify-end">
           <button type="button" onClick={handleSave} className={PRIMARY_ACTION_CLASSNAME} disabled={isSaveDisabled}>
-            {isSaving ? "Salvando..." : "Salvar alteracoes"}
+            {isSaving ? "Salvando..." : "Salvar alterações"}
           </button>
         </div>
       </div>
+
+      <Dialog
+        open={isPasswordConfirmationOpen}
+        onOpenChange={(open) => {
+          if (!isSaving) {
+            setIsPasswordConfirmationOpen(open);
+          }
+        }}
+        title="Confirmar alteração de senha"
+        description="Confirme antes de atualizar as credenciais do usuário."
+        contentClassName={PASSWORD_CONFIRM_DIALOG_CLASSNAME}
+        bodyClassName="!px-4 !py-3"
+        footer={(
+          <>
+            <button
+              type="button"
+              className={`${SECONDARY_ACTION_CLASSNAME} ${PASSWORD_CONFIRM_ACTION_CLASSNAME}`}
+              disabled={isSaving}
+              onClick={() => setIsPasswordConfirmationOpen(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className={`${PRIMARY_ACTION_CLASSNAME} ${PASSWORD_CONFIRM_ACTION_CLASSNAME}`}
+              disabled={isSaving}
+              onClick={() => void handleConfirmPasswordUpdate()}
+            >
+              {isSaving ? "Salvando..." : "Confirmar alteração"}
+            </button>
+          </>
+        )}
+      >
+        <p className={TEXT_CLASSNAME}>
+          A senha do usuário selecionado será alterada.
+        </p>
+      </Dialog>
     </div>
   );
 }

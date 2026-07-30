@@ -30,13 +30,16 @@ import {
   YAxis,
 } from "recharts";
 
+import { useActivityClock } from "../../../modules/dashboard/hooks/useActivityClock";
 import { useDashboard } from "../../../modules/dashboard/hooks/useDashboard";
 import type { DashboardStats } from "../../../modules/dashboard/types";
+import { formatActivityTime } from "../../../modules/dashboard/utils/activityTime";
 
 type DashboardProjectStats = DashboardStats["projects"];
 type DashboardActivity = DashboardStats["activities"][number] & {
   bgColor: string;
   textColor: string;
+  elapsedTime: string;
 };
 
 const ACTIVITY_TONE_CLASSES: Record<DashboardStats["activities"][number]["tone"], { bgColor: string; textColor: string }> = {
@@ -126,7 +129,8 @@ function formatLastUpdated(updatedAt: string | null | undefined): string {
 }
 
 export function Dashboard() {
-  const { stats } = useDashboard();
+  const { stats, isLoading, error, refetch } = useDashboard();
+  const activityNow = useActivityClock();
   const lastUpdated = formatLastUpdated(stats?.updatedAt);
   const tasksSummary = stats?.tasks ?? {
     today: 0,
@@ -160,6 +164,7 @@ export function Dashboard() {
   const performanceData = stats?.performance ?? getEmptyPerformanceData();
   const activities: DashboardActivity[] = (stats?.activities ?? []).map((activity) => ({
     ...activity,
+    elapsedTime: formatActivityTime(activity.createdAt, activityNow),
     ...(ACTIVITY_TONE_CLASSES[activity.tone] ?? ACTIVITY_TONE_CLASSES.blue),
   }));
 
@@ -460,27 +465,55 @@ export function Dashboard() {
             </button>
           </div>
           <div className="space-y-4">
-            {activities.map((activity, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer"
-              >
+            {activities.length > 0 ? (
+              activities.map((activity, i) => (
                 <div
-                  className={`w-8 h-8 rounded-full ${activity.bgColor} flex items-center justify-center flex-shrink-0`}
+                  key={i}
+                  className="flex items-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer"
                 >
-                  <span className={`text-xs font-semibold ${activity.textColor}`}>
-                    {activity.avatar}
-                  </span>
+                  <div
+                    className={`w-8 h-8 rounded-full ${activity.bgColor} flex items-center justify-center flex-shrink-0`}
+                  >
+                    <span className={`text-xs font-semibold ${activity.textColor}`}>
+                      {activity.avatar}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      <span className="font-medium">{activity.user}</span> {activity.action}{" "}
+                      <span className="font-medium">{activity.item}</span>
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {activity.elapsedTime}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900 dark:text-white">
-                    <span className="font-medium">{activity.user}</span> {activity.action}{" "}
-                    <span className="font-medium">{activity.item}</span>
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{activity.time}</p>
-                </div>
+              ))
+            ) : isLoading ? (
+              <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                Carregando atividades...
+              </p>
+            ) : error && !stats ? (
+              <div
+                role="alert"
+                className="rounded-lg bg-red-50 p-4 text-center dark:bg-red-900/20"
+              >
+                <p className="text-sm text-red-700 dark:text-red-300">
+                  Não foi possível carregar as atividades agora.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void refetch()}
+                  className="mt-3 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  Tentar novamente
+                </button>
               </div>
-            ))}
+            ) : (
+              <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                Nenhuma atividade recente.
+              </p>
+            )}
           </div>
         </div>
 
@@ -522,4 +555,3 @@ export function Dashboard() {
     </div>
   );
 }
-

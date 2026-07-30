@@ -4,6 +4,7 @@ import pg from "pg";
 const { Pool } = pg;
 
 type Queryable = Pick<pg.Pool, "query">;
+const DASHBOARD_MAX_CONCURRENT_QUERIES = 2;
 
 export interface FiscalObligationSummary {
   status: "Pendente" | "Emitida" | "Atrasada";
@@ -82,7 +83,7 @@ export interface DashboardStats {
     user: string;
     action: string;
     item: string;
-    time: string;
+    createdAt: string | null;
     avatar: string;
     tone: "green" | "blue" | "yellow" | "purple" | "indigo";
   }>;
@@ -91,6 +92,7 @@ export interface DashboardStats {
 export interface DashboardStatsServiceOptions {
   databaseUrl?: string;
   pool?: Queryable;
+  maxConcurrentQueries?: number;
 }
 
 interface ClientSummaryRow {
@@ -156,6 +158,8 @@ interface ActivityRow {
   item: string | null;
   path: string | null;
   created_at: Date | string | null;
+  outcome: string | null;
+  activity_visible: boolean | null;
 }
 
 interface UpdatedAtRow {
@@ -279,32 +283,6 @@ function initials(name: string): string {
   );
 }
 
-function formatElapsedTime(value: Date | string | null): string {
-  if (!value) {
-    return "agora";
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-
-  if (seconds < 60) {
-    return "agora";
-  }
-
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return `há ${minutes} min`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `há ${hours} hora${hours === 1 ? "" : "s"}`;
-  }
-
-  const days = Math.floor(hours / 24);
-  return `há ${days} dia${days === 1 ? "" : "s"}`;
-}
-
 function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -335,6 +313,11 @@ function fillMonthlyClientTrends(rows: MonthlyClientRow[]): DashboardStats["mont
   });
 }
 
+function isEligibleActivity(activity: ActivityRow): boolean {
+  if (activity.activity_visible == null) return true;
+  return activity.activity_visible && activity.outcome === "success";
+}
+
 function normalizeAction(row: ActivityRow): string {
   if (row.action) {
     return row.action;
@@ -353,14 +336,55 @@ function normalizeAction(row: ActivityRow): string {
   }
 }
 
+class DashboardQueryQueue {
+  private activeTasks = 0;
+  private readonly pendingTasks: Array<() => void> = [];
+
+  constructor(private readonly concurrency: number) {}
+
+  async run<T>(task: () => Promise<T>): Promise<T> {
+    await this.acquire();
+
+    try {
+      return await task();
+    } finally {
+      this.release();
+    }
+  }
+
+  private acquire(): Promise<void> {
+    if (this.activeTasks < this.concurrency) {
+      this.activeTasks += 1;
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.pendingTasks.push(() => {
+        this.activeTasks += 1;
+        resolve();
+      });
+    });
+  }
+
+  private release(): void {
+    this.activeTasks -= 1;
+    this.pendingTasks.shift()?.();
+  }
+}
+
 export class DashboardStatsService {
   private readonly databaseUrl?: string;
   private readonly injectedPool?: Queryable;
+  private readonly queryQueue: DashboardQueryQueue;
+  private readonly inFlightStats = new Map<string, Promise<DashboardStats>>();
   private pool?: pg.Pool;
 
   constructor(options: DashboardStatsServiceOptions) {
     this.databaseUrl = options.databaseUrl;
     this.injectedPool = options.pool;
+    this.queryQueue = new DashboardQueryQueue(
+      Math.max(1, Math.floor(options.maxConcurrentQueries ?? DASHBOARD_MAX_CONCURRENT_QUERIES)),
+    );
   }
 
   async getStats(organizationId: string): Promise<DashboardStats> {
@@ -368,8 +392,27 @@ export class DashboardStatsService {
       throw new ServiceError(400, "Organização autenticada não informada.");
     }
 
+    const currentLoad = this.inFlightStats.get(organizationId);
+    if (currentLoad) {
+      return currentLoad;
+    }
+
+    const load = this.loadStats(organizationId);
+    const trackedLoad = load.finally(() => {
+      if (this.inFlightStats.get(organizationId) === trackedLoad) {
+        this.inFlightStats.delete(organizationId);
+      }
+    });
+
+    this.inFlightStats.set(organizationId, trackedLoad);
+    return trackedLoad;
+  }
+
+  private async loadStats(organizationId: string): Promise<DashboardStats> {
     try {
       const pool = this.getPool();
+      const query = <Row extends pg.QueryResultRow>(sql: string): Promise<pg.QueryResult<Row>> =>
+        this.queryQueue.run(() => pool.query<Row>(sql, [organizationId]));
       const [
         clientSummaryResult,
         monthlyClientsResult,
@@ -382,16 +425,16 @@ export class DashboardStatsService {
         activitiesResult,
         updatedAtResult,
       ] = await Promise.all([
-        pool.query<ClientSummaryRow>(CLIENT_SUMMARY_SQL, [organizationId]),
-        pool.query<MonthlyClientRow>(MONTHLY_CLIENTS_SQL, [organizationId]),
-        pool.query<RecentClientRow>(RECENT_CLIENTS_SQL, [organizationId]),
-        pool.query<TaskSummaryRow>(TASK_SUMMARY_SQL, [organizationId]),
-        pool.query<PendingTaskRow>(PENDING_TASKS_SQL, [organizationId]),
-        pool.query<ProjectSummaryRow>(PROJECT_SUMMARY_SQL, [organizationId]),
-        pool.query<NotificationSummaryRow>(NOTIFICATION_SUMMARY_SQL, [organizationId]),
-        pool.query<PerformanceRow>(PERFORMANCE_SQL, [organizationId]),
-        pool.query<ActivityRow>(ACTIVITIES_SQL, [organizationId]),
-        pool.query<UpdatedAtRow>(UPDATED_AT_SQL, [organizationId]),
+        query<ClientSummaryRow>(CLIENT_SUMMARY_SQL),
+        query<MonthlyClientRow>(MONTHLY_CLIENTS_SQL),
+        query<RecentClientRow>(RECENT_CLIENTS_SQL),
+        query<TaskSummaryRow>(TASK_SUMMARY_SQL),
+        query<PendingTaskRow>(PENDING_TASKS_SQL),
+        query<ProjectSummaryRow>(PROJECT_SUMMARY_SQL),
+        query<NotificationSummaryRow>(NOTIFICATION_SUMMARY_SQL),
+        query<PerformanceRow>(PERFORMANCE_SQL),
+        query<ActivityRow>(ACTIVITIES_SQL),
+        query<UpdatedAtRow>(UPDATED_AT_SQL),
       ]);
 
       const clientSummary = clientSummaryResult.rows[0];
@@ -477,13 +520,13 @@ export class DashboardStatsService {
           dueDate: formatDueDate(task.prevision_date),
           status: task.is_urgent ? "urgent" : "pending",
         })),
-        activities: activitiesResult.rows.map((activity, index) => {
+        activities: activitiesResult.rows.filter(isEligibleActivity).map((activity, index) => {
           const user = activity.user_name ?? "Usuário";
           return {
             user,
             action: normalizeAction(activity),
             item: activity.item ?? activity.path ?? "registro",
-            time: formatElapsedTime(activity.created_at),
+            createdAt: formatNullableIsoDate(activity.created_at),
             avatar: initials(user),
             tone: ACTIVITY_TONES[index % ACTIVITY_TONES.length] ?? "blue",
           };
@@ -510,6 +553,7 @@ export class DashboardStatsService {
 
     this.pool ??= new Pool({
       connectionString: this.databaseUrl,
+      max: DASHBOARD_MAX_CONCURRENT_QUERIES,
       ssl: this.databaseUrl.includes("supabase.com")
         ? {
             rejectUnauthorized: false,
@@ -658,10 +702,19 @@ const ACTIVITIES_SQL = `
     a.method,
     coalesce(nullif(a.referring, ''), nullif(a.referring_id, '')) as item,
     a.path,
-    a.created_at
+    a.created_at,
+    a.outcome,
+    (a.metadata_json ->> 'activityVisible')::boolean as activity_visible
   from public.audit_requests a
   left join public.users u on u.id = a.user_id
   where a.organization_id = $1
+    and (
+      not coalesce(a.metadata_json ? 'activityVisible', false)
+      or (
+        a.metadata_json @> '{"activityVisible": true}'::jsonb
+        and a.outcome = 'success'
+      )
+    )
   order by a.created_at desc
   limit 5
 `;

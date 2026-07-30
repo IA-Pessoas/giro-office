@@ -1,9 +1,14 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
 import type { CreateTiMessageBody, ListTiMessagesQuery } from "../schemas/tiRequest.schemas.js";
 import type { TiAuthContext } from "./tiRequestService.js";
+
+type CreateStoredTiMessageInput = CreateTiMessageBody & {
+  attachment?: string;
+};
 
 export class TiMessageService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -13,7 +18,7 @@ export class TiMessageService {
     requestId: string,
     query: ListTiMessagesQuery,
   ): Promise<unknown[]> {
-    await this.ensureRequest(context.organizationId, requestId);
+    await this.assertRequestAccess(context, requestId);
     const { skip, take } = getPaginationParams(query);
 
     return this.prisma.tIMessage.findMany({
@@ -38,10 +43,10 @@ export class TiMessageService {
   async create(
     context: TiAuthContext,
     requestId: string,
-    body: CreateTiMessageBody,
+    body: CreateStoredTiMessageInput,
   ): Promise<unknown> {
     try {
-      await this.ensureRequest(context.organizationId, requestId);
+      await this.assertRequestAccess(context, requestId);
 
       return this.prisma.tIMessage.create({
         data: {
@@ -60,12 +65,15 @@ export class TiMessageService {
     }
   }
 
-  private async ensureRequest(organizationId: string, requestId: string): Promise<void> {
+  async assertRequestAccess(context: TiAuthContext, requestId: string): Promise<void> {
     const request = await this.prisma.tIRequest.findFirst({
-      where: { id: requestId, organization_id: organizationId },
+      where: { id: requestId, organization_id: context.organizationId },
     });
 
-    if (!request) {
+    if (
+      !request ||
+      (context.permission < TiPermissionLevel.Technician && request.requester_id !== context.userId)
+    ) {
       throw new ServiceError(404, "Chamado de TI nao encontrado.");
     }
   }

@@ -9,16 +9,76 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 const otherUserId = "00000000-0000-4000-8000-000000000002";
 const categoryId = "20000000-0000-4000-8000-000000000001";
-const TI_ADMIN_PERMISSION = 2;
+const requestId = "30000000-0000-4000-8000-000000000001";
+const technologyDepartmentId = "40000000-0000-4000-8000-000000000001";
+const financeDepartmentId = "40000000-0000-4000-8000-000000000002";
+const tiUserId = "00000000-0000-4000-8000-000000000003";
+const financeUserId = "00000000-0000-4000-8000-000000000004";
+const inactiveTiUserId = "00000000-0000-4000-8000-000000000005";
+const TI_ADMIN_PERMISSION = 3;
 
 const context = {
   organizationId,
   userId,
   permission: TI_ADMIN_PERMISSION,
+  isOrganizationOwner: false,
 };
 
+function createAssignPrismaMock(destination: {
+  id: string;
+  department_id: string;
+  status: string;
+}) {
+  return {
+    department: {
+      findFirst: vi.fn(async () => ({ id: technologyDepartmentId })),
+    },
+    user: {
+      findFirst: vi.fn(async () => ({
+        ...destination,
+        organization_id: organizationId,
+      })),
+    },
+    tIRequest: {
+      findFirst: vi.fn(async () => ({
+        id: requestId,
+        requester_id: otherUserId,
+        assigned_to_id: userId,
+        organization_id: organizationId,
+      })),
+      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
+  };
+}
+
+function createTransferCandidatesPrismaMock(assignedToId = userId) {
+  return {
+    department: {
+      findFirst: vi.fn(async () => ({ id: technologyDepartmentId })),
+    },
+    user: {
+      findMany: vi.fn(async () => [
+        {
+          id: tiUserId,
+          name: "Tecnica responsavel",
+          full_name: "Tecnica responsavel da Silva",
+          department_id: technologyDepartmentId,
+        },
+      ]),
+    },
+    tIRequest: {
+      findFirst: vi.fn(async () => ({
+        id: requestId,
+        assigned_to_id: assignedToId,
+        organization_id: organizationId,
+      })),
+    },
+  };
+}
+
 describe("TiRequestService", () => {
-  it("documents admin TI permission as level 2", () => {
+  it("documents admin TI permission as level 3", () => {
     expect(TiPermissionLevel.Admin).toBe(TI_ADMIN_PERMISSION);
   });
 
@@ -68,6 +128,30 @@ describe("TiRequestService", () => {
               rg: true,
             }),
           },
+        }),
+      }),
+    );
+  });
+
+  it("forces requester filter for viewer permission", async () => {
+    const prisma = {
+      tIRequest: {
+        findMany: vi.fn(async () => []),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    await service.list(
+      { ...context, permission: TiPermissionLevel.Viewer },
+      {
+        requester_id: otherUserId,
+      },
+    );
+
+    expect(prisma.tIRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          requester_id: userId,
         }),
       }),
     );
@@ -180,10 +264,33 @@ describe("TiRequestService", () => {
     );
   });
 
+  it("hides another user's request from viewer permission", async () => {
+    const prisma = {
+      tIRequest: {
+        findFirst: vi.fn(async () => ({
+          id: "req-1",
+          status: "New",
+          requester_id: otherUserId,
+        })),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.getById(
+        { ...context, permission: TiPermissionLevel.Viewer },
+        "30000000-0000-4000-8000-000000000001",
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Chamado de TI nao encontrado.",
+    });
+  });
+
   it("rejects transition from Closed without admin permission", async () => {
     const prisma = {
       tIRequest: {
-        findFirst: vi.fn(async () => ({ id: "req-1", status: "Closed" })),
+        findFirst: vi.fn(async () => ({ id: "req-1", status: "Closed", requester_id: userId })),
       },
     };
     const service = new TiRequestService(prisma as never);
@@ -201,7 +308,7 @@ describe("TiRequestService", () => {
   it("rejects reopening resolved request without admin permission", async () => {
     const prisma = {
       tIRequest: {
-        findFirst: vi.fn(async () => ({ id: "req-1", status: "Resolved" })),
+        findFirst: vi.fn(async () => ({ id: "req-1", status: "Resolved", requester_id: userId })),
       },
     };
     const service = new TiRequestService(prisma as never);
@@ -216,7 +323,7 @@ describe("TiRequestService", () => {
     });
   });
 
-  it("allows admin level 2 to reopen resolved request", async () => {
+  it("allows admin level 3 to reopen resolved request", async () => {
     const prisma = {
       tIRequest: {
         findFirst: vi.fn(async () => ({ id: "req-1", status: "Resolved" })),
@@ -228,5 +335,214 @@ describe("TiRequestService", () => {
     const result = await service.updateStatus(context, "req-1", { status: "In_Progress" });
 
     expect(result).toMatchObject({ id: "req-1", status: "In_Progress" });
+  });
+
+  it("allows the current assignee to transfer a request to an active TI user", async () => {
+    const prisma = createAssignPrismaMock({
+      id: tiUserId,
+      department_id: technologyDepartmentId,
+      status: "active",
+    });
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign({ ...context, permission: TiPermissionLevel.Technician }, requestId, {
+        assigned_to_id: tiUserId,
+      }),
+    ).resolves.toEqual({ id: requestId, assigned_to_id: tiUserId });
+  });
+
+  it("lists only active users from the resolved Technology department for the current assignee", async () => {
+    const prisma = createTransferCandidatesPrismaMock();
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.listTransferCandidates(
+        { ...context, permission: TiPermissionLevel.Technician },
+        requestId,
+      ),
+    ).resolves.toEqual([
+      {
+        id: tiUserId,
+        name: "Tecnica responsavel",
+        full_name: "Tecnica responsavel da Silva",
+        department_id: technologyDepartmentId,
+      },
+    ]);
+    expect(prisma.user.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: organizationId,
+        department_id: technologyDepartmentId,
+        status: "active",
+        permissions: {
+          some: {
+            organization_id: organizationId,
+            ti: { gte: TiPermissionLevel.Requester },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        full_name: true,
+        department_id: true,
+      },
+      orderBy: { full_name: "asc" },
+    });
+  });
+
+  it("rejects a transfer when the current assignee changed after authorization", async () => {
+    const prisma = {
+      department: {
+        findFirst: vi.fn(async () => ({ id: technologyDepartmentId })),
+      },
+      user: {
+        findFirst: vi.fn(async () => ({
+          id: tiUserId,
+          department_id: technologyDepartmentId,
+          status: "active",
+          organization_id: organizationId,
+        })),
+      },
+      tIRequest: {
+        findFirst: vi.fn(async () => ({
+          id: requestId,
+          assigned_to_id: userId,
+          organization_id: organizationId,
+        })),
+        update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+        updateMany: vi.fn(async () => ({ count: 0 })),
+      },
+    };
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign({ ...context, permission: TiPermissionLevel.Requester }, requestId, {
+        assigned_to_id: tiUserId,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Chamado de TI foi transferido por outro usuario.",
+    });
+
+    expect(prisma.tIRequest.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: requestId,
+        organization_id: organizationId,
+        assigned_to_id: userId,
+      },
+      data: { assigned_to_id: tiUserId },
+    });
+  });
+
+  it("rejects a TI technician who is not the current assignee from listing transfer candidates", async () => {
+    const prisma = createTransferCandidatesPrismaMock(userId);
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.listTransferCandidates(
+        { ...context, userId: otherUserId, permission: TiPermissionLevel.Technician },
+        requestId,
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      message: "Permissao insuficiente para transferir chamado.",
+    });
+  });
+
+  it.each([
+    ["admin", { ...context, userId: otherUserId, permission: TiPermissionLevel.Admin }],
+    [
+      "organization owner",
+      {
+        ...context,
+        userId: otherUserId,
+        permission: TiPermissionLevel.Technician,
+        isOrganizationOwner: true,
+      },
+    ],
+  ])("allows %s to list transfer candidates", async (_actor, actorContext) => {
+    const prisma = createTransferCandidatesPrismaMock(userId);
+    const service = new TiRequestService(prisma as never);
+
+    await expect(service.listTransferCandidates(actorContext, requestId)).resolves.toHaveLength(1);
+  });
+
+  it("rejects a TI technician who is not the current assignee", async () => {
+    const prisma = createAssignPrismaMock({
+      id: tiUserId,
+      department_id: technologyDepartmentId,
+      status: "active",
+    });
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign(
+        {
+          ...context,
+          userId: otherUserId,
+          permission: TiPermissionLevel.Technician,
+        },
+        requestId,
+        { assigned_to_id: tiUserId },
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      message: "Permissao insuficiente para transferir chamado.",
+    });
+  });
+
+  it("allows an organization owner to transfer a request", async () => {
+    const prisma = createAssignPrismaMock({
+      id: tiUserId,
+      department_id: technologyDepartmentId,
+      status: "active",
+    });
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign(
+        {
+          ...context,
+          userId: otherUserId,
+          permission: TiPermissionLevel.Viewer,
+          isOrganizationOwner: true,
+        },
+        requestId,
+        { assigned_to_id: tiUserId },
+      ),
+    ).resolves.toEqual({ id: requestId, assigned_to_id: tiUserId });
+  });
+
+  it("rejects an assignee outside the resolved Technology department", async () => {
+    const prisma = createAssignPrismaMock({
+      id: financeUserId,
+      department_id: financeDepartmentId,
+      status: "active",
+    });
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign(context, requestId, { assigned_to_id: financeUserId }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Responsavel deve pertencer ao departamento Tecnologia.",
+    });
+  });
+
+  it("rejects an inactive assignee in the resolved Technology department", async () => {
+    const prisma = createAssignPrismaMock({
+      id: inactiveTiUserId,
+      department_id: technologyDepartmentId,
+      status: "inactive",
+    });
+    const service = new TiRequestService(prisma as never);
+
+    await expect(
+      service.assign(context, requestId, { assigned_to_id: inactiveTiUserId }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Responsavel deve pertencer ao departamento Tecnologia.",
+    });
   });
 });

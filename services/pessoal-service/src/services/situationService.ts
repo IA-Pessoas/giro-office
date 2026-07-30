@@ -7,7 +7,13 @@ import type {
   UpdateSituationBody,
 } from "../schemas/situation.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
-import { omitUndefined, type PessoalAuthContext, requireUserId } from "./pessoalServiceTypes.js";
+import {
+  omitUndefined,
+  PESSOAL_WRITE_PERMISSION,
+  type PessoalAuthContext,
+  requireMinimumPermission,
+  requireUserId,
+} from "./pessoalServiceTypes.js";
 
 const situationSelect = {
   id: true,
@@ -44,6 +50,7 @@ export class SituationService {
 
   async create(context: PessoalAuthContext, body: CreateSituationBody): Promise<SituationRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       await this.ensureClient(context.organizationId, body.client_id);
 
@@ -115,6 +122,7 @@ export class SituationService {
     body: UpdateSituationBody,
   ): Promise<SituationRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const existing = await this.prisma.situationsPessoal.findFirst({
         where: { id, organization_id: context.organizationId },
@@ -164,6 +172,41 @@ export class SituationService {
       logError("Erro ao atualizar situacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao atualizar situacao de pessoal.", err);
+    }
+  }
+
+  async delete(context: PessoalAuthContext, id: string): Promise<SituationRecord> {
+    try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
+      const userId = requireUserId(context);
+      const existing = await this.prisma.situationsPessoal.findFirst({
+        where: { id, organization_id: context.organizationId },
+        select: situationSelect,
+      });
+
+      if (!existing) {
+        throw new ServiceError(404, "Situacao nao encontrada.");
+      }
+
+      await this.prisma.situationsPessoal.delete({ where: { id } });
+
+      await this.auditService.recordChange({
+        requestId: context.requestId,
+        organizationId: context.organizationId,
+        userId,
+        permission: context.permission,
+        action: "Exclusao",
+        referring: "pessoal.situations",
+        referringId: id,
+        changes: existing,
+        path: `/pessoal/situations/${id}`,
+      });
+
+      return existing;
+    } catch (err: unknown) {
+      logError("Erro ao remover situacao de pessoal", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao remover situacao de pessoal.", err);
     }
   }
 

@@ -7,7 +7,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { isAuthenticated, requireContabilWritePermission } from "../middlewares/isAuthenticated.js";
 import {
   createRelationshipBodySchema,
   relationshipClientIdParamsSchema,
@@ -29,6 +29,7 @@ export function createRelationshipRoutes(
   router.post(
     "/relationships",
     isAuthenticated,
+    requireContabilWritePermission,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createRelationshipBodySchema, req.body);
@@ -51,6 +52,7 @@ export function createRelationshipRoutes(
   router.put(
     "/relationships/:id",
     isAuthenticated,
+    requireContabilWritePermission,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const params = parseWithZod(relationshipIdParamsSchema, req.params);
@@ -92,6 +94,7 @@ export function createRelationshipRoutes(
   router.delete(
     "/relationships/:id",
     isAuthenticated,
+    requireContabilWritePermission,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const params = parseWithZod(relationshipIdParamsSchema, req.params);

@@ -7,6 +7,7 @@ import type {
 } from "@workspace/shared";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
+import { describeActivity } from "../audit/activityCatalog.js";
 import type { GatewayEnv } from "../config/env.js";
 import { resolveGatewayService } from "../config/serviceRegistry.js";
 
@@ -16,6 +17,9 @@ interface BuildAuditLifecycleMiddlewareOptions {
   logger: Logger;
   recordAuditRequest: AuditRecorder;
 }
+
+const TI_PASSWORD_DEACTIVATION_PATH = /^\/ti\/passwords\/[^/]+\/deactivate\/?$/i;
+const TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS = new Set(["password", "reason"]);
 
 function getResponseSizeBytes(response: Response): number | undefined {
   const header = response.getHeader("content-length");
@@ -45,11 +49,19 @@ function normalizeOptionalString(value: string | undefined): string | undefined 
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function buildQueryFromUrl(url: string): AuditQuery {
+function buildQueryFromUrl(url: string, method: string, path: string): AuditQuery {
   const query: AuditQuery = {};
   const parsedUrl = new URL(url, "http://localhost");
+  const isTiPasswordDeactivation = method === "POST" && TI_PASSWORD_DEACTIVATION_PATH.test(path);
 
   parsedUrl.searchParams.forEach((value, key) => {
+    if (
+      isTiPasswordDeactivation &&
+      TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS.has(key.toLowerCase())
+    ) {
+      return;
+    }
+
     const current = query[key];
 
     if (!current) {
@@ -61,6 +73,14 @@ function buildQueryFromUrl(url: string): AuditQuery {
   });
 
   return query;
+}
+
+function getPublicPath(originalUrl: string, fallbackPath: string): string {
+  try {
+    return new URL(originalUrl, "http://localhost").pathname;
+  } catch {
+    return fallbackPath;
+  }
 }
 
 function getOutcome(statusCode: number): AuditOutcome {
@@ -90,6 +110,8 @@ export function buildAuditLifecycleMiddleware({
 
     const startedAt = process.hrtime.bigint();
     const createdAt = new Date();
+    const publicPath = getPublicPath(request.originalUrl, request.path);
+    const activity = describeActivity(request.method, publicPath);
     const requestLogger = request.log ?? logger;
     let recorded = false;
 
@@ -113,8 +135,8 @@ export function buildAuditLifecycleMiddleware({
             ? request.auth.claims.permission
             : undefined,
         method: request.method,
-        path: request.path,
-        query: buildQueryFromUrl(request.originalUrl),
+        path: publicPath,
+        query: buildQueryFromUrl(request.originalUrl, request.method, publicPath),
         statusCode,
         outcome,
         durationMs: getDurationMs(startedAt),
@@ -129,7 +151,10 @@ export function buildAuditLifecycleMiddleware({
         metadata: {
           responseSizeBytes: getResponseSizeBytes(response) ?? null,
           routeTarget: getRouteTarget(env, request),
+          activityVisible: activity !== null,
         },
+        action: activity?.action,
+        referring: activity?.item,
       };
 
       void recordAuditRequest(payload);

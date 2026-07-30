@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
+import { toast } from "react-toastify";
 import {
   Bell,
   CalendarClock,
@@ -14,6 +15,7 @@ import {
   Search,
   ShieldCheck,
   ShieldAlert,
+  Trash2,
 } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
@@ -22,7 +24,6 @@ import {
   DEFAULT_CERTIFICATE_PAGE,
   DEFAULT_CERTIFICATE_PAGE_SIZE,
 } from "@modules/certificates/services/certificateService.contract";
-import { MODULE_ADMIN_PERMISSION } from "@modules/auth/utils/moduleAccess";
 import {
   useCertificateNotificationsList,
   useCertificatePjDetail,
@@ -31,6 +32,8 @@ import {
   useCertificatePfList,
   useCreateCertificatePjMutation,
   useCreateCertificatePfMutation,
+  useDeleteCertificatePjMutation,
+  useDeleteCertificatePfMutation,
   useUpdateCertificatePjMutation,
   useUpdateCertificatePfMutation,
 } from "@modules/certificates/hooks";
@@ -68,6 +71,7 @@ import {
   CERTIFICATE_TABLE_ACTION_CELL_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME,
+  CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
   CERTIFICATE_TABLE_CELL_CLASSNAME,
   CERTIFICATE_TABLE_CLASSNAME,
   CERTIFICATE_TABLE_EMPTY_CELL_CLASSNAME,
@@ -79,6 +83,7 @@ import {
   CERTIFICATE_SUMMARY_ITEM_CLASSNAME,
   formatDateBR,
   getExpirationTone,
+  resolveCertificateWorkspaceCapabilities,
 } from "./certificateWorkspaceUi";
 
 type CertificateTab = "pj" | "pf" | "notifications";
@@ -240,7 +245,7 @@ function AccessDeniedCard() {
 }
 
 export function CertificatesWorkspace() {
-  const { access, isLoading: isModuleAccessLoading, user } = useModuleAccess("certificado");
+  const { access, isLoading: isModuleAccessLoading } = useModuleAccess("certificado");
   const [activeTab, setActiveTab] = useState<CertificateTab>("pj");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("view");
   const [selected, setSelected] = useState<DetailTarget>(null);
@@ -250,6 +255,7 @@ export function CertificatesWorkspace() {
   const [notificationPage, setNotificationPage] = useState(FIRST_PAGE);
   const [visiblePjItems, setVisiblePjItems] = useState<CertificatePj[]>([]);
   const [visiblePfItems, setVisiblePfItems] = useState<CertificatePf[]>([]);
+  const [visibleNotificationItems, setVisibleNotificationItems] = useState<CertificateNotification[]>([]);
 
   const [pjFilters, setPjFilters] = useState<PjFilters>({
     name: "",
@@ -318,11 +324,10 @@ export function CertificatesWorkspace() {
   const deferredPjQueryParams = useDeferredValue(pjQueryParams);
   const deferredPfQueryParams = useDeferredValue(pfQueryParams);
   const deferredNotificationsParams = useDeferredValue(notificationsParams);
-  const shouldFetchCertificates = access.canView && !isModuleAccessLoading;
-  const canManageCertificateModule =
-    access.isAdmin ||
-    (typeof user?.modules?.certificado === "number" &&
-      user.modules?.certificado >= MODULE_ADMIN_PERMISSION);
+  const certificateCapabilities = resolveCertificateWorkspaceCapabilities(access);
+  const shouldFetchCertificates =
+    certificateCapabilities.canReadRecords && !isModuleAccessLoading;
+  const canManageCertificateModule = certificateCapabilities.canManageRecords;
 
   const pjListQuery = useCertificatePjList(deferredPjQueryParams, {
     enabled: shouldFetchCertificates && activeTab === "pj",
@@ -344,11 +349,17 @@ export function CertificatesWorkspace() {
   );
   const createPjMutation = useCreateCertificatePjMutation();
   const createPfMutation = useCreateCertificatePfMutation();
+  const deletePjMutation = useDeleteCertificatePjMutation();
+  const deletePfMutation = useDeleteCertificatePfMutation();
   const updatePjMutation = useUpdateCertificatePjMutation(selected?.type === "pj" ? selected.id : "");
   const updatePfMutation = useUpdateCertificatePfMutation(selected?.type === "pf" ? selected.id : "");
 
   useEffect(() => {
-    if (!pjListQuery.data) {
+    if (
+      !pjListQuery.data ||
+      pjListQuery.isPlaceholderData ||
+      pjListQuery.data.page !== pjPage
+    ) {
       return;
     }
 
@@ -357,10 +368,14 @@ export function CertificatesWorkspace() {
     setVisiblePjItems((current) =>
       pjPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
     );
-  }, [pjListQuery.data, pjPage]);
+  }, [pjListQuery.data, pjListQuery.isPlaceholderData, pjPage]);
 
   useEffect(() => {
-    if (!pfListQuery.data) {
+    if (
+      !pfListQuery.data ||
+      pfListQuery.isPlaceholderData ||
+      pfListQuery.data.page !== pfPage
+    ) {
       return;
     }
 
@@ -369,7 +384,23 @@ export function CertificatesWorkspace() {
     setVisiblePfItems((current) =>
       pfPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
     );
-  }, [pfListQuery.data, pfPage]);
+  }, [pfListQuery.data, pfListQuery.isPlaceholderData, pfPage]);
+
+  useEffect(() => {
+    if (
+      !notificationsQuery.data ||
+      notificationsQuery.isPlaceholderData ||
+      notificationsQuery.data.page !== notificationPage
+    ) {
+      return;
+    }
+
+    const nextItems = notificationsQuery.data.data;
+
+    setVisibleNotificationItems((current) =>
+      notificationPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
+    );
+  }, [notificationPage, notificationsQuery.data, notificationsQuery.isPlaceholderData]);
 
   useEffect(() => {
     setPjPage(FIRST_PAGE);
@@ -433,8 +464,8 @@ export function CertificatesWorkspace() {
   }, [visiblePfItems]);
 
   const notificationsStats = useMemo(() => {
-    const total = notificationsQuery.data?.data.length ?? ZERO;
-    const pjCount = notificationsQuery.data?.data.filter((item) => item.type === "PJ").length ?? ZERO;
+    const total = visibleNotificationItems.length;
+    const pjCount = visibleNotificationItems.filter((item) => item.type === "PJ").length;
     const pfCount = total - pjCount;
 
     return [
@@ -451,19 +482,22 @@ export function CertificatesWorkspace() {
         value: pfCount,
       },
     ];
-  }, [notificationsQuery.data?.data]);
+  }, [visibleNotificationItems]);
 
   const activeStats = activeTab === "pf" ? pfStats : activeTab === "pj" ? pjStats : notificationsStats;
   const activeListHasMore = activeTab === "pf"
-    ? pfListQuery.data?.hasMore
+    ? !pfListQuery.isPlaceholderData && pfListQuery.data?.page === pfPage && pfListQuery.data.hasMore
     : activeTab === "pj"
-      ? pjListQuery.data?.hasMore
-      : notificationsQuery.data?.hasMore;
+      ? !pjListQuery.isPlaceholderData && pjListQuery.data?.page === pjPage && pjListQuery.data.hasMore
+      :
+          !notificationsQuery.isPlaceholderData &&
+          notificationsQuery.data?.page === notificationPage &&
+          notificationsQuery.data.hasMore;
   const activeListIsLoading = activeTab === "pf"
-    ? pfListQuery.isLoading
+    ? pfListQuery.isFetching
     : activeTab === "pj"
-      ? pjListQuery.isLoading
-      : notificationsQuery.isLoading;
+      ? pjListQuery.isFetching
+      : notificationsQuery.isFetching;
   const activeListError = activeTab === "pf" ? pfListQuery.isError : activeTab === "pj" ? pjListQuery.isError : notificationsQuery.isError;
   const activeListErrorMessage = activeTab === "pf"
     ? getCertificateErrorMessage(pfListQuery.error, "Não foi possível carregar os certificados PF agora. Tente atualizar em alguns instantes.")
@@ -478,7 +512,7 @@ export function CertificatesWorkspace() {
 
   const hasPjRows = visiblePjItems.length > ZERO;
   const hasPfRows = visiblePfItems.length > ZERO;
-  const hasNotificationRows = (notificationsQuery.data?.data.length ?? ZERO) > ZERO;
+  const hasNotificationRows = visibleNotificationItems.length > ZERO;
   const hasActiveRows = activeTab === "pf"
     ? hasPfRows
     : activeTab === "pj"
@@ -576,27 +610,36 @@ export function CertificatesWorkspace() {
 
   function handleRefresh() {
     if (activeTab === "pj") {
-      setVisiblePjItems([]);
-      void pjListQuery.refetch();
-      setPjPage(FIRST_PAGE);
+      if (pjPage === FIRST_PAGE) {
+        void pjListQuery.refetch();
+      } else {
+        setPjPage(FIRST_PAGE);
+      }
       setWorkspaceMode("view");
       setShowDetailPassword(false);
       return;
     }
 
     if (activeTab === "pf") {
-      setVisiblePfItems([]);
-      void pfListQuery.refetch();
-      setPfPage(FIRST_PAGE);
+      if (pfPage === FIRST_PAGE) {
+        void pfListQuery.refetch();
+      } else {
+        setPfPage(FIRST_PAGE);
+      }
       setWorkspaceMode("view");
       setShowDetailPassword(false);
       return;
     }
 
-    void notificationsQuery.refetch();
-    setNotificationPage(FIRST_PAGE);
-    setWorkspaceMode("view");
-    setShowDetailPassword(false);
+    if (activeTab === "notifications") {
+      if (notificationPage === FIRST_PAGE) {
+        void notificationsQuery.refetch();
+      } else {
+        setNotificationPage(FIRST_PAGE);
+      }
+      setWorkspaceMode("view");
+      setShowDetailPassword(false);
+    }
   }
 
   function handlePjFileActionSuccess(certificateId: string) {
@@ -610,6 +653,56 @@ export function CertificatesWorkspace() {
     void pfListQuery.refetch();
     if (selected?.type === "pf" && selected.id === certificateId) {
       void pfDetailQuery.refetch();
+    }
+  }
+
+  async function handleDeletePj(certificate: CertificatePj) {
+    if (
+      !canManageCertificateModule ||
+      (typeof window !== "undefined" &&
+        !window.confirm(`Excluir o certificado PJ "${certificate.name}"?`))
+    ) {
+      return;
+    }
+
+    try {
+      await deletePjMutation.mutateAsync({ id: certificate.id });
+      setVisiblePjItems((current) => current.filter((item) => item.id !== certificate.id));
+      setSelected((current) =>
+        current?.type === "pj" && current.id === certificate.id ? null : current,
+      );
+      setWorkspaceMode("view");
+      setShowDetailPassword(false);
+      toast.success("Certificado PJ excluído com sucesso.");
+    } catch (error) {
+      toast.error(
+        getCertificateErrorMessage(error, "Não foi possível excluir o certificado PJ."),
+      );
+    }
+  }
+
+  async function handleDeletePf(certificate: CertificatePf) {
+    if (
+      !canManageCertificateModule ||
+      (typeof window !== "undefined" &&
+        !window.confirm(`Excluir o certificado PF "${certificate.name}"?`))
+    ) {
+      return;
+    }
+
+    try {
+      await deletePfMutation.mutateAsync({ id: certificate.id });
+      setVisiblePfItems((current) => current.filter((item) => item.id !== certificate.id));
+      setSelected((current) =>
+        current?.type === "pf" && current.id === certificate.id ? null : current,
+      );
+      setWorkspaceMode("view");
+      setShowDetailPassword(false);
+      toast.success("Certificado PF excluído com sucesso.");
+    } catch (error) {
+      toast.error(
+        getCertificateErrorMessage(error, "Não foi possível excluir o certificado PF."),
+      );
     }
   }
 
@@ -1289,11 +1382,28 @@ export function CertificatesWorkspace() {
                               kind="pj"
                               certificateId={item.id}
                               hasCertificate={item.has_certificate}
-                              canEdit={access.canEdit}
+                              canEdit={certificateCapabilities.canManageFiles}
+                              canDeleteFile={certificateCapabilities.canDeleteFiles}
+                              canDeleteRecord={certificateCapabilities.canDeleteRecords}
                               variant="inline"
                               onUploadSuccess={() => handlePjFileActionSuccess(item.id)}
                               onDeleteSuccess={() => handlePjFileActionSuccess(item.id)}
                             />
+                            {canManageCertificateModule ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleDeletePj(item)}
+                                className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
+                                disabled={deletePjMutation.isPending}
+                                title="Excluir certificado"
+                              >
+                                {deletePjMutation.isPending ? (
+                                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -1377,11 +1487,28 @@ export function CertificatesWorkspace() {
                               kind="pf"
                               certificateId={item.id}
                               hasCertificate={item.has_certificate}
-                              canEdit={access.canEdit}
+                              canEdit={certificateCapabilities.canManageFiles}
+                              canDeleteFile={certificateCapabilities.canDeleteFiles}
+                              canDeleteRecord={certificateCapabilities.canDeleteRecords}
                               variant="inline"
                               onUploadSuccess={() => handlePfFileActionSuccess(item.id)}
                               onDeleteSuccess={() => handlePfFileActionSuccess(item.id)}
                             />
+                            {canManageCertificateModule ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleDeletePf(item)}
+                                className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
+                                disabled={deletePfMutation.isPending}
+                                title="Excluir certificado"
+                              >
+                                {deletePfMutation.isPending ? (
+                                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -1419,7 +1546,7 @@ export function CertificatesWorkspace() {
                     </td>
                   </tr>
                 ) : (
-                  notificationsQuery.data?.data.map((notification) => (
+                  visibleNotificationItems.map((notification) => (
                     <tr
                       key={notification.id}
                       className="border-b border-slate-200/80 align-top last:border-b-0 dark:border-slate-800"
@@ -1648,7 +1775,9 @@ export function CertificatesWorkspace() {
                   kind="pj"
                   certificateId={pjDetail.id}
                   hasCertificate={pjDetail.has_certificate}
-                  canEdit={access.canEdit}
+                  canEdit={certificateCapabilities.canManageFiles}
+                  canDeleteFile={certificateCapabilities.canDeleteFiles}
+                  canDeleteRecord={certificateCapabilities.canDeleteRecords}
                   onUploadSuccess={() => handlePjFileActionSuccess(pjDetail.id)}
                   onDeleteSuccess={() => handlePjFileActionSuccess(pjDetail.id)}
                 />
@@ -1656,7 +1785,7 @@ export function CertificatesWorkspace() {
 
               <div className="grid gap-3">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</p>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap break-words">
                   {pjDetail?.notes ?? "Sem observações."}
                 </p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -1740,7 +1869,9 @@ export function CertificatesWorkspace() {
                   kind="pf"
                   certificateId={pfDetail.id}
                   hasCertificate={pfDetail.has_certificate}
-                  canEdit={access.canEdit}
+                  canEdit={certificateCapabilities.canManageFiles}
+                  canDeleteFile={certificateCapabilities.canDeleteFiles}
+                  canDeleteRecord={certificateCapabilities.canDeleteRecords}
                   onUploadSuccess={() => handlePfFileActionSuccess(pfDetail.id)}
                   onDeleteSuccess={() => handlePfFileActionSuccess(pfDetail.id)}
                 />
@@ -1748,7 +1879,7 @@ export function CertificatesWorkspace() {
 
               <div className="grid gap-3">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</p>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap break-words">
                   {pfDetail?.notes ?? "Sem observações."}
                 </p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">

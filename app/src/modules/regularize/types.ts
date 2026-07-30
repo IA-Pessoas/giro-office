@@ -4,6 +4,8 @@ export type RegularizeStatus = string | boolean;
 
 export type RegularizePartnerType = "pf" | "pj";
 
+export type RegularizeMunicipalTaxType = "TFF" | "TLP" | "TLL";
+
 export type RegularizeOptionalDate = string | undefined;
 
 export type RegularizeIdFilter = {
@@ -16,10 +18,16 @@ export type RegularizePasswordListFilters = {
 
 export type RegularizeSitePasswordListFilters = {
   status: boolean;
+  search?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizeClientPfListFilters = {
   status: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizePartnerListFilters = {
@@ -29,10 +37,18 @@ export type RegularizePartnerListFilters = {
 
 export type RegularizeMunicipalTaxesListFilters = {
   year: number;
+  search?: string;
+  status?: "Todos" | "Criado" | "Pendente";
+  type?: RegularizeMunicipalTaxType;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizeProcessListFilters = {
   status: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizeGuidanceListFilters = {
@@ -190,6 +206,14 @@ export type RegularizeMunicipalTaxesClientSummary = {
   cpf_cnpj?: string | null;
   city?: string | null;
   municipalTaxes?: Array<{ id: RegularizeId }> | null;
+};
+
+export type RegularizeMunicipalTaxesPage = {
+  data: RegularizeMunicipalTaxesClientSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
 };
 
 export type RegularizeMunicipalTaxesDetail = {
@@ -453,3 +477,20 @@ export type CreateRegularizeLicensePayload = {
 export type UpdateRegularizeLicensePayload = CreateRegularizeLicensePayload & {
   id: RegularizeId;
 };
+
+export interface RegularizeDashboard {
+  year: number;
+  metrics: {
+    openProcesses: number;
+    activeLicenses: number;
+    activeClientPfs: number;
+    activeSites: number;
+    municipalTaxesCompleted: number;
+    municipalTaxesPending: number;
+    municipalTaxesTotal: number;
+  };
+  recentProcesses: RegularizeProcessListItem[];
+  trackedLicenses: Array<
+    Pick<RegularizeLicenseListItem, "id" | "type_license" | "protocol" | "due_date">
+  >;
+}

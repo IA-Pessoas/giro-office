@@ -7,7 +7,12 @@ import type {
   UpdateObligationFieldBody,
 } from "../schemas/obligation.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
-import { type PessoalAuthContext, requireUserId } from "./pessoalServiceTypes.js";
+import {
+  PESSOAL_WRITE_PERMISSION,
+  type PessoalAuthContext,
+  requireMinimumPermission,
+  requireUserId,
+} from "./pessoalServiceTypes.js";
 
 const OBLIGATION_CREATE_CHUNK_SIZE = 50;
 
@@ -97,6 +102,7 @@ export class ObligationService {
     body: CreateObligationBody,
   ): Promise<CreateObligationResult> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       await this.ensureClient(context.organizationId, body.client_id);
 
@@ -176,8 +182,8 @@ export class ObligationService {
   async detail(
     context: Pick<PessoalAuthContext, "organizationId">,
     query: DetailObligationQuery,
-  ): Promise<ObligationRecord> {
-    const obligation = await this.prisma.obrigationsPessoal.findFirst({
+  ): Promise<ObligationRecord | null> {
+    return this.prisma.obrigationsPessoal.findFirst({
       where: {
         organization_id: context.organizationId,
         client_id: query.client_id,
@@ -185,12 +191,6 @@ export class ObligationService {
       },
       select: obligationSelect,
     });
-
-    if (!obligation) {
-      throw new ServiceError(404, "Obrigacao de pessoal nao encontrada.");
-    }
-
-    return obligation;
   }
 
   async updateField(
@@ -199,6 +199,7 @@ export class ObligationService {
     body: UpdateObligationFieldBody,
   ): Promise<ObligationRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const existing = await this.prisma.obrigationsPessoal.findFirst({
         where: { id, organization_id: context.organizationId },
@@ -240,6 +241,7 @@ export class ObligationService {
     competence: string,
   ): Promise<GenerateObligationResult> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const clients = await this.prisma.client.findMany({
         where: {

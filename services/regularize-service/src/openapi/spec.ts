@@ -18,6 +18,128 @@ function successEnvelopeContent() {
   };
 }
 
+function dualListSuccessEnvelopeContent() {
+  const itemArray = { type: "array", items: { type: "object" } };
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          oneOf: [
+            {
+              type: "object",
+              properties: { success: { type: "boolean" }, data: itemArray },
+            },
+            {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                data: {
+                  type: "object",
+                  required: ["data", "total", "page", "limit", "hasMore"],
+                  properties: {
+                    data: itemArray,
+                    total: { type: "integer", minimum: 0 },
+                    page: { type: "integer", minimum: 1 },
+                    limit: { type: "integer", minimum: 1, maximum: 100 },
+                    hasMore: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+  };
+}
+
+function paginatedClientPfSuccessEnvelopeContent() {
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              required: ["data", "total", "page", "limit", "hasMore"],
+              properties: {
+                data: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["id", "name"],
+                    properties: {
+                      id: { type: "string", format: "uuid" },
+                      code: { type: "string", nullable: true },
+                      name: { type: "string" },
+                      cpf: { type: "string", nullable: true },
+                    },
+                  },
+                },
+                total: { type: "integer", minimum: 0 },
+                page: { type: "integer", minimum: 1 },
+                limit: { type: "integer", minimum: 1, maximum: 100 },
+                hasMore: { type: "boolean" },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function paginatedMunicipalTaxesSuccessEnvelopeContent() {
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              required: ["data", "total", "page", "limit", "hasMore"],
+              properties: {
+                data: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["id", "name"],
+                    properties: {
+                      id: { type: "string", format: "uuid" },
+                      dominio_code: { type: "string", nullable: true },
+                      name: { type: "string" },
+                      cpf_cnpj: { type: "string", nullable: true },
+                      city: { type: "string", nullable: true },
+                      municipalTaxes: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          required: ["id"],
+                          properties: { id: { type: "string", format: "uuid" } },
+                        },
+                      },
+                    },
+                  },
+                },
+                total: { type: "integer", minimum: 0 },
+                page: { type: "integer", minimum: 1 },
+                limit: { type: "integer", minimum: 1, maximum: 100 },
+                hasMore: { type: "boolean" },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
 export function buildRegularizeServiceOpenApiSpec(
   env: RegularizeServiceOpenApiEnv,
 ): OpenApiDocument {
@@ -33,6 +155,7 @@ export function buildRegularizeServiceOpenApiSpec(
     servers: [{ url: baseUrl }],
     tags: [
       { name: "Health", description: "Saude do servico" },
+      { name: "Dashboard", description: "Resumo do modulo Regularize" },
       { name: "Passwords", description: "Senhas por cliente" },
       { name: "Sites", description: "Sites e credenciais base" },
       { name: "PF", description: "Clientes PF do regularize" },
@@ -74,6 +197,24 @@ export function buildRegularizeServiceOpenApiSpec(
               description: "Servico disponivel",
               ...successEnvelopeContent(),
             },
+          },
+        },
+      },
+      "/regularize/dashboard": {
+        get: {
+          tags: ["Dashboard"],
+          summary: "Obter resumo do dashboard do Regularize",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "year",
+              in: "query",
+              required: true,
+              schema: { type: "integer" },
+            },
+          ],
+          responses: {
+            "200": { description: "Resumo do dashboard", ...successEnvelopeContent() },
           },
         },
       },
@@ -120,11 +261,24 @@ export function buildRegularizeServiceOpenApiSpec(
         get: {
           tags: ["Sites"],
           summary: "Listar sites base",
+          description: "Retorna somente campos seguros da lista; o campo password nao e retornado.",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "status", in: "query", required: true, schema: { type: "boolean" } },
+            { name: "search", in: "query", schema: { type: "string" } },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
           ],
-          responses: { "200": { description: "Lista de sites", ...successEnvelopeContent() } },
+          responses: {
+            "200": {
+              description: "Lista completa ou pagina de sites",
+              ...dualListSuccessEnvelopeContent(),
+            },
+          },
         },
         post: {
           tags: ["Sites"],
@@ -142,12 +296,16 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/sites-pass-detail": {
         get: {
           tags: ["Sites"],
-          summary: "Detalhar site base",
+          summary: "Detalhar site base com credencial",
+          description: "Revela usuario e senha somente para usuarios com permissao de revelacao.",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
-          responses: { "200": { description: "Detalhe do site", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Detalhe do site com credencial", ...successEnvelopeContent() },
+            "403": { description: "Permissao insuficiente para revelar credencial" },
+          },
         },
       },
       "/regularize/pf": {
@@ -180,11 +338,23 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/pfs": {
         get: {
           tags: ["PF"],
-          summary: "Listar clientes PF",
+          summary: "Listar clientes PF com busca e paginação",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "status", in: "query", required: true, schema: { type: "string" } }],
+          parameters: [
+            { name: "status", in: "query", required: true, schema: { type: "string" } },
+            { name: "search", in: "query", schema: { type: "string" } },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
           responses: {
-            "200": { description: "Lista de clientes PF", ...successEnvelopeContent() },
+            "200": {
+              description: "Página de clientes PF",
+              ...paginatedClientPfSuccessEnvelopeContent(),
+            },
           },
         },
       },
@@ -236,11 +406,29 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/municipal-taxes": {
         get: {
           tags: ["MunicipalTaxes"],
-          summary: "Listar tributos municipais por ano",
+          summary: "Listar tributos municipais com filtros e paginação",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "year", in: "query", required: true, schema: { type: "integer" } }],
+          parameters: [
+            { name: "year", in: "query", required: true, schema: { type: "integer" } },
+            { name: "search", in: "query", schema: { type: "string", default: "" } },
+            {
+              name: "status",
+              in: "query",
+              schema: { type: "string", enum: ["Todos", "Criado", "Pendente"], default: "Todos" },
+            },
+            { name: "type", in: "query", schema: { type: "string", enum: ["TFF", "TLP", "TLL"] } },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
           responses: {
-            "200": { description: "Lista de tributos municipais", ...successEnvelopeContent() },
+            "200": {
+              description: "Página de tributos municipais",
+              ...paginatedMunicipalTaxesSuccessEnvelopeContent(),
+            },
           },
         },
         post: {
@@ -301,8 +489,22 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Processes"],
           summary: "Listar processos",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "status", in: "query", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Lista de processos", ...successEnvelopeContent() } },
+          parameters: [
+            { name: "status", in: "query", required: true, schema: { type: "string" } },
+            { name: "search", in: "query", schema: { type: "string" } },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Lista completa ou pagina de processos",
+              ...dualListSuccessEnvelopeContent(),
+            },
+          },
         },
       },
       "/regularize/guidance": {

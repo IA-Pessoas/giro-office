@@ -2,6 +2,7 @@ import {
   createSuccessResponse,
   error as logError,
   parseWithZod,
+  requireAuthenticatedRequestContext,
   ServiceError,
 } from "@workspace/shared";
 import { createPhotoUploadMiddleware, validateUploadFileSignature } from "@workspace/shared/upload";
@@ -39,6 +40,12 @@ function requireManageUsersAuthMiddleware(
   } catch (err) {
     next(err);
   }
+}
+
+function isSelfPasswordUpdate(request: Request, id: string, body: object): boolean {
+  const keys = Object.keys(body);
+
+  return request.user_id === id && keys.length === 1 && keys[0] === "password";
 }
 
 router.get(
@@ -111,11 +118,14 @@ router.post(
         requireOwnerUserAuth(request);
       }
 
-      const user = await userService.create({
-        ...body,
-        organization_id: auth.organization_id,
-        first_owner_flag: body.first_owner_flag ?? false,
-      });
+      const user = await userService.create(
+        {
+          ...body,
+          organization_id: auth.organization_id,
+          first_owner_flag: body.first_owner_flag ?? false,
+        },
+        auth.user_id,
+      );
 
       response.status(201).json(createSuccessResponse(user));
     } catch (err) {
@@ -125,19 +135,26 @@ router.post(
   },
 );
 
-router.patch(
+router.put(
   "/:id",
   isAuthenticated,
   async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const auth = requireManageUsersAuth(request);
       const { id } = parseWithZod(userIdParamsSchema, request.params);
       const body = parseWithZod(updateUserBodySchema, request.body);
-      if (isOwnerMutationPayload(body)) {
+      const selfPasswordUpdate = isSelfPasswordUpdate(request, id, body);
+      const auth = selfPasswordUpdate
+        ? requireAuthenticatedRequestContext(request, {
+            userIdMessage: "Não autenticado.",
+            organizationIdMessage: "Não autenticado.",
+          })
+        : requireManageUsersAuth(request);
+
+      if (!selfPasswordUpdate && isOwnerMutationPayload(body)) {
         requireOwnerUserAuth(request);
       }
 
-      const user = await userService.update(id, body, auth.organization_id);
+      const user = await userService.update(id, body, auth.organization_id, auth.user_id);
 
       response.json(createSuccessResponse(user));
     } catch (err) {

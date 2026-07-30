@@ -7,12 +7,15 @@ import { getSmokeSpecFiles } from "./service-registry.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const EXEMPT_ROUTE_KEYS = new Set([
+export const EXEMPT_ROUTE_KEYS = new Set([
   "GET|/health",
   "GET|/ready",
   "POST|/user/session",
   "POST|/user/start-config",
+  "GET|/user/session/validate",
 ]);
+
+export const EXEMPT_SPEC_OPERATION_KEYS = new Set(["user-service|GET|/user/session/validate"]);
 
 const GOOD_STATUS_OVERRIDES = new Map([
   ["userStartConfig", [200, 409]],
@@ -487,17 +490,17 @@ const baseManifest = [
   }),
   op({
     service: "user-service",
-    method: "PATCH",
+    method: "PUT",
     path: "/user/{id}",
-    action: "userPatch",
+    action: "userPut",
     target: "gateway",
     auth: "bearer",
   }),
   op({
     service: "user-service",
-    method: "PATCH",
+    method: "PUT",
     path: "/user/{id}",
-    action: "userPatchNotFound",
+    action: "userPutNotFound",
     target: "gateway",
     auth: "bearer",
     specOperation: false,
@@ -719,6 +722,14 @@ const baseManifest = [
     method: "GET",
     path: "/client/list",
     action: "clientList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/client/commercial/overview",
+    action: "clientCommercialOverview",
     target: "gateway",
     auth: "bearer",
   }),
@@ -1239,6 +1250,14 @@ const baseManifest = [
     method: "GET",
     path: "/task/deps/list",
     action: "taskDepsList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/deps/options",
+    action: "taskDepsOptions",
     target: "gateway",
     auth: "bearer",
   }),
@@ -2305,6 +2324,14 @@ const baseManifest = [
   op({
     service: "pessoal-service",
     method: "GET",
+    path: "/pessoal/overview",
+    action: "pessoalOverviewGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
+    method: "GET",
     path: "/pessoal/situations",
     action: "pessoalSituationList",
     target: "gateway",
@@ -2331,6 +2358,14 @@ const baseManifest = [
     method: "PATCH",
     path: "/pessoal/situations/{id}",
     action: "pessoalSituationPatch",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
+    method: "DELETE",
+    path: "/pessoal/situations/{id}",
+    action: "pessoalSituationDelete",
     target: "gateway",
     auth: "bearer",
   }),
@@ -2363,6 +2398,14 @@ const baseManifest = [
     method: "PATCH",
     path: "/pessoal/unions/{id}",
     action: "pessoalUnionPatch",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "pessoal-service",
+    method: "DELETE",
+    path: "/pessoal/unions/{id}",
+    action: "pessoalUnionDelete",
     target: "gateway",
     auth: "bearer",
   }),

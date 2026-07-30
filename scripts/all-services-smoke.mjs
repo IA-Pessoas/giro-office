@@ -1042,6 +1042,13 @@ const handlers = {
     });
   },
 
+  async certificatePjDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/certificate/pj/${requireState("certificatePjId")}`,
+    });
+  },
+
   async certificatePfList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -1119,6 +1126,13 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/certificate/pf/${requireState("certificatePfId")}/file`,
+    });
+  },
+
+  async certificatePfDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/certificate/pf/${requireState("certificatePfId")}`,
     });
   },
 
@@ -1220,6 +1234,13 @@ const handlers = {
       json: {
         assigned_to_id: requireState("session").id,
       },
+    });
+  },
+
+  async tiRequestTransferCandidates(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/requests/${requireState("tiRequestId")}/transfer-candidates`,
     });
   },
 
@@ -1563,6 +1584,31 @@ const handlers = {
     });
   },
 
+  async tiPasswordDeactivate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/passwords/${requireState("tiPasswordId")}/deactivate`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        reason: "Smoke credential retired.",
+      },
+    });
+  },
+
+  async tiPasswordDeactivateConflict(op) {
+    await httpRequest(op, {
+      expectedStatus: [409],
+      expectEnvelope: false,
+      path: `/ti/passwords/${requireState("tiPasswordId")}/deactivate`,
+      auth: "public",
+      headers: getTiAdminHeaders(),
+      json: {
+        reason: "Smoke repeated deactivation.",
+      },
+    });
+  },
+
   async tiExtensionList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
@@ -1613,8 +1659,6 @@ const handlers = {
       headers: getTiAdminHeaders(),
       json: {
         date: new Date().toISOString(),
-        user_name: uniqueText("Smoke TI User"),
-        user_cpf: uniqueDigits(11),
         user_id: await ensureRhTargetUser(),
         reason: "Smoke TI term.",
       },
@@ -1789,7 +1833,7 @@ const handlers = {
     });
   },
 
-  async userPatch(op) {
+  async userPut(op) {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/user/${requireState("tempUserId")}`,
@@ -2717,6 +2761,13 @@ const handlers = {
     });
   },
 
+  async pessoalSituationDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/situations/${requireState("pessoalSituationId")}`,
+    });
+  },
+
   async pessoalUnionList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
@@ -2748,6 +2799,33 @@ const handlers = {
       expectedStatus: [200],
       path: `/pessoal/unions/${requireState("pessoalUnionId")}`,
       json: { name: uniqueText("Smoke Union Updated") },
+    });
+  },
+
+  async pessoalUnionDelete(op) {
+    if (isBadExpectation(op)) {
+      await httpRequest(op, {
+        expectedStatus: [401],
+        path: "/pessoal/unions/40000000-0000-4000-8000-000000000002",
+      });
+      return;
+    }
+
+    const created = await httpRequest(op, {
+      method: "POST",
+      path: "/pessoal/unions",
+      expectedStatus: [201],
+      json: {
+        name: uniqueText("Smoke Union To Delete"),
+        cnpj: uniqueDigits(14),
+        base_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+    const temporaryUnionId = pickFirst(created.body, "data.id") ?? findFirstId(created.body?.data);
+
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/pessoal/unions/${temporaryUnionId}`,
     });
   },
 
@@ -2900,6 +2978,10 @@ const handlers = {
   },
 
   async taskDepsList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async taskDepsOptions(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
@@ -3925,7 +4007,7 @@ const handlers = {
   // Error-path handlers: 404 Not Found on mutations (PUT/PATCH non-existent)
   // -------------------------------------------------------------------------
 
-  async userPatchNotFound(op) {
+  async userPutNotFound(op) {
     await httpRequest(op, {
       expectedStatus: [404],
       path: "/user/00000000-0000-0000-0000-000000000000",

@@ -30,6 +30,148 @@ describe("TiDepartmentResolverService", () => {
 });
 
 describe("TiStockService", () => {
+  it("rejects an active stock category whose name only differs by case and spaces", async () => {
+    const findMany = vi.fn(async () => [{ name: "  Rede   Interna  " }]);
+    const create = vi.fn(async ({ data }) => ({ id: "stock-cat-1", ...data }));
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      categoryStock: {
+        findFirst: vi.fn(async () => null),
+        findMany,
+        create,
+      },
+    };
+    const service = new TiStockService(prisma as never);
+
+    await expect(service.createCategory(context, { name: "rede interna" })).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+    });
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: context.organizationId,
+        department_id: departmentId,
+        status: true,
+      },
+      select: { name: true },
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("maps a unique category race to a domain conflict", async () => {
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      categoryStock: {
+        findMany: vi.fn(async () => []),
+        create: vi.fn(async () => {
+          throw { code: "P2002" };
+        }),
+      },
+    };
+    const service = new TiStockService(prisma as never);
+
+    await expect(service.createCategory(context, { name: "Redes" })).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+    });
+  });
+
+  it("maps a unique category update collision to a domain conflict", async () => {
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      categoryStock: {
+        findFirst: vi.fn(async () => ({ id: categoryId })),
+        update: vi.fn(async () => {
+          throw { code: "P2002" };
+        }),
+      },
+    };
+    const service = new TiStockService(prisma as never);
+
+    await expect(
+      service.updateCategory(context, categoryId, { name: "Perifericos" }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+    });
+  });
+
+  it("maps a category reactivation unique collision to a domain conflict", async () => {
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      categoryStock: {
+        findFirst: vi.fn(async () => ({ id: categoryId, status: false })),
+        update: vi.fn(async () => {
+          throw { code: "P2002" };
+        }),
+      },
+    };
+    const service = new TiStockService(prisma as never);
+
+    await expect(
+      service.updateCategory(context, categoryId, { status: true }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+    });
+  });
+
+  it("filters the full stock result before pagination and returns page metadata", async () => {
+    const item = {
+      id: stockId,
+      name: "Mouse sem fio",
+      category_id: categoryId,
+      location_id: locationId,
+      status: true,
+      location: { id: locationId, name: "Almoxarifado TI" },
+    };
+    const count = vi.fn(async () => 3);
+    const findMany = vi.fn(async () => [item]);
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      stock: { count, findMany },
+    };
+    const service = new TiStockService(prisma as never);
+
+    const result = await service.listItems(context, {
+      name: "Mouse",
+      category_id: categoryId,
+      location_id: locationId,
+      status: true,
+      page: 2,
+      page_size: 1,
+    });
+    const where = {
+      organization_id: context.organizationId,
+      department_id: departmentId,
+      category_id: categoryId,
+      location_id: locationId,
+      name: { contains: "Mouse", mode: "insensitive" },
+      status: true,
+    };
+
+    expect(count).toHaveBeenCalledWith({ where });
+    expect(findMany).toHaveBeenCalledWith({
+      where,
+      include: {
+        category: true,
+        location: true,
+        department: true,
+      },
+      orderBy: { name: "asc" },
+      skip: 1,
+      take: 1,
+    });
+    expect(result).toEqual({
+      data: [item],
+      total: 3,
+      page: 2,
+      limit: 1,
+      hasMore: true,
+    });
+  });
+
   it("creates a stock item in the Tecnologia department", async () => {
     const prisma = {
       department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
@@ -56,6 +198,27 @@ describe("TiStockService", () => {
       organization_id: context.organizationId,
       quantity: 3,
     });
+  });
+
+  it("rejects an active stock location with the same normalized name", async () => {
+    const locationStock = {
+      findFirst: vi.fn(async () => null),
+      findMany: vi.fn(async () => [{ id: locationId, name: "Almoxarifado São", status: true }]),
+      create: vi.fn(async ({ data }) => ({ id: "location-2", ...data })),
+    };
+    const prisma = {
+      department: { findFirst: vi.fn(async () => ({ id: departmentId })) },
+      locationStock,
+    };
+    const service = new TiStockService(prisma as never);
+
+    await expect(
+      service.createLocation(context, { name: "  ALMOXARIFADO   SAO  " }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Ja existe um local de estoque de TI ativo com este nome.",
+    });
+    expect(locationStock.create).not.toHaveBeenCalled();
   });
 
   it("creates an entry and increments stock quantity", async () => {

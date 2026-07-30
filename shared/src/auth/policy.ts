@@ -1,6 +1,7 @@
+import type { ModulePermissions } from "./modules.js";
 import type { AuthContext, AuthPolicy } from "./types.js";
 
-const GLOBAL_ADMIN_PERMISSION = 2;
+const MODULE_ADMIN_PERMISSION = 3;
 
 export function hasRequiredPermission(context: AuthContext, minPermission: number): boolean {
   return (
@@ -12,14 +13,8 @@ function isExplicitOwner(context: AuthContext): boolean {
   return context.claims.type === "owner";
 }
 
-function isLegacyGlobalAdmin(context: AuthContext): boolean {
-  return (
-    context.claims.type === undefined && hasRequiredPermission(context, GLOBAL_ADMIN_PERMISSION)
-  );
-}
-
 function hasGlobalAdminPermission(context: AuthContext): boolean {
-  return isExplicitOwner(context) || isLegacyGlobalAdmin(context);
+  return isExplicitOwner(context);
 }
 
 function hasExplicitModulePermission(
@@ -27,15 +22,13 @@ function hasExplicitModulePermission(
   module: string,
   minPermission: number,
 ): boolean {
-  const modulePermission = context.claims.modules?.[module];
+  const modulePermission = context.claims.modules?.[module as keyof ModulePermissions];
   return typeof modulePermission === "number" && modulePermission >= minPermission;
 }
 
 function canManageUsers(context: AuthContext): boolean {
   return (
-    isExplicitOwner(context) ||
-    isLegacyGlobalAdmin(context) ||
-    hasExplicitModulePermission(context, "rh", GLOBAL_ADMIN_PERMISSION)
+    isExplicitOwner(context) || hasExplicitModulePermission(context, "rh", MODULE_ADMIN_PERMISSION)
   );
 }
 
@@ -64,8 +57,12 @@ function hasAnyRequiredModulePermission(
 }
 
 export function canAccessRoute(context: AuthContext, policy: AuthPolicy): boolean {
+  if (policy.anyOf) {
+    return policy.anyOf.some((alternative) => canAccessRoute(context, alternative));
+  }
+
   if (policy.special === "ownerOnly") {
-    return isExplicitOwner(context) || isLegacyGlobalAdmin(context);
+    return isExplicitOwner(context);
   }
 
   if (policy.special === "manageUsers" && !canManageUsers(context)) {

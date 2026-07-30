@@ -24,6 +24,11 @@ import type {
   TiExtensionUpdatePayload,
   TiId,
 } from "../types";
+import {
+  TI_EXTENSION_NUMBER_LENGTH,
+  isValidTiExtensionNumber,
+  sanitizeTiExtensionNumber,
+} from "../utils/extensionNumber";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -96,7 +101,7 @@ function buildExtensionFormState(item?: TiExtension | null): ExtensionFormState 
 
 export function TiExtensionsTab() {
   const { access } = useModuleAccess("ti");
-  const canManageExtensions = access.canEdit || access.isAdmin;
+  const canManageExtensions = access.isAdmin;
   const [selectedExtensionId, setSelectedExtensionId] = useState<TiId | undefined>();
   const [editingExtension, setEditingExtension] = useState<TiExtension | null>(null);
   const [extensionForm, setExtensionForm] = useState<ExtensionFormState>(
@@ -146,8 +151,8 @@ export function TiExtensionsTab() {
   function buildCreatePayload(): TiExtensionCreatePayload | null {
     const number = extensionForm.number.trim();
 
-    if (!number) {
-      toast.error("Informe o número do ramal.");
+    if (!isValidTiExtensionNumber(number)) {
+      toast.error("Informe um ramal com exatamente 4 dígitos.");
       return null;
     }
 
@@ -165,8 +170,8 @@ export function TiExtensionsTab() {
   function buildUpdatePayload(): TiExtensionUpdatePayload | null {
     const number = extensionForm.number.trim();
 
-    if (!number) {
-      toast.error("Informe o número do ramal.");
+    if (!isValidTiExtensionNumber(number)) {
+      toast.error("Informe um ramal com exatamente 4 dígitos.");
       return null;
     }
 
@@ -295,7 +300,6 @@ export function TiExtensionsTab() {
                 <div className="space-y-2">
                   <TiFieldLine label="Número" value={formatText(selectedExtension.number)} />
                   <TiFieldLine label="Usuário" value={getExtensionUserName(selectedExtension)} />
-                  <TiFieldLine label="ID" value={getId(selectedExtension.id)} />
                 </div>
               ) : (
                 <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -327,8 +331,15 @@ export function TiExtensionsTab() {
                 ) : null}
               </div>
               <TiTextField
+                inputMode="numeric"
                 label="Número"
-                onChange={(event) => updateExtensionField("number", event.target.value)}
+                maxLength={TI_EXTENSION_NUMBER_LENGTH}
+                onChange={(event) =>
+                  updateExtensionField(
+                    "number",
+                    sanitizeTiExtensionNumber(event.target.value),
+                  )
+                }
                 placeholder="Ex: 1001"
                 value={extensionForm.number}
               />

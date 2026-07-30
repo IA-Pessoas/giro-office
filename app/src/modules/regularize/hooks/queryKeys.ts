@@ -12,9 +12,20 @@ import type {
 
 export const regularizeQueryKeys = {
   root: ["regularize"] as const,
+  dashboardRoot: () => [...regularizeQueryKeys.root, "dashboard"] as const,
+  dashboard: (year: number) => [...regularizeQueryKeys.dashboardRoot(), year] as const,
   credentials: () => [...regularizeQueryKeys.root, "credentials"] as const,
   sitePasswords: (filters: RegularizeSitePasswordListFilters) =>
     [...regularizeQueryKeys.credentials(), "sites", filters.status] as const,
+  sitePasswordsPage: (filters: RegularizeSitePasswordListFilters) =>
+    [
+      ...regularizeQueryKeys.credentials(),
+      "sites-page",
+      filters.status,
+      filters.search ?? "",
+      filters.page ?? 1,
+      filters.limit ?? 20,
+    ] as const,
   sitePasswordDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.credentials(), "sites", "detail", id ?? ""] as const,
   passwords: (filters: RegularizePasswordListFilters) =>
@@ -22,8 +33,15 @@ export const regularizeQueryKeys = {
   passwordDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.credentials(), "passwords", "detail", id ?? ""] as const,
   people: () => [...regularizeQueryKeys.root, "people"] as const,
-  clientPfs: (filters: RegularizeClientPfListFilters) =>
-    [...regularizeQueryKeys.people(), "client-pfs", filters.status] as const,
+  clientPfsPage: (filters: RegularizeClientPfListFilters) =>
+    [
+      ...regularizeQueryKeys.people(),
+      "client-pfs-page",
+      filters.status,
+      filters.search ?? "",
+      filters.page ?? 1,
+      filters.limit ?? 20,
+    ] as const,
   clientPfDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.people(), "client-pfs", "detail", id ?? ""] as const,
   partners: (filters: RegularizePartnerListFilters) =>
@@ -37,11 +55,29 @@ export const regularizeQueryKeys = {
     [...regularizeQueryKeys.people(), "partners", "detail", id ?? ""] as const,
   operations: () => [...regularizeQueryKeys.root, "operations"] as const,
   municipalTaxes: (filters: RegularizeMunicipalTaxesListFilters) =>
-    [...regularizeQueryKeys.operations(), "municipal-taxes", filters.year] as const,
+    [
+      ...regularizeQueryKeys.operations(),
+      "municipal-taxes",
+      filters.year,
+      filters.search ?? "",
+      filters.status ?? "Todos",
+      filters.type ?? "Todos",
+      filters.page ?? 1,
+      filters.limit ?? 20,
+    ] as const,
   municipalTaxDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.operations(), "municipal-taxes", "detail", id ?? ""] as const,
   processes: (filters: RegularizeProcessListFilters) =>
     [...regularizeQueryKeys.operations(), "processes", filters.status] as const,
+  processesPage: (filters: RegularizeProcessListFilters) =>
+    [
+      ...regularizeQueryKeys.operations(),
+      "processes-page",
+      filters.status,
+      filters.search ?? "",
+      filters.page ?? 1,
+      filters.limit ?? 20,
+    ] as const,
   processDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.operations(), "processes", "detail", id ?? ""] as const,
   guidance: (filters: RegularizeGuidanceListFilters) =>

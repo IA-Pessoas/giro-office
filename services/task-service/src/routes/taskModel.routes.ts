@@ -1,6 +1,8 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
+  parseWithZod,
   requireAuthenticatedRequestContext,
   ServiceError,
 } from "@workspace/shared";
@@ -8,6 +10,8 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { taskModelListQuerySchema } from "../schemas/taskModelList.schemas.js";
+import { parseTaskModelResponsibleSequence } from "../schemas/taskModelResponsibleSequence.schemas.js";
 import { TaskModelService } from "../services/taskModelService.js";
 
 const router: ReturnType<typeof Router> = Router();
@@ -27,6 +31,11 @@ router.post("/model", isAuthenticated, async (req: Request, res: Response, next:
       type,
     } = req.body;
     const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+    const responsibleSequence = parseTaskModelResponsibleSequence({
+      responsible_id,
+      responsible2_id: responsible2_id ?? null,
+      responsible3_id: responsible3_id ?? null,
+    });
 
     if (!name || !department_id || !responsible_id || !billing || prevision === undefined) {
       throw new ServiceError(
@@ -40,13 +49,15 @@ router.post("/model", isAuthenticated, async (req: Request, res: Response, next:
       organization_id,
       name,
       department_id,
-      responsible_id,
-      responsible2_id: responsible2_id ?? null,
-      responsible3_id: responsible3_id ?? null,
+      responsible_id: responsibleSequence.responsible_id,
+      responsible2_id: responsibleSequence.responsible2_id,
+      responsible3_id: responsibleSequence.responsible3_id,
       observations: observations ?? null,
       billing,
       prevision: Number(prevision),
       type: type ?? null,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.status(201).json(createSuccessResponse(result));
@@ -65,7 +76,11 @@ router.get("/model", isAuthenticated, async (req: Request, res: Response, next: 
       throw new ServiceError(400, "task_id Ã© obrigatÃ³rio (body ou query).");
     }
 
-    const result = await taskModelService.detailModel(task_id, organization_id);
+    const result = await taskModelService.detailModel(task_id, organization_id, {
+      userId: req.user_id,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
+    });
     res.json(createSuccessResponse(result));
   } catch (err) {
     logError("Erro ao buscar task model", { err });
@@ -88,6 +103,11 @@ router.put("/model", isAuthenticated, async (req: Request, res: Response, next: 
       type,
     } = req.body;
     const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+    const responsibleSequence = parseTaskModelResponsibleSequence({
+      responsible_id,
+      responsible2_id: responsible2_id ?? null,
+      responsible3_id: responsible3_id ?? null,
+    });
 
     if (
       !task_id ||
@@ -109,13 +129,15 @@ router.put("/model", isAuthenticated, async (req: Request, res: Response, next: 
       task_id,
       name,
       department_id,
-      responsible_id,
-      responsible2_id: responsible2_id ?? null,
-      responsible3_id: responsible3_id ?? null,
+      responsible_id: responsibleSequence.responsible_id,
+      responsible2_id: responsibleSequence.responsible2_id,
+      responsible3_id: responsibleSequence.responsible3_id,
       observations: observations ?? null,
       billing,
       prevision: Number(prevision),
       type: type ?? null,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
     });
 
     res.json(createSuccessResponse(result));
@@ -130,16 +152,21 @@ router.get(
   isAuthenticated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const type = req.body.type ?? req.query.type;
-      const billing = req.body.billing ?? req.query.billing;
-
       const { organization_id } = requireAuthenticatedRequestContext(req);
-
-      const result = await taskModelService.listModel(
-        type === undefined ? undefined : String(type),
-        billing === undefined ? undefined : String(billing),
-        organization_id,
-      );
+      const paginationRequested = req.query.page !== undefined || req.query.limit !== undefined;
+      const query = parseWithZod(taskModelListQuerySchema, {
+        ...req.query,
+        type: req.query.type ?? req.body?.type,
+        billing: req.query.billing ?? req.body?.billing,
+      });
+      const result = await taskModelService.listModel({
+        organizationId: organization_id,
+        userId: req.user_id,
+        paginationRequested,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
+        ...query,
+      });
 
       res.json(createSuccessResponse(result));
     } catch (err) {
@@ -165,6 +192,8 @@ router.delete(
         task_id,
         user_id,
         organization_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
       });
 
       res.json(createSuccessResponse(result));

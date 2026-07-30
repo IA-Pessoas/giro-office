@@ -10,6 +10,12 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
+  canManageRh,
+  RH_MANAGEMENT_PERMISSION,
+  RH_SELF_SERVICE_PERMISSION,
+  requireRhPermission,
+} from "../middlewares/requireRhPermission.js";
+import {
   listPointsQuerySchema,
   pointIdParamsSchema,
   pointSummaryQuerySchema,
@@ -19,32 +25,40 @@ import { PointService } from "../services/pointService.js";
 const router: ReturnType<typeof Router> = Router();
 const pointService = new PointService();
 
-router.get("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
-    const queryInput = {
-      date_from: getSingleTrimmedQueryValue(req.query.date_from),
-      date_to: getSingleTrimmedQueryValue(req.query.date_to),
-      user_id: getSingleTrimmedQueryValue(req.query.user_id),
-    };
-    const query = parseWithZod(listPointsQuerySchema, queryInput);
+router.get(
+  "/",
+  isAuthenticated,
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+        statusCode: 400,
+      });
+      const queryInput = {
+        date_from: getSingleTrimmedQueryValue(req.query.date_from),
+        date_to: getSingleTrimmedQueryValue(req.query.date_to),
+        user_id: getSingleTrimmedQueryValue(req.query.user_id),
+      };
+      const query = parseWithZod(listPointsQuerySchema, queryInput);
 
-    const result = await pointService.listPoints(organization_id, {
-      user_id: query.user_id,
-      date_from: query.date_from,
-      date_to: query.date_to,
-    });
+      const result = await pointService.listPoints(organization_id, {
+        user_id: canManageRh(req) ? query.user_id : user_id,
+        date_from: query.date_from,
+        date_to: query.date_to,
+      });
 
-    res.status(200).json(createSuccessResponse(result));
-  } catch (err) {
-    logError("Erro ao listar registros de ponto", { err });
-    next(err);
-  }
-});
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao listar registros de ponto", { err });
+      next(err);
+    }
+  },
+);
 
 router.get(
   "/me/today",
   isAuthenticated,
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
@@ -64,33 +78,39 @@ router.get(
   },
 );
 
-router.get("/summary", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
-      statusCode: 400,
-    });
-    const queryInput = {
-      month: getSingleTrimmedQueryValue(req.query.month),
-      user_id: getSingleTrimmedQueryValue(req.query.user_id),
-    };
-    const query = parseWithZod(pointSummaryQuerySchema, queryInput);
+router.get(
+  "/summary",
+  isAuthenticated,
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+        statusCode: 400,
+      });
+      const queryInput = {
+        month: getSingleTrimmedQueryValue(req.query.month),
+        user_id: getSingleTrimmedQueryValue(req.query.user_id),
+      };
+      const query = parseWithZod(pointSummaryQuerySchema, queryInput);
 
-    const result = await pointService.getMonthlySummary({
-      organization_id,
-      user_id: query.user_id ?? user_id,
-      month: query.month,
-    });
+      const result = await pointService.getMonthlySummary({
+        organization_id,
+        user_id: canManageRh(req) ? (query.user_id ?? user_id) : user_id,
+        month: query.month,
+      });
 
-    res.status(200).json(createSuccessResponse(result));
-  } catch (err) {
-    logError("Erro ao gerar resumo mensal de ponto", { err });
-    next(err);
-  }
-});
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao gerar resumo mensal de ponto", { err });
+      next(err);
+    }
+  },
+);
 
 router.post(
   "/register",
   isAuthenticated,
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
@@ -113,6 +133,7 @@ router.post(
 router.post(
   "/:pointId/calculate",
   isAuthenticated,
+  requireRhPermission(RH_MANAGEMENT_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });

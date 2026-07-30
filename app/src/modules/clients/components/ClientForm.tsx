@@ -2,11 +2,15 @@ import type { ChangeEvent } from "react";
 
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import type { ClientFormValues } from "../types";
+import { validateCpfCnpjDocument } from "../utils/documentValidation";
 
 interface ClientFormProps {
   values: ClientFormValues;
   disabled?: boolean;
+  showPersonType?: boolean;
+  showDocumentError?: boolean;
   submitLabel: string;
   onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   onSubmit: () => void;
@@ -16,28 +20,32 @@ interface ClientFormProps {
 export function ClientForm({
   values,
   disabled = false,
+  showPersonType = false,
+  showDocumentError = false,
   submitLabel,
   onChange,
   onSubmit,
   onCancel,
 }: ClientFormProps) {
+  const documentLabel = showPersonType ? (values.type === "PF" ? "CPF" : "CNPJ") : "CPF/CNPJ";
+  const documentError = showDocumentError && showPersonType && values.cpf_cnpj
+    ? validateCpfCnpjDocument(values.cpf_cnpj, showPersonType ? values.type : undefined)
+    : null;
+
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1.5">
-          <span className="block text-sm font-medium text-slate-700 dark:text-white">Nome</span>
-          <input name="name" value={values.name} onChange={onChange} disabled={disabled} className={clientTextFieldClassName} />
-        </label>
-
-        <label className="space-y-1.5">
-          <span className="block text-sm font-medium text-slate-700 dark:text-white">CPF/CNPJ</span>
+          <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
+            Nome
+          </RequiredFieldLabel>
           <input
-            name="cpf_cnpj"
-            value={values.cpf_cnpj}
+            name="name"
+            value={values.name}
             onChange={onChange}
             disabled={disabled}
-            placeholder="Somente números"
             className={clientTextFieldClassName}
+            aria-required="true"
           />
         </label>
 
@@ -50,6 +58,54 @@ export function ClientForm({
             disabled={disabled}
             className={clientTextFieldClassName}
           />
+        </label>
+
+        {showPersonType ? (
+          <label className="space-y-1.5">
+            <span className="block text-sm font-medium text-slate-700 dark:text-white">Tipo de pessoa</span>
+            <ClientNativeSelect
+              name="type"
+              value={values.type ?? "PJ"}
+              onChange={onChange}
+              disabled={disabled}
+            >
+              <option value="PJ">Pessoa Jurídica (PJ)</option>
+              <option value="PF">Pessoa Física (PF)</option>
+            </ClientNativeSelect>
+          </label>
+        ) : null}
+
+        <label className="space-y-1.5">
+          <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
+            {documentLabel}
+          </RequiredFieldLabel>
+          <input
+            name="cpf_cnpj"
+            value={values.cpf_cnpj}
+            onChange={onChange}
+            disabled={disabled}
+            inputMode="numeric"
+            autoComplete="off"
+            aria-invalid={Boolean(documentError)}
+            aria-describedby={documentError ? "client-create-document-error" : undefined}
+            placeholder={
+              showPersonType
+                ? values.type === "PF"
+                  ? "000.000.000-00"
+                  : "00.000.000/0000-00"
+                : "Somente números"
+            }
+            className={clientTextFieldClassName}
+            aria-required="true"
+          />
+          {documentError ? (
+            <span
+              id="client-create-document-error"
+              className="block text-xs font-medium text-red-600 dark:text-red-300"
+            >
+              {documentError}
+            </span>
+          ) : null}
         </label>
 
         <label className="space-y-1.5">
@@ -73,7 +129,7 @@ export function ClientForm({
           </ClientNativeSelect>
         </label>
 
-        <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 dark:border-slate-700 dark:bg-slate-950/40">
+        <label className="flex items-center gap-2 md:col-span-2">
           <input
             type="checkbox"
             name="service_unique"
@@ -82,7 +138,7 @@ export function ClientForm({
             disabled={disabled}
             className="h-4 w-4 rounded border-slate-300 text-[var(--colors-brand-gradient-end)] focus:ring-[var(--colors-brand-gradient-start)]/20 dark:border-slate-600 dark:bg-slate-900"
           />
-          <span className="text-sm font-medium text-slate-700 dark:text-white">Serviço único</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-white">Serviço único?</span>
         </label>
       </div>
 

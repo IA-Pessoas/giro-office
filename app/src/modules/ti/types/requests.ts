@@ -32,6 +32,7 @@ export interface TiRequestMessage {
   author_id?: TiId | null;
   author_name?: string | null;
   message?: string;
+  attachment?: string | null;
   created_at?: string;
   [key: string]: unknown;
 }
@@ -51,6 +52,13 @@ export interface TiRequestAssignPayload {
   [key: string]: unknown;
 }
 
+export interface TiTransferCandidate {
+  id: TiId;
+  name?: string | null;
+  full_name?: string | null;
+  department_id: TiId;
+}
+
 export interface TiRequestStatusPayload {
   status: string;
   [key: string]: unknown;
@@ -58,6 +66,7 @@ export interface TiRequestStatusPayload {
 
 export interface TiRequestMessagePayload {
   message: string;
+  attachment?: File;
   [key: string]: unknown;
 }
 

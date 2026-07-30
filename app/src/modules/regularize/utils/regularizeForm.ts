@@ -48,11 +48,37 @@ export function toRegularizeRequiredNumber(value: string): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function getRegularizeApiErrorMessage(error: unknown): string {
+  const response = (
+    error as { response?: { data?: { error?: unknown; message?: unknown } } }
+  ).response;
+  const responseMessage =
+    typeof response?.data?.error === "string"
+      ? response.data.error
+      : typeof response?.data?.message === "string"
+        ? response.data.message
+        : "";
+
+  return responseMessage.trim();
+}
+
+export function getRegularizeErrorMessage(error: unknown, fallback: string): string {
+  const apiMessage = getRegularizeApiErrorMessage(error);
+
+  if (apiMessage) {
+    return apiMessage;
+  }
+
+  const message = error instanceof Error ? error.message.trim() : "";
+
+  return message || fallback;
+}
+
 export function getRegularizeMutationErrorMessage(
   error: unknown,
   fallback: string,
 ): string {
-  const message = error instanceof Error ? error.message : "";
+  const message = getRegularizeErrorMessage(error, "");
 
   if (/403|forbidden|permission|permiss/i.test(message)) {
     return "Acesso negado para executar esta ação.";

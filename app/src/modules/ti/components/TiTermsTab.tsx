@@ -1,11 +1,15 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Eye, FileCheck2, Pencil, Plus, Printer, Save, Signature, X } from "lucide-react";
+import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
+import { useAssignableUsers } from "@modules/rh";
+import { PaginationControls } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -16,7 +20,7 @@ import {
   useTiTerms,
   useUpdateTiTermMutation,
 } from "../hooks";
-import type { TiId, TiInventoryAsset, TiTerm } from "../types";
+import type { TiId, TiInventoryAsset, TiTerm, TiTermUpdatePayload } from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -48,6 +52,8 @@ const TERM_STATUS_OPTIONS = [
   { value: "pending", label: "Pendente" },
   { value: "signed", label: "Assinado" },
 ];
+
+const TERMS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 function getText(value: unknown, fallback = "-"): string {
   if (value === null || value === undefined || value === "") {
@@ -241,27 +247,33 @@ function buildPrintableTermHtml(term: TiTerm, departmentName: string): string {
 
 export function TiTermsTab() {
   const { access } = useModuleAccess("ti");
-  const canManage = access.canEdit || access.isAdmin;
+  const canManage = access.isAdmin;
   const canSign = access.canView;
   const [search, setSearch] = useState("");
   const [termStatus, setTermStatus] = useState("");
   const [assetId, setAssetId] = useState("");
+  const [termsPage, setTermsPage] = useState(1);
   const [selectedTermId, setSelectedTermId] = useState<TiId | undefined>();
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [dialogState, setDialogState] = useState<TermsDialogState | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
   const termsQuery = useTiTerms();
-  const assetsQuery = useTiInventory();
+  const assetsQuery = useTiInventory(
+    { status: "available", page_size: 100 },
+    { enabled: canManage },
+  );
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManage });
   const departmentsQuery = useFetch<DepItem[]>(
     ["ti-terms", "departments"],
     () => departmentService.list(),
-    { retry: false },
+    { retry: false, enabled: canManage },
   );
   const selectedTermQuery = useTiTerm(selectedTermId, { enabled: Boolean(selectedTermId) });
   const createTermMutation = useCreateTiTermMutation();
   const updateTermMutation = useUpdateTiTermMutation();
   const signTermMutation = useSignTiTermMutation();
+  const assignableUsers = assignableUsersQuery.data ?? [];
 
   const assetsById = useMemo(
     () => new Map((assetsQuery.data ?? []).map((asset) => [String(asset.id), asset])),
@@ -290,10 +302,13 @@ export function TiTermsTab() {
     [assetsQuery.data],
   );
 
-  const assetFilterOptions = useMemo(
-    () => [{ value: "", label: "Todos" }, ...assetOptions],
-    [assetOptions],
-  );
+  const assetFilterOptions = useMemo(() => {
+    if (!canManage) {
+      return [{ value: "", label: "Todos" }];
+    }
+
+    return [{ value: "", label: "Todos" }, ...assetOptions];
+  }, [assetOptions, canManage]);
 
   const assetFormOptions = useMemo(
     () => [{ value: "", label: "Selecione" }, ...assetOptions],
@@ -309,6 +324,17 @@ export function TiTermsTab() {
       })),
     ],
     [departmentsQuery.data],
+  );
+
+  const assignableUserOptions = useMemo(
+    () => [
+      { value: "", label: "Selecione" },
+      ...assignableUsers.map((user) => ({
+        value: user.id,
+        label: user.departmentName ? `${user.name} - ${user.departmentName}` : user.name,
+      })),
+    ],
+    [assignableUsers],
   );
 
   const filteredTerms = useMemo(() => {
@@ -337,10 +363,23 @@ export function TiTermsTab() {
     });
   }, [assetId, assetsById, search, termStatus, termsQuery.data]);
 
+  useEffect(() => {
+    setTermsPage(1);
+  }, [assetId, search, termStatus]);
+
+  const termsPageCount = Math.max(1, Math.ceil(filteredTerms.length / TERMS_PAGE_SIZE));
+  const currentTermsPage = Math.min(termsPage, termsPageCount);
+  const paginatedTerms = useMemo(() => {
+    const start = (currentTermsPage - 1) * TERMS_PAGE_SIZE;
+
+    return filteredTerms.slice(start, start + TERMS_PAGE_SIZE);
+  }, [currentTermsPage, filteredTerms]);
+
   const selectedListTerm = (termsQuery.data ?? []).find(
     (term) => String(term.id) === String(selectedTermId),
   );
   const selectedTerm = selectedTermQuery.data ?? selectedListTerm;
+  const isEditingTerm = dialogState?.type === "term" && dialogState.mode === "edit";
 
   function getDepartmentName(id: unknown): string {
     return getText(departmentsById.get(String(id))?.name);
@@ -372,6 +411,9 @@ export function TiTermsTab() {
     const printWindow = window.open("", "_blank", "width=900,height=1100");
 
     if (!printWindow) {
+      toast.error(
+        "Não foi possível abrir a janela de impressão. Verifique o bloqueador de pop-ups do navegador.",
+      );
       return;
     }
 
@@ -392,11 +434,9 @@ export function TiTermsTab() {
     const selectedAssetId = getFormText(formData, "selected_asset_id");
     const selectedAsset = assetsById.get(String(selectedAssetId));
     const selectedAssetCode = getAssetCode(selectedAsset);
-    const payload = compactPayload({
+    const selectedUserId = getFormText(formData, "user_id");
+    const payload: TiTermUpdatePayload = compactPayload({
       date: getFormText(formData, "date"),
-      user_name: getFormText(formData, "user_name"),
-      user_cpf: getFormText(formData, "user_cpf"),
-      user_id: getFormText(formData, "user_id"),
       department_id: getFormText(formData, "department_id"),
       address: getFormText(formData, "address"),
       reason: getFormText(formData, "reason"),
@@ -421,10 +461,13 @@ export function TiTermsTab() {
     try {
       setDialogError(null);
 
-      if (dialogState.mode === "edit") {
+      if (isEditingTerm) {
         await updateTermMutation.mutateAsync({ id: dialogState.term.id, payload });
       } else {
-        const createdTerm = await createTermMutation.mutateAsync(payload);
+        const createdTerm = await createTermMutation.mutateAsync({
+          ...payload,
+          user_id: selectedUserId,
+        });
         setSelectedTermId(createdTerm.id);
         setIsDetailDialogOpen(true);
       }
@@ -517,67 +560,86 @@ export function TiTermsTab() {
         >
           {() =>
             filteredTerms.length > 0 ? (
-              <TiDataTable headers={["Termo", "Ativo", "Usuário", "Data", "Status", ""]}>
-                {filteredTerms.map((term) => {
-                  const isSelected = String(term.id) === String(selectedTermId);
-                  const termStatusValue = getTermStatus(term);
+              <div>
+                <TiDataTable headers={["Termo", "Ativo", "Usuário", "Data", "Status", ""]}>
+                  {paginatedTerms.map((term) => {
+                    const isSelected = String(term.id) === String(selectedTermId);
+                    const termStatusValue = getTermStatus(term);
 
-                  return (
-                    <tr
-                      key={term.id}
-                      className={cn(
-                        "text-slate-700 dark:text-slate-200",
-                        isSelected ? "bg-blue-50/70 dark:bg-blue-950/20" : "",
-                      )}
-                    >
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          className="text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
-                          onClick={() => openTermDetail(term.id)}
-                        >
-                          {getTermTitle(term)}
-                        </button>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                          {getText(term.user_cpf)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">{getTermAsset(term)}</td>
-                      <td className="px-4 py-3">{getTermUser(term)}</td>
-                      <td className="px-4 py-3">{formatDate(term.date)}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge
-                          config={getStatusBadgeConfig(termStatusValue)}
-                          className={tiStatusBadgeClassName}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2">
-                          <TiTableAction
-                            icon={Eye}
-                            label="Detalhes"
+                    return (
+                      <tr
+                        key={term.id}
+                        className={cn(
+                          "text-slate-700 dark:text-slate-200",
+                          isSelected ? "bg-blue-50/70 dark:bg-blue-950/20" : "",
+                        )}
+                      >
+                        <td className="max-w-48 px-4 py-3 align-top">
+                          <button
+                            type="button"
+                            className="block max-w-full break-words text-left font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300"
                             onClick={() => openTermDetail(term.id)}
+                          >
+                            {getTermTitle(term)}
+                          </button>
+                          <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">
+                            {getText(term.user_cpf)}
+                          </p>
+                        </td>
+                        <td className="max-w-56 break-all px-4 py-3 align-top">{getTermAsset(term)}</td>
+                        <td className="max-w-40 break-words px-4 py-3 align-top">{getTermUser(term)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 align-top">{formatDate(term.date)}</td>
+                        <td className="px-4 py-3 align-top">
+                          <StatusBadge
+                            config={getStatusBadgeConfig(termStatusValue)}
+                            className={tiStatusBadgeClassName}
                           />
-                          {canManage ? (
+                        </td>
+                        <td className="w-32 px-4 py-3 align-top">
+                          <div className="flex justify-end gap-1">
                             <TiTableAction
-                              icon={Pencil}
-                              label="Editar termo"
-                              onClick={() => openDialog({ type: "term", mode: "edit", term })}
+                              icon={Eye}
+                              iconOnly
+                              label="Detalhes"
+                              onClick={() => openTermDetail(term.id)}
                             />
-                          ) : null}
-                          {canSign ? (
-                            <TiTableAction
-                              icon={Signature}
-                              label="Assinar termo"
-                              onClick={() => openDialog({ type: "sign", term })}
-                            />
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </TiDataTable>
+                            {canManage ? (
+                              <TiTableAction
+                                icon={Pencil}
+                                iconOnly
+                                label="Editar termo"
+                                onClick={() => openDialog({ type: "term", mode: "edit", term })}
+                              />
+                            ) : null}
+                            {canSign ? (
+                              <TiTableAction
+                                icon={Signature}
+                                iconOnly
+                                label="Assinar termo"
+                                onClick={() => openDialog({ type: "sign", term })}
+                              />
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </TiDataTable>
+                {filteredTerms.length > TERMS_PAGE_SIZE ? (
+                  <PaginationControls
+                    page={currentTermsPage}
+                    limit={TERMS_PAGE_SIZE}
+                    total={filteredTerms.length}
+                    totalPages={termsPageCount}
+                    count={paginatedTerms.length}
+                    hasMore={currentTermsPage < termsPageCount}
+                    isFetching={termsQuery.isFetching}
+                    onPrevious={() => setTermsPage((current) => Math.max(1, current - 1))}
+                    onNext={() => setTermsPage((current) => Math.min(termsPageCount, current + 1))}
+                    onPageChange={(page) => setTermsPage(page)}
+                  />
+                ) : null}
+              </div>
             ) : (
               <TiEmptyState
                 icon={FileCheck2}
@@ -666,23 +728,33 @@ export function TiTermsTab() {
         <form className="space-y-3" onSubmit={handleSubmitTerm}>
           {dialogError ? <TiInlineNotice tone="danger">{dialogError}</TiInlineNotice> : null}
           <div className="grid gap-3 md:grid-cols-2">
-            <TiTextField
-              label="Nome do usuário"
-              name="user_name"
-              required
-              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.user_name, "") : ""}
-            />
-            <TiTextField
-              label="CPF do usuário"
-              name="user_cpf"
-              required
-              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.user_cpf, "") : ""}
-            />
-            <TiTextField
-              label="ID do usuário"
-              name="user_id"
-              defaultValue={dialogState?.type === "term" ? getText(dialogState.term?.user_id, "") : ""}
-            />
+            {isEditingTerm ? (
+              <>
+                <TiTextField
+                  label="Nome do usuário"
+                  value={getText(dialogState.term.user_name, "")}
+                  readOnly
+                />
+                <TiTextField
+                  label="CPF do usuário"
+                  value={getText(dialogState.term.user_cpf, "")}
+                  readOnly
+                />
+                <TiTextField
+                  label="ID do usuário"
+                  value={getText(dialogState.term.user_id, "")}
+                  readOnly
+                />
+              </>
+            ) : (
+              <TiNativeSelect
+                label="Usuário"
+                name="user_id"
+                required
+                disabled={assignableUsersQuery.isLoading}
+                options={assignableUserOptions}
+              />
+            )}
             <TiNativeSelect
               label="Departamento"
               name="department_id"

@@ -105,9 +105,11 @@ export interface ClientListFilters {
   status?: string;
   page?: number;
   limit?: number;
+  legacyIntegrationStatusFilter?: boolean;
 }
 
 export interface ClientFormValues {
+  type?: "PJ" | "PF";
   name: string;
   company_name: string;
   fantasy_name: string;
@@ -231,21 +233,18 @@ export interface UpdateClientPaPayload {
 export interface Perms {
   id: string;
   user_id: string;
-  atendimento: number | null;
-  certificado: number | null;
-  comercial: number | null;
-  contabil: number | null;
-  financeiro: number | null;
-  fiscal: number | null;
-  integracao: number | null;
-  marketing: number | null;
-  parcelamento: number | null;
-  pec: number | null;
-  pessoal: number | null;
-  regularize: number | null;
-  rh: number | null;
-  triagem: number | null;
-  wiki: number | null;
+  certificado: number;
+  comercial: number;
+  contabil: number;
+  financeiro: number;
+  fiscal: number;
+  integracao: number;
+  marketing: number;
+  parcelamento: number;
+  pessoal: number;
+  regularize: number;
+  rh: number;
+  triagem: number;
 }
 
 export interface CreateClientData {
@@ -259,6 +258,7 @@ export interface CreateClientData {
 
 export interface CreateClientPayload {
   organization_id?: string;
+  type: "PJ" | "PF";
   name: string;
   status?: string;
   cpf_cnpj: string;

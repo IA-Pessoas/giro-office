@@ -15,6 +15,7 @@ interface UserRouteMocks {
   authServiceMock: {
     login: Mock;
     firstCreate: Mock;
+    validateSession: Mock;
   };
   userServiceMock: {
     list: Mock;
@@ -39,6 +40,7 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
     authServiceMock: {
       login: vi.fn(),
       firstCreate: vi.fn(),
+      validateSession: vi.fn(),
     },
     userServiceMock: {
       list: vi.fn(),
@@ -113,7 +115,7 @@ export function gatewayAuthHeaders(overrides?: {
   organizationId?: string;
   permission?: number;
   type?: "owner" | "admin" | "user";
-  modules?: Record<string, number | null>;
+  modules?: Record<string, number>;
 }): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
@@ -121,7 +123,9 @@ export function gatewayAuthHeaders(overrides?: {
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]:
       overrides?.organizationId ?? DEFAULT_TEST_ORGANIZATION_ID,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(overrides?.permission ?? 2),
-    ...(overrides?.type ? { [FORWARDED_AUTH_TYPE_HEADER]: overrides.type } : {}),
+    [FORWARDED_AUTH_TYPE_HEADER]:
+      overrides?.type ??
+      (overrides?.permission === 2 || overrides?.permission === undefined ? "owner" : "user"),
     ...(overrides?.modules
       ? { [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify(overrides.modules) }
       : {}),

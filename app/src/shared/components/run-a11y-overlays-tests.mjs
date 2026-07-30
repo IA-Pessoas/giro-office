@@ -30,6 +30,7 @@ const myOrganizationSectionSource = readFileSync(
   new URL("../../modules/organizations/ui/MyOrganizationSection.tsx", import.meta.url),
   "utf8",
 );
+const dialogSource = readFileSync(new URL("./ui/Dialog.tsx", import.meta.url), "utf8");
 const legacyAiChatBackdrop = [
   'className="fixed inset-0 z-[60] bg-black/40"',
   " onClick",
@@ -73,6 +74,47 @@ runTest("AppShell menu triggers expose expanded state and controlled panels", ()
   assert.match(appShellSource, /id=\{USER_MENU_PANEL_ID\}/);
 });
 
+runTest("AppShell sidebar toggle sits in the header and exposes an accessible name", () => {
+  const toggleStart = appShellSource.indexOf("toggleSidebar();");
+  const toggleSource = appShellSource.slice(toggleStart - 500, toggleStart + 700);
+
+  assert.notEqual(toggleStart, -1);
+  assert.match(toggleSource, /event\.stopPropagation\(\);/);
+  assert.match(toggleSource, /aria-label=\{sidebarToggleLabel\}/);
+  assert.match(toggleSource, /title=\{sidebarToggleLabel\}/);
+  assert.match(toggleSource, /h-9 w-9/);
+  assert.match(toggleSource, /justify-center px-2/);
+  assert.match(toggleSource, /\{shouldExpandSidebar \? <Logo showText \/> : null\}/);
+  assert.doesNotMatch(toggleSource, /absolute -right-3 top-20/);
+});
+
+runTest("AppShell sidebar preview opens temporarily and pins only by click", () => {
+  assert.match(appShellSource, /const \[isSidebarPreviewOpen, setIsSidebarPreviewOpen\] = useState\(false\);/);
+  assert.match(appShellSource, /const shouldExpandSidebar = isSidebarOpen \|\| isSidebarPreviewOpen;/);
+  assert.match(appShellSource, /const sidebarToggleLabel = isSidebarOpen/);
+  assert.match(appShellSource, /\? "Fixar sidebar aberta"/);
+  assert.match(appShellSource, /const openSidebarPreview = \(\) => \{/);
+  assert.match(appShellSource, /const closeSidebarPreview = \(\) => \{/);
+  assert.match(appShellSource, /const pinSidebarOpen = \(\) => \{/);
+  assert.match(appShellSource, /onMouseEnter=\{openSidebarPreview\}/);
+  assert.match(appShellSource, /onMouseLeave=\{closeSidebarPreview\}/);
+  assert.match(appShellSource, /onFocus=\{openSidebarPreview\}/);
+  assert.match(appShellSource, /onClick=\{pinSidebarOpen\}/);
+  assert.match(appShellSource, /if \(isMobileMenuOpen \|\| isSidebarPreviewOpen\)/);
+  assert.match(appShellSource, /if \(isSidebarPreviewOpen\) setIsSidebarPreviewOpen\(false\);/);
+  assert.match(appShellSource, /className=\{`flex flex-col min-h-screen transition-all duration-300 \$\{isSidebarOpen \? "lg:ml-64" : "lg:ml-20"\}`\}/);
+});
+
+runTest("AppShell header notifications do not embed mock notification rows", () => {
+  assert.equal(appShellSource.includes("Novo chamado crítico aberto"), false);
+  assert.equal(appShellSource.includes("Prazo de tarefa próximo do vencimento"), false);
+  assert.equal(appShellSource.includes("Backup diário finalizado"), false);
+  assert.match(appShellSource, /const notifications: AppShellNotification\[] = \[];/);
+  assert.match(appShellSource, /const hasUnreadNotifications = notifications\.some/);
+  assert.match(appShellSource, /hasUnreadNotifications \?/);
+  assert.match(appShellSource, /Nenhuma notificação encontrada\./);
+});
+
 runTest("AppShell AI chat uses Radix Dialog primitives", () => {
   assert.match(appShellSource, /import \* as DialogPrimitive from "@radix-ui\/react-dialog";/);
   assert.match(appShellSource, /<DialogPrimitive\.Root[\s\S]*open=\{showAiChat\}/);
@@ -102,6 +144,19 @@ runTest("Integracao task modals remain on shared Dialog", () => {
   assert.match(taskFormModalSource, /<Dialog/);
   assert.match(taskModelModalSource, /<Dialog/);
   assert.match(taskModelsConfigSource, /<Dialog/);
+});
+
+runTest("shared Dialog constrains content and scrolls only its body", () => {
+  assert.match(
+    dialogSource,
+    /<DialogPrimitive\.Content[\s\S]*className=\{`[^`]*max-h-\[calc\(100dvh-2rem\)\][^`]*flex-col[^`]*overflow-hidden[^`]*`\}/,
+  );
+  assert.match(dialogSource, /<header className="[^"]*shrink-0[^"]*"/);
+  assert.match(
+    dialogSource,
+    /<div\s+className=\{`[^`]*min-h-0[^`]*flex-1[^`]*overflow-y-auto[^`]*overscroll-contain[^`]*\$\{bodyClassName\}[^`]*`\}/,
+  );
+  assert.match(dialogSource, /<footer className="[^"]*shrink-0[^"]*"/);
 });
 
 runTest("MyOrganizationSection opens organization editing in a shared Dialog", () => {

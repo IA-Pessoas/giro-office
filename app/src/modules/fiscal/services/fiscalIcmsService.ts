@@ -4,6 +4,7 @@ import type {
   CreateFiscalIcmsPayload,
   FiscalIcms,
   FiscalIcmsListFilters,
+  FiscalIcmsListResult,
   UpdateFiscalIcmsPayload,
 } from "../types";
 import {
@@ -12,18 +13,21 @@ import {
   FISCAL_ENDPOINTS,
   unwrapFiscalCreate,
   unwrapFiscalDetail,
-  unwrapFiscalEnvelope,
+  unwrapFiscalPaginatedEnvelope,
   unwrapFiscalMutation,
 } from "./fiscalService.contract";
 
 export const fiscalIcmsService = {
-  async list(filters: FiscalIcmsListFilters = {}): Promise<FiscalIcms[]> {
+  async list(filters: FiscalIcmsListFilters = {}): Promise<FiscalIcmsListResult> {
     const api = setupAPIClient();
     const response = await api.get(FISCAL_ENDPOINTS.icmsList, {
       params: buildFiscalIcmsListParams(filters),
     });
 
-    return unwrapFiscalEnvelope<FiscalIcms[]>(response.data);
+    return unwrapFiscalPaginatedEnvelope<FiscalIcms>(response.data, {
+      page: filters.page ?? 1,
+      limit: filters.page_size ?? 50,
+    });
   },
 
   async detail(icmsId: string): Promise<FiscalIcms> {
@@ -47,5 +51,12 @@ export const fiscalIcmsService = {
     const response = await api.put(FISCAL_ENDPOINTS.icms, payload);
 
     return unwrapFiscalMutation<FiscalIcms>(response.data);
+  },
+
+  async delete(icmsId: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(FISCAL_ENDPOINTS.icms, {
+      params: buildFiscalIcmsDetailParams(icmsId),
+    });
   },
 };

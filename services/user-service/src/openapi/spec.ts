@@ -83,6 +83,19 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/user/session/validate": {
+        get: {
+          tags: ["Auth"],
+          summary: "Validar a sessão atual",
+          description:
+            "Valida o JWT contra o usuário ativo e a versão de sessão persistida; usado pelo gateway para revogação imediata.",
+          security: bearer,
+          responses: {
+            "200": { description: "Sessão válida", ...successJson },
+            "401": { description: "Sessão inválida ou revogada" },
+          },
+        },
+      },
       "/user/start-config": {
         post: {
           tags: ["Auth"],
@@ -138,7 +151,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                     first_owner_flag: { type: "boolean" },
                     modules: {
                       type: "object",
-                      additionalProperties: { type: ["integer", "null"] },
+                      additionalProperties: { type: "integer", minimum: 0, maximum: 3 },
                     },
                   },
                   required: ["name", "login", "password", "department_id", "permission"],
@@ -156,7 +169,6 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                     type: "owner",
                     first_owner_flag: true,
                     modules: {
-                      administracao: 2,
                       integracao: 3,
                       rh: 1,
                       ti: 3,
@@ -181,7 +193,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             "200": { description: "Usuário", ...successJson },
           },
         },
-        patch: {
+        put: {
           tags: ["Users"],
           summary: "Atualizar usuário",
           security: bearer,
@@ -204,7 +216,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                     first_owner_flag: { type: "boolean" },
                     modules: {
                       type: "object",
-                      additionalProperties: { type: ["integer", "null"] },
+                      additionalProperties: { type: "integer", minimum: 0, maximum: 3 },
                     },
                   },
                   additionalProperties: true,
@@ -220,9 +232,8 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                     type: "user",
                     first_owner_flag: false,
                     modules: {
-                      administracao: 1,
                       integracao: 2,
-                      rh: null,
+                      rh: 1,
                       ti: 3,
                     },
                   },
@@ -317,14 +328,22 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                 schema: {
                   type: "object",
                   properties: {
-                    administracao: { type: "integer", nullable: true },
-                    integracao: { type: "integer", nullable: true },
-                    rh: { type: "integer", nullable: true },
-                    ti: { type: "integer", nullable: true },
+                    certificado: { type: "integer", minimum: 0, maximum: 3 },
+                    comercial: { type: "integer", minimum: 0, maximum: 3 },
+                    contabil: { type: "integer", minimum: 0, maximum: 3 },
+                    financeiro: { type: "integer", minimum: 0, maximum: 3 },
+                    fiscal: { type: "integer", minimum: 0, maximum: 3 },
+                    integracao: { type: "integer", minimum: 0, maximum: 3 },
+                    marketing: { type: "integer", minimum: 0, maximum: 3 },
+                    parcelamento: { type: "integer", minimum: 0, maximum: 3 },
+                    pessoal: { type: "integer", minimum: 0, maximum: 3 },
+                    regularize: { type: "integer", minimum: 0, maximum: 3 },
+                    rh: { type: "integer", minimum: 0, maximum: 3 },
+                    ti: { type: "integer", minimum: 0, maximum: 3 },
+                    triagem: { type: "integer", minimum: 0, maximum: 3 },
                   },
-                  additionalProperties: { type: "integer", nullable: true },
+                  additionalProperties: false,
                   example: {
-                    administracao: 2,
                     integracao: 3,
                     rh: 1,
                     ti: 3,

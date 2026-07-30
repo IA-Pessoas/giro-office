@@ -1,3 +1,4 @@
+import type { PessoalOverviewSummary } from "../types";
 import type {
   PessoalObligation,
   PessoalObligationCreatePayload,
@@ -21,7 +22,12 @@ import type {
   PessoalSituationPayload,
   PessoalSituationUpdatePayload,
 } from "../types/tracking";
-import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
+import type {
+  PessoalUnion,
+  PessoalUnionListParams,
+  PessoalUnionPayload,
+} from "../types/unions";
+import type { PaginatedResult } from "@shared/pagination/pagination";
 
 async function getPessoalHttp() {
   const [{ setupAPIClient }, contract] = await Promise.all([
@@ -40,6 +46,14 @@ export function buildPessoalUnionPayload(payload: PessoalUnionPayload): PessoalU
     name: payload.name,
     cnpj: payload.cnpj,
     base_date: typeof payload.base_date === "undefined" ? null : payload.base_date,
+  };
+}
+
+export function buildPessoalUnionListParams(params: PessoalUnionListParams) {
+  return {
+    ...(params.search?.trim() ? { search: params.search.trim() } : {}),
+    page: params.page,
+    limit: params.limit,
   };
 }
 
@@ -119,11 +133,29 @@ function isNotFoundError(error: unknown): boolean {
 }
 
 export const pessoalService = {
+  async getOverview(): Promise<PessoalOverviewSummary> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.overview);
+
+    return unwrapPessoalEnvelope<PessoalOverviewSummary>(response.data);
+  },
+
   async listUnions(): Promise<PessoalUnion[]> {
     const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
     const response = await api.get(PESSOAL_ENDPOINTS.unions);
 
     return unwrapPessoalEnvelope<PessoalUnion[]>(response.data);
+  },
+
+  async listUnionsPage(
+    params: PessoalUnionListParams,
+  ): Promise<PaginatedResult<PessoalUnion>> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalPage } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.unions, {
+      params: buildPessoalUnionListParams(params),
+    });
+
+    return unwrapPessoalPage<PessoalUnion>(response.data, params);
   },
 
   async detailUnion(id: string): Promise<PessoalUnion> {
@@ -146,6 +178,13 @@ export const pessoalService = {
       PESSOAL_ENDPOINTS.unionDetail(id),
       buildPessoalUnionPayload(payload),
     );
+
+    return unwrapPessoalEnvelope<PessoalUnion>(response.data);
+  },
+
+  async deleteUnion(id: string): Promise<PessoalUnion> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.delete(PESSOAL_ENDPOINTS.unionDetail(id));
 
     return unwrapPessoalEnvelope<PessoalUnion>(response.data);
   },
@@ -301,6 +340,13 @@ export const pessoalService = {
   ): Promise<PessoalSituation> {
     const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
     const response = await api.patch(PESSOAL_ENDPOINTS.situationDetail(id), payload);
+
+    return unwrapPessoalEnvelope<PessoalSituation>(response.data);
+  },
+
+  async deleteSituation(id: string): Promise<PessoalSituation> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.delete(PESSOAL_ENDPOINTS.situationDetail(id));
 
     return unwrapPessoalEnvelope<PessoalSituation>(response.data);
   },
