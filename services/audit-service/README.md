@@ -28,3 +28,51 @@ pnpm --filter @workspace/audit-service dev
 ```
 
 Testes do pacote: `pnpm --filter @workspace/audit-service test`.
+
+## Consulta operacional
+
+Os registros ficam na tabela `audit_requests` e podem ser consultados, sempre
+limitados à organização enviada na autenticação encaminhada, por:
+
+- `GET /audit/requests` para pesquisa paginada;
+- `GET /audit/requests/:requestId` para consultar um evento específico.
+
+As consultas exigem o token interno do serviço e uma permissão de administrador
+de auditoria. A pesquisa aceita filtros de `requestId`, `userId`, `method`,
+`path`, `statusCode`, intervalo de datas, `referring`, `referringId` e
+`department`. Alterações de entidade preservam `action`, `referring`,
+`referringId` e `changes_json`, permitindo investigar quem alterou o recurso,
+qual foi o resultado e qual era o diff.
+
+## Retenção
+
+O serviço não executa expurgo automático nem aplica um TTL próprio. Os eventos
+permanecem em `audit_requests` até que a política operacional externa de banco,
+backup ou retenção da organização os remova. A equipe responsável pelo banco
+deve definir e executar essa política, considerando o prazo de auditoria e os
+requisitos legais aplicáveis. Uma retenção automática futura deve ser adicionada
+como job/migração explícita e coberta por teste antes de ser habilitada.
+
+## Teste de persistência real (opt-in)
+
+A suíte padrão usa um repositório em memória para continuar rápida e
+determinística. A integração Prisma real só é executada quando explicitamente
+habilitada, com um banco já existente e uma organização válida:
+
+```bash
+AUDIT_REAL_DB_TEST=1 \
+AUDIT_TEST_ORGANIZATION_ID=<organization-id> \
+pnpm --filter @workspace/audit-service exec vitest run tests/persistence.integration.test.ts
+```
+
+No PowerShell:
+
+```powershell
+$env:AUDIT_REAL_DB_TEST = "1"
+$env:AUDIT_TEST_ORGANIZATION_ID = "<organization-id>"
+pnpm --filter @workspace/audit-service exec vitest run tests/persistence.integration.test.ts
+```
+
+`DATABASE_URL` também precisa estar configurada. O teste cria um único evento
+marcado, valida a persistência do diff, a consulta por filtros independentes e
+o isolamento por organização, e remove o registro ao terminar.
