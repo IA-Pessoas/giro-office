@@ -171,7 +171,7 @@ runTest("RH request timeline uses distinct semantic message type badges", () => 
 
   assert.equal(new Set(classNames).size, 4);
   assert.match(getRhMessageTypeClassName("Message"), /blue|slate|gray/);
-  assert.match(getRhMessageTypeClassName("Solution"), /green|emerald/);
+  assert.match(getRhMessageTypeClassName("Solution"), /amber|yellow/);
   assert.match(getRhMessageTypeClassName("Rejection"), /red|rose/);
   assert.match(getRhMessageTypeClassName("Acceptance"), /green|emerald/);
   assert.match(timelineSource, /getRhMessageTypeClassName\(item\.type\)/);
