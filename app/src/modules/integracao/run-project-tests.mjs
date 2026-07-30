@@ -359,6 +359,13 @@ runTest("task model options keep active users and departments in one response", 
   );
 });
 
+runTest("task edit form loads auxiliary selects from integration task options", () => {
+  const source = readFileSync(new URL("./components/TaskFormModal.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /taskModelService\.listOptions/);
+  assert.doesNotMatch(source, /listAdminUsers|departmentService\.list/);
+});
+
 runTest("task model deletion preserves actionable dependency conflicts", () => {
   const source = readFileSync(new URL("./hooks/useTaskModels.tsx", import.meta.url), "utf8");
 

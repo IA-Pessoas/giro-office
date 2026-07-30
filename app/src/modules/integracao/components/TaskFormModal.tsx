@@ -4,8 +4,6 @@ import { toast } from "react-toastify";
 
 import { ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import type { ModuleAccess } from "@modules/auth";
-import { departmentService, type DepItem } from "@modules/departments";
-import { listAdminUsers, type UserItem } from "@modules/users";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { useFetch } from "@shared/hooks";
 import { useAuth } from "../../../context/AuthContext";
@@ -176,14 +174,7 @@ export function TaskFormModal({
       enabled: open && !isEditing,
     },
   );
-  const departmentsQuery = useFetch<DepItem[]>(
-    ["task-form-departments"],
-    () => departmentService.list({ status: "Ativo" }),
-    {
-      enabled: open && isEditing && !isRestrictedEdit,
-    },
-  );
-  const usersQuery = useFetch<UserItem[]>(["task-form-users"], () => listAdminUsers("active"), {
+  const taskOptionsQuery = useFetch(["task-form-options"], () => taskModelService.listOptions(), {
     enabled: open && isEditing && !isRestrictedEdit,
   });
   const taskDetailQuery = useIntegracaoTaskDetail(open && taskId ? taskId : undefined);
@@ -232,11 +223,11 @@ export function TaskFormModal({
     isEditing &&
     shouldBlockTaskEditForm({
       isTaskLoading: taskDetailQuery.isLoading,
-      isDepartmentsLoading: isRestrictedEdit ? false : departmentsQuery.isLoading,
-      isUsersLoading: isRestrictedEdit ? false : usersQuery.isLoading,
+      isDepartmentsLoading: isRestrictedEdit ? false : taskOptionsQuery.isLoading,
+      isUsersLoading: isRestrictedEdit ? false : taskOptionsQuery.isLoading,
     });
   const hasEditAuxiliaryOptionsWarning =
-    isEditing && !isRestrictedEdit && (departmentsQuery.isError || usersQuery.isError);
+    isEditing && !isRestrictedEdit && taskOptionsQuery.isError;
   const hasRestrictedTaskAccessDenied =
     isRestrictedEdit &&
     Boolean(taskDetailQuery.data) &&
@@ -245,8 +236,8 @@ export function TaskFormModal({
       taskDetailQuery.data?.responsible2_id,
       taskDetailQuery.data?.responsible3_id,
     ].includes(user?.id ?? null);
-  const departments = departmentsQuery.data ?? [];
-  const users = usersQuery.data ?? [];
+  const departments = taskOptionsQuery.data?.departments ?? [];
+  const users = taskOptionsQuery.data?.users ?? [];
   const shouldRenderCurrentDepartmentOption =
     Boolean(editValues.department_id) &&
     !departments.some((department) => department.id === editValues.department_id);
@@ -271,11 +262,11 @@ export function TaskFormModal({
   }
 
   function getDepartmentPlaceholder() {
-    if (departmentsQuery.isLoading) {
+    if (taskOptionsQuery.isLoading) {
       return "Carregando departamentos...";
     }
 
-    if (departmentsQuery.isError) {
+    if (taskOptionsQuery.isError) {
       return "Departamentos indisponíveis";
     }
 
@@ -283,11 +274,11 @@ export function TaskFormModal({
   }
 
   function getUserPlaceholder(optional: boolean) {
-    if (usersQuery.isLoading) {
+    if (taskOptionsQuery.isLoading) {
       return "Carregando usuários...";
     }
 
-    if (usersQuery.isError) {
+    if (taskOptionsQuery.isError) {
       return "Usuários indisponíveis";
     }
 
@@ -559,7 +550,7 @@ export function TaskFormModal({
                     onChange={(event) => updateEditValue("department_id", event.target.value)}
                     className={PROJECT_SELECT_CLASSNAME}
                     style={PROJECT_SELECT_ARROW_STYLE}
-                    disabled={departmentsQuery.isLoading || departmentsQuery.isError}
+                    disabled={taskOptionsQuery.isLoading || taskOptionsQuery.isError}
                   >
                     <option value="">{getDepartmentPlaceholder()}</option>
                     {shouldRenderCurrentDepartmentOption ? (
@@ -604,7 +595,7 @@ export function TaskFormModal({
                     onChange={(event) => updateEditValue("responsible_id", event.target.value)}
                     className={PROJECT_SELECT_CLASSNAME}
                     style={PROJECT_SELECT_ARROW_STYLE}
-                    disabled={usersQuery.isLoading || usersQuery.isError}
+                    disabled={taskOptionsQuery.isLoading || taskOptionsQuery.isError}
                   >
                     <option value="">{getUserPlaceholder(false)}</option>
                     {shouldRenderCurrentUserOption(editValues.responsible_id) ? (
@@ -627,7 +618,7 @@ export function TaskFormModal({
                     onChange={(event) => updateEditValue("responsible2_id", event.target.value)}
                     className={PROJECT_SELECT_CLASSNAME}
                     style={PROJECT_SELECT_ARROW_STYLE}
-                    disabled={usersQuery.isLoading || usersQuery.isError}
+                    disabled={taskOptionsQuery.isLoading || taskOptionsQuery.isError}
                   >
                     <option value="">{getUserPlaceholder(true)}</option>
                     {shouldRenderCurrentUserOption(editValues.responsible2_id) ? (
@@ -650,7 +641,7 @@ export function TaskFormModal({
                     onChange={(event) => updateEditValue("responsible3_id", event.target.value)}
                     className={PROJECT_SELECT_CLASSNAME}
                     style={PROJECT_SELECT_ARROW_STYLE}
-                    disabled={usersQuery.isLoading || usersQuery.isError}
+                    disabled={taskOptionsQuery.isLoading || taskOptionsQuery.isError}
                   >
                     <option value="">{getUserPlaceholder(true)}</option>
                     {shouldRenderCurrentUserOption(editValues.responsible3_id) ? (
@@ -831,7 +822,7 @@ export function TaskFormModal({
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Departamento</span>
-              <select value={createValues.department_id} onChange={(event) => updateCreateValue("department_id", event.target.value)} className={PROJECT_SELECT_CLASSNAME} style={PROJECT_SELECT_ARROW_STYLE} disabled={departmentsQuery.isLoading || departmentsQuery.isError}>
+              <select value={createValues.department_id} onChange={(event) => updateCreateValue("department_id", event.target.value)} className={PROJECT_SELECT_CLASSNAME} style={PROJECT_SELECT_ARROW_STYLE} disabled={taskOptionsQuery.isLoading || taskOptionsQuery.isError}>
                 <option value="">Usar departamento do modelo</option>
                 {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
               </select>
@@ -848,7 +839,7 @@ export function TaskFormModal({
             {(["responsible_id", "responsible2_id", "responsible3_id"] as const).map((field, index) => (
               <label key={field} className={TASK_FORM_LABEL_CLASSNAME}>
                 <span className="text-sm font-medium text-slate-700 dark:text-white">{index === 0 ? "Responsável" : `Responsável ${index + 1}`}</span>
-                <select value={createValues[field]} onChange={(event) => updateCreateValue(field, event.target.value)} className={PROJECT_SELECT_CLASSNAME} style={PROJECT_SELECT_ARROW_STYLE} disabled={usersQuery.isLoading || usersQuery.isError}>
+                <select value={createValues[field]} onChange={(event) => updateCreateValue(field, event.target.value)} className={PROJECT_SELECT_CLASSNAME} style={PROJECT_SELECT_ARROW_STYLE} disabled={taskOptionsQuery.isLoading || taskOptionsQuery.isError}>
                   <option value="">Usar responsável do modelo</option>
                   {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
                 </select>
