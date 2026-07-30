@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog } from "./Dialog";
 
 const CANCEL_BUTTON_CLASSNAME =
@@ -38,6 +38,12 @@ export function ConfirmationDialog({
 }: ConfirmationDialogProps) {
   const [localError, setLocalError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!open) {
+      setLocalError(null);
+    }
+  }, [open]);
+
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen && isConfirming) {
       return;
@@ -70,7 +76,7 @@ export function ConfirmationDialog({
     }
   };
 
-  const displayedError = localError ?? errorMessage;
+  const displayedError = errorMessage ?? localError;
 
   return (
     <Dialog
@@ -108,7 +114,7 @@ export function ConfirmationDialog({
           role="alert"
           className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
         >
-          {localError ?? errorMessage}
+          {displayedError}
         </p>
       ) : null}
     </Dialog>

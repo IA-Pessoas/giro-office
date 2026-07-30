@@ -81,7 +81,61 @@ Implementada exclusivamente a Task 1 na branch `feat/456-confirmation-dialog-fou
 
 ## Preocupações
 
-- O runner a11y deste repositório valida a estrutura por inspeção de fonte; não há renderização do
-  novo componente no navegador nesta Task 1 porque nenhum fluxo produtivo pode consumi-lo ainda.
+- A cobertura comportamental agora usa uma fixture Next isolada e Chromium real, sem expor rota no
+  app produtivo e sem adicionar dependências.
 - O Biome não oferece evidência de formatação para estes arquivos enquanto o frontend permanecer
   ignorado na configuração.
+
+## Rodada de correção 1
+
+### Feedback verificado
+
+1. `localError ?? errorMessage` fazia o fallback local mascarar uma mensagem controlada e mais
+   específica do consumidor.
+2. O erro local só era limpo pelos handlers internos; fechar o componente externamente e reabri-lo
+   para outro contexto preservava o fallback antigo.
+3. As verificações anteriores desses comportamentos eram regex sobre o código-fonte, sem executar
+   React ou Radix.
+
+### RED
+
+- Foi criada uma fixture Next exclusivamente de teste em
+  `app/src/shared/components/confirmation-dialog-test-fixture/`.
+- Foi criado `run-confirmation-dialog-behavior-tests.mjs` usando o Playwright já instalado; nenhuma
+  dependência ou rota produtiva foi adicionada.
+- O runner renderiza `ConfirmationDialog` e `Dialog` reais e interage com botões, Escape e overlay.
+- `pnpm --filter @workspace/app test:a11y-overlays` reproduziu duas falhas:
+  - após fechamento externo e reabertura, havia 1 alerta quando o esperado era 0;
+  - após rejeição, o texto visível era o fallback local em vez de
+    `Erro específico informado pelo consumidor.`.
+- No mesmo RED, os cenários de loading e `Dialog preventClose={false}` passaram, isolando a causa no
+  estado de erro do `ConfirmationDialog`.
+
+### GREEN
+
+- `errorMessage` agora tem prioridade sobre `localError`.
+- Um efeito limpa `localError` quando `open` muda para `false`, incluindo fechamento controlado
+  externamente.
+- Os regex de falha/guards foram substituídos por cinco cenários comportamentais:
+  - rejeição mantém o diálogo aberto e mostra fallback;
+  - fechamento externo limpa fallback para o próximo contexto;
+  - erro controlado tem prioridade após rejeição;
+  - cancelar, Escape e overlay não fecham durante loading;
+  - `Dialog` normal continua fechando por Escape e overlay.
+- Resultado GREEN: 18 casos passaram, 0 falhas.
+
+### Verificações da rodada
+
+- `pnpm --filter @workspace/app test:a11y-overlays`
+  - passou fora do sandbox, necessário para bind local do Next e execução do Chromium.
+- `pnpm --filter @workspace/app typecheck`
+  - passou, incluindo `typecheck:usefetch`.
+- `git diff --check`
+  - passou.
+
+### Auto-revisão da rodada
+
+- Nenhum `package.json` ou lockfile foi alterado.
+- A fixture está fora de `app/src/pages`; não cria rota no app produtivo.
+- Nenhum consumidor produtivo de `ConfirmationDialog` foi adicionado ou modificado.
+- A cobertura executa os componentes reais, sem mockar `ConfirmationDialog`, `Dialog` ou Radix.
