@@ -343,13 +343,13 @@ await (async () => {
     ]);
   });
 
-  await runTest("relationship field registry keeps bidding last in the UI order", () => {
+  await runTest("relationship field registry keeps bidding beside system in the UI order", () => {
     assert.deepEqual(
       CONTABIL_RELATIONSHIP_FIELDS.map((field) => field.field),
-      ["chart_accounts", "tool", "system", "note", "bidding"],
+      ["chart_accounts", "tool", "system", "bidding", "note"],
     );
-    assert.equal(CONTABIL_RELATIONSHIP_FIELDS.at(-1)?.field, "bidding");
-    assert.equal(CONTABIL_RELATIONSHIP_FIELDS.at(-1)?.requiredOnCreate, true);
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.field, "bidding");
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.requiredOnCreate, true);
   });
 
   await runTest("relationship bidding checkbox uses compact form proportions", () => {
@@ -366,7 +366,8 @@ await (async () => {
     );
 
     assert.ok(textFieldsStart < textareaStart);
-    assert.ok(textareaStart < checkboxStart);
+    assert.ok(textFieldsStart < checkboxStart);
+    assert.ok(checkboxStart < textareaStart);
     assert.match(checkboxSource, /className="flex h-11 items-center gap-3/);
     assert.match(checkboxSource, /className="h-4 w-4/);
     assert.doesNotMatch(
