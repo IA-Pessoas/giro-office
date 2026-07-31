@@ -7,6 +7,7 @@ import type {
   UpdateObligationFieldBody,
 } from "../schemas/obligation.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
+import { ensurePessoalResponsible } from "./pessoalResponsibleService.js";
 import {
   PESSOAL_WRITE_PERMISSION,
   type PessoalAuthContext,
@@ -41,10 +42,6 @@ const payrollDefaultsSelect = {
   bsf: true,
   va: true,
   vt: true,
-} as const;
-
-const userSelect = {
-  id: true,
 } as const;
 
 type PayrollDefaults = {
@@ -208,7 +205,12 @@ export class ObligationService {
       if (!existing) {
         throw new ServiceError(404, "Obrigacao de pessoal nao encontrada.");
       }
-      await this.ensureResponsible(context.organizationId, body.responsavel_id);
+      await ensurePessoalResponsible(
+        this.prisma,
+        context.organizationId,
+        body.responsavel_id,
+        existing.responsavel_id,
+      );
 
       const updated = await this.prisma.obrigationsPessoal.update({
         where: { id },
@@ -351,23 +353,6 @@ export class ObligationService {
     });
     if (!client) {
       throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
-    }
-  }
-
-  private async ensureResponsible(
-    organizationId: string,
-    responsibleId: string | null | undefined,
-  ): Promise<void> {
-    if (responsibleId === undefined || responsibleId === null) {
-      return;
-    }
-
-    const responsible = await this.prisma.user.findFirst({
-      where: { id: responsibleId, organization_id: organizationId },
-      select: userSelect,
-    });
-    if (!responsible) {
-      throw new ServiceError(404, "Responsavel nao encontrado para a organizacao.");
     }
   }
 }

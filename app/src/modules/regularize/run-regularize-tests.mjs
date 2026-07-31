@@ -78,6 +78,16 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   }
 });
 
+await runTest("regularize license responsible field uses the contextual selector", async () => {
+  const source = await readModuleSource("components/RegularizeLicenseForm.tsx");
+
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "regularize"/);
+  assert.match(source, /<RegularizeNativeSelect[\s\S]*value=\{formState\.responsible_id\}/);
+  assert.match(source, /Respons.vel atual/);
+  assert.doesNotMatch(source, /Respons.vel ID/);
+});
+
 await runTest("regularize PF list contract preserves explicit search status and pagination", async () => {
   assert.deepEqual(
     buildRegularizeClientPfListParams({
@@ -751,6 +761,29 @@ await runTest("regularize finite status and urgency fields use native selects", 
   assert.match(licenseSource, /regularizeUrgencyOptions/);
   assert.match(licenseSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
   assert.match(licenseSource, /<RegularizeNativeSelect\s+value=\{formState\.urgency\}/);
+});
+
+await runTest("regularize process task id uses the real task selector", async () => {
+  const processSource = await readModuleSource("components/RegularizeProcessForm.tsx");
+  const tasksHookSource = await readFile(
+    join(appRoot, "src/modules/integracao/hooks/useIntegracaoTasks.ts"),
+    "utf8",
+  );
+
+  assert.match(tasksHookSource, /options\??: \{\s*enabled\??: boolean/);
+  assert.match(tasksHookSource, /enabled: options\.enabled \?\? true/);
+  assert.match(processSource, /useIntegracaoTasksList/);
+  assert.match(processSource, /status: "Todos",\s*limit: 100,\s*search: taskSearch/);
+  assert.match(processSource, /\{\s*enabled: open\s*\}/);
+  assert.match(processSource, /value=\{taskSearch\}/);
+  assert.match(processSource, /taskSearch/);
+  assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.task_id\}/);
+  assert.match(processSource, /taskOptions\.map/);
+  assert.match(processSource, /tasksQuery\.isLoading/);
+  assert.match(processSource, /tasksQuery\.error/);
+  assert.match(processSource, /disabled=/);
+  assert.match(processSource, /Sem task vinculada/);
+  assert.doesNotMatch(processSource, /<input\s+value=\{formState\.task_id\}/);
 });
 
 await runTest("regularize municipal tax year uses the shared native select", async () => {

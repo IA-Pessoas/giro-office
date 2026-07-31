@@ -39,7 +39,7 @@ export function RhRequestsSection() {
 
   const { user, canManageRhRequests } = useRhPermissions("requests");
   const categoriesQuery = useRhCategories({ activeOnly: true });
-  const assignableUsersQuery = useAssignableUsers({ enabled: canManageRhRequests });
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManageRhRequests, module: "rh" });
   const deleteRequestMutation = useDeleteRhRequestMutation();
   const requestsQuery = useRhRequests({
     status: statusFilter === "all" ? undefined : statusFilter,

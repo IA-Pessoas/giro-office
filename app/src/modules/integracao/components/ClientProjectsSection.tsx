@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
+import { ConfirmationDialog } from "@shared/components";
 
 import {
   useDeleteProjectMutation,
@@ -34,20 +35,37 @@ export function ClientProjectsSection({
   const recalculateProgressMutation = useRecalculateProjectProgressMutation();
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [pendingProjectDeletion, setPendingProjectDeletion] = useState<{
+    project: ProjectListItem;
+    clientId: string;
+  } | null>(null);
+  const [projectDeletionError, setProjectDeletionError] = useState<string | null>(null);
 
-  async function handleDelete(project: ProjectListItem) {
-    if (!window.confirm(`Excluir o projeto "${project.name}"?`)) {
+  function handleDelete(project: ProjectListItem) {
+    setProjectDeletionError(null);
+    setPendingProjectDeletion({ project, clientId });
+  }
+
+  async function handleConfirmProjectDeletion() {
+    const pendingDeletion = pendingProjectDeletion;
+
+    if (!pendingDeletion) {
       return;
     }
+
+    const { project, clientId: pendingClientId } = pendingDeletion;
 
     try {
       await deleteProjectMutation.mutateAsync({
         projectId: project.id,
-        clientId,
+        clientId: pendingClientId,
       });
       toast.success("Projeto excluído com sucesso.");
     } catch (error) {
-      toast.error(getProjectDeleteErrorMessage(error));
+      const message = getProjectDeleteErrorMessage(error);
+      toast.error(message);
+      setProjectDeletionError(message);
+      throw error;
     }
   }
 
@@ -65,6 +83,24 @@ export function ClientProjectsSection({
 
   return (
     <div className="space-y-4">
+      <ConfirmationDialog
+        open={Boolean(pendingProjectDeletion)}
+        onOpenChange={(open) => {
+          if (!open && !deleteProjectMutation.isPending) {
+            setPendingProjectDeletion(null);
+            setProjectDeletionError(null);
+          }
+        }}
+        title={`Excluir projeto "${pendingProjectDeletion?.project.name ?? ""}"?`}
+        description="Esta ação remove o projeto e não pode ser desfeita."
+        onConfirm={handleConfirmProjectDeletion}
+        isConfirming={deleteProjectMutation.isPending}
+        errorMessage={projectDeletionError}
+        confirmLabel="Excluir projeto"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
+
       <ProjectFormModal
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}

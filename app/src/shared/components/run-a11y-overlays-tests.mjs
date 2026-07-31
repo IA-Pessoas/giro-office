@@ -31,6 +31,10 @@ const myOrganizationSectionSource = readFileSync(
   "utf8",
 );
 const dialogSource = readFileSync(new URL("./ui/Dialog.tsx", import.meta.url), "utf8");
+const confirmationDialogSource = readFileSync(
+  new URL("./ui/ConfirmationDialog.tsx", import.meta.url),
+  "utf8",
+);
 const legacyAiChatBackdrop = [
   'className="fixed inset-0 z-[60] bg-black/40"',
   " onClick",
@@ -159,6 +163,31 @@ runTest("shared Dialog constrains content and scrolls only its body", () => {
   assert.match(dialogSource, /<footer className="[^"]*shrink-0[^"]*"/);
 });
 
+runTest("shared Dialog animates close without trapping interaction in the exiting content", () => {
+  const overlayClass =
+    dialogSource.match(/<DialogPrimitive\.Overlay[\s\S]*?className=\{`([^`]*)`\}/)?.[1] ?? "";
+  const contentClass =
+    dialogSource.match(/<DialogPrimitive\.Content[\s\S]*?className=\{`([^`]*)`\}/)?.[1] ?? "";
+
+  assert.match(overlayClass, /data-\[state=open\]:animate-in/);
+  assert.match(overlayClass, /data-\[state=closed\]:animate-out/);
+  assert.match(overlayClass, /data-\[state=open\]:fade-in-0/);
+  assert.match(overlayClass, /data-\[state=closed\]:fade-out-0/);
+  assert.match(overlayClass, /motion-reduce:animate-none/);
+
+  assert.match(contentClass, /data-\[state=open\]:fade-in-0/);
+  assert.match(contentClass, /data-\[state=open\]:zoom-in-95/);
+  assert.match(contentClass, /data-\[state=closed\]:fade-out-0/);
+  assert.match(contentClass, /data-\[state=closed\]:zoom-out-95/);
+  assert.match(contentClass, /data-\[state=closed\]:pointer-events-none/);
+  assert.match(contentClass, /motion-reduce:animate-none/);
+});
+
+runTest("ConfirmationDialog composes the shared Dialog with explicit action controls", () => {
+  assert.match(confirmationDialogSource, /import \{ Dialog \} from "\.\/Dialog";/);
+  assert.match(confirmationDialogSource, /<Dialog[\s\S]*preventClose=\{isConfirming\}/);
+});
+
 runTest("MyOrganizationSection opens organization editing in a shared Dialog", () => {
   assert.match(myOrganizationSectionSource, /import \{ Dialog \} from "@shared\/components";/);
   assert.match(myOrganizationSectionSource, /<Dialog[\s\S]*title="Editar organização"/);
@@ -187,3 +216,5 @@ runTest("Configuracoes access dialog uses accented permission copy", () => {
   assert.match(configuracoesSource, /Permissão atual: \{currentPermissionLabel\}/);
   assert.equal(configuracoesSource.includes("Permissao atual"), false);
 });
+
+await import("./run-confirmation-dialog-behavior-tests.mjs");

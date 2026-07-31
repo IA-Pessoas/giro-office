@@ -122,6 +122,7 @@ export function RhPointSection() {
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManagePoint,
+    module: "rh",
   });
 
   const assignableUsers = assignableUsersQuery.data ?? [];

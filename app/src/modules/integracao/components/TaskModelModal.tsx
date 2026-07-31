@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 
+import { departmentService, type DepItem } from "@modules/departments";
+import { useAssignableUsers } from "@modules/rh";
+import { ConfirmationDialog } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
@@ -12,7 +15,6 @@ import type {
   TaskDependent,
   TaskModel,
   TaskModelListItem,
-  TaskModelOption,
 } from "../types";
 import {
   PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME,
@@ -88,8 +90,7 @@ export function TaskModelModal({
 }: TaskModelModalProps) {
   const isEditing = Boolean(initialData?.id);
   const [formData, setFormData] = useState<CreateTaskModelData>(EMPTY_FORM_DATA);
-  const [users, setUsers] = useState<TaskModelOption[]>([]);
-  const [departments, setDepartments] = useState<TaskModelOption[]>([]);
+  const [departments, setDepartments] = useState<DepItem[]>([]);
   const [allTasks, setAllTasks] = useState<TaskModelListItem[]>([]);
   const [dependents, setDependents] = useState<TaskDependent[]>([]);
   const [newDependent, setNewDependent] = useState({
@@ -100,9 +101,17 @@ export function TaskModelModal({
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loadingDependents, setLoadingDependents] = useState(false);
+  const [pendingDependentDeletion, setPendingDependentDeletion] = useState<string | null>(null);
+  const [dependentDeletionError, setDependentDeletionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [optionsWarning, setOptionsWarning] = useState<string | null>(null);
+  const usersQuery = useAssignableUsers({
+    enabled: isOpen,
+    module: "integracao",
+    departmentId: formData.department_id || undefined,
+  });
+  const users = usersQuery.data ?? [];
   const [optionsRetryKey, setOptionsRetryKey] = useState(0);
   const [requiredOptionsWarning, setRequiredOptionsWarning] = useState(false);
   const [taskModelsWarning, setTaskModelsWarning] = useState(false);
@@ -117,6 +126,8 @@ export function TaskModelModal({
       setFormData(EMPTY_FORM_DATA);
       setDependents([]);
       setNewDependent({ dependent_id: "", wait: false, observation: "" });
+      setPendingDependentDeletion(null);
+      setDependentDeletionError(null);
       setDetailError(false);
       setOptionsWarning(null);
       setOptionsRetryKey(0);
@@ -133,8 +144,8 @@ export function TaskModelModal({
       setRequiredOptionsWarning(false);
       setTaskModelsWarning(false);
 
-      const [optionsResult, taskModelsResult] = await Promise.allSettled([
-        taskModelService.listOptions(),
+      const [departmentsResult, taskModelsResult] = await Promise.allSettled([
+        departmentService.list({ status: "Ativo" }),
         taskModelService.list({ type: "Projeto" }),
       ]);
 
@@ -144,14 +155,12 @@ export function TaskModelModal({
 
       const failedLists: string[] = [];
 
-      if (optionsResult.status === "fulfilled") {
-        setUsers(optionsResult.value.users);
-        setDepartments(optionsResult.value.departments);
+      if (departmentsResult.status === "fulfilled") {
+        setDepartments(departmentsResult.value);
       } else {
-        setUsers([]);
         setDepartments([]);
         setRequiredOptionsWarning(true);
-        failedLists.push("usuários e departamentos");
+        failedLists.push("departamentos");
       }
 
       if (taskModelsResult.status === "fulfilled") {
@@ -301,8 +310,12 @@ export function TaskModelModal({
   }
 
   function getUserPlaceholder(optional: boolean) {
-    if (loadingOptions && users.length === 0) {
+    if (usersQuery.isLoading) {
       return "Carregando usuários...";
+    }
+
+    if (usersQuery.isError) {
+      return "Usuários indisponíveis";
     }
 
     if (users.length === 0) {
@@ -395,10 +408,10 @@ export function TaskModelModal({
     }
   }
 
-  async function handleDeleteDependent(relationId: string) {
-    const shouldDelete = window.confirm("Remover esta dependência?");
+  async function handleConfirmDependentDeletion() {
+    const relationId = pendingDependentDeletion;
 
-    if (!shouldDelete) {
+    if (!relationId) {
       return;
     }
 
@@ -408,19 +421,26 @@ export function TaskModelModal({
       await taskModelService.deleteDependent(relationId);
       toast.success("Dependência removida.");
       await refreshDependents();
-    } catch {
-      toast.error("Não foi possível remover dependência.");
+      setPendingDependentDeletion(null);
+      setDependentDeletionError(null);
+    } catch (error) {
+      const message = "Não foi possível remover dependência.";
+      toast.error(message);
+      setDependentDeletionError(message);
+      throw error;
     } finally {
       setLoadingDependents(false);
     }
   }
 
-  const optionsUnavailable = loadingOptions || requiredOptionsWarning;
+  const optionsUnavailable =
+    loadingOptions || requiredOptionsWarning || usersQuery.isLoading || usersQuery.isError;
   const taskModelsUnavailable = loadingOptions || taskModelsWarning;
   const saveDisabled = saving || loadingDetail || detailError || optionsUnavailable;
 
   return (
-    <Dialog
+    <>
+      <Dialog
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
@@ -802,7 +822,10 @@ export function TaskModelModal({
                             <div className="flex justify-center">
                               <button
                                 type="button"
-                                onClick={() => void handleDeleteDependent(dependent.id)}
+                                onClick={() => {
+                                  setDependentDeletionError(null);
+                                  setPendingDependentDeletion(dependent.id);
+                                }}
                                 className={PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME}
                                 disabled={loadingDependents}
                                 aria-label={`Remover dependência ${dependent.dependent?.name ?? ""}`}
@@ -822,6 +845,25 @@ export function TaskModelModal({
           ) : null}
         </form>
       )}
-    </Dialog>
+      </Dialog>
+
+      <ConfirmationDialog
+        open={Boolean(pendingDependentDeletion)}
+        onOpenChange={(open) => {
+          if (!open && !loadingDependents) {
+            setPendingDependentDeletion(null);
+            setDependentDeletionError(null);
+          }
+        }}
+        title="Remover dependência?"
+        description="Esta ação remove a dependência selecionada do modelo de tarefa."
+        onConfirm={handleConfirmDependentDeletion}
+        isConfirming={loadingDependents}
+        errorMessage={dependentDeletionError}
+        confirmLabel="Remover dependência"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
+    </>
   );
 }

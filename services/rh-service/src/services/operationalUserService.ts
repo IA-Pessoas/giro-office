@@ -1,4 +1,5 @@
 import { assertNonEmptyString, error as logError, ServiceError } from "@workspace/shared";
+import type { ModulePermissionKey } from "@workspace/shared/auth";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
@@ -21,18 +22,46 @@ export interface OperationalUserSnapshot {
   status: string;
 }
 
+export interface OperationalUserContext {
+  departmentId?: string;
+  departmentName?: string;
+  module?: ModulePermissionKey;
+}
+
 class OperationalUserService {
-  async list(organizationId: string): Promise<OperationalUserSnapshot[]> {
+  async list(
+    organizationId: string,
+    context: OperationalUserContext = {},
+  ): Promise<OperationalUserSnapshot[]> {
     try {
       const orgId = assertNonEmptyString(organizationId, "organization_id");
+      const where: Prisma.UserWhereInput = {
+        status: "active",
+        OR: [
+          { organization_id: orgId },
+          { organization_id: null, department: { organization_id: orgId } },
+        ],
+      };
+
+      if (context.departmentId || context.departmentName) {
+        where.department = {
+          organization_id: orgId,
+          ...(context.departmentId ? { id: context.departmentId } : {}),
+          ...(context.departmentName ? { name: context.departmentName } : {}),
+        };
+      }
+
+      if (context.module) {
+        where.permissions = {
+          some: {
+            organization_id: orgId,
+            [context.module]: { gt: 0 },
+          },
+        };
+      }
+
       const users = await prismaClient.user.findMany({
-        where: {
-          status: "active",
-          OR: [
-            { organization_id: orgId },
-            { organization_id: null, department: { organization_id: orgId } },
-          ],
-        },
+        where,
         orderBy: { name: "asc" },
         select: OPERATIONAL_USER_SELECT,
       });

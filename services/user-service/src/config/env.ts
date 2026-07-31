@@ -69,6 +69,14 @@ const rawEnvSchema = z
 
       .transform((value) => parseBoolean(value)),
 
+    auditEnabled: z
+      .string()
+      .optional()
+      .default("true")
+      .transform((value) => parseBoolean(value)),
+
+    auditServiceUrl: z.string().url().default("http://localhost:3020"),
+
     enableApiDocsEnv: z.string().optional(),
 
     /** Token interno igual ao do gateway (`AUDIT_SERVICE_TOKEN`) para pedidos com headers x-auth-* */
@@ -155,6 +163,9 @@ export function getUserServiceEnv(): UserServiceEnv {
     logLevel: process.env.LOG_LEVEL,
 
     logPretty: process.env.LOG_PRETTY,
+
+    auditEnabled: process.env.AUDIT_ENABLED,
+    auditServiceUrl: process.env.AUDIT_SERVICE_URL,
 
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
 

@@ -2,6 +2,7 @@ import {
   createSuccessResponse,
   FORWARDED_AUTH_MODULES_HEADER,
   error as logError,
+  parseWithZod,
   parseModulePermissions,
   requireAuthenticatedRequestContext,
   ServiceError,
@@ -16,10 +17,18 @@ import {
   RH_SELF_SERVICE_PERMISSION,
 } from "../middlewares/requireRhPermission.js";
 import { OperationalUserService } from "../services/operationalUserService.js";
+import { operationalUserListQuerySchema } from "../schemas/operationalUser.schemas.js";
 
 const router: ReturnType<typeof Router> = Router();
 const operationalUserService = new OperationalUserService();
-const OPERATIONAL_USER_CATALOG_MODULES = ["rh", "contabil"] as const;
+const OPERATIONAL_USER_CATALOG_MODULES = [
+  "rh",
+  "contabil",
+  "pessoal",
+  "regularize",
+  "ti",
+  "integracao",
+] as const;
 const OPERATIONAL_USER_CATALOG_MIN_PERMISSION = RH_SELF_SERVICE_PERMISSION;
 
 function getSingleHeaderValue(value: string | string[] | undefined): string | undefined {
@@ -60,8 +69,17 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
+      const query = parseWithZod(operationalUserListQuerySchema, req.query);
+      const context = {
+        ...(query.department_id ? { departmentId: query.department_id } : {}),
+        ...(query.department_name ? { departmentName: query.department_name } : {}),
+        ...(query.module ? { module: query.module } : {}),
+      };
 
-      const result = await operationalUserService.list(organization_id);
+      const result = await operationalUserService.list(
+        organization_id,
+        Object.keys(context).length > 0 ? context : undefined,
+      );
 
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {

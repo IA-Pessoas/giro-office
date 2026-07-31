@@ -83,7 +83,7 @@ runTest("certificate deletion mutations invalidate lists and details", () => {
   );
 });
 
-runTest("certificate table exposes admin-only full-record deletion", () => {
+runTest("certificate workspace requests table record deletion through the shared confirmation", () => {
   const workspaceSource = readFileSync(
     new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
     "utf8",
@@ -92,15 +92,25 @@ runTest("certificate table exposes admin-only full-record deletion", () => {
   assert.match(workspaceSource, /useDeleteCertificatePjMutation/);
   assert.match(workspaceSource, /useDeleteCertificatePfMutation/);
   assert.match(workspaceSource, /Trash2/);
-  assert.match(workspaceSource, /window\.confirm\(`Excluir o certificado/);
+  assert.match(workspaceSource, /<ConfirmationDialog/);
+  assert.doesNotMatch(workspaceSource, /window\.confirm/);
+  assert.match(workspaceSource, /const \[pendingDeletion, setPendingDeletion\] = useState<PendingCertificateDeletion \| null>\(null\)/);
+  assert.match(workspaceSource, /setPendingDeletion\(\{ kind: "pj", certificate \}\)/);
+  assert.match(workspaceSource, /setPendingDeletion\(\{ kind: "pf", certificate \}\)/);
+  assert.match(workspaceSource, /async function handleConfirmPendingDeletion\(\)/);
+  assert.match(workspaceSource, /await deletePjMutation\.mutateAsync\(\{ id: certificate\.id \}\)/);
+  assert.match(workspaceSource, /await deletePfMutation\.mutateAsync\(\{ id: certificate\.id \}\)/);
   assert.match(workspaceSource, /setVisiblePjItems\(\(current\) => current\.filter/);
   assert.match(workspaceSource, /setVisiblePfItems\(\(current\) => current\.filter/);
   assert.match(workspaceSource, /toast\.success\("Certificado/);
   assert.match(workspaceSource, /toast\.error\(/);
   assert.match(workspaceSource, /canManageCertificateModule &&/);
+  assert.match(workspaceSource, /cancelLabel="Cancelar"/);
+  assert.match(workspaceSource, /confirmLabel="Excluir certificado"/);
+  assert.match(workspaceSource, /Esta ação remove o cadastro e o arquivo associado, quando existir\./);
 });
 
-runTest("certificate record deletion uses the detail endpoints and an internal dialog", () => {
+runTest("certificate record deletion uses the shared confirmation dialog", () => {
   const clientSource = readFileSync(new URL("./services/certificateService.ts", import.meta.url), "utf8");
   const actionsSource = readFileSync(
     new URL("./components/CertificateFileActions.tsx", import.meta.url),
@@ -109,9 +119,37 @@ runTest("certificate record deletion uses the detail endpoints and an internal d
 
   assert.match(clientSource, /async deletePj\(id: string\): Promise<void>/);
   assert.match(clientSource, /async deletePf\(id: string\): Promise<void>/);
-  assert.match(actionsSource, /Excluir certificado/);
-  assert.match(actionsSource, /<Dialog/);
+  assert.match(actionsSource, /<ConfirmationDialog/);
+  assert.doesNotMatch(actionsSource, /import \{ Dialog \}/);
   assert.doesNotMatch(actionsSource, /window\.confirm/);
+  assert.match(actionsSource, /isRecordDeleteDialogOpen/);
+  assert.match(actionsSource, /handleDeleteRecord/);
+  assert.match(actionsSource, /isDeletingRecord/);
+  assert.match(actionsSource, /onDeleteRecordSuccess/);
+  assert.match(actionsSource, /Excluir certificado/);
+  assert.match(actionsSource, /cancelLabel="Cancelar"/);
+  assert.match(actionsSource, /confirmLabel="Excluir certificado"/);
+  assert.match(actionsSource, /Esta ação remove o cadastro e o arquivo associado, quando existir\./);
+});
+
+runTest("certificate record confirmation isolates file operation errors", () => {
+  const actionsSource = readFileSync(
+    new URL("./components/CertificateFileActions.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(actionsSource, /const \[recordDeleteError, setRecordDeleteError\] = useState<string \| null>\(null\)/);
+  assert.match(
+    actionsSource,
+    /function handleOpenRecordDeleteDialog\(\) \{\s*setRecordDeleteError\(null\);\s*setIsRecordDeleteDialogOpen\(true\);\s*\}/,
+  );
+  assert.match(actionsSource, /onClick=\{handleOpenRecordDeleteDialog\}/);
+  assert.match(
+    actionsSource,
+    /async function handleDeleteRecord\(\) \{[\s\S]*?setRecordDeleteError\(null\);[\s\S]*?catch \(error\) \{[\s\S]*?setRecordDeleteError\(message\);[\s\S]*?throw error;/,
+  );
+  assert.match(actionsSource, /errorMessage=\{recordDeleteError\}/);
+  assert.doesNotMatch(actionsSource, /errorMessage=\{localError \|\| null\}/);
 });
 
 runTest("buildCertificateListParams removes empty values", () => {
@@ -246,6 +284,25 @@ runTest("certificate refresh keeps rows while a new first page is requested", ()
   );
 });
 
+runTest("certificate filters preserve the initial query result", () => {
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workspaceSource, /import \{[^}]*useRef[^}]*\} from "react"/);
+  assert.match(workspaceSource, /const pjFiltersMountedRef = useRef\(false\);/);
+  assert.match(workspaceSource, /const pfFiltersMountedRef = useRef\(false\);/);
+  assert.match(
+    workspaceSource,
+    /useEffect\(\(\) => \{\s*if \(!pjFiltersMountedRef\.current\) \{\s*pjFiltersMountedRef\.current = true;\s*return;\s*\}/,
+  );
+  assert.match(
+    workspaceSource,
+    /useEffect\(\(\) => \{\s*if \(!pfFiltersMountedRef\.current\) \{\s*pfFiltersMountedRef\.current = true;\s*return;\s*\}/,
+  );
+});
+
 const certificateFileActionsSource = readFileSync(
   "src/modules/certificates/components/CertificateFileActions.tsx",
   "utf8",
@@ -254,6 +311,22 @@ const certificatesWorkspaceSource = readFileSync(
   "src/modules/certificates/components/CertificatesWorkspace.tsx",
   "utf8",
 );
+
+runTest("ações de arquivo inline não duplicam a exclusão do certificado", () => {
+  const inlineBlock = certificateFileActionsSource.match(
+    /if \(variant === "inline"\) \{([\s\S]*?)\n  \}\n\n  return \(/,
+  )?.[1];
+  const panelBlock = certificateFileActionsSource.match(/\n  return \(([\s\S]*?)\n\}\n$/)?.[1];
+
+  assert.ok(inlineBlock, "bloco inline não encontrado");
+  assert.ok(panelBlock, "bloco panel não encontrado");
+  assert.doesNotMatch(inlineBlock, /Remover arquivo/);
+  assert.doesNotMatch(inlineBlock, /CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME/);
+  assert.match(panelBlock, /canDeleteFile/);
+  assert.match(panelBlock, /Remover/);
+  assert.match(panelBlock, /canDeleteRecord/);
+  assert.match(panelBlock, /Excluir certificado/);
+});
 
 runTest("Viewer de certificados pode consultar sem receber ações de escrita", () => {
   assert.equal(

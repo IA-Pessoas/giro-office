@@ -18,7 +18,7 @@ import {
   isAcceptedCertificateFileName,
 } from "@modules/certificates/services";
 import type { CertificateDownloadResult, CertificateKind } from "@modules/certificates/types";
-import { Dialog } from "@shared/components/ui/Dialog";
+import { ConfirmationDialog } from "@shared/components";
 
 import {
   CERTIFICATE_COMPACT_BUTTON_CLASSNAME,
@@ -26,7 +26,6 @@ import {
   CERTIFICATE_FILE_ACTION_PANEL_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_BUTTON_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME,
-  CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
 } from "./certificateWorkspaceUi";
 
 type CertificateFileActionsVariant = "panel" | "inline";
@@ -107,6 +106,7 @@ export function CertificateFileActions({
 }: CertificateFileActionsProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [localError, setLocalError] = useState("");
+  const [recordDeleteError, setRecordDeleteError] = useState<string | null>(null);
   const [isRecordDeleteDialogOpen, setIsRecordDeleteDialogOpen] = useState(false);
   const uploadPjMutation = useUploadCertificatePjFileMutation();
   const uploadPfMutation = useUploadCertificatePfFileMutation();
@@ -128,6 +128,18 @@ export function CertificateFileActions({
   function resetFileInput() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  }
+
+  function handleOpenRecordDeleteDialog() {
+    setRecordDeleteError(null);
+    setIsRecordDeleteDialogOpen(true);
+  }
+
+  function handleRecordDeleteDialogOpenChange(open: boolean) {
+    setIsRecordDeleteDialogOpen(open);
+    if (!open) {
+      setRecordDeleteError(null);
     }
   }
 
@@ -216,7 +228,7 @@ export function CertificateFileActions({
 
   async function handleDeleteRecord() {
     try {
-      setLocalError("");
+      setRecordDeleteError(null);
       if (kind === "pj") {
         await deleteRecordPjMutation.mutateAsync({ id: certificateId });
       } else {
@@ -227,8 +239,9 @@ export function CertificateFileActions({
       void onDeleteRecordSuccess?.();
     } catch (error) {
       const message = getCertificateFileErrorMessage(error, "Não foi possível excluir o certificado.");
-      setLocalError(message);
+      setRecordDeleteError(message);
       toast.error(message);
+      throw error;
     }
   }
 
@@ -276,17 +289,6 @@ export function CertificateFileActions({
         >
           {isDownloading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         </button>
-        {canDeleteFile ? (
-          <button
-            type="button"
-            onClick={() => void handleDelete()}
-            className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
-            disabled={!(canDeleteFile && hasCertificate) || isBusy}
-            title="Remover arquivo"
-          >
-            {isDeleting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-          </button>
-        ) : null}
       </div>
     );
   }
@@ -342,7 +344,7 @@ export function CertificateFileActions({
         {canDeleteRecord ? (
           <button
             type="button"
-            onClick={() => setIsRecordDeleteDialogOpen(true)}
+            onClick={handleOpenRecordDeleteDialog}
             className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}
             disabled={isBusy}
           >
@@ -355,20 +357,18 @@ export function CertificateFileActions({
       {localError ? (
         <p className="text-sm font-medium text-rose-600 dark:text-rose-300">{localError}</p>
       ) : null}
-      <Dialog
+      <ConfirmationDialog
         open={isRecordDeleteDialogOpen}
-        onOpenChange={setIsRecordDeleteDialogOpen}
+        onOpenChange={handleRecordDeleteDialogOpenChange}
         title="Excluir certificado"
-        description="Confirmação de exclusão do certificado"
-        footer={
-          <>
-            <button type="button" onClick={() => setIsRecordDeleteDialogOpen(false)} disabled={isDeletingRecord} className={CERTIFICATE_COMPACT_BUTTON_CLASSNAME}>Cancelar</button>
-            <button type="button" onClick={() => void handleDeleteRecord()} disabled={isDeletingRecord} className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}>{isDeletingRecord ? "Excluindo..." : "Excluir certificado"}</button>
-          </>
-        }
-      >
-        <p className="text-sm text-slate-600 dark:text-slate-300">Esta ação remove o cadastro e o arquivo associado, quando existir.</p>
-      </Dialog>
+        description="Esta ação remove o cadastro e o arquivo associado, quando existir."
+        onConfirm={handleDeleteRecord}
+        isConfirming={isDeletingRecord}
+        errorMessage={recordDeleteError}
+        confirmLabel="Excluir certificado"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
     </div>
   );
 }

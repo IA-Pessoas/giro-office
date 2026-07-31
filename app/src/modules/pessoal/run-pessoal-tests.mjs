@@ -317,10 +317,10 @@ runTest("payroll responsible field uses a user selector instead of raw IDs", () 
     "utf8",
   );
 
-  assert.match(payroll, /listAdminUsers\("active"\)/);
-  assert.match(payroll, /departmentService\.list\(\)/);
-  assert.match(payroll, /departmentNameById\.get\(user\.department_id\)/);
-  assert.match(payroll, /resolveDepartmentModuleKey\(departmentName\) === "pessoal"/);
+  assert.match(payroll, /useAssignableUsers/);
+  assert.match(payroll, /module: "pessoal"/);
+  assert.doesNotMatch(payroll, /listAdminUsers/);
+  assert.doesNotMatch(payroll, /departmentService/);
   assert.match(payroll, /<select[\s\S]*value=\{formValues\.responsible_id\}/);
   assert.doesNotMatch(payroll, /label: "Responsável ID"/);
 });
@@ -338,15 +338,28 @@ runTest("obligations responsible field uses a pessoal user selector instead of r
     "utf8",
   );
 
-  assert.match(obligations, /listAdminUsers\("active"\)/);
-  assert.match(obligations, /departmentService\.list\(\)/);
-  assert.match(obligations, /departmentNameById\.get\(user\.department_id\)/);
-  assert.match(obligations, /resolveDepartmentModuleKey\(departmentName\) === "pessoal"/);
+  assert.match(obligations, /useAssignableUsers/);
+  assert.match(obligations, /module: "pessoal"/);
+  assert.doesNotMatch(obligations, /listAdminUsers/);
+  assert.doesNotMatch(obligations, /departmentService/);
   assert.match(obligations, /<select[\s\S]*value=\{responsibleId\}/);
-  assert.match(obligations, /responsibleUsersQuery\.isError \|\| departmentsQuery\.isError/);
+  assert.match(obligations, /responsibleUsersQuery\.isError/);
   assert.match(obligations, /Respons.veis indispon.veis/);
   assert.match(obligations, /<option value=\{responsibleId\}>Respons.vel atual<\/option>/);
   assert.doesNotMatch(obligations, /Respons.vel ID/);
+});
+
+runTest("password responsible field uses the contextual pessoal user selector", () => {
+  const passwords = readFileSync(
+    "src/modules/pessoal/components/PessoalPasswordsSection.tsx",
+    "utf8",
+  );
+
+  assert.match(passwords, /useAssignableUsers/);
+  assert.match(passwords, /module: "pessoal"/);
+  assert.doesNotMatch(passwords, /listAdminUsers/);
+  assert.match(passwords, /<select[\s\S]*value=\{formValues\.responsavel_id\}/);
+  assert.match(passwords, /Respons.vel atual/);
 });
 
 runTest("obligation generation copy explains global scope and no-payroll count", () => {

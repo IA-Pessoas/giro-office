@@ -20,6 +20,7 @@ interface UserRouteMocks {
   userServiceMock: {
     list: Mock;
     getById: Mock;
+    getByIdWithModules: Mock;
     create: Mock;
     update: Mock;
     delete: Mock;
@@ -45,6 +46,7 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
     userServiceMock: {
       list: vi.fn(),
       getById: vi.fn(),
+      getByIdWithModules: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
