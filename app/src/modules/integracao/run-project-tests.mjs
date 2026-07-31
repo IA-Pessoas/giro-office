@@ -103,6 +103,40 @@ async function runAsyncTest(name, fn) {
   }
 }
 
+runTest("integration destructive actions use the shared confirmation dialog", () => {
+  const sources = {
+    tasks: readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8"),
+    taskModel: readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8"),
+    projects: readFileSync(
+      new URL("./components/ProjectsWorkspace.tsx", import.meta.url),
+      "utf8",
+    ),
+    projectDetail: readFileSync(
+      new URL("./components/ProjectDetailView.tsx", import.meta.url),
+      "utf8",
+    ),
+    clientProjects: readFileSync(
+      new URL("./components/ClientProjectsSection.tsx", import.meta.url),
+      "utf8",
+    ),
+  };
+
+  for (const source of Object.values(sources)) {
+    assert.doesNotMatch(source, /window\.confirm\(/);
+    assert.match(source, /ConfirmationDialog/);
+  }
+
+  assert.match(sources.tasks, /deleteTaskMutation\.isPending/);
+  assert.match(sources.tasks, /isLoading=\{deleteTaskMutation\.isPending\}/);
+  assert.match(sources.taskModel, /loadingDependents/);
+  assert.match(sources.taskModel, /isLoading=\{loadingDependents\}/);
+
+  for (const source of [sources.projects, sources.projectDetail, sources.clientProjects]) {
+    assert.match(source, /deleteProjectMutation\.isPending/);
+    assert.match(source, /isLoading=\{deleteProjectMutation\.isPending\}/);
+  }
+});
+
 runTest("project endpoints use only the v1 project contract", () => {
   assert.equal(PROJECT_ENDPOINTS.list, "/project/list");
   assert.equal(PROJECT_ENDPOINTS.crud, "/project");
