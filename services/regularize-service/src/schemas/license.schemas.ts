@@ -30,9 +30,19 @@ export const updateLicenseBodySchema = createLicenseBodySchema
 
 export const licenseDetailQuerySchema = idQuerySchema;
 
+export const licenseListStatusValues = [
+  "Todos",
+  "Ativo",
+  "Pendente",
+  "A vencer",
+  "Vencido",
+  "Inativo",
+  "Cancelado",
+] as const;
+
 export const listLicensesQuerySchema = z
   .object({
-    status: z.string().min(1, "status obrigatorio."),
+    status: z.enum(licenseListStatusValues),
   })
   .strict();
 
