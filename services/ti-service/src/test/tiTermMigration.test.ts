@@ -28,11 +28,10 @@ describe("TI term signature migration", () => {
     expect(model).not.toMatch(/@@index\(\[organization_id, reason\]/);
   });
 
-  it("backfills legacy non-empty reasons without making reason the status source", () => {
+  it("keeps ambiguous legacy terms pending and indexes the lifecycle field", () => {
     expect(migration).toContain('ADD COLUMN "signed_at" TIMESTAMP(3)');
-    expect(migration).toContain('SET "signed_at" = "date"');
-    expect(migration).toContain('"reason" IS NOT NULL');
-    expect(migration).toContain("btrim(\"reason\") <> ''");
+    expect(migration).not.toContain('SET "signed_at" = "date"');
+    expect(migration).not.toContain('"reason" IS NOT NULL');
     expect(migration).toContain('CREATE INDEX "idx_tecnologia_terms_org_signed_at"');
     expect(migration).toContain('DROP INDEX IF EXISTS "idx_tecnologia_terms_org_reason"');
   });
