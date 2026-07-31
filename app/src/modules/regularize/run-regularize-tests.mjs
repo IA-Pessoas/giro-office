@@ -591,6 +591,17 @@ await runTest("regularize operational tabs expose write actions", async () => {
   }
 });
 
+await runTest("regularize partners render client names instead of internal ids", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /const pfNameById = new Map\(\s*\(pfPageQuery\.data\?\.data \?\? \[\]\)/);
+  assert.match(pageSource, /const pjNameById = new Map\(\s*\(clientQuery\.data\?\.items \?\? \[\]\)/);
+  assert.match(pageSource, /pfNameById\.get\(item\.pf_id\)\s*(?:\?\?|\|\|)\s*"PF não identificado"/);
+  assert.match(pageSource, /pjNameById\.get\(item\.pj_id\)\s*(?:\?\?|\|\|)\s*"PJ não identificado"/);
+  assert.doesNotMatch(pageSource, /formatText\(item\.pf_id\)\.slice\(0, 8\)/);
+  assert.doesNotMatch(pageSource, /formatText\(item\.pj_id\)\.slice\(0, 8\)/);
+});
+
 await runTest("regularize municipal tax keeps row actions visible and centered", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
   const taxTableStart = pageSource.indexOf(
@@ -994,7 +1005,6 @@ await runTest("regularize selects clients in the header and shows the bound clie
   assert.match(pageSource, /Selecione um cliente no cabeçalho antes de iniciar este cadastro\./);
   assert.equal((pageSource.match(/disabled=\{!currentCredentialClientId\}/g) ?? []).length, 7);
   assert.doesNotMatch(pageSource, /RegularizeClientPickerField/);
-  assert.doesNotMatch(pageSource, /useClients\(/);
   formSources.forEach((formSource) => {
     assert.match(formSource, /ClientSelectionField/);
     assert.doesNotMatch(formSource, /RegularizeClientPickerField/);
