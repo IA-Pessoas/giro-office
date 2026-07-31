@@ -31,6 +31,10 @@ const myOrganizationSectionSource = readFileSync(
   "utf8",
 );
 const dialogSource = readFileSync(new URL("./ui/Dialog.tsx", import.meta.url), "utf8");
+const confirmationDialogSource = readFileSync(
+  new URL("./ui/ConfirmationDialog.tsx", import.meta.url),
+  "utf8",
+);
 const legacyAiChatBackdrop = [
   'className="fixed inset-0 z-[60] bg-black/40"',
   " onClick",
@@ -179,6 +183,11 @@ runTest("shared Dialog animates close without trapping interaction in the exitin
   assert.match(contentClass, /motion-reduce:animate-none/);
 });
 
+runTest("ConfirmationDialog composes the shared Dialog with explicit action controls", () => {
+  assert.match(confirmationDialogSource, /import \{ Dialog \} from "\.\/Dialog";/);
+  assert.match(confirmationDialogSource, /<Dialog[\s\S]*preventClose=\{isConfirming\}/);
+});
+
 runTest("MyOrganizationSection opens organization editing in a shared Dialog", () => {
   assert.match(myOrganizationSectionSource, /import \{ Dialog \} from "@shared\/components";/);
   assert.match(myOrganizationSectionSource, /<Dialog[\s\S]*title="Editar organização"/);
@@ -207,3 +216,5 @@ runTest("Configuracoes access dialog uses accented permission copy", () => {
   assert.match(configuracoesSource, /Permissão atual: \{currentPermissionLabel\}/);
   assert.equal(configuracoesSource.includes("Permissao atual"), false);
 });
+
+await import("./run-confirmation-dialog-behavior-tests.mjs");

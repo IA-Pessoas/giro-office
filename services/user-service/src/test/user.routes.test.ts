@@ -603,6 +603,8 @@ describe("user routes", () => {
         photo_url: "https://cdn/avatar.png",
       },
       "a0000000-0000-4000-8000-000000000001",
+      "c0000000-0000-4000-8000-000000000001",
+      "UPDATE_PHOTO",
     );
   });
 
@@ -644,6 +646,8 @@ describe("user routes", () => {
       "user-3",
       { photo_url: null },
       "a0000000-0000-4000-8000-000000000001",
+      "c0000000-0000-4000-8000-000000000001",
+      "UPDATE_PHOTO",
     );
   });
 
@@ -657,6 +661,7 @@ describe("user routes", () => {
     expect(userServiceMock.delete).toHaveBeenCalledWith(
       "user-3",
       "a0000000-0000-4000-8000-000000000001",
+      "c0000000-0000-4000-8000-000000000001",
     );
   });
 });
