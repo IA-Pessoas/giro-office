@@ -127,6 +127,11 @@ Retorna os dados do usuário autenticado.
     "type": "owner",
     "first_owner_flag": true,
     "permission_id": "uuid",
+    "modules": {
+      "contabil": 1,
+      "rh": 3,
+      "ti": 1
+    },
     "service": "user-service"
   }
 }
