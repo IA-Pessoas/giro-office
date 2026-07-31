@@ -139,6 +139,13 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
   }
 
   assert.match(sources.tasks, /deleteTaskMutation\.isPending/);
+  assert.match(
+    sources.tasks,
+    /const \[pendingTaskDeletion, setPendingTaskDeletion\] = useState<IntegracaoTaskListItem \| null>\(null\);/,
+  );
+  assert.match(sources.tasks, /setPendingTaskDeletion\(task\);/);
+  assert.match(sources.tasks, /open=\{Boolean\(pendingTaskDeletion\)\}/);
+  assert.match(sources.tasks, /onConfirm=\{handleConfirmTaskDeletion\}/);
   assert.match(sources.tasks, /isConfirming=\{deleteTaskMutation\.isPending\}/);
   assert.match(
     sources.tasks,
@@ -160,6 +167,13 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
   );
 
   assert.match(sources.taskModel, /loadingDependents/);
+  assert.match(
+    sources.taskModel,
+    /const \[pendingDependentDeletion, setPendingDependentDeletion\] = useState<string \| null>\(null\);/,
+  );
+  assert.match(sources.taskModel, /setPendingDependentDeletion\(dependent\.id\);/);
+  assert.match(sources.taskModel, /open=\{Boolean\(pendingDependentDeletion\)\}/);
+  assert.match(sources.taskModel, /onConfirm=\{handleConfirmDependentDeletion\}/);
   assert.match(sources.taskModel, /isConfirming=\{loadingDependents\}/);
   assert.match(sources.taskModel, /await taskModelService\.deleteDependent\(relationId\);/);
   assert.match(sources.taskModel, /toast\.success\("Dependência removida\."\);/);

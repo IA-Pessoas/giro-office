@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { useAssignableUsers } from "@modules/rh";
+import { ConfirmationDialog } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
@@ -100,6 +101,8 @@ export function TaskModelModal({
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loadingDependents, setLoadingDependents] = useState(false);
+  const [pendingDependentDeletion, setPendingDependentDeletion] = useState<string | null>(null);
+  const [dependentDeletionError, setDependentDeletionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [optionsWarning, setOptionsWarning] = useState<string | null>(null);
@@ -123,6 +126,8 @@ export function TaskModelModal({
       setFormData(EMPTY_FORM_DATA);
       setDependents([]);
       setNewDependent({ dependent_id: "", wait: false, observation: "" });
+      setPendingDependentDeletion(null);
+      setDependentDeletionError(null);
       setDetailError(false);
       setOptionsWarning(null);
       setOptionsRetryKey(0);
@@ -403,10 +408,10 @@ export function TaskModelModal({
     }
   }
 
-  async function handleDeleteDependent(relationId: string) {
-    const shouldDelete = window.confirm("Remover esta dependência?");
+  async function handleConfirmDependentDeletion() {
+    const relationId = pendingDependentDeletion;
 
-    if (!shouldDelete) {
+    if (!relationId) {
       return;
     }
 
@@ -416,8 +421,12 @@ export function TaskModelModal({
       await taskModelService.deleteDependent(relationId);
       toast.success("Dependência removida.");
       await refreshDependents();
+      setPendingDependentDeletion(null);
+      setDependentDeletionError(null);
     } catch {
-      toast.error("Não foi possível remover dependência.");
+      const message = "Não foi possível remover dependência.";
+      toast.error(message);
+      setDependentDeletionError(message);
     } finally {
       setLoadingDependents(false);
     }
@@ -429,7 +438,8 @@ export function TaskModelModal({
   const saveDisabled = saving || loadingDetail || detailError || optionsUnavailable;
 
   return (
-    <Dialog
+    <>
+      <Dialog
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
@@ -811,7 +821,10 @@ export function TaskModelModal({
                             <div className="flex justify-center">
                               <button
                                 type="button"
-                                onClick={() => void handleDeleteDependent(dependent.id)}
+                                onClick={() => {
+                                  setDependentDeletionError(null);
+                                  setPendingDependentDeletion(dependent.id);
+                                }}
                                 className={PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME}
                                 disabled={loadingDependents}
                                 aria-label={`Remover dependência ${dependent.dependent?.name ?? ""}`}
@@ -831,6 +844,25 @@ export function TaskModelModal({
           ) : null}
         </form>
       )}
-    </Dialog>
+      </Dialog>
+
+      <ConfirmationDialog
+        open={Boolean(pendingDependentDeletion)}
+        onOpenChange={(open) => {
+          if (!open && !loadingDependents) {
+            setPendingDependentDeletion(null);
+            setDependentDeletionError(null);
+          }
+        }}
+        title="Remover dependência?"
+        description="Esta ação remove a dependência selecionada do modelo de tarefa."
+        onConfirm={handleConfirmDependentDeletion}
+        isConfirming={loadingDependents}
+        errorMessage={dependentDeletionError}
+        confirmLabel="Remover dependência"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
+    </>
   );
 }
