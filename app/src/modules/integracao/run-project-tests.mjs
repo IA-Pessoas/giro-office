@@ -882,11 +882,11 @@ runTest("project select placeholder keeps empty state inside the control", () =>
   );
 });
 
-runTest("tasks table uses shorter width and thin horizontal scrollbar", () => {
+runTest("tasks table uses shorter width and the shared system scrollbar", () => {
   assert.equal(TASK_TABLE_CLASSNAME.includes("1320px"), false);
   assert.equal(TASK_TABLE_CLASSNAME.includes("1120px"), true);
   assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("overflow-x-auto"), true);
-  assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("h-1.5"), true);
+  assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("u-scrollbar-system"), true);
 });
 
 runTest("tasks table gives the task name column more breathing room", () => {

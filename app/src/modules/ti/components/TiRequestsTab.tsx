@@ -1011,7 +1011,7 @@ export function TiRequestsTab() {
 
           {!isRequestsLoading && !requestsQuery.isError && filteredRequests.length > 0 ? (
             <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto u-scrollbar-system">
                 <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
                   <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-normal text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
                     <tr>

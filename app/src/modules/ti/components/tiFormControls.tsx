@@ -258,7 +258,7 @@ export function TiDataTable({
   return (
     <div
       className={cn(
-        "overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900",
+        "overflow-x-auto u-scrollbar-system rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900",
         className,
       )}
     >
