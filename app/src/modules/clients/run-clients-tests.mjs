@@ -756,3 +756,26 @@ runTest("client creation discloses name and document as required", () => {
   assert.match(source, /name="name"[\s\S]*aria-required/);
   assert.match(source, /name="cpf_cnpj"[\s\S]*aria-required/);
 });
+
+runTest("legacy client tabs use toast warnings for validation", () => {
+  const commercialSource = readFileSync(
+    "src/components/Forms/ClientTabs/Comercial/DataTab.tsx",
+    "utf8",
+  );
+  const regularizeSource = readFileSync(
+    "src/components/Forms/ClientTabs/Regularize/DataTab.tsx",
+    "utf8",
+  );
+  const integrationSource = readFileSync(
+    "src/components/Forms/ClientTabs/Integracao/DataTab.tsx",
+    "utf8",
+  );
+
+  assert.match(commercialSource, /toast\.warn\('Preencha todos os campos'\)/);
+  assert.match(commercialSource, /toast\.warn\('Preencha a competencia de saída'\)/);
+  assert.match(regularizeSource, /toast\.warn\('Preencha todos os campos'\)/);
+  assert.match(integrationSource, /toast\.warn\('Preencha todos os campos'\)/);
+  assert.doesNotMatch(commercialSource, /\balert\(/);
+  assert.doesNotMatch(regularizeSource, /\balert\(/);
+  assert.doesNotMatch(integrationSource, /\balert\(/);
+});

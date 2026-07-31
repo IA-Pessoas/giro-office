@@ -30,7 +30,7 @@ export default function DataTabIntegracao({ client }) {
 
     async function handleUpdate() {
         if (name === '' || cnpj === '') {
-            alert('Preencha todos os campos')
+            toast.warn('Preencha todos os campos')
             return
         }
 
