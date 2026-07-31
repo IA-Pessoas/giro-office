@@ -708,9 +708,10 @@ export function TiStockTab() {
       closeExitDialog();
       toast.success("Saída registrada com sucesso.");
     } catch (error) {
-      setExitConfirmationError(
-        getTiStockMutationErrorMessage(error, "Não foi possível registrar a saída."),
-      );
+      const message = getTiStockMutationErrorMessage(error, "Não foi possível registrar a saída.");
+
+      setExitConfirmationError(message);
+      toast.error(message);
       throw error;
     }
   }

@@ -610,8 +610,10 @@ await runTest("ti stock exit feedback uses the scoped mutation error normalizer"
   );
   assert.match(
     exitHandlerSource,
-    /getTiStockMutationErrorMessage\(error, "Não foi possível registrar a saída\."\)/,
+    /const message = getTiStockMutationErrorMessage\(error, "Não foi possível registrar a saída\."\);/,
   );
+  assert.match(exitHandlerSource, /setExitConfirmationError\(message\);/);
+  assert.match(exitHandlerSource, /toast\.error\(message\);/);
 });
 
 await runTest("ti stock exit confirmation uses the shared destructive dialog", async () => {
