@@ -5,12 +5,14 @@ import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
+import { ConfirmationDialog } from "@shared/components";
 
 import {
   useDeleteProjectMutation,
   useProjectDetail,
   useRecalculateProjectProgressMutation,
 } from "../hooks/useProjects";
+import type { ProjectDetail } from "../types";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectProgressBar } from "./ProjectProgressBar";
 import {
@@ -31,15 +33,24 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const deleteProjectMutation = useDeleteProjectMutation();
   const recalculateProgressMutation = useRecalculateProjectProgressMutation();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [pendingProjectDeletion, setPendingProjectDeletion] = useState<ProjectDetail | null>(null);
+  const [projectDeletionError, setProjectDeletionError] = useState<string | null>(null);
   const backClientId = typeof router.query.clientId === "string" ? router.query.clientId : null;
   const project = projectQuery.data;
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!project) {
       return;
     }
 
-    if (!window.confirm(`Excluir o projeto "${project.name}"?`)) {
+    setProjectDeletionError(null);
+    setPendingProjectDeletion(project);
+  }
+
+  async function handleConfirmProjectDeletion() {
+    const project = pendingProjectDeletion;
+
+    if (!project) {
       return;
     }
 
@@ -60,11 +71,17 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           : null;
 
       if (statusCode === 403) {
-      toast.error("Somente usuários com permissão administrativa na Integração podem excluir projetos.");
-        return;
+        const message =
+          "Somente usuários com permissão administrativa na Integração podem excluir projetos.";
+        toast.error(message);
+        setProjectDeletionError(message);
+        throw error;
       }
 
-      toast.error("Não foi possível excluir o projeto.");
+      const message = "Não foi possível excluir o projeto.";
+      toast.error(message);
+      setProjectDeletionError(message);
+      throw error;
     }
   }
 
@@ -107,6 +124,24 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
+      <ConfirmationDialog
+        open={Boolean(pendingProjectDeletion)}
+        onOpenChange={(open) => {
+          if (!open && !deleteProjectMutation.isPending) {
+            setPendingProjectDeletion(null);
+            setProjectDeletionError(null);
+          }
+        }}
+        title={`Excluir projeto "${pendingProjectDeletion?.name ?? ""}"?`}
+        description="Esta ação remove o projeto e não pode ser desfeita."
+        onConfirm={handleConfirmProjectDeletion}
+        isConfirming={deleteProjectMutation.isPending}
+        errorMessage={projectDeletionError}
+        confirmLabel="Excluir projeto"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
+
       {canEdit ? (
         <ProjectFormModal
           open={isEditModalOpen}
@@ -252,7 +287,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
               {integracaoAccess.isAdmin ? (
                 <button
                   type="button"
-                  onClick={() => void handleDelete()}
+                  onClick={handleDelete}
                   className={PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME}
                   disabled={deleteProjectMutation.isPending}
                 >
