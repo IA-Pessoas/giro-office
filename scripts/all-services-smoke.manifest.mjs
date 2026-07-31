@@ -1727,6 +1727,14 @@ const baseManifest = [
   }),
   op({
     service: "rh-service",
+    method: "PUT",
+    path: "/rh/point/adjustment/reject",
+    action: "rhPointAdjustmentReject",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
     method: "POST",
     path: "/rh/categories",
     action: "rhCategoryCreate",

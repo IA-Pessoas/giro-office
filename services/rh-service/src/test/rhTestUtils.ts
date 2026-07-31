@@ -35,6 +35,7 @@ const rhMocks: {
   timeClockRequestServiceMock: {
     create: vi.fn(),
     approve: vi.fn(),
+    reject: vi.fn(),
     list: vi.fn(),
   },
   categoryServiceMock: {
@@ -270,6 +271,7 @@ export function resetRhRouteMocks() {
   });
   timeClockRequestServiceMock.create.mockResolvedValue({ ok: true });
   timeClockRequestServiceMock.approve.mockResolvedValue({ ok: true });
+  timeClockRequestServiceMock.reject.mockResolvedValue({ ok: true });
   timeClockRequestServiceMock.list.mockResolvedValue([
     { id: "00000000-0000-4000-8000-000000000010", status: "Pendente" },
   ]);

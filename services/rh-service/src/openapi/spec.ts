@@ -90,6 +90,8 @@ const approveTimeClockAdjustmentRequestBody = createObjectRequestBody({
   },
 });
 
+const rejectTimeClockAdjustmentRequestBody = approveTimeClockAdjustmentRequestBody;
+
 const categoryCreateRequestBody = createObjectRequestBody({
   example: {
     name: "Benefícios",
@@ -556,6 +558,17 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/point/adjustment/reject": {
+        put: {
+          tags: ["Ponto"],
+          summary: "Rejeitar ajuste de ponto",
+          security: bearer,
+          ...rejectTimeClockAdjustmentRequestBody,
+          responses: {
+            "200": { description: "Ajuste rejeitado", ...successJson },
+          },
+        },
+      },
       "/rh/point/adjustment/requests": {
         get: {
           tags: ["Ponto"],
@@ -565,7 +578,7 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
             {
               name: "status",
               in: "query",
-              schema: { type: "string", enum: ["Pendente", "Aprovado"] },
+              schema: { type: "string", enum: ["Pendente", "Aprovado", "Rejeitado"] },
             },
             { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
           ],

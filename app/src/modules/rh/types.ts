@@ -237,7 +237,9 @@ export interface ApproveRhPointAdjustmentPayload {
   obs_approver?: string | null;
 }
 
-export type RhPointAdjustmentStatus = "Pendente" | "Aprovado";
+export type RejectRhPointAdjustmentPayload = ApproveRhPointAdjustmentPayload;
+
+export type RhPointAdjustmentStatus = "Pendente" | "Aprovado" | "Rejeitado";
 
 export interface RhPointAdjustmentListFilters {
   status?: RhPointAdjustmentStatus;

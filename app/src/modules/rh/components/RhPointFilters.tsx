@@ -78,6 +78,7 @@ export function RhPointFilters({
                 <option value="">Todos</option>
                 <option value="Pendente">Pendentes</option>
                 <option value="Aprovado">Aprovados</option>
+                <option value="Rejeitado">Rejeitados</option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             </div>

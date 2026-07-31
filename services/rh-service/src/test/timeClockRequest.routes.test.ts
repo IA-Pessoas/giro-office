@@ -55,4 +55,36 @@ describe("timeClockRequest routes", () => {
     expect(res.status).toBe(200);
     expect(timeClockRequestServiceMock.approve).toHaveBeenCalledTimes(1);
   });
+
+  it("PUT /rh/point/adjustment/reject rejeita solicitacao", async () => {
+    const app = createTestApp();
+    const res = await request(app).put("/rh/point/adjustment/reject").send({
+      request_id: requestId,
+      obs_approver: "Motivo",
+    });
+
+    expect(res.status).toBe(200);
+    expect(timeClockRequestServiceMock.reject).toHaveBeenCalledTimes(1);
+  });
+
+  it("PUT /rh/point/adjustment/reject bloqueia usuario sem permissao", async () => {
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).put("/rh/point/adjustment/reject").send({
+      request_id: requestId,
+    });
+
+    expect(res.status).toBe(403);
+    expect(timeClockRequestServiceMock.reject).not.toHaveBeenCalled();
+  });
+
+  it("GET /rh/point/adjustment/requests aceita status Rejeitado", async () => {
+    const app = createTestApp();
+    const res = await request(app).get("/rh/point/adjustment/requests?status=Rejeitado");
+
+    expect(res.status).toBe(200);
+    expect(timeClockRequestServiceMock.list).toHaveBeenCalledWith(organizationId, {
+      status: "Rejeitado",
+      user_id: undefined,
+    });
+  });
 });
