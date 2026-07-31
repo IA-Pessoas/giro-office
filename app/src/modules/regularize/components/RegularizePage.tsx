@@ -748,7 +748,7 @@ export function RegularizePage() {
     { enabled: queryPolicy.processes },
   );
   const licenseQuery = useRegularizeLicenses(
-    { status: "Ativo" },
+    { status: "Todos" },
     { enabled: queryPolicy.licenses },
   );
   const processPageQuery = usePaginatedRegularizeProcesses(

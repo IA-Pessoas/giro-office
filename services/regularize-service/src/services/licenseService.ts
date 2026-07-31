@@ -138,7 +138,7 @@ export class LicenseService {
     const list = await this.prisma.license.findMany({
       where: {
         organization_id: organizationId,
-        status,
+        ...(status === "Todos" ? {} : { status }),
       },
       orderBy: {
         entry_date: "desc",
