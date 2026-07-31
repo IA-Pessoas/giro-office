@@ -163,6 +163,26 @@ runTest("shared Dialog constrains content and scrolls only its body", () => {
   assert.match(dialogSource, /<footer className="[^"]*shrink-0[^"]*"/);
 });
 
+runTest("shared Dialog animates close without trapping interaction in the exiting content", () => {
+  const overlayClass =
+    dialogSource.match(/<DialogPrimitive\.Overlay[\s\S]*?className=\{`([^`]*)`\}/)?.[1] ?? "";
+  const contentClass =
+    dialogSource.match(/<DialogPrimitive\.Content[\s\S]*?className=\{`([^`]*)`\}/)?.[1] ?? "";
+
+  assert.match(overlayClass, /data-\[state=open\]:animate-in/);
+  assert.match(overlayClass, /data-\[state=closed\]:animate-out/);
+  assert.match(overlayClass, /data-\[state=open\]:fade-in-0/);
+  assert.match(overlayClass, /data-\[state=closed\]:fade-out-0/);
+  assert.match(overlayClass, /motion-reduce:animate-none/);
+
+  assert.match(contentClass, /data-\[state=open\]:fade-in-0/);
+  assert.match(contentClass, /data-\[state=open\]:zoom-in-95/);
+  assert.match(contentClass, /data-\[state=closed\]:fade-out-0/);
+  assert.match(contentClass, /data-\[state=closed\]:zoom-out-95/);
+  assert.match(contentClass, /data-\[state=closed\]:pointer-events-none/);
+  assert.match(contentClass, /motion-reduce:animate-none/);
+});
+
 runTest("ConfirmationDialog composes the shared Dialog with explicit action controls", () => {
   assert.match(confirmationDialogSource, /import \{ Dialog \} from "\.\/Dialog";/);
   assert.match(confirmationDialogSource, /<Dialog[\s\S]*preventClose=\{isConfirming\}/);
