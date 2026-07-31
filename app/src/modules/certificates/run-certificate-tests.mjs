@@ -132,6 +132,26 @@ runTest("certificate record deletion uses the shared confirmation dialog", () =>
   assert.match(actionsSource, /Esta ação remove o cadastro e o arquivo associado, quando existir\./);
 });
 
+runTest("certificate record confirmation isolates file operation errors", () => {
+  const actionsSource = readFileSync(
+    new URL("./components/CertificateFileActions.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(actionsSource, /const \[recordDeleteError, setRecordDeleteError\] = useState<string \| null>\(null\)/);
+  assert.match(
+    actionsSource,
+    /function handleOpenRecordDeleteDialog\(\) \{\s*setRecordDeleteError\(null\);\s*setIsRecordDeleteDialogOpen\(true\);\s*\}/,
+  );
+  assert.match(actionsSource, /onClick=\{handleOpenRecordDeleteDialog\}/);
+  assert.match(
+    actionsSource,
+    /async function handleDeleteRecord\(\) \{[\s\S]*?setRecordDeleteError\(null\);[\s\S]*?catch \(error\) \{[\s\S]*?setRecordDeleteError\(message\);[\s\S]*?throw error;/,
+  );
+  assert.match(actionsSource, /errorMessage=\{recordDeleteError\}/);
+  assert.doesNotMatch(actionsSource, /errorMessage=\{localError \|\| null\}/);
+});
+
 runTest("buildCertificateListParams removes empty values", () => {
   assert.deepEqual(
     buildCertificateListParams({

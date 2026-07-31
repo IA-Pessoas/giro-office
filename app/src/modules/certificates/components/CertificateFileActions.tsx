@@ -107,6 +107,7 @@ export function CertificateFileActions({
 }: CertificateFileActionsProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [localError, setLocalError] = useState("");
+  const [recordDeleteError, setRecordDeleteError] = useState<string | null>(null);
   const [isRecordDeleteDialogOpen, setIsRecordDeleteDialogOpen] = useState(false);
   const uploadPjMutation = useUploadCertificatePjFileMutation();
   const uploadPfMutation = useUploadCertificatePfFileMutation();
@@ -128,6 +129,18 @@ export function CertificateFileActions({
   function resetFileInput() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  }
+
+  function handleOpenRecordDeleteDialog() {
+    setRecordDeleteError(null);
+    setIsRecordDeleteDialogOpen(true);
+  }
+
+  function handleRecordDeleteDialogOpenChange(open: boolean) {
+    setIsRecordDeleteDialogOpen(open);
+    if (!open) {
+      setRecordDeleteError(null);
     }
   }
 
@@ -216,7 +229,7 @@ export function CertificateFileActions({
 
   async function handleDeleteRecord() {
     try {
-      setLocalError("");
+      setRecordDeleteError(null);
       if (kind === "pj") {
         await deleteRecordPjMutation.mutateAsync({ id: certificateId });
       } else {
@@ -227,7 +240,7 @@ export function CertificateFileActions({
       void onDeleteRecordSuccess?.();
     } catch (error) {
       const message = getCertificateFileErrorMessage(error, "Não foi possível excluir o certificado.");
-      setLocalError(message);
+      setRecordDeleteError(message);
       toast.error(message);
       throw error;
     }
@@ -343,7 +356,7 @@ export function CertificateFileActions({
         {canDeleteRecord ? (
           <button
             type="button"
-            onClick={() => setIsRecordDeleteDialogOpen(true)}
+            onClick={handleOpenRecordDeleteDialog}
             className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}
             disabled={isBusy}
           >
@@ -358,12 +371,12 @@ export function CertificateFileActions({
       ) : null}
       <ConfirmationDialog
         open={isRecordDeleteDialogOpen}
-        onOpenChange={setIsRecordDeleteDialogOpen}
+        onOpenChange={handleRecordDeleteDialogOpenChange}
         title="Excluir certificado"
         description="Esta ação remove o cadastro e o arquivo associado, quando existir."
         onConfirm={handleDeleteRecord}
         isConfirming={isDeletingRecord}
-        errorMessage={localError || null}
+        errorMessage={recordDeleteError}
         confirmLabel="Excluir certificado"
         cancelLabel="Cancelar"
         variant="destructive"
