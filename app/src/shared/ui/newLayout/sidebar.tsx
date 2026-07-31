@@ -12,6 +12,7 @@ import { Input } from "./input";
 import { Separator } from "./separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./sheet";
 import { Skeleton } from "./skeleton";
+import { SYSTEM_SCROLLBAR_CLASSNAME } from "./scrollbar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
@@ -315,7 +316,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-content"
       data-sidebar="content"
-      className={cn("flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden", className)}
+      className={cn("flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden", SYSTEM_SCROLLBAR_CLASSNAME, className)}
       {...props}
     />
   );
@@ -579,4 +580,3 @@ export {
   SidebarTrigger,
   useSidebar,
 };
-

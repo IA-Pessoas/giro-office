@@ -11,6 +11,7 @@ const appShellSource = readFileSync(
   new URL("./components/newLayout/AppShell.tsx", import.meta.url),
   "utf8",
 );
+const sidebarSource = readFileSync(new URL("./ui/newLayout/sidebar.tsx", import.meta.url), "utf8");
 const tiWorkspaceUiSource = readFileSync(
   new URL("../modules/ti/components/tiWorkspaceUi.ts", import.meta.url),
   "utf8",
@@ -76,6 +77,8 @@ runTest("AppShell applies the system scrollbar to vertical shell scrollers", () 
     appShellSource,
     /className=\{`flex-1 p-4 lg:p-8 \$\{SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME\}`\}/,
   );
+  assert.match(sidebarSource, /SYSTEM_SCROLLBAR_CLASSNAME/);
+  assert.match(sidebarSource, /overflow-auto group-data-\[collapsible=icon\]:overflow-hidden", SYSTEM_SCROLLBAR_CLASSNAME/);
 });
 
 runTest("operational module table scrollers reuse the shared system scrollbar", () => {
