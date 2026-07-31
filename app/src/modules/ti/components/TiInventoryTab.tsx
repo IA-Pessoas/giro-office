@@ -4,6 +4,7 @@ import { Boxes, Eye, Pencil, Plus, RotateCcw, Save, Tags, UserPlus, X } from "lu
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
 import { useAssignableUsers } from "@modules/rh";
+import { ConfirmationDialog } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
@@ -20,7 +21,13 @@ import {
   useUpdateTiInventoryAssetMutation,
   useUpdateTiInventoryCategoryMutation,
 } from "../hooks";
-import type { TiId, TiInventoryAsset, TiInventoryCategory } from "../types";
+import type {
+  TiId,
+  TiInventoryAsset,
+  TiInventoryAssignUserPayload,
+  TiInventoryCategory,
+  TiInventoryReturnPayload,
+} from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -49,6 +56,10 @@ type InventoryDialogState =
   | { type: "assign"; asset: TiInventoryAsset }
   | { type: "return"; asset: TiInventoryAsset }
   | { type: "categories" };
+
+type PendingInventoryAction =
+  | { type: "assign"; asset: TiInventoryAsset; payload: TiInventoryAssignUserPayload }
+  | { type: "return"; asset: TiInventoryAsset; payload: TiInventoryReturnPayload };
 
 const INVENTORY_STATUS_OPTIONS = [
   { value: "", label: "Todos" },
@@ -220,6 +231,8 @@ export function TiInventoryTab() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [dialogState, setDialogState] = useState<InventoryDialogState | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingInventoryAction | null>(null);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<TiInventoryCategory | null>(null);
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManage && (dialogState?.type === "asset" || dialogState?.type === "assign"),
@@ -385,7 +398,7 @@ export function TiInventoryTab() {
     }
   }
 
-  async function handleSubmitAssign(event: FormEvent<HTMLFormElement>) {
+  function handleSubmitAssign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canManage || dialogState?.type !== "assign") {
@@ -395,50 +408,58 @@ export function TiInventoryTab() {
     const formData = new FormData(event.currentTarget);
     const userId = getFormText(formData, "user_id");
 
-    if (!confirm("Confirmar atribuição deste ativo?")) {
-      return;
-    }
-
-    try {
-      setDialogError(null);
-      await assignUserMutation.mutateAsync({
-        id: dialogState.asset.id,
-        payload: compactPayload({
-          user_id: userId,
-        }),
-      });
-      setSelectedAssetId(dialogState.asset.id);
-      closeDialog();
-    } catch (error) {
-      setDialogError(getMutationErrorMessage(error));
-    }
+    setConfirmationError(null);
+    setPendingAction({
+      type: "assign",
+      asset: dialogState.asset,
+      payload: compactPayload({ user_id: userId }),
+    });
   }
 
-  async function handleSubmitReturn(event: FormEvent<HTMLFormElement>) {
+  function handleSubmitReturn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canManage || dialogState?.type !== "return") {
       return;
     }
 
-    if (!confirm("Confirmar devolução deste ativo?")) {
+    const formData = new FormData(event.currentTarget);
+
+    setConfirmationError(null);
+    setPendingAction({
+      type: "return",
+      asset: dialogState.asset,
+      payload: compactPayload({ notes: getFormText(formData, "notes") }),
+    });
+  }
+
+  async function handleConfirmPendingAction() {
+    if (!pendingAction) {
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
-
     try {
-      setDialogError(null);
-      await returnAssetMutation.mutateAsync({
-        id: dialogState.asset.id,
-        payload: compactPayload({
-          notes: getFormText(formData, "notes"),
-        }),
-      });
-      setSelectedAssetId(dialogState.asset.id);
+      setConfirmationError(null);
+
+      if (pendingAction.type === "assign") {
+        await assignUserMutation.mutateAsync({
+          id: pendingAction.asset.id,
+          payload: pendingAction.payload,
+        });
+      } else {
+        await returnAssetMutation.mutateAsync({
+          id: pendingAction.asset.id,
+          payload: pendingAction.payload,
+        });
+      }
+
+      setSelectedAssetId(pendingAction.asset.id);
       closeDialog();
     } catch (error) {
-      setDialogError(getMutationErrorMessage(error));
+      const actionLabel = pendingAction.type === "assign" ? "atribuir o ativo" : "registrar a devolução";
+
+      setConfirmationError(`Não foi possível ${actionLabel}: ${getMutationErrorMessage(error)}`);
+      throw error;
     }
   }
 
@@ -687,6 +708,30 @@ export function TiInventoryTab() {
           )}
         </div>
       </Dialog>
+
+      <ConfirmationDialog
+        open={pendingAction !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingAction(null);
+            setConfirmationError(null);
+          }
+        }}
+        title={pendingAction?.type === "assign" ? "Confirmar atribuição" : "Confirmar devolução"}
+        description={
+          pendingAction?.type === "assign"
+            ? "Deseja atribuir este ativo ao usuário informado?"
+            : "Deseja registrar a devolução deste ativo?"
+        }
+        onConfirm={handleConfirmPendingAction}
+        isConfirming={
+          pendingAction?.type === "assign" ? assignUserMutation.isPending : returnAssetMutation.isPending
+        }
+        errorMessage={confirmationError}
+        confirmLabel={pendingAction?.type === "assign" ? "Atribuir ativo" : "Registrar devolução"}
+        cancelLabel="Cancelar"
+        variant={pendingAction?.type === "return" ? "destructive" : "neutral"}
+      />
 
       <Dialog
         open={dialogState?.type === "asset"}

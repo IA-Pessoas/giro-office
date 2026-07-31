@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
+import { ConfirmationDialog } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { formatCnpjInput, formatCpfInput } from "@shared/utils/inputFormatting";
 import {
@@ -121,6 +122,16 @@ type DetailTarget = {
   type: "pf";
   id: string;
 } | null;
+
+type PendingCertificateDeletion =
+  | {
+      kind: "pj";
+      certificate: CertificatePj;
+    }
+  | {
+      kind: "pf";
+      certificate: CertificatePf;
+    };
 
 type CertificateErrorBody = {
   error?: string;
@@ -260,6 +271,8 @@ export function CertificatesWorkspace() {
   const [visibleNotificationItems, setVisibleNotificationItems] = useState<CertificateNotification[]>([]);
   const pjFiltersMountedRef = useRef(false);
   const pfFiltersMountedRef = useRef(false);
+  const [pendingDeletion, setPendingDeletion] = useState<PendingCertificateDeletion | null>(null);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
 
   const [pjFilters, setPjFilters] = useState<PjFilters>({
     name: "",
@@ -556,6 +569,11 @@ export function CertificatesWorkspace() {
     : isEditing
       ? (workspaceMode === "editPj" ? updatePjMutation.isPending : updatePfMutation.isPending)
       : false;
+  const isConfirmingDeletion = pendingDeletion?.kind === "pj"
+    ? deletePjMutation.isPending
+    : pendingDeletion?.kind === "pf"
+      ? deletePfMutation.isPending
+      : false;
 
   const shouldShowDetailPanel = Boolean(selected);
   const pjDetail = pjDetailQuery.data;
@@ -670,53 +688,59 @@ export function CertificatesWorkspace() {
     }
   }
 
-  async function handleDeletePj(certificate: CertificatePj) {
-    if (
-      !canManageCertificateModule ||
-      (typeof window !== "undefined" &&
-        !window.confirm(`Excluir o certificado PJ "${certificate.name}"?`))
-    ) {
+  function handleDeletePj(certificate: CertificatePj) {
+    if (!canManageCertificateModule) {
       return;
     }
 
-    try {
-      await deletePjMutation.mutateAsync({ id: certificate.id });
-      setVisiblePjItems((current) => current.filter((item) => item.id !== certificate.id));
-      setSelected((current) =>
-        current?.type === "pj" && current.id === certificate.id ? null : current,
-      );
-      setWorkspaceMode("view");
-      setShowDetailPassword(false);
-      toast.success("Certificado PJ excluído com sucesso.");
-    } catch (error) {
-      toast.error(
-        getCertificateErrorMessage(error, "Não foi possível excluir o certificado PJ."),
-      );
-    }
+    setPendingDeletion({ kind: "pj", certificate });
+    setConfirmationError(null);
   }
 
-  async function handleDeletePf(certificate: CertificatePf) {
-    if (
-      !canManageCertificateModule ||
-      (typeof window !== "undefined" &&
-        !window.confirm(`Excluir o certificado PF "${certificate.name}"?`))
-    ) {
+  function handleDeletePf(certificate: CertificatePf) {
+    if (!canManageCertificateModule) {
       return;
     }
 
+    setPendingDeletion({ kind: "pf", certificate });
+    setConfirmationError(null);
+  }
+
+  async function handleConfirmPendingDeletion() {
+    if (!pendingDeletion || !canManageCertificateModule) {
+      return;
+    }
+
+    const { certificate } = pendingDeletion;
+
     try {
-      await deletePfMutation.mutateAsync({ id: certificate.id });
-      setVisiblePfItems((current) => current.filter((item) => item.id !== certificate.id));
-      setSelected((current) =>
-        current?.type === "pf" && current.id === certificate.id ? null : current,
-      );
+      if (pendingDeletion.kind === "pj") {
+        await deletePjMutation.mutateAsync({ id: certificate.id });
+        setVisiblePjItems((current) => current.filter((item) => item.id !== certificate.id));
+        setSelected((current) =>
+          current?.type === "pj" && current.id === certificate.id ? null : current,
+        );
+        toast.success("Certificado PJ excluído com sucesso.");
+      } else {
+        await deletePfMutation.mutateAsync({ id: certificate.id });
+        setVisiblePfItems((current) => current.filter((item) => item.id !== certificate.id));
+        setSelected((current) =>
+          current?.type === "pf" && current.id === certificate.id ? null : current,
+        );
+        toast.success("Certificado PF excluído com sucesso.");
+      }
+
       setWorkspaceMode("view");
       setShowDetailPassword(false);
-      toast.success("Certificado PF excluído com sucesso.");
+      setConfirmationError(null);
     } catch (error) {
-      toast.error(
-        getCertificateErrorMessage(error, "Não foi possível excluir o certificado PF."),
-      );
+      const fallback = pendingDeletion.kind === "pj"
+        ? "Não foi possível excluir o certificado PJ."
+        : "Não foi possível excluir o certificado PF.";
+      const message = getCertificateErrorMessage(error, fallback);
+      setConfirmationError(message);
+      toast.error(message);
+      throw error;
     }
   }
 
@@ -1710,6 +1734,32 @@ export function CertificatesWorkspace() {
           )
         ) : null}
       </Dialog>
+
+      <ConfirmationDialog
+        open={pendingDeletion !== null}
+        onOpenChange={(open) => {
+          if (!open && !isConfirmingDeletion) {
+            setPendingDeletion(null);
+            setConfirmationError(null);
+          }
+        }}
+        title={
+          pendingDeletion?.kind === "pj"
+            ? `Excluir certificado PJ "${pendingDeletion.certificate.name}"?`
+            : `Excluir certificado PF "${pendingDeletion?.certificate.name ?? ""}"?`
+        }
+        description={
+          pendingDeletion
+            ? `Esta ação remove o cadastro e o arquivo associado, quando existir, para ${pendingDeletion.kind.toUpperCase()} "${pendingDeletion.certificate.name}".`
+            : "Esta ação remove o cadastro e o arquivo associado, quando existir."
+        }
+        onConfirm={handleConfirmPendingDeletion}
+        isConfirming={isConfirmingDeletion}
+        errorMessage={confirmationError}
+        confirmLabel="Excluir certificado"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
 
       {shouldShowDetailPanel ? (
         <section className={`${CERTIFICATE_PANEL_CLASSNAME} space-y-4`}>
