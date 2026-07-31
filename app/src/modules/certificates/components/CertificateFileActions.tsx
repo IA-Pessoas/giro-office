@@ -18,7 +18,7 @@ import {
   isAcceptedCertificateFileName,
 } from "@modules/certificates/services";
 import type { CertificateDownloadResult, CertificateKind } from "@modules/certificates/types";
-import { Dialog } from "@shared/components/ui/Dialog";
+import { ConfirmationDialog } from "@shared/components";
 
 import {
   CERTIFICATE_COMPACT_BUTTON_CLASSNAME,
@@ -229,6 +229,7 @@ export function CertificateFileActions({
       const message = getCertificateFileErrorMessage(error, "Não foi possível excluir o certificado.");
       setLocalError(message);
       toast.error(message);
+      throw error;
     }
   }
 
@@ -355,20 +356,18 @@ export function CertificateFileActions({
       {localError ? (
         <p className="text-sm font-medium text-rose-600 dark:text-rose-300">{localError}</p>
       ) : null}
-      <Dialog
+      <ConfirmationDialog
         open={isRecordDeleteDialogOpen}
         onOpenChange={setIsRecordDeleteDialogOpen}
         title="Excluir certificado"
-        description="Confirmação de exclusão do certificado"
-        footer={
-          <>
-            <button type="button" onClick={() => setIsRecordDeleteDialogOpen(false)} disabled={isDeletingRecord} className={CERTIFICATE_COMPACT_BUTTON_CLASSNAME}>Cancelar</button>
-            <button type="button" onClick={() => void handleDeleteRecord()} disabled={isDeletingRecord} className={CERTIFICATE_COMPACT_DANGER_BUTTON_CLASSNAME}>{isDeletingRecord ? "Excluindo..." : "Excluir certificado"}</button>
-          </>
-        }
-      >
-        <p className="text-sm text-slate-600 dark:text-slate-300">Esta ação remove o cadastro e o arquivo associado, quando existir.</p>
-      </Dialog>
+        description="Esta ação remove o cadastro e o arquivo associado, quando existir."
+        onConfirm={handleDeleteRecord}
+        isConfirming={isDeletingRecord}
+        errorMessage={localError || null}
+        confirmLabel="Excluir certificado"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
     </div>
   );
 }
