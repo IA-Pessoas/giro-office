@@ -153,6 +153,22 @@ async function readWorkspaceSource(relativePath) {
   return readFile(join(appRoot, "..", relativePath), "utf8");
 }
 
+await runTest("ti inventory assignment and return require shared confirmation", async () => {
+  const inventorySource = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(inventorySource, /import \{ ConfirmationDialog \} from "@shared\/components"/);
+  assert.match(inventorySource, /type: "assign"/);
+  assert.match(inventorySource, /type: "return"/);
+  assert.doesNotMatch(inventorySource, /\bconfirm\(/);
+});
+
+await runTest("ti term signing requires shared confirmation", async () => {
+  const termsSource = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(termsSource, /<ConfirmationDialog/);
+  assert.doesNotMatch(termsSource, /\bconfirm\(/);
+});
+
 async function collectSourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
@@ -584,7 +600,7 @@ await runTest("ti stock mutation error uses an actionable fallback for a 409 wit
 
 await runTest("ti stock exit feedback uses the scoped mutation error normalizer", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
-  const exitHandlerStart = tabSource.indexOf("async function handleSubmitExit");
+  const exitHandlerStart = tabSource.indexOf("async function handleConfirmExit");
   const exitHandlerEnd = tabSource.indexOf("async function handleSubmitCategory", exitHandlerStart);
   const exitHandlerSource = tabSource.slice(exitHandlerStart, exitHandlerEnd);
 
@@ -594,8 +610,21 @@ await runTest("ti stock exit feedback uses the scoped mutation error normalizer"
   );
   assert.match(
     exitHandlerSource,
-    /getTiStockMutationErrorMessage\(error, "Não foi possível registrar a saída\."\)/,
+    /const message = getTiStockMutationErrorMessage\(error, "Não foi possível registrar a saída\."\);/,
   );
+  assert.match(exitHandlerSource, /setExitConfirmationError\(message\);/);
+  assert.match(exitHandlerSource, /toast\.error\(message\);/);
+});
+
+await runTest("ti stock exit confirmation uses the shared destructive dialog", async () => {
+  const stockSource = await readModuleSource("components/TiStockTab.tsx");
+
+  assert.match(stockSource, /import \{ ConfirmationDialog, PaginationControls \} from "@shared\/components"/);
+  assert.match(stockSource, /const \[pendingExitConfirmation, setPendingExitConfirmation\]/);
+  assert.match(stockSource, /<ConfirmationDialog/);
+  assert.match(stockSource, /onConfirm=\{handleConfirmExit\}/);
+  assert.match(stockSource, /async function handleConfirmExit\(\)[\s\S]*createExitMutation\.mutateAsync/);
+  assert.doesNotMatch(stockSource, /window\.confirm/);
 });
 
 await runTest("ti stock category dialog filters matches and makes new category creation explicit", async () => {
@@ -680,7 +709,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
     "useCreateTiStockExitMutation",
     "useCreateTiStockCategoryMutation",
     "useCreateTiStockLocationMutation",
-    "window.confirm",
+    "ConfirmationDialog",
     "Entrada",
     "Saída",
     "Categorias",
@@ -1627,7 +1656,8 @@ await runTest("ti inventory tab exposes assets, categories, departments, assignm
   assert.match(source, /departmentService\.list\(\)/);
   assert.match(source, /useFetch<DepItem\[\]>/);
   assert.doesNotMatch(source, /useTiInventoryLocations\(/);
-  assert.match(source, /confirm\(/);
+  assert.match(source, /<ConfirmationDialog/);
+  assert.doesNotMatch(source, /\bconfirm\(/);
 });
 
 await runTest("ti inventory department options come from the global department endpoint", async () => {
@@ -1745,7 +1775,8 @@ await runTest("ti terms tab exposes term create, edit, detail and signing action
   assert.match(source, /useTiInventory\([\s\S]*status: "available"[\s\S]*page_size: 100[\s\S]*enabled: canManage/);
   assert.doesNotMatch(source, /useTiInventory\(undefined, \{ enabled: canManage \}\)/);
   assert.match(source, /departmentService\.list\(\),\s*\{ retry: false, enabled: canManage \}/);
-  assert.match(source, /confirm\(/);
+  assert.match(source, /<ConfirmationDialog/);
+  assert.doesNotMatch(source, /\bconfirm\(/);
 });
 
 await runTest("ti inventory list exposes availability status for term asset selectors", async () => {
@@ -1812,7 +1843,7 @@ await runTest("ti terms list paginates locally and keeps actions compact", async
   const source = await readModuleSource("components/TiTermsTab.tsx");
   const controlsSource = await readModuleSource("components/tiFormControls.tsx");
 
-  assert.match(source, /import \{ PaginationControls \} from "@shared\/components";/);
+  assert.match(source, /import \{ ConfirmationDialog, PaginationControls \} from "@shared\/components";/);
   assert.match(source, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
   assert.match(source, /const TERMS_PAGE_SIZE = DEFAULT_PAGE_SIZE;/);
   assert.match(source, /const \[termsPage, setTermsPage\] = useState\(1\);/);
