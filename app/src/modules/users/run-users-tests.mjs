@@ -89,6 +89,10 @@ const permissionConfigSource = readFileSync(
   "utf8",
 );
 const userTypesSource = readFileSync(new URL("./types/index.ts", import.meta.url), "utf8");
+const userServiceSource = readFileSync(
+  new URL("./services/userService.ts", import.meta.url),
+  "utf8",
+);
 
 function extractClassConstant(source, constantName) {
   const match = source.match(new RegExp(`const ${constantName} =\\s*\\n\\s*"([^"]+)";`));
@@ -546,6 +550,13 @@ runTest("department permission sync payload uses zero for no access", () => {
     type: "user",
     modules,
   });
+});
+
+runTest("user updates forward modular permissions to the PATCH payload", () => {
+  assert.match(
+    userServiceSource,
+    /if \(data\.modules !== undefined\) payload\.modules = data\.modules;/,
+  );
 });
 
 runTest("department permission sync detects stale global user access", () => {
