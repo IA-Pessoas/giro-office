@@ -26,7 +26,6 @@ import {
   CERTIFICATE_FILE_ACTION_PANEL_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_BUTTON_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME,
-  CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
 } from "./certificateWorkspaceUi";
 
 type CertificateFileActionsVariant = "panel" | "inline";
@@ -276,17 +275,6 @@ export function CertificateFileActions({
         >
           {isDownloading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         </button>
-        {canDeleteFile ? (
-          <button
-            type="button"
-            onClick={() => void handleDelete()}
-            className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
-            disabled={!(canDeleteFile && hasCertificate) || isBusy}
-            title="Remover arquivo"
-          >
-            {isDeleting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-          </button>
-        ) : null}
       </div>
     );
   }

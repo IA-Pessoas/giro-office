@@ -274,6 +274,22 @@ const certificatesWorkspaceSource = readFileSync(
   "utf8",
 );
 
+runTest("ações de arquivo inline não duplicam a exclusão do certificado", () => {
+  const inlineBlock = certificateFileActionsSource.match(
+    /if \(variant === "inline"\) \{([\s\S]*?)\n  \}\n\n  return \(/,
+  )?.[1];
+  const panelBlock = certificateFileActionsSource.match(/\n  return \(([\s\S]*?)\n\}\n$/)?.[1];
+
+  assert.ok(inlineBlock, "bloco inline não encontrado");
+  assert.ok(panelBlock, "bloco panel não encontrado");
+  assert.doesNotMatch(inlineBlock, /Remover arquivo/);
+  assert.doesNotMatch(inlineBlock, /CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME/);
+  assert.match(panelBlock, /canDeleteFile/);
+  assert.match(panelBlock, /Remover/);
+  assert.match(panelBlock, /canDeleteRecord/);
+  assert.match(panelBlock, /Excluir certificado/);
+});
+
 runTest("Viewer de certificados pode consultar sem receber ações de escrita", () => {
   assert.equal(
     typeof certificateWorkspaceUi.resolveCertificateWorkspaceCapabilities,
