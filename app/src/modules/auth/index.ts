@@ -9,6 +9,7 @@ export {
   canViewIntegrationRoute,
   canViewTasksOnlyIntegrationRoute,
   getModulePermissionLevel,
+  hasAnyModuleAccess,
   normalizeRoutePath,
   MODULE_KEYS,
   resolveDepartmentModuleKey,
