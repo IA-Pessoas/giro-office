@@ -13,6 +13,7 @@ export const listTiTermsQuerySchema = paginationQuerySchema
   .merge(
     z.object({
       user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
+      status: z.enum(["pending", "signed"]).optional(),
     }),
   )
   .strict();

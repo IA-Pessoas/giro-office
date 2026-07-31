@@ -163,7 +163,7 @@ function getTermAsset(term: TiTerm): string {
 }
 
 function hasTermSignature(term?: TiTerm | null): boolean {
-  return Boolean(String(term?.reason ?? "").trim());
+  return term?.signed_at != null;
 }
 
 function getTermStatus(term?: TiTerm | null): "pending" | "signed" {

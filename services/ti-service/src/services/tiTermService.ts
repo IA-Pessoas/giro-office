@@ -12,6 +12,7 @@ import type {
 import type { TiAuthContext } from "./tiRequestService.js";
 
 type TermRecord = Record<string, unknown>;
+type TiTermStatus = "pending" | "signed";
 
 const SAFE_USER_INCLUDE = {
   user: {
@@ -45,6 +46,19 @@ function withoutNestedUserPassword(record: unknown): unknown {
   };
 }
 
+function toTermResponse(record: unknown): unknown {
+  const safeRecord = withoutNestedUserPassword(record);
+
+  if (!safeRecord || typeof safeRecord !== "object" || Array.isArray(safeRecord)) {
+    return safeRecord;
+  }
+
+  const typedRecord = safeRecord as TermRecord;
+  const status: TiTermStatus = typedRecord.signed_at == null ? "pending" : "signed";
+
+  return { ...typedRecord, status };
+}
+
 export class TiTermService {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -55,6 +69,7 @@ export class TiTermService {
       where: {
         organization_id: context.organizationId,
         ...(userId ? { user_id: userId } : {}),
+        ...(query.status ? { signed_at: query.status === "signed" ? { not: null } : null } : {}),
       },
       include: SAFE_USER_INCLUDE,
       orderBy: { date: "desc" },
@@ -62,7 +77,7 @@ export class TiTermService {
       take,
     });
 
-    return terms.map((term) => withoutNestedUserPassword(term));
+    return terms.map((term) => toTermResponse(term));
   }
 
   async getById(context: TiAuthContext, id: string): Promise<unknown> {
@@ -79,7 +94,7 @@ export class TiTermService {
       throw new ServiceError(404, "Termo de TI nao encontrado.");
     }
 
-    return withoutNestedUserPassword(term);
+    return toTermResponse(term);
   }
 
   async create(context: TiAuthContext, body: CreateTiTermBody): Promise<unknown> {
@@ -90,15 +105,18 @@ export class TiTermService {
         await this.ensureDepartment(context.organizationId, body.department_id);
       }
 
-      return this.prisma.termTecnologia.create({
-        data: {
-          ...body,
-          organization_id: context.organizationId,
-          user_id: user.id,
-          user_name: user.full_name?.trim() || user.name,
-          user_cpf: user.cpf?.trim() ?? "",
-        },
-      });
+      return this.prisma.termTecnologia
+        .create({
+          data: {
+            ...body,
+            signed_at: null,
+            organization_id: context.organizationId,
+            user_id: user.id,
+            user_name: user.full_name?.trim() || user.name,
+            user_cpf: user.cpf?.trim() ?? "",
+          },
+        })
+        .then((term) => toTermResponse(term));
     } catch (err: unknown) {
       logError("Erro ao criar termo de TI", { err });
       if (err instanceof ServiceError) throw err;
@@ -114,10 +132,12 @@ export class TiTermService {
         await this.ensureDepartment(context.organizationId, body.department_id);
       }
 
-      return this.prisma.termTecnologia.update({
-        where: { id },
-        data: body,
-      });
+      return this.prisma.termTecnologia
+        .update({
+          where: { id },
+          data: body,
+        })
+        .then((term) => toTermResponse(term));
     } catch (err: unknown) {
       logError("Erro ao atualizar termo de TI", { err });
       if (err instanceof ServiceError) throw err;
@@ -133,12 +153,15 @@ export class TiTermService {
         throw new ServiceError(403, "Permissao insuficiente para assinar termo de outro usuario.");
       }
 
-      return this.prisma.termTecnologia.update({
-        where: { id },
-        data: {
-          reason: body.reason ?? "Termo assinado pelo usuario.",
-        },
-      });
+      return this.prisma.termTecnologia
+        .update({
+          where: { id },
+          data: {
+            reason: body.reason ?? "Termo assinado pelo usuario.",
+            signed_at: new Date(),
+          },
+        })
+        .then((term) => toTermResponse(term));
     } catch (err: unknown) {
       logError("Erro ao assinar termo de TI", { err });
       if (err instanceof ServiceError) throw err;

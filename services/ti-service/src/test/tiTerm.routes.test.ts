@@ -54,6 +54,7 @@ function createPrismaMock(): PrismaClient {
         user_id: userId,
         organization_id: where.organization_id,
         reason: null,
+        signed_at: null,
       })),
       create: vi.fn(async ({ data }) => ({ id: termId, ...data })),
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
@@ -77,7 +78,25 @@ describe("ti term routes", () => {
       .set(gatewayHeaders(TI_VIEWER_PERMISSION));
 
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ success: true, data: { id: termId, user_id: userId } });
+    expect(response.body).toMatchObject({
+      success: true,
+      data: { id: termId, user_id: userId, status: "pending", signed_at: null },
+    });
+  });
+
+  it("GET /ti/terms/list filters by signed_at status", async () => {
+    const prisma = createPrismaMock();
+
+    const response = await request(createTestApp(prisma))
+      .get("/ti/terms/list?status=signed")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(prisma.termTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ signed_at: { not: null } }),
+      }),
+    );
   });
 
   it("PATCH /ti/terms/:id/sign allows viewer to sign own term", async () => {
@@ -89,7 +108,7 @@ describe("ti term routes", () => {
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       success: true,
-      data: { id: termId, reason: "Termo assinado pelo usuario." },
+      data: { id: termId, reason: "Termo assinado pelo usuario.", status: "signed" },
     });
   });
 
@@ -128,6 +147,7 @@ describe("ti term routes", () => {
         user_id: userId,
         department_id: departmentId,
         asset_code: "NB-001",
+        reason: "Motivo cadastral",
       });
 
     expect(response.status).toBe(201);
@@ -141,6 +161,9 @@ describe("ti term routes", () => {
         department_id: departmentId,
         asset_code: "NB-001",
         organization_id: organizationId,
+        reason: "Motivo cadastral",
+        signed_at: null,
+        status: "pending",
       },
     });
   });
@@ -173,6 +196,7 @@ describe("ti term routes", () => {
       data: {
         id: termId,
         reason: "Termo assinado pelo usuario.",
+        status: "signed",
       },
     });
   });
@@ -197,6 +221,7 @@ describe("ti term routes", () => {
       data: {
         id: termId,
         reason: "Termo assinado pelo usuario.",
+        status: "signed",
       },
     });
   });
