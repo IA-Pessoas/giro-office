@@ -103,6 +103,19 @@ async function runAsyncTest(name, fn) {
   }
 }
 
+runTest("task and dependency confirmations retain contextual errors on failure", () => {
+  const tasks = readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8");
+  const taskModel = readFileSync(
+    new URL("./components/TaskModelModal.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(tasks, /errorMessage=\{taskDeletionError\}/);
+  assert.match(tasks, /setTaskDeletionError\(message\);\s*throw error;/);
+  assert.match(taskModel, /errorMessage=\{dependentDeletionError\}/);
+  assert.match(taskModel, /setDependentDeletionError\(message\);\s*throw error;/);
+});
+
 runTest("integration destructive actions use the shared confirmation dialog", () => {
   const sources = {
     tasks: readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8"),

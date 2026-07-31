@@ -423,10 +423,11 @@ export function TaskModelModal({
       await refreshDependents();
       setPendingDependentDeletion(null);
       setDependentDeletionError(null);
-    } catch {
+    } catch (error) {
       const message = "Não foi possível remover dependência.";
       toast.error(message);
       setDependentDeletionError(message);
+      throw error;
     } finally {
       setLoadingDependents(false);
     }

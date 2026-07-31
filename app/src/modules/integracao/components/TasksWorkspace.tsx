@@ -195,12 +195,13 @@ export function TasksWorkspace() {
         const message = "Somente usuários com permissão administrativa na Integração podem excluir tarefas.";
         toast.error(message);
         setTaskDeletionError(message);
-        return;
+        throw error;
       }
 
       const message = "Não foi possível excluir a tarefa.";
       toast.error(message);
       setTaskDeletionError(message);
+      throw error;
     }
   }
 
