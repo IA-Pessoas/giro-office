@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { formatCpfInput, normalizeDigits } from "@shared/utils/inputFormatting";
 
 import type { AddRegularizeGuidancePartnerPayload, RegularizeId } from "../types";
 import {
@@ -82,7 +83,7 @@ export function RegularizeGuidancePartnerForm({
         process_id: processId,
         partner: {
           name: trimRegularizeText(formState.name),
-          cpf: trimRegularizeText(formState.cpf),
+          cpf: normalizeDigits(trimRegularizeText(formState.cpf)),
           role: trimRegularizeOptionalText(formState.role),
           share: toRegularizeOptionalNumber(formState.share),
         },
@@ -119,7 +120,9 @@ export function RegularizeGuidancePartnerForm({
           <RegularizeFormField label="CPF" required>
             <input
               value={formState.cpf}
-              onChange={(event) => handleChange("cpf", event.target.value)}
+              onChange={(event) =>
+                handleChange("cpf", formatCpfInput(event.target.value))
+              }
               className={regularizeTextFieldClassName}
             />
           </RegularizeFormField>

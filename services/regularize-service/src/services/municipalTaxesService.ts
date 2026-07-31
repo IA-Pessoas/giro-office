@@ -1,8 +1,9 @@
 import { ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type {
   CreateMunicipalTaxesBody,
+  MunicipalTaxesType,
   UpdateMunicipalTaxesBody,
 } from "../schemas/municipalTaxes.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
@@ -34,6 +35,30 @@ const municipalTaxesSelect = {
   tll_analysis_is_done: true,
   tll_analysis_notes: true,
 } as const;
+
+const municipalTaxesApplicabilityFields = {
+  TFF: "tff_is_applicable",
+  TLP: "tlp_is_applicable",
+  TLL: "tll_is_applicable",
+} as const;
+
+export type MunicipalTaxesListParams = {
+  organizationId: string;
+  year: number;
+  search: string;
+  status: "Todos" | "Criado" | "Pendente";
+  type?: MunicipalTaxesType;
+  page: number;
+  limit: number;
+};
+
+export type MunicipalTaxesListPage = {
+  data: Record<string, unknown>[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+};
 
 export class MunicipalTaxesService {
   readonly #logs: RegularizeLogService;
@@ -137,32 +162,72 @@ export class MunicipalTaxesService {
     return { detail };
   }
 
-  async list(organizationId: string, year: number): Promise<Record<string, unknown>[]> {
-    const list = await this.prisma.client.findMany({
-      where: {
-        organization_id: organizationId,
-        status: "Ativo",
-      },
-      select: {
-        id: true,
-        dominio_code: true,
-        name: true,
-        cpf_cnpj: true,
-        city: true,
-        municipalTaxes: {
-          where: {
-            organization_id: organizationId,
-            year,
+  async list(params: MunicipalTaxesListParams): Promise<MunicipalTaxesListPage> {
+    const municipalTaxesWhere: Prisma.MunicipalTaxesWhereInput = {
+      organization_id: params.organizationId,
+      year: params.year,
+      ...(params.type ? { [municipalTaxesApplicabilityFields[params.type]]: true } : {}),
+    };
+    const where: Prisma.ClientWhereInput = {
+      organization_id: params.organizationId,
+      status: "Ativo",
+      ...(params.search
+        ? {
+            OR: [
+              { name: { contains: params.search, mode: "insensitive" } },
+              { cpf_cnpj: { contains: params.search, mode: "insensitive" } },
+              { city: { contains: params.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+      ...(params.status === "Todos"
+        ? params.type
+          ? {
+              municipalTaxes: {
+                some: municipalTaxesWhere,
+              },
+            }
+          : {}
+        : {
+            municipalTaxes: {
+              [params.status === "Criado" ? "some" : "none"]: {
+                ...municipalTaxesWhere,
+              },
+            },
+          }),
+    };
+    const [list, total] = await Promise.all([
+      this.prisma.client.findMany({
+        where,
+        select: {
+          id: true,
+          dominio_code: true,
+          name: true,
+          cpf_cnpj: true,
+          city: true,
+          municipalTaxes: {
+            where: {
+              ...municipalTaxesWhere,
+            },
+            select: { id: true },
           },
-          select: { id: true },
         },
-      },
-      orderBy: {
-        name: "asc",
-      },
-    });
+        orderBy: {
+          name: "asc",
+        },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      this.prisma.client.count({ where }),
+    ]);
 
-    return list as unknown as Record<string, unknown>[];
+    return {
+      data: list as unknown as Record<string, unknown>[],
+      total,
+      page: params.page,
+      limit: params.limit,
+      hasMore: params.page * params.limit < total,
+    };
   }
 
   private async ensureClientExists(organizationId: string, clientId: string): Promise<void> {

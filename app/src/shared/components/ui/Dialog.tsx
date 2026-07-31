@@ -12,6 +12,7 @@ interface DialogProps {
   overlayClassName?: string;
   contentClassName?: string;
   bodyClassName?: string;
+  preventClose?: boolean;
 }
 
 export function Dialog({
@@ -24,14 +25,33 @@ export function Dialog({
   overlayClassName = "",
   contentClassName = "",
   bodyClassName = "",
+  preventClose = false,
 }: DialogProps) {
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (preventClose && !nextOpen) {
+      return;
+    }
+
+    onOpenChange(nextOpen);
+  };
+
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           className={`fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm ${overlayClassName}`}
         />
         <DialogPrimitive.Content
+          onEscapeKeyDown={(event) => {
+            if (preventClose) {
+              event.preventDefault();
+            }
+          }}
+          onPointerDownOutside={(event) => {
+            if (preventClose) {
+              event.preventDefault();
+            }
+          }}
           className={`fixed left-1/2 top-1/2 z-[1500] flex max-h-[calc(100dvh-2rem)] w-[min(92vw,680px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:[color-scheme:dark] ${contentClassName}`}
         >
           <header className="flex shrink-0 items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
@@ -40,6 +60,7 @@ export function Dialog({
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">{description}</DialogPrimitive.Description>
             <DialogPrimitive.Close
+              disabled={preventClose}
               className="rounded-md p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--colors-blue-500)] dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
               aria-label="Fechar"
             >

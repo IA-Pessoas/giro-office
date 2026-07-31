@@ -1237,6 +1237,13 @@ const handlers = {
     });
   },
 
+  async tiRequestTransferCandidates(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/ti/requests/${requireState("tiRequestId")}/transfer-candidates`,
+    });
+  },
+
   async tiRequestStatusPatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -1826,7 +1833,7 @@ const handlers = {
     });
   },
 
-  async userPatch(op) {
+  async userPut(op) {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/user/${requireState("tempUserId")}`,
@@ -4000,7 +4007,7 @@ const handlers = {
   // Error-path handlers: 404 Not Found on mutations (PUT/PATCH non-existent)
   // -------------------------------------------------------------------------
 
-  async userPatchNotFound(op) {
+  async userPutNotFound(op) {
     await httpRequest(op, {
       expectedStatus: [404],
       path: "/user/00000000-0000-0000-0000-000000000000",

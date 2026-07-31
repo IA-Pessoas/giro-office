@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import type { UserAuditRecorder } from "../integrations/audit.js";
 import {
   permissionQuerySchema,
   permissionUserIdParamsSchema,
@@ -11,8 +12,11 @@ import {
 import { requireManageUsersAuth, requireOwnerUserAuth } from "../security/userManagementAuth.js";
 import { PermissionService } from "../services/permissionService.js";
 
-const router: ReturnType<typeof Router> = Router();
-const permissionService = new PermissionService();
+export function createPermissionRoutes(
+  options: { audit?: UserAuditRecorder } = {},
+): ReturnType<typeof Router> {
+  const router: ReturnType<typeof Router> = Router();
+  const permissionService = new PermissionService(options.audit);
 
 router.get(
   "/:userId",
@@ -57,4 +61,7 @@ router.put(
   },
 );
 
-export { router as permissionRoutes };
+  return router;
+}
+
+export const permissionRoutes: ReturnType<typeof Router> = createPermissionRoutes();

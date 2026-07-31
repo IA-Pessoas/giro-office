@@ -361,6 +361,16 @@ runTest("task model modal uses contextual user selectors", () => {
   assert.doesNotMatch(source, /listAdminUsers/);
 });
 
+runTest("task edit form loads contextual auxiliary selectors", () => {
+  const source = readFileSync(new URL("./components/TaskFormModal.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "integracao"/);
+  assert.match(source, /departmentId:/);
+  assert.match(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
+  assert.doesNotMatch(source, /listAdminUsers/);
+});
+
 runTest("task model deletion preserves actionable dependency conflicts", () => {
   const source = readFileSync(new URL("./hooks/useTaskModels.tsx", import.meta.url), "utf8");
 

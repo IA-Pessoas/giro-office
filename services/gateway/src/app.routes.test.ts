@@ -351,7 +351,6 @@ it("requires admin permission for user-management routes", async () => {
     { method: "GET", path: "/user" },
     { method: "GET", path: "/user/user-3" },
     { method: "GET", path: "/user/user-3/photo" },
-    { method: "PATCH", path: "/user/user-3" },
     { method: "POST", path: "/user/user-3/photo" },
     { method: "DELETE", path: "/user/user-3/photo" },
     { method: "DELETE", path: "/user/user-3" },
@@ -376,6 +375,63 @@ it("requires admin permission for user-management routes", async () => {
     }
   } finally {
     await stopServer(server);
+  }
+});
+
+it("proxies authenticated self password updates with PUT to user-service", async () => {
+  let seenHeaders: {
+    userId?: string;
+    organizationId?: string;
+    permission?: string;
+    type?: string;
+  } = {};
+  let seenMethod = "";
+
+  const upstream = createServer((request, response) => {
+    seenMethod = request.method ?? "";
+    seenHeaders = {
+      userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+      organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
+      permission: request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined,
+      type: request.headers[FORWARDED_AUTH_TYPE_HEADER] as string | undefined,
+    };
+    request.resume();
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { updated: true } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 0,
+    type: "user",
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/user-1`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ password: "nova-senha-segura" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenMethod).toBe("PUT");
+    expect(seenHeaders).toEqual({
+      userId: "user-1",
+      organizationId: "org-1",
+      permission: "0",
+      type: "user",
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
   }
 });
 

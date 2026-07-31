@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 import {
@@ -20,6 +20,7 @@ import {
 
 import { useModuleAccess } from "@modules/auth";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { formatCnpjInput, formatCpfInput } from "@shared/utils/inputFormatting";
 import {
   DEFAULT_CERTIFICATE_PAGE,
   DEFAULT_CERTIFICATE_PAGE_SIZE,
@@ -50,6 +51,7 @@ import type {
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
 import { CertificateFileActions } from "./CertificateFileActions";
 import { CertificateForm } from "./CertificateForm";
+import { normalizeCertificateDocumentFilter } from "./certificateInputNormalization";
 import {
   CERTIFICATE_COMPACT_BUTTON_CLASSNAME,
   CERTIFICATE_DATE_STATUS_OK_CLASSNAME,
@@ -256,6 +258,8 @@ export function CertificatesWorkspace() {
   const [visiblePjItems, setVisiblePjItems] = useState<CertificatePj[]>([]);
   const [visiblePfItems, setVisiblePfItems] = useState<CertificatePf[]>([]);
   const [visibleNotificationItems, setVisibleNotificationItems] = useState<CertificateNotification[]>([]);
+  const pjFiltersMountedRef = useRef(false);
+  const pfFiltersMountedRef = useRef(false);
 
   const [pjFilters, setPjFilters] = useState<PjFilters>({
     name: "",
@@ -285,7 +289,7 @@ export function CertificatesWorkspace() {
       page: pjPage,
       page_size: PAGE_SIZE,
       name: trimValue(pjFilters.name) || undefined,
-      cnpj: trimValue(pjFilters.cnpj) || undefined,
+      cnpj: normalizeCertificateDocumentFilter(pjFilters.cnpj),
       responsible: trimValue(pjFilters.responsible) || undefined,
       model: trimValue(pjFilters.model) || undefined,
       client_castelo_status: pjFilters.clientCasteloStatus,
@@ -301,9 +305,9 @@ export function CertificatesWorkspace() {
       page: pfPage,
       page_size: PAGE_SIZE,
       search: trimValue(pfFilters.search) || undefined,
-      cpf: trimValue(pfFilters.cpf) || undefined,
+      cpf: normalizeCertificateDocumentFilter(pfFilters.cpf),
       enterprise: trimValue(pfFilters.enterprise) || undefined,
-      cnpj: trimValue(pfFilters.cnpj) || undefined,
+      cnpj: normalizeCertificateDocumentFilter(pfFilters.cnpj),
       model: trimValue(pfFilters.model) || undefined,
       client_castelo_status: pfFilters.clientCasteloStatus,
       client_focus_status: pfFilters.clientFocusStatus,
@@ -403,6 +407,11 @@ export function CertificatesWorkspace() {
   }, [notificationPage, notificationsQuery.data, notificationsQuery.isPlaceholderData]);
 
   useEffect(() => {
+    if (!pjFiltersMountedRef.current) {
+      pjFiltersMountedRef.current = true;
+      return;
+    }
+
     setPjPage(FIRST_PAGE);
     setVisiblePjItems([]);
     setSelected((current) => (current?.type === "pj" ? null : current));
@@ -418,6 +427,11 @@ export function CertificatesWorkspace() {
   ]);
 
   useEffect(() => {
+    if (!pfFiltersMountedRef.current) {
+      pfFiltersMountedRef.current = true;
+      return;
+    }
+
     setPfPage(FIRST_PAGE);
     setVisiblePfItems([]);
     setSelected((current) => (current?.type === "pf" ? null : current));
@@ -1013,7 +1027,9 @@ export function CertificatesWorkspace() {
               <input
                 type="text"
                 value={pjFilters.cnpj}
-                onChange={(event) => setPjFilters((prev) => ({ ...prev, cnpj: event.target.value }))}
+                onChange={(event) =>
+                  setPjFilters((prev) => ({ ...prev, cnpj: formatCnpjInput(event.target.value) }))
+                }
                 className={CERTIFICATE_INPUT_CLASSNAME}
                 placeholder="Digite CNPJ"
               />
@@ -1161,7 +1177,9 @@ export function CertificatesWorkspace() {
               <input
                 type="text"
                 value={pfFilters.cpf}
-                onChange={(event) => setPfFilters((prev) => ({ ...prev, cpf: event.target.value }))}
+                onChange={(event) =>
+                  setPfFilters((prev) => ({ ...prev, cpf: formatCpfInput(event.target.value) }))
+                }
                 className={CERTIFICATE_INPUT_CLASSNAME}
                 placeholder="Digite CPF"
               />
@@ -1183,7 +1201,9 @@ export function CertificatesWorkspace() {
               <input
                 type="text"
                 value={pfFilters.cnpj}
-                onChange={(event) => setPfFilters((prev) => ({ ...prev, cnpj: event.target.value }))}
+                onChange={(event) =>
+                  setPfFilters((prev) => ({ ...prev, cnpj: formatCnpjInput(event.target.value) }))
+                }
                 className={CERTIFICATE_INPUT_CLASSNAME}
                 placeholder="Digite CNPJ da empresa"
               />

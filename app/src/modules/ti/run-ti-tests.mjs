@@ -115,6 +115,32 @@ await runTest("ti request attachment UI retains the accessible upload flow and c
   );
 });
 
+await runTest("ti request transfer UI uses request-scoped candidates and preserves authorized actors", async () => {
+  const tiRequestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const tiRequestsServiceSource = await readModuleSource("services/tiRequestsService.ts");
+
+  assert.match(tiRequestsTabSource, /Transferir responsabilidade/);
+  assert.match(tiRequestsTabSource, /useTiRequestTransferCandidates/);
+  assert.doesNotMatch(tiRequestsTabSource, /listAdminUsers/);
+  assert.doesNotMatch(tiRequestsTabSource, /departmentService/);
+  assert.match(tiRequestsTabSource, /Tecnologia/);
+  assert.match(tiRequestsTabSource, /assigned_to_id/);
+  assert.match(tiRequestsTabSource, /assignRequestMutation\.mutateAsync/);
+  assert.match(
+    tiRequestsTabSource,
+    /function canTransferRequest\(request: TiRequest\)[\s\S]*access\.isAdmin[\s\S]*currentUser\?\.type === "owner"[\s\S]*assigned_to_id/,
+  );
+  assert.match(tiRequestsTabSource, /<TiNativeSelect[\s\S]*label="Novo responsável"/);
+  assert.doesNotMatch(tiRequestsTabSource, /type="text"[^>]*name="assigned_to_id"/);
+  assert.match(tiRequestsServiceSource, /listTransferCandidates\(id: TiId\)/);
+  assert.match(tiRequestsServiceSource, /TI_ENDPOINTS\.requests\.transferCandidates/);
+  assert.doesNotMatch(tiRequestsTabSource, /resolveDepartmentModuleKey\(departmentName\)/);
+  assert.match(
+    tiRequestsTabSource,
+    /await assignRequestMutation\.mutateAsync\([\s\S]*setIsTransferDialogOpen\(false\);[\s\S]*setSelectedAssigneeId\(""\);[\s\S]*setActionError\(null\);/,
+  );
+});
+
 async function readModuleSource(relativePath) {
   return readFile(join(moduleRoot, relativePath), "utf8");
 }
@@ -1359,7 +1385,7 @@ await runTest("ti request detail keeps secondary actions compact", async () => {
   assert.doesNotMatch(tabSource, /Editar t.tulo/);
 });
 
-await runTest("ti request detail does not fetch admin users for assignment automatically", async () => {
+await runTest("ti request detail loads transfer candidates only when the dialog opens", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 
   assert.match(tabSource, /useAssignTiRequest/);
@@ -1370,7 +1396,12 @@ await runTest("ti request detail does not fetch admin users for assignment autom
   assert.doesNotMatch(tabSource, /useTiAssignableUsers/);
   assert.doesNotMatch(tabSource, /assignableUserOptions/);
   assert.doesNotMatch(tabSource, /Atribuir à equipe de TI/);
-  assert.doesNotMatch(tabSource, /listAdminUsers/);
+  assert.match(
+    tabSource,
+    /useTiRequestTransferCandidates\(activeRequestId,\s*\{\s*enabled: isTransferDialogOpen,?\s*\}\)/,
+  );
+  assert.doesNotMatch(tabSource, /listAdminUsers\("active"\)/);
+  assert.doesNotMatch(tabSource, /departmentService\.list\(\)/);
   assert.doesNotMatch(tabSource, /placeholder="ID do usuário"/);
   assert.doesNotMatch(tabSource, /assignedUserId/);
 });

@@ -4,6 +4,7 @@ import { createLogger } from "@workspace/shared/logger";
 
 import { createUserApp } from "./app.js";
 import { getUserServiceEnv } from "./config/env.js";
+import { createUserAudit } from "./integrations/audit.js";
 
 const env = getUserServiceEnv();
 const logger = createLogger({
@@ -13,7 +14,14 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-const app = createUserApp(env, logger);
+const audit = createUserAudit({
+  enabled: env.auditEnabled,
+  serviceUrl: env.auditServiceUrl,
+  serviceToken: env.auditServiceToken,
+  logger,
+});
+
+const app = createUserApp(env, logger, { audit });
 
 app.listen(env.port, () => {
   logger.info({ event: "server.start", data: { port: env.port } }, "user-service rodando");

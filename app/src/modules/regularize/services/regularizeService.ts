@@ -23,9 +23,9 @@ import type {
   RegularizeLicenseDetail,
   RegularizeLicenseListFilters,
   RegularizeLicenseListItem,
-  RegularizeMunicipalTaxesClientSummary,
   RegularizeMunicipalTaxesDetail,
   RegularizeMunicipalTaxesListFilters,
+  RegularizeMunicipalTaxesPage,
   RegularizePartner,
   RegularizePartnerListFilters,
   RegularizePasswordDetail,
@@ -251,13 +251,13 @@ export const regularizeService = {
 
   async listMunicipalTaxes(
     filters: RegularizeMunicipalTaxesListFilters,
-  ): Promise<RegularizeMunicipalTaxesClientSummary[]> {
+  ): Promise<RegularizeMunicipalTaxesPage> {
     const api = setupAPIClient();
     const response = await api.get(REGULARIZE_ENDPOINTS.municipalTaxes, {
       params: buildRegularizeMunicipalTaxesListParams(filters),
     });
 
-    return unwrapRegularizeEnvelope<RegularizeMunicipalTaxesClientSummary[]>(response.data) ?? [];
+    return unwrapRegularizeEnvelope<RegularizeMunicipalTaxesPage>(response.data);
   },
 
   async getMunicipalTax(id: RegularizeId): Promise<RegularizeMunicipalTaxesDetail> {

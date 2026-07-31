@@ -14,6 +14,7 @@ import type {
   TiReadQueryOptions,
   TiRequest,
   TiRequestAssignPayload,
+  TiTransferCandidate,
   TiRequestCategory,
   TiRequestCategoryPayload,
   TiRequestMessage,
@@ -83,6 +84,20 @@ export function useTiRequestMessages(
   return useFetch(
     tiQueryKeys.requests.messages(id),
     () => tiRequestsService.listMessages(id as TiId),
+    {
+      ...options,
+      enabled: Boolean(id) && options?.enabled !== false,
+    },
+  );
+}
+
+export function useTiRequestTransferCandidates(
+  id?: TiId,
+  options?: TiReadQueryOptions,
+): UseQueryResult<TiTransferCandidate[], Error> {
+  return useFetch(
+    tiQueryKeys.requests.transferCandidates(id),
+    () => tiRequestsService.listTransferCandidates(id as TiId),
     {
       ...options,
       enabled: Boolean(id) && options?.enabled !== false,

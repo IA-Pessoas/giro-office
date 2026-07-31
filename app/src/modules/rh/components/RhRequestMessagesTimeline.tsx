@@ -7,7 +7,10 @@ import {
   useRhMessages,
 } from "../hooks/useRhRequests";
 import type { RhMessageType } from "../types";
-import { getRhMessageTypeLabel } from "../utils/rhRequestUi";
+import {
+  getRhMessageTypeClassName,
+  getRhMessageTypeLabel,
+} from "../utils/rhRequestUi";
 import { formatRhDateTime } from "../utils/rhDate";
 
 interface RhRequestMessagesTimelineProps {
@@ -83,7 +86,9 @@ export function RhRequestMessagesTimeline({
                 className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/20"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${getRhMessageTypeClassName(item.type)}`}
+                  >
                     {getRhMessageTypeLabel(item.type)}
                   </span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">

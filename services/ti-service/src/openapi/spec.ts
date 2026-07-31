@@ -354,6 +354,17 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: false,
   },
+  TiTransferCandidate: {
+    type: "object",
+    required: ["id", "department_id"],
+    properties: {
+      id: { type: "string", format: "uuid" },
+      name: { type: "string", nullable: true },
+      full_name: { type: "string", nullable: true },
+      department_id: { type: "string", format: "uuid" },
+    },
+    additionalProperties: false,
+  },
   TiRequestStatusInput: {
     type: "object",
     required: ["status"],
@@ -1245,6 +1256,29 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           parameters: [pathIdParameter("Chamado de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiRequestAssignInput"),
           successDescription: "Chamado atribuido",
+          errors: [400, 401, 403, 404, 409],
+        }),
+      },
+      "/ti/requests/{id}/transfer-candidates": {
+        get: publicTiOperation({
+          operationId: "listTiRequestTransferCandidates",
+          tags: ["TI Requests"],
+          summary:
+            "Lista candidatos ativos do departamento Tecnologia para transferencia de um chamado",
+          parameters: [pathIdParameter("Chamado de TI")],
+          successSchema: {
+            type: "object",
+            required: ["success", "data"],
+            properties: {
+              success: { type: "boolean", enum: [true] },
+              data: {
+                type: "array",
+                items: { $ref: "#/components/schemas/TiTransferCandidate" },
+              },
+            },
+            additionalProperties: true,
+          },
+          successDescription: "Candidatos permitidos para transferencia",
           errors: [400, 401, 403, 404],
         }),
       },

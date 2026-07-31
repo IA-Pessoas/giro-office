@@ -52,6 +52,13 @@ export interface TiRequestAssignPayload {
   [key: string]: unknown;
 }
 
+export interface TiTransferCandidate {
+  id: TiId;
+  name?: string | null;
+  full_name?: string | null;
+  department_id: TiId;
+}
+
 export interface TiRequestStatusPayload {
   status: string;
   [key: string]: unknown;

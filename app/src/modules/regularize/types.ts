@@ -4,6 +4,8 @@ export type RegularizeStatus = string | boolean;
 
 export type RegularizePartnerType = "pf" | "pj";
 
+export type RegularizeMunicipalTaxType = "TFF" | "TLP" | "TLL";
+
 export type RegularizeOptionalDate = string | undefined;
 
 export type RegularizeIdFilter = {
@@ -35,6 +37,11 @@ export type RegularizePartnerListFilters = {
 
 export type RegularizeMunicipalTaxesListFilters = {
   year: number;
+  search?: string;
+  status?: "Todos" | "Criado" | "Pendente";
+  type?: RegularizeMunicipalTaxType;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizeProcessListFilters = {
@@ -199,6 +206,14 @@ export type RegularizeMunicipalTaxesClientSummary = {
   cpf_cnpj?: string | null;
   city?: string | null;
   municipalTaxes?: Array<{ id: RegularizeId }> | null;
+};
+
+export type RegularizeMunicipalTaxesPage = {
+  data: RegularizeMunicipalTaxesClientSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
 };
 
 export type RegularizeMunicipalTaxesDetail = {

@@ -710,12 +710,19 @@ export function RegularizePage() {
   const [pfSearch, setPfSearch] = useState("");
   const [pfStatus, setPfStatus] = useState("Todos");
   const [pfPage, setPfPage] = useState(1);
+  const [taxSearch, setTaxSearch] = useState("");
+  const [taxStatus, setTaxStatus] = useState<"Todos" | "Criado" | "Pendente">("Todos");
+  const [taxType, setTaxType] = useState<"Todos" | "TFF" | "TLP" | "TLL">("Todos");
+  const [taxYear, setTaxYear] = useState(() => new Date().getFullYear());
+  const [taxPage, setTaxPage] = useState(1);
   const debouncedProcessSearch = useDebouncedValue(processSearch.trim(), 300);
   const debouncedSiteSearch = useDebouncedValue(siteSearch.trim(), 300);
   const debouncedPfSearch = useDebouncedValue(pfSearch.trim(), 300);
+  const debouncedTaxSearch = useDebouncedValue(taxSearch.trim(), 300);
   const isProcessSearchPending = processSearch.trim() !== debouncedProcessSearch;
   const isSiteSearchPending = siteSearch.trim() !== debouncedSiteSearch;
   const isPfSearchPending = pfSearch.trim() !== debouncedPfSearch;
+  const isTaxSearchPending = taxSearch.trim() !== debouncedTaxSearch;
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const { access: regularizeAccess } = useModuleAccess("regularize");
@@ -740,7 +747,14 @@ export function RegularizePage() {
     { enabled: queryPolicy.sitePasswords },
   );
   const taxQuery = useRegularizeMunicipalTaxes(
-    { year: currentYear },
+    {
+      year: taxYear,
+      search: debouncedTaxSearch,
+      status: taxStatus,
+      type: taxType === "Todos" ? undefined : taxType,
+      page: taxPage,
+      limit: REGULARIZE_PAGE_SIZE,
+    },
     { enabled: queryPolicy.municipalTaxes },
   );
   const processQuery = useRegularizeProcesses(
@@ -868,6 +882,13 @@ export function RegularizePage() {
     }
   }, [pfPage, pfPageQuery.data]);
 
+  useEffect(() => {
+    const result = taxQuery.data;
+    if (result && result.data.length === 0 && result.total > 0 && taxPage > 1) {
+      setTaxPage(getLastPage(result.total, REGULARIZE_PAGE_SIZE));
+    }
+  }, [taxPage, taxQuery.data]);
+
   const processTableQuery: ListQuery<RegularizeProcessListItem> = {
     ...processPageQuery,
     data: isProcessSearchPending ? undefined : visibleProcessRows,
@@ -882,6 +903,11 @@ export function RegularizePage() {
     ...pfPageQuery,
     data: isPfSearchPending ? undefined : visiblePfRows,
     isLoading: isPfSearchPending || pfPageQuery.isLoading,
+  };
+  const taxTableQuery: ListQuery<RegularizeMunicipalTaxesClientSummary> = {
+    ...taxQuery,
+    data: isTaxSearchPending ? undefined : taxQuery.data?.data,
+    isLoading: isTaxSearchPending || taxQuery.isLoading,
   };
 
   const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
@@ -2229,7 +2255,7 @@ export function RegularizePage() {
         <section className="space-y-4">
           <TabActionHeader
             title="Tributos municipais"
-            description={`Controle de TFF, TLP e TLL para ${currentYear}.`}
+            description={`Controle de TFF, TLP e TLL para ${taxYear}.`}
             action={
               canManageRegularizeCore ? (
                 <PrimaryActionButton
@@ -2248,67 +2274,154 @@ export function RegularizePage() {
             }
           />
 
-          <QueryStatePanel query={taxQuery} emptyTitle="Nenhum tributo encontrado.">
-            {(taxRows) => (
-              <DataTable headers={["Cliente", "Documento", "Cidade", "Ano", "Registro", "Ação"]}>
-                {taxRows.map((item: RegularizeMunicipalTaxesClientSummary) => {
-                  const municipalTaxId = getMunicipalTaxId(item);
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_160px_160px_180px] dark:border-gray-700 dark:bg-gray-800">
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Buscar tributo
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={taxSearch}
+                  onChange={(event) => {
+                    setTaxSearch(event.target.value);
+                    setTaxPage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  placeholder="Cliente, documento ou cidade"
+                />
+              </div>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Ano</span>
+              <RegularizeNativeSelect
+                value={String(taxYear)}
+                onChange={(event) => {
+                  setTaxYear(Number(event.target.value));
+                  setTaxPage(1);
+                }}
+              >
+                {[currentYear - 1, currentYear, currentYear + 1].map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Status</span>
+              <RegularizeNativeSelect
+                value={taxStatus}
+                onChange={(event) => {
+                  setTaxStatus(event.target.value as "Todos" | "Criado" | "Pendente");
+                  setTaxPage(1);
+                }}
+              >
+                {["Todos", "Criado", "Pendente"].map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Tipo</span>
+              <RegularizeNativeSelect
+                value={taxType}
+                onChange={(event) => {
+                  setTaxType(event.target.value as "Todos" | "TFF" | "TLP" | "TLL");
+                  setTaxPage(1);
+                }}
+              >
+                {["Todos", "TFF", "TLP", "TLL"].map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
+          </div>
 
-                  return (
-                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                      <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                      <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
-                      <td className="px-4 py-3">
-                        {item.city ? (
-                          formatText(item.city)
-                        ) : (
-                          <span className="block text-center text-gray-500 dark:text-slate-400">
-                            -
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{currentYear}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge
-                          config={
-                            municipalTaxId
-                              ? { label: "Criado", variant: "success", icon: CheckCircle2 }
-                              : { label: "Pendente", variant: "warning", icon: CalendarDays }
-                          }
-                          size="sm"
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex justify-center">
-                          {canManageRegularizeCore ? (
-                            <TableTextActionButton
-                              icon={Pencil}
-                              title="Editar tributo"
-                              label="Editar"
-                              onClick={() =>
-                                setActiveForm(
-                                  municipalTaxId
-                                    ? {
-                                        type: "municipal-tax",
-                                        mode: "edit",
-                                        id: municipalTaxId,
-                                        clientId: item.id,
-                                      }
-                                    : {
-                                        type: "municipal-tax",
-                                        mode: "create",
-                                        clientId: item.id,
-                                      },
-                                )
-                              }
-                            />
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </DataTable>
+          <QueryStatePanel
+            query={taxTableQuery}
+            emptyTitle={
+              taxSearch || taxStatus !== "Todos" || taxType !== "Todos" || taxYear !== currentYear
+                ? "Nenhum tributo corresponde aos filtros."
+                : "Nenhum tributo encontrado."
+            }
+          >
+            {(taxRows) => (
+              <div>
+                <DataTable headers={["Cliente", "Documento", "Cidade", "Ano", "Registro", "Ação"]}>
+                  {taxRows.map((item: RegularizeMunicipalTaxesClientSummary) => {
+                    const municipalTaxId = getMunicipalTaxId(item);
+
+                    return (
+                      <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                        <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
+                        <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
+                        <td className="px-4 py-3">
+                          {item.city ? (
+                            formatText(item.city)
+                          ) : (
+                            <span className="block text-center text-gray-500 dark:text-slate-400">
+                              -
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">{taxYear}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge
+                            config={
+                              municipalTaxId
+                                ? { label: "Criado", variant: "success", icon: CheckCircle2 }
+                                : { label: "Pendente", variant: "warning", icon: CalendarDays }
+                            }
+                            size="sm"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex justify-center">
+                            {canManageRegularizeCore ? (
+                              <TableTextActionButton
+                                icon={Pencil}
+                                title="Editar tributo"
+                                label="Editar"
+                                onClick={() =>
+                                  setActiveForm(
+                                    municipalTaxId
+                                      ? {
+                                          type: "municipal-tax",
+                                          mode: "edit",
+                                          id: municipalTaxId,
+                                          clientId: item.id,
+                                        }
+                                      : {
+                                          type: "municipal-tax",
+                                          mode: "create",
+                                          clientId: item.id,
+                                        },
+                                  )
+                                }
+                              />
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </DataTable>
+                <PaginationControls
+                  page={taxPage}
+                  limit={REGULARIZE_PAGE_SIZE}
+                  total={taxQuery.data?.total ?? 0}
+                  count={taxRows.length}
+                  hasMore={taxQuery.data?.hasMore ?? false}
+                  isFetching={taxQuery.isFetching || isTaxSearchPending}
+                  onPrevious={() => setTaxPage((current) => Math.max(1, current - 1))}
+                  onNext={() => setTaxPage((current) => current + 1)}
+                />
+              </div>
             )}
           </QueryStatePanel>
         </section>
@@ -2373,7 +2486,7 @@ export function RegularizePage() {
         mode={activeForm?.type === "municipal-tax" ? activeForm.mode : "create"}
         municipalTax={activeMunicipalTaxForForm}
         defaultClientId={activeMunicipalTaxDefaultClientId}
-        currentYear={currentYear}
+        currentYear={taxYear}
         isLoadingInitialValue={
           activeForm?.type === "municipal-tax" &&
           activeForm.mode === "edit" &&
