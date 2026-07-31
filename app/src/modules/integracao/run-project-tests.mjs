@@ -168,7 +168,7 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
     sources.tasks,
     /const deleteTaskMutation = useDeleteIntegracaoTaskMutation\(\);/,
   );
-  assert.match(sources.tasks, /await deleteTaskMutation\.mutateAsync\(\{\s*taskId:\s*task\.id,\s*\}\);/);
+  assert.match(sources.tasks, /await deleteTaskMutation\.mutateAsync\(\{\s*taskId:\s*task\.id,?\s*\}\);/);
   assert.match(
     sources.tasks,
     /setVisibleTasks\(\(currentTasks\) =>\s*currentTasks\.filter\(\(currentTask\) => currentTask\.id !== task\.id\),\s*\);/,
@@ -202,6 +202,33 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
     assert.match(source, /const deleteProjectMutation = useDeleteProjectMutation\(\);/);
     assert.match(source, /toast\.success\("Projeto excluído com sucesso\."\);/);
   }
+
+  assert.match(
+    sources.projects,
+    /const \[pendingProjectDeletion, setPendingProjectDeletion\] = useState<ProjectListItem \| null>\(null\);/,
+  );
+  assert.match(sources.projects, /setPendingProjectDeletion\(project\);/);
+  assert.match(sources.projects, /open=\{Boolean\(pendingProjectDeletion\)\}/);
+  assert.match(sources.projects, /onConfirm=\{handleConfirmProjectDeletion\}/);
+  assert.match(sources.projects, /errorMessage=\{projectDeletionError\}/);
+  assert.match(sources.projects, /setProjectDeletionError\(message\);\s*throw error;/);
+
+  assert.match(sources.projectDetail, /const \[pendingProjectDeletion, setPendingProjectDeletion\]/);
+  assert.match(sources.projectDetail, /setPendingProjectDeletion\(project\);/);
+  assert.match(sources.projectDetail, /open=\{Boolean\(pendingProjectDeletion\)\}/);
+  assert.match(sources.projectDetail, /onConfirm=\{handleConfirmProjectDeletion\}/);
+  assert.match(sources.projectDetail, /errorMessage=\{projectDeletionError\}/);
+  assert.match(sources.projectDetail, /setProjectDeletionError\(message\);\s*throw error;/);
+
+  assert.match(
+    sources.clientProjects,
+    /const \[pendingProjectDeletion, setPendingProjectDeletion\] = useState<ProjectListItem \| null>\(null\);/,
+  );
+  assert.match(sources.clientProjects, /setPendingProjectDeletion\(project\);/);
+  assert.match(sources.clientProjects, /open=\{Boolean\(pendingProjectDeletion\)\}/);
+  assert.match(sources.clientProjects, /onConfirm=\{handleConfirmProjectDeletion\}/);
+  assert.match(sources.clientProjects, /errorMessage=\{projectDeletionError\}/);
+  assert.match(sources.clientProjects, /setProjectDeletionError\(message\);\s*throw error;/);
 
   assert.match(
     sources.projects,
