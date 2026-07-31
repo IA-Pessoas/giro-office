@@ -29,6 +29,8 @@ import {
   buildCreateProjectPayload,
   buildDeleteProjectPayload,
   buildProjectListParams,
+  getProjectDeleteErrorMessage,
+  PROJECT_DELETE_ADMIN_MESSAGE,
   PROJECT_ENDPOINTS,
   unwrapCreatedProject,
   unwrapProjectDetail,
@@ -289,6 +291,39 @@ runTest("buildCreateProjectPayload omits end_date when absent", () => {
 
 runTest("buildDeleteProjectPayload maps project_id body", () => {
   assert.deepEqual(buildDeleteProjectPayload("project-1"), { project_id: "project-1" });
+});
+
+runTest("project delete actions preserve actionable conflict messages", () => {
+  const conflictMessage = "Não é possível excluir projeto com dependências.";
+
+  assert.equal(
+    getProjectDeleteErrorMessage({
+      response: {
+        status: 409,
+        data: { error: conflictMessage },
+      },
+    }),
+    conflictMessage,
+  );
+  assert.equal(
+    getProjectDeleteErrorMessage({
+      response: {
+        status: 403,
+        data: { error: "Permissão insuficiente." },
+      },
+    }),
+    PROJECT_DELETE_ADMIN_MESSAGE,
+  );
+
+  for (const file of [
+    "./components/ProjectsWorkspace.tsx",
+    "./components/ProjectDetailView.tsx",
+    "./components/ClientProjectsSection.tsx",
+  ]) {
+    const source = readFileSync(new URL(file, import.meta.url), "utf8");
+    assert.match(source, /getProjectDeleteErrorMessage/);
+    assert.doesNotMatch(source, /toast\.error\("Não foi possível excluir o projeto\."\)/);
+  }
 });
 
 runTest("unwrapProjectEnvelope handles top-level data wrapper", () => {
