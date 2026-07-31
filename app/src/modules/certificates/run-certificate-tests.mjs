@@ -246,6 +246,25 @@ runTest("certificate refresh keeps rows while a new first page is requested", ()
   );
 });
 
+runTest("certificate filters preserve the initial query result", () => {
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workspaceSource, /import \{[^}]*useRef[^}]*\} from "react"/);
+  assert.match(workspaceSource, /const pjFiltersMountedRef = useRef\(false\);/);
+  assert.match(workspaceSource, /const pfFiltersMountedRef = useRef\(false\);/);
+  assert.match(
+    workspaceSource,
+    /useEffect\(\(\) => \{\s*if \(!pjFiltersMountedRef\.current\) \{\s*pjFiltersMountedRef\.current = true;\s*return;\s*\}/,
+  );
+  assert.match(
+    workspaceSource,
+    /useEffect\(\(\) => \{\s*if \(!pfFiltersMountedRef\.current\) \{\s*pfFiltersMountedRef\.current = true;\s*return;\s*\}/,
+  );
+});
+
 const certificateFileActionsSource = readFileSync(
   "src/modules/certificates/components/CertificateFileActions.tsx",
   "utf8",

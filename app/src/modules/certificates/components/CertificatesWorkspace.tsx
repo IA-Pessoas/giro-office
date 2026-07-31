@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 import {
@@ -258,6 +258,8 @@ export function CertificatesWorkspace() {
   const [visiblePjItems, setVisiblePjItems] = useState<CertificatePj[]>([]);
   const [visiblePfItems, setVisiblePfItems] = useState<CertificatePf[]>([]);
   const [visibleNotificationItems, setVisibleNotificationItems] = useState<CertificateNotification[]>([]);
+  const pjFiltersMountedRef = useRef(false);
+  const pfFiltersMountedRef = useRef(false);
 
   const [pjFilters, setPjFilters] = useState<PjFilters>({
     name: "",
@@ -405,6 +407,11 @@ export function CertificatesWorkspace() {
   }, [notificationPage, notificationsQuery.data, notificationsQuery.isPlaceholderData]);
 
   useEffect(() => {
+    if (!pjFiltersMountedRef.current) {
+      pjFiltersMountedRef.current = true;
+      return;
+    }
+
     setPjPage(FIRST_PAGE);
     setVisiblePjItems([]);
     setSelected((current) => (current?.type === "pj" ? null : current));
@@ -420,6 +427,11 @@ export function CertificatesWorkspace() {
   ]);
 
   useEffect(() => {
+    if (!pfFiltersMountedRef.current) {
+      pfFiltersMountedRef.current = true;
+      return;
+    }
+
     setPfPage(FIRST_PAGE);
     setVisiblePfItems([]);
     setSelected((current) => (current?.type === "pf" ? null : current));
