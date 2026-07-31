@@ -78,6 +78,16 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   }
 });
 
+await runTest("regularize license responsible field uses the contextual selector", async () => {
+  const source = await readModuleSource("components/RegularizeLicenseForm.tsx");
+
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "regularize"/);
+  assert.match(source, /<RegularizeNativeSelect[\s\S]*value=\{formState\.responsible_id\}/);
+  assert.match(source, /Respons.vel atual/);
+  assert.doesNotMatch(source, /Respons.vel ID/);
+});
+
 await runTest("regularize PF list contract preserves explicit search status and pagination", async () => {
   assert.deepEqual(
     buildRegularizeClientPfListParams({

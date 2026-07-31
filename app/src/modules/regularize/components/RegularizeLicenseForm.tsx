@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
 import { ClientSelectionField } from "@modules/clients";
+import { useAssignableUsers } from "@modules/rh";
 
 import type {
   CreateRegularizeLicensePayload,
@@ -134,6 +135,11 @@ export function RegularizeLicenseForm({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const isEditing = mode === "edit";
+  const responsibleUsersQuery = useAssignableUsers({ enabled: open, module: "regularize" });
+  const responsibleUsers = responsibleUsersQuery.data ?? [];
+  const hasSelectedResponsible = responsibleUsers.some(
+    (user) => user.id === formState.responsible_id,
+  );
 
   useEffect(() => {
     if (open) {
@@ -328,12 +334,30 @@ export function RegularizeLicenseForm({
               </RegularizeNativeSelect>
             </RegularizeFormField>
 
-            <RegularizeFormField label="Responsável ID">
-              <input
+            <RegularizeFormField label="Responsável">
+              <RegularizeNativeSelect
                 value={formState.responsible_id}
                 onChange={(event) => handleChange("responsible_id", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+                disabled={
+                  isSubmitting || responsibleUsersQuery.isLoading || responsibleUsersQuery.isError
+                }
+              >
+                <option value="">
+                  {responsibleUsersQuery.isLoading
+                    ? "Carregando responsáveis"
+                    : responsibleUsersQuery.isError
+                      ? "Responsáveis indisponíveis"
+                      : "Sem responsável"}
+                </option>
+                {formState.responsible_id && !hasSelectedResponsible ? (
+                  <option value={formState.responsible_id}>Responsável atual</option>
+                ) : null}
+                {responsibleUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
             <RegularizeFormField label="Task ID">

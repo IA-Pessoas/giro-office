@@ -346,24 +346,29 @@ runTest("task model endpoints match task-service contract", () => {
   assert.equal(TASK_MODEL_ENDPOINTS.options, "/task/deps/options");
 });
 
-runTest("task model options keep active users and departments in one response", () => {
+runTest("task model modal uses contextual user selectors", () => {
   const options = {
     users: [{ id: "user-1", name: "Ana" }],
     departments: [{ id: "dep-1", name: "Fiscal" }],
   };
 
   assert.deepEqual(unwrapTaskModelOptions({ success: true, data: options }), options);
-  assert.doesNotMatch(
-    readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8"),
-    /listAdminUsers|departmentService\.list/,
-  );
+  const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "integracao"/);
+  assert.match(source, /departmentId: formData\.department_id/);
+  assert.match(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
+  assert.doesNotMatch(source, /listAdminUsers/);
 });
 
-runTest("task edit form loads auxiliary selects from integration task options", () => {
+runTest("task edit form loads contextual auxiliary selectors", () => {
   const source = readFileSync(new URL("./components/TaskFormModal.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /taskModelService\.listOptions/);
-  assert.doesNotMatch(source, /listAdminUsers|departmentService\.list/);
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "integracao"/);
+  assert.match(source, /departmentId:/);
+  assert.match(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
+  assert.doesNotMatch(source, /listAdminUsers/);
 });
 
 runTest("task model deletion preserves actionable dependency conflicts", () => {
@@ -514,10 +519,12 @@ runTest("task model modal allows retrying failed options before saving", () => {
   assert.match(source, /const \[taskModelsWarning, setTaskModelsWarning\] = useState\(false\)/);
   assert.match(source, /onClick=\{\(\) => setOptionsRetryKey\(\(currentKey\) => currentKey \+ 1\)\}/);
   assert.match(source, />\s*Tentar novamente\s*<\/button>/);
-  assert.match(
-    source,
-    /const optionsUnavailable = loadingOptions \|\| requiredOptionsWarning;[\s\S]*const taskModelsUnavailable = loadingOptions \|\| taskModelsWarning;[\s\S]*const saveDisabled = saving \|\| loadingDetail \|\| detailError \|\| optionsUnavailable;/,
-  );
+  assert.match(source, /const optionsUnavailable =/);
+  assert.match(source, /requiredOptionsWarning/);
+  assert.match(source, /usersQuery\.isLoading/);
+  assert.match(source, /usersQuery\.isError/);
+  assert.match(source, /const taskModelsUnavailable = loadingOptions \|\| taskModelsWarning;/);
+  assert.match(source, /const saveDisabled =[\s\S]*optionsUnavailable;/);
   assert.match(source, /disabled=\{taskModelsUnavailable\}/);
 });
 
@@ -592,7 +599,9 @@ runTest("integration write actions use the modular access level", () => {
   assert.match(tasksSource, /const canManageTaskModels = integracaoAccess\.isAdmin;/);
   assert.match(tasksSource, /canEditIntegracaoTask\(integracaoAccess, task\)/);
   assert.match(taskFormSource, /const isRestrictedEdit =/);
-  assert.match(taskFormSource, /enabled: open && isEditing && !isRestrictedEdit/);
+  assert.match(taskFormSource, /enabled: open && !isRestrictedEdit/);
+  assert.match(taskFormSource, /module: "integracao"/);
+  assert.match(taskFormSource, /departmentId:/);
   assert.match(taskFormSource, /task_id: taskId,\s*status,\s*observations/);
   assert.match(taskFormSource, /hasRestrictedTaskAccessDenied/);
   assert.match(projectsSource, /const canEdit = integracaoAccess\.canEdit;/);

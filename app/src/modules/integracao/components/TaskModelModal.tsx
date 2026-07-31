@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 
+import { departmentService, type DepItem } from "@modules/departments";
+import { useAssignableUsers } from "@modules/rh";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
@@ -12,7 +14,6 @@ import type {
   TaskDependent,
   TaskModel,
   TaskModelListItem,
-  TaskModelOption,
 } from "../types";
 import {
   PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME,
@@ -88,8 +89,7 @@ export function TaskModelModal({
 }: TaskModelModalProps) {
   const isEditing = Boolean(initialData?.id);
   const [formData, setFormData] = useState<CreateTaskModelData>(EMPTY_FORM_DATA);
-  const [users, setUsers] = useState<TaskModelOption[]>([]);
-  const [departments, setDepartments] = useState<TaskModelOption[]>([]);
+  const [departments, setDepartments] = useState<DepItem[]>([]);
   const [allTasks, setAllTasks] = useState<TaskModelListItem[]>([]);
   const [dependents, setDependents] = useState<TaskDependent[]>([]);
   const [newDependent, setNewDependent] = useState({
@@ -103,6 +103,12 @@ export function TaskModelModal({
   const [saving, setSaving] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [optionsWarning, setOptionsWarning] = useState<string | null>(null);
+  const usersQuery = useAssignableUsers({
+    enabled: isOpen,
+    module: "integracao",
+    departmentId: formData.department_id || undefined,
+  });
+  const users = usersQuery.data ?? [];
   const [optionsRetryKey, setOptionsRetryKey] = useState(0);
   const [requiredOptionsWarning, setRequiredOptionsWarning] = useState(false);
   const [taskModelsWarning, setTaskModelsWarning] = useState(false);
@@ -133,8 +139,8 @@ export function TaskModelModal({
       setRequiredOptionsWarning(false);
       setTaskModelsWarning(false);
 
-      const [optionsResult, taskModelsResult] = await Promise.allSettled([
-        taskModelService.listOptions(),
+      const [departmentsResult, taskModelsResult] = await Promise.allSettled([
+        departmentService.list({ status: "Ativo" }),
         taskModelService.list({ type: "Projeto" }),
       ]);
 
@@ -144,14 +150,12 @@ export function TaskModelModal({
 
       const failedLists: string[] = [];
 
-      if (optionsResult.status === "fulfilled") {
-        setUsers(optionsResult.value.users);
-        setDepartments(optionsResult.value.departments);
+      if (departmentsResult.status === "fulfilled") {
+        setDepartments(departmentsResult.value);
       } else {
-        setUsers([]);
         setDepartments([]);
         setRequiredOptionsWarning(true);
-        failedLists.push("usuários e departamentos");
+        failedLists.push("departamentos");
       }
 
       if (taskModelsResult.status === "fulfilled") {
@@ -301,8 +305,12 @@ export function TaskModelModal({
   }
 
   function getUserPlaceholder(optional: boolean) {
-    if (loadingOptions && users.length === 0) {
+    if (usersQuery.isLoading) {
       return "Carregando usuários...";
+    }
+
+    if (usersQuery.isError) {
+      return "Usuários indisponíveis";
     }
 
     if (users.length === 0) {
@@ -415,7 +423,8 @@ export function TaskModelModal({
     }
   }
 
-  const optionsUnavailable = loadingOptions || requiredOptionsWarning;
+  const optionsUnavailable =
+    loadingOptions || requiredOptionsWarning || usersQuery.isLoading || usersQuery.isError;
   const taskModelsUnavailable = loadingOptions || taskModelsWarning;
   const saveDisabled = saving || loadingDetail || detailError || optionsUnavailable;
 

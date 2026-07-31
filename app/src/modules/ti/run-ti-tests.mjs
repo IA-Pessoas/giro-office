@@ -1160,7 +1160,7 @@ await runTest("ti user selects reuse the operational users source", async () => 
   const rhTypesSource = await readAppSource("src/modules/rh/types.ts");
   const userTypesSource = await readAppSource("src/modules/users/types/index.ts");
 
-  assert.match(hookSource, /api\.get\(RH_ENDPOINTS\.operationalUsers\)/);
+  assert.match(hookSource, /api\.get\(RH_ENDPOINTS\.operationalUsers(?:,|\))/);
   assert.match(hookSource, /unwrapRhEnvelope<RhOperationalUser\[\]>/);
   assert.doesNotMatch(hookSource, /cpf: user\.cpf \?\? null/);
   assert.doesNotMatch(rhTypesSource, /cpf\?: string \| null/);
@@ -1244,7 +1244,7 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   );
   assert.match(
     tabSource,
-    /assignableUsersQuery = useAssignableUsers\(\{ enabled: canManageExtensions \}\)/,
+    /assignableUsersQuery = useAssignableUsers\(\{ enabled: canManageExtensions, module: "ti" \}\)/,
   );
   assert.match(tabSource, /\{!canManageExtensions \? \(/);
   assert.match(tabSource, /<TiEmptyState/);
@@ -1941,6 +1941,19 @@ await runTest("ti inventory category form keeps a stable form reference", async 
   assert.match(source, /categoryForm\.reset\(\)/);
   assert.doesNotMatch(source, /const\s+locationForm\s*=\s*event\.currentTarget/);
   assert.doesNotMatch(source, /locationForm\.reset\(\)/);
+});
+
+await runTest("ti inventory user fields use the contextual user catalog", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "ti"/);
+  assert.match(source, /name="user_id"/);
+  assert.match(source, /name="responsible_it_staff_id"/);
+  assert.match(source, /Usuário atual/);
+  assert.match(source, /Responsável atual/);
+  assert.doesNotMatch(source, /<TiTextField\s+label="ID do usuário"/);
+  assert.doesNotMatch(source, /<TiTextField\s+label="ID do responsável TI"/);
 });
 
 await runTest("ti inventory category status supports is_active fallback", async () => {

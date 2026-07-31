@@ -46,6 +46,7 @@ export function RhTimeBankSection() {
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManageTimeBank,
+    module: "rh",
   });
 
   const effectiveUserId = canManageTimeBank ? selectedUserId : user?.id ?? "";
