@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, bcryptMock, permissionServiceMock } = vi.hoisted(() => ({
+const { prismaMock, bcryptMock, permissionServiceMock, userAuditMock } = vi.hoisted(() => ({
   prismaMock: {
     user: {
       findMany: vi.fn(),
@@ -21,6 +21,7 @@ const { prismaMock, bcryptMock, permissionServiceMock } = vi.hoisted(() => ({
     create: vi.fn(),
     update: vi.fn(),
   },
+  userAuditMock: vi.fn(),
 }));
 
 vi.mock("../prisma/index.js", () => ({
@@ -400,6 +401,166 @@ describe("UserService", () => {
       }),
     );
     expect(prismaMock.user.update).toHaveBeenCalled();
+  });
+
+  it("update records a safe administrative audit with actor and diff", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      name: "Before",
+      login: "before",
+      permission: 1,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+      permission_id: "permission-1",
+    });
+    prismaMock.user.update.mockResolvedValue({
+      id: "user-1",
+      name: "After",
+      login: "before",
+      permission: 1,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+      permission_id: "permission-1",
+    });
+    const service = new UserService(userAuditMock);
+
+    await service.update("user-1", { name: "After" }, "org-1", "actor-1");
+
+    expect(userAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: "actor-1",
+        organizationId: "org-1",
+        action: "UPDATE",
+        referring: "user",
+        referringId: "user-1",
+        outcome: "success",
+        changes: {
+          name: { previous: "Before", next: "After" },
+        },
+      }),
+    );
+    expect(userAuditMock.mock.calls[0]?.[0].changes).not.toHaveProperty("password");
+  });
+
+  it("create records the new user without credentials", async () => {
+    bcryptMock.hash.mockResolvedValue("hashed-password");
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1", name: "Fiscal" });
+    prismaMock.user.create.mockResolvedValue({
+      id: "user-created",
+      name: "Created",
+      login: "created",
+      permission: 1,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+      permission_id: null,
+    });
+    permissionServiceMock.create.mockResolvedValue({ id: "permission-1" });
+    prismaMock.user.update.mockResolvedValue({});
+    const service = new UserService(userAuditMock);
+
+    await service.create(
+      {
+        name: "Created",
+        login: "created",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 1,
+        organization_id: "org-1",
+        type: "user",
+      },
+      "actor-1",
+    );
+
+    expect(userAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "CREATE",
+        referring: "user",
+        referringId: "user-created",
+        actorUserId: "actor-1",
+        organizationId: "org-1",
+        outcome: "success",
+        changes: expect.not.objectContaining({ password: expect.anything() }),
+      }),
+    );
+  });
+
+  it("delete records the deactivation after success", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      name: "User",
+      login: "user",
+      permission: 1,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+    });
+    prismaMock.user.update.mockResolvedValue({});
+    const service = new UserService(userAuditMock);
+
+    await service.delete("user-1", "org-1", "actor-1");
+
+    expect(userAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "DEACTIVATE",
+        referring: "user",
+        referringId: "user-1",
+        actorUserId: "actor-1",
+        organizationId: "org-1",
+        outcome: "success",
+      }),
+    );
+  });
+
+  it("update photo uses the dedicated audit action", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      name: "User",
+      login: "user",
+      permission: 1,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+    });
+    prismaMock.user.update.mockResolvedValue({
+      id: "user-1",
+      name: "User",
+      login: "user",
+      permission: 1,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: "photo-url",
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+    });
+    const service = new UserService(userAuditMock);
+
+    await service.update("user-1", { photo_url: "photo-url" }, "org-1", "actor-1", "UPDATE_PHOTO");
+
+    expect(userAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "UPDATE_PHOTO", referringId: "user-1" }),
+    );
   });
 
   it("update ao rebaixar para usuario limpa permissoes modulares antigas e mantem RH self-service", async () => {

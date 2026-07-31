@@ -246,6 +246,25 @@ runTest("certificate refresh keeps rows while a new first page is requested", ()
   );
 });
 
+runTest("certificate filters preserve the initial query result", () => {
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workspaceSource, /import \{[^}]*useRef[^}]*\} from "react"/);
+  assert.match(workspaceSource, /const pjFiltersMountedRef = useRef\(false\);/);
+  assert.match(workspaceSource, /const pfFiltersMountedRef = useRef\(false\);/);
+  assert.match(
+    workspaceSource,
+    /useEffect\(\(\) => \{\s*if \(!pjFiltersMountedRef\.current\) \{\s*pjFiltersMountedRef\.current = true;\s*return;\s*\}/,
+  );
+  assert.match(
+    workspaceSource,
+    /useEffect\(\(\) => \{\s*if \(!pfFiltersMountedRef\.current\) \{\s*pfFiltersMountedRef\.current = true;\s*return;\s*\}/,
+  );
+});
+
 const certificateFileActionsSource = readFileSync(
   "src/modules/certificates/components/CertificateFileActions.tsx",
   "utf8",
@@ -254,6 +273,22 @@ const certificatesWorkspaceSource = readFileSync(
   "src/modules/certificates/components/CertificatesWorkspace.tsx",
   "utf8",
 );
+
+runTest("ações de arquivo inline não duplicam a exclusão do certificado", () => {
+  const inlineBlock = certificateFileActionsSource.match(
+    /if \(variant === "inline"\) \{([\s\S]*?)\n  \}\n\n  return \(/,
+  )?.[1];
+  const panelBlock = certificateFileActionsSource.match(/\n  return \(([\s\S]*?)\n\}\n$/)?.[1];
+
+  assert.ok(inlineBlock, "bloco inline não encontrado");
+  assert.ok(panelBlock, "bloco panel não encontrado");
+  assert.doesNotMatch(inlineBlock, /Remover arquivo/);
+  assert.doesNotMatch(inlineBlock, /CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME/);
+  assert.match(panelBlock, /canDeleteFile/);
+  assert.match(panelBlock, /Remover/);
+  assert.match(panelBlock, /canDeleteRecord/);
+  assert.match(panelBlock, /Excluir certificado/);
+});
 
 runTest("Viewer de certificados pode consultar sem receber ações de escrita", () => {
   assert.equal(

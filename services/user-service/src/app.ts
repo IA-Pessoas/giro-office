@@ -12,12 +12,13 @@ import express, { type Express, type Request } from "express";
 import "express-async-errors";
 
 import type { UserServiceEnv } from "./config/env.js";
+import type { UserAuditRecorder } from "./integrations/audit.js";
 import { isAuthenticated } from "./middlewares/isAuthenticated.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildUserServiceOpenApiSpec } from "./openapi/spec.js";
 import { authRoutes } from "./routes/auth.routes.js";
-import { permissionRoutes } from "./routes/permission.routes.js";
-import { userRoutes } from "./routes/user.routes.js";
+import { createPermissionRoutes } from "./routes/permission.routes.js";
+import { createUserRoutes } from "./routes/user.routes.js";
 
 function userServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -32,8 +33,14 @@ function userServiceErrorLogContext(request: Request): Record<string, unknown> |
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export function createUserApp(env: UserServiceEnv, logger: Logger): Express {
+export function createUserApp(
+  env: UserServiceEnv,
+  logger: Logger,
+  options: { audit?: UserAuditRecorder } = {},
+): Express {
   const app = express();
+  const userRoutes = createUserRoutes({ audit: options.audit });
+  const permissionRoutes = createPermissionRoutes({ audit: options.audit });
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "user-service")));
