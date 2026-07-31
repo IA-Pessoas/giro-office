@@ -28,18 +28,22 @@ export interface MessageCreateInput {
   message: string;
   type: RhMessageTypeInput;
   attachment?: string;
+  can_manage_rh?: boolean;
 }
 
 export interface MessageListByRequestInput {
   organization_id: string;
   user_id: string;
   request_id: string;
+  can_manage_rh?: boolean;
 }
 
-function assertUserIsParticipant(
+function assertUserCanAccessRequest(
   request: { requester_user_id: string; assigned_to_user_id: string },
   userId: string,
+  canManageRh = false,
 ): void {
+  if (canManageRh) return;
   if (request.requester_user_id !== userId && request.assigned_to_user_id !== userId) {
     throw new ServiceError(403, "Você não tem permissão para acessar este chamado.");
   }
@@ -79,7 +83,7 @@ class MessageService {
           throw new ServiceError(404, "Chamado não encontrado.");
         }
 
-        assertUserIsParticipant(request, senderUserId);
+        assertUserCanAccessRequest(request, senderUserId, input.can_manage_rh);
 
         const created = await tx.rhMessage.create({
           data: {
@@ -135,7 +139,7 @@ class MessageService {
         throw new ServiceError(404, "Chamado não encontrado.");
       }
 
-      assertUserIsParticipant(request, userId);
+      assertUserCanAccessRequest(request, userId, input.can_manage_rh);
 
       return await prismaClient.rhMessage.findMany({
         where: {
