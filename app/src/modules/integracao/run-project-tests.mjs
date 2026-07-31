@@ -122,19 +122,51 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
   };
 
   for (const source of Object.values(sources)) {
-    assert.doesNotMatch(source, /window\.confirm\(/);
-    assert.match(source, /ConfirmationDialog/);
+    assert.doesNotMatch(source, /window\.confirm\s*\(/);
+    assert.match(
+      source,
+      /import\s*\{[^}]*\bConfirmationDialog\b[^}]*\}\s*from\s*"@shared\/components";/,
+    );
+    assert.match(source, /<ConfirmationDialog\b/);
   }
 
   assert.match(sources.tasks, /deleteTaskMutation\.isPending/);
-  assert.match(sources.tasks, /isLoading=\{deleteTaskMutation\.isPending\}/);
+  assert.match(sources.tasks, /isConfirming=\{deleteTaskMutation\.isPending\}/);
+  assert.match(sources.tasks, /await deleteTaskMutation\.mutateAsync\(\{\s*taskId:\s*task\.id,\s*\}\);/);
+  assert.match(
+    sources.tasks,
+    /setVisibleTasks\(\(currentTasks\) =>\s*currentTasks\.filter\(\(currentTask\) => currentTask\.id !== task\.id\),\s*\);/,
+  );
+  assert.match(sources.tasks, /toast\.success\("Tarefa excluída com sucesso\."\);/);
+
   assert.match(sources.taskModel, /loadingDependents/);
-  assert.match(sources.taskModel, /isLoading=\{loadingDependents\}/);
+  assert.match(sources.taskModel, /isConfirming=\{loadingDependents\}/);
+  assert.match(sources.taskModel, /await taskModelService\.deleteDependent\(relationId\);/);
+  assert.match(sources.taskModel, /toast\.success\("Dependência removida\."\);/);
+  assert.match(sources.taskModel, /await refreshDependents\(\);/);
 
   for (const source of [sources.projects, sources.projectDetail, sources.clientProjects]) {
     assert.match(source, /deleteProjectMutation\.isPending/);
-    assert.match(source, /isLoading=\{deleteProjectMutation\.isPending\}/);
+    assert.match(source, /isConfirming=\{deleteProjectMutation\.isPending\}/);
+    assert.match(source, /toast\.success\("Projeto excluído com sucesso\."\);/);
   }
+
+  assert.match(
+    sources.projects,
+    /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId:\s*selectedClientId,\s*\}\);/,
+  );
+  assert.match(
+    sources.projectDetail,
+    /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId:\s*project\.client_id,\s*\}\);/,
+  );
+  assert.match(
+    sources.projectDetail,
+    /await router\.push\(backClientId \? `\/projects\?clientId=\$\{backClientId\}` : "\/projects"\);/,
+  );
+  assert.match(
+    sources.clientProjects,
+    /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId,\s*\}\);/,
+  );
 });
 
 runTest("project endpoints use only the v1 project contract", () => {
