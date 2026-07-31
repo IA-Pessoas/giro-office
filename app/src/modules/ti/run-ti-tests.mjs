@@ -600,7 +600,7 @@ await runTest("ti stock mutation error uses an actionable fallback for a 409 wit
 
 await runTest("ti stock exit feedback uses the scoped mutation error normalizer", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
-  const exitHandlerStart = tabSource.indexOf("async function handleSubmitExit");
+  const exitHandlerStart = tabSource.indexOf("async function handleConfirmExit");
   const exitHandlerEnd = tabSource.indexOf("async function handleSubmitCategory", exitHandlerStart);
   const exitHandlerSource = tabSource.slice(exitHandlerStart, exitHandlerEnd);
 
@@ -612,6 +612,17 @@ await runTest("ti stock exit feedback uses the scoped mutation error normalizer"
     exitHandlerSource,
     /getTiStockMutationErrorMessage\(error, "Não foi possível registrar a saída\."\)/,
   );
+});
+
+await runTest("ti stock exit confirmation uses the shared destructive dialog", async () => {
+  const stockSource = await readModuleSource("components/TiStockTab.tsx");
+
+  assert.match(stockSource, /import \{ ConfirmationDialog, PaginationControls \} from "@shared\/components"/);
+  assert.match(stockSource, /const \[pendingExitConfirmation, setPendingExitConfirmation\]/);
+  assert.match(stockSource, /<ConfirmationDialog/);
+  assert.match(stockSource, /onConfirm=\{handleConfirmExit\}/);
+  assert.match(stockSource, /async function handleConfirmExit\(\)[\s\S]*createExitMutation\.mutateAsync/);
+  assert.doesNotMatch(stockSource, /window\.confirm/);
 });
 
 await runTest("ti stock category dialog filters matches and makes new category creation explicit", async () => {
@@ -696,7 +707,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
     "useCreateTiStockExitMutation",
     "useCreateTiStockCategoryMutation",
     "useCreateTiStockLocationMutation",
-    "window.confirm",
+    "ConfirmationDialog",
     "Entrada",
     "Saída",
     "Categorias",
