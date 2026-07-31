@@ -130,11 +130,16 @@ export class TaskModelService {
         throw new ServiceError(409, "Tarefa com esse nome nesse departamento já foi cadastrada.");
       }
 
-      await assertResponsibleUsersInDepartment(prismaClient, data.organization_id, data.department_id, [
-        responsibleSequence.responsible_id,
-        responsibleSequence.responsible2_id,
-        responsibleSequence.responsible3_id,
-      ]);
+      await assertResponsibleUsersInDepartment(
+        prismaClient,
+        data.organization_id,
+        data.department_id,
+        [
+          responsibleSequence.responsible_id,
+          responsibleSequence.responsible2_id,
+          responsibleSequence.responsible3_id,
+        ],
+      );
 
       const create = await prismaClient.taskModel.create({
         data: {

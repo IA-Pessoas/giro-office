@@ -18,48 +18,52 @@ export function createPermissionRoutes(
   const router: ReturnType<typeof Router> = Router();
   const permissionService = new PermissionService(options.audit);
 
-router.get(
-  "/:userId",
-  isAuthenticated,
-  async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const auth = requireManageUsersAuth(request);
-      const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
-      const { modulo } = parseWithZod(permissionQuerySchema, request.query);
+  router.get(
+    "/:userId",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const auth = requireManageUsersAuth(request);
+        const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
+        const { modulo } = parseWithZod(permissionQuerySchema, request.query);
 
-      const permission = await permissionService.getByUserId(userId, modulo, auth.organization_id);
+        const permission = await permissionService.getByUserId(
+          userId,
+          modulo,
+          auth.organization_id,
+        );
 
-      response.json(createSuccessResponse(permission));
-    } catch (err) {
-      logError("Erro ao buscar permissao", { err });
-      next(err);
-    }
-  },
-);
+        response.json(createSuccessResponse(permission));
+      } catch (err) {
+        logError("Erro ao buscar permissao", { err });
+        next(err);
+      }
+    },
+  );
 
-router.put(
-  "/:userId",
-  isAuthenticated,
-  async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const auth = requireOwnerUserAuth(request);
-      const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
-      const modules = parseWithZod(updatePermissionBodySchema, request.body) as Record<
-        string,
-        number
-      >;
+  router.put(
+    "/:userId",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const auth = requireOwnerUserAuth(request);
+        const { userId } = parseWithZod(permissionUserIdParamsSchema, request.params);
+        const modules = parseWithZod(updatePermissionBodySchema, request.body) as Record<
+          string,
+          number
+        >;
 
-      const permission = await permissionService.update(userId, modules, auth.organization_id, {
-        actorUserId: auth.user_id,
-      });
+        const permission = await permissionService.update(userId, modules, auth.organization_id, {
+          actorUserId: auth.user_id,
+        });
 
-      response.json(createSuccessResponse(permission));
-    } catch (err) {
-      logError("Erro ao atualizar permissao", { err });
-      next(err);
-    }
-  },
-);
+        response.json(createSuccessResponse(permission));
+      } catch (err) {
+        logError("Erro ao atualizar permissao", { err });
+        next(err);
+      }
+    },
+  );
 
   return router;
 }

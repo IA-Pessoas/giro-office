@@ -26,7 +26,7 @@ function statusColor(status: string) {
 
 export function RecentClientsTable({ data }: RecentClientsTableProps) {
   return (
-    <section className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 overflow-x-auto">
+    <section className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 overflow-x-auto u-scrollbar-system">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
           <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -70,4 +70,3 @@ export function RecentClientsTable({ data }: RecentClientsTableProps) {
     </section>
   );
 }
-

@@ -329,12 +329,11 @@ export class TaskCrudService {
             : data.prevision_date;
 
       const { create, dependentCreates } = await this.#runTransaction(async (tx) => {
-        await assertResponsibleUsersInDepartment(
-          tx,
-          data.organization_id,
-          departmentId,
-          [responsibleId, responsible2Id, responsible3Id],
-        );
+        await assertResponsibleUsersInDepartment(tx, data.organization_id, departmentId, [
+          responsibleId,
+          responsible2Id,
+          responsible3Id,
+        ]);
 
         const create = await tx.task.create({
           data: {

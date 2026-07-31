@@ -150,7 +150,7 @@ export function Departments() {
       </div>
 
       <section className={`${DEPARTMENTS_PANEL_CLASSNAME} overflow-hidden`}>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto u-scrollbar-system">
           <table className="min-w-full">
             <thead className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-950/40">
               <tr className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">

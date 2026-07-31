@@ -43,6 +43,7 @@ import {
   type ModulePermissionSubject,
 } from "@modules/auth";
 import { useMe } from "@shared/hooks";
+import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -648,7 +649,7 @@ export function AppShell({
           </button>
         </div>
 
-        <nav className="p-3 space-y-6 overflow-y-auto h-[calc(100vh-4rem)]">
+        <nav className={`p-3 space-y-6 h-[calc(100vh-4rem)] ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}>
           {filteredModuleCategories.map((category) => {
             const shouldRenderModuleNavLoading =
               category.isModuleAccessCategory === true && isModuleAccessLoading;
@@ -767,7 +768,7 @@ export function AppShell({
                         Notificações
                       </h3>
                     </div>
-                    <div className="max-h-96 overflow-y-auto">
+                    <div className={`max-h-96 ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}>
                       {notifications.length > 0 ? (
                         notifications.map((item) => (
                           <button
@@ -883,7 +884,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">{mainContent}</main>
+        <main className={`flex-1 p-4 lg:p-8 ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}>{mainContent}</main>
       </div>
 
       <DialogPrimitive.Root open={showAiChat} onOpenChange={setShowAiChat}>
@@ -924,7 +925,7 @@ export function AppShell({
 
             <div
               ref={chatScrollRef}
-              className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-slate-950/40"
+              className={`flex-1 p-4 space-y-3 bg-gray-50 dark:bg-slate-950/40 ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}
             >
               {chatMessages.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-center">

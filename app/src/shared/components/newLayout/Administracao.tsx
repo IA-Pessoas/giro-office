@@ -697,7 +697,7 @@ export function Administracao() {
       </div>
 
       <div className="rounded-2xl bg-white p-1 shadow-sm dark:bg-slate-900">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto u-scrollbar-system">
           {adminTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;

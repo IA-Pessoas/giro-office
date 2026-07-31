@@ -74,7 +74,7 @@ export function PessoalShell() {
         />
       </header>
 
-      <nav className="overflow-x-auto rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
+      <nav className="overflow-x-auto u-scrollbar-system rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
         <div role="tablist" className="flex min-w-max items-center justify-center gap-1 sm:min-w-full">
           {PESSOAL_TABS.map((tab) => {
             const Icon = tabIcons[tab.id];

@@ -47,8 +47,7 @@ function createTestRepository(): AuditRequestRepository {
         action: payload.action ?? null,
         referring: payload.referring ?? null,
         referringId: payload.referringId ?? null,
-        changes:
-          payload.changes && typeof payload.changes !== "string" ? payload.changes : null,
+        changes: payload.changes && typeof payload.changes !== "string" ? payload.changes : null,
         department: payload.department ?? null,
         metadata: payload.metadata ?? null,
       });
@@ -361,10 +360,9 @@ it("searches administrative audits by independent entity filters and organizatio
   const baseUrl = await startServer(server);
 
   try {
-    const response = await fetch(
-      `${baseUrl}/audit/requests?referring=user&referringId=user-1`,
-      { headers: withReadHeaders("2", "org-1") },
-    );
+    const response = await fetch(`${baseUrl}/audit/requests?referring=user&referringId=user-1`, {
+      headers: withReadHeaders("2", "org-1"),
+    });
     const body = (await response.json()) as { success: true; data: AuditSearchResult };
 
     expect(response.status).toBe(200);

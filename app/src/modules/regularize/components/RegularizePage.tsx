@@ -578,7 +578,7 @@ function DataTable({
   headers: string[];
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+    <div className="overflow-x-auto u-scrollbar-system rounded-lg border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
       <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
         <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-slate-800/60 dark:text-slate-400">
           <tr>
@@ -1334,7 +1334,7 @@ export function RegularizePage() {
         aria-label="Abas do Regularize"
         className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
       >
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto u-scrollbar-system">
           <div role="tablist" className="flex min-w-max items-center justify-center gap-1 md:min-w-full">
             {REGULARIZE_TABS.map((tab) => (
               <TabButton

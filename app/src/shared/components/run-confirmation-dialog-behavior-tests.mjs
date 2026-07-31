@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
@@ -161,15 +161,16 @@ async function clickOpenOverlay(page) {
 }
 
 async function withFixture(run) {
-  const server = spawn(
-    "pnpm",
-    ["exec", "next", "dev", fixtureRoot, "--webpack", "--port", TEST_PORT],
-    {
-      cwd: appRoot,
-      env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
+  const command = process.platform === "win32" ? "cmd" : "pnpm";
+  const args =
+    process.platform === "win32"
+      ? ["/c", "pnpm", "exec", "next", "dev", fixtureRoot, "--webpack", "--port", TEST_PORT]
+      : ["exec", "next", "dev", fixtureRoot, "--webpack", "--port", TEST_PORT];
+  const server = spawn(command, args, {
+    cwd: appRoot,
+    env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   let serverOutput = "";
 
   server.stdout.on("data", (chunk) => {
@@ -192,8 +193,21 @@ async function withFixture(run) {
       await browser.close();
     }
   } finally {
-    server.kill("SIGTERM");
+    stopServer(server);
   }
+}
+
+function stopServer(server) {
+  if (!server.pid || server.exitCode !== null) {
+    return;
+  }
+
+  if (process.platform === "win32") {
+    execFileSync("taskkill", ["/pid", String(server.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+
+  server.kill("SIGTERM");
 }
 
 async function waitForServer(server, getOutput) {

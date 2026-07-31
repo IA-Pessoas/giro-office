@@ -25,221 +25,223 @@ import {
 import { StorageService } from "../services/storageService.js";
 import { UserService } from "../services/userService.js";
 
-export function createUserRoutes(options: { audit?: UserAuditRecorder } = {}): ReturnType<typeof Router> {
+export function createUserRoutes(
+  options: { audit?: UserAuditRecorder } = {},
+): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
-const upload = createPhotoUploadMiddleware();
+  const upload = createPhotoUploadMiddleware();
   const userService = new UserService(options.audit);
   const storageService = new StorageService();
 
-function requireManageUsersAuthMiddleware(
-  request: Request,
-  _response: Response,
-  next: NextFunction,
-): void {
-  try {
-    requireManageUsersAuth(request);
-    next();
-  } catch (err) {
-    next(err);
+  function requireManageUsersAuthMiddleware(
+    request: Request,
+    _response: Response,
+    next: NextFunction,
+  ): void {
+    try {
+      requireManageUsersAuth(request);
+      next();
+    } catch (err) {
+      next(err);
+    }
   }
-}
 
-function isSelfPasswordUpdate(request: Request, id: string, body: object): boolean {
-  const keys = Object.keys(body);
+  function isSelfPasswordUpdate(request: Request, id: string, body: object): boolean {
+    const keys = Object.keys(body);
 
-  return request.user_id === id && keys.length === 1 && keys[0] === "password";
-}
+    return request.user_id === id && keys.length === 1 && keys[0] === "password";
+  }
 
-router.get(
-  "/",
-  isAuthenticated,
-  async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const auth = requireManageUsersAuth(request);
-      const { skip, take } = parseWithZod(listUsersQuerySchema, request.query);
-      const result = await userService.list({ skip, take, organizationId: auth.organization_id });
+  router.get(
+    "/",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const auth = requireManageUsersAuth(request);
+        const { skip, take } = parseWithZod(listUsersQuerySchema, request.query);
+        const result = await userService.list({ skip, take, organizationId: auth.organization_id });
 
-      response.json(createSuccessResponse(result));
-    } catch (err) {
-      logError("Erro ao listar usuarios", { err });
-      next(err);
-    }
-  },
-);
-
-router.get(
-  "/:id/photo",
-  isAuthenticated,
-  async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const auth = requireManageUsersAuth(request);
-      const { id } = parseWithZod(userIdParamsSchema, request.params);
-      const user = await userService.getById(id, auth.organization_id);
-      const publicPhotoUrl = storageService.readUserPhoto(user.photo_url);
-
-      if (!publicPhotoUrl) {
-        throw new ServiceError(404, "Foto nao encontrada.");
+        response.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao listar usuarios", { err });
+        next(err);
       }
+    },
+  );
 
-      response.json(createSuccessResponse({ url: publicPhotoUrl }));
-    } catch (err) {
-      logError("Erro ao obter foto do usuario", { err });
-      next(err);
-    }
-  },
-);
+  router.get(
+    "/:id/photo",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const auth = requireManageUsersAuth(request);
+        const { id } = parseWithZod(userIdParamsSchema, request.params);
+        const user = await userService.getById(id, auth.organization_id);
+        const publicPhotoUrl = storageService.readUserPhoto(user.photo_url);
 
-router.get(
-  "/:id",
-  isAuthenticated,
-  async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const auth = requireManageUsersAuth(request);
-      const { id } = parseWithZod(userIdParamsSchema, request.params);
-      const user = await userService.getById(id, auth.organization_id);
+        if (!publicPhotoUrl) {
+          throw new ServiceError(404, "Foto nao encontrada.");
+        }
 
-      response.json(createSuccessResponse(user));
-    } catch (err) {
-      logError("Erro ao buscar usuario por ID", { err });
-      next(err);
-    }
-  },
-);
-
-router.post(
-  "/",
-  isAuthenticated,
-  async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const auth = requireManageUsersAuth(request);
-      const body = parseWithZod(createUserBodySchema, request.body);
-      if (body.organization_id !== undefined && body.organization_id !== auth.organization_id) {
-        throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+        response.json(createSuccessResponse({ url: publicPhotoUrl }));
+      } catch (err) {
+        logError("Erro ao obter foto do usuario", { err });
+        next(err);
       }
-      if (isOwnerMutationPayload(body)) {
-        requireOwnerUserAuth(request);
+    },
+  );
+
+  router.get(
+    "/:id",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const auth = requireManageUsersAuth(request);
+        const { id } = parseWithZod(userIdParamsSchema, request.params);
+        const user = await userService.getById(id, auth.organization_id);
+
+        response.json(createSuccessResponse(user));
+      } catch (err) {
+        logError("Erro ao buscar usuario por ID", { err });
+        next(err);
       }
+    },
+  );
 
-      const user = await userService.create(
-        {
-          ...body,
-          organization_id: auth.organization_id,
-          first_owner_flag: body.first_owner_flag ?? false,
-        },
-        auth.user_id,
-      );
+  router.post(
+    "/",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const auth = requireManageUsersAuth(request);
+        const body = parseWithZod(createUserBodySchema, request.body);
+        if (body.organization_id !== undefined && body.organization_id !== auth.organization_id) {
+          throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+        }
+        if (isOwnerMutationPayload(body)) {
+          requireOwnerUserAuth(request);
+        }
 
-      response.status(201).json(createSuccessResponse(user));
-    } catch (err) {
-      logError("Erro ao criar usuario", { err });
-      next(err);
-    }
-  },
-);
+        const user = await userService.create(
+          {
+            ...body,
+            organization_id: auth.organization_id,
+            first_owner_flag: body.first_owner_flag ?? false,
+          },
+          auth.user_id,
+        );
 
-router.put(
-  "/:id",
-  isAuthenticated,
-  async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const { id } = parseWithZod(userIdParamsSchema, request.params);
-      const body = parseWithZod(updateUserBodySchema, request.body);
-      const selfPasswordUpdate = isSelfPasswordUpdate(request, id, body);
-      const auth = selfPasswordUpdate
-        ? requireAuthenticatedRequestContext(request, {
-            userIdMessage: "Não autenticado.",
-            organizationIdMessage: "Não autenticado.",
-          })
-        : requireManageUsersAuth(request);
-
-      if (!selfPasswordUpdate && isOwnerMutationPayload(body)) {
-        requireOwnerUserAuth(request);
+        response.status(201).json(createSuccessResponse(user));
+      } catch (err) {
+        logError("Erro ao criar usuario", { err });
+        next(err);
       }
+    },
+  );
 
-      const user = await userService.update(id, body, auth.organization_id, auth.user_id);
+  router.put(
+    "/:id",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { id } = parseWithZod(userIdParamsSchema, request.params);
+        const body = parseWithZod(updateUserBodySchema, request.body);
+        const selfPasswordUpdate = isSelfPasswordUpdate(request, id, body);
+        const auth = selfPasswordUpdate
+          ? requireAuthenticatedRequestContext(request, {
+              userIdMessage: "Não autenticado.",
+              organizationIdMessage: "Não autenticado.",
+            })
+          : requireManageUsersAuth(request);
 
-      response.json(createSuccessResponse(user));
-    } catch (err) {
-      logError("Erro ao atualizar usuario", { err });
-      next(err);
-    }
-  },
-);
+        if (!selfPasswordUpdate && isOwnerMutationPayload(body)) {
+          requireOwnerUserAuth(request);
+        }
 
-router.post(
-  "/:id/photo",
-  isAuthenticated,
-  requireManageUsersAuthMiddleware,
-  upload.single("file"),
-  async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const auth = requireManageUsersAuth(request);
-      const { id } = parseWithZod(userIdParamsSchema, request.params);
+        const user = await userService.update(id, body, auth.organization_id, auth.user_id);
 
-      if (!request.file) {
-        throw new ServiceError(400, "Arquivo de imagem e obrigatorio.");
+        response.json(createSuccessResponse(user));
+      } catch (err) {
+        logError("Erro ao atualizar usuario", { err });
+        next(err);
       }
+    },
+  );
 
-      validateUploadFileSignature(request.file);
-      const photoUrl = await storageService.uploadUserPhoto(request.file, id);
-      const user = await userService.update(
-        id,
-        { photo_url: photoUrl },
-        auth.organization_id,
-        auth.user_id,
-        "UPDATE_PHOTO",
-      );
+  router.post(
+    "/:id/photo",
+    isAuthenticated,
+    requireManageUsersAuthMiddleware,
+    upload.single("file"),
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const auth = requireManageUsersAuth(request);
+        const { id } = parseWithZod(userIdParamsSchema, request.params);
 
-      response.json(createSuccessResponse(user));
-    } catch (err) {
-      logError("Erro ao fazer upload de foto", { err });
-      next(err);
-    }
-  },
-);
+        if (!request.file) {
+          throw new ServiceError(400, "Arquivo de imagem e obrigatorio.");
+        }
 
-router.delete(
-  "/:id/photo",
-  isAuthenticated,
-  async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const auth = requireManageUsersAuth(request);
-      const { id } = parseWithZod(userIdParamsSchema, request.params);
+        validateUploadFileSignature(request.file);
+        const photoUrl = await storageService.uploadUserPhoto(request.file, id);
+        const user = await userService.update(
+          id,
+          { photo_url: photoUrl },
+          auth.organization_id,
+          auth.user_id,
+          "UPDATE_PHOTO",
+        );
 
-      await storageService.deleteUserPhoto(id);
-      const user = await userService.update(
-        id,
-        { photo_url: null },
-        auth.organization_id,
-        auth.user_id,
-        "UPDATE_PHOTO",
-      );
+        response.json(createSuccessResponse(user));
+      } catch (err) {
+        logError("Erro ao fazer upload de foto", { err });
+        next(err);
+      }
+    },
+  );
 
-      response.json(createSuccessResponse(user));
-    } catch (err) {
-      logError("Erro ao excluir foto", { err });
-      next(err);
-    }
-  },
-);
+  router.delete(
+    "/:id/photo",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const auth = requireManageUsersAuth(request);
+        const { id } = parseWithZod(userIdParamsSchema, request.params);
 
-router.delete(
-  "/:id",
-  isAuthenticated,
-  async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const auth = requireManageUsersAuth(request);
-      const { id } = parseWithZod(userIdParamsSchema, request.params);
+        await storageService.deleteUserPhoto(id);
+        const user = await userService.update(
+          id,
+          { photo_url: null },
+          auth.organization_id,
+          auth.user_id,
+          "UPDATE_PHOTO",
+        );
 
-      await userService.delete(id, auth.organization_id, auth.user_id);
+        response.json(createSuccessResponse(user));
+      } catch (err) {
+        logError("Erro ao excluir foto", { err });
+        next(err);
+      }
+    },
+  );
 
-      response.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
-    } catch (err) {
-      logError("Erro ao desativar usuario", { err });
-      next(err);
-    }
-  },
-);
+  router.delete(
+    "/:id",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const auth = requireManageUsersAuth(request);
+        const { id } = parseWithZod(userIdParamsSchema, request.params);
+
+        await userService.delete(id, auth.organization_id, auth.user_id);
+
+        response.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
+      } catch (err) {
+        logError("Erro ao desativar usuario", { err });
+        next(err);
+      }
+    },
+  );
 
   return router;
 }

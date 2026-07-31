@@ -2,8 +2,10 @@ import {
   ACTIVE_MODULE_KEYS,
   type AuthUserType,
   error as logError,
-  ServiceError,
   type ModulePermissionKey,
+  type ModulePermissions,
+  normalizeModulePermissions,
+  ServiceError,
 } from "@workspace/shared";
 import bcrypt from "bcryptjs";
 
@@ -125,6 +127,7 @@ interface DepartmentAccessContext {
 
 type UserPublicRow = Prisma.UserGetPayload<{ select: typeof USER_PUBLIC_SELECT }>;
 type UserCreateRow = Prisma.UserGetPayload<{ select: typeof USER_CREATE_SELECT }>;
+type UserSessionRow = UserPublicRow & { modules: ModulePermissions };
 
 function userOrganizationWhere(id: string, organizationId: string): Prisma.UserWhereInput {
   return {
@@ -293,6 +296,24 @@ class UserService {
     }
 
     return normalizeUserOrganization(user, organizationId);
+  }
+
+  async getByIdWithModules(id: string, organizationId: string): Promise<UserSessionRow> {
+    const user = await this.getById(id, organizationId);
+    let permission: unknown;
+
+    try {
+      permission = await new PermissionService().getByUserId(id, undefined, organizationId);
+    } catch (err: unknown) {
+      if (!(err instanceof ServiceError) || err.statusCode !== 404) {
+        throw err;
+      }
+    }
+
+    return {
+      ...user,
+      modules: normalizeModulePermissions(permission),
+    };
   }
 
   async create(

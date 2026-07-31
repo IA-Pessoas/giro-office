@@ -39,6 +39,21 @@ export default function ConfirmationDialogTestPage() {
         {normalDialogOpen ? "normal-open" : "normal-closed"}
       </p>
 
+      <button type="button" onClick={() => setNormalDialogOpen(true)}>
+        Abrir dialogo normal
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setConfirmationContext("manual");
+          setConsumerError(null);
+          setIsConfirming(false);
+          setConfirmationOpen(true);
+        }}
+      >
+        Abrir confirmacao
+      </button>
+
       <ConfirmationDialog
         open={confirmationOpen}
         onOpenChange={setConfirmationOpen}
