@@ -120,6 +120,14 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
       "utf8",
     ),
   };
+  const tasksHooksSource = readFileSync(
+    new URL("./hooks/useIntegracaoTasks.ts", import.meta.url),
+    "utf8",
+  );
+  const projectsHooksSource = readFileSync(
+    new URL("./hooks/useProjects.ts", import.meta.url),
+    "utf8",
+  );
 
   for (const source of Object.values(sources)) {
     assert.doesNotMatch(source, /window\.confirm\s*\(/);
@@ -132,12 +140,24 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
 
   assert.match(sources.tasks, /deleteTaskMutation\.isPending/);
   assert.match(sources.tasks, /isConfirming=\{deleteTaskMutation\.isPending\}/);
+  assert.match(
+    sources.tasks,
+    /import\s*\{[^}]*\buseDeleteIntegracaoTaskMutation\b[^}]*\}\s*from\s*"\.\.\/hooks";/,
+  );
+  assert.match(
+    sources.tasks,
+    /const deleteTaskMutation = useDeleteIntegracaoTaskMutation\(\);/,
+  );
   assert.match(sources.tasks, /await deleteTaskMutation\.mutateAsync\(\{\s*taskId:\s*task\.id,\s*\}\);/);
   assert.match(
     sources.tasks,
     /setVisibleTasks\(\(currentTasks\) =>\s*currentTasks\.filter\(\(currentTask\) => currentTask\.id !== task\.id\),\s*\);/,
   );
   assert.match(sources.tasks, /toast\.success\("Tarefa excluída com sucesso\."\);/);
+  assert.match(
+    tasksHooksSource,
+    /export function useDeleteIntegracaoTaskMutation\(\): UseMutationResult<\s*void,\s*Error,\s*\{ taskId: string \}\s*>\s*\{\s*const queryClient = useQueryClient\(\);\s*return useMutation\(\{\s*mutationFn: \(\{ taskId \}\) => integracaoTasksService\.delete\(taskId\),\s*onSuccess: async \(_result, variables\) => \{\s*queryClient\.removeQueries\(\{\s*queryKey: integracaoTaskDetailQueryKey\(variables\.taskId\),\s*\}\);\s*await queryClient\.invalidateQueries\(\{\s*queryKey: INTEGRACAO_TASKS_QUERY_KEY,\s*\}\);\s*\},\s*\}\);\s*\}/,
+  );
 
   assert.match(sources.taskModel, /loadingDependents/);
   assert.match(sources.taskModel, /isConfirming=\{loadingDependents\}/);
@@ -148,6 +168,11 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
   for (const source of [sources.projects, sources.projectDetail, sources.clientProjects]) {
     assert.match(source, /deleteProjectMutation\.isPending/);
     assert.match(source, /isConfirming=\{deleteProjectMutation\.isPending\}/);
+    assert.match(
+      source,
+      /import\s*\{[^}]*\buseDeleteProjectMutation\b[^}]*\}\s*from\s*"\.\.\/hooks\/useProjects";/,
+    );
+    assert.match(source, /const deleteProjectMutation = useDeleteProjectMutation\(\);/);
     assert.match(source, /toast\.success\("Projeto excluído com sucesso\."\);/);
   }
 
@@ -166,6 +191,10 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
   assert.match(
     sources.clientProjects,
     /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId,\s*\}\);/,
+  );
+  assert.match(
+    projectsHooksSource,
+    /export function useDeleteProjectMutation\(\): UseMutationResult<\s*void,\s*Error,\s*\{ projectId: string; clientId: string \}\s*>\s*\{\s*const queryClient = useQueryClient\(\);\s*return useMutation\(\{\s*mutationFn: \(\{ projectId \}\) => projectService\.delete\(projectId\),\s*onSuccess: async \(_result, variables\) => \{\s*queryClient\.removeQueries\(\{ queryKey: projectDetailQueryKey\(variables\.projectId\) \}\);\s*await queryClient\.invalidateQueries\(\{\s*queryKey: projectListQueryKey\(\{ ref: "client", id: variables\.clientId \}\),\s*\}\);\s*\},\s*\}\);\s*\}/,
   );
 });
 
