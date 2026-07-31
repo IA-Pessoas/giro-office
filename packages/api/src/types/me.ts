@@ -7,6 +7,7 @@ export interface MeProfile {
   photo_url: string | null;
   organization_id: string | null;
   type: "owner" | "admin" | "user" | null;
+  modules?: Record<string, number>;
   department?: {
     name: string;
     color: string;

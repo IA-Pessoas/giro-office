@@ -1,3 +1,4 @@
+import { ServiceError } from "@workspace/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, bcryptMock, permissionServiceMock, userAuditMock } = vi.hoisted(() => ({
@@ -19,6 +20,7 @@ const { prismaMock, bcryptMock, permissionServiceMock, userAuditMock } = vi.hois
   },
   permissionServiceMock: {
     create: vi.fn(),
+    getByUserId: vi.fn(),
     update: vi.fn(),
   },
   userAuditMock: vi.fn(),
@@ -94,6 +96,63 @@ describe("UserService", () => {
         },
       }),
     );
+  });
+
+  it("getByIdWithModules retorna somente a permissão modular da organização", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      name: "Usuário",
+      login: "user",
+      permission: 1,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+      permission_id: "permission-1",
+    });
+    permissionServiceMock.getByUserId.mockResolvedValue({
+      user_id: "user-1",
+      organization_id: "org-1",
+      contabil: 1,
+      rh: 1,
+      ti: 1,
+      fiscal: null,
+    });
+    const service = new UserService();
+
+    const result = await service.getByIdWithModules("user-1", "org-1");
+
+    expect(result.modules).toMatchObject({ contabil: 1, rh: 1, ti: 1, fiscal: 0 });
+    expect(result.modules).not.toHaveProperty("atendimento");
+    expect(permissionServiceMock.getByUserId).toHaveBeenCalledWith("user-1", undefined, "org-1");
+  });
+
+  it("getByIdWithModules assume nível zero quando a permissão não existe", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      name: "Usuário",
+      login: "user",
+      permission: 1,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+      permission_id: null,
+    });
+    permissionServiceMock.getByUserId.mockRejectedValue(
+      new ServiceError(404, "Permissão não encontrada."),
+    );
+    const service = new UserService();
+
+    const result = await service.getByIdWithModules("user-1", "org-1");
+
+    expect(Object.values(result.modules).every((level) => level === 0)).toBe(true);
   });
 
   it("list retorna usuários da organização com paginação", async () => {
