@@ -3523,6 +3523,17 @@ const handlers = {
   },
 
   async rhPointAdjustmentReject(op) {
+    if (isBadExpectation(op)) {
+      await httpRequest(op, {
+        expectedStatus: [403],
+        path: "/rh/point/adjustment/reject",
+        json: {
+          request_id: "40000000-0000-4000-8000-000000000002",
+        },
+      });
+      return;
+    }
+
     const now = new Date();
     const clockIn = new Date(now);
     clockIn.setUTCHours(8, 0, 0, 0);
@@ -3547,15 +3558,12 @@ const handlers = {
         justification: "Smoke point adjustment rejection",
       },
     });
-    if (isBadExpectation(op)) {
-      return;
-    }
-
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/point/adjustment/reject",
       json: {
-        request_id: pickFirst(createResponse.body, "data.id") ?? findFirstId(createResponse.body?.data),
+        request_id:
+          pickFirst(createResponse.body, "data.id") ?? findFirstId(createResponse.body?.data),
         obs_approver: "Rejected by smoke test",
       },
     });

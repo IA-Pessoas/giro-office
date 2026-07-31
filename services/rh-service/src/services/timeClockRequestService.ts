@@ -127,75 +127,85 @@ class TimeClockRequestService {
       const approverUserId = assertNonEmptyString(input.approver_user_id, "approver_user_id");
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
 
-      const request = await prismaClient.timeClockRequest.findUnique({
-        where: { id: requestId },
-        select: TIME_CLOCK_REQUEST_SELECT,
-      });
+      return await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
+        const request = await tx.timeClockRequest.findUnique({
+          where: { id: requestId },
+          select: TIME_CLOCK_REQUEST_SELECT,
+        });
 
-      if (!request) {
-        throw new ServiceError(404, "Solicitacao nao encontrada.");
-      }
-      if (request.organization_id !== organizationId) {
-        throw new ServiceError(403, "Solicitacao pertence a outra organizacao.");
-      }
-      if (request.status !== "Pendente") {
-        throw new ServiceError(409, "Solicitacao nao esta pendente de aprovacao.");
-      }
-      if (request.user_id === approverUserId) {
-        throw new ServiceError(403, "O solicitante nao pode decidir o proprio ajuste.");
-      }
+        if (!request) {
+          throw new ServiceError(404, "Solicitacao nao encontrada.");
+        }
+        if (request.organization_id !== organizationId) {
+          throw new ServiceError(403, "Solicitacao pertence a outra organizacao.");
+        }
+        if (request.status !== "Pendente") {
+          throw new ServiceError(409, "Solicitacao nao esta pendente de aprovacao.");
+        }
+        if (request.user_id === approverUserId) {
+          throw new ServiceError(403, "O solicitante nao pode decidir o proprio ajuste.");
+        }
 
-      const point = await prismaClient.point.findUnique({
-        where: { id: request.point_id },
-        select: {
-          id: true,
-          user_id: true,
-          organization_id: true,
-          time_bank_balance: true,
-        },
-      });
-
-      if (!point) {
-        throw new ServiceError(404, "Registro de ponto vinculado nao encontrado.");
-      }
-      if (point.organization_id !== organizationId) {
-        throw new ServiceError(403, "Registro de ponto pertence a outra organizacao.");
-      }
-
-      if (point.time_bank_balance !== null && point.time_bank_balance !== undefined) {
-        await prismaClient.pointsConfig.update({
-          where: { user_id: point.user_id },
+        const claimed = await tx.timeClockRequest.updateMany({
+          where: { id: requestId, organization_id: organizationId, status: "Pendente" },
           data: {
-            bank_balance: { decrement: point.time_bank_balance },
+            status: "Aprovado",
+            approver_user_id: approverUserId,
+            ...(input.obs_approver !== undefined
+              ? {
+                  obs_approver:
+                    input.obs_approver === null ? null : String(input.obs_approver).trim() || null,
+                }
+              : {}),
           },
         });
-      }
 
-      await prismaClient.point.update({
-        where: { id: point.id },
-        data: {
-          clock_in: request.clock_in,
-          lunch_out: request.lunch_out,
-          lunch_in: request.lunch_in,
-          clock_out: request.clock_out,
-        },
-      });
+        if (claimed.count !== 1) {
+          throw new ServiceError(409, "Solicitacao nao esta mais pendente de aprovacao.");
+        }
 
-      await this.pointService.calculateDailyHours(point.id, organizationId);
+        const point = await tx.point.findUnique({
+          where: { id: request.point_id },
+          select: {
+            id: true,
+            user_id: true,
+            organization_id: true,
+            time_bank_balance: true,
+          },
+        });
 
-      return await prismaClient.timeClockRequest.update({
-        where: { id: requestId },
-        data: {
-          status: "Aprovado",
-          approver_user_id: approverUserId,
-          ...(input.obs_approver !== undefined
-            ? {
-                obs_approver:
-                  input.obs_approver === null ? null : String(input.obs_approver).trim() || null,
-              }
-            : {}),
-        },
-        select: TIME_CLOCK_REQUEST_SELECT,
+        if (!point) {
+          throw new ServiceError(404, "Registro de ponto vinculado nao encontrado.");
+        }
+        if (point.organization_id !== organizationId) {
+          throw new ServiceError(403, "Registro de ponto pertence a outra organizacao.");
+        }
+
+        if (point.time_bank_balance !== null && point.time_bank_balance !== undefined) {
+          await tx.pointsConfig.update({
+            where: { user_id: point.user_id },
+            data: {
+              bank_balance: { decrement: point.time_bank_balance },
+            },
+          });
+        }
+
+        await tx.point.update({
+          where: { id: point.id },
+          data: {
+            clock_in: request.clock_in,
+            lunch_out: request.lunch_out,
+            lunch_in: request.lunch_in,
+            clock_out: request.clock_out,
+          },
+        });
+
+        await this.pointService.calculateDailyHours(point.id, organizationId, tx);
+
+        return await tx.timeClockRequest.findUniqueOrThrow({
+          where: { id: requestId },
+          select: TIME_CLOCK_REQUEST_SELECT,
+        });
       });
     } catch (err: unknown) {
       logError("Erro ao aprovar solicitacao de ajuste de ponto", { err });
@@ -229,8 +239,8 @@ class TimeClockRequestService {
         throw new ServiceError(403, "O solicitante nao pode decidir o proprio ajuste.");
       }
 
-      return await prismaClient.timeClockRequest.update({
-        where: { id: requestId },
+      const updated = await prismaClient.timeClockRequest.updateMany({
+        where: { id: requestId, organization_id: organizationId, status: "Pendente" },
         data: {
           status: "Rejeitado",
           approver_user_id: approverUserId,
@@ -239,6 +249,14 @@ class TimeClockRequestService {
               ? null
               : String(input.obs_approver).trim() || null,
         },
+      });
+
+      if (updated.count !== 1) {
+        throw new ServiceError(409, "Solicitacao nao esta mais pendente de rejeicao.");
+      }
+
+      return await prismaClient.timeClockRequest.findUniqueOrThrow({
+        where: { id: requestId },
         select: TIME_CLOCK_REQUEST_SELECT,
       });
     } catch (err: unknown) {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, pointServiceMock } = vi.hoisted(() => ({
   prismaMock: {
+    $transaction: vi.fn(),
     point: {
       findUnique: vi.fn(),
       update: vi.fn(),
@@ -11,6 +12,8 @@ const { prismaMock, pointServiceMock } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
     },
     pointsConfig: {
       update: vi.fn(),
@@ -31,7 +34,12 @@ vi.mock("../services/pointService.js", () => ({
 import { TimeClockRequestService } from "../services/timeClockRequestService.js";
 
 describe("TimeClockRequestService", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation(
+      async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock),
+    );
+  });
 
   it("create lanca 404 quando ponto nao existe", async () => {
     prismaMock.point.findUnique.mockResolvedValue(null);
@@ -89,7 +97,7 @@ describe("TimeClockRequestService", () => {
       status: "Pendente",
       point_id: "point-1",
     });
-    prismaMock.timeClockRequest.update.mockResolvedValue({ id: "req-1", status: "Rejeitado" });
+    prismaMock.timeClockRequest.updateMany.mockResolvedValue({ count: 1 });
     const service = new TimeClockRequestService();
 
     await service.reject({
@@ -99,9 +107,9 @@ describe("TimeClockRequestService", () => {
       obs_approver: "  Motivo da rejeicao  ",
     });
 
-    expect(prismaMock.timeClockRequest.update).toHaveBeenCalledWith(
+    expect(prismaMock.timeClockRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "req-1" },
+        where: { id: "req-1", organization_id: "org-1", status: "Pendente" },
         data: {
           status: "Rejeitado",
           approver_user_id: "user-3",
