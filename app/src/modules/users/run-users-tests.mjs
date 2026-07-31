@@ -621,6 +621,18 @@ runTest("administration empty states avoid backend wording", () => {
   assert.doesNotMatch(adminUserDetailsPanelSource, /backend/i);
 });
 
+runTest("admin permission context changes confirm discarding pending edits through the shared dialog", () => {
+  assert.match(administracaoSource, /import \{ ConfirmationDialog \} from "@shared\/components";/);
+  assert.match(
+    administracaoSource,
+    /const \[pendingPermissionUserId, setPendingPermissionUserId\] = useState<string \| null>\(null\);/,
+  );
+  assert.match(administracaoSource, /if \(isDirty\) \{\s*setPendingPermissionUserId\(nextUserId\);\s*return;/s);
+  assert.match(administracaoSource, /<ConfirmationDialog\s+open=\{pendingPermissionUserId !== null\}/s);
+  assert.match(administracaoSource, /onConfirm=\{handleConfirmPermissionUserChange\}/);
+  assert.doesNotMatch(administracaoSource, /window\.confirm\(/);
+});
+
 runTest("admin user details panels avoid stacked borders while keeping empty states clear", () => {
   const panelClassName = extractClassConstant(adminUserDetailsPanelSource, "PANEL_CLASSNAME");
   const feedbackClassName = extractClassConstant(
