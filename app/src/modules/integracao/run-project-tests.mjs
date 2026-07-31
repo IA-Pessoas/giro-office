@@ -170,7 +170,7 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
     assert.match(source, /isConfirming=\{deleteProjectMutation\.isPending\}/);
     assert.match(
       source,
-      /import\s*\{[^}]*\buseDeleteProjectMutation\b[^}]*\}\s*from\s*"\.\.\/hooks\/useProjects";/,
+      /import\s*\{[^}]*\buseDeleteProjectMutation\b[^}]*\}\s*from\s*"\.\.\/hooks(?:\/useProjects)?";/,
     );
     assert.match(source, /const deleteProjectMutation = useDeleteProjectMutation\(\);/);
     assert.match(source, /toast\.success\("Projeto excluído com sucesso\."\);/);
