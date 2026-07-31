@@ -143,7 +143,7 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
   );
 
   for (const source of Object.values(sources)) {
-    assert.doesNotMatch(source, /window\.confirm\s*\(/);
+    assert.doesNotMatch(source, /window\s*\.\s*(?:confirm|alert|prompt)\s*\(/);
     assert.match(
       source,
       /import\s*\{[^}]*\bConfirmationDialog\b[^}]*\}\s*from\s*"@shared\/components";/,
@@ -205,9 +205,9 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
 
   assert.match(
     sources.projects,
-    /const \[pendingProjectDeletion, setPendingProjectDeletion\] = useState<ProjectListItem \| null>\(null\);/,
+    /const \[pendingProjectDeletion, setPendingProjectDeletion\] = useState<\{\s*project: ProjectListItem;\s*clientId: string;\s*\} \| null>\(null\);/,
   );
-  assert.match(sources.projects, /setPendingProjectDeletion\(project\);/);
+  assert.match(sources.projects, /setPendingProjectDeletion\(\{ project, clientId: selectedClientId \}\);/);
   assert.match(sources.projects, /open=\{Boolean\(pendingProjectDeletion\)\}/);
   assert.match(sources.projects, /onConfirm=\{handleConfirmProjectDeletion\}/);
   assert.match(sources.projects, /errorMessage=\{projectDeletionError\}/);
@@ -222,9 +222,9 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
 
   assert.match(
     sources.clientProjects,
-    /const \[pendingProjectDeletion, setPendingProjectDeletion\] = useState<ProjectListItem \| null>\(null\);/,
+    /const \[pendingProjectDeletion, setPendingProjectDeletion\] = useState<\{\s*project: ProjectListItem;\s*clientId: string;\s*\} \| null>\(null\);/,
   );
-  assert.match(sources.clientProjects, /setPendingProjectDeletion\(project\);/);
+  assert.match(sources.clientProjects, /setPendingProjectDeletion\(\{ project, clientId \}\);/);
   assert.match(sources.clientProjects, /open=\{Boolean\(pendingProjectDeletion\)\}/);
   assert.match(sources.clientProjects, /onConfirm=\{handleConfirmProjectDeletion\}/);
   assert.match(sources.clientProjects, /errorMessage=\{projectDeletionError\}/);
@@ -232,7 +232,7 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
 
   assert.match(
     sources.projects,
-    /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId:\s*selectedClientId,\s*\}\);/,
+    /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId:\s*pendingClientId,\s*\}\);/,
   );
   assert.match(
     sources.projectDetail,
@@ -244,7 +244,7 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
   );
   assert.match(
     sources.clientProjects,
-    /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId,\s*\}\);/,
+    /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId:\s*pendingClientId,\s*\}\);/,
   );
   assert.match(
     projectsHooksSource,

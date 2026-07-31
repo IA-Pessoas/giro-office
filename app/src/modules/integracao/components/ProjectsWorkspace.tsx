@@ -116,7 +116,10 @@ export function ProjectsWorkspace() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [pendingProjectDeletion, setPendingProjectDeletion] = useState<ProjectListItem | null>(null);
+  const [pendingProjectDeletion, setPendingProjectDeletion] = useState<{
+    project: ProjectListItem;
+    clientId: string;
+  } | null>(null);
   const [projectDeletionError, setProjectDeletionError] = useState<string | null>(null);
 
   const selectedClientId = selectedClient?.id ?? null;
@@ -267,20 +270,22 @@ export function ProjectsWorkspace() {
     }
 
     setProjectDeletionError(null);
-    setPendingProjectDeletion(project);
+    setPendingProjectDeletion({ project, clientId: selectedClientId });
   }
 
   async function handleConfirmProjectDeletion() {
-    const project = pendingProjectDeletion;
+    const pendingDeletion = pendingProjectDeletion;
 
-    if (!project || !selectedClientId) {
+    if (!pendingDeletion) {
       return;
     }
+
+    const { project, clientId: pendingClientId } = pendingDeletion;
 
     try {
       await deleteProjectMutation.mutateAsync({
         projectId: project.id,
-        clientId: selectedClientId,
+        clientId: pendingClientId,
       });
       toast.success("Projeto excluído com sucesso.");
     } catch (error) {
@@ -349,7 +354,7 @@ export function ProjectsWorkspace() {
             setProjectDeletionError(null);
           }
         }}
-        title={`Excluir projeto "${pendingProjectDeletion?.name ?? ""}"?`}
+        title={`Excluir projeto "${pendingProjectDeletion?.project.name ?? ""}"?`}
         description="Esta ação remove o projeto e não pode ser desfeita."
         onConfirm={handleConfirmProjectDeletion}
         isConfirming={deleteProjectMutation.isPending}

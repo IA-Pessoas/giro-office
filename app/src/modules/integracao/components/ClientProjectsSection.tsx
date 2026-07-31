@@ -34,25 +34,30 @@ export function ClientProjectsSection({
   const recalculateProgressMutation = useRecalculateProjectProgressMutation();
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [pendingProjectDeletion, setPendingProjectDeletion] = useState<ProjectListItem | null>(null);
+  const [pendingProjectDeletion, setPendingProjectDeletion] = useState<{
+    project: ProjectListItem;
+    clientId: string;
+  } | null>(null);
   const [projectDeletionError, setProjectDeletionError] = useState<string | null>(null);
 
   function handleDelete(project: ProjectListItem) {
     setProjectDeletionError(null);
-    setPendingProjectDeletion(project);
+    setPendingProjectDeletion({ project, clientId });
   }
 
   async function handleConfirmProjectDeletion() {
-    const project = pendingProjectDeletion;
+    const pendingDeletion = pendingProjectDeletion;
 
-    if (!project) {
+    if (!pendingDeletion) {
       return;
     }
+
+    const { project, clientId: pendingClientId } = pendingDeletion;
 
     try {
       await deleteProjectMutation.mutateAsync({
         projectId: project.id,
-        clientId,
+        clientId: pendingClientId,
       });
       toast.success("Projeto excluído com sucesso.");
     } catch (error) {
@@ -101,7 +106,7 @@ export function ClientProjectsSection({
             setProjectDeletionError(null);
           }
         }}
-        title={`Excluir projeto "${pendingProjectDeletion?.name ?? ""}"?`}
+        title={`Excluir projeto "${pendingProjectDeletion?.project.name ?? ""}"?`}
         description="Esta ação remove o projeto e não pode ser desfeita."
         onConfirm={handleConfirmProjectDeletion}
         isConfirming={deleteProjectMutation.isPending}
