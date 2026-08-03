@@ -481,8 +481,8 @@ it("proxies authenticated self password updates with PUT to user-service", async
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
-    permission: 2,
-    type: "owner",
+    permission: 0,
+    type: "user",
   });
 
   try {
