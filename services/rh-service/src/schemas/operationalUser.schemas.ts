@@ -5,7 +5,9 @@ export const operationalUserListQuerySchema = z
   .object({
     department_id: z.string().uuid("department_id invalido.").optional(),
     department_name: z.string().trim().min(1, "department_name obrigatorio.").optional(),
-    module: z.enum(ACTIVE_MODULE_KEYS, { errorMap: () => ({ message: "module invalido." }) }).optional(),
+    module: z
+      .enum(ACTIVE_MODULE_KEYS, { errorMap: () => ({ message: "module invalido." }) })
+      .optional(),
   })
   .strict();
 

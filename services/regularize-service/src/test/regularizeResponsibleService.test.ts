@@ -29,7 +29,12 @@ describe("ensureRegularizeResponsible", () => {
   it("preserva responsavel legado atual", async () => {
     const prisma = { user: { findFirst: vi.fn() } };
 
-    await ensureRegularizeResponsible(prisma as never, organizationId, responsibleId, responsibleId);
+    await ensureRegularizeResponsible(
+      prisma as never,
+      organizationId,
+      responsibleId,
+      responsibleId,
+    );
 
     expect(prisma.user.findFirst).not.toHaveBeenCalled();
   });

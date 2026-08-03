@@ -1,6 +1,7 @@
 import type { ModuleAccess } from "@modules/auth";
 
 import type { IntegracaoTaskListItem } from "../types";
+import { SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME } from "../../../shared/ui/newLayout/scrollbar.ts";
 
 export const TASK_TABLE_HEAD_CELL_CLASSNAME =
   "px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-blue-200/80";
@@ -17,7 +18,7 @@ export const TASK_TABLE_BADGE_CLASSNAME =
 export const TASK_TABLE_CLASSNAME = "w-[1120px] min-w-full table-fixed";
 
 export const TASK_TABLE_SCROLL_AREA_CLASSNAME =
-  "overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-slate-200/60 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/80 dark:[&::-webkit-scrollbar-track]:bg-slate-800 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600";
+  SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME;
 
 export const TASK_TABLE_ACTION_HEAD_CELL_CLASSNAME =
   "w-24 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-blue-200/80";

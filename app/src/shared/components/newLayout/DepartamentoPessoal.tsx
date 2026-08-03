@@ -455,7 +455,7 @@ export function DepartamentoPessoal() {
 
       {/* Tabs */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto u-scrollbar-system">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`flex-1 min-w-fit px-4 py-2.5 rounded-lg font-medium transition-all ${
@@ -890,7 +890,7 @@ export function DepartamentoPessoal() {
       {activeTab === 'certificates' && (
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
@@ -999,7 +999,7 @@ export function DepartamentoPessoal() {
       {activeTab === 'debts' && (
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>

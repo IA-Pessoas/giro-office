@@ -355,7 +355,6 @@ export class ObligationService {
       throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
     }
   }
-
 }
 
 function isUniqueConstraintError(err: unknown): boolean {

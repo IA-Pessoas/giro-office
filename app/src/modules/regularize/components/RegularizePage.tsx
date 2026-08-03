@@ -25,7 +25,12 @@ import {
 import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
-import { ClientPickerModal, ClientSelectionField, type ClientPickerOption } from "@modules/clients";
+import {
+  ClientPickerModal,
+  ClientSelectionField,
+  type ClientPickerOption,
+  useClients,
+} from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { PaginationControls } from "@shared/components";
 import { useDebouncedValue } from "@shared/hooks";
@@ -573,7 +578,7 @@ function DataTable({
   headers: string[];
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+    <div className="overflow-x-auto u-scrollbar-system rounded-lg border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
       <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-slate-700">
         <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-slate-800/60 dark:text-slate-400">
           <tr>
@@ -742,6 +747,12 @@ export function RegularizePage() {
     },
     { enabled: queryPolicy.clientPfs },
   );
+  const clientQuery = useClients({
+    status: "Ativo",
+    legacyIntegrationStatusFilter: false,
+    page: 1,
+    limit: 50,
+  });
   const siteQuery = useRegularizeSitePasswords(
     { status: true },
     { enabled: queryPolicy.sitePasswords },
@@ -806,6 +817,15 @@ export function RegularizePage() {
   const updateLicenseMutation = useUpdateRegularizeLicenseMutation();
 
   const visiblePfRows = isPfSearchPending ? [] : pfPageQuery.data?.data ?? [];
+  const pfNameById = new Map(
+    (pfPageQuery.data?.data ?? []).map((client) => [client.id, client.name]),
+  );
+  const pjNameById = new Map(
+    (clientQuery.data?.items ?? []).map((client) => [
+      client.id,
+      client.name || client.company_name,
+    ]),
+  );
   const firstClientPfId = visiblePfRows[0]?.id;
   const visibleProcessRows = isProcessSearchPending ? [] : processPageQuery.data?.data ?? [];
   const automaticProcessId = visibleProcessRows[0]?.id;
@@ -1314,7 +1334,7 @@ export function RegularizePage() {
         aria-label="Abas do Regularize"
         className="rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800"
       >
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto u-scrollbar-system">
           <div role="tablist" className="flex min-w-max items-center justify-center gap-1 md:min-w-full">
             {REGULARIZE_TABS.map((tab) => (
               <TabButton
@@ -1983,8 +2003,12 @@ export function RegularizePage() {
               <DataTable headers={["PF", "PJ", "Participação", "Entrada", "Saída", ""]}>
                 {partnerRows.map((item: RegularizePartner) => (
                   <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                    <td className="px-4 py-3 font-medium">{formatText(item.pf_id).slice(0, 8)}</td>
-                    <td className="px-4 py-3">{formatText(item.pj_id).slice(0, 8)}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {pfNameById.get(item.pf_id) || "PF não identificado"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {pjNameById.get(item.pj_id) || "PJ não identificado"}
+                    </td>
                     <td className="px-4 py-3">{formatText(item.part)}</td>
                     <td className="px-4 py-3">{formatDate(item.entry)}</td>
                     <td className="px-4 py-3">{formatDate(item.exit)}</td>
