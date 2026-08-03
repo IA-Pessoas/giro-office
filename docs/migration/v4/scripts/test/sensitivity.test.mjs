@@ -105,3 +105,9 @@ test("assertNoSensitiveValues rejeita JWTs com prefixos sem espacos", () => {
     );
   }
 });
+
+test("assertNoSensitiveValues preserva valores benignos de tres segmentos", () => {
+  for (const value of ["versao-1.2.3", "build.2026.08"]) {
+    assert.doesNotThrow(() => assertNoSensitiveValues({ details: { value } }));
+  }
+});

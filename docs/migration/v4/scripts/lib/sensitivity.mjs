@@ -5,7 +5,7 @@ const SECRET_COLUMN_PATTERN = /token|secret|chave|private[_-]?key|certificado|pf
 const SAFE_LEGACY_ID_PATTERN = /^[a-z0-9_-]{1,64}$/i;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POSTGRES_CREDENTIAL_URL_PATTERN = /postgres(?:ql)?:\/\/[^\s/:@]+:[^\s/@]+@/i;
-const JWT_PATTERN = /[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+/i;
+const JWT_CANDIDATE_PATTERN = /([a-z0-9_-]+)\.([a-z0-9_-]+)\.([a-z0-9_-]+)/gi;
 const PEM_OR_PFX_PATTERN = /-----BEGIN [A-Z0-9 #_-]+-----|\b(?:pfx|pkcs\s*#?\s*12)\b/i;
 
 export function isSensitiveColumn(name) {
@@ -61,7 +61,7 @@ function inspectValue(value, seen) {
   if (typeof value === "string") {
     if (
       POSTGRES_CREDENTIAL_URL_PATTERN.test(value) ||
-      JWT_PATTERN.test(value) ||
+      hasPlausibleJwt(value) ||
       PEM_OR_PFX_PATTERN.test(value)
     ) {
       throw new Error("Valor sensivel identificado no relatorio");
@@ -91,6 +91,24 @@ function inspectValue(value, seen) {
     }
     inspectValue(entry, seen);
   }
+}
+
+function hasPlausibleJwt(value) {
+  for (const match of value.matchAll(JWT_CANDIDATE_PATTERN)) {
+    try {
+      const header = JSON.parse(Buffer.from(match[1], "base64url").toString("utf8"));
+      if (
+        header !== null &&
+        !Array.isArray(header) &&
+        typeof header === "object" &&
+        "alg" in header
+      ) {
+        return true;
+      }
+    } catch {}
+  }
+
+  return false;
 }
 
 function hasNonEmptyValue(value) {
