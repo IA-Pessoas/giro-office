@@ -182,7 +182,11 @@ class SqlInsertStreamParser {
     if (INSERT_PREFIX.startsWith(candidate)) {
       return;
     }
-    if (candidate.startsWith(INSERT_PREFIX)) {
+    const insertState = getInsertIntoTableState(candidate);
+    if (insertState === "waiting") {
+      return;
+    }
+    if (insertState === "valid") {
       this.mode = "header";
       return;
     }
@@ -328,6 +332,27 @@ class SqlInsertStreamParser {
       `Erro no parser SQL em ${this.fileName} na posicao ${this.position}: ${reason}`,
     );
   }
+}
+
+function getInsertIntoTableState(candidate) {
+  if (!candidate.startsWith(INSERT_PREFIX)) {
+    return "invalid";
+  }
+
+  const tableSegment = candidate.slice(INSERT_PREFIX.length);
+  if (!/^\s+/.test(tableSegment)) {
+    return "invalid";
+  }
+
+  const tableIdentifier = tableSegment.trimStart();
+  if (!tableIdentifier) {
+    return "waiting";
+  }
+
+  const identifierStart = tableIdentifier[0];
+  return identifierStart === "`" || identifierStart === '"' || /[A-Z_]/.test(identifierStart)
+    ? "valid"
+    : "invalid";
 }
 
 function parseColumns(header, fail) {

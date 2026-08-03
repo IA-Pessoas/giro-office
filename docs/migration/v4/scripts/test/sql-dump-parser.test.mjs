@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -91,6 +91,24 @@ test("iterateSqlRows informa arquivo e posicao sem vazar a linha malformada", as
       return true;
     },
   );
+});
+
+test("iterateSqlRows ignora INSERT INTOX sem gerar linhas ou metadados de INSERT", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "giro-v4-parser-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const dumpPath = path.join(directory, "tb_schema.invalida.sql");
+  await writeFile(
+    dumpPath,
+    "INSERT INTOX `tb_schema`.`invalida` (`id`, `nome`) VALUES (1, 'nao deve entrar');\n",
+  );
+
+  assert.deepEqual(await collectRows(dumpPath), []);
+  const inspection = await inspectSqlDump(dumpPath, { relativeTo: directory });
+  assert.deepEqual(inspection.columns, []);
+  assert.equal(inspection.rowCount, 0);
+  assert.equal(inspection.insertStatementCount, 0);
+  assert.equal(inspection.legacyIdColumn, null);
+  assert.deepEqual(inspection.sensitiveColumns, []);
 });
 
 test("o modulo do parser usa streaming e nao readFile", async () => {
