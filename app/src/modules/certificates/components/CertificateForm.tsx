@@ -505,9 +505,9 @@ export function CertificateForm({
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
           <span className="inline-flex items-center gap-1">
-            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Castelo do certificado</span>
+            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Castelo</span>
             <FieldHelp
-              label="Situação Castelo do certificado"
+              label="Situação Castelo"
               description="Indica se este certificado está regularizado no sistema Castelo."
             />
           </span>
@@ -526,9 +526,9 @@ export function CertificateForm({
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
           <span className="inline-flex items-center gap-1">
-            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Focus do certificado</span>
+            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Focus</span>
             <FieldHelp
-              label="Situação Focus do certificado"
+              label="Situação Focus"
               description="Indica se este certificado está regularizado no sistema Focus."
             />
           </span>

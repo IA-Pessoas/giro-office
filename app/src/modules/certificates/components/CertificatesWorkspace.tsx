@@ -1104,7 +1104,7 @@ export function CertificatesWorkspace() {
                   <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
                     <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>
                       <Filter className="h-4 w-4 text-slate-400" />
-                      Situação Castelo do certificado
+                      Situação Castelo
                     </span>
                     <CertificateNativeSelect
                       value={String(pjFilters.clientCasteloStatus ?? "")}
@@ -1126,7 +1126,7 @@ export function CertificatesWorkspace() {
                   <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
                     <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>
                       <Filter className="h-4 w-4 text-slate-400" />
-                      Situação Focus do certificado
+                      Situação Focus
                     </span>
                     <CertificateNativeSelect
                       value={String(pjFilters.clientFocusStatus ?? "")}
@@ -1266,7 +1266,7 @@ export function CertificatesWorkspace() {
                   <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
                     <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>
                       <Filter className="h-4 w-4 text-slate-400" />
-                      Situação Castelo do certificado
+                      Situação Castelo
                     </span>
                     <CertificateNativeSelect
                       value={String(pfFilters.clientCasteloStatus ?? "")}
@@ -1288,7 +1288,7 @@ export function CertificatesWorkspace() {
                   <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
                     <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>
                       <Filter className="h-4 w-4 text-slate-400" />
-                      Situação Focus do certificado
+                      Situação Focus
                     </span>
                     <CertificateNativeSelect
                       value={String(pfFilters.clientFocusStatus ?? "")}
@@ -1877,12 +1877,12 @@ export function CertificatesWorkspace() {
                 <span
                   className={`inline-flex w-fit ${pjDetail?.client_castelo_status ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"} ${ "rounded-full px-2.5 py-1 text-xs font-semibold"}`}
                 >
-                  Situação Castelo do certificado: {certificateStatusLabel(Boolean(pjDetail?.client_castelo_status))}
+                  Situação Castelo: {certificateStatusLabel(Boolean(pjDetail?.client_castelo_status))}
                 </span>
                 <span
                   className={`inline-flex w-fit ${pjDetail?.client_focus_status ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"} ${ "rounded-full px-2.5 py-1 text-xs font-semibold"}`}
                 >
-                  Situação Focus do certificado: {certificateStatusLabel(Boolean(pjDetail?.client_focus_status))}
+                  Situação Focus: {certificateStatusLabel(Boolean(pjDetail?.client_focus_status))}
                 </span>
                 <span
                   className={`inline-flex w-fit ${pjDetail?.has_certificate ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"} ${ "rounded-full px-2.5 py-1 text-xs font-semibold"}`}
@@ -1971,12 +1971,12 @@ export function CertificatesWorkspace() {
                 <span
                   className={`inline-flex w-fit ${pfDetail?.client_castelo_status ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"} ${ "rounded-full px-2.5 py-1 text-xs font-semibold"}`}
                 >
-                  Situação Castelo do certificado: {certificateStatusLabel(Boolean(pfDetail?.client_castelo_status))}
+                  Situação Castelo: {certificateStatusLabel(Boolean(pfDetail?.client_castelo_status))}
                 </span>
                 <span
                   className={`inline-flex w-fit ${pfDetail?.client_focus_status ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"} ${ "rounded-full px-2.5 py-1 text-xs font-semibold"}`}
                 >
-                  Situação Focus do certificado: {certificateStatusLabel(Boolean(pfDetail?.client_focus_status))}
+                  Situação Focus: {certificateStatusLabel(Boolean(pfDetail?.client_focus_status))}
                 </span>
                 <span
                   className={`inline-flex w-fit ${pfDetail?.has_certificate ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"} ${ "rounded-full px-2.5 py-1 text-xs font-semibold"}`}

@@ -614,11 +614,11 @@ runTest("certificate Focus and Castelo statuses remain explicit and independent"
   assert.match(workspaceSource, /label: "[^"]*regularizado"/i);
 
   for (const statusName of ["Castelo", "Focus"]) {
-    assert.match(formSource, new RegExp(`Situa\\u00e7\\u00e3o ${statusName} do certificado`));
-    assert.match(workspaceSource, new RegExp(`Situa\\u00e7\\u00e3o ${statusName} do certificado`));
+    assert.match(formSource, new RegExp(`Situa\\u00e7\\u00e3o ${statusName}`));
+    assert.match(workspaceSource, new RegExp(`Situa\\u00e7\\u00e3o ${statusName}`));
     assert.match(
       workspaceSource,
-      new RegExp(`Situa\\u00e7\\u00e3o ${statusName} do certificado: \\{certificateStatusLabel\\(Boolean\\((pjDetail|pfDetail)\\?\\.client_`),
+      new RegExp(`Situa\\u00e7\\u00e3o ${statusName}: \\{certificateStatusLabel\\(Boolean\\((pjDetail|pfDetail)\\?\\.client_`),
     );
   }
 
