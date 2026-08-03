@@ -1946,12 +1946,21 @@ await runTest("ti inventory category form keeps a stable form reference", async 
 await runTest("ti inventory user fields use the contextual user catalog", async () => {
   const source = await readModuleSource("components/TiInventoryTab.tsx");
 
-  assert.match(source, /useAssignableUsers/);
-  assert.match(source, /module: "ti"/);
+  assert.match(source, /const assetUsersQuery = useAssignableUsers\(\{[\s\S]*enabled:[\s\S]*\}\)/);
+  assert.match(
+    source,
+    /const technologyResponsibleUsersQuery = useAssignableUsers\(\{[\s\S]*departmentName: "Tecnologia"[\s\S]*\}\)/,
+  );
+  assert.doesNotMatch(source, /module: "ti"/);
+  assert.match(source, /error\.response\.data\.error/);
   assert.match(source, /name="user_id"/);
   assert.match(source, /name="responsible_it_staff_id"/);
   assert.match(source, /Usuário atual/);
   assert.match(source, /Responsável atual/);
+  assert.match(
+    source,
+    /function getLegacySelectedUserLabel\(\s*asset: TiInventoryAsset,[\s\S]*getRelatedUserName\(asset\.user\)[\s\S]*getRelatedUserName\(asset\.responsible_it_staff\)/,
+  );
   assert.doesNotMatch(source, /<TiTextField\s+label="ID do usuário"/);
   assert.doesNotMatch(source, /<TiTextField\s+label="ID do responsável TI"/);
 });

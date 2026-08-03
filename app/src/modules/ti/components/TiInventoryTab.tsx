@@ -204,6 +204,19 @@ function getItResponsible(asset: TiInventoryAsset): string {
   return getText(getRelatedUserName(asset.responsible_it_staff) ?? asset.responsible_it_staff_id);
 }
 
+function getLegacySelectedUserLabel(
+  asset: TiInventoryAsset,
+  relation: "user" | "responsible_it_staff",
+): string {
+  if (relation === "user") {
+    return `Usuário atual: ${getText(getRelatedUserName(asset.user) ?? asset.user_id)}`;
+  }
+
+  return `Responsável atual: ${getText(
+    getRelatedUserName(asset.responsible_it_staff) ?? asset.responsible_it_staff_id,
+  )}`;
+}
+
 function getAssetStatus(asset: TiInventoryAsset): string {
   if (asset.status) {
     return String(asset.status);
@@ -212,9 +225,38 @@ function getAssetStatus(asset: TiInventoryAsset): string {
   return asset.user_id || asset.user ? "assigned" : "available";
 }
 
+type InventoryMutationError = {
+  message?: unknown;
+  response?: {
+    data?: {
+      error?: unknown;
+    };
+  };
+};
+
+const TECHNICAL_MUTATION_ERROR_MESSAGE = /^(request failed with status code \d{3}[.!]?|network error)$/i;
+
+function isInventoryMutationError(error: unknown): error is InventoryMutationError {
+  return typeof error === "object" && error !== null;
+}
+
 function getMutationErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
+  if (
+    isInventoryMutationError(error) &&
+    error.response &&
+    error.response.data &&
+    typeof error.response.data.error === "string" &&
+    error.response.data.error.trim()
+  ) {
+    return error.response.data.error.trim();
+  }
+
+  if (isInventoryMutationError(error) && typeof error.message === "string") {
+    const message = error.message.trim();
+
+    if (message && !TECHNICAL_MUTATION_ERROR_MESSAGE.test(message)) {
+      return message;
+    }
   }
 
   return "Não foi possível concluir a ação.";
@@ -234,9 +276,12 @@ export function TiInventoryTab() {
   const [pendingAction, setPendingAction] = useState<PendingInventoryAction | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<TiInventoryCategory | null>(null);
-  const assignableUsersQuery = useAssignableUsers({
-    enabled: canManage && (dialogState?.type === "asset" || dialogState?.type === "assign"),
-    module: "ti",
+  const isUserSelectorEnabled =
+    canManage && (dialogState?.type === "asset" || dialogState?.type === "assign");
+  const assetUsersQuery = useAssignableUsers({ enabled: isUserSelectorEnabled });
+  const technologyResponsibleUsersQuery = useAssignableUsers({
+    enabled: isUserSelectorEnabled && dialogState?.type === "asset",
+    departmentName: "Tecnologia",
   });
 
   const filters = useMemo(
@@ -305,19 +350,33 @@ export function TiInventoryTab() {
     [departmentOptions],
   );
 
-  const assignableUserOptions = useMemo(
+  const assetUserOptions = useMemo(
     () => [
       { value: "", label: "NÃ£o atribuir" },
-      ...(assignableUsersQuery.data ?? []).map((user) => ({
+      ...(assetUsersQuery.data ?? []).map((user) => ({
         value: user.id,
         label: user.name,
       })),
     ],
-    [assignableUsersQuery.data],
+    [assetUsersQuery.data],
   );
 
-  function hasAssignableUser(userId: unknown): boolean {
-    return Boolean(userId) && (assignableUsersQuery.data ?? []).some((user) => user.id === userId);
+  const technologyResponsibleOptions = useMemo(
+    () => [
+      { value: "", label: "NÃ£o atribuir" },
+      ...(technologyResponsibleUsersQuery.data ?? []).map((user) => ({
+        value: user.id,
+        label: user.name,
+      })),
+    ],
+    [technologyResponsibleUsersQuery.data],
+  );
+
+  function hasAssignableUser(
+    userId: unknown,
+    users: typeof assetUsersQuery.data | typeof technologyResponsibleUsersQuery.data,
+  ): boolean {
+    return Boolean(userId) && (users ?? []).some((user) => user.id === userId);
   }
 
   const filteredInventory = useMemo(() => {
@@ -779,14 +838,16 @@ export function TiInventoryTab() {
               label="Usuário"
               name="user_id"
               defaultValue={dialogState?.type === "asset" ? getText(dialogState.asset?.user_id, "") : ""}
-              options={assignableUserOptions}
-              disabled={assignableUsersQuery.isLoading || assignableUsersQuery.isError}
+              options={assetUserOptions}
+              disabled={assetUsersQuery.isLoading || assetUsersQuery.isError}
             >
               {dialogState?.type === "asset" &&
               dialogState.mode === "edit" &&
               dialogState.asset?.user_id &&
-              !hasAssignableUser(dialogState.asset.user_id) ? (
-                <option value={dialogState.asset.user_id}>Usuário atual</option>
+              !hasAssignableUser(dialogState.asset.user_id, assetUsersQuery.data) ? (
+                <option value={dialogState.asset.user_id}>
+                  {getLegacySelectedUserLabel(dialogState.asset, "user")}
+                </option>
               ) : null}
             </TiNativeSelect>
             <TiNativeSelect
@@ -797,14 +858,21 @@ export function TiInventoryTab() {
                   ? getText(dialogState.asset?.responsible_it_staff_id, "")
                   : ""
               }
-              options={assignableUserOptions}
-              disabled={assignableUsersQuery.isLoading || assignableUsersQuery.isError}
+              options={technologyResponsibleOptions}
+              disabled={
+                technologyResponsibleUsersQuery.isLoading || technologyResponsibleUsersQuery.isError
+              }
             >
               {dialogState?.type === "asset" &&
               dialogState.mode === "edit" &&
               dialogState.asset?.responsible_it_staff_id &&
-              !hasAssignableUser(dialogState.asset.responsible_it_staff_id) ? (
-                <option value={dialogState.asset.responsible_it_staff_id}>Responsável atual</option>
+              !hasAssignableUser(
+                dialogState.asset.responsible_it_staff_id,
+                technologyResponsibleUsersQuery.data,
+              ) ? (
+                <option value={dialogState.asset.responsible_it_staff_id}>
+                  {getLegacySelectedUserLabel(dialogState.asset, "responsible_it_staff")}
+                </option>
               ) : null}
             </TiNativeSelect>
           </div>
@@ -847,8 +915,8 @@ export function TiInventoryTab() {
             label="Usuário"
             name="user_id"
             required
-            options={assignableUserOptions}
-            disabled={assignableUsersQuery.isLoading || assignableUsersQuery.isError}
+            options={assetUserOptions}
+            disabled={assetUsersQuery.isLoading || assetUsersQuery.isError}
           />
           <div className="flex justify-end gap-2">
             <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
