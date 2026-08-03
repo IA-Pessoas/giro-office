@@ -214,6 +214,29 @@ function publicTiOperation({
   };
 }
 
+const tiTermSuccessSchema: OpenApiSchema = {
+  type: "object",
+  required: ["success", "data"],
+  properties: {
+    success: { type: "boolean", enum: [true] },
+    data: { $ref: "#/components/schemas/TiTerm" },
+  },
+  additionalProperties: true,
+};
+
+const tiTermListSuccessSchema: OpenApiSchema = {
+  type: "object",
+  required: ["success", "data"],
+  properties: {
+    success: { type: "boolean", enum: [true] },
+    data: {
+      type: "array",
+      items: { $ref: "#/components/schemas/TiTerm" },
+    },
+  },
+  additionalProperties: true,
+};
+
 const urgencyValues = ["Low", "Medium", "High", "Critical"];
 const requestStatusValues = ["New", "In_Progress", "Waiting", "Resolved", "Closed"];
 
@@ -503,6 +526,27 @@ const schemas: Record<string, OpenApiSchema> = {
       reason: { type: "string" },
     },
     additionalProperties: false,
+  },
+  TiTerm: {
+    type: "object",
+    required: ["id", "status", "signed_at"],
+    properties: {
+      id: { type: "string", format: "uuid" },
+      date: { type: "string", format: "date-time" },
+      user_id: { type: "string", format: "uuid", nullable: true },
+      user_name: { type: "string" },
+      user_cpf: { type: "string" },
+      department_id: { type: "string", format: "uuid", nullable: true },
+      address: { type: "string", nullable: true },
+      reason: { type: "string", nullable: true },
+      signed_at: { type: "string", format: "date-time", nullable: true },
+      equipament_list: { type: "string", nullable: true },
+      brand: { type: "string", nullable: true },
+      asset_code: { type: "string", nullable: true },
+      imei: { type: "string", nullable: true },
+      status: { type: "string", enum: ["pending", "signed"] },
+    },
+    additionalProperties: true,
   },
   TiStockItemInput: {
     type: "object",
@@ -1470,8 +1514,10 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           summary: "Lista termos de TI",
           parameters: [
             uuidQueryParameter("user_id", "Usuario vinculado ao termo"),
+            enumQueryParameter("status", "Status do termo", ["pending", "signed"]),
             ...paginationParameters(),
           ],
+          successSchema: tiTermListSuccessSchema,
           successDescription: "Termos listados",
           errors: [400, 401, 403],
         }),
@@ -1483,6 +1529,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           summary: "Cria termo de TI",
           requestBody: jsonRequestBody("#/components/schemas/TiTermInput"),
           successStatus: 201,
+          successSchema: tiTermSuccessSchema,
           successDescription: "Termo criado",
           errors: [400, 401, 403, 404],
         }),
@@ -1493,6 +1540,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           tags: ["TI Terms"],
           summary: "Busca termo de TI",
           parameters: [pathIdParameter("Termo de TI")],
+          successSchema: tiTermSuccessSchema,
           successDescription: "Termo encontrado",
           errors: [400, 401, 403, 404],
         }),
@@ -1502,6 +1550,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           summary: "Atualiza termo de TI",
           parameters: [pathIdParameter("Termo de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiTermUpdateInput"),
+          successSchema: tiTermSuccessSchema,
           successDescription: "Termo atualizado",
           errors: [400, 401, 403, 404],
         }),
@@ -1513,6 +1562,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           summary: "Assina termo de TI",
           parameters: [pathIdParameter("Termo de TI")],
           requestBody: jsonRequestBody("#/components/schemas/TiTermSignInput"),
+          successSchema: tiTermSuccessSchema,
           successDescription: "Termo assinado",
           errors: [400, 401, 403, 404],
         }),

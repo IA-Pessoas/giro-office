@@ -1975,6 +1975,7 @@ model TermTecnologia {
   department_id   String?
   address         String?
   reason          String?
+  signed_at       DateTime?
   equipament_list String?
   brand           String?
   asset_code      String?
@@ -1983,7 +1984,7 @@ model TermTecnologia {
   organization    Organization @relation(fields: [organization_id], references: [id])
   user            User?        @relation(fields: [user_id], references: [id])
 
-  @@index([organization_id, reason], map: "idx_tecnologia_terms_org_reason")
+  @@index([organization_id, signed_at], map: "idx_tecnologia_terms_org_signed_at")
   @@map("tecnologia.terms")
 }
 

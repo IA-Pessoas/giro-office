@@ -1826,7 +1826,7 @@ await runTest("ti terms form dialog stays scrollable and compact", async () => {
   assert.doesNotMatch(source, /dialogState\?\.type === "term" && dialogState\.mode === "edit" \? \(/);
 });
 
-await runTest("ti terms filters stay local because the backend list only supports user_id", async () => {
+await runTest("ti terms filters use the shared signed_at-derived status locally", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
 
   assert.match(source, /const termsQuery = useTiTerms\(\)/);
@@ -1837,6 +1837,18 @@ await runTest("ti terms filters stay local because the backend list only support
   assert.doesNotMatch(source, /inventory_id: assetId/);
   assert.doesNotMatch(source, /asset_id: assetId/);
   assert.doesNotMatch(source, /status,\s*inventory_id/);
+});
+
+await runTest("ti term status is derived only from signed_at", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+  const statusSource = source.slice(
+    source.indexOf("function hasTermSignature"),
+    source.indexOf("function getMutationErrorMessage"),
+  );
+
+  assert.match(statusSource, /function hasTermSignature\(term\?: TiTerm \| null\): boolean/);
+  assert.match(statusSource, /term\?\.signed_at != null/);
+  assert.doesNotMatch(statusSource, /reason/);
 });
 
 await runTest("ti terms list paginates locally and keeps actions compact", async () => {
