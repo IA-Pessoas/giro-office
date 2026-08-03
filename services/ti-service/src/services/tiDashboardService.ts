@@ -75,7 +75,7 @@ export class TiDashboardService {
     const pendingTerms = await this.prisma.termTecnologia.count({
       where: {
         ...organizationWhere,
-        reason: null,
+        signed_at: null,
       },
     });
     const lowStockItems = technologyDepartment

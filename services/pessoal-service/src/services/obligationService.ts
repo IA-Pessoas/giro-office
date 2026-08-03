@@ -7,7 +7,13 @@ import type {
   UpdateObligationFieldBody,
 } from "../schemas/obligation.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
-import { type PessoalAuthContext, requireUserId } from "./pessoalServiceTypes.js";
+import { ensurePessoalResponsible } from "./pessoalResponsibleService.js";
+import {
+  PESSOAL_WRITE_PERMISSION,
+  type PessoalAuthContext,
+  requireMinimumPermission,
+  requireUserId,
+} from "./pessoalServiceTypes.js";
 
 const OBLIGATION_CREATE_CHUNK_SIZE = 50;
 
@@ -36,10 +42,6 @@ const payrollDefaultsSelect = {
   bsf: true,
   va: true,
   vt: true,
-} as const;
-
-const userSelect = {
-  id: true,
 } as const;
 
 type PayrollDefaults = {
@@ -97,6 +99,7 @@ export class ObligationService {
     body: CreateObligationBody,
   ): Promise<CreateObligationResult> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       await this.ensureClient(context.organizationId, body.client_id);
 
@@ -193,6 +196,7 @@ export class ObligationService {
     body: UpdateObligationFieldBody,
   ): Promise<ObligationRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const existing = await this.prisma.obrigationsPessoal.findFirst({
         where: { id, organization_id: context.organizationId },
@@ -201,7 +205,12 @@ export class ObligationService {
       if (!existing) {
         throw new ServiceError(404, "Obrigacao de pessoal nao encontrada.");
       }
-      await this.ensureResponsible(context.organizationId, body.responsavel_id);
+      await ensurePessoalResponsible(
+        this.prisma,
+        context.organizationId,
+        body.responsavel_id,
+        existing.responsavel_id,
+      );
 
       const updated = await this.prisma.obrigationsPessoal.update({
         where: { id },
@@ -234,6 +243,7 @@ export class ObligationService {
     competence: string,
   ): Promise<GenerateObligationResult> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const clients = await this.prisma.client.findMany({
         where: {
@@ -343,23 +353,6 @@ export class ObligationService {
     });
     if (!client) {
       throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
-    }
-  }
-
-  private async ensureResponsible(
-    organizationId: string,
-    responsibleId: string | null | undefined,
-  ): Promise<void> {
-    if (responsibleId === undefined || responsibleId === null) {
-      return;
-    }
-
-    const responsible = await this.prisma.user.findFirst({
-      where: { id: responsibleId, organization_id: organizationId },
-      select: userSelect,
-    });
-    if (!responsible) {
-      throw new ServiceError(404, "Responsavel nao encontrado para a organizacao.");
     }
   }
 }

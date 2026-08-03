@@ -101,7 +101,7 @@ function buildExtensionFormState(item?: TiExtension | null): ExtensionFormState 
 
 export function TiExtensionsTab() {
   const { access } = useModuleAccess("ti");
-  const canManageExtensions = access.canEdit || access.isAdmin;
+  const canManageExtensions = access.isAdmin;
   const [selectedExtensionId, setSelectedExtensionId] = useState<TiId | undefined>();
   const [editingExtension, setEditingExtension] = useState<TiExtension | null>(null);
   const [extensionForm, setExtensionForm] = useState<ExtensionFormState>(
@@ -112,7 +112,7 @@ export function TiExtensionsTab() {
   const selectedExtensionQuery = useTiExtension(selectedExtensionId, {
     enabled: Boolean(selectedExtensionId),
   });
-  const assignableUsersQuery = useAssignableUsers({ enabled: canManageExtensions });
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManageExtensions, module: "ti" });
   const createExtensionMutation = useCreateTiExtensionMutation();
   const updateExtensionMutation = useUpdateTiExtensionMutation();
   const isSubmitting = createExtensionMutation.isPending || updateExtensionMutation.isPending;

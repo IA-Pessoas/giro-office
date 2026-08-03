@@ -41,7 +41,7 @@ export default function DataTabComercial({ client }) {
 
     async function handleUpdate() {
         if (prospecting_status === '' || prospecting_status == null) {
-            alert('Preencha todos os campos')
+            toast.warn('Preencha todos os campos')
             return
         }
 
@@ -73,7 +73,7 @@ export default function DataTabComercial({ client }) {
 
     async function handleDistrato() {
         if (competence_output === '' || competence_output === null) {
-            alert('Preencha a competencia de saída')
+            toast.warn('Preencha a competencia de saída')
             return
         }
 

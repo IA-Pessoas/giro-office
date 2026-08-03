@@ -92,6 +92,54 @@ function paginatedClientPfSuccessEnvelopeContent() {
   };
 }
 
+function paginatedMunicipalTaxesSuccessEnvelopeContent() {
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              required: ["data", "total", "page", "limit", "hasMore"],
+              properties: {
+                data: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["id", "name"],
+                    properties: {
+                      id: { type: "string", format: "uuid" },
+                      dominio_code: { type: "string", nullable: true },
+                      name: { type: "string" },
+                      cpf_cnpj: { type: "string", nullable: true },
+                      city: { type: "string", nullable: true },
+                      municipalTaxes: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          required: ["id"],
+                          properties: { id: { type: "string", format: "uuid" } },
+                        },
+                      },
+                    },
+                  },
+                },
+                total: { type: "integer", minimum: 0 },
+                page: { type: "integer", minimum: 1 },
+                limit: { type: "integer", minimum: 1, maximum: 100 },
+                hasMore: { type: "boolean" },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
 export function buildRegularizeServiceOpenApiSpec(
   env: RegularizeServiceOpenApiEnv,
 ): OpenApiDocument {
@@ -358,11 +406,29 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/municipal-taxes": {
         get: {
           tags: ["MunicipalTaxes"],
-          summary: "Listar tributos municipais por ano",
+          summary: "Listar tributos municipais com filtros e paginação",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "year", in: "query", required: true, schema: { type: "integer" } }],
+          parameters: [
+            { name: "year", in: "query", required: true, schema: { type: "integer" } },
+            { name: "search", in: "query", schema: { type: "string", default: "" } },
+            {
+              name: "status",
+              in: "query",
+              schema: { type: "string", enum: ["Todos", "Criado", "Pendente"], default: "Todos" },
+            },
+            { name: "type", in: "query", schema: { type: "string", enum: ["TFF", "TLP", "TLL"] } },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
           responses: {
-            "200": { description: "Lista de tributos municipais", ...successEnvelopeContent() },
+            "200": {
+              description: "Página de tributos municipais",
+              ...paginatedMunicipalTaxesSuccessEnvelopeContent(),
+            },
           },
         },
         post: {
@@ -550,7 +616,26 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Licenses"],
           summary: "Listar licencas",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "status", in: "query", required: true, schema: { type: "string" } }],
+          parameters: [
+            {
+              name: "status",
+              in: "query",
+              required: true,
+              description: "Use Todos para listar todos os status.",
+              schema: {
+                type: "string",
+                enum: [
+                  "Todos",
+                  "Ativo",
+                  "Pendente",
+                  "A vencer",
+                  "Vencido",
+                  "Inativo",
+                  "Cancelado",
+                ],
+              },
+            },
+          ],
           responses: { "200": { description: "Lista de licencas", ...successEnvelopeContent() } },
         },
       },

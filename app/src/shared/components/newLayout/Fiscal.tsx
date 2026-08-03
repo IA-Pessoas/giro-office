@@ -35,6 +35,7 @@ import {
   Percent
 } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { getSummaryItems } from '../../utils/summaryItems';
 
 interface Company {
   id: string;
@@ -419,6 +420,11 @@ export function Fiscal() {
     const matchesStatus = filterStatus === 'all' || assessment.status === filterStatus;
     return matchesSearch && matchesPeriod && matchesStatus;
   });
+  const overdueDebtsSummary = getSummaryItems(debts.filter(debt => debt.status === 'overdue'), 3);
+  const recentAssessmentsSummary = getSummaryItems(
+    assessments.filter(assessment => assessment.period === '02/2026'),
+    5,
+  );
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
@@ -449,7 +455,7 @@ export function Fiscal() {
 
       {/* Tabs */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto u-scrollbar-system">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`flex-1 min-w-fit px-4 py-2.5 rounded-lg font-medium transition-all ${
@@ -672,7 +678,7 @@ export function Fiscal() {
               </div>
               <div className="space-y-3">
                 {/* Overdue Debts */}
-                {debts.filter(d => d.status === 'overdue').slice(0, 3).map((debt) => (
+                {overdueDebtsSummary.items.map((debt) => (
                   <div key={debt.id} className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                     <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
@@ -685,6 +691,15 @@ export function Fiscal() {
                     </div>
                   </div>
                 ))}
+                {overdueDebtsSummary.hasHiddenItems ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('debts')}
+                    className="text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium"
+                  >
+                    Ver todas ({overdueDebtsSummary.total})
+                  </button>
+                ) : null}
 
                 {/* Overdue Assessments */}
                 {assessments.filter(a => a.status === 'overdue').map((assessment) => (
@@ -725,15 +740,16 @@ export function Fiscal() {
                   <Calculator className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                   Apurações Recentes
                 </h3>
-                <button 
+                <button
+                  type="button"
                   onClick={() => setActiveTab('assessments')}
                   className="text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium"
                 >
-                  Ver todas
+                  Ver todas{recentAssessmentsSummary.hasHiddenItems ? ` (${recentAssessmentsSummary.total})` : ''}
                 </button>
               </div>
               <div className="space-y-3">
-                {assessments.filter(a => a.period === '02/2026').slice(0, 5).map((assessment) => {
+                {recentAssessmentsSummary.items.map((assessment) => {
                   const StatusIcon = assessmentStatusConfig[assessment.status].icon;
                   return (
                     <div key={assessment.id} className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors border border-gray-100 dark:border-gray-700">
@@ -896,7 +912,7 @@ export function Fiscal() {
 
           {/* Assessments Table */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
@@ -987,7 +1003,7 @@ export function Fiscal() {
       {activeTab === 'debts' && (
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
@@ -1151,4 +1167,3 @@ export function Fiscal() {
     </div>
   );
 }
-

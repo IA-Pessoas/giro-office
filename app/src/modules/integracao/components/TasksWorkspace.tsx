@@ -15,6 +15,7 @@ import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
+import { ConfirmationDialog } from "@shared/components";
 import { useDebouncedValue } from "@shared/hooks";
 
 import { INTEGRACAO_TASK_STATUS_VALUES, type IntegracaoTaskListItem } from "../types";
@@ -98,6 +99,8 @@ export function TasksWorkspace() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
+  const [pendingTaskDeletion, setPendingTaskDeletion] = useState<IntegracaoTaskListItem | null>(null);
+  const [taskDeletionError, setTaskDeletionError] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
   const isSearchPending = searchTerm.trim() !== debouncedSearch;
 
@@ -154,13 +157,20 @@ export function TasksWorkspace() {
     [tasksQuery.data],
   );
 
-  async function handleDelete(task: IntegracaoTaskListItem) {
+  function handleDelete(task: IntegracaoTaskListItem) {
     if (!canDelete) {
       toast.error("Somente usuários com permissão administrativa na Integração podem excluir tarefas.");
       return;
     }
 
-    if (!window.confirm(`Excluir a tarefa "${task.name}"?`)) {
+    setTaskDeletionError(null);
+    setPendingTaskDeletion(task);
+  }
+
+  async function handleConfirmTaskDeletion() {
+    const task = pendingTaskDeletion;
+
+    if (!task) {
       return;
     }
 
@@ -170,6 +180,8 @@ export function TasksWorkspace() {
         currentTasks.filter((currentTask) => currentTask.id !== task.id),
       );
       toast.success("Tarefa excluída com sucesso.");
+      setPendingTaskDeletion(null);
+      setTaskDeletionError(null);
     } catch (error) {
       const statusCode =
         typeof error === "object" &&
@@ -180,11 +192,16 @@ export function TasksWorkspace() {
           : null;
 
       if (statusCode === 403) {
-        toast.error("Somente usuários com permissão administrativa na Integração podem excluir tarefas.");
-        return;
+        const message = "Somente usuários com permissão administrativa na Integração podem excluir tarefas.";
+        toast.error(message);
+        setTaskDeletionError(message);
+        throw error;
       }
 
-      toast.error("Não foi possível excluir a tarefa.");
+      const message = "Não foi possível excluir a tarefa.";
+      toast.error(message);
+      setTaskDeletionError(message);
+      throw error;
     }
   }
 
@@ -203,6 +220,24 @@ export function TasksWorkspace() {
 
   return (
     <div className="space-y-6">
+      <ConfirmationDialog
+        open={Boolean(pendingTaskDeletion)}
+        onOpenChange={(open) => {
+          if (!open && !deleteTaskMutation.isPending) {
+            setPendingTaskDeletion(null);
+            setTaskDeletionError(null);
+          }
+        }}
+        title={`Excluir tarefa "${pendingTaskDeletion?.name ?? ""}"?`}
+        description="Esta ação remove a tarefa e não pode ser desfeita."
+        onConfirm={handleConfirmTaskDeletion}
+        isConfirming={deleteTaskMutation.isPending}
+        errorMessage={taskDeletionError}
+        confirmLabel="Excluir tarefa"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
+
       {canCreate ? (
         <TaskFormModal
           open={isCreateModalOpen}

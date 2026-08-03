@@ -349,6 +349,8 @@ export function createPrismaMock(): PrismaClient {
       findFirst: vi.fn(async ({ where }) => ({
         id: where.id,
         organization_id: where.organization_id,
+        department_id: departmentId,
+        status: "active",
       })),
     },
     tIRequest: {
@@ -369,11 +371,13 @@ export function createPrismaMock(): PrismaClient {
       findFirst: vi.fn(async ({ where }) => ({
         id: where.id,
         requester_id: userId,
+        assigned_to_id: userId,
         status: "New",
         organization_id: where.organization_id,
       })),
       create: vi.fn(async ({ data }) => ({ id: "req-1", ...data })),
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     tIMessage: {
       findMany: vi.fn(async () => []),

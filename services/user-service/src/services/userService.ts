@@ -2,12 +2,15 @@ import {
   ACTIVE_MODULE_KEYS,
   type AuthUserType,
   error as logError,
-  ServiceError,
   type ModulePermissionKey,
+  type ModulePermissions,
+  normalizeModulePermissions,
+  ServiceError,
 } from "@workspace/shared";
 import bcrypt from "bcryptjs";
 
 import type { Prisma } from "../generated/prisma/client.js";
+import type { UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { PermissionService } from "./permissionService.js";
 
@@ -41,6 +44,18 @@ const SELF_SERVICE_PERMISSION = 1;
 const MODULE_FIELDS = [...ACTIVE_MODULE_KEYS] as const;
 type ModuleField = ModulePermissionKey;
 type ModulePatch = Partial<Record<ModuleField, number>>;
+
+const AUDITABLE_USER_FIELDS = [
+  "name",
+  "login",
+  "department_id",
+  "permission",
+  "status",
+  "photo_url",
+  "organization_id",
+  "type",
+  "first_owner_flag",
+] as const;
 
 const MAX_MODULES = Object.fromEntries(
   MODULE_FIELDS.map((field) => [field, MAX_MODULE_PERMISSION]),
@@ -112,6 +127,7 @@ interface DepartmentAccessContext {
 
 type UserPublicRow = Prisma.UserGetPayload<{ select: typeof USER_PUBLIC_SELECT }>;
 type UserCreateRow = Prisma.UserGetPayload<{ select: typeof USER_CREATE_SELECT }>;
+type UserSessionRow = UserPublicRow & { modules: ModulePermissions };
 
 function userOrganizationWhere(id: string, organizationId: string): Prisma.UserWhereInput {
   return {
@@ -172,6 +188,29 @@ function hasModulePatch(modulePatch: ModulePatch): boolean {
   return Object.keys(modulePatch).length > 0;
 }
 
+function pickUserAuditFields(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    AUDITABLE_USER_FIELDS.filter((field) => field in value).map((field) => [field, value[field]]),
+  );
+}
+
+function buildUserAuditChanges(
+  previous: Record<string, unknown>,
+  next: Record<string, unknown>,
+): Record<string, unknown> {
+  const previousSafe = pickUserAuditFields(previous);
+  const nextSafe = pickUserAuditFields(next);
+  const changes: Record<string, unknown> = {};
+
+  for (const field of AUDITABLE_USER_FIELDS) {
+    if (previousSafe[field] !== nextSafe[field]) {
+      changes[field] = { previous: previousSafe[field], next: nextSafe[field] };
+    }
+  }
+
+  return changes;
+}
+
 function normalizePermissionForType(type: AuthUserType | null, permission: number): number {
   if (type === "owner") {
     return OWNER_GLOBAL_PERMISSION;
@@ -223,6 +262,8 @@ function withDefaultSelfServiceModules(modules: ModulePatch, permission: number)
 }
 
 class UserService {
+  constructor(private readonly audit?: UserAuditRecorder) {}
+
   async list({ skip = 0, take = 20, organizationId }: ListUsersParams): Promise<{
     users: UserPublicRow[];
     total: number;
@@ -255,6 +296,24 @@ class UserService {
     }
 
     return normalizeUserOrganization(user, organizationId);
+  }
+
+  async getByIdWithModules(id: string, organizationId: string): Promise<UserSessionRow> {
+    const user = await this.getById(id, organizationId);
+    let permission: unknown;
+
+    try {
+      permission = await new PermissionService().getByUserId(id, undefined, organizationId);
+    } catch (err: unknown) {
+      if (!(err instanceof ServiceError) || err.statusCode !== 404) {
+        throw err;
+      }
+    }
+
+    return {
+      ...user,
+      modules: normalizeModulePermissions(permission),
+    };
   }
 
   async create(
@@ -300,7 +359,7 @@ class UserService {
 
       if (data.organization_id) {
         try {
-          const permissionService = new PermissionService();
+          const permissionService = new PermissionService(this.audit);
           const permission = await permissionService.create(user.id, data.organization_id);
 
           if (hasModulePatch(modulesToApply)) {
@@ -318,10 +377,23 @@ class UserService {
             data: { permission_id: permission.id },
           });
 
-          return {
+          const createdUser = {
             ...user,
             permission_id: permission.id,
           };
+          if (this.audit && actorUserId) {
+            this.#recordAudit({
+              actorUserId,
+              organizationId: data.organization_id,
+              action: "CREATE",
+              referring: "user",
+              referringId: user.id,
+              changes: { next: pickUserAuditFields(createdUser) },
+              outcome: "success",
+            });
+          }
+
+          return createdUser;
         } catch (permErr: unknown) {
           logError("Erro ao criar/atualizar permissao no create de usuario", { err: permErr });
           throw new ServiceError(500, "Erro ao criar permissao para o usuario.", permErr);
@@ -348,6 +420,7 @@ class UserService {
     data: UpdateUserInput,
     organizationId: string,
     actorUserId?: string,
+    action = "UPDATE",
   ): Promise<UserPublicRow> {
     const existingUser = await prismaClient.user.findFirst({
       where: userOrganizationWhere(id, organizationId),
@@ -469,7 +542,7 @@ class UserService {
           logError("Usuario sem permissao: nao e possivel atualizar modules", { userId: id });
           throw new ServiceError(400, "Usuario nao possui permissao. Crie a permissao primeiro.");
         }
-        const permissionService = new PermissionService();
+        const permissionService = new PermissionService(this.audit);
         if (actorUserId) {
           await permissionService.update(id, modulesToApply, organizationId, { actorUserId });
         } else {
@@ -477,7 +550,20 @@ class UserService {
         }
       }
 
-      return normalizeUserOrganization(user, organizationId);
+      const normalizedUser = normalizeUserOrganization(user, organizationId);
+      if (this.audit && actorUserId) {
+        this.#recordAudit({
+          actorUserId,
+          organizationId,
+          action,
+          referring: "user",
+          referringId: id,
+          changes: buildUserAuditChanges(existingUser, normalizedUser),
+          outcome: "success",
+        });
+      }
+
+      return normalizedUser;
     } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
       const isUniqueViolation =
@@ -493,14 +579,35 @@ class UserService {
     }
   }
 
-  async delete(id: string, organizationId: string): Promise<void> {
-    await this.getById(id, organizationId);
+  #recordAudit(params: Parameters<UserAuditRecorder>[0]): void {
+    try {
+      void Promise.resolve(this.audit?.(params)).catch((err: unknown) => {
+        logError("Erro ao registrar auditoria de usuario", { err });
+      });
+    } catch (err: unknown) {
+      logError("Erro ao registrar auditoria de usuario", { err });
+    }
+  }
+
+  async delete(id: string, organizationId: string, actorUserId?: string): Promise<void> {
+    const existingUser = await this.getById(id, organizationId);
 
     try {
       await prismaClient.user.update({
         where: { id },
         data: { status: "inactive" },
       });
+      if (this.audit && actorUserId) {
+        this.#recordAudit({
+          actorUserId,
+          organizationId,
+          action: "DEACTIVATE",
+          referring: "user",
+          referringId: id,
+          changes: buildUserAuditChanges(existingUser, { ...existingUser, status: "inactive" }),
+          outcome: "success",
+        });
+      }
     } catch (err: unknown) {
       const prismaErr = err as { code?: string };
       if (prismaErr?.code === "P2003") {

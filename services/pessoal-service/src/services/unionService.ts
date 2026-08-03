@@ -3,7 +3,13 @@ import { error as logError, ServiceError } from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { CreateUnionBody, UpdateUnionBody } from "../schemas/union.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
-import { omitUndefined, type PessoalAuthContext, requireUserId } from "./pessoalServiceTypes.js";
+import {
+  omitUndefined,
+  PESSOAL_WRITE_PERMISSION,
+  type PessoalAuthContext,
+  requireMinimumPermission,
+  requireUserId,
+} from "./pessoalServiceTypes.js";
 
 const unionSelect = {
   id: true,
@@ -124,6 +130,7 @@ export class UnionService {
 
   async create(context: PessoalAuthContext, body: CreateUnionBody): Promise<UnionRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const existing = await this.prisma.unionPessoal.findFirst({
         where: {
@@ -175,6 +182,7 @@ export class UnionService {
     body: UpdateUnionBody,
   ): Promise<UnionRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const existing = await this.prisma.unionPessoal.findFirst({
         where: { id, organization_id: context.organizationId },
@@ -232,6 +240,7 @@ export class UnionService {
 
   async delete(context: PessoalAuthContext, id: string): Promise<UnionRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const existing = await this.prisma.unionPessoal.findFirst({
         where: { id, organization_id: context.organizationId },

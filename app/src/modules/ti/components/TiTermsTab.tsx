@@ -5,10 +5,11 @@ import { toast } from "react-toastify";
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
 import { useAssignableUsers } from "@modules/rh";
-import { PaginationControls } from "@shared/components";
+import { ConfirmationDialog, PaginationControls } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -19,7 +20,13 @@ import {
   useTiTerms,
   useUpdateTiTermMutation,
 } from "../hooks";
-import type { TiId, TiInventoryAsset, TiTerm, TiTermUpdatePayload } from "../types";
+import type {
+  TiId,
+  TiInventoryAsset,
+  TiTerm,
+  TiTermSignPayload,
+  TiTermUpdatePayload,
+} from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -46,13 +53,18 @@ type TermsDialogState =
   | { type: "term"; mode: "edit"; term: TiTerm }
   | { type: "sign"; term: TiTerm };
 
+type PendingSigningAction = {
+  termId: TiId;
+  payload: TiTermSignPayload;
+};
+
 const TERM_STATUS_OPTIONS = [
   { value: "", label: "Todos" },
   { value: "pending", label: "Pendente" },
   { value: "signed", label: "Assinado" },
 ];
 
-const TERMS_PAGE_SIZE = 10;
+const TERMS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 function getText(value: unknown, fallback = "-"): string {
   if (value === null || value === undefined || value === "") {
@@ -163,7 +175,7 @@ function getTermAsset(term: TiTerm): string {
 }
 
 function hasTermSignature(term?: TiTerm | null): boolean {
-  return Boolean(String(term?.reason ?? "").trim());
+  return term?.signed_at != null;
 }
 
 function getTermStatus(term?: TiTerm | null): "pending" | "signed" {
@@ -256,13 +268,15 @@ export function TiTermsTab() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [dialogState, setDialogState] = useState<TermsDialogState | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [pendingSigningAction, setPendingSigningAction] = useState<PendingSigningAction | null>(null);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
 
   const termsQuery = useTiTerms();
   const assetsQuery = useTiInventory(
     { status: "available", page_size: 100 },
     { enabled: canManage },
   );
-  const assignableUsersQuery = useAssignableUsers({ enabled: canManage });
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManage, module: "ti" });
   const departmentsQuery = useFetch<DepItem[]>(
     ["ti-terms", "departments"],
     () => departmentService.list(),
@@ -477,32 +491,39 @@ export function TiTermsTab() {
     }
   }
 
-  async function handleSubmitSign(event: FormEvent<HTMLFormElement>) {
+  function handleSubmitSign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canSign || dialogState?.type !== "sign") {
       return;
     }
 
-    if (!confirm("Confirmar assinatura deste termo?")) {
+    const formData = new FormData(event.currentTarget);
+
+    setConfirmationError(null);
+    setPendingSigningAction({
+      termId: dialogState.term.id,
+      payload: compactPayload({ reason: getFormText(formData, "reason") }),
+    });
+  }
+
+  async function handleConfirmSigningAction() {
+    if (!pendingSigningAction) {
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
-
     try {
-      setDialogError(null);
+      setConfirmationError(null);
       await signTermMutation.mutateAsync({
-        id: dialogState.term.id,
-        payload: compactPayload({
-          reason: getFormText(formData, "reason"),
-        }),
+        id: pendingSigningAction.termId,
+        payload: pendingSigningAction.payload,
       });
-      setSelectedTermId(dialogState.term.id);
+      setSelectedTermId(pendingSigningAction.termId);
       setIsDetailDialogOpen(true);
       closeDialog();
     } catch (error) {
-      setDialogError(getMutationErrorMessage(error));
+      setConfirmationError(`Não foi possível assinar o termo: ${getMutationErrorMessage(error)}`);
+      throw error;
     }
   }
 
@@ -877,6 +898,24 @@ export function TiTermsTab() {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmationDialog
+        open={pendingSigningAction !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingSigningAction(null);
+            setConfirmationError(null);
+          }
+        }}
+        title="Confirmar assinatura"
+        description="Deseja confirmar a assinatura deste termo de responsabilidade?"
+        onConfirm={handleConfirmSigningAction}
+        isConfirming={signTermMutation.isPending}
+        errorMessage={confirmationError}
+        confirmLabel="Assinar termo"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
     </TiPanel>
   );
 }

@@ -36,6 +36,22 @@ function readOptionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
+function readOptionalModules(value: unknown): Record<string, number> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const modules: Record<string, number> = {};
+
+  for (const [moduleKey, modulePermission] of Object.entries(value)) {
+    if (typeof modulePermission === "number") {
+      modules[moduleKey] = modulePermission;
+    }
+  }
+
+  return modules;
+}
+
 function extractMeRecord(payload: unknown): InternalMeRecord {
   const userPayload = extractUserPayload(payload);
 
@@ -78,6 +94,7 @@ function extractMeRecord(payload: unknown): InternalMeRecord {
       userPayload.type === "owner" || userPayload.type === "admin" || userPayload.type === "user"
         ? userPayload.type
         : null,
+    modules: readOptionalModules(userPayload.modules),
     department,
   };
 }
@@ -92,6 +109,7 @@ function toMeSessionUser(record: InternalMeRecord): MeSessionUser {
     photo_url: record.photo_url,
     organization_id: record.organization_id,
     type: record.type,
+    modules: record.modules,
   };
 }
 
@@ -159,13 +177,17 @@ export async function updateCurrentUser(
   payload: UpdateCurrentUserPayload,
 ): Promise<MeSessionUser> {
   const currentUser = await getInternalMeRecord(client);
-  const body: Record<string, string> = { name: payload.name };
+  const body: Record<string, string> = {};
+
+  if ("name" in payload && payload.name !== undefined) {
+    body.name = payload.name;
+  }
 
   if (payload.password !== undefined && payload.password !== "") {
     body.password = payload.password;
   }
 
-  const { data } = await client.patch(`/user/${currentUser.id}`, body);
+  const { data } = await client.put(`/user/${currentUser.id}`, body);
   return toMeSessionUser(extractMeRecord(data));
 }
 

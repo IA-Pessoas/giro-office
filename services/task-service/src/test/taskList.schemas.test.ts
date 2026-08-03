@@ -11,10 +11,11 @@ describe("task list query schema", () => {
     });
   });
 
-  it.each([{ page: "0" }, { limit: "101" }, { page: "1.5" }])(
-    "rejeita limites invalidos com 400: %o",
-    (query) => {
-      expect(() => parseWithZod(taskListQuerySchema, query)).toThrow(ServiceError);
-    },
-  );
+  it.each([
+    { page: "0" },
+    { limit: "101" },
+    { page: "1.5" },
+  ])("rejeita limites invalidos com 400: %o", (query) => {
+    expect(() => parseWithZod(taskListQuerySchema, query)).toThrow(ServiceError);
+  });
 });

@@ -545,7 +545,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             toast.success("Atualizado com sucesso!")
         } catch (error) {
             console.error("Erro ao atualizar grupo:", error);
-            alert("Não foi possível atualizar os detalhes do grupo.");
+            toast.error("Não foi possível atualizar os detalhes do grupo.");
         } finally {
             setIsUploading(false);
         }

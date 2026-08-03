@@ -29,6 +29,8 @@ import {
   buildCreateProjectPayload,
   buildDeleteProjectPayload,
   buildProjectListParams,
+  getProjectDeleteErrorMessage,
+  PROJECT_DELETE_ADMIN_MESSAGE,
   PROJECT_ENDPOINTS,
   unwrapCreatedProject,
   unwrapProjectDetail,
@@ -103,6 +105,155 @@ async function runAsyncTest(name, fn) {
   }
 }
 
+runTest("task and dependency confirmations retain contextual errors on failure", () => {
+  const tasks = readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8");
+  const taskModel = readFileSync(
+    new URL("./components/TaskModelModal.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(tasks, /errorMessage=\{taskDeletionError\}/);
+  assert.match(tasks, /setTaskDeletionError\(message\);\s*throw error;/);
+  assert.match(taskModel, /errorMessage=\{dependentDeletionError\}/);
+  assert.match(taskModel, /setDependentDeletionError\(message\);\s*throw error;/);
+});
+
+runTest("integration destructive actions use the shared confirmation dialog", () => {
+  const sources = {
+    tasks: readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8"),
+    taskModel: readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8"),
+    projects: readFileSync(
+      new URL("./components/ProjectsWorkspace.tsx", import.meta.url),
+      "utf8",
+    ),
+    projectDetail: readFileSync(
+      new URL("./components/ProjectDetailView.tsx", import.meta.url),
+      "utf8",
+    ),
+    clientProjects: readFileSync(
+      new URL("./components/ClientProjectsSection.tsx", import.meta.url),
+      "utf8",
+    ),
+  };
+  const tasksHooksSource = readFileSync(
+    new URL("./hooks/useIntegracaoTasks.ts", import.meta.url),
+    "utf8",
+  );
+  const projectsHooksSource = readFileSync(
+    new URL("./hooks/useProjects.ts", import.meta.url),
+    "utf8",
+  );
+
+  for (const source of Object.values(sources)) {
+    assert.doesNotMatch(source, /window\s*\.\s*(?:confirm|alert|prompt)\s*\(/);
+    assert.match(
+      source,
+      /import\s*\{[^}]*\bConfirmationDialog\b[^}]*\}\s*from\s*"@shared\/components";/,
+    );
+    assert.match(source, /<ConfirmationDialog\b/);
+  }
+
+  assert.match(sources.tasks, /deleteTaskMutation\.isPending/);
+  assert.match(
+    sources.tasks,
+    /const \[pendingTaskDeletion, setPendingTaskDeletion\] = useState<IntegracaoTaskListItem \| null>\(null\);/,
+  );
+  assert.match(sources.tasks, /setPendingTaskDeletion\(task\);/);
+  assert.match(sources.tasks, /open=\{Boolean\(pendingTaskDeletion\)\}/);
+  assert.match(sources.tasks, /onConfirm=\{handleConfirmTaskDeletion\}/);
+  assert.match(sources.tasks, /isConfirming=\{deleteTaskMutation\.isPending\}/);
+  assert.match(
+    sources.tasks,
+    /import\s*\{[^}]*\buseDeleteIntegracaoTaskMutation\b[^}]*\}\s*from\s*"\.\.\/hooks";/,
+  );
+  assert.match(
+    sources.tasks,
+    /const deleteTaskMutation = useDeleteIntegracaoTaskMutation\(\);/,
+  );
+  assert.match(sources.tasks, /await deleteTaskMutation\.mutateAsync\(\{\s*taskId:\s*task\.id,?\s*\}\);/);
+  assert.match(
+    sources.tasks,
+    /setVisibleTasks\(\(currentTasks\) =>\s*currentTasks\.filter\(\(currentTask\) => currentTask\.id !== task\.id\),\s*\);/,
+  );
+  assert.match(sources.tasks, /toast\.success\("Tarefa excluída com sucesso\."\);/);
+  assert.match(
+    tasksHooksSource,
+    /export function useDeleteIntegracaoTaskMutation\(\): UseMutationResult<\s*void,\s*Error,\s*\{ taskId: string \}\s*>\s*\{\s*const queryClient = useQueryClient\(\);\s*return useMutation\(\{\s*mutationFn: \(\{ taskId \}\) => integracaoTasksService\.delete\(taskId\),\s*onSuccess: async \(_result, variables\) => \{\s*queryClient\.removeQueries\(\{\s*queryKey: integracaoTaskDetailQueryKey\(variables\.taskId\),\s*\}\);\s*await queryClient\.invalidateQueries\(\{\s*queryKey: INTEGRACAO_TASKS_QUERY_KEY,\s*\}\);\s*\},\s*\}\);\s*\}/,
+  );
+
+  assert.match(sources.taskModel, /loadingDependents/);
+  assert.match(
+    sources.taskModel,
+    /const \[pendingDependentDeletion, setPendingDependentDeletion\] = useState<string \| null>\(null\);/,
+  );
+  assert.match(sources.taskModel, /setPendingDependentDeletion\(dependent\.id\);/);
+  assert.match(sources.taskModel, /open=\{Boolean\(pendingDependentDeletion\)\}/);
+  assert.match(sources.taskModel, /onConfirm=\{handleConfirmDependentDeletion\}/);
+  assert.match(sources.taskModel, /isConfirming=\{loadingDependents\}/);
+  assert.match(sources.taskModel, /await taskModelService\.deleteDependent\(relationId\);/);
+  assert.match(sources.taskModel, /toast\.success\("Dependência removida\."\);/);
+  assert.match(sources.taskModel, /await refreshDependents\(\);/);
+
+  for (const source of [sources.projects, sources.projectDetail, sources.clientProjects]) {
+    assert.match(source, /deleteProjectMutation\.isPending/);
+    assert.match(source, /isConfirming=\{deleteProjectMutation\.isPending\}/);
+    assert.match(
+      source,
+      /import\s*\{[^}]*\buseDeleteProjectMutation\b[^}]*\}\s*from\s*"\.\.\/hooks(?:\/useProjects)?";/,
+    );
+    assert.match(source, /const deleteProjectMutation = useDeleteProjectMutation\(\);/);
+    assert.match(source, /toast\.success\("Projeto excluído com sucesso\."\);/);
+  }
+
+  assert.match(
+    sources.projects,
+    /const \[pendingProjectDeletion, setPendingProjectDeletion\] = useState<\{\s*project: ProjectListItem;\s*clientId: string;\s*\} \| null>\(null\);/,
+  );
+  assert.match(sources.projects, /setPendingProjectDeletion\(\{ project, clientId: selectedClientId \}\);/);
+  assert.match(sources.projects, /open=\{Boolean\(pendingProjectDeletion\)\}/);
+  assert.match(sources.projects, /onConfirm=\{handleConfirmProjectDeletion\}/);
+  assert.match(sources.projects, /errorMessage=\{projectDeletionError\}/);
+  assert.match(sources.projects, /setProjectDeletionError\(message\);\s*throw error;/);
+
+  assert.match(sources.projectDetail, /const \[pendingProjectDeletion, setPendingProjectDeletion\]/);
+  assert.match(sources.projectDetail, /setPendingProjectDeletion\(project\);/);
+  assert.match(sources.projectDetail, /open=\{Boolean\(pendingProjectDeletion\)\}/);
+  assert.match(sources.projectDetail, /onConfirm=\{handleConfirmProjectDeletion\}/);
+  assert.match(sources.projectDetail, /errorMessage=\{projectDeletionError\}/);
+  assert.match(sources.projectDetail, /setProjectDeletionError\(message\);\s*throw error;/);
+
+  assert.match(
+    sources.clientProjects,
+    /const \[pendingProjectDeletion, setPendingProjectDeletion\] = useState<\{\s*project: ProjectListItem;\s*clientId: string;\s*\} \| null>\(null\);/,
+  );
+  assert.match(sources.clientProjects, /setPendingProjectDeletion\(\{ project, clientId \}\);/);
+  assert.match(sources.clientProjects, /open=\{Boolean\(pendingProjectDeletion\)\}/);
+  assert.match(sources.clientProjects, /onConfirm=\{handleConfirmProjectDeletion\}/);
+  assert.match(sources.clientProjects, /errorMessage=\{projectDeletionError\}/);
+  assert.match(sources.clientProjects, /setProjectDeletionError\(message\);\s*throw error;/);
+
+  assert.match(
+    sources.projects,
+    /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId:\s*pendingClientId,\s*\}\);/,
+  );
+  assert.match(
+    sources.projectDetail,
+    /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId:\s*project\.client_id,\s*\}\);/,
+  );
+  assert.match(
+    sources.projectDetail,
+    /await router\.push\(backClientId \? `\/projects\?clientId=\$\{backClientId\}` : "\/projects"\);/,
+  );
+  assert.match(
+    sources.clientProjects,
+    /await deleteProjectMutation\.mutateAsync\(\{\s*projectId:\s*project\.id,\s*clientId:\s*pendingClientId,\s*\}\);/,
+  );
+  assert.match(
+    projectsHooksSource,
+    /export function useDeleteProjectMutation\(\): UseMutationResult<\s*void,\s*Error,\s*\{ projectId: string; clientId: string \}\s*>\s*\{\s*const queryClient = useQueryClient\(\);\s*return useMutation\(\{\s*mutationFn: \(\{ projectId \}\) => projectService\.delete\(projectId\),\s*onSuccess: async \(_result, variables\) => \{\s*queryClient\.removeQueries\(\{ queryKey: projectDetailQueryKey\(variables\.projectId\) \}\);\s*await queryClient\.invalidateQueries\(\{\s*queryKey: projectListQueryKey\(\{ ref: "client", id: variables\.clientId \}\),\s*\}\);\s*\},\s*\}\);\s*\}/,
+  );
+});
+
 runTest("project endpoints use only the v1 project contract", () => {
   assert.equal(PROJECT_ENDPOINTS.list, "/project/list");
   assert.equal(PROJECT_ENDPOINTS.crud, "/project");
@@ -140,6 +291,39 @@ runTest("buildCreateProjectPayload omits end_date when absent", () => {
 
 runTest("buildDeleteProjectPayload maps project_id body", () => {
   assert.deepEqual(buildDeleteProjectPayload("project-1"), { project_id: "project-1" });
+});
+
+runTest("project delete actions preserve actionable conflict messages", () => {
+  const conflictMessage = "Não é possível excluir projeto com dependências.";
+
+  assert.equal(
+    getProjectDeleteErrorMessage({
+      response: {
+        status: 409,
+        data: { error: conflictMessage },
+      },
+    }),
+    conflictMessage,
+  );
+  assert.equal(
+    getProjectDeleteErrorMessage({
+      response: {
+        status: 403,
+        data: { error: "Permissão insuficiente." },
+      },
+    }),
+    PROJECT_DELETE_ADMIN_MESSAGE,
+  );
+
+  for (const file of [
+    "./components/ProjectsWorkspace.tsx",
+    "./components/ProjectDetailView.tsx",
+    "./components/ClientProjectsSection.tsx",
+  ]) {
+    const source = readFileSync(new URL(file, import.meta.url), "utf8");
+    assert.match(source, /getProjectDeleteErrorMessage/);
+    assert.doesNotMatch(source, /toast\.error\("Não foi possível excluir o projeto\."\)/);
+  }
 });
 
 runTest("unwrapProjectEnvelope handles top-level data wrapper", () => {
@@ -346,17 +530,29 @@ runTest("task model endpoints match task-service contract", () => {
   assert.equal(TASK_MODEL_ENDPOINTS.options, "/task/deps/options");
 });
 
-runTest("task model options keep active users and departments in one response", () => {
+runTest("task model modal uses contextual user selectors", () => {
   const options = {
     users: [{ id: "user-1", name: "Ana" }],
     departments: [{ id: "dep-1", name: "Fiscal" }],
   };
 
   assert.deepEqual(unwrapTaskModelOptions({ success: true, data: options }), options);
-  assert.doesNotMatch(
-    readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8"),
-    /listAdminUsers|departmentService\.list/,
-  );
+  const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "integracao"/);
+  assert.match(source, /departmentId: formData\.department_id/);
+  assert.match(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
+  assert.doesNotMatch(source, /listAdminUsers/);
+});
+
+runTest("task edit form loads contextual auxiliary selectors", () => {
+  const source = readFileSync(new URL("./components/TaskFormModal.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "integracao"/);
+  assert.match(source, /departmentId:/);
+  assert.match(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
+  assert.doesNotMatch(source, /listAdminUsers/);
 });
 
 runTest("task model deletion preserves actionable dependency conflicts", () => {
@@ -507,10 +703,12 @@ runTest("task model modal allows retrying failed options before saving", () => {
   assert.match(source, /const \[taskModelsWarning, setTaskModelsWarning\] = useState\(false\)/);
   assert.match(source, /onClick=\{\(\) => setOptionsRetryKey\(\(currentKey\) => currentKey \+ 1\)\}/);
   assert.match(source, />\s*Tentar novamente\s*<\/button>/);
-  assert.match(
-    source,
-    /const optionsUnavailable = loadingOptions \|\| requiredOptionsWarning;[\s\S]*const taskModelsUnavailable = loadingOptions \|\| taskModelsWarning;[\s\S]*const saveDisabled = saving \|\| loadingDetail \|\| detailError \|\| optionsUnavailable;/,
-  );
+  assert.match(source, /const optionsUnavailable =/);
+  assert.match(source, /requiredOptionsWarning/);
+  assert.match(source, /usersQuery\.isLoading/);
+  assert.match(source, /usersQuery\.isError/);
+  assert.match(source, /const taskModelsUnavailable = loadingOptions \|\| taskModelsWarning;/);
+  assert.match(source, /const saveDisabled =[\s\S]*optionsUnavailable;/);
   assert.match(source, /disabled=\{taskModelsUnavailable\}/);
 });
 
@@ -585,7 +783,9 @@ runTest("integration write actions use the modular access level", () => {
   assert.match(tasksSource, /const canManageTaskModels = integracaoAccess\.isAdmin;/);
   assert.match(tasksSource, /canEditIntegracaoTask\(integracaoAccess, task\)/);
   assert.match(taskFormSource, /const isRestrictedEdit =/);
-  assert.match(taskFormSource, /enabled: open && isEditing && !isRestrictedEdit/);
+  assert.match(taskFormSource, /enabled: open && !isRestrictedEdit/);
+  assert.match(taskFormSource, /module: "integracao"/);
+  assert.match(taskFormSource, /departmentId:/);
   assert.match(taskFormSource, /task_id: taskId,\s*status,\s*observations/);
   assert.match(taskFormSource, /hasRestrictedTaskAccessDenied/);
   assert.match(projectsSource, /const canEdit = integracaoAccess\.canEdit;/);
@@ -682,11 +882,11 @@ runTest("project select placeholder keeps empty state inside the control", () =>
   );
 });
 
-runTest("tasks table uses shorter width and thin horizontal scrollbar", () => {
+runTest("tasks table uses shorter width and the shared system scrollbar", () => {
   assert.equal(TASK_TABLE_CLASSNAME.includes("1320px"), false);
   assert.equal(TASK_TABLE_CLASSNAME.includes("1120px"), true);
   assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("overflow-x-auto"), true);
-  assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("h-1.5"), true);
+  assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("u-scrollbar-system"), true);
 });
 
 runTest("tasks table gives the task name column more breathing room", () => {

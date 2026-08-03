@@ -120,6 +120,17 @@ export function canViewIntegrationRoute(
   return integrationLevel >= MODULE_VIEW_PERMISSION;
 }
 
+export function canViewTasksOnlyIntegrationRoute(
+  routePath: string,
+  subject: ModulePermissionSubject,
+): boolean {
+  if (getModulePermissionLevel(subject, "integracao") !== 0) {
+    return true;
+  }
+
+  return isWithinRoute(normalizeRoutePath(routePath), "/tasks");
+}
+
 const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
   certificado: "certificado",
   comercial: "comercial",
@@ -158,6 +169,12 @@ function createModuleAccess(level: AccessLevel, source: AccessSource): ModuleAcc
 
 export function isModuleDisabled(module: ModuleKey): boolean {
   return DISABLED_MODULE_KEY_SET.has(module);
+}
+
+export function hasAnyModuleAccess(
+  accessMap: Partial<Record<ModuleKey, Pick<ModuleAccess, "canView">>> | null | undefined,
+): boolean {
+  return Object.values(accessMap ?? {}).some((access) => access?.canView === true);
 }
 
 function normalizeDepartmentName(value?: string | null): string {

@@ -1,18 +1,15 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AlertCircle, ChevronDown, Loader2, RefreshCw, Save, WalletCards } from "lucide-react";
 
-import { resolveDepartmentModuleKey } from "@modules/auth";
-import { departmentService } from "@modules/departments";
-import { listAdminUsers } from "@modules/users";
-import { useFetch } from "@shared/hooks";
+import { useAssignableUsers } from "@modules/rh";
 import { cn } from "@shared/ui/newLayout/utils";
+import { FieldHelp } from "@shared/ui/newLayout/field-help";
 
 import {
   useCreatePessoalPayrollMutation,
   usePessoalPayroll,
   useUpdatePessoalPayrollMutation,
 } from "../hooks/usePessoalPayroll";
-import { pessoalQueryKey } from "../hooks/queryKeys";
 import { usePessoalUnions } from "../hooks/usePessoalUnions";
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
@@ -77,8 +74,20 @@ const emptyPayrollFormValues: PayrollFormValues = {
 const textFields = [
   { name: "info", label: "Informações", type: "text", required: true },
   { name: "group", label: "Grupo", type: "text", required: true },
-  { name: "advance_type", label: "Tipo de adiantamento", type: "text", required: false },
-  { name: "vt_type", label: "Tipo de VT", type: "text", required: false },
+  {
+    name: "advance_type",
+    label: "Tipo de adiantamento",
+    type: "text",
+    required: false,
+    help: "Tipo usado para calcular o adiantamento quando essa opção estiver ativa.",
+  },
+  {
+    name: "vt_type",
+    label: "Tipo de VT",
+    type: "text",
+    required: false,
+    help: "Tipo de vale-transporte utilizado pelo cliente.",
+  },
   { name: "contact", label: "Contato", type: "text", required: false },
 ] as const;
 
@@ -91,13 +100,17 @@ const numberFields = [
 const checkboxFields = [
   { name: "advance", label: "Adiantamento" },
   { name: "previous", label: "Folha anterior" },
-  { name: "onvio", label: "Onvio" },
+  {
+    name: "onvio",
+    label: "Onvio",
+    help: "Indica se a rotina Onvio é usada para este cliente.",
+  },
   { name: "vt", label: "Vale-transporte" },
   { name: "va", label: "Vale-alimentação" },
   { name: "assistance_fee", label: "Contribuição assistencial" },
   { name: "bem_mais", label: "Bem Mais" },
-  { name: "bsf", label: "BSF" },
-  { name: "reinf", label: "Reinf" },
+  { name: "bsf", label: "BSF", help: "Indica se a rotina BSF é usada para este cliente." },
+  { name: "reinf", label: "Reinf", help: "Indica se a rotina Reinf é usada para este cliente." },
 ] as const;
 
 function buildPayrollFormValues(
@@ -166,39 +179,14 @@ export function PessoalPayrollSection({
   const hasClient = selectedClientId.length > 0;
   const payrollQuery = usePessoalPayroll(selectedClientId, hasClient);
   const unionsQuery = usePessoalUnions();
-  const responsibleUsersQuery = useFetch(
-    pessoalQueryKey("payroll", "users", "active"),
-    () => listAdminUsers("active"),
-    { enabled: canEdit },
-  );
-  const departmentsQuery = useFetch(
-    pessoalQueryKey("payroll", "departments"),
-    () => departmentService.list(),
-    { enabled: canEdit },
-  );
+  const responsibleUsersQuery = useAssignableUsers({ enabled: canEdit, module: "pessoal" });
   const createMutation = useCreatePessoalPayrollMutation();
   const updateMutation = useUpdatePessoalPayrollMutation(selectedClientId);
   const [formValues, setFormValues] = useState<PayrollFormValues>(emptyPayrollFormValues);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const payroll = payrollQuery.data ?? null;
-  const departmentNameById = useMemo(
-    () =>
-      new Map(
-        (departmentsQuery.data ?? []).map((department) => [department.id, department.name]),
-      ),
-    [departmentsQuery.data],
-  );
-  const responsibleUsers = useMemo(
-    () =>
-      (responsibleUsersQuery.data ?? []).filter((user) => {
-        const departmentName =
-          departmentNameById.get(user.department_id) ?? user.department?.name ?? null;
-
-        return resolveDepartmentModuleKey(departmentName) === "pessoal";
-      }),
-    [departmentNameById, responsibleUsersQuery.data],
-  );
+  const responsibleUsers = responsibleUsersQuery.data ?? [];
   const hasSelectedResponsible = responsibleUsers.some(
     (user) => user.id === formValues.responsible_id,
   );
@@ -338,22 +326,29 @@ export function PessoalPayrollSection({
         ) : null}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {textFields.map((field) => (
-            <label
-              key={field.name}
-              className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
-            >
-              {field.label}
-              <input
-                type={field.type}
-                required={field.required}
-                value={String(formValues[field.name])}
-                onChange={(event) => handleFieldChange(field.name, event.target.value)}
-                disabled={isFormDisabled}
-                className={pessoalTextFieldClassName}
-              />
-            </label>
-          ))}
+          {textFields.map((field) => {
+            const helpText = "help" in field ? field.help : undefined;
+
+            return (
+              <label
+                key={field.name}
+                className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
+              >
+                <span className="inline-flex items-center gap-1">
+                  <span>{field.label}</span>
+                  {helpText ? <FieldHelp label={field.label} description={helpText} /> : null}
+                </span>
+                <input
+                  type={field.type}
+                  required={field.required}
+                  value={String(formValues[field.name])}
+                  onChange={(event) => handleFieldChange(field.name, event.target.value)}
+                  disabled={isFormDisabled}
+                  className={pessoalTextFieldClassName}
+                />
+              </label>
+            );
+          })}
 
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
             Responsável
@@ -362,21 +357,23 @@ export function PessoalPayrollSection({
                 value={formValues.responsible_id}
                 onChange={(event) => handleFieldChange("responsible_id", event.target.value)}
                 disabled={
-                  isFormDisabled || responsibleUsersQuery.isLoading || departmentsQuery.isLoading
+                  isFormDisabled || responsibleUsersQuery.isLoading || responsibleUsersQuery.isError
                 }
                 className={`${pessoalTextFieldClassName} appearance-none pr-12`}
               >
                 <option value="">
-                  {responsibleUsersQuery.isLoading || departmentsQuery.isLoading
+                  {responsibleUsersQuery.isLoading
                     ? "Carregando responsáveis"
-                    : "Sem responsável"}
+                    : responsibleUsersQuery.isError
+                      ? "Responsáveis indisponíveis"
+                      : "Sem responsável"}
                 </option>
                 {formValues.responsible_id && !hasSelectedResponsible ? (
                   <option value={formValues.responsible_id}>Responsável atual</option>
                 ) : null}
                 {responsibleUsers.map((user) => (
                   <option key={user.id} value={user.id}>
-                    {user.name || user.login}
+                    {user.name}
                   </option>
                 ))}
               </select>
@@ -425,21 +422,25 @@ export function PessoalPayrollSection({
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {checkboxFields.map((field) => (
-            <label
-              key={field.name}
-              className={pessoalCheckboxCardClassName}
-            >
-              <input
-                type="checkbox"
-                checked={Boolean(formValues[field.name])}
-                onChange={(event) => handleFieldChange(field.name, event.target.checked)}
-                disabled={isFormDisabled}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              {field.label}
-            </label>
-          ))}
+          {checkboxFields.map((field) => {
+            const helpText = "help" in field ? field.help : undefined;
+
+            return (
+              <label key={field.name} className={pessoalCheckboxCardClassName}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(formValues[field.name])}
+                  onChange={(event) => handleFieldChange(field.name, event.target.checked)}
+                  disabled={isFormDisabled}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="inline-flex items-center gap-1">
+                  <span>{field.label}</span>
+                  {helpText ? <FieldHelp label={field.label} description={helpText} /> : null}
+                </span>
+              </label>
+            );
+          })}
         </div>
 
         {formError ? (

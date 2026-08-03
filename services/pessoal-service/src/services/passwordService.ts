@@ -8,6 +8,7 @@ import type {
 } from "../schemas/password.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
 import { isPessoalPasswordEncrypted, type PessoalPasswordCrypto } from "./pessoalPasswordCrypto.js";
+import { ensurePessoalResponsible } from "./pessoalResponsibleService.js";
 import {
   omitUndefined,
   type PessoalAuthContext,
@@ -160,7 +161,7 @@ export class PasswordService {
       requireMinimumPermission(context, PESSOAL_PASSWORD_SECRET_PERMISSION);
       const userId = requireUserId(context);
       await this.ensureClient(context.organizationId, body.client_id);
-      await this.ensureResponsible(context.organizationId, body.responsavel_id);
+      await ensurePessoalResponsible(this.prisma, context.organizationId, body.responsavel_id);
 
       const data = this.buildCreateData(context.organizationId, body);
       const created = await this.prisma.passwordPessoal.create({
@@ -196,8 +197,13 @@ export class PasswordService {
     try {
       requireMinimumPermission(context, PESSOAL_PASSWORD_SECRET_PERMISSION);
       const userId = requireUserId(context);
-      await this.findScopedPassword(context.organizationId, id);
-      await this.ensureResponsible(context.organizationId, body.responsavel_id);
+      const existing = await this.findScopedPassword(context.organizationId, id);
+      await ensurePessoalResponsible(
+        this.prisma,
+        context.organizationId,
+        body.responsavel_id,
+        existing.responsavel_id,
+      );
 
       const data = this.buildUpdateData(body);
       const updated = await this.prisma.passwordPessoal.update({
@@ -280,23 +286,6 @@ export class PasswordService {
 
     if (!client) {
       throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
-    }
-  }
-
-  private async ensureResponsible(
-    organizationId: string,
-    responsibleId: string | null | undefined,
-  ): Promise<void> {
-    if (responsibleId === undefined || responsibleId === null) {
-      return;
-    }
-
-    const responsible = await this.prisma.user.findFirst({
-      where: { id: responsibleId, organization_id: organizationId },
-      select: { id: true },
-    });
-    if (!responsible) {
-      throw new ServiceError(404, "Responsavel nao encontrado para a organizacao.");
     }
   }
 

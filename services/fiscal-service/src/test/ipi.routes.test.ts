@@ -41,6 +41,7 @@ function createMockDeps(): IpiRouteDeps {
   return {
     create: vi.fn(async () => ({ create: {} })),
     update: vi.fn(async () => ({})),
+    delete: vi.fn(async () => ({ deleted: {} })),
     detail: vi.fn(async () => ({ detail: {} })),
     list: vi.fn(async () => emptyListResult),
   };
@@ -124,6 +125,40 @@ describe("ipi routes", () => {
 
     expect(res.status).toBe(403);
     expect(deps.update).not.toHaveBeenCalled();
+  });
+
+  it("DELETE /fiscal/ipi com Editor retorna 403 antes do servico", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
+
+    const res = await request(app)
+      .delete("/fiscal/ipi")
+      .query({ ipi_id: IPI_ID })
+      .set(gatewayHeaders(2));
+
+    expect(res.status).toBe(403);
+    expect(deps.delete).not.toHaveBeenCalled();
+  });
+
+  it("DELETE /fiscal/ipi com Admin fiscal exclui registro", async () => {
+    const payload = { deleted: { id: IPI_ID, ncm: "84719012" } };
+    const deps = createMockDeps();
+    deps.delete = vi.fn(async () => payload);
+    const app = createFiscalApp({ env, logger, ipiRouteDeps: deps });
+
+    const res = await request(app)
+      .delete("/fiscal/ipi")
+      .query({ ipi_id: IPI_ID })
+      .set(gatewayHeaders(3));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: payload });
+    expect(deps.delete).toHaveBeenCalledWith({
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      permission: 3,
+      ipi_id: IPI_ID,
+    });
   });
 
   it("GET /fiscal/ipi sem ipi_id válido retorna 400", async () => {

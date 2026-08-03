@@ -53,12 +53,40 @@ function createPrismaMock() {
 }
 
 describe("ObligationService", () => {
+  it("bloqueia mutacoes de obrigacoes para Viewer antes de acessar a persistencia", async () => {
+    const prisma = createPrismaMock();
+    const audit = createAuditMock();
+    const service = new ObligationService(prisma as never, audit);
+    const viewerContext = { organizationId, userId, permission: 1 };
+    const operations = [
+      () =>
+        service.create(viewerContext, {
+          client_id: clientId,
+          competence: "2026-06",
+        }),
+      () => service.updateField(viewerContext, recordId, { payroll: true }),
+      () => service.generateForCompetence(viewerContext, "2026-06"),
+    ];
+
+    for (const operation of operations) {
+      await expect(operation()).rejects.toMatchObject({ statusCode: 403 });
+    }
+
+    expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    expect(prisma.client.findMany).not.toHaveBeenCalled();
+    expect(prisma.obrigationsPessoal.findFirst).not.toHaveBeenCalled();
+    expect(prisma.obrigationsPessoal.create).not.toHaveBeenCalled();
+    expect(prisma.obrigationsPessoal.update).not.toHaveBeenCalled();
+    expect(prisma.obrigationsPessoal.createMany).not.toHaveBeenCalled();
+    expect(audit.recordChange).not.toHaveBeenCalled();
+  });
+
   it("cria obrigacao de forma idempotente", async () => {
     const prisma = createPrismaMock();
     const service = new ObligationService(prisma as never, createAuditMock());
 
     const created = await service.create(
-      { organizationId, userId },
+      { organizationId, userId, permission: 2 },
       { client_id: clientId, competence: "2026-06" },
     );
 
@@ -86,7 +114,7 @@ describe("ObligationService", () => {
       client_id: clientId,
     });
     const existing = await service.create(
-      { organizationId, userId },
+      { organizationId, userId, permission: 2 },
       { client_id: clientId, competence: "2026-06" },
     );
 
@@ -106,7 +134,7 @@ describe("ObligationService", () => {
     const service = new ObligationService(prisma as never, audit);
 
     const result = await service.create(
-      { organizationId, userId },
+      { organizationId, userId, permission: 2 },
       { client_id: clientId, competence: "2026-06" },
     );
 
@@ -132,7 +160,9 @@ describe("ObligationService", () => {
     });
     const service = new ObligationService(prisma as never, createAuditMock());
 
-    await service.updateField({ organizationId, userId }, recordId, { payroll: true });
+    await service.updateField({ organizationId, userId, permission: 2 }, recordId, {
+      payroll: true,
+    });
 
     expect(prisma.obrigationsPessoal.update).toHaveBeenCalledWith({
       where: { id: recordId },
@@ -149,12 +179,20 @@ describe("ObligationService", () => {
     });
     const service = new ObligationService(prisma as never, createAuditMock());
 
-    await service.updateField({ organizationId, userId }, recordId, {
+    await service.updateField({ organizationId, userId, permission: 2 }, recordId, {
       responsavel_id: responsibleId,
     });
 
     expect(prisma.user.findFirst).toHaveBeenCalledWith({
-      where: { id: responsibleId, organization_id: organizationId },
+      where: {
+        id: responsibleId,
+        status: "active",
+        OR: [
+          { organization_id: organizationId },
+          { organization_id: null, department: { organization_id: organizationId } },
+        ],
+        permissions: { some: { organization_id: organizationId, pessoal: { gt: 0 } } },
+      },
       select: { id: true },
     });
     expect(prisma.obrigationsPessoal.update).toHaveBeenCalledWith(
@@ -174,7 +212,7 @@ describe("ObligationService", () => {
     const service = new ObligationService(prisma as never, createAuditMock());
 
     await expect(
-      service.updateField({ organizationId, userId }, recordId, {
+      service.updateField({ organizationId, userId, permission: 2 }, recordId, {
         responsavel_id: responsibleId,
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
@@ -185,7 +223,10 @@ describe("ObligationService", () => {
     const prisma = createPrismaMock();
     const service = new ObligationService(prisma as never, createAuditMock());
 
-    const result = await service.generateForCompetence({ organizationId, userId }, "2026-06");
+    const result = await service.generateForCompetence(
+      { organizationId, userId, permission: 2 },
+      "2026-06",
+    );
 
     expect(prisma.client.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -218,7 +259,10 @@ describe("ObligationService", () => {
     prisma.obrigationsPessoal.createMany.mockResolvedValueOnce({ count: 1 });
     const service = new ObligationService(prisma as never, createAuditMock());
 
-    const result = await service.generateForCompetence({ organizationId, userId }, "2026-06");
+    const result = await service.generateForCompetence(
+      { organizationId, userId, permission: 2 },
+      "2026-06",
+    );
 
     expect(prisma.obrigationsPessoal.createMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([

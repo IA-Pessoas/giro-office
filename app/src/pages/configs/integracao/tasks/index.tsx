@@ -262,7 +262,7 @@ export default function TaskModelsConfig() {
         </section>
 
         <section className={`${PROJECT_PANEL_CLASSNAME} overflow-hidden`}>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto u-scrollbar-system">
             <table className={TASK_MODEL_TABLE_CLASSNAME}>
               <colgroup>
                 <col className={TASK_MODEL_TABLE_MODEL_COLUMN_CLASSNAME} />

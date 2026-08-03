@@ -251,7 +251,10 @@ export function RegularizeGuidanceForm({
             />
           </RegularizeFormField>
 
-          <RegularizeFormField label="Natureza jurídica">
+          <RegularizeFormField
+            label="Natureza jurídica"
+            help="Classificação jurídica da empresa conforme o cadastro oficial."
+          >
             <input
               value={formState.legal_nature}
               onChange={(event) => handleChange("legal_nature", event.target.value)}

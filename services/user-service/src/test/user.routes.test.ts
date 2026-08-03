@@ -1,13 +1,40 @@
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { getUserServiceEnv } from "../config/env.js";
 import {
+  authServiceMock,
   createTestApp,
   gatewayAuthHeaders,
   resetUserRouteMocks,
   storageServiceMock,
   userServiceMock,
 } from "./userTestUtils.js";
+
+function bearerAuthHeaders(overrides?: {
+  userId?: string;
+  organizationId?: string;
+  permission?: number;
+  type?: "owner" | "admin" | "user";
+  modules?: Record<string, number>;
+}): Record<string, string> {
+  const userId = overrides?.userId ?? "c0000000-0000-4000-8000-000000000001";
+  const token = jwt.sign(
+    {
+      user_id: userId,
+      organization_id: overrides?.organizationId ?? "a0000000-0000-4000-8000-000000000001",
+      permission: overrides?.permission ?? 0,
+      type: overrides?.type ?? "user",
+      modules: overrides?.modules ?? {},
+      session_version: 1,
+    },
+    getUserServiceEnv().jwtSecret,
+    { subject: userId },
+  );
+
+  return { Authorization: `Bearer ${token}` };
+}
 
 describe("user routes", () => {
   beforeEach(() => {
@@ -27,7 +54,7 @@ describe("user routes", () => {
       { method: "get", path: "/user" },
       { method: "get", path: "/user/user-3" },
       { method: "get", path: "/user/user-3/photo" },
-      { method: "patch", path: "/user/user-3" },
+      { method: "put", path: "/user/user-3" },
       { method: "post", path: "/user/user-3/photo" },
       { method: "delete", path: "/user/user-3/photo" },
       { method: "delete", path: "/user/user-3" },
@@ -338,11 +365,11 @@ describe("user routes", () => {
     expect(userServiceMock.create).not.toHaveBeenCalled();
   });
 
-  it("PATCH /user/:id atualiza usuario", async () => {
+  it("PUT /user/:id atualiza usuario", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-3" });
     const app = createTestApp();
 
-    const res = await request(app).patch("/user/user-3").set(gatewayAuthHeaders()).send({
+    const res = await request(app).put("/user/user-3").set(gatewayAuthHeaders()).send({
       name: "Usuario Atualizado",
     });
 
@@ -357,11 +384,101 @@ describe("user routes", () => {
     );
   });
 
-  it("PATCH /user/:id rejeita promocao para owner quando solicitante nao e owner", async () => {
+  it("PUT /user/:id permite ao usuario comum alterar somente a propria senha", async () => {
+    userServiceMock.update.mockResolvedValue({ id: "user-1" });
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-3")
+      .put("/user/user-1")
+      .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
+      .send({ password: "nova-senha-segura" });
+
+    expect(res.status).toBe(200);
+    expect(userServiceMock.update).toHaveBeenCalledWith(
+      "user-1",
+      { password: "nova-senha-segura" },
+      "a0000000-0000-4000-8000-000000000001",
+      "user-1",
+    );
+  });
+
+  it("PUT /user/:id permite a propria senha com Authorization Bearer direto", async () => {
+    userServiceMock.update.mockResolvedValue({ id: "user-1" });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/user-1")
+      .set(bearerAuthHeaders({ userId: "user-1" }))
+      .send({ password: "nova-senha-segura" });
+
+    expect(res.status).toBe(200);
+    expect(userServiceMock.update).toHaveBeenCalledWith(
+      "user-1",
+      { password: "nova-senha-segura" },
+      "a0000000-0000-4000-8000-000000000001",
+      "user-1",
+    );
+    expect(authServiceMock.validateSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "user-1",
+        organization_id: "a0000000-0000-4000-8000-000000000001",
+      }),
+    );
+  });
+
+  it("PUT /user/:id bloqueia usuario comum ao alterar a senha de outra pessoa", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/user-2")
+      .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
+      .send({ password: "nova-senha-segura" });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("PUT /user/:id bloqueia outra pessoa com Authorization Bearer direto", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/user-2")
+      .set(bearerAuthHeaders({ userId: "user-1" }))
+      .send({ password: "nova-senha-segura" });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("PUT /user/:id bloqueia usuario comum ao combinar senha com outro campo", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/user-1")
+      .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
+      .send({ password: "nova-senha-segura", name: "Nome indevido" });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("PUT /user/:id bloqueia payload misto com Authorization Bearer direto", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/user-1")
+      .set(bearerAuthHeaders({ userId: "user-1" }))
+      .send({ password: "nova-senha-segura", name: "Nome indevido" });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
+  it("PUT /user/:id rejeita promocao para owner quando solicitante nao e owner", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/user-3")
       .set(gatewayAuthHeaders({ permission: 2, type: "admin", modules: { rh: 3 } }))
       .send({
         type: "owner",
@@ -372,12 +489,12 @@ describe("user routes", () => {
     expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
-  it("PATCH /user/:id permite admin RH atualizar permissoes modulares", async () => {
+  it("PUT /user/:id permite admin RH atualizar permissoes modulares", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-3" });
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-3")
+      .put("/user/user-3")
       .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 3 } }))
       .send({
         modules: { comercial: 1 },
@@ -387,12 +504,12 @@ describe("user routes", () => {
     expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
-  it("PATCH /user/:id permite admin RH alterar acesso sem promover owner", async () => {
+  it("PUT /user/:id permite admin RH alterar acesso sem promover owner", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-3" });
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-3")
+      .put("/user/user-3")
       .set(gatewayAuthHeaders({ permission: 1, type: "admin", modules: { rh: 3 } }))
       .send({
         permission: 1,
@@ -411,11 +528,11 @@ describe("user routes", () => {
     );
   });
 
-  it("PATCH /user/:id rejeita permissao de modulo TI fora do intervalo permitido", async () => {
+  it("PUT /user/:id rejeita permissao de modulo TI fora do intervalo permitido", async () => {
     const app = createTestApp();
 
     const res = await request(app)
-      .patch("/user/user-3")
+      .put("/user/user-3")
       .set(gatewayAuthHeaders())
       .send({
         modules: { ti: 999 },
@@ -486,6 +603,8 @@ describe("user routes", () => {
         photo_url: "https://cdn/avatar.png",
       },
       "a0000000-0000-4000-8000-000000000001",
+      "c0000000-0000-4000-8000-000000000001",
+      "UPDATE_PHOTO",
     );
   });
 
@@ -527,6 +646,8 @@ describe("user routes", () => {
       "user-3",
       { photo_url: null },
       "a0000000-0000-4000-8000-000000000001",
+      "c0000000-0000-4000-8000-000000000001",
+      "UPDATE_PHOTO",
     );
   });
 
@@ -540,6 +661,7 @@ describe("user routes", () => {
     expect(userServiceMock.delete).toHaveBeenCalledWith(
       "user-3",
       "a0000000-0000-4000-8000-000000000001",
+      "c0000000-0000-4000-8000-000000000001",
     );
   });
 });

@@ -1,5 +1,6 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { isAxiosError } from "axios";
+import { toast } from "react-toastify";
 import {
   Bell,
   CalendarClock,
@@ -14,15 +15,17 @@ import {
   Search,
   ShieldCheck,
   ShieldAlert,
+  Trash2,
 } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
+import { ConfirmationDialog } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { formatCnpjInput, formatCpfInput } from "@shared/utils/inputFormatting";
 import {
   DEFAULT_CERTIFICATE_PAGE,
   DEFAULT_CERTIFICATE_PAGE_SIZE,
 } from "@modules/certificates/services/certificateService.contract";
-import { MODULE_ADMIN_PERMISSION } from "@modules/auth/utils/moduleAccess";
 import {
   useCertificateNotificationsList,
   useCertificatePjDetail,
@@ -31,6 +34,8 @@ import {
   useCertificatePfList,
   useCreateCertificatePjMutation,
   useCreateCertificatePfMutation,
+  useDeleteCertificatePjMutation,
+  useDeleteCertificatePfMutation,
   useUpdateCertificatePjMutation,
   useUpdateCertificatePfMutation,
 } from "@modules/certificates/hooks";
@@ -47,6 +52,7 @@ import type {
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
 import { CertificateFileActions } from "./CertificateFileActions";
 import { CertificateForm } from "./CertificateForm";
+import { normalizeCertificateDocumentFilter } from "./certificateInputNormalization";
 import {
   CERTIFICATE_COMPACT_BUTTON_CLASSNAME,
   CERTIFICATE_DATE_STATUS_OK_CLASSNAME,
@@ -68,6 +74,7 @@ import {
   CERTIFICATE_TABLE_ACTION_CELL_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME,
   CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME,
+  CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME,
   CERTIFICATE_TABLE_CELL_CLASSNAME,
   CERTIFICATE_TABLE_CLASSNAME,
   CERTIFICATE_TABLE_EMPTY_CELL_CLASSNAME,
@@ -79,6 +86,7 @@ import {
   CERTIFICATE_SUMMARY_ITEM_CLASSNAME,
   formatDateBR,
   getExpirationTone,
+  resolveCertificateWorkspaceCapabilities,
 } from "./certificateWorkspaceUi";
 
 type CertificateTab = "pj" | "pf" | "notifications";
@@ -114,6 +122,16 @@ type DetailTarget = {
   type: "pf";
   id: string;
 } | null;
+
+type PendingCertificateDeletion =
+  | {
+      kind: "pj";
+      certificate: CertificatePj;
+    }
+  | {
+      kind: "pf";
+      certificate: CertificatePf;
+    };
 
 type CertificateErrorBody = {
   error?: string;
@@ -240,7 +258,7 @@ function AccessDeniedCard() {
 }
 
 export function CertificatesWorkspace() {
-  const { access, isLoading: isModuleAccessLoading, user } = useModuleAccess("certificado");
+  const { access, isLoading: isModuleAccessLoading } = useModuleAccess("certificado");
   const [activeTab, setActiveTab] = useState<CertificateTab>("pj");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("view");
   const [selected, setSelected] = useState<DetailTarget>(null);
@@ -251,6 +269,10 @@ export function CertificatesWorkspace() {
   const [visiblePjItems, setVisiblePjItems] = useState<CertificatePj[]>([]);
   const [visiblePfItems, setVisiblePfItems] = useState<CertificatePf[]>([]);
   const [visibleNotificationItems, setVisibleNotificationItems] = useState<CertificateNotification[]>([]);
+  const pjFiltersMountedRef = useRef(false);
+  const pfFiltersMountedRef = useRef(false);
+  const [pendingDeletion, setPendingDeletion] = useState<PendingCertificateDeletion | null>(null);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
 
   const [pjFilters, setPjFilters] = useState<PjFilters>({
     name: "",
@@ -280,7 +302,7 @@ export function CertificatesWorkspace() {
       page: pjPage,
       page_size: PAGE_SIZE,
       name: trimValue(pjFilters.name) || undefined,
-      cnpj: trimValue(pjFilters.cnpj) || undefined,
+      cnpj: normalizeCertificateDocumentFilter(pjFilters.cnpj),
       responsible: trimValue(pjFilters.responsible) || undefined,
       model: trimValue(pjFilters.model) || undefined,
       client_castelo_status: pjFilters.clientCasteloStatus,
@@ -296,9 +318,9 @@ export function CertificatesWorkspace() {
       page: pfPage,
       page_size: PAGE_SIZE,
       search: trimValue(pfFilters.search) || undefined,
-      cpf: trimValue(pfFilters.cpf) || undefined,
+      cpf: normalizeCertificateDocumentFilter(pfFilters.cpf),
       enterprise: trimValue(pfFilters.enterprise) || undefined,
-      cnpj: trimValue(pfFilters.cnpj) || undefined,
+      cnpj: normalizeCertificateDocumentFilter(pfFilters.cnpj),
       model: trimValue(pfFilters.model) || undefined,
       client_castelo_status: pfFilters.clientCasteloStatus,
       client_focus_status: pfFilters.clientFocusStatus,
@@ -319,11 +341,10 @@ export function CertificatesWorkspace() {
   const deferredPjQueryParams = useDeferredValue(pjQueryParams);
   const deferredPfQueryParams = useDeferredValue(pfQueryParams);
   const deferredNotificationsParams = useDeferredValue(notificationsParams);
-  const shouldFetchCertificates = access.canView && !isModuleAccessLoading;
-  const canManageCertificateModule =
-    access.isAdmin ||
-    (typeof user?.modules?.certificado === "number" &&
-      user.modules?.certificado >= MODULE_ADMIN_PERMISSION);
+  const certificateCapabilities = resolveCertificateWorkspaceCapabilities(access);
+  const shouldFetchCertificates =
+    certificateCapabilities.canReadRecords && !isModuleAccessLoading;
+  const canManageCertificateModule = certificateCapabilities.canManageRecords;
 
   const pjListQuery = useCertificatePjList(deferredPjQueryParams, {
     enabled: shouldFetchCertificates && activeTab === "pj",
@@ -345,6 +366,8 @@ export function CertificatesWorkspace() {
   );
   const createPjMutation = useCreateCertificatePjMutation();
   const createPfMutation = useCreateCertificatePfMutation();
+  const deletePjMutation = useDeleteCertificatePjMutation();
+  const deletePfMutation = useDeleteCertificatePfMutation();
   const updatePjMutation = useUpdateCertificatePjMutation(selected?.type === "pj" ? selected.id : "");
   const updatePfMutation = useUpdateCertificatePfMutation(selected?.type === "pf" ? selected.id : "");
 
@@ -397,6 +420,11 @@ export function CertificatesWorkspace() {
   }, [notificationPage, notificationsQuery.data, notificationsQuery.isPlaceholderData]);
 
   useEffect(() => {
+    if (!pjFiltersMountedRef.current) {
+      pjFiltersMountedRef.current = true;
+      return;
+    }
+
     setPjPage(FIRST_PAGE);
     setVisiblePjItems([]);
     setSelected((current) => (current?.type === "pj" ? null : current));
@@ -412,6 +440,11 @@ export function CertificatesWorkspace() {
   ]);
 
   useEffect(() => {
+    if (!pfFiltersMountedRef.current) {
+      pfFiltersMountedRef.current = true;
+      return;
+    }
+
     setPfPage(FIRST_PAGE);
     setVisiblePfItems([]);
     setSelected((current) => (current?.type === "pf" ? null : current));
@@ -536,6 +569,11 @@ export function CertificatesWorkspace() {
     : isEditing
       ? (workspaceMode === "editPj" ? updatePjMutation.isPending : updatePfMutation.isPending)
       : false;
+  const isConfirmingDeletion = pendingDeletion?.kind === "pj"
+    ? deletePjMutation.isPending
+    : pendingDeletion?.kind === "pf"
+      ? deletePfMutation.isPending
+      : false;
 
   const shouldShowDetailPanel = Boolean(selected);
   const pjDetail = pjDetailQuery.data;
@@ -647,6 +685,62 @@ export function CertificatesWorkspace() {
     void pfListQuery.refetch();
     if (selected?.type === "pf" && selected.id === certificateId) {
       void pfDetailQuery.refetch();
+    }
+  }
+
+  function handleDeletePj(certificate: CertificatePj) {
+    if (!canManageCertificateModule) {
+      return;
+    }
+
+    setPendingDeletion({ kind: "pj", certificate });
+    setConfirmationError(null);
+  }
+
+  function handleDeletePf(certificate: CertificatePf) {
+    if (!canManageCertificateModule) {
+      return;
+    }
+
+    setPendingDeletion({ kind: "pf", certificate });
+    setConfirmationError(null);
+  }
+
+  async function handleConfirmPendingDeletion() {
+    if (!pendingDeletion || !canManageCertificateModule) {
+      return;
+    }
+
+    const { certificate } = pendingDeletion;
+
+    try {
+      if (pendingDeletion.kind === "pj") {
+        await deletePjMutation.mutateAsync({ id: certificate.id });
+        setVisiblePjItems((current) => current.filter((item) => item.id !== certificate.id));
+        setSelected((current) =>
+          current?.type === "pj" && current.id === certificate.id ? null : current,
+        );
+        toast.success("Certificado PJ excluído com sucesso.");
+      } else {
+        await deletePfMutation.mutateAsync({ id: certificate.id });
+        setVisiblePfItems((current) => current.filter((item) => item.id !== certificate.id));
+        setSelected((current) =>
+          current?.type === "pf" && current.id === certificate.id ? null : current,
+        );
+        toast.success("Certificado PF excluído com sucesso.");
+      }
+
+      setWorkspaceMode("view");
+      setShowDetailPassword(false);
+      setConfirmationError(null);
+    } catch (error) {
+      const fallback = pendingDeletion.kind === "pj"
+        ? "Não foi possível excluir o certificado PJ."
+        : "Não foi possível excluir o certificado PF.";
+      const message = getCertificateErrorMessage(error, fallback);
+      setConfirmationError(message);
+      toast.error(message);
+      throw error;
     }
   }
 
@@ -957,7 +1051,9 @@ export function CertificatesWorkspace() {
               <input
                 type="text"
                 value={pjFilters.cnpj}
-                onChange={(event) => setPjFilters((prev) => ({ ...prev, cnpj: event.target.value }))}
+                onChange={(event) =>
+                  setPjFilters((prev) => ({ ...prev, cnpj: formatCnpjInput(event.target.value) }))
+                }
                 className={CERTIFICATE_INPUT_CLASSNAME}
                 placeholder="Digite CNPJ"
               />
@@ -1105,7 +1201,9 @@ export function CertificatesWorkspace() {
               <input
                 type="text"
                 value={pfFilters.cpf}
-                onChange={(event) => setPfFilters((prev) => ({ ...prev, cpf: event.target.value }))}
+                onChange={(event) =>
+                  setPfFilters((prev) => ({ ...prev, cpf: formatCpfInput(event.target.value) }))
+                }
                 className={CERTIFICATE_INPUT_CLASSNAME}
                 placeholder="Digite CPF"
               />
@@ -1127,7 +1225,9 @@ export function CertificatesWorkspace() {
               <input
                 type="text"
                 value={pfFilters.cnpj}
-                onChange={(event) => setPfFilters((prev) => ({ ...prev, cnpj: event.target.value }))}
+                onChange={(event) =>
+                  setPfFilters((prev) => ({ ...prev, cnpj: formatCnpjInput(event.target.value) }))
+                }
                 className={CERTIFICATE_INPUT_CLASSNAME}
                 placeholder="Digite CNPJ da empresa"
               />
@@ -1326,12 +1426,28 @@ export function CertificatesWorkspace() {
                               kind="pj"
                               certificateId={item.id}
                               hasCertificate={item.has_certificate}
-                              canEdit={access.canEdit}
-                              canDelete={access.isAdmin}
+                              canEdit={certificateCapabilities.canManageFiles}
+                              canDeleteFile={certificateCapabilities.canDeleteFiles}
+                              canDeleteRecord={certificateCapabilities.canDeleteRecords}
                               variant="inline"
                               onUploadSuccess={() => handlePjFileActionSuccess(item.id)}
                               onDeleteSuccess={() => handlePjFileActionSuccess(item.id)}
                             />
+                            {canManageCertificateModule ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleDeletePj(item)}
+                                className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
+                                disabled={deletePjMutation.isPending}
+                                title="Excluir certificado"
+                              >
+                                {deletePjMutation.isPending ? (
+                                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -1415,12 +1531,28 @@ export function CertificatesWorkspace() {
                               kind="pf"
                               certificateId={item.id}
                               hasCertificate={item.has_certificate}
-                              canEdit={access.canEdit}
-                              canDelete={access.isAdmin}
+                              canEdit={certificateCapabilities.canManageFiles}
+                              canDeleteFile={certificateCapabilities.canDeleteFiles}
+                              canDeleteRecord={certificateCapabilities.canDeleteRecords}
                               variant="inline"
                               onUploadSuccess={() => handlePfFileActionSuccess(item.id)}
                               onDeleteSuccess={() => handlePfFileActionSuccess(item.id)}
                             />
+                            {canManageCertificateModule ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleDeletePf(item)}
+                                className={CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME}
+                                disabled={deletePfMutation.isPending}
+                                title="Excluir certificado"
+                              >
+                                {deletePfMutation.isPending ? (
+                                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -1603,6 +1735,32 @@ export function CertificatesWorkspace() {
         ) : null}
       </Dialog>
 
+      <ConfirmationDialog
+        open={pendingDeletion !== null}
+        onOpenChange={(open) => {
+          if (!open && !isConfirmingDeletion) {
+            setPendingDeletion(null);
+            setConfirmationError(null);
+          }
+        }}
+        title={
+          pendingDeletion?.kind === "pj"
+            ? `Excluir certificado PJ "${pendingDeletion.certificate.name}"?`
+            : `Excluir certificado PF "${pendingDeletion?.certificate.name ?? ""}"?`
+        }
+        description={
+          pendingDeletion
+            ? `Esta ação remove o cadastro e o arquivo associado, quando existir, para ${pendingDeletion.kind.toUpperCase()} "${pendingDeletion.certificate.name}".`
+            : "Esta ação remove o cadastro e o arquivo associado, quando existir."
+        }
+        onConfirm={handleConfirmPendingDeletion}
+        isConfirming={isConfirmingDeletion}
+        errorMessage={confirmationError}
+        confirmLabel="Excluir certificado"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
+
       {shouldShowDetailPanel ? (
         <section className={`${CERTIFICATE_PANEL_CLASSNAME} space-y-4`}>
           <div className="flex items-center justify-between">
@@ -1687,8 +1845,9 @@ export function CertificatesWorkspace() {
                   kind="pj"
                   certificateId={pjDetail.id}
                   hasCertificate={pjDetail.has_certificate}
-                  canEdit={access.canEdit}
-                  canDelete={access.isAdmin}
+                  canEdit={certificateCapabilities.canManageFiles}
+                  canDeleteFile={certificateCapabilities.canDeleteFiles}
+                  canDeleteRecord={certificateCapabilities.canDeleteRecords}
                   onUploadSuccess={() => handlePjFileActionSuccess(pjDetail.id)}
                   onDeleteSuccess={() => handlePjFileActionSuccess(pjDetail.id)}
                 />
@@ -1780,8 +1939,9 @@ export function CertificatesWorkspace() {
                   kind="pf"
                   certificateId={pfDetail.id}
                   hasCertificate={pfDetail.has_certificate}
-                  canEdit={access.canEdit}
-                  canDelete={access.isAdmin}
+                  canEdit={certificateCapabilities.canManageFiles}
+                  canDeleteFile={certificateCapabilities.canDeleteFiles}
+                  canDeleteRecord={certificateCapabilities.canDeleteRecords}
                   onUploadSuccess={() => handlePfFileActionSuccess(pfDetail.id)}
                   onDeleteSuccess={() => handlePfFileActionSuccess(pfDetail.id)}
                 />

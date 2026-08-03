@@ -47,6 +47,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { getSummaryItems } from "../../utils/summaryItems";
 
 interface Budget {
   id: string;
@@ -543,6 +544,11 @@ export function Marketing() {
     });
   }, [budgets, searchTerm, filterStatus]);
 
+  const recentRequestsSummary = getSummaryItems(
+    requests.filter((request) => request.status !== "completed"),
+    4,
+  );
+
   return (
     <div className="w-full space-y-5">
       <div className="flex items-center justify-between">
@@ -576,7 +582,7 @@ export function Marketing() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-1">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto u-scrollbar-system">
           {(
             [
               { id: "dashboard", label: "Dashboard", icon: BarChart3 },
@@ -830,13 +836,11 @@ export function Marketing() {
                   className="text-sm text-pink-600 dark:text-pink-400 hover:text-pink-700 dark:hover:text-pink-300 font-medium"
                   type="button"
                 >
-                  Ver todas
+                  Ver todas{recentRequestsSummary.hasHiddenItems ? ` (${recentRequestsSummary.total})` : ""}
                 </button>
               </div>
               <div className="space-y-3">
-                {requests
-                  .filter((r) => r.status !== "completed")
-                  .slice(0, 4)
+                {recentRequestsSummary.items
                   .map((request) => {
                     const StatusIcon = requestStatusConfig[request.status].icon;
                     return (
@@ -911,7 +915,7 @@ export function Marketing() {
           </div>
 
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                   <tr>
@@ -1192,7 +1196,7 @@ export function Marketing() {
       {activeTab === "requests" ? (
         <div className="space-y-5">
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                   <tr>
@@ -1309,4 +1313,3 @@ export function Marketing() {
     </div>
   );
 }
-

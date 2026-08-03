@@ -7,7 +7,9 @@ export { useAccessStore } from "./store/accessStore";
 export {
   APP_ROUTE_MODULE_MAP,
   canViewIntegrationRoute,
+  canViewTasksOnlyIntegrationRoute,
   getModulePermissionLevel,
+  hasAnyModuleAccess,
   normalizeRoutePath,
   MODULE_KEYS,
   resolveDepartmentModuleKey,

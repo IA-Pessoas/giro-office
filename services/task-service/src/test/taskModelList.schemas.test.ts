@@ -14,10 +14,11 @@ describe("task model list query schema", () => {
     ).toMatchObject({ search: "Fiscal", page: 2, limit: 20 });
   });
 
-  it.each([{ page: "0" }, { limit: "101" }, { page: "x" }])(
-    "rejeita paginacao invalida: %o",
-    (query) => {
-      expect(() => parseWithZod(taskModelListQuerySchema, query)).toThrow(ServiceError);
-    },
-  );
+  it.each([
+    { page: "0" },
+    { limit: "101" },
+    { page: "x" },
+  ])("rejeita paginacao invalida: %o", (query) => {
+    expect(() => parseWithZod(taskModelListQuerySchema, query)).toThrow(ServiceError);
+  });
 });

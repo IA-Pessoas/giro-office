@@ -16,7 +16,7 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const categoryId = "20000000-0000-4000-8000-000000000001";
 const locationId = "30000000-0000-4000-8000-000000000001";
 const assetId = "40000000-0000-4000-8000-000000000001";
-const TI_REQUESTER_PERMISSION = 1;
+const TI_VIEWER_PERMISSION = 1;
 const TI_ADMIN_PERMISSION = 3;
 
 function gatewayHeaders(permission: number): Record<string, string> {
@@ -29,10 +29,13 @@ function gatewayHeaders(permission: number): Record<string, string> {
 }
 
 describe("ti inventory routes", () => {
-  it("GET /ti/inventory/list requires admin permission", async () => {
+  it.each([
+    "/ti/inventory/list",
+    `/ti/inventory/${assetId}`,
+  ])("GET %s rejects viewer permission", async (path) => {
     const response = await request(createTestApp())
-      .get("/ti/inventory/list")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION));
+      .get(path)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION));
 
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
@@ -113,7 +116,7 @@ describe("ti inventory routes", () => {
   it("POST /ti/inventory requires admin permission", async () => {
     const response = await request(createTestApp())
       .post("/ti/inventory")
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
       .send({
         asset_code: "NB-001",
         category_id: categoryId,

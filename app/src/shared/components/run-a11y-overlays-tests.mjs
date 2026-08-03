@@ -31,6 +31,10 @@ const myOrganizationSectionSource = readFileSync(
   "utf8",
 );
 const dialogSource = readFileSync(new URL("./ui/Dialog.tsx", import.meta.url), "utf8");
+const confirmationDialogSource = readFileSync(
+  new URL("./ui/ConfirmationDialog.tsx", import.meta.url),
+  "utf8",
+);
 const legacyAiChatBackdrop = [
   'className="fixed inset-0 z-[60] bg-black/40"',
   " onClick",
@@ -72,6 +76,37 @@ runTest("AppShell menu triggers expose expanded state and controlled panels", ()
   assert.match(appShellSource, /aria-expanded=\{showUserMenu\}/);
   assert.match(appShellSource, /aria-controls=\{USER_MENU_PANEL_ID\}/);
   assert.match(appShellSource, /id=\{USER_MENU_PANEL_ID\}/);
+});
+
+runTest("AppShell sidebar toggle sits in the header and exposes an accessible name", () => {
+  const toggleStart = appShellSource.indexOf("toggleSidebar();");
+  const toggleSource = appShellSource.slice(toggleStart - 500, toggleStart + 700);
+
+  assert.notEqual(toggleStart, -1);
+  assert.match(toggleSource, /event\.stopPropagation\(\);/);
+  assert.match(toggleSource, /aria-label=\{sidebarToggleLabel\}/);
+  assert.match(toggleSource, /title=\{sidebarToggleLabel\}/);
+  assert.match(toggleSource, /h-9 w-9/);
+  assert.match(toggleSource, /justify-center px-2/);
+  assert.match(toggleSource, /\{shouldExpandSidebar \? <Logo showText \/> : null\}/);
+  assert.doesNotMatch(toggleSource, /absolute -right-3 top-20/);
+});
+
+runTest("AppShell sidebar preview opens temporarily and pins only by click", () => {
+  assert.match(appShellSource, /const \[isSidebarPreviewOpen, setIsSidebarPreviewOpen\] = useState\(false\);/);
+  assert.match(appShellSource, /const shouldExpandSidebar = isSidebarOpen \|\| isSidebarPreviewOpen;/);
+  assert.match(appShellSource, /const sidebarToggleLabel = isSidebarOpen/);
+  assert.match(appShellSource, /\? "Fixar sidebar aberta"/);
+  assert.match(appShellSource, /const openSidebarPreview = \(\) => \{/);
+  assert.match(appShellSource, /const closeSidebarPreview = \(\) => \{/);
+  assert.match(appShellSource, /const pinSidebarOpen = \(\) => \{/);
+  assert.match(appShellSource, /onMouseEnter=\{openSidebarPreview\}/);
+  assert.match(appShellSource, /onMouseLeave=\{closeSidebarPreview\}/);
+  assert.match(appShellSource, /onFocus=\{openSidebarPreview\}/);
+  assert.match(appShellSource, /onClick=\{pinSidebarOpen\}/);
+  assert.match(appShellSource, /if \(isMobileMenuOpen \|\| isSidebarPreviewOpen\)/);
+  assert.match(appShellSource, /if \(isSidebarPreviewOpen\) setIsSidebarPreviewOpen\(false\);/);
+  assert.match(appShellSource, /className=\{`flex flex-col min-h-screen transition-all duration-300 \$\{isSidebarOpen \? "lg:ml-64" : "lg:ml-20"\}`\}/);
 });
 
 runTest("AppShell header notifications do not embed mock notification rows", () => {
@@ -128,6 +163,31 @@ runTest("shared Dialog constrains content and scrolls only its body", () => {
   assert.match(dialogSource, /<footer className="[^"]*shrink-0[^"]*"/);
 });
 
+runTest("shared Dialog animates close without trapping interaction in the exiting content", () => {
+  const overlayClass =
+    dialogSource.match(/<DialogPrimitive\.Overlay[\s\S]*?className=\{`([^`]*)`\}/)?.[1] ?? "";
+  const contentClass =
+    dialogSource.match(/<DialogPrimitive\.Content[\s\S]*?className=\{`([^`]*)`\}/)?.[1] ?? "";
+
+  assert.match(overlayClass, /data-\[state=open\]:animate-in/);
+  assert.match(overlayClass, /data-\[state=closed\]:animate-out/);
+  assert.match(overlayClass, /data-\[state=open\]:fade-in-0/);
+  assert.match(overlayClass, /data-\[state=closed\]:fade-out-0/);
+  assert.match(overlayClass, /motion-reduce:animate-none/);
+
+  assert.match(contentClass, /data-\[state=open\]:fade-in-0/);
+  assert.match(contentClass, /data-\[state=open\]:zoom-in-95/);
+  assert.match(contentClass, /data-\[state=closed\]:fade-out-0/);
+  assert.match(contentClass, /data-\[state=closed\]:zoom-out-95/);
+  assert.match(contentClass, /data-\[state=closed\]:pointer-events-none/);
+  assert.match(contentClass, /motion-reduce:animate-none/);
+});
+
+runTest("ConfirmationDialog composes the shared Dialog with explicit action controls", () => {
+  assert.match(confirmationDialogSource, /import \{ Dialog \} from "\.\/Dialog";/);
+  assert.match(confirmationDialogSource, /<Dialog[\s\S]*preventClose=\{isConfirming\}/);
+});
+
 runTest("MyOrganizationSection opens organization editing in a shared Dialog", () => {
   assert.match(myOrganizationSectionSource, /import \{ Dialog \} from "@shared\/components";/);
   assert.match(myOrganizationSectionSource, /<Dialog[\s\S]*title="Editar organização"/);
@@ -156,3 +216,5 @@ runTest("Configuracoes access dialog uses accented permission copy", () => {
   assert.match(configuracoesSource, /Permissão atual: \{currentPermissionLabel\}/);
   assert.equal(configuracoesSource.includes("Permissao atual"), false);
 });
+
+await import("./run-confirmation-dialog-behavior-tests.mjs");

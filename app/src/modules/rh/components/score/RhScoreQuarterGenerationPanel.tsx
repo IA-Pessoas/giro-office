@@ -10,7 +10,7 @@ export function RhScoreQuarterGenerationPanel({ canManageScore }: { canManageSco
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedQuarter, setSelectedQuarter] = useState(getDefaultRhQuarterValue);
   const quarterOptions = useMemo(() => getRhQuarterOptions(), []);
-  const assignableUsersQuery = useAssignableUsers({ enabled: canManageScore });
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManageScore, module: "rh" });
   const generateQuarterMutation = useGenerateRhScoreQuarterMutation();
 
   const assignableUsers = assignableUsersQuery.data ?? [];

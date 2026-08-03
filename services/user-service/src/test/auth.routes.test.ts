@@ -38,7 +38,11 @@ describe("auth routes", () => {
   });
 
   it("GET /user/me usa o usuario encaminhado pelo gateway", async () => {
-    userServiceMock.getById.mockResolvedValue({ id: "user-1" });
+    userServiceMock.getByIdWithModules.mockResolvedValue({
+      id: "user-1",
+      organization_id: "a0000000-0000-4000-8000-000000000001",
+      modules: { contabil: 1, rh: 1, ti: 1 },
+    });
     const app = createTestApp();
 
     const res = await request(app)
@@ -46,7 +50,8 @@ describe("auth routes", () => {
       .set(gatewayAuthHeaders({ userId: "user-1" }));
 
     expect(res.status).toBe(200);
-    expect(userServiceMock.getById).toHaveBeenCalledWith(
+    expect(res.body.data.modules).toEqual({ contabil: 1, rh: 1, ti: 1 });
+    expect(userServiceMock.getByIdWithModules).toHaveBeenCalledWith(
       "user-1",
       "a0000000-0000-4000-8000-000000000001",
     );

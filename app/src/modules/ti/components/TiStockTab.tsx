@@ -21,9 +21,10 @@ import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
 import { useAssignableUsers } from "@modules/rh";
-import { PaginationControls } from "@shared/components";
+import { ConfirmationDialog, PaginationControls } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -43,6 +44,7 @@ import type {
   TiId,
   TiListFilters,
   TiStockCategory,
+  TiStockExitPayload,
   TiStockItem,
   TiStockItemCreatePayload,
   TiStockItemUpdatePayload,
@@ -94,6 +96,11 @@ type StockExitFormState = {
   location_destination_id: string;
 };
 
+type PendingExitConfirmation = {
+  id: TiId;
+  payload: TiStockExitPayload;
+};
+
 type StockDialogState = "item" | "entry" | "exit" | "categories" | "locations" | null;
 
 type StockFilterDraft = {
@@ -134,7 +141,7 @@ const STOCK_STATUS_FILTER_OPTIONS = [
   { value: "false", label: "Inativos" },
 ] as const;
 
-const STOCK_PAGE_SIZE = 50;
+const STOCK_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 function formatText(value: unknown, fallback = "-"): string {
   if (value === null || value === undefined || value === "") {
@@ -299,6 +306,9 @@ export function TiStockTab() {
   const [movementItemId, setMovementItemId] = useState("");
   const [entryQuantity, setEntryQuantity] = useState("");
   const [exitForm, setExitForm] = useState<StockExitFormState>(initialExitFormState);
+  const [pendingExitConfirmation, setPendingExitConfirmation] =
+    useState<PendingExitConfirmation | null>(null);
+  const [exitConfirmationError, setExitConfirmationError] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [locationName, setLocationName] = useState("");
   const [locationFloor, setLocationFloor] = useState("");
@@ -318,7 +328,7 @@ export function TiStockTab() {
   });
   const stockCategoriesQuery = useTiStockCategories();
   const stockLocationsQuery = useTiStockLocations();
-  const assignableUsersQuery = useAssignableUsers({ enabled: canEditStock });
+  const assignableUsersQuery = useAssignableUsers({ enabled: canEditStock, module: "ti" });
 
   const createItemMutation = useCreateTiStockItemMutation();
   const updateItemMutation = useUpdateTiStockItemMutation();
@@ -671,33 +681,38 @@ export function TiStockTab() {
       return;
     }
 
-    const confirmed = window.confirm("Confirmar saída do estoque?");
+    const payload: TiStockExitPayload = {
+      quantity,
+      requester_id: exitForm.requester_id,
+      ...(toOptionalText(exitForm.destination)
+        ? { destination: toOptionalText(exitForm.destination) }
+        : {}),
+      ...(toOptionalId(exitForm.approver_id) ? { approver_id: exitForm.approver_id } : {}),
+      ...(toOptionalId(exitForm.operator_id) ? { operator_id: exitForm.operator_id } : {}),
+      ...(toOptionalId(exitForm.location_destination_id)
+        ? { location_destination_id: exitForm.location_destination_id }
+        : {}),
+    };
 
-    if (!confirmed) {
+    setPendingExitConfirmation({ id: itemId, payload });
+  }
+
+  async function handleConfirmExit() {
+    if (!pendingExitConfirmation) {
       return;
     }
 
     try {
-      await createExitMutation.mutateAsync({
-        id: itemId,
-        payload: {
-          quantity,
-          requester_id: exitForm.requester_id,
-          ...(toOptionalText(exitForm.destination)
-            ? { destination: toOptionalText(exitForm.destination) }
-            : {}),
-          ...(toOptionalId(exitForm.approver_id) ? { approver_id: exitForm.approver_id } : {}),
-          ...(toOptionalId(exitForm.operator_id) ? { operator_id: exitForm.operator_id } : {}),
-          ...(toOptionalId(exitForm.location_destination_id)
-            ? { location_destination_id: exitForm.location_destination_id }
-            : {}),
-        },
-      });
-      setSelectedItemId(itemId);
+      await createExitMutation.mutateAsync(pendingExitConfirmation);
+      setSelectedItemId(pendingExitConfirmation.id);
       closeExitDialog();
       toast.success("Saída registrada com sucesso.");
     } catch (error) {
-      toast.error(getTiStockMutationErrorMessage(error, "Não foi possível registrar a saída."));
+      const message = getTiStockMutationErrorMessage(error, "Não foi possível registrar a saída.");
+
+      setExitConfirmationError(message);
+      toast.error(message);
+      throw error;
     }
   }
 
@@ -1318,6 +1333,24 @@ export function TiStockTab() {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmationDialog
+        open={pendingExitConfirmation !== null}
+        onOpenChange={(open) => {
+          if (!open && !createExitMutation.isPending) {
+            setPendingExitConfirmation(null);
+            setExitConfirmationError(null);
+          }
+        }}
+        title="Confirmar saída"
+        description="Deseja confirmar a saída deste item do estoque?"
+        onConfirm={handleConfirmExit}
+        isConfirming={createExitMutation.isPending}
+        errorMessage={exitConfirmationError}
+        confirmLabel="Registrar saída"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
 
       <Dialog
         open={stockDialog === "categories"}

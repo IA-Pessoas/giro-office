@@ -63,7 +63,7 @@ export function RhPointTable({
           Nenhum registro encontrado para o período selecionado.
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto u-scrollbar-system">
           <table className="min-w-[960px] w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700/50">
               <tr>

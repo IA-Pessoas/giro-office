@@ -30,12 +30,40 @@ function createPrismaMock() {
 }
 
 describe("SituationService", () => {
+  it("bloqueia mutacoes de situacao para Viewer antes de acessar a persistencia", async () => {
+    const prisma = createPrismaMock();
+    const audit = createAuditMock();
+    const service = new SituationService(prisma as never, audit);
+    const viewerContext = { organizationId, userId, permission: 1 };
+    const operations = [
+      () =>
+        service.create(viewerContext, {
+          client_id: clientId,
+          title: "Folha",
+          description: "Conferir pendencias",
+        }),
+      () => service.update(viewerContext, recordId, { status: "Finalizado" }),
+      () => service.delete(viewerContext, recordId),
+    ];
+
+    for (const operation of operations) {
+      await expect(operation()).rejects.toMatchObject({ statusCode: 403 });
+    }
+
+    expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    expect(prisma.situationsPessoal.findFirst).not.toHaveBeenCalled();
+    expect(prisma.situationsPessoal.create).not.toHaveBeenCalled();
+    expect(prisma.situationsPessoal.update).not.toHaveBeenCalled();
+    expect(prisma.situationsPessoal.delete).not.toHaveBeenCalled();
+    expect(audit.recordChange).not.toHaveBeenCalled();
+  });
+
   it("cria situacao com status Em andamento", async () => {
     const prisma = createPrismaMock();
     const service = new SituationService(prisma as never, createAuditMock());
 
     await service.create(
-      { organizationId, userId },
+      { organizationId, userId, permission: 2 },
       { client_id: clientId, title: "Folha", description: "Conferir pendencias" },
     );
 
@@ -55,7 +83,9 @@ describe("SituationService", () => {
     const now = new Date("2026-06-30T12:00:00.000Z");
     const service = new SituationService(prisma as never, createAuditMock(), () => now);
 
-    await service.update({ organizationId, userId }, recordId, { status: "Finalizado" });
+    await service.update({ organizationId, userId, permission: 2 }, recordId, {
+      status: "Finalizado",
+    });
 
     expect(prisma.situationsPessoal.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -84,7 +114,7 @@ describe("SituationService", () => {
     } as never);
     const service = new SituationService(prisma as never, createAuditMock());
 
-    await service.update({ organizationId, userId }, recordId, {
+    await service.update({ organizationId, userId, permission: 2 }, recordId, {
       title: "Folha revisada",
       description: "Pendencias conferidas",
     });
@@ -103,7 +133,9 @@ describe("SituationService", () => {
     const prisma = createPrismaMock();
     const service = new SituationService(prisma as never, createAuditMock());
 
-    await service.update({ organizationId, userId }, recordId, { status: "Em andamento" });
+    await service.update({ organizationId, userId, permission: 2 }, recordId, {
+      status: "Em andamento",
+    });
 
     expect(prisma.situationsPessoal.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -132,7 +164,10 @@ describe("SituationService", () => {
     const audit = createAuditMock();
     const service = new SituationService(prisma as never, audit);
 
-    await service.delete({ organizationId, userId, requestId: "request-491" }, recordId);
+    await service.delete(
+      { organizationId, userId, permission: 2, requestId: "request-491" },
+      recordId,
+    );
 
     expect(prisma.situationsPessoal.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: recordId, organization_id: organizationId } }),
@@ -161,7 +196,9 @@ describe("SituationService", () => {
     });
     const service = new SituationService(prisma as never, createAuditMock());
 
-    await expect(service.delete({ organizationId, userId }, recordId)).resolves.toMatchObject({
+    await expect(
+      service.delete({ organizationId, userId, permission: 2 }, recordId),
+    ).resolves.toMatchObject({
       id: recordId,
       status: "Finalizado",
     });
@@ -173,7 +210,9 @@ describe("SituationService", () => {
     prisma.situationsPessoal.findFirst.mockResolvedValueOnce(null);
     const service = new SituationService(prisma as never, createAuditMock());
 
-    await expect(service.delete({ organizationId, userId }, recordId)).rejects.toMatchObject({
+    await expect(
+      service.delete({ organizationId, userId, permission: 2 }, recordId),
+    ).rejects.toMatchObject({
       statusCode: 404,
       message: "Situacao nao encontrada.",
     });
@@ -186,7 +225,7 @@ describe("SituationService", () => {
     const service = new SituationService(prisma as never, createAuditMock());
 
     await expect(
-      service.delete({ organizationId: otherOrganizationId, userId }, recordId),
+      service.delete({ organizationId: otherOrganizationId, userId, permission: 2 }, recordId),
     ).rejects.toMatchObject({
       statusCode: 404,
       message: "Situacao nao encontrada.",

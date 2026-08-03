@@ -9,6 +9,7 @@ import { FaRegEdit } from "react-icons/fa";
 import { GiConfirmed } from "react-icons/gi";
 import { CiCircleInfo } from "react-icons/ci";
 import { FaPencilRuler } from "react-icons/fa";
+import { toast } from "react-toastify";
 
 import { useChat } from '../../../context/ChatContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -433,7 +434,7 @@ const MessageInput = ({ onSendMessage }: MessageInputProps) => {
                 clearRecordingTimer();
                 setIsRecording(false);
                 console.error("Erro ao acessar o microfone:", err);
-                alert("Não foi possível acessar o microfone. Verifique as permissões do navegador.");
+                toast.error("Não foi possível acessar o microfone. Verifique as permissões do navegador.");
             }
         }
     };

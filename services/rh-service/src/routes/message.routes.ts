@@ -8,6 +8,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
+  canManageRh,
   RH_SELF_SERVICE_PERMISSION,
   requireRhPermission,
 } from "../middlewares/requireRhPermission.js";
@@ -41,6 +42,7 @@ router.post(
         message: body.message,
         type: body.type,
         ...(body.attachment !== undefined ? { attachment: body.attachment } : {}),
+        can_manage_rh: canManageRh(req),
       });
 
       res.status(200).json(createSuccessResponse(result));
@@ -72,6 +74,7 @@ router.get(
         organization_id: organizationId,
         user_id: userId,
         request_id: query.requestId,
+        can_manage_rh: canManageRh(req),
       });
 
       res.status(200).json(createSuccessResponse(result));

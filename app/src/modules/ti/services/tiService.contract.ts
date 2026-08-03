@@ -24,6 +24,7 @@ export const TI_ENDPOINTS = {
     base: "/ti/requests",
     detail: "/ti/requests/{id}",
     assign: "/ti/requests/{id}/assign",
+    transferCandidates: "/ti/requests/{id}/transfer-candidates",
     status: "/ti/requests/{id}/status",
     messages: "/ti/requests/{id}/messages",
   },

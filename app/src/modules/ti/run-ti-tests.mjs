@@ -115,6 +115,32 @@ await runTest("ti request attachment UI retains the accessible upload flow and c
   );
 });
 
+await runTest("ti request transfer UI uses request-scoped candidates and preserves authorized actors", async () => {
+  const tiRequestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const tiRequestsServiceSource = await readModuleSource("services/tiRequestsService.ts");
+
+  assert.match(tiRequestsTabSource, /Transferir responsabilidade/);
+  assert.match(tiRequestsTabSource, /useTiRequestTransferCandidates/);
+  assert.doesNotMatch(tiRequestsTabSource, /listAdminUsers/);
+  assert.doesNotMatch(tiRequestsTabSource, /departmentService/);
+  assert.match(tiRequestsTabSource, /Tecnologia/);
+  assert.match(tiRequestsTabSource, /assigned_to_id/);
+  assert.match(tiRequestsTabSource, /assignRequestMutation\.mutateAsync/);
+  assert.match(
+    tiRequestsTabSource,
+    /function canTransferRequest\(request: TiRequest\)[\s\S]*access\.isAdmin[\s\S]*currentUser\?\.type === "owner"[\s\S]*assigned_to_id/,
+  );
+  assert.match(tiRequestsTabSource, /<TiNativeSelect[\s\S]*label="Novo responsável"/);
+  assert.doesNotMatch(tiRequestsTabSource, /type="text"[^>]*name="assigned_to_id"/);
+  assert.match(tiRequestsServiceSource, /listTransferCandidates\(id: TiId\)/);
+  assert.match(tiRequestsServiceSource, /TI_ENDPOINTS\.requests\.transferCandidates/);
+  assert.doesNotMatch(tiRequestsTabSource, /resolveDepartmentModuleKey\(departmentName\)/);
+  assert.match(
+    tiRequestsTabSource,
+    /await assignRequestMutation\.mutateAsync\([\s\S]*setIsTransferDialogOpen\(false\);[\s\S]*setSelectedAssigneeId\(""\);[\s\S]*setActionError\(null\);/,
+  );
+});
+
 async function readModuleSource(relativePath) {
   return readFile(join(moduleRoot, relativePath), "utf8");
 }
@@ -126,6 +152,22 @@ async function readAppSource(relativePath) {
 async function readWorkspaceSource(relativePath) {
   return readFile(join(appRoot, "..", relativePath), "utf8");
 }
+
+await runTest("ti inventory assignment and return require shared confirmation", async () => {
+  const inventorySource = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(inventorySource, /import \{ ConfirmationDialog \} from "@shared\/components"/);
+  assert.match(inventorySource, /type: "assign"/);
+  assert.match(inventorySource, /type: "return"/);
+  assert.doesNotMatch(inventorySource, /\bconfirm\(/);
+});
+
+await runTest("ti term signing requires shared confirmation", async () => {
+  const termsSource = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(termsSource, /<ConfirmationDialog/);
+  assert.doesNotMatch(termsSource, /\bconfirm\(/);
+});
 
 async function collectSourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -459,7 +501,7 @@ await runTest("ti stock list preserves server pagination metadata", async () => 
   assert.match(serviceSource, /PaginatedResult<TiStockItem>/);
   assert.match(serviceSource, /normalizePaginatedResult/);
   assert.match(serviceSource, /page:\s*Number\(filters\?\.page\s*\?\?\s*1\)/);
-  assert.match(serviceSource, /limit:\s*Number\(filters\?\.page_size\s*\?\?\s*50\)/);
+  assert.match(serviceSource, /limit:\s*Number\(filters\?\.page_size\s*\?\?\s*DEFAULT_PAGE_SIZE\)/);
   assert.match(hookSource, /UseQueryResult<PaginatedResult<TiStockItem>, Error>/);
 });
 
@@ -558,7 +600,7 @@ await runTest("ti stock mutation error uses an actionable fallback for a 409 wit
 
 await runTest("ti stock exit feedback uses the scoped mutation error normalizer", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
-  const exitHandlerStart = tabSource.indexOf("async function handleSubmitExit");
+  const exitHandlerStart = tabSource.indexOf("async function handleConfirmExit");
   const exitHandlerEnd = tabSource.indexOf("async function handleSubmitCategory", exitHandlerStart);
   const exitHandlerSource = tabSource.slice(exitHandlerStart, exitHandlerEnd);
 
@@ -568,8 +610,21 @@ await runTest("ti stock exit feedback uses the scoped mutation error normalizer"
   );
   assert.match(
     exitHandlerSource,
-    /getTiStockMutationErrorMessage\(error, "Não foi possível registrar a saída\."\)/,
+    /const message = getTiStockMutationErrorMessage\(error, "Não foi possível registrar a saída\."\);/,
   );
+  assert.match(exitHandlerSource, /setExitConfirmationError\(message\);/);
+  assert.match(exitHandlerSource, /toast\.error\(message\);/);
+});
+
+await runTest("ti stock exit confirmation uses the shared destructive dialog", async () => {
+  const stockSource = await readModuleSource("components/TiStockTab.tsx");
+
+  assert.match(stockSource, /import \{ ConfirmationDialog, PaginationControls \} from "@shared\/components"/);
+  assert.match(stockSource, /const \[pendingExitConfirmation, setPendingExitConfirmation\]/);
+  assert.match(stockSource, /<ConfirmationDialog/);
+  assert.match(stockSource, /onConfirm=\{handleConfirmExit\}/);
+  assert.match(stockSource, /async function handleConfirmExit\(\)[\s\S]*createExitMutation\.mutateAsync/);
+  assert.doesNotMatch(stockSource, /window\.confirm/);
 });
 
 await runTest("ti stock category dialog filters matches and makes new category creation explicit", async () => {
@@ -616,7 +671,8 @@ await runTest("ti stock locations filter progressively and identify normalized a
 await runTest("ti stock filters reset and render server pagination", async () => {
   const tabSource = await readModuleSource("components/TiStockTab.tsx");
 
-  assert.match(tabSource, /const STOCK_PAGE_SIZE = 50/);
+  assert.match(tabSource, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
+  assert.match(tabSource, /const STOCK_PAGE_SIZE = DEFAULT_PAGE_SIZE;/);
   assert.match(tabSource, /const \[stockPage, setStockPage\] = useState\(1\)/);
   assert.match(tabSource, /page:\s*stockPage/);
   assert.match(tabSource, /page_size:\s*STOCK_PAGE_SIZE/);
@@ -653,7 +709,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
     "useCreateTiStockExitMutation",
     "useCreateTiStockCategoryMutation",
     "useCreateTiStockLocationMutation",
-    "window.confirm",
+    "ConfirmationDialog",
     "Entrada",
     "Saída",
     "Categorias",
@@ -1104,7 +1160,7 @@ await runTest("ti user selects reuse the operational users source", async () => 
   const rhTypesSource = await readAppSource("src/modules/rh/types.ts");
   const userTypesSource = await readAppSource("src/modules/users/types/index.ts");
 
-  assert.match(hookSource, /api\.get\(RH_ENDPOINTS\.operationalUsers\)/);
+  assert.match(hookSource, /api\.get\(RH_ENDPOINTS\.operationalUsers(?:,|\))/);
   assert.match(hookSource, /unwrapRhEnvelope<RhOperationalUser\[\]>/);
   assert.doesNotMatch(hookSource, /cpf: user\.cpf \?\? null/);
   assert.doesNotMatch(rhTypesSource, /cpf\?: string \| null/);
@@ -1182,6 +1238,15 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(hookSource, /tiQueryKeys\.extensions\.all\(\)/);
   assert.match(tabSource, /useTiExtensions/);
   assert.match(tabSource, /useTiExtension/);
+  assert.match(
+    tabSource,
+    /const canManageExtensions = access\.isAdmin/,
+  );
+  assert.match(
+    tabSource,
+    /assignableUsersQuery = useAssignableUsers\(\{ enabled: canManageExtensions, module: "ti" \}\)/,
+  );
+  assert.match(tabSource, /\{!canManageExtensions \? \(/);
   assert.match(tabSource, /<TiEmptyState/);
   const sectionHeaderMatch = tabSource.match(/<TiSectionHeader[\s\S]*?\/>/);
   assert.ok(sectionHeaderMatch);
@@ -1192,6 +1257,20 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(tabSource, /placeholder="Ex: 1001"/);
   assert.doesNotMatch(tabSource, /placeholder="1001"/);
   assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
+});
+
+await runTest("ti extension controls stay hidden for technician level 2", async () => {
+  const { resolveModuleAccess } = await import("../auth/utils/moduleAccess.ts");
+  const technicianAccess = resolveModuleAccess({
+    module: "ti",
+    additionalModulePermissions: { ti: 2 },
+  });
+  const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
+
+  assert.equal(technicianAccess.canView, true);
+  assert.equal(technicianAccess.canEdit, true);
+  assert.equal(technicianAccess.isAdmin, false);
+  assert.match(tabSource, /const canManageExtensions = access\.isAdmin;/);
 });
 
 await runTest("ti visible copy stays product-facing and avoids implementation handoff terms", async () => {
@@ -1231,14 +1310,21 @@ await runTest("ti shell follows the existing regularize-style page and tab patte
   assert.doesNotMatch(`${pageSource}\n${workspaceUiSource}`, /indigo-/);
 });
 
-await runTest("ti shell exposes dashboard for self-service users", async () => {
+await runTest("ti shell exposes ramais but hides sensitive tabs for self-service users", async () => {
   const pageSource = await readModuleSource("components/TiPage.tsx");
+  const selfServiceTabsSource =
+    pageSource.match(/const SELF_SERVICE_TI_TABS[\s\S]*?\n\];/)?.[0] ?? "";
 
   assert.match(pageSource, /SELF_SERVICE_TI_TABS/);
   assert.match(pageSource, /const canManageTi = access\.isAdmin/);
   assert.match(pageSource, /const visibleTabs = canManageTi \? TI_TABS : SELF_SERVICE_TI_TABS/);
-  assert.match(pageSource, /SELF_SERVICE_TI_TABS[\s\S]*id: "dashboard"/);
-  assert.match(pageSource, /label: "Meus termos"/);
+  assert.match(selfServiceTabsSource, /id: "dashboard"/);
+  assert.match(selfServiceTabsSource, /id: "extensions"[\s\S]*label: "Ramais"/);
+  assert.match(selfServiceTabsSource, /label: "Meus termos"/);
+
+  for (const sensitiveTabId of ["inventory", "stock", "passwords", "robots"]) {
+    assert.doesNotMatch(selfServiceTabsSource, new RegExp(`id: "${sensitiveTabId}"`));
+  }
 });
 
 await runTest("ti requests hooks expose mutations and invalidate requests plus dashboard caches", async () => {
@@ -1328,7 +1414,7 @@ await runTest("ti request detail keeps secondary actions compact", async () => {
   assert.doesNotMatch(tabSource, /Editar t.tulo/);
 });
 
-await runTest("ti request detail does not fetch admin users for assignment automatically", async () => {
+await runTest("ti request detail loads transfer candidates only when the dialog opens", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 
   assert.match(tabSource, /useAssignTiRequest/);
@@ -1339,7 +1425,12 @@ await runTest("ti request detail does not fetch admin users for assignment autom
   assert.doesNotMatch(tabSource, /useTiAssignableUsers/);
   assert.doesNotMatch(tabSource, /assignableUserOptions/);
   assert.doesNotMatch(tabSource, /Atribuir à equipe de TI/);
-  assert.doesNotMatch(tabSource, /listAdminUsers/);
+  assert.match(
+    tabSource,
+    /useTiRequestTransferCandidates\(activeRequestId,\s*\{\s*enabled: isTransferDialogOpen,?\s*\}\)/,
+  );
+  assert.doesNotMatch(tabSource, /listAdminUsers\("active"\)/);
+  assert.doesNotMatch(tabSource, /departmentService\.list\(\)/);
   assert.doesNotMatch(tabSource, /placeholder="ID do usuário"/);
   assert.doesNotMatch(tabSource, /assignedUserId/);
 });
@@ -1565,7 +1656,8 @@ await runTest("ti inventory tab exposes assets, categories, departments, assignm
   assert.match(source, /departmentService\.list\(\)/);
   assert.match(source, /useFetch<DepItem\[\]>/);
   assert.doesNotMatch(source, /useTiInventoryLocations\(/);
-  assert.match(source, /confirm\(/);
+  assert.match(source, /<ConfirmationDialog/);
+  assert.doesNotMatch(source, /\bconfirm\(/);
 });
 
 await runTest("ti inventory department options come from the global department endpoint", async () => {
@@ -1683,7 +1775,8 @@ await runTest("ti terms tab exposes term create, edit, detail and signing action
   assert.match(source, /useTiInventory\([\s\S]*status: "available"[\s\S]*page_size: 100[\s\S]*enabled: canManage/);
   assert.doesNotMatch(source, /useTiInventory\(undefined, \{ enabled: canManage \}\)/);
   assert.match(source, /departmentService\.list\(\),\s*\{ retry: false, enabled: canManage \}/);
-  assert.match(source, /confirm\(/);
+  assert.match(source, /<ConfirmationDialog/);
+  assert.doesNotMatch(source, /\bconfirm\(/);
 });
 
 await runTest("ti inventory list exposes availability status for term asset selectors", async () => {
@@ -1733,7 +1826,7 @@ await runTest("ti terms form dialog stays scrollable and compact", async () => {
   assert.doesNotMatch(source, /dialogState\?\.type === "term" && dialogState\.mode === "edit" \? \(/);
 });
 
-await runTest("ti terms filters stay local because the backend list only supports user_id", async () => {
+await runTest("ti terms filters use the shared signed_at-derived status locally", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
 
   assert.match(source, /const termsQuery = useTiTerms\(\)/);
@@ -1746,12 +1839,25 @@ await runTest("ti terms filters stay local because the backend list only support
   assert.doesNotMatch(source, /status,\s*inventory_id/);
 });
 
+await runTest("ti term status is derived only from signed_at", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+  const statusSource = source.slice(
+    source.indexOf("function hasTermSignature"),
+    source.indexOf("function getMutationErrorMessage"),
+  );
+
+  assert.match(statusSource, /function hasTermSignature\(term\?: TiTerm \| null\): boolean/);
+  assert.match(statusSource, /term\?\.signed_at != null/);
+  assert.doesNotMatch(statusSource, /reason/);
+});
+
 await runTest("ti terms list paginates locally and keeps actions compact", async () => {
   const source = await readModuleSource("components/TiTermsTab.tsx");
   const controlsSource = await readModuleSource("components/tiFormControls.tsx");
 
-  assert.match(source, /import \{ PaginationControls \} from "@shared\/components";/);
-  assert.match(source, /const TERMS_PAGE_SIZE = 10;/);
+  assert.match(source, /import \{ ConfirmationDialog, PaginationControls \} from "@shared\/components";/);
+  assert.match(source, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
+  assert.match(source, /const TERMS_PAGE_SIZE = DEFAULT_PAGE_SIZE;/);
   assert.match(source, /const \[termsPage, setTermsPage\] = useState\(1\);/);
   assert.match(source, /useEffect\(\(\) => \{\s*setTermsPage\(1\);/);
   assert.match(source, /const paginatedTerms = useMemo\(/);
@@ -1847,6 +1953,19 @@ await runTest("ti inventory category form keeps a stable form reference", async 
   assert.match(source, /categoryForm\.reset\(\)/);
   assert.doesNotMatch(source, /const\s+locationForm\s*=\s*event\.currentTarget/);
   assert.doesNotMatch(source, /locationForm\.reset\(\)/);
+});
+
+await runTest("ti inventory user fields use the contextual user catalog", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "ti"/);
+  assert.match(source, /name="user_id"/);
+  assert.match(source, /name="responsible_it_staff_id"/);
+  assert.match(source, /Usuário atual/);
+  assert.match(source, /Responsável atual/);
+  assert.doesNotMatch(source, /<TiTextField\s+label="ID do usuário"/);
+  assert.doesNotMatch(source, /<TiTextField\s+label="ID do responsável TI"/);
 });
 
 await runTest("ti inventory category status supports is_active fallback", async () => {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Edit3, Eye, RefreshCcw, Trash2 } from "lucide-react";
 
 import type { ProjectListItem } from "../types";
+import { SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME } from "../../../shared/ui/newLayout/scrollbar.ts";
 import { ProjectProgressBar } from "./ProjectProgressBar";
 import {
   formatProjectDate,
@@ -40,7 +41,7 @@ export function ProjectListTable({
 }: ProjectListTableProps) {
   return (
     <section className={`${PROJECT_PANEL_CLASSNAME} overflow-hidden`}>
-      <div className="overflow-x-auto">
+      <div className={SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME}>
         <table className="min-w-full">
           <thead className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-950/40">
             <tr className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">

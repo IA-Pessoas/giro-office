@@ -1,3 +1,8 @@
+import {
+  formatBrazilianPhoneInput,
+  formatCpfCnpjInput,
+  formatCpfInput,
+} from "../../../shared/utils/inputFormatting.ts";
 import type {
   Client,
   ClientRegularizeFormValues,
@@ -53,7 +58,6 @@ const nullableTextFieldNames = [
   "cnae",
   "cnae_secondary",
   "responsible",
-  "number",
   "email",
   "address",
   "cep",
@@ -118,12 +122,12 @@ export function createRegularizeInitialValues(client: Client): ClientRegularizeF
     name: client.name ?? "",
     company_name: client.company_name ?? "",
     fantasy_name: client.fantasy_name ?? "",
-    cpf_cnpj: client.cpf_cnpj ?? "",
+    cpf_cnpj: formatCpfCnpjInput(client.cpf_cnpj ?? ""),
     cnae: client.cnae ?? "",
     cnae_secondary: client.cnae_secondary ?? "",
     responsible: client.responsible ?? "",
-    cpf_responsible: client.cpf_responsible ?? "",
-    number: client.number ?? "",
+    cpf_responsible: formatCpfInput(client.cpf_responsible ?? ""),
+    number: formatBrazilianPhoneInput(client.number ?? ""),
     email: client.email ?? "",
     address: client.address ?? "",
     cep: client.cep ?? "",
@@ -175,6 +179,13 @@ export function buildRegularizePayload(
 
   if (nextCpfResponsible !== currentCpfResponsible) {
     payload.cpf_responsible = nextCpfResponsible;
+  }
+
+  const nextNumber = normalizeDocumentValue(values.number) || null;
+  const currentNumber = normalizeDocumentValue(currentValues.number) || null;
+
+  if (nextNumber !== currentNumber) {
+    payload.number = nextNumber;
   }
 
   for (const fieldName of nullableTextFieldNames) {

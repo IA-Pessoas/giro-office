@@ -39,6 +39,7 @@ import {
   Settings
 } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { getSummaryItems } from '../../utils/summaryItems';
 
 interface Company {
   id: string;
@@ -418,6 +419,13 @@ export function DepartamentoPessoal() {
     navigator.clipboard.writeText(text);
   };
 
+  const expiringCertificatesSummary = getSummaryItems(
+    certificates.filter(c => c.status === 'expiring' || c.status === 'expired'),
+    3,
+  );
+  const overdueDebtsSummary = getSummaryItems(debts.filter(d => d.status === 'overdue'), 2);
+  const upcomingTasksSummary = getSummaryItems(tasks.filter(t => t.status !== 'completed'), 5);
+
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
       {/* Header */}
@@ -447,7 +455,7 @@ export function DepartamentoPessoal() {
 
       {/* Tabs */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto u-scrollbar-system">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`flex-1 min-w-fit px-4 py-2.5 rounded-lg font-medium transition-all ${
@@ -668,7 +676,7 @@ export function DepartamentoPessoal() {
               </div>
               <div className="space-y-3">
                 {/* Expiring Certificates */}
-                {certificates.filter(c => c.status === 'expiring' || c.status === 'expired').slice(0, 3).map((cert) => {
+                {expiringCertificatesSummary.items.map((cert) => {
                   const daysLeft = getDaysUntilExpiry(cert.expiryDate);
                   return (
                     <div key={cert.id} className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -684,9 +692,18 @@ export function DepartamentoPessoal() {
                     </div>
                   );
                 })}
+                {expiringCertificatesSummary.hasHiddenItems ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('certificates')}
+                    className="text-sm text-pink-600 dark:text-pink-400 hover:text-pink-700 dark:hover:text-pink-300 font-medium"
+                  >
+                    Ver todos ({expiringCertificatesSummary.total})
+                  </button>
+                ) : null}
 
                 {/* Overdue Debts */}
-                {debts.filter(d => d.status === 'overdue').slice(0, 2).map((debt) => (
+                {overdueDebtsSummary.items.map((debt) => (
                   <div key={debt.id} className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                     <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
@@ -699,6 +716,15 @@ export function DepartamentoPessoal() {
                     </div>
                   </div>
                 ))}
+                {overdueDebtsSummary.hasHiddenItems ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('debts')}
+                    className="text-sm text-pink-600 dark:text-pink-400 hover:text-pink-700 dark:hover:text-pink-300 font-medium"
+                  >
+                    Ver todos ({overdueDebtsSummary.total})
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -709,15 +735,16 @@ export function DepartamentoPessoal() {
                   <CheckSquare className="w-5 h-5 text-pink-600 dark:text-pink-400" />
                   Próximas Tarefas
                 </h3>
-                <button 
+                <button
+                  type="button"
                   onClick={() => setActiveTab('tasks')}
                   className="text-sm text-pink-600 dark:text-pink-400 hover:text-pink-700 dark:hover:text-pink-300 font-medium"
                 >
-                  Ver todas
+                  Ver todas{upcomingTasksSummary.hasHiddenItems ? ` (${upcomingTasksSummary.total})` : ''}
                 </button>
               </div>
               <div className="space-y-3">
-                {tasks.filter(t => t.status !== 'completed').slice(0, 5).map((task) => {
+                {upcomingTasksSummary.items.map((task) => {
                   const TypeIcon = taskTypeConfig[task.type].icon;
                   return (
                     <div key={task.id} className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors border border-gray-100 dark:border-gray-700">
@@ -863,7 +890,7 @@ export function DepartamentoPessoal() {
       {activeTab === 'certificates' && (
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
@@ -972,7 +999,7 @@ export function DepartamentoPessoal() {
       {activeTab === 'debts' && (
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
@@ -1113,4 +1140,3 @@ export function DepartamentoPessoal() {
     </div>
   );
 }
-
