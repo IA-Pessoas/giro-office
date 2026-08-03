@@ -9,6 +9,7 @@ import type {
   ReturnTiInventoryBody,
   UpdateTiInventoryBody,
 } from "../schemas/tiInventory.schemas.js";
+import { TiDepartmentResolverService } from "./tiDepartmentResolverService.js";
 import type { TiAuthContext } from "./tiRequestService.js";
 
 const SAFE_USER_SELECT = {
@@ -31,7 +32,11 @@ const INVENTORY_INCLUDE = {
 } as const;
 
 export class TiInventoryService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly departmentResolver: TiDepartmentResolverService;
+
+  constructor(private readonly prisma: PrismaClient) {
+    this.departmentResolver = new TiDepartmentResolverService(prisma);
+  }
 
   async list(context: TiAuthContext, query: ListTiInventoryQuery): Promise<unknown[]> {
     const { skip, take } = getPaginationParams(query);
@@ -87,13 +92,12 @@ export class TiInventoryService {
         await this.ensureLocation(context.organizationId, body.location_id);
       }
       if (body.user_id) {
-        await this.ensureUser(context.organizationId, body.user_id, "Usuario nao encontrado.");
+        await this.ensureActiveOrganizationUser(context.organizationId, body.user_id);
       }
       if (body.responsible_it_staff_id) {
-        await this.ensureUser(
+        await this.ensureTechnologyResponsible(
           context.organizationId,
           body.responsible_it_staff_id,
-          "Responsavel de TI nao encontrado.",
         );
       }
 
@@ -143,13 +147,12 @@ export class TiInventoryService {
         await this.ensureLocation(context.organizationId, body.location_id);
       }
       if (body.user_id) {
-        await this.ensureUser(context.organizationId, body.user_id, "Usuario nao encontrado.");
+        await this.ensureActiveOrganizationUser(context.organizationId, body.user_id);
       }
       if (body.responsible_it_staff_id) {
-        await this.ensureUser(
+        await this.ensureTechnologyResponsible(
           context.organizationId,
           body.responsible_it_staff_id,
-          "Responsavel de TI nao encontrado.",
         );
       }
 
@@ -173,7 +176,7 @@ export class TiInventoryService {
     body: AssignTiInventoryUserBody,
   ): Promise<unknown> {
     await this.getById(context, id);
-    await this.ensureUser(context.organizationId, body.user_id, "Usuario nao encontrado.");
+    await this.ensureActiveOrganizationUser(context.organizationId, body.user_id);
 
     return this.prisma.inventoryTecnologia.update({
       where: { id },
@@ -208,7 +211,7 @@ export class TiInventoryService {
     });
 
     if (!category) {
-      throw new ServiceError(404, "Categoria de inventario de TI nao encontrada.");
+      throw new ServiceError(404, "Categoria de inventario nao encontrada.");
     }
   }
 
@@ -218,17 +221,37 @@ export class TiInventoryService {
     });
 
     if (!location) {
-      throw new ServiceError(404, "Local de inventario de TI nao encontrado.");
+      throw new ServiceError(404, "Departamento/local de inventario nao encontrado.");
     }
   }
 
-  private async ensureUser(organizationId: string, userId: string, message: string): Promise<void> {
+  private async ensureActiveOrganizationUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
     const user = await this.prisma.user.findFirst({
-      where: { id: userId, organization_id: organizationId },
+      where: { id: userId, organization_id: organizationId, status: "active" },
     });
 
     if (!user) {
-      throw new ServiceError(404, message);
+      throw new ServiceError(404, "Usuario nao encontrado na organizacao.");
+    }
+  }
+
+  private async ensureTechnologyResponsible(organizationId: string, userId: string): Promise<void> {
+    const technologyDepartmentId =
+      await this.departmentResolver.resolveTechnologyDepartmentId(organizationId);
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        organization_id: organizationId,
+        status: "active",
+        department_id: technologyDepartmentId,
+      },
+    });
+
+    if (!user) {
+      throw new ServiceError(422, "Responsavel de TI deve pertencer ao departamento Tecnologia.");
     }
   }
 }

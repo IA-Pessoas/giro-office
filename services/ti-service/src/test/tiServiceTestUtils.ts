@@ -346,12 +346,40 @@ export function createPrismaMock(): PrismaClient {
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
     },
     user: {
-      findFirst: vi.fn(async ({ where }) => ({
-        id: where.id,
-        organization_id: where.organization_id,
-        department_id: departmentId,
-        status: "active",
-      })),
+      findFirst: vi.fn(async ({ where }) => {
+        if (where.organization_id !== organizationId) {
+          return null;
+        }
+
+        if (where.id === "00000000-0000-4000-8000-000000000002") {
+          return where.status === "active"
+            ? null
+            : {
+                id: where.id,
+                organization_id: where.organization_id,
+                department_id: departmentId,
+                status: "inactive",
+              };
+        }
+
+        if (where.id === "00000000-0000-4000-8000-000000000003") {
+          return where.department_id === departmentId
+            ? null
+            : {
+                id: where.id,
+                organization_id: where.organization_id,
+                department_id: "50000000-0000-4000-8000-000000000002",
+                status: "active",
+              };
+        }
+
+        return {
+          id: where.id,
+          organization_id: where.organization_id,
+          department_id: departmentId,
+          status: "active",
+        };
+      }),
     },
     tIRequest: {
       count: vi.fn(async ({ where }) => {

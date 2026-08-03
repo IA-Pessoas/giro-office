@@ -16,6 +16,8 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const categoryId = "20000000-0000-4000-8000-000000000001";
 const locationId = "30000000-0000-4000-8000-000000000001";
 const assetId = "40000000-0000-4000-8000-000000000001";
+const inactiveUserId = "00000000-0000-4000-8000-000000000002";
+const nonTechnologyUserId = "00000000-0000-4000-8000-000000000003";
 const TI_VIEWER_PERMISSION = 1;
 const TI_ADMIN_PERMISSION = 3;
 
@@ -147,6 +149,23 @@ describe("ti inventory routes", () => {
     });
   });
 
+  it("POST /ti/inventory rejects a responsible user outside Tecnologia", async () => {
+    const response = await request(createTestApp())
+      .post("/ti/inventory")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({
+        asset_code: "NB-001",
+        category_id: categoryId,
+        responsible_it_staff_id: nonTechnologyUserId,
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Responsavel de TI deve pertencer ao departamento Tecnologia.",
+    });
+  });
+
   it("PATCH /ti/inventory/:id/assign-user assigns an asset", async () => {
     const response = await request(createTestApp())
       .patch(`/ti/inventory/${assetId}/assign-user`)
@@ -161,6 +180,19 @@ describe("ti inventory routes", () => {
         user_id: userId,
         return_date: null,
       },
+    });
+  });
+
+  it("PATCH /ti/inventory/:id/assign-user rejects an inactive user", async () => {
+    const response = await request(createTestApp())
+      .patch(`/ti/inventory/${assetId}/assign-user`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({ user_id: inactiveUserId });
+
+    expect(response.status).toBe(404);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Usuario nao encontrado na organizacao.",
     });
   });
 
