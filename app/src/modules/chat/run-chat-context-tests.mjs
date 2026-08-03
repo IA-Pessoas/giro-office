@@ -101,6 +101,18 @@ await runTest("chat upload uses toast feedback instead of alert", () => {
   assert.match(uploadSource, /toast\.error\("Nao foi possivel enviar sua midia\."\)/);
 });
 
+await runTest("group detail update failure uses toast feedback instead of alert", () => {
+  const updateGroupDetailsSource = source.match(
+    /const updateGroupDetails = useCallback\(async \(chatId:[\s\S]*?\n    \}, \[\]\);/,
+  )?.[0] ?? "";
+
+  assert.match(
+    updateGroupDetailsSource,
+    /toast\.error\("Não foi possível atualizar os detalhes do grupo\."\)/,
+  );
+  assert.equal(updateGroupDetailsSource.includes("alert("), false);
+});
+
 await runTest("provider value is memoized with the public context type", () => {
   assert.match(source, /const value = useMemo<ChatContextType>\(\(\) => \(\{/);
 });
