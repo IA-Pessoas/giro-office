@@ -45,6 +45,8 @@ export const deleteRequestBodySchema = z
 
 export const listRequestQuerySchema = z
   .object({
+    page: z.coerce.number().int().min(1).optional().default(1),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(20),
     status: rhRequestStatusSchema.optional(),
     category_id: z.string().uuid({ message: "category_id inválido." }).optional(),
     requester_user_id: z.string().uuid({ message: "requester_user_id inválido." }).optional(),

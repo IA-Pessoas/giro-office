@@ -140,7 +140,27 @@ describe("request routes", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(requestServiceMock.list).toHaveBeenCalledTimes(1);
+    expect(requestServiceMock.list).toHaveBeenCalledWith(organizationId, {
+      category_id: itemId,
+      requester_user_id: userId,
+      assigned_to_user_id: userId,
+      status: "New",
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it.each([
+    ["page", 0],
+    ["limit", 101],
+  ])("GET /rh/requests rejeita %s fora do limite", async (field, value) => {
+    const app = createTestApp();
+    const res = await request(app)
+      .get("/rh/requests")
+      .query({ [field]: value });
+
+    expect(res.status).toBe(400);
+    expect(requestServiceMock.list).not.toHaveBeenCalled();
   });
 
   it("GET /rh/requests restringe RH self-service ao proprio usuario", async () => {
@@ -156,6 +176,8 @@ describe("request routes", () => {
     expect(res.status).toBe(200);
     expect(requestServiceMock.list).toHaveBeenCalledWith(organizationId, {
       requester_user_id: userId,
+      page: 1,
+      limit: 20,
     });
   });
 
@@ -171,6 +193,8 @@ describe("request routes", () => {
     expect(requestServiceMock.list).toHaveBeenCalledWith(organizationId, {
       requester_user_id: userId,
       status: "New",
+      page: 1,
+      limit: 20,
     });
   });
 
