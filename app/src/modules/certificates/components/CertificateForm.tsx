@@ -10,6 +10,7 @@ import {
 } from "./certificateWorkspaceUi";
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
+import { FieldHelp } from "@shared/ui/newLayout/field-help";
 import {
   formatBrlInput,
   formatCnpjInput,
@@ -396,9 +397,15 @@ export function CertificateForm({
             </label>
 
             <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-              <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
-                Natureza jurídica
-              </RequiredFieldLabel>
+              <span className="inline-flex items-center gap-1">
+                <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
+                  Natureza jurídica
+                </RequiredFieldLabel>
+                <FieldHelp
+                  label="Natureza jurídica"
+                  description="Classificação jurídica da empresa conforme o cadastro oficial."
+                />
+              </span>
               <input
                 type="text"
                 value={formState.legalNature}
@@ -485,7 +492,13 @@ export function CertificateForm({
         </label>
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Castelo</span>
+          <span className="inline-flex items-center gap-1">
+            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Castelo</span>
+            <FieldHelp
+              label="Situação Castelo"
+              description="Indica se o certificado está regularizado no sistema Castelo."
+            />
+          </span>
           <CertificateNativeSelect
             value={boolToLabel(formState.clientCasteloStatus)}
             onChange={(event) => setBoolField("clientCasteloStatus", event.target.value === "Sim")}
@@ -497,7 +510,13 @@ export function CertificateForm({
         </label>
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Focus</span>
+          <span className="inline-flex items-center gap-1">
+            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Focus</span>
+            <FieldHelp
+              label="Situação Focus"
+              description="Indica se o certificado está regularizado no sistema Focus."
+            />
+          </span>
           <CertificateNativeSelect
             value={boolToLabel(formState.clientFocusStatus)}
             onChange={(event) => setBoolField("clientFocusStatus", event.target.value === "Sim")}
@@ -532,7 +551,13 @@ export function CertificateForm({
         </label>
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Valor pago</span>
+          <span className="inline-flex items-center gap-1">
+            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Valor pago</span>
+            <FieldHelp
+              label="Valor pago"
+              description="Informe o valor pago em reais, usando o formato R$ 0,00."
+            />
+          </span>
           <input
             type="text"
             value={formState.paymentAmount}

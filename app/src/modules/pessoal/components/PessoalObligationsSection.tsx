@@ -11,6 +11,7 @@ import {
 
 import { useAssignableUsers } from "@modules/rh";
 import { cn } from "@shared/ui/newLayout/utils";
+import { FieldHelp } from "@shared/ui/newLayout/field-help";
 
 import {
   useCreatePessoalObligationMutation,
@@ -39,9 +40,17 @@ const booleanFields = [
   { name: "advance", label: "Adiantamento" },
   { name: "payroll", label: "Folha" },
   { name: "charges", label: "Encargos" },
-  { name: "assistance_fee", label: "Contribuição assistencial" },
+  {
+    name: "assistance_fee",
+    label: "Contribuição assistencial",
+    help: "Indica se há cobrança de contribuição assistencial para a obrigação.",
+  },
   { name: "bem_mais", label: "Bem Mais" },
-  { name: "bsf", label: "BSF" },
+  {
+    name: "bsf",
+    label: "BSF",
+    help: "Indica se a rotina BSF deve ser considerada nesta obrigação.",
+  },
   { name: "va", label: "Vale-alimentação" },
   { name: "vt", label: "Vale-transporte" },
 ] as const;
@@ -303,18 +312,25 @@ export function PessoalObligationsSection({
         {obligation ? (
           <>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {booleanFields.map((field) => (
-                <label key={field.name} className={pessoalCheckboxCardClassName}>
-                  <input
-                    type="checkbox"
-                    checked={obligation[field.name] === true}
-                    onChange={(event) => handleBooleanChange(field.name, event.target.checked)}
-                    disabled={isFormDisabled}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  {field.label}
-                </label>
-              ))}
+              {booleanFields.map((field) => {
+                const helpText = "help" in field ? field.help : undefined;
+
+                return (
+                  <label key={field.name} className={pessoalCheckboxCardClassName}>
+                    <input
+                      type="checkbox"
+                      checked={obligation[field.name] === true}
+                      onChange={(event) => handleBooleanChange(field.name, event.target.checked)}
+                      disabled={isFormDisabled}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="inline-flex items-center gap-1">
+                      <span>{field.label}</span>
+                      {helpText ? <FieldHelp label={field.label} description={helpText} /> : null}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
 
             <form
