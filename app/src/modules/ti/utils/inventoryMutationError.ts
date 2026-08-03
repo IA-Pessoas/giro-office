@@ -8,6 +8,8 @@ const TECHNICAL_AXIOS_MESSAGES = [
 ];
 
 type InventoryMutationError = {
+  code?: unknown;
+  isAxiosError?: unknown;
   message?: unknown;
   response?: {
     data?: {
@@ -20,6 +22,13 @@ function isInventoryMutationError(error: unknown): error is InventoryMutationErr
   return typeof error === "object" && error !== null;
 }
 
+function isTransportError(error: InventoryMutationError): boolean {
+  return (
+    error.isAxiosError === true ||
+    (typeof error.code === "string" && /^(ECONN|ERR_)/i.test(error.code))
+  );
+}
+
 export function getTiInventoryMutationErrorMessage(error: unknown): string {
   if (
     isInventoryMutationError(error) &&
@@ -29,6 +38,10 @@ export function getTiInventoryMutationErrorMessage(error: unknown): string {
     error.response.data.error.trim()
   ) {
     return error.response.data.error.trim();
+  }
+
+  if (isInventoryMutationError(error) && isTransportError(error)) {
+    return FALLBACK_MESSAGE;
   }
 
   if (isInventoryMutationError(error) && typeof error.message === "string") {

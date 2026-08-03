@@ -1973,6 +1973,7 @@ await runTest("ti inventory mutation errors preserve domain feedback and hide te
   assert.equal(
     getTiInventoryMutationErrorMessage(
       Object.assign(new Error("Request failed with status code 404"), {
+        isAxiosError: true,
         response: { data: { error: "O ativo não está disponível." } },
       }),
     ),
@@ -1989,6 +1990,17 @@ await runTest("ti inventory mutation errors preserve domain feedback and hide te
     "ERR_CANCELED",
   ]) {
     assert.equal(getTiInventoryMutationErrorMessage(new Error(message)), fallback);
+  }
+
+  for (const axiosError of [
+    { isAxiosError: true, code: "ECONNABORTED", message: "Request aborted" },
+    {
+      isAxiosError: true,
+      code: "ECONNREFUSED",
+      message: "connect ECONNREFUSED 127.0.0.1:3000",
+    },
+  ]) {
+    assert.equal(getTiInventoryMutationErrorMessage(axiosError), fallback);
   }
 
   assert.equal(
