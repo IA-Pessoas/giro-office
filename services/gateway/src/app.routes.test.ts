@@ -378,6 +378,80 @@ it("requires admin permission for user-management routes", async () => {
   }
 });
 
+it("blocks PUT /user/:id without user-management permission", async () => {
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.end(JSON.stringify({ success: true }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/user-3`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${createToken({
+          user_id: "user-1",
+          organization_id: "org-1",
+          permission: 1,
+          type: "user",
+        })}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ modules: { rh: 1 } }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("proxies PUT /user/:id for an authorized owner", async () => {
+  let seenMethod = "";
+  let seenUrl = "";
+  const upstream = createServer((request, response) => {
+    seenMethod = request.method ?? "";
+    seenUrl = request.url ?? "";
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: {} }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/user-3`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${createToken({
+          user_id: "owner-1",
+          organization_id: "org-1",
+          permission: 2,
+          type: "owner",
+        })}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ modules: { rh: 1 } }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenMethod).toBe("PUT");
+    expect(seenUrl).toBe("/user/user-3");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("proxies authenticated self password updates with PUT to user-service", async () => {
   let seenHeaders: {
     userId?: string;
@@ -407,8 +481,8 @@ it("proxies authenticated self password updates with PUT to user-service", async
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
-    permission: 0,
-    type: "user",
+    permission: 2,
+    type: "owner",
   });
 
   try {
