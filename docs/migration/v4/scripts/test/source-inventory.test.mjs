@@ -9,6 +9,7 @@ import { buildSourceInventory } from "../lib/source-inventory.mjs";
 
 const USERS_DUMP = "INSERT INTO `legacy`.`users` (`id`, `senha`) VALUES (1, 'ultrassecreto');\n";
 const TEAMS_DUMP = "INSERT INTO `legacy`.`teams` (`id`, `nome`) VALUES (1, 'Equipe A');\n";
+const JWT_SHAPED_STEM = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.signature";
 
 async function withTemporaryDirectory(run) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "giro-v4-inventory-"));
@@ -56,6 +57,16 @@ test("buildSourceInventory preserva stems com um, dois ou mais segmentos", async
       inventory.tables.map((table) => table.sourceTable),
       ["public.users", "tb_historico", "tb_regularize.orientaoes_processual.socios"],
     );
+  });
+});
+
+test("buildSourceInventory aceita stem literal em formato de JWT", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await writeDump(directory, `${JWT_SHAPED_STEM}.sql`, USERS_DUMP);
+
+    const inventory = await buildSourceInventory({ sourceDir: directory, expectedTables: 1 });
+
+    assert.equal(inventory.tables[0].sourceTable, JWT_SHAPED_STEM);
   });
 });
 

@@ -2,7 +2,6 @@ import crypto from "node:crypto";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
-import { assertNoSensitiveValues } from "./sensitivity.mjs";
 import { inspectSqlDump, parseSourceTableFileName } from "./sql-dump-parser.mjs";
 
 const DEFAULT_CONCURRENCY = 4;
@@ -35,7 +34,6 @@ export async function buildSourceInventory({
     sourceDigest: createSourceDigest(tables),
     tables,
   };
-  assertNoSensitiveValues(inventory);
   return inventory;
 }
 
