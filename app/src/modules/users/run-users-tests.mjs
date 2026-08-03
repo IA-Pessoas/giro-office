@@ -557,6 +557,10 @@ runTest("user updates use PUT and forward modular permissions", () => {
     userServiceSource,
     /const response = await api\.put\(`\/user\/\$\{id\}`, payload\);/,
   );
+  assert.match(
+    userServiceSource,
+    /if \(data\.modules !== undefined\) payload\.modules = data\.modules;/,
+  );
 });
 
 runTest("department permission sync detects stale global user access", () => {
