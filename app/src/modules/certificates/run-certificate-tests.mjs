@@ -445,21 +445,29 @@ runTest("certificate required fields are disclosed only while creating", () => {
   assert.match(source, /function hasText\(value: string\): boolean/);
 });
 
-runTest("certificate form masks documents and BRL while preserving generic contact input", () => {
+runTest("certificate form masks documents, BRL, and contact phones", () => {
   const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
 
   assert.match(
     source,
-    /import \{[\s\S]*formatBrlInput,[\s\S]*formatCnpjInput,[\s\S]*formatCpfInput,[\s\S]*\} from "@shared\/utils\/inputFormatting"/,
+    /import \{[\s\S]*formatBrazilianPhoneInput,[\s\S]*formatBrlInput,[\s\S]*formatCnpjInput,[\s\S]*formatCpfInput,[\s\S]*\} from "@shared\/utils\/inputFormatting"/,
   );
   assert.match(source, /getCreatePjPayload/);
   assert.match(source, /getCreatePfPayload/);
   assert.match(source, /getUpdatePjPayload/);
   assert.match(source, /getUpdatePfPayload/);
-  assert.doesNotMatch(source, /formatBrazilianPhoneInput/);
+  assert.match(source, /formatBrazilianPhoneInput/);
   assert.match(
     source,
-    /value=\{formState\.contactInfo\}[\s\S]{0,160}updateField\("contactInfo", event\.target\.value\)/,
+    /contactInfo: formatBrazilianPhoneInput\(initialPj\?\.contact_info \?\? ""\)/,
+  );
+  assert.match(
+    source,
+    /contactInfo: formatBrazilianPhoneInput\(initialPf\?\.contact_info \?\? ""\)/,
+  );
+  assert.match(
+    source,
+    /updateField\("contactInfo", formatBrazilianPhoneInput\(event\.target\.value\)\)/,
   );
   assert.match(source, /updateField\("paymentAmount", formatBrlInput\(event\.target\.value\)\)/);
 });
@@ -491,7 +499,7 @@ runTest("certificate workspace formats document filters and sends digit-only que
   assert.match(source, /cpf: formatCpfInput\(event\.target\.value\)/);
 });
 
-runTest("certificate payload builders normalize masked documents and BRL amounts", () => {
+runTest("certificate payload builders normalize masked documents, BRL amounts, and contact phones", () => {
   const pjPayload = getCreatePjPayload({
     kind: "pj",
     clientCasteloStatus: true,
@@ -529,12 +537,14 @@ runTest("certificate payload builders normalize masked documents and BRL amounts
 
   assert.equal(pjPayload.cnpj, "12345678000190");
   assert.equal(pjPayload.payment_amount, 1234.56);
+  assert.equal(pjPayload.contact_info, "11999999999");
   assert.equal(pfPayload.cpf, "12345678901");
   assert.equal(pfPayload.cnpj, "12345678000190");
   assert.equal(pfPayload.payment_amount, null);
+  assert.equal(pfPayload.contact_info, "11999999999");
 });
 
-runTest("certificate update builders ignore document mask-only changes", () => {
+runTest("certificate update builders ignore document mask-only changes and normalize contact phones", () => {
   const pjState = {
     kind: "pj",
     clientCasteloStatus: false,
@@ -574,6 +584,14 @@ runTest("certificate update builders ignore document mask-only changes", () => {
   assert.equal(
     getUpdatePfPayload(pfState, { ...pfState, cpf: "12345678901", cnpj: "12345678000190" }),
     null,
+  );
+  assert.deepEqual(
+    getUpdatePjPayload({ ...pjState, contactInfo: "(11) 99999-9999" }, pjState),
+    { contact_info: "11999999999" },
+  );
+  assert.deepEqual(
+    getUpdatePfPayload({ ...pfState, contactInfo: "(11) 99999-9999" }, pfState),
+    { contact_info: "11999999999" },
   );
 });
 

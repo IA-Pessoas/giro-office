@@ -12,6 +12,7 @@ import { CertificateNativeSelect } from "./CertificateNativeSelect";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
 import {
+  formatBrazilianPhoneInput,
   formatBrlInput,
   formatCnpjInput,
   formatCpfInput,
@@ -114,7 +115,7 @@ function buildInitialFormState(formKind: "pj" | "pf", initial?: CertificatePj | 
         initialPj?.payment_amount != null
           ? formatBrlInput(String(Math.round(initialPj.payment_amount * 100)))
           : "",
-      contactInfo: initialPj?.contact_info ?? "",
+      contactInfo: formatBrazilianPhoneInput(initialPj?.contact_info ?? ""),
     };
   }
 
@@ -137,7 +138,7 @@ function buildInitialFormState(formKind: "pj" | "pf", initial?: CertificatePj | 
       initialPf?.payment_amount != null
         ? formatBrlInput(String(Math.round(initialPf.payment_amount * 100)))
         : "",
-    contactInfo: initialPf?.contact_info ?? "",
+    contactInfo: formatBrazilianPhoneInput(initialPf?.contact_info ?? ""),
   };
 }
 
@@ -485,7 +486,9 @@ export function CertificateForm({
           <input
             type="text"
             value={formState.contactInfo}
-            onChange={(event) => updateField("contactInfo", event.target.value)}
+            onChange={(event) =>
+              updateField("contactInfo", formatBrazilianPhoneInput(event.target.value))
+            }
             className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting}
           />

@@ -45,6 +45,10 @@ function normalizeOptionalText(value: string): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function normalizeOptionalPhone(value: string): string | null {
+  return normalizeDigits(value) || null;
+}
+
 function hasText(value: string): boolean {
   return value.trim().length > 0;
 }
@@ -79,7 +83,7 @@ export function getCreatePjPayload(state: PjFormState): CreateCertificatePjBody 
     was_paid: state.wasPaid,
     payment_date: state.wasPaid ? normalizeOptionalText(state.paymentDate) : null,
     payment_amount: state.wasPaid ? parseBrlInput(state.paymentAmount) : null,
-    contact_info: normalizeOptionalText(state.contactInfo),
+    contact_info: normalizeOptionalPhone(state.contactInfo),
   };
 }
 
@@ -98,7 +102,7 @@ export function getCreatePfPayload(state: PfFormState): CreateCertificatePfBody 
     was_paid: state.wasPaid,
     payment_date: state.wasPaid ? normalizeOptionalText(state.paymentDate) : null,
     payment_amount: state.wasPaid ? parseBrlInput(state.paymentAmount) : null,
-    contact_info: normalizeOptionalText(state.contactInfo),
+    contact_info: normalizeOptionalPhone(state.contactInfo),
   };
 }
 
@@ -144,7 +148,7 @@ export function getUpdatePjPayload(
   }
 
   if (current.contactInfo !== initial.contactInfo) {
-    payload.contact_info = normalizeOptionalText(current.contactInfo);
+    payload.contact_info = normalizeOptionalPhone(current.contactInfo);
   }
 
   if (current.clientCasteloStatus !== initial.clientCasteloStatus) {
@@ -216,7 +220,7 @@ export function getUpdatePfPayload(
   }
 
   if (current.contactInfo !== initial.contactInfo) {
-    payload.contact_info = normalizeOptionalText(current.contactInfo);
+    payload.contact_info = normalizeOptionalPhone(current.contactInfo);
   }
 
   if (current.clientCasteloStatus !== initial.clientCasteloStatus) {
