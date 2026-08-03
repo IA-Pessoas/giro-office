@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { formatCpfInput, normalizeDigits } from "@shared/utils/inputFormatting";
 
 import type {
   CreateRegularizeClientPfPayload,
@@ -116,7 +117,7 @@ function buildClientPfFormState(
     mother: clientPf.mother ?? "",
     marital_status: clientPf.marital_status ?? "",
     date_of_birth: toRegularizeInputDate(clientPf.date_of_birth),
-    cpf: clientPf.cpf ?? "",
+    cpf: formatCpfInput(clientPf.cpf ?? ""),
     rg: clientPf.rg ?? "",
     rg_expedition: toRegularizeInputDate(clientPf.rg_expedition),
     rg_validity: toRegularizeInputDate(clientPf.rg_validity),
@@ -147,7 +148,7 @@ function buildClientPfPayload(
     mother: trimRegularizeText(formState.mother),
     marital_status: trimRegularizeText(formState.marital_status),
     date_of_birth: formState.date_of_birth,
-    cpf: trimRegularizeText(formState.cpf),
+    cpf: normalizeDigits(trimRegularizeText(formState.cpf)),
     rg: trimRegularizeText(formState.rg),
     rg_expedition: trimRegularizeOptionalText(formState.rg_expedition),
     rg_validity: trimRegularizeOptionalText(formState.rg_validity),
@@ -284,7 +285,7 @@ export function RegularizeClientPfForm({
             <RegularizeFormField label="CPF" required>
               <input
                 value={formState.cpf}
-                onChange={(event) => handleChange("cpf", event.target.value)}
+                onChange={(event) => handleChange("cpf", formatCpfInput(event.target.value))}
                 className={regularizeTextFieldClassName}
               />
             </RegularizeFormField>
