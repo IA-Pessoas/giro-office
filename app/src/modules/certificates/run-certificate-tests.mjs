@@ -601,4 +601,78 @@ runTest("certificate document filters normalize masked values and omit empty inp
   assert.equal(normalizeCertificateDocumentFilter(" .-/ "), undefined);
 });
 
+runTest("certificate Focus and Castelo statuses remain explicit and independent", () => {
+  const formSource = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(formSource, /CERTIFICATE_STATUS_OPTIONS/);
+  assert.match(workspaceSource, /CERTIFICATE_STATUS_FILTER_OPTIONS/);
+  assert.match(workspaceSource, /label: "Regularizado"/);
+  assert.match(workspaceSource, /label: "[^"]*regularizado"/i);
+
+  for (const statusName of ["Castelo", "Focus"]) {
+    assert.match(formSource, new RegExp(`Situa\\u00e7\\u00e3o ${statusName} do certificado`));
+    assert.match(workspaceSource, new RegExp(`Situa\\u00e7\\u00e3o ${statusName} do certificado`));
+    assert.match(
+      workspaceSource,
+      new RegExp(`Situa\\u00e7\\u00e3o ${statusName} do certificado: \\{certificateStatusLabel\\(Boolean\\((pjDetail|pfDetail)\\?\\.client_`),
+    );
+  }
+
+  const pjState = {
+    kind: "pj",
+    clientCasteloStatus: false,
+    clientFocusStatus: false,
+    name: "Cliente",
+    cnpj: "12345678000190",
+    responsible: "Responsavel",
+    model: "A1",
+    legalNature: "LTDA",
+    password: "",
+    expirationDate: "2026-12-31",
+    notes: "",
+    wasPaid: false,
+    paymentDate: "",
+    paymentAmount: "",
+    contactInfo: "",
+  };
+  const pfState = {
+    kind: "pf",
+    clientCasteloStatus: false,
+    clientFocusStatus: false,
+    name: "Cliente",
+    cpf: "12345678901",
+    enterprise: "",
+    model: "A1",
+    cnpj: "",
+    password: "",
+    expirationDate: "2026-12-31",
+    notes: "",
+    wasPaid: false,
+    paymentDate: "",
+    paymentAmount: "",
+    contactInfo: "",
+  };
+
+  assert.deepEqual(
+    getUpdatePjPayload({ ...pjState, clientFocusStatus: true }, pjState),
+    { client_focus_status: true },
+  );
+  assert.deepEqual(
+    getUpdatePjPayload({ ...pjState, clientCasteloStatus: true }, pjState),
+    { client_castelo_status: true },
+  );
+  assert.deepEqual(
+    getUpdatePfPayload({ ...pfState, clientFocusStatus: true }, pfState),
+    { client_focus_status: true },
+  );
+  assert.deepEqual(
+    getUpdatePfPayload({ ...pfState, clientCasteloStatus: true }, pfState),
+    { client_castelo_status: true },
+  );
+});
+
 console.log("certificates contract tests passed");
