@@ -57,7 +57,7 @@ test("writeCsv preserva a ordem declarada, escapa RFC 4180 e representa null com
         {
           descricao: 'valor, com "aspas"',
           id: 7,
-          observacao: "primeira\nsegunda",
+          observacao: "crlf\r\nlf\ncr\rfim",
           ausente: null,
         },
       ],
@@ -65,7 +65,7 @@ test("writeCsv preserva a ordem declarada, escapa RFC 4180 e representa null com
 
     assert.equal(
       await readFile(filePath, "utf8"),
-      'id,descricao,observacao,ausente\r\n7,"valor, com ""aspas""","primeira\nsegunda",\r\n',
+      'id,descricao,observacao,ausente\r\n7,"valor, com ""aspas""","crlf\r\nlf\r\ncr\r\nfim",\r\n',
     );
   });
 });

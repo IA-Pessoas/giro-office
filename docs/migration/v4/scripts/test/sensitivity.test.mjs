@@ -90,3 +90,18 @@ test("assertNoSensitiveValues rejeita credenciais e material criptografico em va
     assert.throws(() => assertNoSensitiveValues({ details: { value } }), /sensivel/i);
   }
 });
+
+test("assertNoSensitiveValues rejeita JWTs com prefixos sem espacos", () => {
+  const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.assinatura";
+
+  for (const value of [`token=${jwt}`, `prefixo:${jwt}`]) {
+    assert.throws(
+      () => assertNoSensitiveValues({ details: { value } }),
+      (error) => {
+        assert.match(error.message, /sensivel/i);
+        assert.equal(error.message.includes(jwt), false);
+        return true;
+      },
+    );
+  }
+});

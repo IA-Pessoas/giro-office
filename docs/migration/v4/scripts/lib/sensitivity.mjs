@@ -5,7 +5,7 @@ const SECRET_COLUMN_PATTERN = /token|secret|chave|private[_-]?key|certificado|pf
 const SAFE_LEGACY_ID_PATTERN = /^[a-z0-9_-]{1,64}$/i;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POSTGRES_CREDENTIAL_URL_PATTERN = /postgres(?:ql)?:\/\/[^\s/:@]+:[^\s/@]+@/i;
-const JWT_PATTERN = /(?:^|\s)[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+(?:$|\s)/i;
+const JWT_PATTERN = /[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+/i;
 const PEM_OR_PFX_PATTERN = /-----BEGIN [A-Z0-9 #_-]+-----|\b(?:pfx|pkcs\s*#?\s*12)\b/i;
 
 export function isSensitiveColumn(name) {

@@ -34,7 +34,7 @@ function escapeCsvValue(value) {
     return "";
   }
 
-  const text = String(value);
+  const text = String(value).replace(/\r\n|\r|\n/g, "\r\n");
   if (!/[",\r\n]/.test(text)) {
     return text;
   }
