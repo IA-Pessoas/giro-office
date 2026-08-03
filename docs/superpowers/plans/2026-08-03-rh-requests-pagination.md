@@ -64,4 +64,3 @@
 - [ ] Confirm the diff uses database-side filters, bounded offset pagination, existing projection, and concurrent `findMany`/`count`; offset is intentional for this shallow operational list.
 - [ ] Run `corepack pnpm lint`, `git diff --check`, inspect `git diff --stat` and the full relevant diff, and use Playwright for an authenticated UI screenshot when available.
 - [ ] If verification finds a defect, add a failing focused test first, apply the smallest fix, rerun the affected suite, and commit with `fix(rh): address pagination verification findings`.
-
