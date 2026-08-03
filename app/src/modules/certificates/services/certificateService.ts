@@ -72,6 +72,11 @@ export const certificateService = {
     return unwrapCertificateEnvelope<CertificatePj>(response.data);
   },
 
+  async deletePj(id: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(CERTIFICATE_ENDPOINTS.pjDetail(id));
+  },
+
   async uploadPjFile(id: string, file: File): Promise<CertificateFileMetadata> {
     const api = setupAPIClient();
     const response = await api.post(
@@ -112,11 +117,6 @@ export const certificateService = {
   async deletePjFile(id: string): Promise<void> {
     const api = setupAPIClient();
     await api.delete(CERTIFICATE_ENDPOINTS.pjFile(id));
-  },
-
-  async deletePj(id: string): Promise<void> {
-    const api = setupAPIClient();
-    await api.delete(CERTIFICATE_ENDPOINTS.pjDetail(id));
   },
 
   async listPf(params: CertificatePfListParams = {}): Promise<

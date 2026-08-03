@@ -91,6 +91,14 @@ export const operations = [
   },
   {
     service: "ti-service",
+    method: "GET",
+    path: "/ti/requests/{id}/transfer-candidates",
+    action: "tiRequestTransferCandidates",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "ti-service",
     method: "PATCH",
     path: "/ti/requests/{id}/status",
     action: "tiRequestStatusPatch",

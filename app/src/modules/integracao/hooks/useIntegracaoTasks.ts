@@ -23,12 +23,13 @@ import {
 
 export function useIntegracaoTasksList(
   params: IntegracaoTaskListParams = {},
+  options: { enabled?: boolean } = {},
 ): UseQueryResult<IntegracaoTaskListResult, Error> {
   return useFetch(
     integracaoTasksListQueryKey(params),
     () => integracaoTasksService.list(params),
     {
-      enabled: true,
+      enabled: options.enabled ?? true,
     },
   );
 }

@@ -4,6 +4,8 @@ import { AxiosError } from "axios";
 import { AlertCircle, ArrowLeft, Building2, Hash, Mail, Send } from "lucide-react";
 import { toast } from "react-toastify";
 
+import { formatCnpjInput, normalizeDigits } from "@shared/utils/inputFormatting";
+
 import { organizationService } from "../services/organizationService";
 
 function getErrorMessage(err: unknown): string {
@@ -26,7 +28,7 @@ export function OrganizationAccessRequestForm() {
     e.preventDefault();
     setNeedsAuth(false);
 
-    const cnpjClean = cnpj.replace(/\D/g, "");
+    const cnpjClean = normalizeDigits(cnpj);
     if (!name.trim() || !email.trim() || cnpjClean.length !== 14) {
       toast.warn("Preencha nome, e-mail válido e CNPJ com 14 dígitos.");
       return;
@@ -168,7 +170,7 @@ export function OrganizationAccessRequestForm() {
               id="org-cnpj"
               type="text"
               value={cnpj}
-              onChange={(e) => setCnpj(e.target.value)}
+              onChange={(e) => setCnpj(formatCnpjInput(e.target.value))}
               onFocus={() => setFocusedField("cnpj")}
               onBlur={() => setFocusedField(null)}
               placeholder="Informe seu CNPJ"

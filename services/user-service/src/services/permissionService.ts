@@ -7,6 +7,7 @@ import {
 } from "@workspace/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
+import type { UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 
 const PERMISSION_PUBLIC_SELECT = {
@@ -50,6 +51,8 @@ interface PermissionChangeAudit {
 }
 
 class PermissionService {
+  constructor(private readonly audit?: UserAuditRecorder) {}
+
   async create(userId: string, organizationId: string): Promise<PermissionPublicRow> {
     const exists = await prismaClient.permission.findFirst({
       where: { user_id: userId, organization_id: organizationId },
@@ -122,7 +125,7 @@ class PermissionService {
     }
 
     try {
-      return await prismaClient.$transaction(async (transaction) => {
+      const nextPermission = await prismaClient.$transaction(async (transaction) => {
         const permission = await transaction.permission.updateMany({
           where: {
             user_id: userId,
@@ -172,10 +175,39 @@ class PermissionService {
 
         return nextPermission;
       });
+
+      if (audit.actorUserId) {
+        this.#recordAudit({
+          actorUserId: audit.actorUserId,
+          organizationId: organizationId ?? nextPermission.organization_id,
+          action: "UPDATE",
+          referring: "Permission",
+          referringId: userId,
+          changes: {
+            affected_user_id: userId,
+            organization_id: organizationId ?? nextPermission.organization_id,
+            previous: previousPermission,
+            next: nextPermission,
+          },
+          outcome: "success",
+        });
+      }
+
+      return nextPermission;
     } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
       logError("Erro ao atualizar permissão", { err });
       throw new ServiceError(500, "Erro ao atualizar permissão.", err);
+    }
+  }
+
+  #recordAudit(params: Parameters<UserAuditRecorder>[0]): void {
+    try {
+      void Promise.resolve(this.audit?.(params)).catch((err: unknown) => {
+        logError("Erro ao registrar auditoria de permissao", { err });
+      });
+    } catch (err: unknown) {
+      logError("Erro ao registrar auditoria de permissao", { err });
     }
   }
 

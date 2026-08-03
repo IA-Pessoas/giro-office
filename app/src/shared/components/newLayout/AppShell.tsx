@@ -32,6 +32,8 @@ import {
 import {
   APP_ROUTE_MODULE_MAP,
   canViewIntegrationRoute,
+  canViewTasksOnlyIntegrationRoute,
+  hasAnyModuleAccess,
   MODULE_KEYS,
   getModulePermissionLevel,
   canAccessAdministration,
@@ -42,6 +44,7 @@ import {
   type ModulePermissionSubject,
 } from "@modules/auth";
 import { useMe } from "@shared/hooks";
+import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -213,7 +216,13 @@ function getNavigationModuleName(
   return module.name;
 }
 
-function ModuleAccessDeniedState() {
+function ModuleAccessDeniedState({
+  fallbackHref = "/dashboard",
+  fallbackLabel = "Voltar para o dashboard",
+}: {
+  fallbackHref?: string;
+  fallbackLabel?: string;
+}) {
   return (
     <section className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center">
       <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -227,10 +236,10 @@ function ModuleAccessDeniedState() {
           {MODULE_ACCESS_DENIED_MESSAGE}
         </p>
         <Link
-          href="/dashboard"
+          href={fallbackHref}
           className="mt-6 inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
         >
-          Voltar para o dashboard
+          {fallbackLabel}
         </Link>
       </div>
     </section>
@@ -305,6 +314,7 @@ export function AppShell({
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarPreviewOpen, setIsSidebarPreviewOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
@@ -314,6 +324,12 @@ export function AppShell({
   const [hasUserPhotoLoadError, setHasUserPhotoLoadError] = useState(false);
   const notifications: AppShellNotification[] = [];
   const hasUnreadNotifications = notifications.some((item) => item.unread);
+  const shouldExpandSidebar = isSidebarOpen || isSidebarPreviewOpen;
+  const sidebarToggleLabel = isSidebarOpen
+    ? "Recolher sidebar"
+    : isSidebarPreviewOpen
+      ? "Fixar sidebar aberta"
+      : "Expandir sidebar";
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
@@ -330,17 +346,28 @@ export function AppShell({
   const canManageOrganization = canCreateOrganizationOwner(accessUser);
   const canManageUsers = canAccessAdministration(accessUser, { rhAccess });
   const isAdministrationAccessLoading = !canManageOrganization && isModuleAccessLoading;
+  const isSelfProfileRoute = normalizeRoutePath(pathname) === "/me";
   const currentModuleKey = getModuleKeyFromRoutePath(pathname);
   const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
+  const shouldShowDashboard = isModuleAccessLoading || hasAnyModuleAccess(moduleAccessMap);
   const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
+  const canViewTasksOnlyRoute = canViewTasksOnlyIntegrationRoute(pathname, moduleAccessUser);
   const canViewCurrentModuleRoute =
-    currentModuleKey === "integracao"
+    canViewTasksOnlyRoute &&
+    (currentModuleKey === "integracao"
       ? canViewIntegrationRoute(pathname, moduleAccessUser)
-      : currentModuleAccess?.canView === true;
+      : currentModuleAccess?.canView === true);
   const shouldRenderModuleAccessDenied =
-    Boolean(currentModuleKey) && !isModuleAccessLoading && !canViewCurrentModuleRoute;
+    !isSelfProfileRoute &&
+    !isModuleAccessLoading &&
+    ((!canViewTasksOnlyRoute && getModulePermissionLevel(moduleAccessUser, "integracao") === 0) ||
+      (Boolean(currentModuleKey) && !canViewCurrentModuleRoute));
 
   const canViewModuleFromPath = (modulePath: string): boolean => {
+    if (modulePath === "/dashboard") {
+      return shouldShowDashboard;
+    }
+
     if (modulePath === "/departments") {
       return canManageOrganization;
     }
@@ -361,6 +388,10 @@ export function AppShell({
 
     if (isModuleAccessLoading) {
       return true;
+    }
+
+    if (!canViewTasksOnlyIntegrationRoute(modulePath, moduleAccessUser)) {
+      return false;
     }
 
     if (moduleKey === "integracao") {
@@ -395,10 +426,32 @@ export function AppShell({
   const mainContent = shouldRenderModuleAccessLoading ? (
     <ModuleAccessLoadingState />
   ) : shouldRenderModuleAccessDenied ? (
-    <ModuleAccessDeniedState />
+    <ModuleAccessDeniedState
+      fallbackHref={
+        getModulePermissionLevel(moduleAccessUser, "integracao") === 0 ? "/tasks" : "/dashboard"
+      }
+      fallbackLabel={
+        getModulePermissionLevel(moduleAccessUser, "integracao") === 0
+          ? "Ir para Minhas tarefas"
+          : "Voltar para o dashboard"
+      }
+    />
   ) : (
     children
   );
+
+  useEffect(() => {
+    if (
+      isSelfProfileRoute ||
+      isModuleAccessLoading ||
+      getModulePermissionLevel(moduleAccessUser, "integracao") !== 0 ||
+      canViewTasksOnlyRoute
+    ) {
+      return;
+    }
+
+    void router.replace("/tasks");
+  }, [canViewTasksOnlyRoute, isModuleAccessLoading, isSelfProfileRoute, moduleAccessUser, router]);
 
   useEffect(() => {
     setHasUserPhotoLoadError(false);
@@ -455,7 +508,34 @@ export function AppShell({
     setChatInput("");
   };
 
-  const toggleSidebar = () => setIsSidebarOpen((v) => !v);
+  const openSidebarPreview = () => {
+    if (!isSidebarOpen) {
+      setIsSidebarPreviewOpen(true);
+    }
+  };
+
+  const closeSidebarPreview = () => {
+    if (!isSidebarOpen) {
+      setIsSidebarPreviewOpen(false);
+    }
+  };
+
+  const pinSidebarOpen = () => {
+    if (!isSidebarOpen) {
+      setIsSidebarOpen(true);
+      setIsSidebarPreviewOpen(false);
+    }
+  };
+
+  const toggleSidebar = () => {
+    if (isSidebarOpen) {
+      setIsSidebarOpen(false);
+      setIsSidebarPreviewOpen(false);
+      return;
+    }
+
+    pinSidebarOpen();
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -466,12 +546,16 @@ export function AppShell({
         !mobileMenuButtonRef.current.contains(event.target as Node)
       ) {
         if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+        if (isSidebarPreviewOpen) setIsSidebarPreviewOpen(false);
       }
     };
 
-    if (isMobileMenuOpen) document.addEventListener("mousedown", handleClickOutside);
+    if (isMobileMenuOpen || isSidebarPreviewOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isMobileMenuOpen]);
+  }, [isMobileMenuOpen, isSidebarPreviewOpen]);
 
   useEffect(() => {
     if (!showNotifications && !showUserMenu && !showAiChat) {
@@ -534,34 +618,51 @@ export function AppShell({
 
       <aside
         ref={sidebarRef}
+        onMouseEnter={openSidebarPreview}
+        onMouseLeave={closeSidebarPreview}
+        onFocus={openSidebarPreview}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            closeSidebarPreview();
+          }
+        }}
+        onClick={pinSidebarOpen}
         className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 transition-all duration-300 z-40 ${
-          isSidebarOpen ? "w-64" : "w-20"
-        } ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
+          shouldExpandSidebar ? "w-64" : "w-20"
+        } ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${isSidebarPreviewOpen ? "lg:z-50 lg:shadow-xl" : ""} lg:translate-x-0`}
       >
-        <div className="h-16 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-4">
-          <Logo showText={isSidebarOpen} />
+        <div
+          className={`h-16 border-b border-gray-200 dark:border-slate-800 flex items-center ${
+            shouldExpandSidebar ? "justify-between gap-2 px-4" : "justify-center px-2"
+          }`}
+        >
+          {shouldExpandSidebar ? <Logo showText /> : null}
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleSidebar();
+            }}
+            className="hidden h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 dark:border-slate-800 dark:bg-slate-900 dark:text-gray-400 dark:hover:bg-slate-800 lg:inline-flex"
+            type="button"
+            aria-label={sidebarToggleLabel}
+            title={sidebarToggleLabel}
+          >
+            {isSidebarOpen ? (
+              <ChevronLeft className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+          </button>
         </div>
 
-        <button
-          onClick={toggleSidebar}
-          className="hidden lg:flex absolute -right-3 top-20 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-full p-1 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors z-50"
-          type="button"
-        >
-          {isSidebarOpen ? (
-            <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-          )}
-        </button>
-
-        <nav className="p-3 space-y-6 overflow-y-auto h-[calc(100vh-4rem)]">
+        <nav className={`p-3 space-y-6 h-[calc(100vh-4rem)] ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}>
           {filteredModuleCategories.map((category) => {
             const shouldRenderModuleNavLoading =
               category.isModuleAccessCategory === true && isModuleAccessLoading;
 
             return (
               <div key={category.name}>
-                {isSidebarOpen ? (
+                {shouldExpandSidebar ? (
                   <div className="px-3 mb-2">
                     <span className="text-xs font-semibold text-black dark:text-white uppercase tracking-wider">
                       {category.name}
@@ -571,7 +672,7 @@ export function AppShell({
 
                 <div className="space-y-1">
                   {shouldRenderModuleNavLoading ? (
-                    <ModuleNavLoadingItem showText={isSidebarOpen} />
+                    <ModuleNavLoadingItem showText={shouldExpandSidebar} />
                   ) : (
                     category.modules.map((module) => {
                       const Icon = module.icon;
@@ -585,11 +686,11 @@ export function AppShell({
                             isActive
                               ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
                               : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
-                          } ${!isSidebarOpen ? "justify-center" : ""}`}
-                          title={!isSidebarOpen ? module.name : undefined}
+                          } ${!shouldExpandSidebar ? "justify-center" : ""}`}
+                          title={!shouldExpandSidebar ? module.name : undefined}
                         >
                           <Icon className="w-5 h-5 flex-shrink-0" />
-                          {isSidebarOpen ? (
+                          {shouldExpandSidebar ? (
                             <span className="text-sm font-medium">
                               {getNavigationModuleName(module, moduleAccessUser)}
                             </span>
@@ -673,7 +774,7 @@ export function AppShell({
                         Notificações
                       </h3>
                     </div>
-                    <div className="max-h-96 overflow-y-auto">
+                    <div className={`max-h-96 ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}>
                       {notifications.length > 0 ? (
                         notifications.map((item) => (
                           <button
@@ -760,15 +861,17 @@ export function AppShell({
                           {displayUserLogin}
                         </p>
                       </div>
-                      <Link
-                        href="/configuracoes"
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                        onClick={() => setShowUserMenu(false)}
-                        role="menuitem"
-                      >
-                        <Settings className="w-4 h-4" />
-                        Configurações
-                      </Link>
+                      {getModulePermissionLevel(moduleAccessUser, "integracao") !== 0 ? (
+                        <Link
+                          href="/configuracoes"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                          onClick={() => setShowUserMenu(false)}
+                          role="menuitem"
+                        >
+                          <Settings className="w-4 h-4" />
+                          Configurações
+                        </Link>
+                      ) : null}
                       <div className="border-t border-gray-100 dark:border-gray-700 mt-2 pt-2">
                         <button
                           onClick={handleLogout}
@@ -787,7 +890,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">{mainContent}</main>
+        <main className={`flex-1 p-4 lg:p-8 ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}>{mainContent}</main>
       </div>
 
       <DialogPrimitive.Root open={showAiChat} onOpenChange={setShowAiChat}>
@@ -828,7 +931,7 @@ export function AppShell({
 
             <div
               ref={chatScrollRef}
-              className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-slate-950/40"
+              className={`flex-1 p-4 space-y-3 bg-gray-50 dark:bg-slate-950/40 ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}
             >
               {chatMessages.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-center">

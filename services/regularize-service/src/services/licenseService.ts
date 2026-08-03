@@ -3,6 +3,7 @@ import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLicenseBody, UpdateLicenseBody } from "../schemas/license.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
+import { ensureRegularizeResponsible } from "./regularizeResponsibleService.js";
 import type { RegularizeReconciliationService } from "./regularizeReconciliationService.js";
 
 const licenseSelect = {
@@ -42,6 +43,7 @@ export class LicenseService {
     if (input.body.client_id) {
       await this.ensureClientExists(input.organizationId, input.body.client_id);
     }
+    await ensureRegularizeResponsible(this.prisma, input.organizationId, input.body.responsible_id);
 
     const exists = await this.prisma.license.findFirst({
       where: {
@@ -94,6 +96,12 @@ export class LicenseService {
     if (input.body.client_id) {
       await this.ensureClientExists(input.organizationId, input.body.client_id);
     }
+    await ensureRegularizeResponsible(
+      this.prisma,
+      input.organizationId,
+      input.body.responsible_id,
+      existing.responsible_id,
+    );
 
     const updated = await this.prisma.license.update({
       where: { id: input.body.id },

@@ -20,7 +20,6 @@ function normalizeDepartmentStatus(status?: string): string {
 
 const getInitialState = (dep: DepItem) => ({
   name: dep?.name || "",
-  color: dep?.color || "#3B82F6",
   solution: dep.solution || false,
   status: normalizeDepartmentStatus(dep?.status),
 });
@@ -48,7 +47,6 @@ export const useDepForm = (initialDep: DepItem) => {
   const [isLoading, setIsLoading] = useState(false);
   const isDirty =
     formData.name.trim() !== savedState.name.trim() ||
-    formData.color.toLowerCase() !== savedState.color.toLowerCase() ||
     formData.status !== savedState.status ||
     formData.solution !== savedState.solution;
 
@@ -68,7 +66,6 @@ export const useDepForm = (initialDep: DepItem) => {
     try {
       const updated = await departmentService.update(initialDep.id, {
         name: formData.name.trim(),
-        color: formData.color,
         solution: formData.solution,
         status: normalizeDepartmentStatus(formData.status),
       });

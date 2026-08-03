@@ -7,6 +7,8 @@ export const tiQueryKeys = {
     all: () => [...tiQueryKeys.all, "requests"] as const,
     list: (filters?: TiListFilters) => [...tiQueryKeys.requests.all(), "list", filters ?? {}] as const,
     detail: (id?: TiId) => [...tiQueryKeys.requests.all(), "detail", id] as const,
+    transferCandidates: (id?: TiId) =>
+      [...tiQueryKeys.requests.detail(id), "transfer-candidates"] as const,
     messages: (id?: TiId) => [...tiQueryKeys.requests.detail(id), "messages"] as const,
     categories: (filters?: TiListFilters) =>
       [...tiQueryKeys.requests.all(), "categories", filters ?? {}] as const,

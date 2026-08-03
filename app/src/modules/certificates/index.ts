@@ -35,6 +35,8 @@ export {
   useCertificatePjList,
   useCreateCertificatePjMutation,
   useCreateCertificatePfMutation,
+  useDeleteCertificatePjMutation,
+  useDeleteCertificatePfMutation,
   useDeleteCertificatePjFileMutation,
   useDeleteCertificatePfFileMutation,
   useDownloadCertificatePjFileMutation,

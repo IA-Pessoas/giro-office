@@ -3,6 +3,8 @@ import { Boxes, Eye, Pencil, Plus, RotateCcw, Save, Tags, UserPlus, X } from "lu
 
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
+import { useAssignableUsers } from "@modules/rh";
+import { ConfirmationDialog } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
@@ -19,7 +21,13 @@ import {
   useUpdateTiInventoryAssetMutation,
   useUpdateTiInventoryCategoryMutation,
 } from "../hooks";
-import type { TiId, TiInventoryAsset, TiInventoryCategory } from "../types";
+import type {
+  TiId,
+  TiInventoryAsset,
+  TiInventoryAssignUserPayload,
+  TiInventoryCategory,
+  TiInventoryReturnPayload,
+} from "../types";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -48,6 +56,10 @@ type InventoryDialogState =
   | { type: "assign"; asset: TiInventoryAsset }
   | { type: "return"; asset: TiInventoryAsset }
   | { type: "categories" };
+
+type PendingInventoryAction =
+  | { type: "assign"; asset: TiInventoryAsset; payload: TiInventoryAssignUserPayload }
+  | { type: "return"; asset: TiInventoryAsset; payload: TiInventoryReturnPayload };
 
 const INVENTORY_STATUS_OPTIONS = [
   { value: "", label: "Todos" },
@@ -219,7 +231,13 @@ export function TiInventoryTab() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [dialogState, setDialogState] = useState<InventoryDialogState | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingInventoryAction | null>(null);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<TiInventoryCategory | null>(null);
+  const assignableUsersQuery = useAssignableUsers({
+    enabled: canManage && (dialogState?.type === "asset" || dialogState?.type === "assign"),
+    module: "ti",
+  });
 
   const filters = useMemo(
     () =>
@@ -286,6 +304,21 @@ export function TiInventoryTab() {
     () => [{ value: "", label: "Selecione" }, ...departmentOptions],
     [departmentOptions],
   );
+
+  const assignableUserOptions = useMemo(
+    () => [
+      { value: "", label: "NÃ£o atribuir" },
+      ...(assignableUsersQuery.data ?? []).map((user) => ({
+        value: user.id,
+        label: user.name,
+      })),
+    ],
+    [assignableUsersQuery.data],
+  );
+
+  function hasAssignableUser(userId: unknown): boolean {
+    return Boolean(userId) && (assignableUsersQuery.data ?? []).some((user) => user.id === userId);
+  }
 
   const filteredInventory = useMemo(() => {
     const assets = inventoryQuery.data ?? [];
@@ -365,7 +398,7 @@ export function TiInventoryTab() {
     }
   }
 
-  async function handleSubmitAssign(event: FormEvent<HTMLFormElement>) {
+  function handleSubmitAssign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canManage || dialogState?.type !== "assign") {
@@ -375,50 +408,58 @@ export function TiInventoryTab() {
     const formData = new FormData(event.currentTarget);
     const userId = getFormText(formData, "user_id");
 
-    if (!confirm("Confirmar atribuição deste ativo?")) {
-      return;
-    }
-
-    try {
-      setDialogError(null);
-      await assignUserMutation.mutateAsync({
-        id: dialogState.asset.id,
-        payload: compactPayload({
-          user_id: userId,
-        }),
-      });
-      setSelectedAssetId(dialogState.asset.id);
-      closeDialog();
-    } catch (error) {
-      setDialogError(getMutationErrorMessage(error));
-    }
+    setConfirmationError(null);
+    setPendingAction({
+      type: "assign",
+      asset: dialogState.asset,
+      payload: compactPayload({ user_id: userId }),
+    });
   }
 
-  async function handleSubmitReturn(event: FormEvent<HTMLFormElement>) {
+  function handleSubmitReturn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canManage || dialogState?.type !== "return") {
       return;
     }
 
-    if (!confirm("Confirmar devolução deste ativo?")) {
+    const formData = new FormData(event.currentTarget);
+
+    setConfirmationError(null);
+    setPendingAction({
+      type: "return",
+      asset: dialogState.asset,
+      payload: compactPayload({ notes: getFormText(formData, "notes") }),
+    });
+  }
+
+  async function handleConfirmPendingAction() {
+    if (!pendingAction) {
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
-
     try {
-      setDialogError(null);
-      await returnAssetMutation.mutateAsync({
-        id: dialogState.asset.id,
-        payload: compactPayload({
-          notes: getFormText(formData, "notes"),
-        }),
-      });
-      setSelectedAssetId(dialogState.asset.id);
+      setConfirmationError(null);
+
+      if (pendingAction.type === "assign") {
+        await assignUserMutation.mutateAsync({
+          id: pendingAction.asset.id,
+          payload: pendingAction.payload,
+        });
+      } else {
+        await returnAssetMutation.mutateAsync({
+          id: pendingAction.asset.id,
+          payload: pendingAction.payload,
+        });
+      }
+
+      setSelectedAssetId(pendingAction.asset.id);
       closeDialog();
     } catch (error) {
-      setDialogError(getMutationErrorMessage(error));
+      const actionLabel = pendingAction.type === "assign" ? "atribuir o ativo" : "registrar a devolução";
+
+      setConfirmationError(`Não foi possível ${actionLabel}: ${getMutationErrorMessage(error)}`);
+      throw error;
     }
   }
 
@@ -668,6 +709,30 @@ export function TiInventoryTab() {
         </div>
       </Dialog>
 
+      <ConfirmationDialog
+        open={pendingAction !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingAction(null);
+            setConfirmationError(null);
+          }
+        }}
+        title={pendingAction?.type === "assign" ? "Confirmar atribuição" : "Confirmar devolução"}
+        description={
+          pendingAction?.type === "assign"
+            ? "Deseja atribuir este ativo ao usuário informado?"
+            : "Deseja registrar a devolução deste ativo?"
+        }
+        onConfirm={handleConfirmPendingAction}
+        isConfirming={
+          pendingAction?.type === "assign" ? assignUserMutation.isPending : returnAssetMutation.isPending
+        }
+        errorMessage={confirmationError}
+        confirmLabel={pendingAction?.type === "assign" ? "Atribuir ativo" : "Registrar devolução"}
+        cancelLabel="Cancelar"
+        variant={pendingAction?.type === "return" ? "destructive" : "neutral"}
+      />
+
       <Dialog
         open={dialogState?.type === "asset"}
         onOpenChange={(open) => {
@@ -710,22 +775,38 @@ export function TiInventoryTab() {
               }
               options={departmentFormOptions}
             />
-            <TiTextField
-              label="ID do usuário"
+            <TiNativeSelect
+              label="Usuário"
               name="user_id"
-              defaultValue={
-                dialogState?.type === "asset" ? getText(dialogState.asset?.user_id, "") : ""
-              }
-            />
-            <TiTextField
-              label="ID do responsável TI"
+              defaultValue={dialogState?.type === "asset" ? getText(dialogState.asset?.user_id, "") : ""}
+              options={assignableUserOptions}
+              disabled={assignableUsersQuery.isLoading || assignableUsersQuery.isError}
+            >
+              {dialogState?.type === "asset" &&
+              dialogState.mode === "edit" &&
+              dialogState.asset?.user_id &&
+              !hasAssignableUser(dialogState.asset.user_id) ? (
+                <option value={dialogState.asset.user_id}>Usuário atual</option>
+              ) : null}
+            </TiNativeSelect>
+            <TiNativeSelect
+              label="Responsável TI"
               name="responsible_it_staff_id"
               defaultValue={
                 dialogState?.type === "asset"
                   ? getText(dialogState.asset?.responsible_it_staff_id, "")
                   : ""
               }
-            />
+              options={assignableUserOptions}
+              disabled={assignableUsersQuery.isLoading || assignableUsersQuery.isError}
+            >
+              {dialogState?.type === "asset" &&
+              dialogState.mode === "edit" &&
+              dialogState.asset?.responsible_it_staff_id &&
+              !hasAssignableUser(dialogState.asset.responsible_it_staff_id) ? (
+                <option value={dialogState.asset.responsible_it_staff_id}>Responsável atual</option>
+              ) : null}
+            </TiNativeSelect>
           </div>
           <TiTextarea
             label="Notas"
@@ -762,7 +843,13 @@ export function TiInventoryTab() {
           <TiInlineNotice tone="warning">
             A atribuição será registrada no ativo selecionado após a confirmação.
           </TiInlineNotice>
-          <TiTextField label="ID do usuário" name="user_id" required />
+          <TiNativeSelect
+            label="Usuário"
+            name="user_id"
+            required
+            options={assignableUserOptions}
+            disabled={assignableUsersQuery.isLoading || assignableUsersQuery.isError}
+          />
           <div className="flex justify-end gap-2">
             <button type="button" className="h-10 px-4 text-sm font-semibold" onClick={closeDialog}>
               Cancelar

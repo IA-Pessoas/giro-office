@@ -108,7 +108,7 @@ describe("TiDashboardService", () => {
       where: { organization_id: context.organizationId, user_id: { not: null } },
     });
     expect(prisma.termTecnologia.count).toHaveBeenCalledWith({
-      where: { organization_id: context.organizationId, reason: null },
+      where: { organization_id: context.organizationId, signed_at: null },
     });
     expect(prisma.department.findFirst).toHaveBeenCalledWith({
       where: {

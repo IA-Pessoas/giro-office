@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 
 const { getRhQuarterOptions } = await import("./utils/rhScoreUi.ts");
 const { formatRhDate } = await import("./utils/rhDate.ts");
+const { resolveRhPermissionCapabilities } = await import("./utils/rhPermissions.ts");
+const { getRhMessageTypeClassName } = await import("./utils/rhRequestUi.ts");
 
 const rhSources = {
   requestFormModal: readFileSync("src/modules/rh/components/RhRequestFormModal.tsx", "utf8"),
@@ -43,6 +45,34 @@ runTest("assignable RH users are loaded from rh-service, not user-service", () =
   assert.match(hookSource, /RH_ENDPOINTS\.operationalUsers/);
   assert.doesNotMatch(hookSource, /@modules\/users/);
   assert.doesNotMatch(hookSource, /listAdminUsers/);
+});
+
+runTest("assignable RH users keep context in cache keys and request params", () => {
+  const hookSource = readFileSync("src/modules/rh/hooks/useAssignableUsers.ts", "utf8");
+
+  assert.match(hookSource, /options\.module/);
+  assert.match(hookSource, /options\.departmentId/);
+  assert.match(hookSource, /options\.departmentName/);
+  assert.match(hookSource, /params:\s*\{/);
+  assert.match(hookSource, /department_id:\s*options\?\.departmentId/);
+  assert.match(hookSource, /department_name:\s*options\?\.departmentName/);
+});
+
+runTest("task assignment selectors use the contextual RH source", () => {
+  const taskFormSource = readFileSync(
+    "src/modules/integracao/components/TaskFormModal.tsx",
+    "utf8",
+  );
+  const taskModelSource = readFileSync(
+    "src/modules/integracao/components/TaskModelModal.tsx",
+    "utf8",
+  );
+
+  for (const source of [taskFormSource, taskModelSource]) {
+    assert.match(source, /useAssignableUsers/);
+    assert.doesNotMatch(source, /listAdminUsers/);
+    assert.match(source, /departmentId:/);
+  }
 });
 
 runTest("RH modal fields disclose required inputs before submission", () => {
@@ -108,6 +138,41 @@ runTest("RH viewer self-service flow stays enabled and scoped", () => {
   );
 });
 
+runTest("RH Usuario mantem autosservico e nao recebe gestao", () => {
+  const capabilities = resolveRhPermissionCapabilities(2, false);
+
+  assert.equal(capabilities.canAccessRhPortal, true);
+  assert.equal(capabilities.canManageRhRequests, false);
+  assert.equal(capabilities.canManageRhScore, false);
+  assert.equal(capabilities.canManageRhTimeBank, false);
+  assert.equal(capabilities.canManageRhTimesheets, false);
+  assert.equal(capabilities.canManageRhWorkday, false);
+});
+
+runTest("RH sem acesso nao e tratado como usuario autorizado", () => {
+  const capabilities = resolveRhPermissionCapabilities(0, false);
+
+  assert.equal(capabilities.canAccessRhPortal, false);
+  assert.equal(capabilities.canManageRhRequests, false);
+});
+
+runTest("RH shell distingue erro de permissao de ausencia de acesso", () => {
+  const shellSource = readFileSync("src/shared/components/newLayout/RH.tsx", "utf8");
+
+  assert.match(
+    shellSource,
+    /if \(!permissionQuery\.isLoading && permissionQuery\.error\) \{/,
+  );
+  assert.match(
+    shellSource,
+    /validar o acesso ao RH agora\./,
+  );
+  assert.match(
+    shellSource,
+    /if \(!permissionQuery\.isLoading && !permissionQuery\.error && !canAccessRhPortal\) \{/,
+  );
+});
+
 runTest("RH score periods include a relative history window and do not hard-code 2026", () => {
   const options = getRhQuarterOptions(new Date("2026-07-01T12:00:00"));
   const historySource = readFileSync("src/modules/rh/components/score/RhScoreHistoryPanel.tsx", "utf8");
@@ -121,4 +186,21 @@ runTest("RH score periods include a relative history window and do not hard-code
 runTest("RH civil dates do not move when an API value is UTC midnight", () => {
   assert.equal(formatRhDate("2026-07-23T00:00:00.000Z"), "23/07/2026");
   assert.equal(formatRhDate("2026-01-01"), "01/01/2026");
+});
+
+runTest("RH request timeline uses distinct semantic message type badges", () => {
+  const timelineSource = readFileSync(
+    "src/modules/rh/components/RhRequestMessagesTimeline.tsx",
+    "utf8",
+  );
+  const classNames = ["Message", "Solution", "Rejection", "Acceptance"].map(
+    getRhMessageTypeClassName,
+  );
+
+  assert.equal(new Set(classNames).size, 4);
+  assert.match(getRhMessageTypeClassName("Message"), /blue|slate|gray/);
+  assert.match(getRhMessageTypeClassName("Solution"), /amber|yellow/);
+  assert.match(getRhMessageTypeClassName("Rejection"), /red|rose/);
+  assert.match(getRhMessageTypeClassName("Acceptance"), /green|emerald/);
+  assert.match(timelineSource, /getRhMessageTypeClassName\(item\.type\)/);
 });

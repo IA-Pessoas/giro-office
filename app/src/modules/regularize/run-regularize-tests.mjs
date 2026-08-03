@@ -4,6 +4,7 @@ import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildRegularizeClientPfListParams,
+  buildRegularizeMunicipalTaxesListParams,
   buildRegularizeProcessListParams,
   buildRegularizeSitePasswordListParams,
   unwrapRegularizePage,
@@ -95,6 +96,16 @@ await runTest("regularize licenses list all statuses by default and keep mutatio
   );
 });
 
+await runTest("regularize license responsible field uses the contextual selector", async () => {
+  const source = await readModuleSource("components/RegularizeLicenseForm.tsx");
+
+  assert.match(source, /useAssignableUsers/);
+  assert.match(source, /module: "regularize"/);
+  assert.match(source, /<RegularizeNativeSelect[\s\S]*value=\{formState\.responsible_id\}/);
+  assert.match(source, /Respons.vel atual/);
+  assert.doesNotMatch(source, /Respons.vel ID/);
+});
+
 await runTest("regularize PF list contract preserves explicit search status and pagination", async () => {
   assert.deepEqual(
     buildRegularizeClientPfListParams({
@@ -152,6 +163,35 @@ await runTest("regularize PF forms search every paginated PF option and preserve
   assert.match(selectSource, /Tentar novamente/);
   assert.match(selectSource, /const error = listQuery\.error \?\? selectedPfQuery\.error/);
   assert.match(selectSource, /listQuery\.refetch/);
+});
+
+await runTest("regularize document inputs keep masks while payloads use canonical digits", async () => {
+  const [processFormSource, guidancePartnerFormSource] = await Promise.all([
+    readModuleSource("components/RegularizeProcessForm.tsx"),
+    readModuleSource("components/RegularizeGuidancePartnerForm.tsx"),
+  ]);
+
+  assert.match(processFormSource, /formatCpfCnpjInput/);
+  assert.match(processFormSource, /normalizeDigits/);
+  assert.match(
+    processFormSource,
+    /handleChange\("cpf_cnpj", formatCpfCnpjInput\(event\.target\.value\)\)/,
+  );
+  assert.match(
+    processFormSource,
+    /cpf_cnpj: normalizeDigits\(trimRegularizeText\(formState\.cpf_cnpj\)\)/,
+  );
+
+  assert.match(guidancePartnerFormSource, /formatCpfInput/);
+  assert.match(guidancePartnerFormSource, /normalizeDigits/);
+  assert.match(
+    guidancePartnerFormSource,
+    /handleChange\("cpf", formatCpfInput\(event\.target\.value\)\)/,
+  );
+  assert.match(
+    guidancePartnerFormSource,
+    /cpf: normalizeDigits\(trimRegularizeText\(formState\.cpf\)\)/,
+  );
 });
 
 await runTest("regularize dashboard has a centralized aggregate data contract", async () => {
@@ -301,6 +341,63 @@ await runTest("regularize list params carry server search and pagination", async
   );
   const page = { data: [{ id: "row-21" }], total: 21, page: 2, limit: 20, hasMore: false };
   assert.deepEqual(unwrapRegularizePage({ data: page }, { page: 2, limit: 20 }), page);
+});
+
+await runTest("regularize municipal tax contract carries filters and unwraps a page", async () => {
+  for (const type of ["TFF", "TLP", "TLL"]) {
+    assert.deepEqual(
+      buildRegularizeMunicipalTaxesListParams({
+        year: 2026,
+        search: " Castelo ",
+        status: "Criado",
+        type,
+        page: 2,
+        limit: 20,
+      }),
+      { year: 2026, search: "Castelo", status: "Criado", type, page: 2, limit: 20 },
+    );
+  }
+
+  const [queryKeysSource, serviceSource, hookSource] = await Promise.all([
+    readModuleSource("hooks/queryKeys.ts"),
+    readModuleSource("services/regularizeService.ts"),
+    readModuleSource("hooks/useRegularizeOperations.ts"),
+  ]);
+
+  assert.match(
+    queryKeysSource,
+    /"municipal-taxes",\s*filters\.year,\s*filters\.search \?\? "",\s*filters\.status \?\? "Todos",\s*filters\.type \?\? "Todos",\s*filters\.page \?\? 1,\s*filters\.limit \?\? 20/,
+  );
+  assert.match(serviceSource, /Promise<RegularizeMunicipalTaxesPage>/);
+  assert.match(serviceSource, /unwrapRegularizeEnvelope<RegularizeMunicipalTaxesPage>\(response\.data\)/);
+  assert.match(hookSource, /UseQueryResult<RegularizeMunicipalTaxesPage, Error>/);
+});
+
+await runTest("regularize municipal tax tab uses debounced filters and paginated rows", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /const \[taxSearch, setTaxSearch\] = useState\(""\)/);
+  assert.match(
+    pageSource,
+    /const \[taxStatus, setTaxStatus\] = useState(?:<"Todos" \| "Criado" \| "Pendente">)?\("Todos"\)/,
+  );
+  assert.match(pageSource, /const \[taxYear, setTaxYear\] = useState\(\(\) => new Date\(\)\.getFullYear\(\)\)/);
+  assert.match(pageSource, /const \[taxType, setTaxType\] = useState<"Todos" \| "TFF" \| "TLP" \| "TLL">\("Todos"\)/);
+  assert.match(pageSource, /useDebouncedValue\(taxSearch\.trim\(\), 300\)/);
+  assert.match(pageSource, /setTaxPage\(1\)/);
+  assert.match(pageSource, /year: taxYear/);
+  assert.match(pageSource, /search: debouncedTaxSearch/);
+  assert.match(pageSource, /status: taxStatus/);
+  assert.match(pageSource, /type: taxType/);
+  assert.match(pageSource, /limit: REGULARIZE_PAGE_SIZE/);
+  assert.match(pageSource, /data: isTaxSearchPending \? undefined : taxQuery\.data\?\.data/);
+  assert.match(pageSource, /total=\{taxQuery\.data\?\.total \?\? 0\}/);
+  assert.match(pageSource, /hasMore=\{taxQuery\.data\?\.hasMore \?\? false\}/);
+  assert.match(pageSource, /<span className="text-sm font-medium text-gray-700 dark:text-gray-200">Tipo<\/span>/);
+  assert.match(pageSource, /value=\{taxType\}[\s\S]{0,180}setTaxType\(event\.target\.value as "Todos" \| "TFF" \| "TLP" \| "TLL"\);[\s\S]{0,80}setTaxPage\(1\)/);
+  for (const type of ["Todos", "TFF", "TLP", "TLL"]) {
+    assert.match(pageSource, new RegExp(`\\["Todos", "TFF", "TLP", "TLL"\\]|<option[^>]*>${type}<\\/option>`));
+  }
 });
 
 await runTest("regularize management tables use debounced paginated hooks", async () => {
@@ -512,6 +609,17 @@ await runTest("regularize operational tabs expose write actions", async () => {
   }
 });
 
+await runTest("regularize partners render client names instead of internal ids", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /const pfNameById = new Map\(\s*\(pfPageQuery\.data\?\.data \?\? \[\]\)/);
+  assert.match(pageSource, /const pjNameById = new Map\(\s*\(clientQuery\.data\?\.items \?\? \[\]\)/);
+  assert.match(pageSource, /pfNameById\.get\(item\.pf_id\)\s*(?:\?\?|\|\|)\s*"PF não identificado"/);
+  assert.match(pageSource, /pjNameById\.get\(item\.pj_id\)\s*(?:\?\?|\|\|)\s*"PJ não identificado"/);
+  assert.doesNotMatch(pageSource, /formatText\(item\.pf_id\)\.slice\(0, 8\)/);
+  assert.doesNotMatch(pageSource, /formatText\(item\.pj_id\)\.slice\(0, 8\)/);
+});
+
 await runTest("regularize municipal tax keeps row actions visible and centered", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
   const taxTableStart = pageSource.indexOf(
@@ -682,6 +790,29 @@ await runTest("regularize finite status and urgency fields use native selects", 
   assert.match(licenseSource, /regularizeUrgencyOptions/);
   assert.match(licenseSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
   assert.match(licenseSource, /<RegularizeNativeSelect\s+value=\{formState\.urgency\}/);
+});
+
+await runTest("regularize process task id uses the real task selector", async () => {
+  const processSource = await readModuleSource("components/RegularizeProcessForm.tsx");
+  const tasksHookSource = await readFile(
+    join(appRoot, "src/modules/integracao/hooks/useIntegracaoTasks.ts"),
+    "utf8",
+  );
+
+  assert.match(tasksHookSource, /options\??: \{\s*enabled\??: boolean/);
+  assert.match(tasksHookSource, /enabled: options\.enabled \?\? true/);
+  assert.match(processSource, /useIntegracaoTasksList/);
+  assert.match(processSource, /status: "Todos",\s*limit: 100,\s*search: taskSearch/);
+  assert.match(processSource, /\{\s*enabled: open\s*\}/);
+  assert.match(processSource, /value=\{taskSearch\}/);
+  assert.match(processSource, /taskSearch/);
+  assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.task_id\}/);
+  assert.match(processSource, /taskOptions\.map/);
+  assert.match(processSource, /tasksQuery\.isLoading/);
+  assert.match(processSource, /tasksQuery\.error/);
+  assert.match(processSource, /disabled=/);
+  assert.match(processSource, /Sem task vinculada/);
+  assert.doesNotMatch(processSource, /<input\s+value=\{formState\.task_id\}/);
 });
 
 await runTest("regularize municipal tax year uses the shared native select", async () => {
@@ -892,7 +1023,6 @@ await runTest("regularize selects clients in the header and shows the bound clie
   assert.match(pageSource, /Selecione um cliente no cabeçalho antes de iniciar este cadastro\./);
   assert.equal((pageSource.match(/disabled=\{!currentCredentialClientId\}/g) ?? []).length, 7);
   assert.doesNotMatch(pageSource, /RegularizeClientPickerField/);
-  assert.doesNotMatch(pageSource, /useClients\(/);
   formSources.forEach((formSource) => {
     assert.match(formSource, /ClientSelectionField/);
     assert.doesNotMatch(formSource, /RegularizeClientPickerField/);

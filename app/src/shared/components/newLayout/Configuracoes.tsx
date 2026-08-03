@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { canCreateOrganizationOwner, useModuleAccess } from "@modules/auth";
+import { useAuth } from "@/context/AuthContext";
+import { canCreateOrganizationOwner, canCreateUsers, useModuleAccess } from "@modules/auth";
 import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
@@ -28,6 +29,7 @@ import { MyOrganizationSection } from "@modules/organizations";
 import { Dialog } from "@shared/components";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
+import { buildSelfProfileUpdatePayload } from "@shared/utils/meProfileUpdate";
 
 const SETTINGS_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
@@ -89,6 +91,7 @@ function applyTheme(nextTheme: "light" | "dark"): void {
 
 export function Configuracoes() {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
   const meQuery = useMe();
   const { access: integracaoAccess } = useModuleAccess("integracao");
   const updateMeMutation = useUpdateMe();
@@ -132,6 +135,7 @@ export function Configuracoes() {
   const currentName = meQuery.data?.name ?? "";
   const currentLogin = meQuery.data?.login ?? "";
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
+  const canManageUsers = canCreateUsers(user);
   const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário";
   const managedOrganizationId =
     canCreateOrganizationOwner(meQuery.data) && meQuery.data.organization_id
@@ -148,15 +152,20 @@ export function Configuracoes() {
   );
 
   const hasPendingPhotoChanges = pendingPhotoFile !== null;
-  const hasPendingAccessChanges =
-    Boolean(meQuery.data) && (name.trim() !== currentName || password.trim().length > 0);
+  const accessUpdatePayload = meQuery.data
+    ? buildSelfProfileUpdatePayload({
+        canManageUsers,
+        currentName,
+        name,
+        password,
+      })
+    : null;
 
   const isSaving =
     updateMeMutation.isPending || uploadPhotoMutation.isPending || deletePhotoMutation.isPending;
 
   const canSavePhoto = Boolean(meQuery.data) && !isSaving && hasPendingPhotoChanges;
-  const canSaveAccessData =
-    Boolean(meQuery.data) && !isSaving && name.trim().length > 0 && hasPendingAccessChanges;
+  const canSaveAccessData = Boolean(accessUpdatePayload) && !isSaving;
 
   useEffect(() => {
     setHasPhotoLoadError(false);
@@ -233,18 +242,8 @@ export function Configuracoes() {
       return;
     }
 
-    const trimmedName = name.trim();
-
-    if (trimmedName.length === 0) {
-      toast.error("Informe um nome para salvar o perfil.");
-      return;
-    }
-
     try {
-      await updateMeMutation.mutateAsync({
-        name: trimmedName,
-        ...(password.trim() ? { password: password.trim() } : {}),
-      });
+      await updateMeMutation.mutateAsync(accessUpdatePayload);
       setPassword("");
       setIsAccessDialogOpen(false);
     } catch {
@@ -516,7 +515,7 @@ export function Configuracoes() {
                         onChange={(event) => setName(event.target.value)}
                         placeholder="Digite o nome exibido no sistema"
                         className={SETTINGS_INPUT_CLASSNAME}
-                        disabled={isSaving}
+                        disabled={isSaving || !canManageUsers}
                       />
                     </div>
 

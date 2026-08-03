@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const conversationWindowUrl = new URL("./components/ConversationWindow.tsx", import.meta.url);
+const groupInfoSidebarUrl = new URL("./components/GroupInfoSidebar.tsx", import.meta.url);
+const chatListPanelUrl = new URL("./components/ChatListPanel.tsx", import.meta.url);
 const source = await readFile(conversationWindowUrl, "utf8");
+const groupInfoSidebarSource = await readFile(groupInfoSidebarUrl, "utf8");
+const chatListPanelSource = await readFile(chatListPanelUrl, "utf8");
+const failures = [];
 
 async function runTest(name, fn) {
   try {
@@ -10,22 +15,23 @@ async function runTest(name, fn) {
     console.log(`PASS ${name}`);
   } catch (error) {
     console.error(`FAIL ${name}`);
-    throw error;
+    console.error(error instanceof Error ? error.message : error);
+    failures.push(name);
   }
 }
 
-function getFunctionSource(functionName) {
-  const start = source.indexOf(`const ${functionName} =`);
-  const nextConst = source.indexOf("\n    const ", start + 1);
-  const nextUseEffect = source.indexOf("\n    useEffect", start + 1);
-  const nextReturn = source.indexOf("\n    return (", start + 1);
+function getFunctionSource(functionName, componentSource = source) {
+  const start = componentSource.indexOf(`const ${functionName} =`);
+  const nextConst = componentSource.indexOf("\n    const ", start + 1);
+  const nextUseEffect = componentSource.indexOf("\n    useEffect", start + 1);
+  const nextReturn = componentSource.indexOf("\n    return (", start + 1);
   const endCandidates = [nextConst, nextUseEffect, nextReturn].filter((index) => index !== -1);
   const end = Math.min(...endCandidates);
 
   assert.notEqual(start, -1);
   assert.notEqual(end, Infinity);
 
-  return source.slice(start, end);
+  return componentSource.slice(start, end);
 }
 
 await runTest("recording resources have centralized cleanup helpers", () => {
@@ -103,3 +109,74 @@ await runTest("recorder setup failures release active recording resources", () =
   assert.match(catchSource, /clearRecordingTimer\(\);/);
   assert.match(catchSource, /setIsRecording\(false\);/);
 });
+
+await runTest("member removal is delegated exclusively to ConfirmationDialog onConfirm", () => {
+  assert.ok(
+    /import\s*\{[^}]*\bConfirmationDialog\b[^}]*\}\s*from\s*["']@shared\/components["'];/.test(
+      groupInfoSidebarSource,
+    ),
+    "GroupInfoSidebar must import ConfirmationDialog from @shared/components",
+  );
+
+  const confirmationDialogSource = groupInfoSidebarSource.match(
+    /<ConfirmationDialog\b[\s\S]*?\/>/,
+  )?.[0];
+
+  assert.ok(confirmationDialogSource, "GroupInfoSidebar must render ConfirmationDialog");
+
+  const confirmHandlerName = confirmationDialogSource.match(
+    /onConfirm=\{([A-Za-z_$][\w$]*)\}/,
+  )?.[1];
+
+  assert.ok(confirmHandlerName, "ConfirmationDialog must receive a named onConfirm handler");
+
+  const confirmHandlerSource = getFunctionSource(confirmHandlerName, groupInfoSidebarSource);
+  const removalCalls = groupInfoSidebarSource.match(/removeMemberFromGroup\s*\(/g) ?? [];
+
+  assert.equal(removalCalls.length, 1);
+  assert.match(confirmHandlerSource, /removeMemberFromGroup\s*\(/);
+});
+
+await runTest("microphone failures use toast.error feedback", () => {
+  const startRecordingSource = getFunctionSource("handleStartRecording");
+  const catchIndex = startRecordingSource.indexOf("} catch (err) {");
+
+  assert.notEqual(catchIndex, -1);
+  assert.ok(
+    /toast\.error\("Não foi possível acessar o microfone\. Verifique as permissões do navegador\."\);/.test(
+      startRecordingSource.slice(catchIndex),
+    ),
+    "the microphone catch branch must call toast.error",
+  );
+});
+
+await runTest("missing group name and participants use toast.error feedback", () => {
+  const createGroupSource = getFunctionSource("handleCreateGroup", chatListPanelSource);
+  const expectedMessages = [
+    "Por favor, digite um nome para o grupo.",
+    "Selecione pelo menos um participante.",
+  ];
+  const missingMessages = expectedMessages.filter(
+    (message) => !createGroupSource.includes(`toast.error("${message}");`),
+  );
+
+  assert.deepEqual(missingMessages, [], "missing toast.error validation messages");
+});
+
+await runTest("chat UI components do not use native feedback APIs", () => {
+  const nativeFeedbackPattern = /\b(?:window\.)?(?:alert|confirm|prompt)\s*\(/;
+  const offenders = [
+    ["ConversationWindow", source],
+    ["GroupInfoSidebar", groupInfoSidebarSource],
+    ["ChatListPanel", chatListPanelSource],
+  ]
+    .filter(([, componentSource]) => nativeFeedbackPattern.test(componentSource))
+    .map(([componentName]) => componentName);
+
+  assert.deepEqual(offenders, [], "components using native feedback APIs");
+});
+
+if (failures.length > 0) {
+  console.error(`FAILED ${failures.length} chat UI contract(s)`);
+  process.exitCode = 1;
+}

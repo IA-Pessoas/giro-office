@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import { cn } from "@shared/ui/newLayout/utils";
+import { FieldHelp } from "@shared/ui/newLayout/field-help";
 
 export const regularizeTextFieldClassName =
   "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:disabled:bg-gray-800";
@@ -66,11 +67,13 @@ export type RegularizeFormOption = {
 export function RegularizeFormField({
   children,
   className,
+  help,
   label,
   required,
 }: {
   children: ReactNode;
   className?: string;
+  help?: string;
   label: string;
   required?: boolean;
 }) {
@@ -79,6 +82,7 @@ export function RegularizeFormField({
       <span className="inline-flex items-center gap-1">
         <span>{label}</span>
         {required ? <span className="text-red-500">*</span> : null}
+        {help ? <FieldHelp label={label} description={help} /> : null}
       </span>
       {children}
     </label>

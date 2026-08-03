@@ -49,7 +49,11 @@ export type ClientListPage = {
   hasMore: boolean;
 };
 
-type ClientAuthorization = IntegracaoServiceAuthorization & { userId: string };
+type ClientAuthorization = IntegracaoServiceAuthorization & {
+  userId: string;
+  hasClientListAccess?: boolean;
+  permission?: number;
+};
 
 const organizationSelect = {
   id: true,
@@ -312,12 +316,15 @@ export class ClientService implements IClientService {
       isOwner: false,
     },
   ): Promise<ClientListPage> {
-    requireIntegracaoRouteAccess("GET", "/client/list", {
-      userId: authorization.userId,
-      level: authorization.level,
-      organizationId,
-      isOwner: authorization.isOwner,
-    });
+    const hasClientListAccess =
+      authorization.hasClientListAccess === true ||
+      authorization.isOwner ||
+      (authorization.permission ?? 0) >= 1 ||
+      authorization.level >= INTEGRACAO_PERMISSION_LEVEL.VIEWER;
+
+    if (!hasClientListAccess) {
+      throw new ServiceError(403, "Usuário não possui permissão para este domínio.");
+    }
 
     const statusWhere = buildListStatusWhere(filters);
     const where = mergeClientListSearchWhere(

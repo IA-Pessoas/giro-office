@@ -298,7 +298,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
 
           {!unionsQuery.isLoading && !isSearchPending && !unionsQuery.isError && unions.length > 0 ? (
             <div className="rounded-xl border border-gray-200 dark:border-gray-700">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full min-w-[720px] border-separate border-spacing-y-2 px-2 text-sm">
                 <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-700 dark:bg-gray-700/50 dark:text-gray-300">
                   <tr>

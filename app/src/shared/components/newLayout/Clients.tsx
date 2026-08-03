@@ -6,6 +6,7 @@ import { useModuleAccess } from "@modules/auth";
 import { ClientCreateModal } from "@modules/clients/components/ClientCreateModal";
 import { useClients } from "@modules/clients/hooks/useClients";
 import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 
 const CLIENTS_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
@@ -57,7 +58,7 @@ export function Clients() {
   const [page, setPage] = useState(1);
   const [pageInputValue, setPageInputValue] = useState(String(page));
   const deferredSearch = useDeferredValue(search);
-  const limit = 10;
+  const limit = DEFAULT_PAGE_SIZE;
 
   const filters = useMemo(
     () => ({
@@ -194,33 +195,32 @@ export function Clients() {
       </div>
 
       <section className={`${CLIENTS_PANEL_CLASSNAME} overflow-hidden`}>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto u-scrollbar-system">
           <table className="min-w-full">
             <thead className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-950/40">
               <tr className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <th className="px-6 py-4 font-medium">Cliente</th>
                 <th className="px-6 py-4 font-medium">Cpf/Cnpj</th>
                 <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Organização</th>
                 <th className="px-6 py-4 font-medium text-center">Ação</th>
               </tr>
             </thead>
             <tbody>
               {clientsQuery.isLoading ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={4}>
                     Carregando clientes...
                   </td>
                 </tr>
               ) : clientsQuery.isError ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={4}>
                     Não foi possível carregar a listagem no momento.
                   </td>
                 </tr>
               ) : clients.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={4}>
                     Nenhum cliente encontrado para os filtros atuais.
                   </td>
                 </tr>
@@ -256,9 +256,6 @@ export function Clients() {
                         >
                           {uiStatus}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
-                        {client.organization?.name ?? "Organização atual"}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <Link

@@ -1,10 +1,12 @@
+import { SYSTEM_SCROLLBAR_CLASSNAME } from "../../../shared/ui/newLayout/scrollbar.ts";
+
 export const tiWorkspaceShellClassName =
   "mx-auto max-w-[1600px] space-y-6";
 
 export const tiWorkspaceContentClassName = "mx-auto flex w-full max-w-7xl flex-col gap-5";
 
 export const tiThinScrollbarClassName =
-  "[scrollbar-color:rgb(71_85_105)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/85 dark:[scrollbar-color:rgb(37_99_235)_transparent] dark:[&::-webkit-scrollbar-thumb]:bg-blue-600/85";
+  SYSTEM_SCROLLBAR_CLASSNAME;
 
 export const tiFiveRowTableClassName = `${tiThinScrollbarClassName} max-h-[280px] overflow-y-auto`;
 

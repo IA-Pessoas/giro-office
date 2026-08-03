@@ -72,7 +72,7 @@ export function ContabilShell({
       </header>
 
       <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
-        <nav aria-label="Abas do módulo contábil" className="overflow-x-auto">
+        <nav aria-label="Abas do módulo contábil" className="overflow-x-auto u-scrollbar-system">
           <div role="tablist" className="flex min-w-max items-center justify-center gap-1">
             {contabilTabs.map((tab) => {
               const Icon = tab.icon;

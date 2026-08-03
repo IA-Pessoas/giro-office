@@ -19,11 +19,14 @@ import {
 import {
   APP_ROUTE_MODULE_MAP,
   canViewIntegrationRoute,
+  canViewTasksOnlyIntegrationRoute,
   getModulePermissionLevel,
+  hasAnyModuleAccess,
   resolveAccessLevelFromAdditionalPermission,
   resolveDepartmentModuleKey,
   resolveModuleAccess,
   DISABLED_MODULE_KEYS,
+  MODULE_KEYS,
   isModuleDisabled,
 } from "./utils/moduleAccess.ts";
 
@@ -57,6 +60,7 @@ const {
   setAccessStoreState,
   shouldSyncAccessStore,
 } = await import("./store/accessStore.ts");
+const { resolveRhPermissionCapabilities } = await import("../rh/utils/rhPermissions.ts");
 const {
   createAuthInvalidationHandler,
   invalidateAuthSession,
@@ -106,6 +110,19 @@ await runTest("integration routes preserve the level 0 own-tasks exception", () 
       );
     });
   }
+});
+
+await runTest("level 0 is restricted to the tasks surface", () => {
+  const level0 = { type: "user", modules: { integracao: 0 } };
+  const level1 = { type: "user", modules: { integracao: 1 } };
+  const owner = { type: "owner", modules: { integracao: 0 } };
+
+  assert.equal(canViewTasksOnlyIntegrationRoute("/tasks", level0), true);
+  assert.equal(canViewTasksOnlyIntegrationRoute("/tasks/123", level0), true);
+  assert.equal(canViewTasksOnlyIntegrationRoute("/dashboard", level0), false);
+  assert.equal(canViewTasksOnlyIntegrationRoute("/configuracoes", level0), false);
+  assert.equal(canViewTasksOnlyIntegrationRoute("/dashboard", level1), true);
+  assert.equal(canViewTasksOnlyIntegrationRoute("/configuracoes", owner), true);
 });
 
 async function runTest(name, fn) {
@@ -312,6 +329,16 @@ await (async () => {
   await runTest("app shell checks full user access for administration navigation", () => {
     assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user;/);
     assert.match(appShellSource, /canAccessAdministration\(accessUser, \{ rhAccess \}\)/);
+  });
+
+  await runTest("dashboard navigation requires access to at least one module", () => {
+    const noAccessMap = Object.fromEntries(
+      MODULE_KEYS.map((moduleKey) => [moduleKey, { canView: false }]),
+    );
+
+    assert.equal(hasAnyModuleAccess(noAccessMap), false);
+    assert.equal(hasAnyModuleAccess({ ...noAccessMap, rh: { canView: true } }), true);
+    assert.match(appShellSource, /hasAnyModuleAccess\(moduleAccessMap\)/);
   });
 
   await runTest("access store isolates snapshots by active organization", () => {
@@ -649,7 +676,7 @@ await (async () => {
     );
     assert.match(
       appShellSource,
-      /:\s*shouldRenderModuleAccessDenied\s*\?\s*\(\s*<ModuleAccessDeniedState\s*\/>/,
+      /:\s*shouldRenderModuleAccessDenied\s*\?\s*\(\s*<ModuleAccessDeniedState/,
     );
   });
 
@@ -998,9 +1025,37 @@ await (async () => {
       /<select[\s\S]*disabled=\{isSelectedPermissionOwner \|\| isSavingPermissions\}/,
     );
   });
-  await runTest("RH module user permission does not grant administrative dashboard", () => {
-    assert.doesNotMatch(rhPermissionsSource, /explicitRhPermission[\s\S]*>=\s*1/);
-    assert.match(rhPermissionsSource, /canViewRhDashboard\s*=\s*canManageRh/);
-    assert.match(rhPermissionsSource, /canManageRh\s*=\s*hasRhAdminPermission \|\| isGlobalAdmin/);
+  await runTest("RH permissions hook delegates to the shared capability contract", () => {
+    const userCapabilities = resolveRhPermissionCapabilities(2, false);
+    const noAccessCapabilities = resolveRhPermissionCapabilities(0, false);
+    const adminCapabilities = resolveRhPermissionCapabilities(3, false);
+    const globalAdminCapabilities = resolveRhPermissionCapabilities(0, true);
+
+    assert.match(rhPermissionsSource, /resolveRhPermissionCapabilities/);
+    assert.match(
+      rhPermissionsSource,
+      /const capabilities = resolveRhPermissionCapabilities\(explicitRhPermission, isGlobalAdmin\);/,
+    );
+    assert.match(
+      rhPermissionsSource,
+      /canViewRhDashboard:\s*capabilities\.canViewRhDashboard/,
+    );
+
+    assert.deepEqual(userCapabilities, {
+      canAccessRhPortal: true,
+      canViewRhDashboard: false,
+      canManageRh: false,
+      canManageRhRequests: false,
+      canManageRhScore: false,
+      canManageRhTimeBank: false,
+      canManageRhTimesheets: false,
+      canManageRhWorkday: false,
+    });
+    assert.equal(noAccessCapabilities.canAccessRhPortal, false);
+    assert.equal(noAccessCapabilities.canManageRh, false);
+    assert.equal(adminCapabilities.canViewRhDashboard, true);
+    assert.equal(adminCapabilities.canManageRh, true);
+    assert.equal(globalAdminCapabilities.canAccessRhPortal, true);
+    assert.equal(globalAdminCapabilities.canManageRh, true);
   });
 })();

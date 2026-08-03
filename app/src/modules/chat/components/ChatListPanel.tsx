@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { IoMdArrowRoundBack } from "react-icons/io";
 import { MdGroupAdd } from "react-icons/md";
 import { CiCirclePlus } from "react-icons/ci";
+import { toast } from "react-toastify";
 
 import { useChat } from '../../../context/ChatContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -104,11 +105,11 @@ const NewGroupView = ({ onBack, onGroupCreated }) => {
 
     const handleCreateGroup = () => {
         if (!groupName.trim()) {
-            alert("Por favor, digite um nome para o grupo.");
+            toast.error("Por favor, digite um nome para o grupo.");
             return;
         }
         if (selectedUserIds.size === 0) {
-            alert("Selecione pelo menos um participante.");
+            toast.error("Selecione pelo menos um participante.");
             return;
         }
         createGroupChat(groupName, Array.from(selectedUserIds));

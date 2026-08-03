@@ -37,5 +37,6 @@ export interface AuthPolicy {
   minPermission?: number;
   modulePermission?: AuthModulePolicy;
   anyModulePermission?: AuthAnyModulePolicy;
+  anyOf?: readonly AuthPolicy[];
   special?: AuthSpecialPolicy;
 }

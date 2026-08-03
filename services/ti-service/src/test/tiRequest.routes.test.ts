@@ -3,12 +3,14 @@ import "./envBootstrap.js";
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
+import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
 import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
@@ -21,12 +23,41 @@ const TI_ADMIN_PERMISSION = 3;
 const otherUserId = "00000000-0000-4000-8000-000000000002";
 const validPng = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 
-function gatewayHeaders(permission: number): Record<string, string> {
+function gatewayHeaders(
+  permission: number,
+  overrides?: { userId?: string; userType?: "owner" | "admin" | "user" },
+): Record<string, string> {
   return {
-    [FORWARDED_AUTH_USER_ID_HEADER]: userId,
+    [FORWARDED_AUTH_USER_ID_HEADER]: overrides?.userId ?? userId,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: organizationId,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
+    ...(overrides?.userType ? { [FORWARDED_AUTH_TYPE_HEADER]: overrides.userType } : {}),
     [INTERNAL_SERVICE_TOKEN_HEADER]: "ti-service-internal-token-test",
+  };
+}
+
+function createTransferCandidatesPrismaMock(assignedToId = userId) {
+  return {
+    department: {
+      findFirst: vi.fn(async () => ({ id: "50000000-0000-4000-8000-000000000001" })),
+    },
+    user: {
+      findMany: vi.fn(async () => [
+        {
+          id: "00000000-0000-4000-8000-000000000003",
+          name: "Tecnica responsavel",
+          full_name: "Tecnica responsavel da Silva",
+          department_id: "50000000-0000-4000-8000-000000000001",
+        },
+      ]),
+    },
+    tIRequest: {
+      findFirst: vi.fn(async () => ({
+        id: requestId,
+        assigned_to_id: assignedToId,
+        organization_id: organizationId,
+      })),
+    },
   };
 }
 
@@ -100,10 +131,106 @@ describe("ti request routes", () => {
     });
   });
 
-  it("PATCH /ti/requests/:id/assign requires admin permission", async () => {
+  it("PATCH /ti/requests/:id/assign reaches the service for the current assignee", async () => {
     const response = await request(createTestApp())
       .patch(`/ti/requests/${requestId}/assign`)
-      .set(gatewayHeaders(TI_REQUESTER_PERMISSION))
+      .set(gatewayHeaders(TiPermissionLevel.Requester))
+      .send({ assigned_to_id: userId });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: requestId,
+        assigned_to_id: userId,
+      },
+    });
+  });
+
+  it("PATCH /ti/requests/:id/assign allows an organization owner who is not the assignee", async () => {
+    const prisma = {
+      department: {
+        findFirst: vi.fn(async () => ({ id: "50000000-0000-4000-8000-000000000001" })),
+      },
+      user: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          organization_id: where.organization_id,
+          department_id: "50000000-0000-4000-8000-000000000001",
+          status: "active",
+        })),
+      },
+      tIRequest: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          assigned_to_id: otherUserId,
+          organization_id: where.organization_id,
+        })),
+        update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+        updateMany: vi.fn(async () => ({ count: 1 })),
+      },
+    };
+
+    const response = await request(createTestApp(prisma as never))
+      .patch(`/ti/requests/${requestId}/assign`)
+      .set(gatewayHeaders(TiPermissionLevel.Requester, { userType: "owner" }))
+      .send({ assigned_to_id: userId });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: requestId,
+        assigned_to_id: userId,
+      },
+    });
+    expect(prisma.tIRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: requestId, organization_id: organizationId },
+      data: { assigned_to_id: userId },
+    });
+  });
+
+  it("PATCH /ti/requests/:id/assign returns 409 when the assignee became stale", async () => {
+    const prisma = {
+      department: {
+        findFirst: vi.fn(async () => ({ id: "50000000-0000-4000-8000-000000000001" })),
+      },
+      user: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          organization_id: where.organization_id,
+          department_id: "50000000-0000-4000-8000-000000000001",
+          status: "active",
+        })),
+      },
+      tIRequest: {
+        findFirst: vi.fn(async ({ where }) => ({
+          id: where.id,
+          assigned_to_id: userId,
+          organization_id: where.organization_id,
+        })),
+        update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+        updateMany: vi.fn(async () => ({ count: 0 })),
+      },
+    };
+
+    const response = await request(createTestApp(prisma as never))
+      .patch(`/ti/requests/${requestId}/assign`)
+      .set(gatewayHeaders(TiPermissionLevel.Requester))
+      .send({ assigned_to_id: otherUserId });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Chamado de TI foi transferido por outro usuario.",
+      code: "CONFLICT",
+    });
+  });
+
+  it("PATCH /ti/requests/:id/assign rejects a non-TI request before the service", async () => {
+    const response = await request(createTestApp())
+      .patch(`/ti/requests/${requestId}/assign`)
+      .set(gatewayHeaders(TI_VIEWER_PERMISSION))
       .send({ assigned_to_id: userId });
 
     expect(response.status).toBe(403);
@@ -111,6 +238,19 @@ describe("ti request routes", () => {
       success: false,
       error: "Permissao insuficiente para acessar o ti-service.",
       code: "FORBIDDEN",
+    });
+  });
+
+  it("PATCH /ti/requests/:id/assign requires forwarded auth context", async () => {
+    const response = await request(createTestApp())
+      .patch(`/ti/requests/${requestId}/assign`)
+      .send({ assigned_to_id: userId });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Token interno do ti-service invalido.",
+      code: "UNAUTHORIZED",
     });
   });
 
@@ -128,6 +268,61 @@ describe("ti request routes", () => {
         assigned_to_id: userId,
       },
     });
+  });
+
+  it("GET /ti/requests/:id/transfer-candidates lets the current assignee list active TI users", async () => {
+    const response = await request(createTestApp(createTransferCandidatesPrismaMock() as never))
+      .get(`/ti/requests/${requestId}/transfer-candidates`)
+      .set(gatewayHeaders(TiPermissionLevel.Technician));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: [
+        {
+          id: "00000000-0000-4000-8000-000000000003",
+          name: "Tecnica responsavel",
+          full_name: "Tecnica responsavel da Silva",
+          department_id: "50000000-0000-4000-8000-000000000001",
+        },
+      ],
+    });
+  });
+
+  it("GET /ti/requests/:id/transfer-candidates rejects an unrelated technician", async () => {
+    const response = await request(createTestApp(createTransferCandidatesPrismaMock() as never))
+      .get(`/ti/requests/${requestId}/transfer-candidates`)
+      .set(gatewayHeaders(TiPermissionLevel.Technician, { userId: otherUserId }));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Permissao insuficiente para transferir chamado.",
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("GET /ti/requests/:id/transfer-candidates lets an admin list candidates", async () => {
+    const response = await request(createTestApp(createTransferCandidatesPrismaMock() as never))
+      .get(`/ti/requests/${requestId}/transfer-candidates`)
+      .set(gatewayHeaders(TiPermissionLevel.Admin, { userId: otherUserId }));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
+  });
+
+  it("GET /ti/requests/:id/transfer-candidates lets an organization owner list candidates", async () => {
+    const response = await request(createTestApp(createTransferCandidatesPrismaMock() as never))
+      .get(`/ti/requests/${requestId}/transfer-candidates`)
+      .set(
+        gatewayHeaders(TiPermissionLevel.Technician, {
+          userId: otherUserId,
+          userType: "owner",
+        }),
+      );
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
   });
 
   it("POST /ti/requests validates body", async () => {

@@ -46,6 +46,28 @@ function createPrismaMock() {
 }
 
 describe("UnionService", () => {
+  it("bloqueia mutacoes de sindicato para Viewer antes de acessar a persistencia", async () => {
+    const prisma = createPrismaMock();
+    const audit = createAuditMock();
+    const service = new UnionService(prisma as never, audit);
+    const viewerContext = { organizationId, userId, permission: 1 };
+    const operations = [
+      () => service.create(viewerContext, { name: "Sindicato A", cnpj: "123" }),
+      () => service.update(viewerContext, recordId, { name: "Sindicato B" }),
+      () => service.delete(viewerContext, recordId),
+    ];
+
+    for (const operation of operations) {
+      await expect(operation()).rejects.toMatchObject({ statusCode: 403 });
+    }
+
+    expect(prisma.unionPessoal.findFirst).not.toHaveBeenCalled();
+    expect(prisma.unionPessoal.create).not.toHaveBeenCalled();
+    expect(prisma.unionPessoal.update).not.toHaveBeenCalled();
+    expect(prisma.unionPessoal.delete).not.toHaveBeenCalled();
+    expect(audit.recordChange).not.toHaveBeenCalled();
+  });
+
   it("lista sindicatos por organizacao", async () => {
     const prisma = createPrismaMock();
     const service = new UnionService(prisma as never, createAuditMock());
@@ -99,7 +121,10 @@ describe("UnionService", () => {
     const service = new UnionService(prisma as never, createAuditMock());
 
     await expect(
-      service.create({ organizationId, userId }, { name: "Sindicato A", cnpj: "123" }),
+      service.create(
+        { organizationId, userId, permission: 2 },
+        { name: "Sindicato A", cnpj: "123" },
+      ),
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
@@ -107,7 +132,9 @@ describe("UnionService", () => {
     const prisma = createPrismaMock();
     const service = new UnionService(prisma as never, createAuditMock());
 
-    await service.update({ organizationId, userId }, recordId, { name: "Sindicato B" });
+    await service.update({ organizationId, userId, permission: 2 }, recordId, {
+      name: "Sindicato B",
+    });
 
     expect(prisma.unionPessoal.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: recordId }, data: { name: "Sindicato B" } }),
@@ -128,7 +155,7 @@ describe("UnionService", () => {
     const service = new UnionService(prisma as never, createAuditMock());
 
     await expect(
-      service.update({ organizationId, userId }, recordId, { name: "Sindicato B" }),
+      service.update({ organizationId, userId, permission: 2 }, recordId, { name: "Sindicato B" }),
     ).rejects.toMatchObject({ statusCode: 409 });
     expect(prisma.unionPessoal.findFirst).toHaveBeenNthCalledWith(2, {
       where: {
@@ -149,7 +176,7 @@ describe("UnionService", () => {
     const service = new UnionService(prisma as never, audit);
 
     const result = await service.delete(
-      { organizationId, userId, permission: 1, requestId: "request-union-delete" },
+      { organizationId, userId, permission: 2, requestId: "request-union-delete" },
       recordId,
     );
 
@@ -171,7 +198,7 @@ describe("UnionService", () => {
       requestId: "request-union-delete",
       organizationId,
       userId,
-      permission: 1,
+      permission: 2,
       action: "Exclusao",
       referring: "pessoal.union",
       referringId: recordId,
@@ -199,7 +226,9 @@ describe("UnionService", () => {
     const audit = createAuditMock();
     const service = new UnionService(prisma as never, audit);
 
-    await expect(service.delete({ organizationId, userId }, recordId)).rejects.toMatchObject({
+    await expect(
+      service.delete({ organizationId, userId, permission: 2 }, recordId),
+    ).rejects.toMatchObject({
       statusCode: 404,
       message: "Sindicato nao encontrado.",
     });
@@ -215,7 +244,9 @@ describe("UnionService", () => {
     const audit = createAuditMock();
     const service = new UnionService(prisma as never, audit);
 
-    await expect(service.delete({ organizationId, userId }, recordId)).rejects.toMatchObject({
+    await expect(
+      service.delete({ organizationId, userId, permission: 2 }, recordId),
+    ).rejects.toMatchObject({
       statusCode: 409,
       message:
         "Não é possível remover o sindicato porque ele está vinculado a uma ou mais configurações de folha. Altere esses vínculos antes de tentar novamente.",
@@ -231,7 +262,9 @@ describe("UnionService", () => {
     const audit = createAuditMock();
     const service = new UnionService(prisma as never, audit);
 
-    await expect(service.delete({ organizationId, userId }, recordId)).rejects.toMatchObject({
+    await expect(
+      service.delete({ organizationId, userId, permission: 2 }, recordId),
+    ).rejects.toMatchObject({
       statusCode: 409,
       message:
         "Não é possível remover o sindicato porque ele está vinculado a uma ou mais configurações de folha. Altere esses vínculos antes de tentar novamente.",
@@ -246,7 +279,9 @@ describe("UnionService", () => {
     const audit = createAuditMock();
     const service = new UnionService(prisma as never, audit);
 
-    await expect(service.delete({ organizationId, userId }, recordId)).rejects.toMatchObject({
+    await expect(
+      service.delete({ organizationId, userId, permission: 2 }, recordId),
+    ).rejects.toMatchObject({
       statusCode: 404,
       message: "Sindicato nao encontrado.",
     });

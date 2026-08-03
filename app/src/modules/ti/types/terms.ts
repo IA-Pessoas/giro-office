@@ -1,4 +1,6 @@
-import type { TiId, TiStatus } from "./common";
+import type { TiId } from "./common";
+
+export type TiTermStatus = "pending" | "signed";
 
 export interface TiTerm {
   id: TiId;
@@ -21,7 +23,7 @@ export interface TiTerm {
     full_name?: string | null;
     [key: string]: unknown;
   } | null;
-  status?: TiStatus;
+  status?: TiTermStatus;
   signed_at?: string | null;
   created_at?: string;
   updated_at?: string;

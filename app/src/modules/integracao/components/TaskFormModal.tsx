@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import { ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import type { ModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
-import { listAdminUsers, type UserItem } from "@modules/users";
+import { useAssignableUsers } from "@modules/rh";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { useFetch } from "@shared/hooks";
 import { useAuth } from "../../../context/AuthContext";
@@ -180,11 +180,15 @@ export function TaskFormModal({
     ["task-form-departments"],
     () => departmentService.list({ status: "Ativo" }),
     {
-      enabled: open && isEditing && !isRestrictedEdit,
+      enabled: open && !isRestrictedEdit,
     },
   );
-  const usersQuery = useFetch<UserItem[]>(["task-form-users"], () => listAdminUsers("active"), {
-    enabled: open && isEditing && !isRestrictedEdit,
+  const usersQuery = useAssignableUsers({
+    enabled: open && !isRestrictedEdit,
+    module: "integracao",
+    departmentId: isEditing
+      ? editValues.department_id || undefined
+      : createValues.department_id || undefined,
   });
   const taskDetailQuery = useIntegracaoTaskDetail(open && taskId ? taskId : undefined);
   const { user } = useAuth();

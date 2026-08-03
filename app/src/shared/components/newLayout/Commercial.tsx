@@ -46,6 +46,7 @@ import {
 
 import { useCommercialOverview } from "../../../modules/commercial/hooks/useCommercialOverview";
 import type { CommercialLead } from "../../../modules/commercial/types";
+import { getSummaryItems } from "../../utils/summaryItems";
 
 export function Commercial() {
   const [activeTab, setActiveTab] = useState<
@@ -200,6 +201,13 @@ export function Commercial() {
     });
   }, [leads, searchTerm, filterStatus, filterSource]);
 
+  const pendingFollowUpsSummary = getSummaryItems(
+    leads
+      .filter((lead) => lead.nextFollowUp && !["won", "lost"].includes(lead.status))
+      .sort((a, b) => new Date(a.nextFollowUp ?? 0).getTime() - new Date(b.nextFollowUp ?? 0).getTime()),
+    5,
+  );
+
   const getLeadsByStatus = (status: CommercialLead["status"]) => {
     return leads.filter((l) => l.status === status);
   };
@@ -224,7 +232,7 @@ export function Commercial() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-1">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto u-scrollbar-system">
           <button
             onClick={() => setActiveTab("dashboard")}
             className={`flex-1 min-w-fit px-4 py-2.5 rounded-lg font-medium transition-all ${
@@ -511,10 +519,7 @@ export function Commercial() {
                 </h3>
               </div>
               <div className="space-y-3">
-                {leads
-                  .filter((l) => l.nextFollowUp && !["won", "lost"].includes(l.status))
-                  .sort((a, b) => new Date(a.nextFollowUp ?? 0).getTime() - new Date(b.nextFollowUp ?? 0).getTime())
-                  .slice(0, 5)
+                {pendingFollowUpsSummary.items
                   .map((lead) => {
                     const StatusIcon = leadStatusConfig[lead.status].icon;
                     return (
@@ -545,6 +550,15 @@ export function Commercial() {
                       </div>
                     );
                   })}
+                {pendingFollowUpsSummary.hasHiddenItems ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("leads")}
+                    className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium"
+                  >
+                    Ver todos ({pendingFollowUpsSummary.total})
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -601,7 +615,7 @@ export function Commercial() {
           </div>
 
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                   <tr>
@@ -760,7 +774,7 @@ export function Commercial() {
           </div>
 
           {pipelineView === "kanban" ? (
-            <div className="overflow-x-auto pb-4">
+            <div className="overflow-x-auto u-scrollbar-system pb-4">
               <div className="flex gap-4 min-w-max">
                 {(["new", "contacted", "qualified", "proposal", "negotiation"] as CommercialLead["status"][]).map(
                   (status) => {
@@ -859,7 +873,7 @@ export function Commercial() {
             </div>
           ) : (
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto u-scrollbar-system">
                 <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                     <tr>
@@ -1042,7 +1056,7 @@ export function Commercial() {
       {!isInitialLoading && !hasOverviewError && activeTab === "contracts" ? (
         <div className="space-y-5">
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto u-scrollbar-system">
               <table className="w-full border-separate border-spacing-y-2 px-2">
                 <thead className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800">
                   <tr>

@@ -257,7 +257,7 @@ export function RhTimesheetDetailView({
             Nenhum dia encontrado para o filtro selecionado.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto u-scrollbar-system">
             <table className="w-full min-w-[920px] divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>

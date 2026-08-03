@@ -7,7 +7,13 @@ import type {
   UpdateSituationBody,
 } from "../schemas/situation.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
-import { omitUndefined, type PessoalAuthContext, requireUserId } from "./pessoalServiceTypes.js";
+import {
+  omitUndefined,
+  PESSOAL_WRITE_PERMISSION,
+  type PessoalAuthContext,
+  requireMinimumPermission,
+  requireUserId,
+} from "./pessoalServiceTypes.js";
 
 const situationSelect = {
   id: true,
@@ -44,6 +50,7 @@ export class SituationService {
 
   async create(context: PessoalAuthContext, body: CreateSituationBody): Promise<SituationRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       await this.ensureClient(context.organizationId, body.client_id);
 
@@ -115,6 +122,7 @@ export class SituationService {
     body: UpdateSituationBody,
   ): Promise<SituationRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const existing = await this.prisma.situationsPessoal.findFirst({
         where: { id, organization_id: context.organizationId },
@@ -169,6 +177,7 @@ export class SituationService {
 
   async delete(context: PessoalAuthContext, id: string): Promise<SituationRecord> {
     try {
+      requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
       const existing = await this.prisma.situationsPessoal.findFirst({
         where: { id, organization_id: context.organizationId },

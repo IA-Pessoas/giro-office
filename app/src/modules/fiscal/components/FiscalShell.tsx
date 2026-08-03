@@ -64,7 +64,7 @@ export function FiscalShell() {
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
-        <nav aria-label="Abas do módulo fiscal" className="overflow-x-auto">
+        <nav aria-label="Abas do módulo fiscal" className="overflow-x-auto u-scrollbar-system">
           <div role="tablist" className="flex min-w-max items-center justify-center gap-1">
             {fiscalTabs.map((tab) => {
               const Icon = tab.icon;
@@ -96,7 +96,11 @@ export function FiscalShell() {
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-        <FiscalActiveTabPanel activeTab={activeTab} canEdit={fiscalAccess.canEdit} />
+        <FiscalActiveTabPanel
+          activeTab={activeTab}
+          canEdit={fiscalAccess.canEdit}
+          canDelete={fiscalAccess.isAdmin}
+        />
       </div>
     </div>
   );
@@ -105,23 +109,25 @@ export function FiscalShell() {
 function FiscalActiveTabPanel({
   activeTab,
   canEdit,
+  canDelete,
 }: {
   activeTab: FiscalTabId;
   canEdit: boolean;
+  canDelete: boolean;
 }) {
   if (activeTab === "search") {
     return <FiscalSearchTab />;
   }
 
   if (activeTab === "ncm") {
-    return <FiscalNcmTab canEdit={canEdit} />;
+    return <FiscalNcmTab canEdit={canEdit} canDelete={canDelete} />;
   }
 
   if (activeTab === "icms") {
-    return <FiscalIcmsTab canEdit={canEdit} />;
+    return <FiscalIcmsTab canEdit={canEdit} canDelete={canDelete} />;
   }
 
-  return <FiscalIpiTab canEdit={canEdit} />;
+  return <FiscalIpiTab canEdit={canEdit} canDelete={canDelete} />;
 }
 
 function FiscalSearchTab() {
@@ -132,26 +138,26 @@ function FiscalSearchTab() {
   );
 }
 
-function FiscalNcmTab({ canEdit }: { canEdit: boolean }) {
+function FiscalNcmTab({ canEdit, canDelete }: { canEdit: boolean; canDelete: boolean }) {
   return (
     <div role="tabpanel" id="fiscal-panel-ncm" aria-labelledby="fiscal-tab-ncm">
-      <FiscalNcmSection canEdit={canEdit} />
+      <FiscalNcmSection canEdit={canEdit} canDelete={canDelete} />
     </div>
   );
 }
 
-function FiscalIcmsTab({ canEdit }: { canEdit: boolean }) {
+function FiscalIcmsTab({ canEdit, canDelete }: { canEdit: boolean; canDelete: boolean }) {
   return (
     <div role="tabpanel" id="fiscal-panel-icms" aria-labelledby="fiscal-tab-icms">
-      <FiscalIcmsSection canEdit={canEdit} />
+      <FiscalIcmsSection canEdit={canEdit} canDelete={canDelete} />
     </div>
   );
 }
 
-function FiscalIpiTab({ canEdit }: { canEdit: boolean }) {
+function FiscalIpiTab({ canEdit, canDelete }: { canEdit: boolean; canDelete: boolean }) {
   return (
     <div role="tabpanel" id="fiscal-panel-ipi" aria-labelledby="fiscal-tab-ipi">
-      <FiscalIpiSection canEdit={canEdit} />
+      <FiscalIpiSection canEdit={canEdit} canDelete={canDelete} />
     </div>
   );
 }
