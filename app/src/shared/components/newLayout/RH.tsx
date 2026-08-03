@@ -33,9 +33,9 @@ export function RH() {
       return 0;
     }
 
-    const newCount = newRequestsQuery.data?.length ?? 0;
-    const inProgressCount = inProgressRequestsQuery.data?.length ?? 0;
-    return newCount + inProgressCount;
+    const newRequests = newRequestsQuery.data?.items ?? [];
+    const inProgressRequests = inProgressRequestsQuery.data?.items ?? [];
+    return newRequests.length + inProgressRequests.length;
   }, [canManageRhRequests, inProgressRequestsQuery.data, newRequestsQuery.data]);
 
   useEffect(() => {

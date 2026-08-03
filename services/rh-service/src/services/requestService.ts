@@ -57,10 +57,20 @@ export interface RequestDeleteInput {
 }
 
 export interface RequestListOptions {
+  page: number;
+  limit: number;
   status?: "New" | "In_Progress" | "Resolved" | "Closed";
   category_id?: string;
   requester_user_id?: string;
   assigned_to_user_id?: string;
+}
+
+export interface RhRequestListPage {
+  items: RhRequestSnapshot[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 }
 
 class RequestService {
@@ -235,10 +245,7 @@ class RequestService {
     }
   }
 
-  async list(
-    organizationId: string,
-    options: RequestListOptions = {},
-  ): Promise<RhRequestSnapshot[]> {
+  async list(organizationId: string, options: RequestListOptions): Promise<RhRequestListPage> {
     try {
       const orgId = assertNonEmptyString(organizationId, "organization_id");
 
@@ -258,11 +265,24 @@ class RequestService {
         where.assigned_to_user_id = options.assigned_to_user_id;
       }
 
-      return await prismaClient.rhRequest.findMany({
-        where,
-        orderBy: { created_at: "desc" },
-        select: REQUEST_SELECT,
-      });
+      const [items, total] = await Promise.all([
+        prismaClient.rhRequest.findMany({
+          where,
+          orderBy: { created_at: "desc" },
+          skip: (options.page - 1) * options.limit,
+          take: options.limit,
+          select: REQUEST_SELECT,
+        }),
+        prismaClient.rhRequest.count({ where }),
+      ]);
+
+      return {
+        items,
+        total,
+        page: options.page,
+        pageSize: options.limit,
+        hasMore: options.page * options.limit < total,
+      };
     } catch (err: unknown) {
       logError("Erro ao listar solicitações RH", { err });
       if (err instanceof ServiceError) throw err;

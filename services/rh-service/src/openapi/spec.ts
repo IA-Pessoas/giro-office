@@ -651,6 +651,16 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           security: bearer,
           parameters: [
             {
+              name: "page",
+              in: "query",
+              schema: { type: "integer", minimum: 1, default: 1 },
+            },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+            {
               name: "status",
               in: "query",
               schema: { type: "string", enum: ["New", "In_Progress", "Resolved", "Closed"] },
@@ -668,7 +678,31 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
             },
           ],
           responses: {
-            "200": { description: "Lista", ...successJson },
+            "200": {
+              description: "Lista paginada de solicitacoes RH",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["success", "data"],
+                    properties: {
+                      success: { type: "boolean", enum: [true] },
+                      data: {
+                        type: "object",
+                        required: ["items", "total", "page", "pageSize", "hasMore"],
+                        properties: {
+                          items: { type: "array", items: { type: "object" } },
+                          total: { type: "integer", minimum: 0 },
+                          page: { type: "integer", minimum: 1 },
+                          pageSize: { type: "integer", minimum: 1, maximum: 100 },
+                          hasMore: { type: "boolean" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
         put: {

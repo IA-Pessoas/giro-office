@@ -76,6 +76,8 @@ router.get(
         statusCode: 400,
       });
       const queryInput = {
+        page: getSingleTrimmedQueryValue(req.query.page),
+        limit: getSingleTrimmedQueryValue(req.query.limit),
         status: getSingleTrimmedQueryValue(req.query.status),
         category_id: getSingleTrimmedQueryValue(req.query.category_id),
         requester_user_id: getSingleTrimmedQueryValue(req.query.requester_user_id),
@@ -83,7 +85,10 @@ router.get(
       };
       const parsed = parseWithZod(listRequestQuerySchema, queryInput);
 
-      const listOptions: RequestListOptions = {};
+      const listOptions: RequestListOptions = {
+        page: parsed.page,
+        limit: parsed.limit,
+      };
       if (parsed.status !== undefined) {
         listOptions.status = parsed.status;
       }

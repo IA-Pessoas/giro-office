@@ -10,6 +10,7 @@ const { prismaMock } = vi.hoisted(() => ({
     },
     rhRequest: {
       create: vi.fn(),
+      count: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
@@ -100,23 +101,35 @@ describe("RequestService", () => {
         requester: { id: "legacy-user-1", name: "Maria Legado", status: "inactive" },
       },
     ]);
+    prismaMock.rhRequest.count.mockResolvedValue(21);
     const service = new RequestService();
 
-    const result = await service.list("org-1", { status: "New" });
+    const result = await service.list("org-1", { status: "New", page: 2, limit: 20 });
+
+    const where = { organization_id: "org-1", status: "New" };
 
     expect(prismaMock.rhRequest.findMany).toHaveBeenCalledWith({
-      where: { organization_id: "org-1", status: "New" },
+      where,
       orderBy: { created_at: "desc" },
+      skip: 20,
+      take: 20,
       select: expect.objectContaining({
         requester: { select: { id: true, name: true, status: true } },
       }),
     });
-    expect(result).toEqual([
-      {
-        id: "req-1",
-        requester_user_id: "legacy-user-1",
-        requester: { id: "legacy-user-1", name: "Maria Legado", status: "inactive" },
-      },
-    ]);
+    expect(prismaMock.rhRequest.count).toHaveBeenCalledWith({ where });
+    expect(result).toEqual({
+      items: [
+        {
+          id: "req-1",
+          requester_user_id: "legacy-user-1",
+          requester: { id: "legacy-user-1", name: "Maria Legado", status: "inactive" },
+        },
+      ],
+      total: 21,
+      page: 2,
+      pageSize: 20,
+      hasMore: false,
+    });
   });
 });

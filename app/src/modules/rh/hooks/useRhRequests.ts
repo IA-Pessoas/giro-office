@@ -21,6 +21,7 @@ import type {
   RhMutationMessage,
   RhRequest,
   RhRequestListFilters,
+  RhRequestListPage,
   UpdateRhCategoryPayload,
   UpdateRhRequestPayload,
 } from "../types";
@@ -43,6 +44,8 @@ export function rhRequestsQueryKey(filters: RhRequestListFilters = {}) {
     filters.category_id ?? "",
     filters.requester_user_id ?? "",
     filters.assigned_to_user_id ?? "",
+    filters.page ?? "",
+    filters.limit ?? "",
   ] as const;
 }
 
@@ -64,7 +67,7 @@ export function useRhCategories(
 export function useRhRequests(
   filters: RhRequestListFilters = {},
   options?: RhRequestsReadQueryOptions,
-): UseQueryResult<RhRequest[], Error> {
+): UseQueryResult<RhRequestListPage, Error> {
   return useFetch(rhRequestsQueryKey(filters), () => rhRequestsService.listRequests(filters), {
     enabled: options?.enabled ?? true,
   });

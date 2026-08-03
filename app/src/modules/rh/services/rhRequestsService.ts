@@ -13,6 +13,7 @@ import type {
   RhMutationMessage,
   RhRequest,
   RhRequestListFilters,
+  RhRequestListPage,
   UpdateRhCategoryPayload,
   UpdateRhRequestPayload,
 } from "../types";
@@ -54,13 +55,13 @@ export const rhRequestsService = {
     return unwrapRhEnvelope<RhMutationMessage>(response.data);
   },
 
-  async listRequests(filters: RhRequestListFilters = {}): Promise<RhRequest[]> {
+  async listRequests(filters: RhRequestListFilters = {}): Promise<RhRequestListPage> {
     const api = setupAPIClient();
     const response = await api.get(RH_ENDPOINTS.requests, {
       params: buildRhRequestListParams(filters),
     });
 
-    return unwrapRhEnvelope<RhRequest[]>(response.data);
+    return unwrapRhEnvelope<RhRequestListPage>(response.data);
   },
 
   async getRequestById(id: string): Promise<RhRequest> {
