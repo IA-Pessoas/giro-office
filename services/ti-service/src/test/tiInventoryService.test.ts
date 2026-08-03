@@ -10,6 +10,13 @@ const context = {
   permission: 2,
 };
 
+const categoryId = "20000000-0000-4000-8000-000000000001";
+const locationId = "30000000-0000-4000-8000-000000000001";
+const assetId = "40000000-0000-4000-8000-000000000001";
+const inactiveUserId = "00000000-0000-4000-8000-000000000002";
+const nonTechnologyUserId = "00000000-0000-4000-8000-000000000003";
+const technologyDepartmentId = "50000000-0000-4000-8000-000000000001";
+
 describe("TiInventoryService", () => {
   it("list applies bounded offset pagination", async () => {
     const prisma = {
@@ -172,6 +179,136 @@ describe("TiInventoryService", () => {
     ).rejects.toMatchObject({
       statusCode: 409,
       message: "Ja existe um ativo de TI com este codigo patrimonial.",
+    });
+  });
+
+  it("rejects an inactive user when creating inventory assets", async () => {
+    const prisma = {
+      inventoryTecnologia: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(),
+      },
+      inventoryCategoryTecnologia: {
+        findFirst: vi.fn(async () => ({ id: categoryId, active: true })),
+      },
+      user: {
+        findFirst: vi.fn(async ({ where }) =>
+          where.status === "active" ? null : { id: inactiveUserId, status: "inactive" },
+        ),
+      },
+    };
+    const service = new TiInventoryService(prisma as never);
+
+    await expect(
+      service.create(context, {
+        asset_code: "NB-001",
+        category_id: categoryId,
+        user_id: inactiveUserId,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Usuario nao encontrado na organizacao.",
+    });
+  });
+
+  it("rejects a responsible user outside Tecnologia when updating an inventory asset", async () => {
+    const prisma = {
+      inventoryTecnologia: {
+        findFirst: vi.fn(async () => ({ id: assetId })),
+        update: vi.fn(),
+      },
+      department: {
+        findFirst: vi.fn(async () => ({ id: technologyDepartmentId })),
+      },
+      user: {
+        findFirst: vi.fn(async ({ where }) =>
+          where.department_id === technologyDepartmentId
+            ? null
+            : { id: nonTechnologyUserId, department_id: "department-rh", status: "active" },
+        ),
+      },
+    };
+    const service = new TiInventoryService(prisma as never);
+
+    await expect(
+      service.update(context, assetId, {
+        responsible_it_staff_id: nonTechnologyUserId,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      message: "Responsavel de TI deve pertencer ao departamento Tecnologia.",
+    });
+  });
+
+  it("uses the approved message when the inventory category does not exist", async () => {
+    const prisma = {
+      inventoryTecnologia: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(),
+      },
+      inventoryCategoryTecnologia: {
+        findFirst: vi.fn(async () => null),
+      },
+    };
+    const service = new TiInventoryService(prisma as never);
+
+    await expect(
+      service.create(context, {
+        asset_code: "NB-001",
+        category_id: categoryId,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Categoria de inventario nao encontrada.",
+    });
+  });
+
+  it("uses the approved message when the inventory location does not exist", async () => {
+    const prisma = {
+      inventoryTecnologia: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(),
+      },
+      inventoryCategoryTecnologia: {
+        findFirst: vi.fn(async () => ({ id: categoryId, active: true })),
+      },
+      inventoryLocationTecnologia: {
+        findFirst: vi.fn(async () => null),
+      },
+    };
+    const service = new TiInventoryService(prisma as never);
+
+    await expect(
+      service.create(context, {
+        asset_code: "NB-001",
+        category_id: categoryId,
+        location_id: locationId,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Departamento/local de inventario nao encontrado.",
+    });
+  });
+
+  it("rejects an inactive user when assigning an inventory asset", async () => {
+    const prisma = {
+      inventoryTecnologia: {
+        findFirst: vi.fn(async () => ({ id: assetId })),
+        update: vi.fn(),
+      },
+      user: {
+        findFirst: vi.fn(async ({ where }) =>
+          where.status === "active" ? null : { id: inactiveUserId, status: "inactive" },
+        ),
+      },
+    };
+    const service = new TiInventoryService(prisma as never);
+
+    await expect(
+      service.assignUser(context, assetId, { user_id: inactiveUserId }),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Usuario nao encontrado na organizacao.",
     });
   });
 });
