@@ -25,6 +25,7 @@ export const RH_ENDPOINTS = {
   calculatePoint: (pointId: string) => `/rh/point/${pointId}/calculate`,
   requestPointAdjustment: "/rh/point/adjustment/request",
   approvePointAdjustment: "/rh/point/adjustment/approve",
+  rejectPointAdjustment: "/rh/point/adjustment/reject",
   holidays: "/rh/holidays",
   timeBankSummary: "/rh/time-bank/summary",
   timeBankSummaryByUser: (userId: string) => `/rh/time-bank/summary/${userId}`,

@@ -213,6 +213,7 @@ class PointService {
   async calculateDailyHours(
     pointId: string,
     organizationId: string,
+    db: Pick<Prisma.TransactionClient, "point" | "pointsConfig" | "holidays"> = prismaClient,
   ): Promise<CalculateDailyHoursResult> {
     try {
       if (!pointId?.trim()) {
@@ -222,7 +223,7 @@ class PointService {
         throw new ServiceError(400, "organization_id e obrigatorio.");
       }
 
-      const point = await prismaClient.point.findUnique({
+      const point = await db.point.findUnique({
         where: { id: pointId },
         select: {
           id: true,
@@ -251,7 +252,7 @@ class PointService {
         );
       }
 
-      const config = await prismaClient.pointsConfig.findUnique({
+      const config = await db.pointsConfig.findUnique({
         where: { user_id: point.user_id },
         select: {
           organization_id: true,
@@ -271,7 +272,7 @@ class PointService {
       }
 
       const { dayStart, dayEnd } = TimeUtils.getUtcDayBounds(point.clock_in);
-      const holiday = await prismaClient.holidays.findFirst({
+      const holiday = await db.holidays.findFirst({
         where: {
           organization_id: organizationId,
           date: { gte: dayStart, lte: dayEnd },
@@ -293,7 +294,7 @@ class PointService {
       const totalWorkedMinutes = morningWorked + afternoonWorked;
       const dayBalance = totalWorkedMinutes - expectedMinutes;
 
-      await prismaClient.point.update({
+      await db.point.update({
         where: { id: point.id },
         data: {
           workload_hours: totalWorkedMinutes,
@@ -301,7 +302,7 @@ class PointService {
         },
       });
 
-      await prismaClient.pointsConfig.update({
+      await db.pointsConfig.update({
         where: { user_id: point.user_id },
         data: {
           bank_balance: { increment: dayBalance },

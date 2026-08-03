@@ -93,6 +93,7 @@ const ROUTE_NEGATIVE_CASE_OVERRIDES = new Map([
   ["task-service|POST|/task/project-plan/hire", "lowPermission403"],
   ["task-service|DELETE|/task/project-plan/task", "lowPermission403"],
   ["task-service|DELETE|/task/project-plan", "lowPermission403"],
+  ["rh-service|PUT|/rh/point/adjustment/reject", "lowPermission403"],
   ["task-service|POST|/task/model/dependent", "unauthorized401"],
   ["task-service|DELETE|/task/model/dependent", "unauthorized401"],
   ["task-service|POST|/task/integration", "unauthorized401"],
@@ -103,7 +104,11 @@ const ROUTE_NEGATIVE_CASE_OVERRIDES = new Map([
   ["task-service|PUT|/task/conclusion", "unauthorized401"],
 ]);
 
-const GENERATED_BAD_CASES_BEFORE = new Set(["taskModelCreate", "taskProjectPlanCreate"]);
+const GENERATED_BAD_CASES_BEFORE = new Set([
+  "taskModelCreate",
+  "taskProjectPlanCreate",
+  "rhPointAdjustmentReject",
+]);
 
 function inferNegativeCaseFromAction(action) {
   if (/Unauthorized/i.test(action)) return "unauthorized401";
@@ -1722,6 +1727,14 @@ const baseManifest = [
     method: "PUT",
     path: "/rh/point/adjustment/approve",
     action: "rhPointAdjustmentApprove",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/point/adjustment/reject",
+    action: "rhPointAdjustmentReject",
     target: "gateway",
     auth: "bearer",
   }),

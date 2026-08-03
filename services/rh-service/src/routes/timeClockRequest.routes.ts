@@ -20,6 +20,7 @@ import {
   approveAdjustmentBodySchema,
   createAdjustmentRequestBodySchema,
   listAdjustmentRequestsQuerySchema,
+  rejectAdjustmentBodySchema,
 } from "../schemas/timeClockRequest.schemas.js";
 import { TimeClockRequestService } from "../services/timeClockRequestService.js";
 
@@ -117,6 +118,38 @@ router.put(
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao aprovar ajuste de ponto", { err });
+      next(err);
+    }
+  },
+);
+
+router.put(
+  "/adjustment/reject",
+  isAuthenticated,
+  requireRhPermission(RH_MANAGEMENT_PERMISSION),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+        statusCode: 400,
+      });
+
+      const body = parseWithZod(rejectAdjustmentBodySchema, req.body);
+
+      const result = await timeClockRequestService.reject({
+        request_id: body.request_id,
+        approver_user_id: user_id,
+        organization_id,
+        obs_approver:
+          body.obs_approver === undefined
+            ? undefined
+            : body.obs_approver === null
+              ? null
+              : String(body.obs_approver),
+      });
+
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao rejeitar ajuste de ponto", { err });
       next(err);
     }
   },

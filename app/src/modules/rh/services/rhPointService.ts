@@ -13,6 +13,7 @@ import type {
   RhRegisterPointResult,
   RhTodayPoint,
   UpsertRhPointConfigPayload,
+  RejectRhPointAdjustmentPayload,
 } from "../types";
 import {
   buildRhPointAdjustmentListParams,
@@ -110,6 +111,15 @@ export const rhPointService = {
   ): Promise<RhPointAdjustmentRequest> {
     const api = setupAPIClient();
     const response = await api.put(RH_ENDPOINTS.approvePointAdjustment, payload);
+
+    return unwrapRhEnvelope<RhPointAdjustmentRequest>(response.data);
+  },
+
+  async rejectAdjustment(
+    payload: RejectRhPointAdjustmentPayload,
+  ): Promise<RhPointAdjustmentRequest> {
+    const api = setupAPIClient();
+    const response = await api.put(RH_ENDPOINTS.rejectPointAdjustment, payload);
 
     return unwrapRhEnvelope<RhPointAdjustmentRequest>(response.data);
   },

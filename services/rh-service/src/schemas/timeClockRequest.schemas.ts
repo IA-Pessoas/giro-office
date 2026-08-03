@@ -39,11 +39,13 @@ export const approveAdjustmentBodySchema = z
   })
   .strict();
 
+export const rejectAdjustmentBodySchema = approveAdjustmentBodySchema;
+
 export const listAdjustmentRequestsQuerySchema = z
   .object({
     status: z
-      .enum(["Pendente", "Aprovado"], {
-        message: "status deve ser Pendente ou Aprovado.",
+      .enum(["Pendente", "Aprovado", "Rejeitado"], {
+        message: "status deve ser Pendente, Aprovado ou Rejeitado.",
       })
       .optional(),
     user_id: z.string().uuid({ message: "user_id inválido." }).optional(),

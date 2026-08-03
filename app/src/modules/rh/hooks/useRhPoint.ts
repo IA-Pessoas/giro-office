@@ -21,6 +21,7 @@ import type {
   RhRegisterPointResult,
   RhTodayPoint,
   UpsertRhPointConfigPayload,
+  RejectRhPointAdjustmentPayload,
 } from "../types";
 import { RH_QUERY_KEY } from "./useRhRequests";
 
@@ -199,6 +200,21 @@ export function useApproveRhPointAdjustmentMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => rhPointService.approveAdjustment(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+    },
+  });
+}
+
+export function useRejectRhPointAdjustmentMutation(): UseMutationResult<
+  RhPointAdjustmentRequest,
+  Error,
+  RejectRhPointAdjustmentPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => rhPointService.rejectAdjustment(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
     },

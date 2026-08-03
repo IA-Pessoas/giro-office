@@ -3543,6 +3543,53 @@ const handlers = {
     });
   },
 
+  async rhPointAdjustmentReject(op) {
+    if (isBadExpectation(op)) {
+      await httpRequest(op, {
+        expectedStatus: [403],
+        path: "/rh/point/adjustment/reject",
+        json: {
+          request_id: "40000000-0000-4000-8000-000000000002",
+        },
+      });
+      return;
+    }
+
+    const now = new Date();
+    const clockIn = new Date(now);
+    clockIn.setUTCHours(8, 0, 0, 0);
+    const lunchOut = new Date(now);
+    lunchOut.setUTCHours(12, 0, 0, 0);
+    const lunchIn = new Date(now);
+    lunchIn.setUTCHours(13, 0, 0, 0);
+    const clockOut = new Date(now);
+    clockOut.setUTCHours(17, 0, 0, 0);
+    const targetToken = await ensureRhTargetUserToken();
+    const createResponse = await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/point/adjustment/request",
+      auth: "public",
+      headers: { Authorization: `Bearer ${targetToken}` },
+      json: {
+        point_id: requireState("rhPointId"),
+        clock_in: clockIn.toISOString(),
+        lunch_out: lunchOut.toISOString(),
+        lunch_in: lunchIn.toISOString(),
+        clock_out: clockOut.toISOString(),
+        justification: "Smoke point adjustment rejection",
+      },
+    });
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/point/adjustment/reject",
+      json: {
+        request_id:
+          pickFirst(createResponse.body, "data.id") ?? findFirstId(createResponse.body?.data),
+        obs_approver: "Rejected by smoke test",
+      },
+    });
+  },
+
   async rhCategoryCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [200],

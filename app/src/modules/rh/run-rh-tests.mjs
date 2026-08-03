@@ -25,6 +25,19 @@ const rhSources = {
     "../services/rh-service/src/routes/timeBankRelease.routes.ts",
     "utf8",
   ),
+  pointAdjustmentRoute: readFileSync(
+    "../services/rh-service/src/routes/timeClockRequest.routes.ts",
+    "utf8",
+  ),
+  pointAdjustmentService: readFileSync(
+    "src/modules/rh/services/rhPointService.ts",
+    "utf8",
+  ),
+  pointAdjustmentHook: readFileSync("src/modules/rh/hooks/useRhPoint.ts", "utf8"),
+  pointAdjustmentPanel: readFileSync(
+    "src/modules/rh/components/RhPointAdjustmentPanel.tsx",
+    "utf8",
+  ),
 };
 
 function runTest(name, fn) {
@@ -136,6 +149,25 @@ runTest("RH viewer self-service flow stays enabled and scoped", () => {
     rhSources.timeBankReleaseRoute,
     /"\/list"[\s\S]*requireRhPermission\(RH_SELF_SERVICE_PERMISSION\)[\s\S]*user_id:\s*canManageTimeBankReleases\s*\?\s*getSingleTrimmedQueryValue\(req\.query\.user_id\)\s*:\s*user_id[\s\S]*canManageTimeBankReleases \? parsed\.user_id : user_id/,
   );
+});
+
+runTest("RH point adjustments expose guarded approve and reject decisions", () => {
+  assert.match(
+    rhSources.pointAdjustmentRoute,
+    /"\/adjustment\/reject"[\s\S]*requireRhPermission\(RH_MANAGEMENT_PERMISSION\)/,
+  );
+  assert.match(rhSources.pointAdjustmentService, /put\(RH_ENDPOINTS\.rejectPointAdjustment/);
+  assert.match(rhSources.pointAdjustmentHook, /useRejectRhPointAdjustmentMutation/);
+  assert.match(
+    rhSources.pointAdjustmentHook,
+    /invalidateQueries\(\{ queryKey: RH_QUERY_KEY \}\)/,
+  );
+  assert.match(
+    rhSources.pointAdjustmentPanel,
+    /canManagePoint[\s\S]*adjustment\.status === "Pendente"[\s\S]*adjustment\.user_id !== currentUserId/,
+  );
+  assert.match(rhSources.pointAdjustmentPanel, /adjustment\.status === "Rejeitado"/);
+  assert.match(rhSources.pointAdjustmentPanel, /obs_approver: rejectionReason\.trim\(\) \|\| null/);
 });
 
 runTest("RH Usuario mantem autosservico e nao recebe gestao", () => {
