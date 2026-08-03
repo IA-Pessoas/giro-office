@@ -78,6 +78,24 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   }
 });
 
+await runTest("regularize licenses list all statuses by default and keep mutation invalidation", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const operationsSource = await readModuleSource("hooks/useRegularizeOperations.ts");
+
+  assert.match(
+    pageSource,
+    /const licenseQuery = useRegularizeLicenses\(\s*\{ status: "Todos" \},\s*\{ enabled: queryPolicy\.licenses \},\s*\);/,
+  );
+  assert.match(
+    operationsSource,
+    /export function useCreateRegularizeLicenseMutation[\s\S]*?onSuccess: \(\) => invalidateRegularizeOperations\(queryClient\)/,
+  );
+  assert.match(
+    operationsSource,
+    /export function useUpdateRegularizeLicenseMutation[\s\S]*?onSuccess: \(\) => invalidateRegularizeOperations\(queryClient\)/,
+  );
+});
+
 await runTest("regularize license responsible field uses the contextual selector", async () => {
   const source = await readModuleSource("components/RegularizeLicenseForm.tsx");
 

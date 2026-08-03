@@ -616,7 +616,26 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Licenses"],
           summary: "Listar licencas",
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "status", in: "query", required: true, schema: { type: "string" } }],
+          parameters: [
+            {
+              name: "status",
+              in: "query",
+              required: true,
+              description: "Use Todos para listar todos os status.",
+              schema: {
+                type: "string",
+                enum: [
+                  "Todos",
+                  "Ativo",
+                  "Pendente",
+                  "A vencer",
+                  "Vencido",
+                  "Inativo",
+                  "Cancelado",
+                ],
+              },
+            },
+          ],
           responses: { "200": { description: "Lista de licencas", ...successEnvelopeContent() } },
         },
       },
