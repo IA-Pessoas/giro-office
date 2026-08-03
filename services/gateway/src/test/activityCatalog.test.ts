@@ -61,6 +61,12 @@ describe("activityCatalog", () => {
       "o status de uma solicitação de TI",
     ],
     [
+      "GET",
+      "/ti/requests/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/transfer-candidates",
+      "consultou",
+      "os candidatos de transferência de uma solicitação de TI",
+    ],
+    [
       "POST",
       "/ti/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/deactivate",
       "inativou",

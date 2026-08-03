@@ -417,6 +417,14 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/ti\/requests\/[^/]+\/transfer-candidates$/,
+    description: {
+      action: "consultou",
+      item: "os candidatos de transferência de uma solicitação de TI",
+    },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/ti\/requests\/[^/]+\/messages$/,
     description: { action: "consultou", item: "as mensagens de uma solicitação de TI" },
   },
