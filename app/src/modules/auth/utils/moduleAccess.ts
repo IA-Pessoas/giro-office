@@ -171,6 +171,12 @@ export function isModuleDisabled(module: ModuleKey): boolean {
   return DISABLED_MODULE_KEY_SET.has(module);
 }
 
+export function hasAnyModuleAccess(
+  accessMap: Partial<Record<ModuleKey, Pick<ModuleAccess, "canView">>> | null | undefined,
+): boolean {
+  return Object.values(accessMap ?? {}).some((access) => access?.canView === true);
+}
+
 function normalizeDepartmentName(value?: string | null): string {
   if (!value) {
     return "";

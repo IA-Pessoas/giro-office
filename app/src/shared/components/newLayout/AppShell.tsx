@@ -33,6 +33,7 @@ import {
   APP_ROUTE_MODULE_MAP,
   canViewIntegrationRoute,
   canViewTasksOnlyIntegrationRoute,
+  hasAnyModuleAccess,
   MODULE_KEYS,
   getModulePermissionLevel,
   canAccessAdministration,
@@ -348,6 +349,7 @@ export function AppShell({
   const isSelfProfileRoute = normalizeRoutePath(pathname) === "/me";
   const currentModuleKey = getModuleKeyFromRoutePath(pathname);
   const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
+  const shouldShowDashboard = isModuleAccessLoading || hasAnyModuleAccess(moduleAccessMap);
   const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
   const canViewTasksOnlyRoute = canViewTasksOnlyIntegrationRoute(pathname, moduleAccessUser);
   const canViewCurrentModuleRoute =
@@ -362,6 +364,10 @@ export function AppShell({
       (Boolean(currentModuleKey) && !canViewCurrentModuleRoute));
 
   const canViewModuleFromPath = (modulePath: string): boolean => {
+    if (modulePath === "/dashboard") {
+      return shouldShowDashboard;
+    }
+
     if (modulePath === "/departments") {
       return canManageOrganization;
     }
