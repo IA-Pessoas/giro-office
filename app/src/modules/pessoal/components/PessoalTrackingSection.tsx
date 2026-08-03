@@ -16,6 +16,7 @@ import {
 
 import { Dialog } from "@shared/components";
 import { cn } from "@shared/ui/newLayout/utils";
+import { FieldHelp } from "@shared/ui/newLayout/field-help";
 
 import {
   useCreatePessoalLddMutation,
@@ -85,11 +86,31 @@ const lddStatusOptions = ["Pendente", "Pago", "Vencido"] as const;
 
 const lddFields = [
   { name: "type", label: "Tipo", options: lddTypeOptions },
-  { name: "period", label: "Período", type: "text" },
+  {
+    name: "period",
+    label: "Período",
+    type: "text",
+    help: "Competência do período que será acompanhado no LDD.",
+  },
   { name: "due_date", label: "Vencimento", type: "date" },
-  { name: "balance_amount", label: "Saldo", type: "number" },
-  { name: "registration_status", label: "Cadastro", options: lddRegistrationStatusOptions },
-  { name: "status", label: "Status", options: lddStatusOptions },
+  {
+    name: "balance_amount",
+    label: "Saldo",
+    type: "number",
+    help: "Saldo atual do LDD para acompanhar o valor pendente ou devido.",
+  },
+  {
+    name: "registration_status",
+    label: "Cadastro",
+    options: lddRegistrationStatusOptions,
+    help: "Indica se o cadastro necessário para o LDD já foi realizado.",
+  },
+  {
+    name: "status",
+    label: "Status",
+    options: lddStatusOptions,
+    help: "Situação atual do LDD: pendente, pago ou vencido.",
+  },
 ] as const;
 
 function formatDate(value: string | null | undefined): string {
@@ -754,6 +775,7 @@ export function PessoalTrackingSection({
                 {lddFields.map((field) => {
                   const fieldValue = lddFormValues[field.name];
                   const fieldOptions = "options" in field ? field.options : null;
+                  const helpText = "help" in field ? field.help : undefined;
                   const customOption =
                     fieldOptions &&
                     fieldValue &&
@@ -766,7 +788,10 @@ export function PessoalTrackingSection({
                       key={field.name}
                       className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
                     >
-                      {field.label}
+                      <span className="inline-flex items-center gap-1">
+                        <span>{field.label}</span>
+                        {helpText ? <FieldHelp label={field.label} description={helpText} /> : null}
+                      </span>
                       {fieldOptions ? (
                         <div className="relative">
                           <select

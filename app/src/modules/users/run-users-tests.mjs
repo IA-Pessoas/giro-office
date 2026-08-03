@@ -89,6 +89,10 @@ const permissionConfigSource = readFileSync(
   "utf8",
 );
 const userTypesSource = readFileSync(new URL("./types/index.ts", import.meta.url), "utf8");
+const userServiceSource = readFileSync(
+  new URL("./services/userService.ts", import.meta.url),
+  "utf8",
+);
 
 function extractClassConstant(source, constantName) {
   const match = source.match(new RegExp(`const ${constantName} =\\s*\\n\\s*"([^"]+)";`));
@@ -548,6 +552,13 @@ runTest("department permission sync payload uses zero for no access", () => {
   });
 });
 
+runTest("user updates forward modular permissions to the PATCH payload", () => {
+  assert.match(
+    userServiceSource,
+    /if \(data\.modules !== undefined\) payload\.modules = data\.modules;/,
+  );
+});
+
 runTest("department permission sync detects stale global user access", () => {
   const modules = { rh: 1 };
 
@@ -619,6 +630,18 @@ runTest("administration neutral panels avoid stacked borders", () => {
 runTest("administration empty states avoid backend wording", () => {
   assert.doesNotMatch(administracaoSource, /backend/i);
   assert.doesNotMatch(adminUserDetailsPanelSource, /backend/i);
+});
+
+runTest("admin permission context changes confirm discarding pending edits through the shared dialog", () => {
+  assert.match(administracaoSource, /import \{ ConfirmationDialog \} from "@shared\/components";/);
+  assert.match(
+    administracaoSource,
+    /const \[pendingPermissionUserId, setPendingPermissionUserId\] = useState<string \| null>\(null\);/,
+  );
+  assert.match(administracaoSource, /if \(isDirty\) \{\s*setPendingPermissionUserId\(nextUserId\);\s*return;/s);
+  assert.match(administracaoSource, /<ConfirmationDialog\s+open=\{pendingPermissionUserId !== null\}/s);
+  assert.match(administracaoSource, /onConfirm=\{handleConfirmPermissionUserChange\}/);
+  assert.doesNotMatch(administracaoSource, /window\.confirm\(/);
 });
 
 runTest("admin user details panels avoid stacked borders while keeping empty states clear", () => {

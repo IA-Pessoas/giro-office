@@ -1,9 +1,17 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { useFetch } from "@shared/hooks";
 
 import { parcelamentoService } from "../services";
 import type {
   CreateParcelamentoPanoramaPayload,
+  ParcelamentoPanorama,
+  ParcelamentoPanoramaGenerateResult,
+  ParcelamentoListPage,
   ParcelamentoListFilters,
   PatchParcelamentoPanoramaPayload,
 } from "../types";
@@ -20,7 +28,7 @@ export function parcelamentoPanoramasQueryKey(filters: ParcelamentoListFilters) 
 export function useParcelamentoPanoramas(
   filters: ParcelamentoListFilters,
   options: ParcelamentoQueryOptions = {},
-) {
+): UseQueryResult<ParcelamentoListPage<ParcelamentoPanorama>, Error> {
   return useFetch(
     parcelamentoPanoramasQueryKey(filters),
     () => parcelamentoService.listPanoramas(filters),
@@ -40,7 +48,9 @@ function invalidatePanoramas(
   ]);
 }
 
-export function useCreateParcelamentoPanoramaMutation(filters: ParcelamentoListFilters) {
+export function useCreateParcelamentoPanoramaMutation(
+  filters: ParcelamentoListFilters,
+): UseMutationResult<ParcelamentoPanorama, Error, CreateParcelamentoPanoramaPayload> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -53,7 +63,7 @@ export function useCreateParcelamentoPanoramaMutation(filters: ParcelamentoListF
 export function useUpdateParcelamentoPanoramaMutation(
   id: string,
   filters: ParcelamentoListFilters,
-) {
+): UseMutationResult<ParcelamentoPanorama, Error, PatchParcelamentoPanoramaPayload> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -66,7 +76,9 @@ export function useUpdateParcelamentoPanoramaMutation(
   });
 }
 
-export function useGenerateParcelamentoPanoramasMutation(filters: ParcelamentoListFilters) {
+export function useGenerateParcelamentoPanoramasMutation(
+  filters: ParcelamentoListFilters,
+): UseMutationResult<ParcelamentoPanoramaGenerateResult, Error, string> {
   const queryClient = useQueryClient();
 
   return useMutation({

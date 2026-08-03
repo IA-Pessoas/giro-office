@@ -3,6 +3,7 @@ import { error as logError, ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreatePayrollBody, UpdatePayrollBody } from "../schemas/payroll.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
+import { ensurePessoalResponsible } from "./pessoalResponsibleService.js";
 import {
   omitUndefined,
   PESSOAL_WRITE_PERMISSION,
@@ -143,7 +144,11 @@ export class PayrollService {
         throw new ServiceError(404, "Folha de pessoal nao encontrada.");
       }
 
-      await this.ensureRelationships(context.organizationId, { ...body, client_id: clientId });
+      await this.ensureRelationships(
+        context.organizationId,
+        { ...body, client_id: clientId },
+        existing.responsible_id,
+      );
 
       const data = omitUndefined({
         responsible_id: body.responsible_id,
@@ -195,6 +200,7 @@ export class PayrollService {
   private async ensureRelationships(
     organizationId: string,
     body: Partial<CreatePayrollBody> & { client_id: string },
+    currentResponsibleId?: string | null,
   ): Promise<void> {
     const client = await this.prisma.client.findFirst({
       where: { id: body.client_id, organization_id: organizationId },
@@ -204,15 +210,12 @@ export class PayrollService {
       throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
     }
 
-    if (body.responsible_id) {
-      const responsible = await this.prisma.user.findFirst({
-        where: { id: body.responsible_id, organization_id: organizationId },
-        select: { id: true },
-      });
-      if (!responsible) {
-        throw new ServiceError(404, "Responsavel nao encontrado para a organizacao.");
-      }
-    }
+    await ensurePessoalResponsible(
+      this.prisma,
+      organizationId,
+      body.responsible_id,
+      currentResponsibleId,
+    );
 
     if (body.union_id) {
       const union = await this.prisma.unionPessoal.findFirst({

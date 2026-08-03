@@ -112,7 +112,7 @@ export function TiExtensionsTab() {
   const selectedExtensionQuery = useTiExtension(selectedExtensionId, {
     enabled: Boolean(selectedExtensionId),
   });
-  const assignableUsersQuery = useAssignableUsers({ enabled: canManageExtensions });
+  const assignableUsersQuery = useAssignableUsers({ enabled: canManageExtensions, module: "ti" });
   const createExtensionMutation = useCreateTiExtensionMutation();
   const updateExtensionMutation = useUpdateTiExtensionMutation();
   const isSubmitting = createExtensionMutation.isPending || updateExtensionMutation.isPending;

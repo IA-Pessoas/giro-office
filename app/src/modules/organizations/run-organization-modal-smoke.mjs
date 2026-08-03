@@ -41,7 +41,7 @@ function getSmokeOrganization() {
   };
 }
 
-async function installApiMocks(page) {
+async function installApiMocks(page, onOrganizationCreate) {
   await page.route("**/user/me", async (route) => {
     await route.fulfill({
       status: 200,
@@ -53,6 +53,16 @@ async function installApiMocks(page) {
   await page.route("**/organizations/org-smoke", async (route) => {
     await route.fulfill({
       status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ success: true, data: getSmokeOrganization() }),
+    });
+  });
+
+  await page.route("**/organizations", async (route) => {
+    assert.equal(route.request().method(), "POST");
+    onOrganizationCreate?.(JSON.parse(route.request().postData() ?? "{}"));
+    await route.fulfill({
+      status: 201,
       contentType: "application/json",
       body: JSON.stringify({ success: true, data: getSmokeOrganization() }),
     });
@@ -163,6 +173,36 @@ async function assertOrganizationModal(viewport) {
   await browser.close();
 }
 
+async function assertOrganizationAccessRequest() {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ baseURL: baseUrl });
+  const page = await context.newPage();
+  let createPayload;
+
+  await installApiMocks(page, (payload) => {
+    createPayload = payload;
+  });
+  await page.goto("/solicitar-acesso", { waitUntil: "networkidle" });
+
+  await page.getByLabel("Nome da organização").fill("Castelo Mask Smoke");
+  await page.getByLabel("E-mail do responsável").fill("admin@castelo.test");
+  const cnpjInput = page.getByLabel("CNPJ");
+  await cnpjInput.fill("12345678000190");
+
+  assert.equal(await cnpjInput.inputValue(), "12.345.678/0001-90");
+
+  await page.getByRole("button", { name: "Enviar pedido" }).click();
+  await page.getByText("Organização registada com sucesso.").waitFor({ state: "visible" });
+
+  assert.deepEqual(createPayload, {
+    name: "Castelo Mask Smoke",
+    email_created_by: "admin@castelo.test",
+    cnpj: "12345678000190",
+  });
+
+  await browser.close();
+}
+
 async function assertVisible(locator, page, label) {
   try {
     await locator.waitFor({ state: "visible", timeout: 10_000 });
@@ -186,6 +226,9 @@ await withNextServer(async () => {
 
   await assertOrganizationModal({ width: 390, height: 844 });
   console.log("PASS organization edit modal mobile viewport");
+
+  await assertOrganizationAccessRequest();
+  console.log("PASS organization access request masks CNPJ and submits canonical digits");
 });
 
 async function withNextServer(fn) {

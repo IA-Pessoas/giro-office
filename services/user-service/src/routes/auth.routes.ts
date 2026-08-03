@@ -62,7 +62,7 @@ router.get(
         organizationIdMessage: "Não autenticado.",
       });
 
-      const user = await userService.getById(user_id, organization_id);
+      const user = await userService.getByIdWithModules(user_id, organization_id);
 
       response.json(createSuccessResponse({ ...user, service: "user-service" }));
     } catch (err) {

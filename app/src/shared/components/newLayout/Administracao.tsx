@@ -41,6 +41,7 @@ import {
   needsDepartmentPermissionSync,
 } from "@modules/users/utils/createUserPayload";
 import { useAuth } from "@/context/AuthContext";
+import { ConfirmationDialog } from "@shared/components";
 import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
 
@@ -132,6 +133,7 @@ export function Administracao() {
   const [permissionSearchTerm, setPermissionSearchTerm] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedPermissionUserId, setSelectedPermissionUserId] = useState<string | null>(null);
+  const [pendingPermissionUserId, setPendingPermissionUserId] = useState<string | null>(null);
   const [permissionDraft, setPermissionDraft] = useState<PermissionDraft>(() =>
     normalizePermissionDraft({}),
   );
@@ -530,16 +532,18 @@ export function Administracao() {
     }
 
     if (isDirty) {
-      const shouldDiscardChanges = window.confirm(
-        "Existem alterações pendentes para este usuário. Deseja descartar e trocar de contexto?",
-      );
-
-      if (!shouldDiscardChanges) {
-        return;
-      }
+      setPendingPermissionUserId(nextUserId);
+      return;
     }
 
     setSelectedPermissionUserId(nextUserId);
+  };
+  const handleConfirmPermissionUserChange = () => {
+    if (!pendingPermissionUserId) {
+      return;
+    }
+
+    setSelectedPermissionUserId(pendingPermissionUserId);
   };
   const handlePermissionChange = (moduleKey: string, nextValue: PermissionSelectValue) => {
     const normalizedValue = normalizePermissionForModule(
@@ -697,7 +701,7 @@ export function Administracao() {
       </div>
 
       <div className="rounded-2xl bg-white p-1 shadow-sm dark:bg-slate-900">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto u-scrollbar-system">
           {adminTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
@@ -1203,6 +1207,23 @@ export function Administracao() {
         organizationIdLoading={isLoadingOrganizationId}
         invitedBy={user?.id}
         canCreateOrganizationOwner={canManageOrganizationOwners}
+      />
+
+      <ConfirmationDialog
+        open={pendingPermissionUserId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingPermissionUserId(null);
+          }
+        }}
+        title="Descartar alterações pendentes?"
+        description="Existem alterações pendentes para este usuário. Ao trocar de contexto, elas serão descartadas."
+        onConfirm={handleConfirmPermissionUserChange}
+        isConfirming={false}
+        errorMessage={null}
+        confirmLabel="Descartar e trocar"
+        cancelLabel="Continuar editando"
+        variant="destructive"
       />
     </div>
   );

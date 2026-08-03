@@ -159,6 +159,49 @@ runTest("departamento pessoal page uses the pessoal module instead of the old mo
   assert.doesNotMatch(page, /shared\/components\/newLayout\/DepartamentoPessoal/);
 });
 
+runTest("prioritized unclear fields expose shared contextual help", () => {
+  const fieldHelp = readFileSync("src/shared/ui/newLayout/field-help.tsx", "utf8");
+  const tracking = readFileSync("src/modules/pessoal/components/PessoalTrackingSection.tsx", "utf8");
+  const obligations = readFileSync(
+    "src/modules/pessoal/components/PessoalObligationsSection.tsx",
+    "utf8",
+  );
+  const payroll = readFileSync("src/modules/pessoal/components/PessoalPayrollSection.tsx", "utf8");
+  const certificate = readFileSync(
+    "src/modules/certificates/components/CertificateForm.tsx",
+    "utf8",
+  );
+  const regularize = readFileSync(
+    "src/modules/regularize/components/RegularizeGuidanceForm.tsx",
+    "utf8",
+  );
+  const regularizeControls = readFileSync(
+    "src/modules/regularize/components/regularizeFormControls.tsx",
+    "utf8",
+  );
+
+  assert.match(fieldHelp, /TooltipTrigger/);
+  assert.match(fieldHelp, /aria-label/);
+  assert.match(tracking, /FieldHelp/);
+  assert.match(tracking, /Período/);
+  assert.match(tracking, /Saldo/);
+  assert.match(obligations, /FieldHelp/);
+  assert.match(obligations, /Contribuição assistencial/);
+  assert.match(obligations, /BSF/);
+  assert.match(payroll, /FieldHelp/);
+  assert.match(payroll, /Tipo de adiantamento/);
+  assert.match(payroll, /Onvio/);
+  assert.match(payroll, /Reinf/);
+  assert.match(certificate, /FieldHelp/);
+  assert.match(certificate, /Natureza jurídica/);
+  assert.match(certificate, /Situação Castelo/);
+  assert.match(certificate, /Situação Focus/);
+  assert.match(certificate, /Valor pago/);
+  assert.match(regularizeControls, /FieldHelp/);
+  assert.match(regularize, /Natureza jurídica/);
+  assert.match(regularize, /help="Classificação jurídica da empresa conforme o cadastro oficial\."/);
+});
+
 runTest("union payload builder keeps backend field names", () => {
   assert.deepEqual(
     buildPessoalUnionPayload({
@@ -317,10 +360,10 @@ runTest("payroll responsible field uses a user selector instead of raw IDs", () 
     "utf8",
   );
 
-  assert.match(payroll, /listAdminUsers\("active"\)/);
-  assert.match(payroll, /departmentService\.list\(\)/);
-  assert.match(payroll, /departmentNameById\.get\(user\.department_id\)/);
-  assert.match(payroll, /resolveDepartmentModuleKey\(departmentName\) === "pessoal"/);
+  assert.match(payroll, /useAssignableUsers/);
+  assert.match(payroll, /module: "pessoal"/);
+  assert.doesNotMatch(payroll, /listAdminUsers/);
+  assert.doesNotMatch(payroll, /departmentService/);
   assert.match(payroll, /<select[\s\S]*value=\{formValues\.responsible_id\}/);
   assert.doesNotMatch(payroll, /label: "Responsável ID"/);
 });
@@ -338,15 +381,28 @@ runTest("obligations responsible field uses a pessoal user selector instead of r
     "utf8",
   );
 
-  assert.match(obligations, /listAdminUsers\("active"\)/);
-  assert.match(obligations, /departmentService\.list\(\)/);
-  assert.match(obligations, /departmentNameById\.get\(user\.department_id\)/);
-  assert.match(obligations, /resolveDepartmentModuleKey\(departmentName\) === "pessoal"/);
+  assert.match(obligations, /useAssignableUsers/);
+  assert.match(obligations, /module: "pessoal"/);
+  assert.doesNotMatch(obligations, /listAdminUsers/);
+  assert.doesNotMatch(obligations, /departmentService/);
   assert.match(obligations, /<select[\s\S]*value=\{responsibleId\}/);
-  assert.match(obligations, /responsibleUsersQuery\.isError \|\| departmentsQuery\.isError/);
+  assert.match(obligations, /responsibleUsersQuery\.isError/);
   assert.match(obligations, /Respons.veis indispon.veis/);
   assert.match(obligations, /<option value=\{responsibleId\}>Respons.vel atual<\/option>/);
   assert.doesNotMatch(obligations, /Respons.vel ID/);
+});
+
+runTest("password responsible field uses the contextual pessoal user selector", () => {
+  const passwords = readFileSync(
+    "src/modules/pessoal/components/PessoalPasswordsSection.tsx",
+    "utf8",
+  );
+
+  assert.match(passwords, /useAssignableUsers/);
+  assert.match(passwords, /module: "pessoal"/);
+  assert.doesNotMatch(passwords, /listAdminUsers/);
+  assert.match(passwords, /<select[\s\S]*value=\{formValues\.responsavel_id\}/);
+  assert.match(passwords, /Respons.vel atual/);
 });
 
 runTest("obligation generation copy explains global scope and no-payroll count", () => {

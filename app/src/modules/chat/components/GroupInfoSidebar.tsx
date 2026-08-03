@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 
 import { useAuth } from '../../../context/AuthContext';
 import { useChat } from '../../../context/ChatContext';
+import { ConfirmationDialog } from "@shared/components";
 import * as styles from '../../../styles/chat'
 import css from './GroupInfoSidebar.module.css'
 
@@ -72,6 +73,11 @@ export const GroupInfoSidebar = ({ chat, onClose }) => {
     const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(chat.photo);
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [pendingMemberRemoval, setPendingMemberRemoval] = useState<{
+        id: string;
+        name: string;
+    } | null>(null);
+    const [isRemovingMember, setIsRemovingMember] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Verifica se o usuário logado é admin
@@ -79,8 +85,19 @@ export const GroupInfoSidebar = ({ chat, onClose }) => {
     const isAdmin = myParticipation?.role === 'ADMIN';
 
     const handleRemoveMember = (userIdToRemove: string, userName: string) => {
-        if (window.confirm(`Tem certeza que deseja remover ${userName} do grupo?`)) {
-            removeMemberFromGroup(chat.id, userIdToRemove);
+        setPendingMemberRemoval({ id: userIdToRemove, name: userName });
+    };
+    const handleConfirmMemberRemoval = async () => {
+        if (!pendingMemberRemoval) {
+            return;
+        }
+
+        setIsRemovingMember(true);
+        try {
+            await removeMemberFromGroup(chat.id, pendingMemberRemoval.id);
+            setPendingMemberRemoval(null);
+        } finally {
+            setIsRemovingMember(false);
         }
     };
     const handleAddMembers = (userIdsToAdd: string[]) => {
@@ -138,6 +155,24 @@ export const GroupInfoSidebar = ({ chat, onClose }) => {
 
     return (
          <>
+            <ConfirmationDialog
+                open={Boolean(pendingMemberRemoval)}
+                onOpenChange={(open) => {
+                    if (!open && !isRemovingMember) {
+                        setPendingMemberRemoval(null);
+                    }
+                }}
+                title="Remover participante?"
+                description={`Tem certeza que deseja remover ${
+                    pendingMemberRemoval?.name ?? "este participante"
+                } do grupo?`}
+                onConfirm={handleConfirmMemberRemoval}
+                isConfirming={isRemovingMember}
+                errorMessage={null}
+                confirmLabel="Remover"
+                cancelLabel="Cancelar"
+                variant="destructive"
+            />
             {isAddModalOpen && (
                 <AddMembersModal 
                     chat={chat} 

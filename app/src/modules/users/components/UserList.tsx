@@ -8,7 +8,7 @@ interface UserListProps {
 
 export function UserList({ users, onUserSelect }: UserListProps) {
   return (
-    <div className="h-[170px] w-full overflow-x-auto overflow-y-hidden bg-[var(--colors-white)] p-2 md:h-full md:overflow-x-hidden md:overflow-y-auto">
+    <div className="h-[170px] w-full overflow-x-auto u-scrollbar-system overflow-y-hidden bg-[var(--colors-white)] p-2 md:h-full md:overflow-x-hidden md:overflow-y-auto">
       <div className="u-horizontal-scroll-cards">
         {users.length > 0 ? (
           users.map((user) => (

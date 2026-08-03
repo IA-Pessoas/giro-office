@@ -76,6 +76,7 @@ export function RhTimesheetsSection() {
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManageTimesheets,
+    module: "rh",
   });
 
   const currentUserName = user?.name?.trim() || "Você";

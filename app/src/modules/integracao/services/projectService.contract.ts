@@ -16,8 +16,42 @@ export const PROJECT_ENDPOINTS = {
   metrics: "/project/metrics",
 } as const;
 
+export const PROJECT_DELETE_ADMIN_MESSAGE =
+  "Somente usuários com permissão administrativa na Integração podem excluir projetos.";
+const PROJECT_DELETE_FALLBACK_MESSAGE = "Não foi possível excluir o projeto.";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getStringField(data: Record<string, unknown> | undefined, key: "error" | "message") {
+  const value = data?.[key];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+export function getProjectDeleteErrorMessage(error: unknown): string {
+  const response = (
+    error as {
+      response?: {
+        status?: number;
+        data?: Record<string, unknown>;
+      };
+    }
+  ).response;
+
+  if (response?.status === 403) {
+    return PROJECT_DELETE_ADMIN_MESSAGE;
+  }
+
+  if (response?.status === 409) {
+    return (
+      getStringField(response.data, "error") ??
+      getStringField(response.data, "message") ??
+      PROJECT_DELETE_FALLBACK_MESSAGE
+    );
+  }
+
+  return PROJECT_DELETE_FALLBACK_MESSAGE;
 }
 
 export function buildProjectListParams(params: ProjectListParams) {

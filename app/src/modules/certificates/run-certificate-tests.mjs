@@ -16,6 +16,14 @@ import {
   certificatePjListQueryKey,
 } from "./hooks/queryKeys.ts";
 import * as certificateWorkspaceUi from "./components/certificateWorkspaceUi.ts";
+import {
+  getCreatePfPayload,
+  getCreatePjPayload,
+  getPaymentAmountValidationError,
+  getUpdatePfPayload,
+  getUpdatePjPayload,
+  normalizeCertificateDocumentFilter,
+} from "./components/certificateInputNormalization.ts";
 
 function runTest(name, fn) {
   try {
@@ -75,7 +83,7 @@ runTest("certificate deletion mutations invalidate lists and details", () => {
   );
 });
 
-runTest("certificate table exposes admin-only full-record deletion", () => {
+runTest("certificate workspace requests table record deletion through the shared confirmation", () => {
   const workspaceSource = readFileSync(
     new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
     "utf8",
@@ -84,15 +92,25 @@ runTest("certificate table exposes admin-only full-record deletion", () => {
   assert.match(workspaceSource, /useDeleteCertificatePjMutation/);
   assert.match(workspaceSource, /useDeleteCertificatePfMutation/);
   assert.match(workspaceSource, /Trash2/);
-  assert.match(workspaceSource, /window\.confirm\(`Excluir o certificado/);
+  assert.match(workspaceSource, /<ConfirmationDialog/);
+  assert.doesNotMatch(workspaceSource, /window\.confirm/);
+  assert.match(workspaceSource, /const \[pendingDeletion, setPendingDeletion\] = useState<PendingCertificateDeletion \| null>\(null\)/);
+  assert.match(workspaceSource, /setPendingDeletion\(\{ kind: "pj", certificate \}\)/);
+  assert.match(workspaceSource, /setPendingDeletion\(\{ kind: "pf", certificate \}\)/);
+  assert.match(workspaceSource, /async function handleConfirmPendingDeletion\(\)/);
+  assert.match(workspaceSource, /await deletePjMutation\.mutateAsync\(\{ id: certificate\.id \}\)/);
+  assert.match(workspaceSource, /await deletePfMutation\.mutateAsync\(\{ id: certificate\.id \}\)/);
   assert.match(workspaceSource, /setVisiblePjItems\(\(current\) => current\.filter/);
   assert.match(workspaceSource, /setVisiblePfItems\(\(current\) => current\.filter/);
   assert.match(workspaceSource, /toast\.success\("Certificado/);
   assert.match(workspaceSource, /toast\.error\(/);
   assert.match(workspaceSource, /canManageCertificateModule &&/);
+  assert.match(workspaceSource, /cancelLabel="Cancelar"/);
+  assert.match(workspaceSource, /confirmLabel="Excluir certificado"/);
+  assert.match(workspaceSource, /Esta ação remove o cadastro e o arquivo associado, quando existir\./);
 });
 
-runTest("certificate record deletion uses the detail endpoints and an internal dialog", () => {
+runTest("certificate record deletion uses the shared confirmation dialog", () => {
   const clientSource = readFileSync(new URL("./services/certificateService.ts", import.meta.url), "utf8");
   const actionsSource = readFileSync(
     new URL("./components/CertificateFileActions.tsx", import.meta.url),
@@ -101,9 +119,37 @@ runTest("certificate record deletion uses the detail endpoints and an internal d
 
   assert.match(clientSource, /async deletePj\(id: string\): Promise<void>/);
   assert.match(clientSource, /async deletePf\(id: string\): Promise<void>/);
-  assert.match(actionsSource, /Excluir certificado/);
-  assert.match(actionsSource, /<Dialog/);
+  assert.match(actionsSource, /<ConfirmationDialog/);
+  assert.doesNotMatch(actionsSource, /import \{ Dialog \}/);
   assert.doesNotMatch(actionsSource, /window\.confirm/);
+  assert.match(actionsSource, /isRecordDeleteDialogOpen/);
+  assert.match(actionsSource, /handleDeleteRecord/);
+  assert.match(actionsSource, /isDeletingRecord/);
+  assert.match(actionsSource, /onDeleteRecordSuccess/);
+  assert.match(actionsSource, /Excluir certificado/);
+  assert.match(actionsSource, /cancelLabel="Cancelar"/);
+  assert.match(actionsSource, /confirmLabel="Excluir certificado"/);
+  assert.match(actionsSource, /Esta ação remove o cadastro e o arquivo associado, quando existir\./);
+});
+
+runTest("certificate record confirmation isolates file operation errors", () => {
+  const actionsSource = readFileSync(
+    new URL("./components/CertificateFileActions.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(actionsSource, /const \[recordDeleteError, setRecordDeleteError\] = useState<string \| null>\(null\)/);
+  assert.match(
+    actionsSource,
+    /function handleOpenRecordDeleteDialog\(\) \{\s*setRecordDeleteError\(null\);\s*setIsRecordDeleteDialogOpen\(true\);\s*\}/,
+  );
+  assert.match(actionsSource, /onClick=\{handleOpenRecordDeleteDialog\}/);
+  assert.match(
+    actionsSource,
+    /async function handleDeleteRecord\(\) \{[\s\S]*?setRecordDeleteError\(null\);[\s\S]*?catch \(error\) \{[\s\S]*?setRecordDeleteError\(message\);[\s\S]*?throw error;/,
+  );
+  assert.match(actionsSource, /errorMessage=\{recordDeleteError\}/);
+  assert.doesNotMatch(actionsSource, /errorMessage=\{localError \|\| null\}/);
 });
 
 runTest("buildCertificateListParams removes empty values", () => {
@@ -238,6 +284,25 @@ runTest("certificate refresh keeps rows while a new first page is requested", ()
   );
 });
 
+runTest("certificate filters preserve the initial query result", () => {
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workspaceSource, /import \{[^}]*useRef[^}]*\} from "react"/);
+  assert.match(workspaceSource, /const pjFiltersMountedRef = useRef\(false\);/);
+  assert.match(workspaceSource, /const pfFiltersMountedRef = useRef\(false\);/);
+  assert.match(
+    workspaceSource,
+    /useEffect\(\(\) => \{\s*if \(!pjFiltersMountedRef\.current\) \{\s*pjFiltersMountedRef\.current = true;\s*return;\s*\}/,
+  );
+  assert.match(
+    workspaceSource,
+    /useEffect\(\(\) => \{\s*if \(!pfFiltersMountedRef\.current\) \{\s*pfFiltersMountedRef\.current = true;\s*return;\s*\}/,
+  );
+});
+
 const certificateFileActionsSource = readFileSync(
   "src/modules/certificates/components/CertificateFileActions.tsx",
   "utf8",
@@ -246,6 +311,22 @@ const certificatesWorkspaceSource = readFileSync(
   "src/modules/certificates/components/CertificatesWorkspace.tsx",
   "utf8",
 );
+
+runTest("ações de arquivo inline não duplicam a exclusão do certificado", () => {
+  const inlineBlock = certificateFileActionsSource.match(
+    /if \(variant === "inline"\) \{([\s\S]*?)\n  \}\n\n  return \(/,
+  )?.[1];
+  const panelBlock = certificateFileActionsSource.match(/\n  return \(([\s\S]*?)\n\}\n$/)?.[1];
+
+  assert.ok(inlineBlock, "bloco inline não encontrado");
+  assert.ok(panelBlock, "bloco panel não encontrado");
+  assert.doesNotMatch(inlineBlock, /Remover arquivo/);
+  assert.doesNotMatch(inlineBlock, /CERTIFICATE_TABLE_DANGER_ACTION_BUTTON_CLASSNAME/);
+  assert.match(panelBlock, /canDeleteFile/);
+  assert.match(panelBlock, /Remover/);
+  assert.match(panelBlock, /canDeleteRecord/);
+  assert.match(panelBlock, /Excluir certificado/);
+});
 
 runTest("Viewer de certificados pode consultar sem receber ações de escrita", () => {
   assert.equal(
@@ -361,6 +442,145 @@ runTest("certificate required fields are disclosed only while creating", () => {
   assert.match(source, /<RequiredFieldLabel[\s\S]*required=\{isCreate\}/);
   assert.match(source, /aria-required=\{isCreate\}/);
   assert.match(source, /isPj \? "CNPJ" : "CPF"/);
+  assert.match(source, /function hasText\(value: string\): boolean/);
+});
+
+runTest("certificate form masks documents and BRL while preserving generic contact input", () => {
+  const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
+
+  assert.match(
+    source,
+    /import \{[\s\S]*formatBrlInput,[\s\S]*formatCnpjInput,[\s\S]*formatCpfInput,[\s\S]*\} from "@shared\/utils\/inputFormatting"/,
+  );
+  assert.match(source, /getCreatePjPayload/);
+  assert.match(source, /getCreatePfPayload/);
+  assert.match(source, /getUpdatePjPayload/);
+  assert.match(source, /getUpdatePfPayload/);
+  assert.doesNotMatch(source, /formatBrazilianPhoneInput/);
+  assert.match(
+    source,
+    /value=\{formState\.contactInfo\}[\s\S]{0,160}updateField\("contactInfo", event\.target\.value\)/,
+  );
+  assert.match(source, /updateField\("paymentAmount", formatBrlInput\(event\.target\.value\)\)/);
+});
+
+runTest("certificate payment validation distinguishes empty from invalid BRL input", () => {
+  assert.equal(getPaymentAmountValidationError("", true), null);
+  assert.equal(getPaymentAmountValidationError("R$ 12,34", true), null);
+  assert.equal(
+    getPaymentAmountValidationError("9007199254740992", true),
+    "Informe um valor de pagamento válido.",
+  );
+  assert.equal(
+    getPaymentAmountValidationError("valor inválido", true),
+    "Informe um valor de pagamento válido.",
+  );
+  assert.equal(getPaymentAmountValidationError("9007199254740992", false), null);
+});
+
+runTest("certificate workspace formats document filters and sends digit-only query parameters", () => {
+  const source = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /normalizeCertificateDocumentFilter\(pjFilters\.cnpj\)/);
+  assert.match(source, /normalizeCertificateDocumentFilter\(pfFilters\.cpf\)/);
+  assert.match(source, /normalizeCertificateDocumentFilter\(pfFilters\.cnpj\)/);
+  assert.match(source, /cnpj: formatCnpjInput\(event\.target\.value\)/);
+  assert.match(source, /cpf: formatCpfInput\(event\.target\.value\)/);
+});
+
+runTest("certificate payload builders normalize masked documents and BRL amounts", () => {
+  const pjPayload = getCreatePjPayload({
+    kind: "pj",
+    clientCasteloStatus: true,
+    clientFocusStatus: false,
+    name: " Cliente PJ ",
+    cnpj: "12.345.678/0001-90",
+    responsible: " Responsável ",
+    model: " A1 ",
+    legalNature: " LTDA ",
+    password: " segredo ",
+    expirationDate: "2026-12-31",
+    notes: " nota ",
+    wasPaid: true,
+    paymentDate: "2026-01-02",
+    paymentAmount: "R$ 1.234,56",
+    contactInfo: "(11) 99999-9999",
+  });
+  const pfPayload = getCreatePfPayload({
+    kind: "pf",
+    clientCasteloStatus: false,
+    clientFocusStatus: true,
+    name: " Cliente PF ",
+    cpf: "123.456.789-01",
+    enterprise: " Empresa ",
+    model: " A3 ",
+    cnpj: "12.345.678/0001-90",
+    password: " segredo ",
+    expirationDate: "2026-12-31",
+    notes: "",
+    wasPaid: true,
+    paymentDate: "2026-01-02",
+    paymentAmount: "",
+    contactInfo: "(11) 99999-9999",
+  });
+
+  assert.equal(pjPayload.cnpj, "12345678000190");
+  assert.equal(pjPayload.payment_amount, 1234.56);
+  assert.equal(pfPayload.cpf, "12345678901");
+  assert.equal(pfPayload.cnpj, "12345678000190");
+  assert.equal(pfPayload.payment_amount, null);
+});
+
+runTest("certificate update builders ignore document mask-only changes", () => {
+  const pjState = {
+    kind: "pj",
+    clientCasteloStatus: false,
+    clientFocusStatus: false,
+    name: "Cliente",
+    cnpj: "12.345.678/0001-90",
+    responsible: "Responsável",
+    model: "A1",
+    legalNature: "LTDA",
+    password: "",
+    expirationDate: "2026-12-31",
+    notes: "",
+    wasPaid: false,
+    paymentDate: "",
+    paymentAmount: "",
+    contactInfo: "",
+  };
+  const pfState = {
+    kind: "pf",
+    clientCasteloStatus: false,
+    clientFocusStatus: false,
+    name: "Cliente",
+    cpf: "123.456.789-01",
+    enterprise: "",
+    model: "A1",
+    cnpj: "12.345.678/0001-90",
+    password: "",
+    expirationDate: "2026-12-31",
+    notes: "",
+    wasPaid: false,
+    paymentDate: "",
+    paymentAmount: "",
+    contactInfo: "",
+  };
+
+  assert.equal(getUpdatePjPayload(pjState, { ...pjState, cnpj: "12345678000190" }), null);
+  assert.equal(
+    getUpdatePfPayload(pfState, { ...pfState, cpf: "12345678901", cnpj: "12345678000190" }),
+    null,
+  );
+});
+
+runTest("certificate document filters normalize masked values and omit empty inputs", () => {
+  assert.equal(normalizeCertificateDocumentFilter("12.345.678/0001-90"), "12345678000190");
+  assert.equal(normalizeCertificateDocumentFilter("123.456.789-01"), "12345678901");
+  assert.equal(normalizeCertificateDocumentFilter(" .-/ "), undefined);
 });
 
 console.log("certificates contract tests passed");

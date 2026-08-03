@@ -210,6 +210,25 @@ html:not(.dark) .border-gray-200 {
     .u-scroll-y-panel {
         overflow-y: auto;
     }
+
+    .u-scrollbar-system {
+        scrollbar-width: thin;
+        scrollbar-color: var(--colors-blue-500) transparent;
+    }
+
+    .u-scrollbar-system::-webkit-scrollbar {
+        width: 0.375rem;
+        height: 0.375rem;
+    }
+
+    .u-scrollbar-system::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .u-scrollbar-system::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: var(--colors-blue-500);
+    }
 }
 
 @layer components {

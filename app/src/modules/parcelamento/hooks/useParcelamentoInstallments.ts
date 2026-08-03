@@ -1,9 +1,16 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { useFetch } from "@shared/hooks";
 
 import { parcelamentoService } from "../services";
 import type {
   CreateParcelamentoInstallmentPayload,
+  ParcelamentoInstallment,
+  ParcelamentoListPage,
   ParcelamentoListFilters,
   PatchParcelamentoInstallmentPayload,
 } from "../types";
@@ -20,7 +27,7 @@ export function parcelamentoInstallmentsQueryKey(filters: ParcelamentoListFilter
 export function useParcelamentoInstallments(
   filters: ParcelamentoListFilters,
   options: ParcelamentoQueryOptions = {},
-) {
+): UseQueryResult<ParcelamentoListPage<ParcelamentoInstallment>, Error> {
   return useFetch(
     parcelamentoInstallmentsQueryKey(filters),
     () => parcelamentoService.listInstallments(filters),
@@ -30,7 +37,9 @@ export function useParcelamentoInstallments(
   );
 }
 
-export function useCreateParcelamentoInstallmentMutation(filters: ParcelamentoListFilters) {
+export function useCreateParcelamentoInstallmentMutation(
+  filters: ParcelamentoListFilters,
+): UseMutationResult<ParcelamentoInstallment, Error, CreateParcelamentoInstallmentPayload> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -46,7 +55,7 @@ export function useCreateParcelamentoInstallmentMutation(filters: ParcelamentoLi
 export function useUpdateParcelamentoInstallmentMutation(
   id: string,
   filters: ParcelamentoListFilters,
-) {
+): UseMutationResult<ParcelamentoInstallment, Error, PatchParcelamentoInstallmentPayload> {
   const queryClient = useQueryClient();
 
   return useMutation({

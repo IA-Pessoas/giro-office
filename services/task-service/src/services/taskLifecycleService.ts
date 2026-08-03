@@ -10,6 +10,7 @@ import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import type { IntegracaoTaskConclusionBody } from "../schemas/integracaoTaskConclusionBody.schema.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
+import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
 
 const CONCLUSION_UPDATE_SELECT = {
   id: true,
@@ -125,6 +126,21 @@ export class TaskLifecycleService {
         body.responsible2_id !== undefined ? body.responsible2_id : exists.responsible2_id;
       const responsible3_id =
         body.responsible3_id !== undefined ? body.responsible3_id : exists.responsible3_id;
+
+      await assertResponsibleUsersInDepartment(
+        prismaClient,
+        organization_id,
+        exists.department_id,
+        [
+          body.responsible_id !== exists.responsible_id ? body.responsible_id : undefined,
+          body.responsible2_id !== undefined && body.responsible2_id !== exists.responsible2_id
+            ? body.responsible2_id
+            : undefined,
+          body.responsible3_id !== undefined && body.responsible3_id !== exists.responsible3_id
+            ? body.responsible3_id
+            : undefined,
+        ],
+      );
 
       const updated = await prismaClient.task.update({
         where: { id: body.task_id },

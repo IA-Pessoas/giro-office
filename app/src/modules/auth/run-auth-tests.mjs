@@ -21,10 +21,12 @@ import {
   canViewIntegrationRoute,
   canViewTasksOnlyIntegrationRoute,
   getModulePermissionLevel,
+  hasAnyModuleAccess,
   resolveAccessLevelFromAdditionalPermission,
   resolveDepartmentModuleKey,
   resolveModuleAccess,
   DISABLED_MODULE_KEYS,
+  MODULE_KEYS,
   isModuleDisabled,
 } from "./utils/moduleAccess.ts";
 
@@ -327,6 +329,16 @@ await (async () => {
   await runTest("app shell checks full user access for administration navigation", () => {
     assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user;/);
     assert.match(appShellSource, /canAccessAdministration\(accessUser, \{ rhAccess \}\)/);
+  });
+
+  await runTest("dashboard navigation requires access to at least one module", () => {
+    const noAccessMap = Object.fromEntries(
+      MODULE_KEYS.map((moduleKey) => [moduleKey, { canView: false }]),
+    );
+
+    assert.equal(hasAnyModuleAccess(noAccessMap), false);
+    assert.equal(hasAnyModuleAccess({ ...noAccessMap, rh: { canView: true } }), true);
+    assert.match(appShellSource, /hasAnyModuleAccess\(moduleAccessMap\)/);
   });
 
   await runTest("access store isolates snapshots by active organization", () => {

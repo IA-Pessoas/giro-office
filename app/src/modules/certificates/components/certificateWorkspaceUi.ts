@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 
+import { SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME } from "../../../shared/ui/newLayout/scrollbar.ts";
+
 const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
 type CertificateWorkspaceAccess = {
@@ -101,7 +103,7 @@ export const CERTIFICATE_SELECT_ARROW_STYLE: CSSProperties = {
 export const CERTIFICATE_TABLE_CLASSNAME = "w-full min-w-[760px] table-auto";
 
 export const CERTIFICATE_TABLE_SCROLL_AREA_CLASSNAME =
-  "overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-slate-200/60 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/80 dark:[&::-webkit-scrollbar-track]:bg-slate-800 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600";
+  SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME;
 
 export const CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME =
   "whitespace-nowrap px-6 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300";

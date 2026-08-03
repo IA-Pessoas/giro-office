@@ -68,7 +68,30 @@ describe("request routes", () => {
     const res = await request(app).get("/rh/operational-users");
 
     expect(res.status).toBe(200);
-    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
+    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId, undefined);
+  });
+
+  it("GET /rh/operational-users encaminha o contexto de departamento e modulo", async () => {
+    const app = createTestApp();
+    const departmentId = "00000000-0000-4000-8000-000000000003";
+    const res = await request(app).get("/rh/operational-users").query({
+      department_id: departmentId,
+      module: "rh",
+    });
+
+    expect(res.status).toBe(200);
+    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId, {
+      departmentId,
+      module: "rh",
+    });
+  });
+
+  it("GET /rh/operational-users rejeita query desconhecida", async () => {
+    const app = createTestApp();
+    const res = await request(app).get("/rh/operational-users").query({ unknown: "value" });
+
+    expect(res.status).toBe(400);
+    expect(operationalUserServiceMock.list).not.toHaveBeenCalled();
   });
 
   it("GET /rh/operational-users aceita modulo Contabil para seletores operacionais", async () => {
@@ -77,6 +100,31 @@ describe("request routes", () => {
       .get("/rh/operational-users")
       .set(FORWARDED_AUTH_PERMISSION_HEADER, "0")
       .set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify({ contabil: 3, rh: 0 }));
+
+    expect(res.status).toBe(200);
+    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
+  });
+
+  it("GET /rh/operational-users aceita modulo Pessoal para seletores de responsavel", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .get("/rh/operational-users")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "0")
+      .set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify({ pessoal: 1, rh: 0 }));
+
+    expect(res.status).toBe(200);
+    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
+  });
+
+  it.each([
+    "ti",
+    "integracao",
+  ])("GET /rh/operational-users aceita modulo %s para seletores contextuais", async (moduleKey) => {
+    const app = createTestApp();
+    const res = await request(app)
+      .get("/rh/operational-users")
+      .set(FORWARDED_AUTH_PERMISSION_HEADER, "0")
+      .set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify({ [moduleKey]: 1, rh: 0 }));
 
     expect(res.status).toBe(200);
     expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
