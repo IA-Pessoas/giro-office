@@ -145,6 +145,7 @@ export const userService = {
     if (data.permission !== undefined) payload.permission = data.permission;
     if (data.department_id !== undefined) payload.department_id = data.department_id;
     if (data.status !== undefined) payload.status = data.status;
+    if (data.modules !== undefined) payload.modules = data.modules;
 
     const response = await api.patch(`/user/${id}`, payload);
     return extractUser(response.data);
