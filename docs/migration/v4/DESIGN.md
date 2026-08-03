@@ -86,7 +86,8 @@ versionados. Os dumps continuam fora do repositório.
 explicitamente. O
 script extrai:
 
-- nome técnico `schema.tabela` derivado do nome do arquivo;
+- identificador técnico `sourceTable` igual ao nome completo do arquivo sem `.sql`, preservando
+  todos os segmentos separados por ponto;
 - colunas presentes nos comandos `INSERT`;
 - quantidade de registros;
 - presença e tipo aparente da chave legada;
@@ -173,7 +174,7 @@ preparada enquanto sua decisão não for registrada.
 
 ## Identidade e reconciliação
 
-A identidade técnica deve continuar baseada em `schema.tabela + id legado`. Campos naturais como
+A identidade técnica deve continuar baseada em `sourceTable integral + id legado`. Campos naturais como
 nome, CPF, CNPJ, e-mail, login e RG podem auxiliar a conferência, mas não substituem a identidade
 legada.
 
@@ -243,7 +244,7 @@ Os testes devem cobrir:
 - extração de colunas e contagens;
 - inventário exato das 312 tabelas;
 - rejeição de tabela ignorada ou duplicada;
-- UUID v5 determinístico por `schema.tabela + id legado`;
+- UUID v5 determinístico por `sourceTable integral + id legado`;
 - regressões das regras V2/V3 e dos fluxos posteriores;
 - classificação integral em `confirmed` ou `pending`;
 - separação entre tabela pending e registro em quarentena;

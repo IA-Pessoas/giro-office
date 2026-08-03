@@ -12,6 +12,8 @@
 
 - Fonte atual: /home/bruno/Documents/03.08.2026, com exatamente 312 arquivos SQL.
 - Fontes históricas somente leitura: /home/bruno/Documents/06.07.2026 e /home/bruno/Documents/10.07.2026.
+- sourceTable é sempre o nome completo do arquivo sem a extensão .sql; um, dois ou mais segmentos
+  separados por ponto são preservados sem reinterpretar schema/tabela.
 - Tenant único de destino: Castelo Contabilidade, organization_id e8048d1c-0830-45d7-84de-68e20abd685b.
 - Namespace UUID v5 já adotado: 3f68d246-0b54-4a10-9415-a8845a767fb5.
 - Todos os novos arquivos, inclusive bibliotecas, regras, testes, fixtures, relatórios e scripts futuros, ficam sob docs/migration/v4/.
@@ -190,7 +192,8 @@ Regras adicionais dos contratos:
   - ordem e nomes das colunas;
   - múltiplos INSERT acumulados;
   - rowCount e insertStatementCount corretos;
-  - nome schema.tabela derivado de tb_schema.tabela.sql;
+  - sourceTable tb_schema.tabela derivado de tb_schema.tabela.sql, preservando todos os segmentos
+    quando houver mais ou menos de dois;
   - SHA-256 com 64 caracteres hexadecimais;
   - mensagem de erro com arquivo e posição, sem conteúdo integral da linha;
   - iteração por stream, sem uso de readFile no módulo.
@@ -287,7 +290,7 @@ Regras adicionais dos contratos:
 
   - seleção exclusiva de arquivos terminados em .sql;
   - ordenação por sourceTable;
-  - rejeição de nomes que não sigam schema.tabela.sql;
+  - rejeição de stem vazio e preservação literal de um, dois ou mais segmentos antes de .sql;
   - rejeição de sourceTable duplicada mesmo com diferença de caixa;
   - falha quando actualTableCount difere de expectedTableCount;
   - sourceDigest estável calculado a partir de sourceTable, sha256 e rowCount;
@@ -452,7 +455,7 @@ Regras adicionais dos contratos:
 
 - [ ] Adicionar testes de regressão para:
 
-  - UUID v5 usar schema.tabela + id legado;
+  - UUID v5 usar sourceTable integral + id legado;
   - requester de solicitação RH usar a reconciliação corrigida e nunca fallback arbitrário;
   - responsável/assignee ausente respeitar a nulabilidade real do Prisma;
   - referência de usuário não encontrada gerar quarantine USER_REFERENCE_NOT_FOUND;
