@@ -552,10 +552,10 @@ runTest("department permission sync payload uses zero for no access", () => {
   });
 });
 
-runTest("user updates forward modular permissions to the PATCH payload", () => {
+runTest("user updates use PUT and forward modular permissions", () => {
   assert.match(
     userServiceSource,
-    /if \(data\.modules !== undefined\) payload\.modules = data\.modules;/,
+    /const response = await api\.put\(`\/user\/\$\{id\}`, payload\);/,
   );
 });
 

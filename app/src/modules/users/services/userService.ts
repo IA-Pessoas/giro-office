@@ -147,7 +147,7 @@ export const userService = {
     if (data.status !== undefined) payload.status = data.status;
     if (data.modules !== undefined) payload.modules = data.modules;
 
-    const response = await api.patch(`/user/${id}`, payload);
+    const response = await api.put(`/user/${id}`, payload);
     return extractUser(response.data);
   },
 };
