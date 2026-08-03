@@ -1,0 +1,23 @@
+{
+  "name": "@workspace/infra",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:seed:qa": "tsx prisma/seed-qa.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.4.1",
+    "@prisma/client": "7.4.1",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.6.1",
+    "pg": "^8.13.0",
+    "prisma": "7.4.1"
+  },
+  "devDependencies": {
+    "express": "^4.18.2",
+    "tsx": "^4.19.0"
+  }
+}
