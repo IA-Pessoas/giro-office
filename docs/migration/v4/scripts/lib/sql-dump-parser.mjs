@@ -7,6 +7,17 @@ const INSERT_PREFIX = "INSERT INTO";
 const SENSITIVE_COLUMN_PATTERN =
   /(?:senha|password|token|secret|chave|key|cpf|cnpj|rg|email|telefone|phone)/i;
 
+export function parseSourceTableFileName(fileName) {
+  if (!fileName.endsWith(".sql")) {
+    throw new Error("Nome de dump deve terminar em .sql");
+  }
+  const sourceTable = fileName.slice(0, -".sql".length);
+  if (!sourceTable) {
+    throw new Error("Nome de dump com stem vazio");
+  }
+  return sourceTable;
+}
+
 export async function* createSqlTokenizer(filePath, { onChunk } = {}) {
   const parser = new SqlInsertStreamParser(filePath);
   const decoder = new StringDecoder("utf8");
@@ -65,7 +76,7 @@ export async function inspectSqlDump(filePath, options = {}) {
   const legacyIdColumn = findLegacyIdColumn(columns);
 
   return {
-    sourceTable: fileName.replace(/\.sql$/i, ""),
+    sourceTable: parseSourceTableFileName(fileName),
     fileName,
     relativePath,
     fileSizeBytes,
