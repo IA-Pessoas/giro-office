@@ -63,6 +63,8 @@ export function buildRhRequestListParams(filters: RhRequestListFilters = {}) {
     category_id: filters.category_id,
     requester_user_id: filters.requester_user_id,
     assigned_to_user_id: filters.assigned_to_user_id,
+    page: filters.page,
+    limit: filters.limit,
   };
 }
 

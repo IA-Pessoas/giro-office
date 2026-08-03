@@ -85,11 +85,21 @@ export interface RhRequestRow {
   updatedAtLabel: string;
 }
 
+export interface RhRequestListPage {
+  items: RhRequest[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
 export interface RhRequestListFilters {
   status?: RhRequestStatus;
   category_id?: string;
   requester_user_id?: string;
   assigned_to_user_id?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface CreateRhRequestPayload {

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { PaginationControls } from "@shared/components";
+import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "react-toastify";
@@ -32,6 +34,7 @@ export function RhRequestsSection() {
   const [statusFilter, setStatusFilter] = useState<RhRequestStatus | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [requesterFilter, setRequesterFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<RhRequest | null>(null);
@@ -45,11 +48,20 @@ export function RhRequestsSection() {
     status: statusFilter === "all" ? undefined : statusFilter,
     category_id: categoryFilter || undefined,
     requester_user_id: canManageRhRequests ? requesterFilter || undefined : user?.id,
+    page,
+    limit: DEFAULT_PAGE_SIZE,
   });
 
   const categories = categoriesQuery.data ?? [];
   const assignableUsers = assignableUsersQuery.data ?? [];
-  const requests = requestsQuery.data ?? [];
+  const requestsPage = requestsQuery.data ?? {
+    items: [],
+    total: 0,
+    page,
+    pageSize: DEFAULT_PAGE_SIZE,
+    hasMore: false,
+  };
+  const requests = requestsPage.items;
 
   const categoryNameById = new Map(
     categories.map((category) => [category.id, formatRhCategoryLabel(category.name)]),
@@ -88,6 +100,7 @@ export function RhRequestsSection() {
   const error = categoriesQuery.error || requestsQuery.error;
   const auxiliaryError = canManageRhRequests ? assignableUsersQuery.error : null;
   const deletingRequestId = deleteRequestMutation.variables?.id ?? null;
+  const totalPages = Math.max(1, Math.ceil(requestsPage.total / requestsPage.pageSize));
 
   function getCategoryLabel(categoryId: string) {
     return categoryNameById.get(categoryId) ?? MISSING_CATEGORY_LABEL;
@@ -107,6 +120,21 @@ export function RhRequestsSection() {
     }
 
     return userNameById.get(request.requester_user_id) ?? MISSING_REQUESTER_LABEL;
+  }
+
+  function handleStatusChange(nextStatus: RhRequestStatus | "all") {
+    setStatusFilter(nextStatus);
+    setPage(1);
+  }
+
+  function handleCategoryChange(nextCategory: string) {
+    setCategoryFilter(nextCategory);
+    setPage(1);
+  }
+
+  function handleRequesterChange(nextRequester: string) {
+    setRequesterFilter(nextRequester);
+    setPage(1);
   }
 
   function handleOpenCreate() {
@@ -196,9 +224,9 @@ export function RhRequestsSection() {
             ? "Acompanhe os chamados de RH por status e categoria."
             : "Acompanhe apenas as solicitações abertas por você."
         }
-        onStatusChange={setStatusFilter}
-        onCategoryChange={setCategoryFilter}
-        onRequesterChange={setRequesterFilter}
+        onStatusChange={handleStatusChange}
+        onCategoryChange={handleCategoryChange}
+        onRequesterChange={handleRequesterChange}
         onOpenCreate={handleOpenCreate}
       />
 
@@ -227,15 +255,29 @@ export function RhRequestsSection() {
       ) : null}
 
       {!isLoading && !error && rows.length > 0 ? (
-        <RhRequestsTable
-          rows={rows}
-          canManageRequests={canManageRhRequests}
-          showRequester={canManageRhRequests}
-          onOpenDetail={handleOpenDetail}
-          onEdit={handleOpenEdit}
-          onDelete={handleRequestDelete}
-          deletingRequestId={deletingRequestId}
-        />
+        <>
+          <RhRequestsTable
+            rows={rows}
+            canManageRequests={canManageRhRequests}
+            showRequester={canManageRhRequests}
+            onOpenDetail={handleOpenDetail}
+            onEdit={handleOpenEdit}
+            onDelete={handleRequestDelete}
+            deletingRequestId={deletingRequestId}
+          />
+          <PaginationControls
+            page={requestsPage.page}
+            limit={requestsPage.pageSize}
+            total={requestsPage.total}
+            count={rows.length}
+            hasMore={requestsPage.hasMore}
+            isFetching={requestsQuery.isFetching}
+            totalPages={totalPages}
+            onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+            onNext={() => setPage((currentPage) => currentPage + 1)}
+            onPageChange={setPage}
+          />
+        </>
       ) : null}
 
       <RhRequestFormModal

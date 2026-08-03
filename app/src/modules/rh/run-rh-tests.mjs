@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const { getRhQuarterOptions } = await import("./utils/rhScoreUi.ts");
@@ -101,6 +101,35 @@ runTest("RH managers can filter requests by requester without changing non-manag
   assert.match(sectionSource, /requesters=\{canManageRhRequests \? assignableUsers : undefined\}/);
   assert.match(filtersSource, /selectedRequesterId\?: string/);
   assert.match(filtersSource, /<span>Solicitante<\/span>/);
+});
+
+runTest("RH requests consume the paginated list contract", () => {
+  const contractSource = readFileSync("src/modules/rh/services/rhService.contract.ts", "utf8");
+  const serviceSource = readFileSync("src/modules/rh/services/rhRequestsService.ts", "utf8");
+  const hookSource = readFileSync("src/modules/rh/hooks/useRhRequests.ts", "utf8");
+  const sectionSource = readFileSync("src/modules/rh/components/RhRequestsSection.tsx", "utf8");
+  const shellSource = readFileSync("src/shared/components/newLayout/RH.tsx", "utf8");
+  const dashboardSource = readFileSync("src/modules/rh/components/RhDashboardSection.tsx", "utf8");
+
+  assert.match(contractSource, /page:\s*filters\.page/);
+  assert.match(contractSource, /limit:\s*filters\.limit/);
+  assert.match(serviceSource, /Promise<RhRequestListPage>/);
+  assert.match(serviceSource, /unwrapRhEnvelope<RhRequestListPage>/);
+  assert.match(hookSource, /filters\.page\s*\?\?\s*""/);
+  assert.match(hookSource, /filters\.limit\s*\?\?\s*""/);
+  assert.match(hookSource, /UseQueryResult<RhRequestListPage, Error>/);
+  assert.match(sectionSource, /DEFAULT_PAGE_SIZE/);
+  assert.match(sectionSource, /PaginationControls/);
+  assert.match(sectionSource, /page,\s*limit:\s*DEFAULT_PAGE_SIZE/);
+  assert.match(sectionSource, /requestsPage\.items/);
+  assert.match(sectionSource, /total=\{requestsPage\.total\}/);
+  assert.match(sectionSource, /page=\{requestsPage\.page\}/);
+  assert.match(sectionSource, /limit=\{requestsPage\.pageSize\}/);
+  assert.match(sectionSource, /hasMore=\{requestsPage\.hasMore\}/);
+  assert.equal((sectionSource.match(/setPage\(1\)/g) ?? []).length, 3);
+  assert.match(shellSource, /newRequestsQuery\.data\?\.items\s*\?\?\s*\[\]/);
+  assert.match(shellSource, /inProgressRequestsQuery\.data\?\.items\s*\?\?\s*\[\]/);
+  assert.match(dashboardSource, /requestsQuery\.data\?\.items\s*\?\?\s*\[\]/);
 });
 
 runTest("RH request form preserves validation errors returned by the API", () => {

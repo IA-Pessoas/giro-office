@@ -182,7 +182,7 @@ export function RhDashboardSection({
   const pendingEvaluationsQuery = useRhPendingScoreEvaluations({ enabled: isActive });
   const timeSheetsQuery = useRhTimeSheets({}, { enabled: isActive });
 
-  const requests = requestsQuery.data ?? [];
+  const requests = requestsQuery.data?.items ?? [];
   const recentRequests = useMemo(() => sortRequestsByUpdatedAt(requests).slice(0, 4), [requests]);
   const pendingRequestsCount = requests.filter(
     (request) => request.status === "New" || request.status === "In_Progress",
