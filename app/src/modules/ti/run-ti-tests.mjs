@@ -1952,7 +1952,8 @@ await runTest("ti inventory user fields use the contextual user catalog", async 
     /const technologyResponsibleUsersQuery = useAssignableUsers\(\{[\s\S]*departmentName: "Tecnologia"[\s\S]*\}\)/,
   );
   assert.doesNotMatch(source, /module: "ti"/);
-  assert.match(source, /error\.response\.data\.error/);
+  assert.match(source, /getTiInventoryMutationErrorMessage/);
+  assert.doesNotMatch(source, /function getMutationErrorMessage/);
   assert.match(source, /name="user_id"/);
   assert.match(source, /name="responsible_it_staff_id"/);
   assert.match(source, /Usuário atual/);
@@ -1963,6 +1964,37 @@ await runTest("ti inventory user fields use the contextual user catalog", async 
   );
   assert.doesNotMatch(source, /<TiTextField\s+label="ID do usuário"/);
   assert.doesNotMatch(source, /<TiTextField\s+label="ID do responsável TI"/);
+});
+
+await runTest("ti inventory mutation errors preserve domain feedback and hide technical Axios messages", async () => {
+  const { getTiInventoryMutationErrorMessage } = await import("./utils/inventoryMutationError.ts");
+  const fallback = "Não foi possível concluir a ação.";
+
+  assert.equal(
+    getTiInventoryMutationErrorMessage(
+      Object.assign(new Error("Request failed with status code 404"), {
+        response: { data: { error: "O ativo não está disponível." } },
+      }),
+    ),
+    "O ativo não está disponível.",
+  );
+
+  for (const message of [
+    "Request failed with status code 404",
+    "Network Error",
+    "timeout of 10000ms exceeded",
+    "canceled",
+    "ECONNABORTED",
+    "ERR_NETWORK",
+    "ERR_CANCELED",
+  ]) {
+    assert.equal(getTiInventoryMutationErrorMessage(new Error(message)), fallback);
+  }
+
+  assert.equal(
+    getTiInventoryMutationErrorMessage(new Error("O ativo já está atribuído a outro usuário.")),
+    "O ativo já está atribuído a outro usuário.",
+  );
 });
 
 await runTest("ti inventory category status supports is_active fallback", async () => {

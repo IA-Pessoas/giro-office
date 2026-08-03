@@ -28,6 +28,7 @@ import type {
   TiInventoryCategory,
   TiInventoryReturnPayload,
 } from "../types";
+import { getTiInventoryMutationErrorMessage } from "../utils/inventoryMutationError";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -225,43 +226,6 @@ function getAssetStatus(asset: TiInventoryAsset): string {
   return asset.user_id || asset.user ? "assigned" : "available";
 }
 
-type InventoryMutationError = {
-  message?: unknown;
-  response?: {
-    data?: {
-      error?: unknown;
-    };
-  };
-};
-
-const TECHNICAL_MUTATION_ERROR_MESSAGE = /^(request failed with status code \d{3}[.!]?|network error)$/i;
-
-function isInventoryMutationError(error: unknown): error is InventoryMutationError {
-  return typeof error === "object" && error !== null;
-}
-
-function getMutationErrorMessage(error: unknown): string {
-  if (
-    isInventoryMutationError(error) &&
-    error.response &&
-    error.response.data &&
-    typeof error.response.data.error === "string" &&
-    error.response.data.error.trim()
-  ) {
-    return error.response.data.error.trim();
-  }
-
-  if (isInventoryMutationError(error) && typeof error.message === "string") {
-    const message = error.message.trim();
-
-    if (message && !TECHNICAL_MUTATION_ERROR_MESSAGE.test(message)) {
-      return message;
-    }
-  }
-
-  return "Não foi possível concluir a ação.";
-}
-
 export function TiInventoryTab() {
   const { access } = useModuleAccess("ti");
   const canManage = access.canEdit || access.isAdmin;
@@ -453,7 +417,7 @@ export function TiInventoryTab() {
 
       closeDialog();
     } catch (error) {
-      setDialogError(getMutationErrorMessage(error));
+      setDialogError(getTiInventoryMutationErrorMessage(error));
     }
   }
 
@@ -517,7 +481,9 @@ export function TiInventoryTab() {
     } catch (error) {
       const actionLabel = pendingAction.type === "assign" ? "atribuir o ativo" : "registrar a devolução";
 
-      setConfirmationError(`Não foi possível ${actionLabel}: ${getMutationErrorMessage(error)}`);
+      setConfirmationError(
+        `Não foi possível ${actionLabel}: ${getTiInventoryMutationErrorMessage(error)}`,
+      );
       throw error;
     }
   }
@@ -557,7 +523,7 @@ export function TiInventoryTab() {
       setEditingCategory(null);
       categoryForm.reset();
     } catch (error) {
-      setDialogError(getMutationErrorMessage(error));
+      setDialogError(getTiInventoryMutationErrorMessage(error));
     }
   }
 
