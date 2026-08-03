@@ -169,7 +169,6 @@ export function ParcelamentoShell() {
         <ParcelamentoCompetenciesSection
           selectedClient={selectedClient}
           canEdit={access.canEdit}
-          onSelectClientId={selectClientById}
         />
       ) : (
         <ParcelamentoPanoramasSection

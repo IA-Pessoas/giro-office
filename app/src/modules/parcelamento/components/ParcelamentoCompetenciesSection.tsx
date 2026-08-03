@@ -48,7 +48,6 @@ const installmentMenuOptionClassName =
 interface ParcelamentoCompetenciesSectionProps {
   selectedClient: ParcelamentoClientOption | null;
   canEdit: boolean;
-  onSelectClientId: (clientId: string) => void;
 }
 
 function formatCurrency(value: number) {
@@ -95,7 +94,6 @@ function getInstallmentMenuOptionClassName(isSelected: boolean) {
 export function ParcelamentoCompetenciesSection({
   selectedClient,
   canEdit,
-  onSelectClientId,
 }: ParcelamentoCompetenciesSectionProps) {
   const [selectedInstallmentId, setSelectedInstallmentId] = useState("");
   const [isInstallmentMenuOpen, setIsInstallmentMenuOpen] = useState(false);
@@ -193,10 +191,6 @@ export function ParcelamentoCompetenciesSection({
 
     if (nextInstallmentId === selectedInstallmentId) {
       return;
-    }
-
-    if (installment) {
-      onSelectClientId(installment.client_id);
     }
 
     setSelectedInstallmentId(nextInstallmentId);

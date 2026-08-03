@@ -555,6 +555,15 @@ runTest("parcelamento installments supports general list and client selection on
   assert.doesNotMatch(section, /!selectedClient \? \(\s*<ParcelamentoStateBox/);
 });
 
+runTest("parcelamento competencies keep general selection independent of client filter", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoCompetenciesSection.tsx",
+  );
+
+  assert.doesNotMatch(section, /onSelectClientId: \(clientId: string\) => void/);
+  assert.doesNotMatch(section, /onSelectClientId\(installment\.client_id\)/);
+});
+
 runTest("parcelamento installments filters and form use compact controls", () => {
   const section = readWorkspaceFile(
     "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
@@ -641,8 +650,6 @@ runTest("parcelamento competencies match installments modal and density patterns
   assert.match(section, /function handleCreateButtonClick/);
   assert.match(section, /isInstallmentRequiredDialogOpen/);
   assert.match(section, /setIsInstallmentRequiredDialogOpen\(true\)/);
-  assert.match(section, /onSelectClientId: \(clientId: string\) => void/);
-  assert.match(section, /onSelectClientId\(installment\.client_id\)/);
   assert.match(section, /handleInstallmentChange\(installment\)/);
   assert.match(section, /Nenhum parcelamento dispon/);
   assert.match(section, /aria-disabled=\{isSubmitting\}/);
