@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
+  BadgeDollarSign,
   Bot,
   Bell,
   Building2,
@@ -134,6 +135,7 @@ const moduleCategories: NavigationCategory[] = [
       },
       { path: "/fiscal", name: "Fiscal", icon: Receipt, moduleKey: "fiscal" as ModuleKey },
       { path: "/contabil", name: "Contábil", icon: Calculator },
+      { path: "/parcelamento", name: "Parcelamento", icon: BadgeDollarSign, moduleKey: "parcelamento" as ModuleKey },
       { path: "/rh", name: "RH", icon: Users, moduleKey: "rh" as ModuleKey },
       {
         path: "/departamento-pessoal",

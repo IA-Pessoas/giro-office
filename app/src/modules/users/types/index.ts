@@ -32,7 +32,7 @@ export type KnownPermissionModuleKey =
   | "regularize"
   | "rh"
   | "ti"
-  | "triagem"
+  | "triagem";
 
 export type KnownPermissionRecord = Record<KnownPermissionModuleKey, number>;
 export type PermissionDraft = Record<string, number>;

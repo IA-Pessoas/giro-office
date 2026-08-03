@@ -23,7 +23,6 @@ export type ModuleKey = (typeof MODULE_KEYS)[number];
 export const DISABLED_MODULE_KEYS = [
   "comercial",
   "marketing",
-  "parcelamento",
   "triagem",
 ] as const satisfies readonly ModuleKey[];
 const DISABLED_MODULE_KEY_SET = new Set<ModuleKey>(DISABLED_MODULE_KEYS);
@@ -65,6 +64,7 @@ export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/regularize": "regularize",
   "/fiscal": "fiscal",
   "/contabil": "contabil",
+  "/parcelamento": "parcelamento",
   "/rh": "rh",
   "/departamento-pessoal": "pessoal",
   "/tecnologia": "ti",

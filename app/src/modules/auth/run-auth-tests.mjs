@@ -542,12 +542,7 @@ await (async () => {
   );
 
   await runTest("disabled modules are blocked even for global admins", () => {
-    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), [
-      "comercial",
-      "marketing",
-      "parcelamento",
-      "triagem",
-    ]);
+    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["comercial", "marketing", "triagem"]);
 
     for (const moduleKey of DISABLED_MODULE_KEYS) {
       assert.equal(isModuleDisabled(moduleKey), true);
@@ -608,8 +603,8 @@ await (async () => {
     },
   );
 
-  await runTest("retired modules are not registered in navigation or quick actions", () => {
-    for (const blockedPath of ["/comercial", "/marketing", "/parcelamento", "/triagem"]) {
+  await runTest("disabled modules are not registered in navigation or quick actions", () => {
+    for (const blockedPath of ["/comercial", "/marketing", "/triagem"]) {
       assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
       assert.equal(quickActionsSource.includes(`href: "${blockedPath}"`), false);
     }
@@ -622,7 +617,6 @@ await (async () => {
         commercialPageSource,
         clientCommercialPageSource,
         marketingPageSource,
-        parcelamentoPageSource,
         triagemPageSource,
       ]) {
         assert.match(source, /notFound:\s*true/);
@@ -632,8 +626,8 @@ await (async () => {
       assert.equal(clientCommercialPageSource.includes("ClientCommercialForm"), false);
       assert.equal(clientCommercialPageSource.includes("useUpdateClientCommercialMutation"), false);
       assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);
-      assert.equal(parcelamentoPageSource.includes("newLayout/Parcelamento"), false);
       assert.equal(triagemPageSource.includes("newLayout/Triagem"), false);
+      assert.match(parcelamentoPageSource, /ParcelamentoShell/);
     },
   );
 
