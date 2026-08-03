@@ -210,6 +210,37 @@ test("assertRuleMatchesPrisma exige política de nulo e relações com colunas d
   );
 });
 
+test("loadPrismaCatalog rejeita @relation sem fechamento citando model e campo", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "prisma-catalog-"));
+  const schemaPath = path.join(directory, "broken-relation.prisma");
+  await writeFile(
+    schemaPath,
+    [
+      "model Parent {",
+      "  id String @id",
+      "}",
+      "",
+      "model Child {",
+      "  id       String @id",
+      "  parentId String",
+      "  parent   Parent @relation(fields: [parentId], references: [id]",
+      "}",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  t.after(() => rm(directory, { recursive: true, force: true }));
+
+  await assert.rejects(
+    () => loadPrismaCatalog(schemaPath),
+    (error) => {
+      assert.match(error.message, /model Child.*parent/i);
+      assert.equal(error.message.includes("parentId String"), false);
+      return true;
+    },
+  );
+});
+
 test("loadPrismaCatalog rejeita bloco model malformado sem expor o schema", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "prisma-catalog-"));
   const schemaPath = path.join(directory, "broken.prisma");

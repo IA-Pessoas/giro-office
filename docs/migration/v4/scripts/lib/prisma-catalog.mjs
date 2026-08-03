@@ -167,6 +167,9 @@ function parseField(line, modelName) {
   const prismaType = rawType.replace(/\?$/, "").replace(/\[\]$/, "");
   const mapArguments = findDirectiveArguments(attributes, "@map");
   const relationArguments = findDirectiveArguments(attributes, "@relation");
+  if (/@relation\b/.test(attributes) && relationArguments === null) {
+    throw new Error(`Model ${modelName}, campo ${prismaName} malformado: @relation sem fechamento`);
+  }
 
   return {
     model: modelName,
