@@ -56,17 +56,6 @@ const REGULARIZE_CLIENT_FIELDS = [
   mapped("competencia_saida", "competence_output", "normalize_competence_date"),
 ];
 
-const CREDENTIAL_COLUMNS = REGULARIZE_CREDENTIAL_SLOTS.flatMap((credentialSlot) => [
-  mapped(credentialSlot.loginColumn, "login", "encrypt_credential", {
-    sensitivity: "credential",
-    reason: `Login do slot lógico ${credentialSlot.siteName} exige criptografia do contrato atual.`,
-  }),
-  mapped(credentialSlot.passwordColumn, "password", "encrypt_credential", {
-    sensitivity: "credential",
-    reason: `Senha do slot lógico ${credentialSlot.siteName} exige criptografia do contrato atual.`,
-  }),
-]);
-
 export const V2_RULES = [
   directRule({
     sourceTable: "tb_admin.departamentos",
@@ -96,13 +85,10 @@ export const V2_RULES = [
       mapped("id", "id", "uuid_v5"),
       mapped("nome", "name", "normalize_text"),
       mapped("user", "login", "normalize_login"),
-      mapped("password", "password", "bcrypt_passthrough_if_valid", {
+      mapped("password", "password", "select_bcrypt_migration_strategy", {
         sensitivity: "credential",
-        reason: "Hash bcrypt legado válido é preservado sem reprocessar ou registrar o valor.",
-      }),
-      mapped("password", "password", "bcrypt_hash_legacy_plaintext", {
-        sensitivity: "credential",
-        reason: "Texto legado não vazio é convertido para bcrypt somente na preparação segura.",
+        reason:
+          "Seletor executável preserva bcrypt válido e aplica bcrypt_hash_legacy_plaintext somente a texto legado não vazio.",
       }),
       mapped("cargo", "permission", "normalize_integer"),
       mapped("status", "status", "normalize_status"),
@@ -158,12 +144,16 @@ export const V2_RULES = [
     ],
     classifySourceRow: classifyCollaboratorRow,
     emitRows(row) {
+      const classification = classifyCollaboratorRow(row);
       return [
         emission({
           stepId: "collaborator-user-merge",
           destinationTable: "users",
-          identityRef: reference("tb_admin.usuarios", row?.user_id),
-          classification: classifyCollaboratorRow(row),
+          identityRef:
+            classification.status === "prepared"
+              ? reference("tb_admin.usuarios", row?.user_id)
+              : invalidIdentityReference("tb_rh.colaboradores", "user_id"),
+          classification,
         }),
       ];
     },
@@ -269,23 +259,42 @@ export const V2_RULES = [
     ],
     classifySourceRow: prepared,
     emitRows(row) {
-      const linked = hasExplicitLegacyLink(row?.cliente_id);
+      const linkPresent = hasExplicitLegacyLink(row?.cliente_id);
+      const linkValid = isValidLegacyIdentity(row?.cliente_id);
+      const sourceIdentity = classifyRequiredIdentity(
+        row?.codigo,
+        "codigo",
+        "REGULARIZE_CLIENT_IDENTITY_INVALID",
+      );
+      const mergeClassification = !linkPresent
+        ? notEmitted("REGULARIZE_CLIENT_WITHOUT_EXPLICIT_LINK")
+        : linkValid
+          ? prepared()
+          : quarantine("cliente_id", "REGULARIZE_CLIENT_LINK_INVALID");
+      const insertClassification = linkPresent
+        ? notEmitted(
+            linkValid
+              ? "REGULARIZE_CLIENT_MERGED_BY_EXPLICIT_LINK"
+              : "REGULARIZE_CLIENT_INVALID_EXPLICIT_LINK",
+          )
+        : sourceIdentity;
       return [
         emission({
           stepId: "regularize-client-merge",
           destinationTable: "clients",
-          identityRef: reference("tb_integracao.clientes", row?.cliente_id),
-          classification: linked
-            ? prepared()
-            : notEmitted("REGULARIZE_CLIENT_WITHOUT_EXPLICIT_LINK"),
+          identityRef: linkValid
+            ? reference("tb_integracao.clientes", row?.cliente_id)
+            : invalidIdentityReference("tb_regularize.clientes", "cliente_id"),
+          classification: mergeClassification,
         }),
         emission({
           stepId: "regularize-client-insert",
           destinationTable: "clients",
-          identityRef: reference("tb_regularize.clientes", row?.codigo),
-          classification: linked
-            ? notEmitted("REGULARIZE_CLIENT_MERGED_BY_EXPLICIT_LINK")
-            : prepared(),
+          identityRef:
+            sourceIdentity.status === "prepared"
+              ? reference("tb_regularize.clientes", row?.codigo)
+              : invalidIdentityReference("tb_regularize.clientes", "codigo"),
+          classification: insertClassification,
         }),
       ];
     },
@@ -346,19 +355,28 @@ export const V2_RULES = [
     ],
     classifySourceRow: classifyClientLink,
     emitRows(row) {
-      const classification = classifyClientLink(row);
+      const clientClassification = classifyClientLink(row);
+      const projectClassification =
+        clientClassification.status === "prepared"
+          ? classifyRequiredIdentity(row?.id, "id", "PROSPECTING_IDENTITY_INVALID")
+          : clientClassification;
       return [
         emission({
           stepId: "prospecting-client-merge",
           destinationTable: "clients",
-          identityRef: reference("tb_integracao.clientes", row?.cliente_id),
-          classification,
+          identityRef:
+            clientClassification.status === "prepared"
+              ? reference("tb_integracao.clientes", row?.cliente_id)
+              : invalidIdentityReference("tb_integracao.prospeccao_comercial", "cliente_id"),
+          classification: clientClassification,
         }),
         emission({
           stepId: "prospecting-project-insert",
           destinationTable: "integracao.projects",
-          identityRef: reference("tb_integracao.prospeccao_comercial", row?.id),
-          classification,
+          identityRef: isValidLegacyIdentity(row?.id)
+            ? reference("tb_integracao.prospeccao_comercial", row?.id)
+            : invalidIdentityReference("tb_integracao.prospeccao_comercial", "id"),
+          classification: projectClassification,
         }),
       ];
     },
@@ -694,20 +712,18 @@ function createTaskRule() {
     classifySourceRow: classifyTaskRow,
     emitRows(row, context) {
       const rowClassification = classifyTaskRow(row);
-      const model = resolutionClassifications(
-        context?.taskModelMatchCount,
-        "nome",
-        "TASK_MODEL_AMBIGUOUS",
-        "TASK_MODEL_NOT_FOUND_DERIVE",
-        "TASK_MODEL_RESOLVED_NO_DERIVE",
-      );
-      const project = resolutionClassifications(
-        context?.projectMatchCount,
-        "cliente_id",
-        "TASK_PROJECT_AMBIGUOUS",
-        "TASK_PROJECT_NOT_FOUND_DERIVE",
-        "TASK_PROJECT_RESOLVED_NO_DERIVE",
-      );
+      const model = resolutionClassifications(context?.taskModelResolution, "nome", {
+        ambiguousReason: "TASK_MODEL_AMBIGUOUS",
+        notExecutedReason: "TASK_MODEL_LOOKUP_NOT_EXECUTED",
+        zeroReason: "TASK_MODEL_NOT_FOUND_DERIVE",
+        foundReason: "TASK_MODEL_RESOLVED_NO_DERIVE",
+      });
+      const project = resolutionClassifications(context?.projectResolution, "cliente_id", {
+        ambiguousReason: "TASK_PROJECT_AMBIGUOUS",
+        notExecutedReason: "TASK_PROJECT_LOOKUP_NOT_EXECUTED",
+        zeroReason: "TASK_PROJECT_NOT_FOUND_DERIVE",
+        foundReason: "TASK_PROJECT_RESOLVED_NO_DERIVE",
+      });
       const dependencyFailure = [model.lookup, project.lookup].find(
         ({ status }) => status === "quarantine",
       );
@@ -715,36 +731,47 @@ function createTaskRule() {
         rowClassification.status === "quarantine"
           ? rowClassification
           : (dependencyFailure ?? prepared());
+      const rowIdentityRef = isValidLegacyIdentity(row?.id)
+        ? reference(sourceTable, row?.id)
+        : invalidIdentityReference(sourceTable, "id");
+      const modelLookupClassification =
+        rowClassification.status === "prepared" ? model.lookup : rowClassification;
+      const modelDerivedClassification =
+        rowClassification.status === "prepared" ? model.derived : rowClassification;
+      const projectLookupClassification =
+        rowClassification.status === "prepared" ? project.lookup : rowClassification;
+      const projectDerivedClassification =
+        rowClassification.status === "prepared" ? project.derived : rowClassification;
 
       return [
         emission({
           stepId: "task-model-lookup",
           destinationTable: "integracao.tasksModel",
-          identityRef: reference(sourceTable, row?.id, "model-lookup"),
-          classification: model.lookup,
+          identityRef: `${rowIdentityRef}:model-lookup`,
+          classification: modelLookupClassification,
         }),
         emission({
           stepId: "task-model-derived",
           destinationTable: "integracao.tasksModel",
-          identityRef: reference(sourceTable, row?.id, "model-derived"),
-          classification: model.derived,
+          identityRef: `${rowIdentityRef}:model-derived`,
+          classification: modelDerivedClassification,
         }),
         emission({
           stepId: "task-project-lookup",
           destinationTable: "integracao.projects",
-          identityRef: reference(sourceTable, row?.id, "project-lookup"),
-          classification: project.lookup,
+          identityRef: `${rowIdentityRef}:project-lookup`,
+          classification: projectLookupClassification,
         }),
         emission({
           stepId: "task-project-derived",
           destinationTable: "integracao.projects",
-          identityRef: reference(sourceTable, row?.id, "project-derived"),
-          classification: project.derived,
+          identityRef: `${rowIdentityRef}:project-derived`,
+          classification: projectDerivedClassification,
         }),
         emission({
           stepId: "task-insert",
           destinationTable: "integracao.tasks",
-          identityRef: reference(sourceTable, row?.id),
+          identityRef: rowIdentityRef,
           classification: taskClassification,
         }),
       ];
@@ -834,36 +861,61 @@ function createGuidanceRule() {
     ],
     classifySourceRow: prepared,
     emitRows(row, context) {
-      const explicitProcess = hasExplicitLegacyLink(row?.processo_id);
-      const configuredCount = context?.processMatchCount;
-      const processCount =
-        configuredCount === undefined ? (explicitProcess ? 1 : 0) : configuredCount;
-      const process = resolutionClassifications(
-        processCount,
-        "processo_id",
-        "GUIDANCE_PROCESS_AMBIGUOUS",
-        "GUIDANCE_PROCESS_NOT_FOUND_DERIVE",
-        "GUIDANCE_PROCESS_RESOLVED_NO_DERIVE",
+      const rowClassification = classifyRequiredIdentity(
+        row?.id,
+        "id",
+        "GUIDANCE_IDENTITY_INVALID",
       );
+      const processLinkPresent = hasExplicitLegacyLink(row?.processo_id);
+      const processLinkValid = isValidLegacyIdentity(row?.processo_id);
+      const process = !processLinkPresent
+        ? {
+            lookup: notEmitted("GUIDANCE_WITHOUT_EXPLICIT_PROCESS"),
+            derived: prepared(),
+          }
+        : !processLinkValid
+          ? {
+              lookup: quarantine("processo_id", "GUIDANCE_PROCESS_LINK_INVALID"),
+              derived: notEmitted("INVALID_PROCESS_LINK_NOT_DERIVED"),
+            }
+          : resolutionClassifications(context?.processResolution, "processo_id", {
+              ambiguousReason: "GUIDANCE_PROCESS_AMBIGUOUS",
+              notExecutedReason: "GUIDANCE_PROCESS_LOOKUP_NOT_EXECUTED",
+              zeroReason: "GUIDANCE_PROCESS_NOT_FOUND",
+              foundReason: "GUIDANCE_PROCESS_RESOLVED_NO_DERIVE",
+              deriveOnZero: false,
+            });
       const guidanceClassification =
-        process.lookup.status === "quarantine" ? process.lookup : prepared();
+        rowClassification.status === "quarantine"
+          ? rowClassification
+          : process.lookup.status === "quarantine"
+            ? process.lookup
+            : prepared();
+      const lookupClassification =
+        rowClassification.status === "prepared" ? process.lookup : rowClassification;
+      const derivedClassification =
+        rowClassification.status === "prepared" ? process.derived : rowClassification;
+      const rowIdentityRef =
+        rowClassification.status === "prepared"
+          ? reference(sourceTable, row?.id)
+          : invalidIdentityReference(sourceTable, "id");
       return [
         emission({
           stepId: "guidance-process-lookup",
           destinationTable: "regularize.process",
           identityRef: reference("tb_regularize.processos", row?.processo_id),
-          classification: process.lookup,
+          classification: lookupClassification,
         }),
         emission({
           stepId: "guidance-process-derived",
           destinationTable: "regularize.process",
-          identityRef: reference(sourceTable, row?.id, "technical-process"),
-          classification: process.derived,
+          identityRef: `${rowIdentityRef}:technical-process`,
+          classification: derivedClassification,
         }),
         emission({
           stepId: "guidance-insert",
           destinationTable: "regularize.proceduralGuidances",
-          identityRef: reference(sourceTable, row?.id),
+          identityRef: rowIdentityRef,
           classification: guidanceClassification,
         }),
       ];
@@ -924,73 +976,91 @@ function createPartnerAggregateRule() {
       },
     ],
     classifySourceRow: classifyPartnerRow,
-    emitRows(row) {
-      return [
-        emission({
+    emitRows(rowOrRows) {
+      const rows = (Array.isArray(rowOrRows) ? [...rowOrRows] : [rowOrRows]).sort(
+        comparePartnerRows,
+      );
+      return rows.map((row) => {
+        const classification = classifyPartnerRow(row);
+        return emission({
           stepId: "guidance-partners-aggregate",
           destinationTable: "regularize.proceduralGuidances",
-          identityRef: reference("tb_regularize.orientaoes_processual", row?.op_id),
-          classification: classifyPartnerRow(row),
-        }),
-      ];
+          identityRef:
+            classification.status === "prepared"
+              ? reference("tb_regularize.orientaoes_processual", row?.op_id, `partner-${row.id}`)
+              : invalidIdentityReference(
+                  sourceTable,
+                  isValidLegacyIdentity(row?.op_id) ? "id" : "op_id",
+                ),
+          classification,
+        });
+      });
     },
   });
 }
 
 function createCredentialRule() {
   const sourceTable = "tb_regularize.clientes_senhas";
+  const siteSlots = [
+    ...new Map(REGULARIZE_CREDENTIAL_SLOTS.map((item) => [item.siteKey, item])).values(),
+  ];
+  const siteDestinations = siteSlots.map((credentialSlot) => ({
+    stepId: credentialSiteStepId(credentialSlot),
+    destinationTable: "regularize.passowordsSites",
+    mode: "derived",
+    identity: generateIdentity("organization_id", `${sourceTable}:site:${credentialSlot.siteKey}`),
+    columns: [mapped(null, "id", "uuid_v5_credential_site")],
+    constants: {
+      name: credentialSlot.siteName,
+      sphere: "legacy",
+      user: "",
+      password: "",
+      status: true,
+      organization_id: ORGANIZATION_ID,
+    },
+    defaults: { link: null },
+    precedence: ["logical_site_scope", "organization_scope"],
+    dependencies: [],
+  }));
+  const credentialDestinations = REGULARIZE_CREDENTIAL_SLOTS.map((credentialSlot, index) => ({
+    stepId: credentialSlotStepId(credentialSlot),
+    destinationTable: "regularize.passwordsRegularize",
+    mode: "insert",
+    identity: generateIdentity("id", `${sourceTable}:credential:${credentialSlot.slotKey}`),
+    columns: [
+      mapped("id", "id", "uuid_v5_per_credential_slot"),
+      mapped("empresa", "client_id", "resolve_regularize_client_reference"),
+      mapped(null, "site_id", "resolve_credential_site"),
+      ...credentialSlotColumns(credentialSlot),
+      mapped(null, "notes", "credential_slot_audit_note"),
+      ...(index === 0
+        ? [
+            notPreserved(
+              "certificado_pj",
+              "Certificado PJ é artefato criptográfico, não uma senha de site, e exige fluxo próprio de storage.",
+            ),
+            notPreserved(
+              "certificado_pf",
+              "Certificado PF é artefato criptográfico, não uma senha de site, e exige fluxo próprio de storage.",
+            ),
+          ]
+        : []),
+    ],
+    constants: { organization_id: ORGANIZATION_ID },
+    defaults: { notes: null },
+    precedence: ["logical_slot_scope", "encrypted_login_and_password"],
+    dependencies: ["tb_regularize.clientes", "tb_integracao.clientes"],
+  }));
+  const destinations = [...siteDestinations, ...credentialDestinations];
+  const destinationsByStep = new Map(
+    destinations.map((destination) => [destination.stepId, destination]),
+  );
   return createRule({
     sourceTable,
     domain: "regularize",
     cardinality: "1:N",
     dependencies: ["tb_regularize.clientes", "tb_integracao.clientes"],
-    destinations: [
-      {
-        stepId: "credential-site-derived",
-        destinationTable: "regularize.passowordsSites",
-        mode: "derived",
-        identity: generateIdentity("slot", `${sourceTable}:credential-site`),
-        columns: [
-          mapped(null, "id", "uuid_v5_credential_site"),
-          mapped(null, "name", "credential_slot_site_name"),
-        ],
-        constants: {
-          sphere: "legacy",
-          user: "",
-          password: "",
-          status: true,
-          organization_id: ORGANIZATION_ID,
-        },
-        defaults: { link: null },
-        precedence: ["logical_slot_name", "organization_scope"],
-        dependencies: [],
-      },
-      {
-        stepId: "credential-insert",
-        destinationTable: "regularize.passwordsRegularize",
-        mode: "insert",
-        identity: generateIdentity("id", `${sourceTable}:slot`),
-        columns: [
-          mapped("id", "id", "uuid_v5_per_credential_slot"),
-          mapped("empresa", "client_id", "resolve_regularize_client_reference"),
-          mapped(null, "site_id", "resolve_credential_site"),
-          ...CREDENTIAL_COLUMNS,
-          mapped(null, "notes", "credential_slot_audit_note"),
-          notPreserved(
-            "certificado_pj",
-            "Certificado PJ é artefato criptográfico, não uma senha de site, e exige fluxo próprio de storage.",
-          ),
-          notPreserved(
-            "certificado_pf",
-            "Certificado PF é artefato criptográfico, não uma senha de site, e exige fluxo próprio de storage.",
-          ),
-        ],
-        constants: { organization_id: ORGANIZATION_ID },
-        defaults: { notes: null },
-        precedence: ["logical_slot", "encrypted_login_and_password"],
-        dependencies: ["tb_regularize.clientes", "tb_integracao.clientes"],
-      },
-    ],
+    destinations,
     classifySourceRow: prepared,
     emitRows(row, context) {
       const activeSlots = REGULARIZE_CREDENTIAL_SLOTS.filter((credentialSlot) =>
@@ -1000,23 +1070,53 @@ function createCredentialRule() {
       return [
         ...activeSites.map((credentialSlot) =>
           emission({
-            stepId: "credential-site-derived",
+            stepId: credentialSiteStepId(credentialSlot),
             destinationTable: "regularize.passowordsSites",
-            identityRef: `credential-site:${credentialSlot.siteKey}`,
+            identityRef: generatedIdentityReference(
+              destinationsByStep.get(credentialSiteStepId(credentialSlot)),
+              row,
+            ),
             classification: prepared(),
           }),
         ),
-        ...activeSlots.map((credentialSlot) =>
-          emission({
-            stepId: "credential-insert",
+        ...activeSlots.map((credentialSlot) => {
+          const classification = classifyCredentialEmission(row, context, credentialSlot);
+          return emission({
+            stepId: credentialSlotStepId(credentialSlot),
             destinationTable: "regularize.passwordsRegularize",
-            identityRef: reference(sourceTable, row?.id, credentialSlot.slotKey),
-            classification: classifyCredentialEmission(row, context, credentialSlot),
-          }),
-        ),
+            identityRef: isValidLegacyIdentity(row?.id)
+              ? generatedIdentityReference(
+                  destinationsByStep.get(credentialSlotStepId(credentialSlot)),
+                  row,
+                )
+              : invalidIdentityReference(sourceTable, "id"),
+            classification,
+          });
+        }),
       ];
     },
   });
+}
+
+function credentialSiteStepId(credentialSlot) {
+  return `credential-site-${credentialSlot.siteKey}`;
+}
+
+function credentialSlotStepId(credentialSlot) {
+  return `credential-slot-${credentialSlot.slotKey}`;
+}
+
+function credentialSlotColumns(credentialSlot) {
+  return [
+    mapped(credentialSlot.loginColumn, "login", "encrypt_credential", {
+      sensitivity: "credential",
+      reason: `Login do slot lógico ${credentialSlot.siteName} exige criptografia do contrato atual.`,
+    }),
+    mapped(credentialSlot.passwordColumn, "password", "encrypt_credential", {
+      sensitivity: "credential",
+      reason: `Senha do slot lógico ${credentialSlot.siteName} exige criptografia do contrato atual.`,
+    }),
+  ];
 }
 
 function directRule({
@@ -1031,6 +1131,16 @@ function directRule({
   defaults,
   classifySourceRow = prepared,
 }) {
+  const classifyDirectSourceRow = (row, context) => {
+    const identityClassification = classifyRequiredIdentity(
+      row?.[legacyColumn],
+      legacyColumn,
+      "SOURCE_IDENTITY_INVALID",
+    );
+    return identityClassification.status === "prepared"
+      ? classifySourceRow(row, context)
+      : identityClassification;
+  };
   return createRule({
     sourceTable,
     domain,
@@ -1049,14 +1159,17 @@ function directRule({
         dependencies,
       },
     ],
-    classifySourceRow,
+    classifySourceRow: classifyDirectSourceRow,
     emitRows(row, context) {
+      const classification = classifyDirectSourceRow(row, context);
       return [
         emission({
           stepId,
           destinationTable,
-          identityRef: reference(sourceTable, row?.[legacyColumn]),
-          classification: classifySourceRow(row, context),
+          identityRef: isValidLegacyIdentity(row?.[legacyColumn])
+            ? reference(sourceTable, row?.[legacyColumn])
+            : invalidIdentityReference(sourceTable, legacyColumn),
+          classification,
         }),
       ];
     },
@@ -1164,6 +1277,14 @@ function reference(sourceTable, legacyValue, suffix = null) {
     : `${sourceTable}:${safeLegacyValue}:${safeReferencePart(suffix)}`;
 }
 
+function generatedIdentityReference(destination, row) {
+  const { identity } = destination;
+  const legacyValue = Object.hasOwn(destination.constants, identity.legacyColumn)
+    ? destination.constants[identity.legacyColumn]
+    : row?.[identity.legacyColumn];
+  return `${identity.scope}:${safeReferencePart(legacyValue)}`;
+}
+
 function safeReferencePart(value) {
   if (
     (typeof value === "string" || typeof value === "number") &&
@@ -1172,6 +1293,10 @@ function safeReferencePart(value) {
     return String(value);
   }
   return "unknown";
+}
+
+function invalidIdentityReference(sourceTable, field) {
+  return `quarantine:${sourceTable}:${field}:invalid`;
 }
 
 function prepared() {
@@ -1190,27 +1315,45 @@ function classifyUserRow(row) {
   if (!hasValue(row?.password)) {
     return quarantine("password", "USER_PASSWORD_EMPTY");
   }
-  if (BCRYPT_PATTERN.test(String(row.password)) || String(row.password).trim().length > 0) {
-    return prepared();
-  }
-  return quarantine("password", "USER_PASSWORD_EMPTY");
+  return {
+    status: "prepared",
+    selectedTransformation: BCRYPT_PATTERN.test(String(row.password))
+      ? "bcrypt_passthrough_if_valid"
+      : "bcrypt_hash_legacy_plaintext",
+  };
+}
+
+function classifyRequiredIdentity(value, field, reasonCode) {
+  return isValidLegacyIdentity(value) ? prepared() : quarantine(field, reasonCode);
 }
 
 function classifyCollaboratorRow(row) {
-  return hasExplicitLegacyLink(row?.user_id)
+  if (!hasExplicitLegacyLink(row?.user_id)) {
+    return quarantine("user_id", "USER_LINK_EMPTY");
+  }
+  return isValidLegacyIdentity(row?.user_id)
     ? prepared()
-    : quarantine("user_id", "USER_LINK_EMPTY");
+    : quarantine("user_id", "USER_LINK_INVALID");
 }
 
 function classifyClientLink(row) {
-  return hasExplicitLegacyLink(row?.cliente_id)
+  if (!hasExplicitLegacyLink(row?.cliente_id)) {
+    return quarantine("cliente_id", "CLIENT_LINK_EMPTY");
+  }
+  return isValidLegacyIdentity(row?.cliente_id)
     ? prepared()
-    : quarantine("cliente_id", "CLIENT_LINK_EMPTY");
+    : quarantine("cliente_id", "CLIENT_LINK_INVALID");
 }
 
 function classifyTaskRow(row) {
+  if (!isValidLegacyIdentity(row?.id)) {
+    return quarantine("id", "TASK_IDENTITY_INVALID");
+  }
   if (!hasExplicitLegacyLink(row?.cliente_id)) {
     return quarantine("cliente_id", "TASK_CLIENT_LINK_EMPTY");
+  }
+  if (!isValidLegacyIdentity(row?.cliente_id)) {
+    return quarantine("cliente_id", "TASK_CLIENT_LINK_INVALID");
   }
   if (!hasValue(row?.nome)) {
     return quarantine("nome", "TASK_NAME_EMPTY");
@@ -1219,12 +1362,42 @@ function classifyTaskRow(row) {
 }
 
 function classifyPartnerRow(row) {
-  return hasExplicitLegacyLink(row?.op_id)
+  if (!hasExplicitLegacyLink(row?.op_id)) {
+    return quarantine("op_id", "GUIDANCE_PARTNER_PARENT_EMPTY");
+  }
+  if (!isValidLegacyIdentity(row?.op_id)) {
+    return quarantine("op_id", "GUIDANCE_PARTNER_PARENT_INVALID");
+  }
+  return isValidLegacyIdentity(row?.id)
     ? prepared()
-    : quarantine("op_id", "GUIDANCE_PARTNER_PARENT_EMPTY");
+    : quarantine("id", "GUIDANCE_PARTNER_IDENTITY_INVALID");
+}
+
+function comparePartnerRows(left, right) {
+  return (
+    compareLegacyIdentityValues(left?.op_id, right?.op_id) ||
+    compareLegacyIdentityValues(left?.id, right?.id)
+  );
+}
+
+function compareLegacyIdentityValues(left, right) {
+  const leftText = String(left ?? "");
+  const rightText = String(right ?? "");
+  if (/^\d+$/.test(leftText) && /^\d+$/.test(rightText)) {
+    const leftNumber = BigInt(leftText);
+    const rightNumber = BigInt(rightText);
+    return leftNumber < rightNumber ? -1 : leftNumber > rightNumber ? 1 : 0;
+  }
+  return leftText < rightText ? -1 : leftText > rightText ? 1 : 0;
 }
 
 function classifyCredentialEmission(row, context, credentialSlot) {
+  if (!isValidLegacyIdentity(row?.id)) {
+    return quarantine("id", "CREDENTIAL_SOURCE_IDENTITY_INVALID");
+  }
+  if (!isValidLegacyIdentity(row?.empresa)) {
+    return quarantine("empresa", "CREDENTIAL_CLIENT_LINK_INVALID");
+  }
   if (context?.credentialEncryptionVerified !== true) {
     return quarantine(credentialSlot.passwordColumn, "CREDENTIAL_REQUIRES_ENCRYPTION");
   }
@@ -1237,24 +1410,31 @@ function classifyCredentialEmission(row, context, credentialSlot) {
   return prepared();
 }
 
-function resolutionClassifications(
-  matchCountValue,
-  field,
-  ambiguousReason,
-  zeroReason,
-  foundReason,
-) {
-  const matchCount = Number.isSafeInteger(matchCountValue) ? matchCountValue : 0;
-  if (matchCount > 1) {
+function resolutionClassifications(resolutionState, field, options) {
+  if (resolutionState === "many") {
     return {
-      lookup: quarantine(field, ambiguousReason),
+      lookup: quarantine(field, options.ambiguousReason),
       derived: notEmitted("AMBIGUOUS_REFERENCE_NOT_DERIVED"),
     };
   }
-  if (matchCount === 1) {
-    return { lookup: prepared(), derived: notEmitted(foundReason) };
+  if (resolutionState === "one") {
+    return { lookup: prepared(), derived: notEmitted(options.foundReason) };
   }
-  return { lookup: notEmitted(zeroReason), derived: prepared() };
+  if (resolutionState === "zero") {
+    return options.deriveOnZero === false
+      ? {
+          lookup: quarantine(field, options.zeroReason),
+          derived: notEmitted("CONFIRMED_ZERO_NOT_DERIVED"),
+        }
+      : {
+          lookup: notEmitted(options.zeroReason),
+          derived: prepared(),
+        };
+  }
+  return {
+    lookup: quarantine(field, options.notExecutedReason),
+    derived: notEmitted("LOOKUP_NOT_EXECUTED_NO_DERIVE"),
+  };
 }
 
 function slot(
@@ -1281,6 +1461,14 @@ function hasValue(value) {
 
 function hasExplicitLegacyLink(value) {
   return hasValue(value) && String(value).trim() !== "0";
+}
+
+function isValidLegacyIdentity(value) {
+  return (
+    hasExplicitLegacyLink(value) &&
+    (typeof value === "string" || typeof value === "number") &&
+    /^[A-Za-z0-9_.-]+$/.test(String(value))
+  );
 }
 
 function inferTransformation(destinationColumn) {

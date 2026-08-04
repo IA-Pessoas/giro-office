@@ -1,255 +1,13 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import test from "node:test";
 
 import { validateMappingRule } from "../lib/mapping-contract.mjs";
 import { loadPrismaCatalog } from "../lib/prisma-catalog.mjs";
+import { inspectSqlDump } from "../lib/sql-dump-parser.mjs";
 import { buildRuleRegistry, V2_RULES } from "../rules/index.mjs";
 
-const SOURCE_COLUMNS = {
-  "tb_admin.departamentos": ["id", "nome", "color", "status", "parceiros"],
-  "tb_admin.usuarios": [
-    "id",
-    "user",
-    "password",
-    "img",
-    "nome",
-    "cargo",
-    "departamento_id",
-    "status",
-  ],
-  "tb_rh.colaboradores": [
-    "id",
-    "user_id",
-    "nome",
-    "data_admissao",
-    "data_admissao_dominio",
-    "data_demissao",
-    "genero",
-    "data_nascimento",
-    "cpf",
-    "rg",
-    "endereco",
-    "cargo",
-    "departamento_id",
-    "email",
-    "telefone",
-    "foto",
-    "status",
-  ],
-  "tb_integracao.clientes": [
-    "id",
-    "nome",
-    "nome_fantasia",
-    "tipo",
-    "cpf_cnpj",
-    "dataAbertura",
-    "socioAdm",
-    "cpf_socio",
-    "contato",
-    "email",
-    "preposto",
-    "cpf_preposto",
-    "instagram",
-    "indicacao",
-    "grupo_id",
-    "cidade",
-    "imagem",
-    "tipo_cliente",
-    "inicio_contrato",
-    "endereco",
-    "cep",
-    "bairro",
-    "estado",
-    "complexidade",
-  ],
-  "tb_regularize.clientes": [
-    "codigo",
-    "nome",
-    "razao_social",
-    "nome_fantasia",
-    "cpf_cnpj",
-    "cnae",
-    "responsavel",
-    "fone",
-    "email",
-    "endereco",
-    "cep",
-    "bairro",
-    "estado",
-    "municipio",
-    "cliente_desde",
-    "inscricao_municipal",
-    "inscricao_estadual",
-    "inscricao_junta_comercial",
-    "situacao",
-    "cliente_id",
-    "competencia_entrada",
-    "competencia_saida",
-  ],
-  "tb_integracao.prospeccao_comercial": [
-    "id",
-    "cliente_id",
-    "servico",
-    "solucao",
-    "situacao",
-    "data_status",
-    "status_prospeccao",
-    "mes",
-    "data_cadastro",
-    "participantes",
-    "modo_reuniao",
-    "data_fechamento",
-    "porcentagem",
-    "ramo",
-  ],
-  "tb_integracao.tarefas_express": [
-    "id",
-    "nome",
-    "departamento_id",
-    "responsavel_id",
-    "responsavel_id_dois",
-    "responsavel_id_tres",
-    "estado",
-    "obs",
-    "cobranca",
-    "previsao",
-  ],
-  "tb_integracao.planos": ["id", "nome", "color"],
-  "tb_integracao.tarefas_planos": ["id", "tarefa_express_id", "plano_id", "ordem"],
-  "tb_integracao.tarefas": [
-    "id",
-    "cliente_id",
-    "nome",
-    "estado",
-    "departamento_id",
-    "responsavel_id",
-    "responsavel_id_dois",
-    "responsavel_id_tres",
-    "realizado",
-    "data_previsao",
-    "data_resolucao",
-    "obs",
-    "ano",
-    "cobranca",
-    "data_cadastro",
-    "data_update",
-    "urgencia",
-    "reuniao",
-  ],
-  "tb_regularize.alvaras": [
-    "id",
-    "empresa",
-    "cpf_cnpj",
-    "tipo_do_alvara",
-    "data_de_entrada",
-    "protocolo",
-    "responsavel",
-    "status",
-    "data_ultima_consulta",
-    "situacao_atual",
-    "contato",
-    "observacao",
-    "urgencia",
-    "tipo",
-    "protocolo_arquivo",
-  ],
-  "tb_regularize.processos": [
-    "id",
-    "cliente",
-    "cpf_cnpj",
-    "processo",
-    "descricao",
-    "data_entrada",
-    "data_finalizacao",
-    "meta",
-    "dias_corridos",
-    "status",
-    "observacao",
-    "financeiro",
-    "data_env_fiscal",
-    "data_ret_fiscal",
-    "responsavel_um",
-    "responsavel_dois",
-    "responsavel_tres",
-    "urgencia",
-    "tipo",
-    "travamento_cliente_notificacao",
-  ],
-  "tb_regularize.orientaoes_processual": [
-    "id",
-    "tipo",
-    "cliente_id",
-    "solicitacao",
-    "obs_quadro",
-    "natureza_juridica",
-    "razao_social",
-    "nome_fantasia",
-    "cnpj",
-    "capital_social",
-    "iptu",
-    "endereco",
-    "obj_social",
-    "porte",
-    "regime",
-    "representante_legal",
-    "arquivo",
-    "processo_id",
-    "status",
-  ],
-  "tb_regularize.orientaoes_processual.socios": [
-    "id",
-    "op_id",
-    "nome",
-    "porcent",
-    "prof",
-    "civil",
-    "rg",
-    "cnh",
-    "cpf",
-    "endereco",
-    "cargo",
-  ],
-  "tb_regularize.taxas_municipais": [
-    "id",
-    "cliente",
-    "ano",
-    "tff_possui",
-    "tff_valor",
-    "tff_obs",
-    "tff_analise_feito",
-    "tff_analise_obs",
-    "tff_envio_data",
-    "tff_vencimento",
-    "tlp_possui",
-    "tlp_obs",
-    "tlp_envio",
-    "tlp_envio_data",
-    "vencimento",
-    "email",
-  ],
-  "tb_regularize.clientes_senhas": [
-    "id",
-    "empresa",
-    "responsavel",
-    "acesso_simples",
-    "inscricao_estadual",
-    "sefaz",
-    "regularize",
-    "webiss_master",
-    "webiss_usuario_cpf",
-    "webiss_cpf",
-    "webiss_usuario_cpf_dois",
-    "webiss_cpf_dois",
-    "seifsa_usuario",
-    "seifsa_senha",
-    "bacen_usuario",
-    "bacen_senha",
-    "gov",
-    "MEI",
-    "certificado_pj",
-    "certificado_pf",
-  ],
-};
+const LEGACY_DUMP_ROOT = "/home/bruno/Documents/03.08.2026";
 
 const DIRECT_TOPOLOGIES = {
   "tb_admin.departamentos": "departments",
@@ -279,6 +37,14 @@ function byStep(emissions, stepId) {
   return emissions.filter((emission) => emission.stepId === stepId);
 }
 
+function assertNoPreparedUnknown(emissions, label) {
+  for (const decision of emissions) {
+    if (decision.status === "prepared") {
+      assert.doesNotMatch(decision.identityRef, /(?:^|:)unknown(?:$|:)/, label);
+    }
+  }
+}
+
 test("registro V2 contém 16 regras semanticamente confirmadas, sem marcadores draft", () => {
   const registry = buildRuleRegistry();
 
@@ -303,6 +69,111 @@ test("as nove topologias diretas usam inserts nos destinos atuais comprovados", 
   }
 });
 
+test("as nove topologias diretas colocam identidade ausente ou inválida em quarantine", () => {
+  for (const sourceTable of Object.keys(DIRECT_TOPOLOGIES)) {
+    const mappingRule = rule(sourceTable);
+    for (const id of [undefined, "", "id inválido", 0]) {
+      const classification = mappingRule.classifySourceRow({ id, password: "legacy-password" }, {});
+      assert.equal(classification.status, "quarantine", `${sourceTable}:${String(id)}`);
+      const [decision] = mappingRule.emitRows({ id, password: "legacy-password" }, {});
+      assert.equal(decision.status, "quarantine", `${sourceTable}:${String(id)}`);
+      assert.equal(decision.field, "id", sourceTable);
+      assert.equal(decision.reasonCode, "SOURCE_IDENTITY_INVALID", sourceTable);
+      assert.doesNotMatch(decision.identityRef, /:unknown$/, sourceTable);
+    }
+  }
+});
+
+test("adaptações não preparam emissão quando a identidade exigida está ausente ou inválida", () => {
+  const collaborator = rule("tb_rh.colaboradores").emitRows({ id: 1, user_id: "id inválido" }, {});
+  assert.equal(collaborator[0].status, "quarantine");
+  assert.equal(collaborator[0].reasonCode, "USER_LINK_INVALID");
+
+  const regularizeInvalidLink = rule("tb_regularize.clientes").emitRows(
+    { codigo: 1, cliente_id: "id inválido" },
+    {},
+  );
+  assert.equal(byStep(regularizeInvalidLink, "regularize-client-merge")[0].status, "quarantine");
+  assert.equal(byStep(regularizeInvalidLink, "regularize-client-insert")[0].status, "not_emitted");
+  const regularizeMissingCode = rule("tb_regularize.clientes").emitRows(
+    { codigo: "", cliente_id: "0" },
+    {},
+  );
+  assert.equal(
+    byStep(regularizeMissingCode, "regularize-client-insert")[0].reasonCode,
+    "REGULARIZE_CLIENT_IDENTITY_INVALID",
+  );
+
+  const prospectInvalidClient = rule("tb_integracao.prospeccao_comercial").emitRows(
+    { id: 1, cliente_id: "id inválido" },
+    {},
+  );
+  assert.ok(prospectInvalidClient.every(({ status }) => status === "quarantine"));
+  const prospectMissingId = rule("tb_integracao.prospeccao_comercial").emitRows(
+    { id: "", cliente_id: 2 },
+    {},
+  );
+  assert.equal(byStep(prospectMissingId, "prospecting-client-merge")[0].status, "prepared");
+  assert.equal(
+    byStep(prospectMissingId, "prospecting-project-insert")[0].reasonCode,
+    "PROSPECTING_IDENTITY_INVALID",
+  );
+
+  const taskMissingId = rule("tb_integracao.tarefas").emitRows(
+    { id: "", cliente_id: 2, nome: "Tarefa" },
+    { taskModelResolution: "one", projectResolution: "one" },
+  );
+  assert.ok(taskMissingId.every(({ status }) => status !== "prepared"));
+
+  const guidanceMissingId = rule("tb_regularize.orientaoes_processual").emitRows(
+    { id: "", processo_id: 2 },
+    { processResolution: "one" },
+  );
+  assert.ok(guidanceMissingId.every(({ status }) => status !== "prepared"));
+
+  const credentialsMissingId = rule("tb_regularize.clientes_senhas").emitRows(
+    { id: "", empresa: 2, responsavel: "login", gov: "password" },
+    { credentialEncryptionVerified: true },
+  );
+  assert.equal(
+    credentialsMissingId.filter(
+      ({ destinationTable, status }) =>
+        destinationTable === "regularize.passowordsSites" && status === "prepared",
+    ).length,
+    1,
+  );
+  assert.equal(
+    credentialsMissingId.find(
+      ({ destinationTable }) => destinationTable === "regularize.passwordsRegularize",
+    ).reasonCode,
+    "CREDENTIAL_SOURCE_IDENTITY_INVALID",
+  );
+  const credentialsMissingClient = rule("tb_regularize.clientes_senhas").emitRows(
+    { id: 1, empresa: "", responsavel: "login", gov: "password" },
+    { credentialEncryptionVerified: true },
+  );
+  assert.equal(
+    credentialsMissingClient.find(
+      ({ destinationTable }) => destinationTable === "regularize.passwordsRegularize",
+    ).reasonCode,
+    "CREDENTIAL_CLIENT_LINK_INVALID",
+  );
+
+  for (const [label, emissions] of [
+    ["collaborator", collaborator],
+    ["regularize-invalid-link", regularizeInvalidLink],
+    ["regularize-missing-code", regularizeMissingCode],
+    ["prospect-invalid-client", prospectInvalidClient],
+    ["prospect-missing-id", prospectMissingId],
+    ["task-missing-id", taskMissingId],
+    ["guidance-missing-id", guidanceMissingId],
+    ["credentials-missing-id", credentialsMissingId],
+    ["credentials-missing-client", credentialsMissingClient],
+  ]) {
+    assertNoPreparedUnknown(emissions, label);
+  }
+});
+
 test("todas as regras V2 são válidas contra o catálogo Prisma atual", async () => {
   const catalog = await loadPrismaCatalog("infra/prisma/schema.prisma");
 
@@ -311,10 +182,15 @@ test("todas as regras V2 são válidas contra o catálogo Prisma atual", async (
   }
 });
 
-test("toda coluna real dos 16 dumps termina mapped ou not_preserved com razão objetiva", () => {
+test("toda coluna real dos 16 dumps termina mapped ou not_preserved com razão objetiva", async () => {
   for (const mappingRule of V2_RULES) {
-    const expected = SOURCE_COLUMNS[mappingRule.sourceTable];
-    assert.ok(expected, mappingRule.sourceTable);
+    const inspection = await inspectSqlDump(
+      path.join(LEGACY_DUMP_ROOT, `${mappingRule.sourceTable}.sql`),
+      { relativeTo: LEGACY_DUMP_ROOT },
+    );
+    const expected = inspection.columns;
+    assert.equal(inspection.sourceTable, mappingRule.sourceTable);
+    assert.ok(expected.length > 0, mappingRule.sourceTable);
     const classified = new Set();
 
     for (const destination of mappingRule.destinations) {
@@ -367,27 +243,40 @@ test("defaults necessários do contrato atual ficam explícitos nos passos V2", 
 
 test("usuário preserva bcrypt, transforma plaintext e quarentena somente senha vazia sem expor valor", () => {
   const mappingRule = rule("tb_admin.usuarios");
-  const passwordTransformations = mappingRule.destinations[0].columns
-    .filter(
-      ({ sourceColumn, destinationColumn }) =>
-        sourceColumn === "password" && destinationColumn === "password",
-    )
-    .map(({ transformation }) => transformation);
-
-  assert.deepEqual(passwordTransformations, [
-    "bcrypt_passthrough_if_valid",
-    "bcrypt_hash_legacy_plaintext",
-  ]);
+  const passwordRules = mappingRule.destinations[0].columns.filter(
+    ({ sourceColumn, destinationColumn }) =>
+      sourceColumn === "password" && destinationColumn === "password",
+  );
+  assert.equal(passwordRules.length, 1);
+  assert.equal(passwordRules[0].transformation, "select_bcrypt_migration_strategy");
 
   const bcrypt = "$2b$12$01234567890123456789012345678901234567890123456789012";
+  assert.deepEqual(mappingRule.classifySourceRow({ id: 1, password: bcrypt }, {}), {
+    status: "prepared",
+    selectedTransformation: "bcrypt_passthrough_if_valid",
+  });
   assert.equal(mappingRule.emitRows({ id: 1, password: bcrypt }, {})[0].status, "prepared");
 
   const legacyPlaintext = "SENTINEL_LEGACY_PASSWORD";
+  const plaintextClassification = mappingRule.classifySourceRow(
+    { id: 2, password: legacyPlaintext },
+    {},
+  );
+  assert.deepEqual(plaintextClassification, {
+    status: "prepared",
+    selectedTransformation: "bcrypt_hash_legacy_plaintext",
+  });
   const plaintextEmissions = mappingRule.emitRows({ id: 2, password: legacyPlaintext }, {});
   assert.equal(plaintextEmissions[0].status, "prepared");
+  assert.doesNotMatch(JSON.stringify(plaintextClassification), new RegExp(legacyPlaintext));
   assert.doesNotMatch(JSON.stringify(plaintextEmissions), new RegExp(legacyPlaintext));
   assert.doesNotMatch(JSON.stringify(mappingRule.evidence), new RegExp(legacyPlaintext));
 
+  assert.deepEqual(mappingRule.classifySourceRow({ id: 3, password: "   " }, {}), {
+    status: "quarantine",
+    field: "password",
+    reasonCode: "USER_PASSWORD_EMPTY",
+  });
   const emptyEmission = mappingRule.emitRows({ id: 3, password: "   " }, {})[0];
   assert.equal(emptyEmission.status, "quarantine");
   assert.equal(emptyEmission.field, "password");
@@ -475,7 +364,7 @@ test("tarefa resolve ou deriva modelo e projeto antes do insert preservando clie
 
   const resolved = mappingRule.emitRows(
     { id: 5, nome: "Rotina", cliente_id: 6 },
-    { taskModelMatchCount: 1, projectMatchCount: 1 },
+    { taskModelResolution: "one", projectResolution: "one" },
   );
   assert.equal(byStep(resolved, "task-model-lookup")[0].status, "prepared");
   assert.equal(byStep(resolved, "task-model-derived")[0].status, "not_emitted");
@@ -483,10 +372,52 @@ test("tarefa resolve ou deriva modelo e projeto antes do insert preservando clie
   assert.equal(byStep(resolved, "task-project-derived")[0].status, "not_emitted");
   assert.equal(byStep(resolved, "task-insert")[0].status, "prepared");
 
-  const derived = mappingRule.emitRows({ id: 5, nome: "Avulsa", cliente_id: 6 }, {});
+  const derived = mappingRule.emitRows(
+    { id: 5, nome: "Avulsa", cliente_id: 6 },
+    { taskModelResolution: "zero", projectResolution: "zero" },
+  );
+  assert.equal(byStep(derived, "task-model-lookup")[0].status, "not_emitted");
   assert.equal(byStep(derived, "task-model-derived")[0].status, "prepared");
+  assert.equal(byStep(derived, "task-project-lookup")[0].status, "not_emitted");
   assert.equal(byStep(derived, "task-project-derived")[0].status, "prepared");
   assert.equal(byStep(derived, "task-insert")[0].status, "prepared");
+
+  const notExecuted = mappingRule.emitRows({ id: 5, nome: "Avulsa", cliente_id: 6 }, {});
+  assert.equal(
+    byStep(notExecuted, "task-model-lookup")[0].reasonCode,
+    "TASK_MODEL_LOOKUP_NOT_EXECUTED",
+  );
+  assert.equal(byStep(notExecuted, "task-model-derived")[0].status, "not_emitted");
+  assert.equal(
+    byStep(notExecuted, "task-project-lookup")[0].reasonCode,
+    "TASK_PROJECT_LOOKUP_NOT_EXECUTED",
+  );
+  assert.equal(byStep(notExecuted, "task-project-derived")[0].status, "not_emitted");
+  assert.equal(byStep(notExecuted, "task-insert")[0].status, "quarantine");
+
+  const modelMany = mappingRule.emitRows(
+    { id: 5, nome: "Ambígua", cliente_id: 6 },
+    { taskModelResolution: "many", projectResolution: "one" },
+  );
+  assert.equal(byStep(modelMany, "task-model-lookup")[0].reasonCode, "TASK_MODEL_AMBIGUOUS");
+  assert.equal(byStep(modelMany, "task-model-derived")[0].status, "not_emitted");
+  assert.equal(byStep(modelMany, "task-insert")[0].status, "quarantine");
+
+  const projectMany = mappingRule.emitRows(
+    { id: 5, nome: "Ambígua", cliente_id: 6 },
+    { taskModelResolution: "one", projectResolution: "many" },
+  );
+  assert.equal(byStep(projectMany, "task-project-lookup")[0].reasonCode, "TASK_PROJECT_AMBIGUOUS");
+  assert.equal(byStep(projectMany, "task-project-derived")[0].status, "not_emitted");
+  assert.equal(byStep(projectMany, "task-insert")[0].status, "quarantine");
+
+  const mixed = mappingRule.emitRows(
+    { id: 5, nome: "Mista", cliente_id: 6 },
+    { taskModelResolution: "one", projectResolution: "zero" },
+  );
+  assert.equal(byStep(mixed, "task-model-lookup")[0].status, "prepared");
+  assert.equal(byStep(mixed, "task-project-derived")[0].status, "prepared");
+  assert.equal(byStep(mixed, "task-insert")[0].status, "prepared");
 });
 
 test("orientação resolve processo legado ou deriva processo técnico antes da orientação", () => {
@@ -500,10 +431,36 @@ test("orientação resolve processo legado ou deriva processo técnico antes da 
     ],
   );
 
-  const linked = mappingRule.emitRows({ id: 10, processo_id: 20 }, {});
+  const linked = mappingRule.emitRows({ id: 10, processo_id: 20 }, { processResolution: "one" });
   assert.equal(byStep(linked, "guidance-process-lookup")[0].status, "prepared");
   assert.equal(byStep(linked, "guidance-process-derived")[0].status, "not_emitted");
   assert.equal(byStep(linked, "guidance-insert")[0].status, "prepared");
+
+  for (const [processResolution, reasonCode] of [
+    ["not_executed", "GUIDANCE_PROCESS_LOOKUP_NOT_EXECUTED"],
+    ["zero", "GUIDANCE_PROCESS_NOT_FOUND"],
+    ["many", "GUIDANCE_PROCESS_AMBIGUOUS"],
+  ]) {
+    const unresolved = mappingRule.emitRows({ id: 10, processo_id: 20 }, { processResolution });
+    assert.equal(byStep(unresolved, "guidance-process-lookup")[0].status, "quarantine");
+    assert.equal(byStep(unresolved, "guidance-process-lookup")[0].reasonCode, reasonCode);
+    assert.equal(byStep(unresolved, "guidance-process-derived")[0].status, "not_emitted");
+    assert.equal(byStep(unresolved, "guidance-insert")[0].status, "quarantine");
+  }
+
+  const implicitNotExecuted = mappingRule.emitRows({ id: 10, processo_id: 20 }, {});
+  assert.equal(
+    byStep(implicitNotExecuted, "guidance-process-lookup")[0].reasonCode,
+    "GUIDANCE_PROCESS_LOOKUP_NOT_EXECUTED",
+  );
+
+  const invalidLink = mappingRule.emitRows({ id: 10, processo_id: "id inválido" }, {});
+  assert.equal(
+    byStep(invalidLink, "guidance-process-lookup")[0].reasonCode,
+    "GUIDANCE_PROCESS_LINK_INVALID",
+  );
+  assert.equal(byStep(invalidLink, "guidance-process-derived")[0].status, "not_emitted");
+  assert.equal(byStep(invalidLink, "guidance-insert")[0].status, "quarantine");
 
   const autonomous = mappingRule.emitRows({ id: 10, processo_id: "0" }, {});
   assert.equal(byStep(autonomous, "guidance-process-lookup")[0].status, "not_emitted");
@@ -527,34 +484,70 @@ test("sócios agregam exclusivamente no JSON proceduralGuidances.partners", () =
     ),
   );
   assert.doesNotMatch(JSON.stringify(mappingRule.destinations), /regularize\.partners|clients\.pf/);
+
+  const children = [
+    { id: 9, op_id: 21, nome: "SEGUNDO_SENTINEL" },
+    { id: 3, op_id: 21, nome: "PRIMEIRO_SENTINEL" },
+  ];
+  const aggregate = mappingRule.emitRows(children, {});
+  assert.deepEqual(
+    aggregate.map(({ identityRef }) => identityRef),
+    [
+      "tb_regularize.orientaoes_processual:21:partner-3",
+      "tb_regularize.orientaoes_processual:21:partner-9",
+    ],
+  );
+  assert.ok(aggregate.every(({ status }) => status === "prepared"));
+  assert.ok(
+    aggregate.every(
+      ({ destinationTable }) => destinationTable === "regularize.proceduralGuidances",
+    ),
+  );
+  assert.deepEqual(mappingRule.emitRows([...children].reverse(), {}), aggregate);
+  assert.doesNotMatch(JSON.stringify(aggregate), /SENTINEL/);
+
+  const orphan = mappingRule.emitRows({ id: 4, op_id: "" }, {})[0];
+  assert.equal(orphan.status, "quarantine");
+  assert.equal(orphan.reasonCode, "GUIDANCE_PARTNER_PARENT_EMPTY");
+  const missingChildIdentity = mappingRule.emitRows({ id: "", op_id: 21 }, {})[0];
+  assert.equal(missingChildIdentity.status, "quarantine");
+  assert.equal(missingChildIdentity.reasonCode, "GUIDANCE_PARTNER_IDENTITY_INVALID");
 });
 
 test("clientes_senhas expande dez credenciais nos nove sites lógicos com criptografia por emissão", () => {
   const mappingRule = rule("tb_regularize.clientes_senhas");
-  assert.deepEqual(
-    mappingRule.destinations.map(({ destinationTable, mode }) => [destinationTable, mode]),
-    [
-      ["regularize.passowordsSites", "derived"],
-      ["regularize.passwordsRegularize", "insert"],
-    ],
+  const siteDestinations = mappingRule.destinations.filter(
+    ({ destinationTable }) => destinationTable === "regularize.passowordsSites",
   );
-  const siteDestination = step(mappingRule, "credential-site-derived");
-  assert.equal(siteDestination.identity.kind, "generate");
-  assert.deepEqual(siteDestination.defaults, { link: null });
-  assert.deepEqual(
-    {
-      sphere: siteDestination.constants.sphere,
-      status: siteDestination.constants.status,
-      user: siteDestination.constants.user,
-      password: siteDestination.constants.password,
-    },
-    { sphere: "legacy", status: true, user: "", password: "" },
+  const credentialDestinations = mappingRule.destinations.filter(
+    ({ destinationTable }) => destinationTable === "regularize.passwordsRegularize",
+  );
+  assert.equal(siteDestinations.length, 9);
+  assert.equal(credentialDestinations.length, 10);
+  assert.ok(siteDestinations.every(({ mode }) => mode === "derived"));
+  assert.ok(credentialDestinations.every(({ mode }) => mode === "insert"));
+  assert.equal(new Set(siteDestinations.map(({ stepId }) => stepId)).size, 9);
+  assert.equal(new Set(credentialDestinations.map(({ stepId }) => stepId)).size, 10);
+  assert.ok(
+    siteDestinations.every(
+      ({ identity, constants }) =>
+        identity.kind === "generate" &&
+        identity.legacyColumn === "organization_id" &&
+        constants.organization_id === "e8048d1c-0830-45d7-84de-68e20abd685b",
+    ),
+  );
+  assert.ok(
+    credentialDestinations.every(
+      ({ identity }) => identity.kind === "generate" && identity.legacyColumn === "id",
+    ),
   );
 
-  const credentialColumns = step(mappingRule, "credential-insert").columns.filter(
-    ({ destinationColumn }) => destinationColumn === "login" || destinationColumn === "password",
+  const credentialColumns = credentialDestinations.flatMap(({ columns }) =>
+    columns.filter(
+      ({ destinationColumn }) => destinationColumn === "login" || destinationColumn === "password",
+    ),
   );
-  assert.ok(credentialColumns.length >= 20);
+  assert.equal(credentialColumns.length, 20);
   assert.ok(
     credentialColumns.every(({ transformation }) => transformation === "encrypt_credential"),
   );
@@ -581,18 +574,59 @@ test("clientes_senhas expande dez credenciais nos nove sites lógicos com cripto
   };
 
   const ready = mappingRule.emitRows(row, { credentialEncryptionVerified: true });
-  const readySites = byStep(ready, "credential-site-derived");
-  const readyCredentials = byStep(ready, "credential-insert");
+  const readySites = ready.filter(
+    ({ destinationTable }) => destinationTable === "regularize.passowordsSites",
+  );
+  const readyCredentials = ready.filter(
+    ({ destinationTable }) => destinationTable === "regularize.passwordsRegularize",
+  );
   assert.equal(readySites.length, 9);
   assert.equal(readyCredentials.length, 10);
   assert.ok(readyCredentials.every(({ status }) => status === "prepared"));
   assert.equal(
-    readyCredentials.filter(({ identityRef }) => /webiss-cpf-[12]$/.test(identityRef)).length,
+    readyCredentials.filter(({ stepId }) => /^credential-slot-webiss-cpf-[12]$/.test(stepId))
+      .length,
     2,
   );
 
+  const destinationsByStep = new Map(
+    mappingRule.destinations.map((destination) => [destination.stepId, destination]),
+  );
+  const identitySeeds = ready.map((decision) => {
+    const destination = destinationsByStep.get(decision.stepId);
+    assert.ok(destination, decision.stepId);
+    assert.equal(destination.identity.kind, "generate", decision.stepId);
+    const legacyValue = Object.hasOwn(destination.constants, destination.identity.legacyColumn)
+      ? destination.constants[destination.identity.legacyColumn]
+      : row[destination.identity.legacyColumn];
+    assert.ok(legacyValue, `${decision.stepId}.${destination.identity.legacyColumn}`);
+    const identitySeed = `${destination.identity.scope}:${legacyValue}`;
+    assert.equal(decision.identityRef, identitySeed, decision.stepId);
+    return identitySeed;
+  });
+  assert.equal(new Set(identitySeeds).size, 19);
+
+  const secondReady = mappingRule.emitRows(
+    { ...row, id: 2 },
+    { credentialEncryptionVerified: true },
+  );
+  assert.deepEqual(
+    secondReady
+      .filter(({ destinationTable }) => destinationTable === "regularize.passowordsSites")
+      .map(({ identityRef }) => identityRef),
+    readySites.map(({ identityRef }) => identityRef),
+  );
+  const firstCredentialIdentities = new Set(readyCredentials.map(({ identityRef }) => identityRef));
+  assert.ok(
+    secondReady
+      .filter(({ destinationTable }) => destinationTable === "regularize.passwordsRegularize")
+      .every(({ identityRef }) => !firstCredentialIdentities.has(identityRef)),
+  );
+
   const blocked = mappingRule.emitRows(row, { credentialEncryptionVerified: false });
-  const blockedCredentials = byStep(blocked, "credential-insert");
+  const blockedCredentials = blocked.filter(
+    ({ destinationTable }) => destinationTable === "regularize.passwordsRegularize",
+  );
   assert.equal(blockedCredentials.length, 10);
   assert.ok(blockedCredentials.every(({ status }) => status === "quarantine"));
   assert.ok(
@@ -601,9 +635,12 @@ test("clientes_senhas expande dez credenciais nos nove sites lógicos com cripto
   assert.doesNotMatch(JSON.stringify(ready), /SENTINEL/);
   assert.doesNotMatch(JSON.stringify(blocked), /SENTINEL/);
 
-  const certificates = step(mappingRule, "credential-insert").columns.filter(({ sourceColumn }) =>
-    ["certificado_pj", "certificado_pf"].includes(sourceColumn),
+  const certificates = credentialDestinations.flatMap(({ columns }) =>
+    columns.filter(({ sourceColumn }) =>
+      ["certificado_pj", "certificado_pf"].includes(sourceColumn),
+    ),
   );
+  assert.equal(certificates.length, 2);
   assert.ok(certificates.every(({ status }) => status === "not_preserved"));
 });
 
@@ -621,6 +658,9 @@ test("emitRows V2 expõe somente decisões sanitizadas, nunca payload ou valor",
         "stepId",
       ]);
       assert.ok(["prepared", "quarantine", "not_emitted"].includes(emission.status));
+      if (emission.status === "prepared") {
+        assert.doesNotMatch(emission.identityRef, /(?:^|:)unknown(?:$|:)/);
+      }
     }
     assert.doesNotMatch(JSON.stringify(emissions), /"(?:payload|value|passwordValue)"\s*:/i);
   }
