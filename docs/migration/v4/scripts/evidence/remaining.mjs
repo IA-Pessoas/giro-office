@@ -48,9 +48,9 @@ const CONFIRMED = new Map(
     [
       "tb_cbs.estoque_saidas",
       ["infra/prisma/schema.prisma:1033", "services/ti-service/src/services/tiStockService.ts:333"],
-      "A saída de saldo possui contrato atual equivalente, com usuários obrigatórios e opcionais explícitos.",
+      "O contrato atual cobre somente o subset fiel das saídas: as 1.807 linhas com obs funcional vão integralmente para quarentena porque stock.exits não possui essa coluna; portanto não há equivalência plena para as 3.000 linhas.",
       [
-        "produto_id referencia tb_cbs.estoque.id; solicitante, autorizador e operador referenciam tb_admin.usuarios.id.",
+        "produto_id referencia tb_cbs.estoque.id; solicitante, autorizador e operador referenciam tb_admin.usuarios.id; qualquer pai não preparado também coloca a saída em quarentena.",
       ],
     ],
     [
@@ -67,8 +67,10 @@ const CONFIRMED = new Map(
     [
       "tb_mkt.senhas",
       ["infra/prisma/schema.prisma:1283", "services/src/src/services/mkt/PasswordService.ts:20"],
-      "A credencial de Marketing possui contrato atual equivalente e exige criptografia antes de emissão.",
-      ["local e user são a chave natural verificada pelo CRUD legado; password é segredo."],
+      "O contrato atual exige criptografia antes da emissão; 2 das 54 linhas têm obs contendo o próprio segredo e ficam integralmente em quarentena, sem copiar ou redigir parcialmente notes.",
+      [
+        "local e user são a chave natural verificada pelo CRUD legado; password é segredo e qualquer repetição em obs bloqueia a linha completa.",
+      ],
     ],
     [
       "tb_pec.notas",
@@ -81,9 +83,9 @@ const CONFIRMED = new Map(
     [
       "tb_triagem.campos",
       ["infra/prisma/schema.prisma:2078", "services/src/src/services/triagem/TriageService.ts:36"],
-      "Os indicadores fiscais ativos por cliente formam o JSON active_items de triagem.configs.",
+      "Os indicadores fiscais permitidos formam active_items; as 307 linhas com faturamento e/ou envio funcionais vão para quarentena nesses campos, incluindo 5 conflitos canônicos multi-causa registrados em blockers auditáveis.",
       [
-        "cliente_id referencia tb_regularize.clientes.codigo; o resolver V2 fornece a identidade Client canônica.",
+        "cliente_id referencia tb_regularize.clientes.codigo; o resolver V2 fornece a identidade Client canônica e conflitos N:1 são preservados sem ocultar os blockers faturamento/envio.",
       ],
     ],
     [
@@ -110,11 +112,14 @@ const CONFIRMED = new Map(
       "tb_workspace.solicitacoes_mensagens",
       [
         "infra/prisma/schema.prisma:2028",
-        "services/ti-service/src/services/tiMessageService.ts:35",
+        "services/ti-service/src/services/tiMessageService.ts:51",
+        "services/ti-service/src/schemas/tiRequest.schemas.ts:58",
+        "services/ti-service/src/services/tiRequestImageStorage.ts:6",
       ],
-      "Mensagens de solicitações TI possuem contrato atual, com anexos tratados por capacidade explícita.",
+      "As 2 mensagens reais vão para quarentena: a normal preserva estado funcional de leitura/destinatário sem destino, e a tipo 6 tem mensagem vazia, PDF real sem correlação e MIME não aceito; esse anexo não é migrável pela capacidade atual.",
       [
-        "solicitacao referencia tb_workspace.solicitacoes.id e remetente referencia tb_admin.usuarios.id.",
+        "solicitacao referencia tb_workspace.solicitacoes.id e remetente referencia tb_admin.usuarios.id; a cadeia categoria→solicitação→mensagem precisa estar prepared antes do filho.",
+        "classes/Solicitacao.php define tipo 0 como mensagem e tipo 6 como arquivo; o row tipo 6 do backup não contém o nome que permitiria correlacionar 67ea8f65eca6d.pdf.",
       ],
     ],
   ].map(([sourceTable, current, reason, relationships]) => [

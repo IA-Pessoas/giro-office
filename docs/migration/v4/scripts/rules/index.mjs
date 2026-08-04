@@ -49,6 +49,8 @@ import {
   buildWorkspaceCategoryContexts,
   buildWorkspaceMessageContexts,
   buildWorkspaceRequestContexts,
+  mapWorkspaceMessageType,
+  projectRemainingRow,
   REMAINING_RULES,
 } from "./remaining.mjs";
 import { RH_PESSOAL_RULES } from "./rh-pessoal.mjs";
@@ -88,10 +90,12 @@ export {
   buildMarketingPasswordContexts,
   buildMarketingSocialContexts,
   buildPecNoteContexts,
+  projectRemainingRow,
   buildTriageClientSlotContexts,
   buildWorkspaceCategoryContexts,
   buildWorkspaceMessageContexts,
   buildWorkspaceRequestContexts,
+  mapWorkspaceMessageType,
   REMAINING_RULES,
   RH_PESSOAL_EVIDENCE,
   RH_PESSOAL_RULES,

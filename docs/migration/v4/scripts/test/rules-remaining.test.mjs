@@ -7,6 +7,7 @@ import { REMAINING_EVIDENCE } from "../evidence/index.mjs";
 import { validateMappingRule } from "../lib/mapping-contract.mjs";
 import { loadPrismaCatalog } from "../lib/prisma-catalog.mjs";
 import { iterateSqlRows } from "../lib/sql-dump-parser.mjs";
+import * as ruleExports from "../rules/index.mjs";
 import {
   ADMIN_BUSINESS_RULES,
   buildCbsStockCategoryContexts,
@@ -97,17 +98,68 @@ async function stockContexts() {
         "tb_cbs.estoque_andares",
       ].map(loadRows),
     );
+  const categoryContexts = buildCbsStockCategoryContexts({
+    rows: categoryRows,
+    departmentRows,
+  });
+  const locationContexts = buildCbsStockLocationContexts({
+    rows: locationRows,
+    floorRows,
+    departmentRows,
+  });
   return {
     rows,
+    categoryRows,
+    categoryContexts,
+    locationRows,
+    locationContexts,
     contexts: buildCbsStockContexts({
       rows,
       departmentRows,
       itemRows,
       categoryRows,
+      categoryContexts,
       categoryItemRows,
       locationRows,
+      locationContexts,
       floorRows,
     }),
+  };
+}
+
+async function workspaceContexts() {
+  const [categoryRows, requestRows, messageRows, departmentRows, userRows] = await Promise.all(
+    [
+      "tb_workspace.solicitacoes_categorias",
+      "tb_workspace.solicitacoes",
+      "tb_workspace.solicitacoes_mensagens",
+      "tb_admin.departamentos",
+      "tb_admin.usuarios",
+    ].map(loadRows),
+  );
+  const categoryContexts = buildWorkspaceCategoryContexts({ rows: categoryRows, departmentRows });
+  const requestContexts = buildWorkspaceRequestContexts({
+    rows: requestRows,
+    userRows,
+    departmentRows,
+    categoryRows,
+    categoryContexts,
+  });
+  const messageContexts = buildWorkspaceMessageContexts({
+    rows: messageRows,
+    requestRows,
+    requestContexts,
+    userRows,
+  });
+  return {
+    categoryRows,
+    categoryContexts,
+    requestRows,
+    requestContexts,
+    messageRows,
+    messageContexts,
+    departmentRows,
+    userRows,
   };
 }
 
@@ -243,6 +295,71 @@ test("estoque CBS preserva descrição/status do item e aplica escopo Tecnologia
     assert.equal(contexts[index].resolutions.item.itemDescription, null);
     assert.equal(emissions[index].reasonCode, "CBS_STOCK_CATEGORY_NOT_FOUND");
   }
+});
+
+test("pais transversais de estoque exigem decisões opacas prepared de categoria e localização", async () => {
+  const { rows, contexts, categoryRows, categoryContexts, locationRows, locationContexts } =
+    await stockContexts();
+  const mappingRule = rule("tb_cbs.estoque");
+  const preparedIndexes = rows.flatMap((row, index) =>
+    mappingRule.emitRows(row, contexts[index])[0].status === "prepared" ? [index] : [],
+  );
+  assert.equal(preparedIndexes.length, 21);
+  assert.equal(
+    preparedIndexes.every(
+      (index) =>
+        contexts[index].resolutions.category.migrationState === "prepared" &&
+        contexts[index].resolutions.location.migrationState === "prepared",
+    ),
+    true,
+  );
+  const quarantinedParentIndexes = rows.flatMap((_row, index) =>
+    contexts[index].resolutions.category.migrationState !== "prepared" ||
+    contexts[index].resolutions.location.migrationState !== "prepared"
+      ? [index]
+      : [],
+  );
+  assert.ok(quarantinedParentIndexes.length > 0);
+  assert.equal(
+    quarantinedParentIndexes.every(
+      (index) => mappingRule.emitRows(rows[index], contexts[index])[0].status !== "prepared",
+    ),
+    true,
+  );
+  const [departmentRows, itemRows, categoryItemRows, floorRows] = await Promise.all(
+    [
+      "tb_admin.departamentos",
+      "tb_cbs.estoque_itens",
+      "tb_cbs.estoque_categorias_itens",
+      "tb_cbs.estoque_andares",
+    ].map(loadRows),
+  );
+  const args = {
+    rows,
+    departmentRows,
+    itemRows,
+    categoryRows,
+    categoryItemRows,
+    locationRows,
+    locationContexts,
+    floorRows,
+  };
+  assert.throws(
+    () =>
+      buildCbsStockContexts({
+        ...args,
+        categoryContexts: categoryContexts.map((context) => ({ ...context })),
+      }),
+    /preflight opaco/i,
+  );
+  assert.throws(
+    () => buildCbsStockContexts({ ...args, categoryContexts: categoryContexts.slice(1) }),
+    /preflight opaco completo/i,
+  );
+  assert.throws(
+    () => buildCbsStockContexts({ ...args, locationContexts: locationContexts.slice(1) }),
+    /preflight opaco completo/i,
+  );
 });
 
 test("entrada e saída só preparam quando estoque e usuários-pai também preparam", async () => {
@@ -395,7 +512,9 @@ test("Triagem usa NFSE e quarentena faturamento/envio antes da consolidação", 
 
   assert.equal(functionalIndexes.length, 307);
   assert.equal(
-    functionalIndexes.every((index) => emissions[index].status !== "prepared"),
+    functionalIndexes.every(
+      (index) => emissions[index].reasonCode === "TRIAGE_FUNCTIONAL_FIELD_UNMAPPABLE",
+    ),
     true,
   );
   assert.deepEqual(summary(emissions), { prepared: 243, quarantine: 309, not_emitted: 1 });
@@ -407,14 +526,25 @@ test("Triagem usa NFSE e quarentena faturamento/envio antes da consolidação", 
   );
   assert.notEqual(deliveryOnlyIndex, -1);
   assert.equal(emissions[deliveryOnlyIndex].field, "envio");
-  for (const clientCode of ["842", "1194", "1031", "1207"]) {
-    const index = rows.findIndex(({ cliente_id }) => cliente_id === clientCode);
-    const reverseIndex = reversedRows.findIndex(({ cliente_id }) => cliente_id === clientCode);
+  const multiCauseIndexes = functionalIndexes.filter(
+    (index) => contexts[index].resolutions.clientSlot.state === "conflict",
+  );
+  assert.equal(multiCauseIndexes.length, 5);
+  for (const index of multiCauseIndexes) {
+    const reverseIndex = reversedRows.findIndex(({ id }) => id === rows[index].id);
     assert.deepEqual(
       contexts[index].resolutions.clientSlot,
       reversedContexts[reverseIndex].resolutions.clientSlot,
     );
-    assert.equal(emissions[index].reasonCode, "TRIAGE_CONFIG_CANONICAL_CLIENT_CONFLICT");
+    const audit = ruleExports.projectRemainingRow({
+      sourceTable: "tb_triagem.campos",
+      row: rows[index],
+      context: contexts[index],
+    });
+    assert.deepEqual(
+      audit.blockers.map(({ reasonCode }) => reasonCode),
+      ["TRIAGE_FUNCTIONAL_FIELD_UNMAPPABLE", "TRIAGE_CONFIG_CANONICAL_CLIENT_CONFLICT"],
+    );
   }
   assert.equal(
     mappingRule.destinations[0].columns.find(({ sourceColumn }) => sourceColumn === "nfce_tomados")
@@ -460,18 +590,57 @@ test("rede social consolida N:1 de modo determinístico no Client canônico", as
   );
 });
 
-test("mensagens Workspace reais preservam texto somente quando não há estado sem destino", async () => {
-  const [rows, requestRows, userRows] = await Promise.all(
-    ["tb_workspace.solicitacoes_mensagens", "tb_workspace.solicitacoes", "tb_admin.usuarios"].map(
-      loadRows,
-    ),
-  );
-  const contexts = buildWorkspaceMessageContexts({ rows, requestRows, userRows });
+test("mensagens Workspace usam tipo executável e cadeia parental opaca", async () => {
+  const {
+    categoryRows,
+    categoryContexts,
+    requestRows,
+    requestContexts,
+    messageRows: rows,
+    messageContexts: contexts,
+    departmentRows,
+    userRows,
+  } = await workspaceContexts();
   const mappingRule = rule("tb_workspace.solicitacoes_mensagens");
   const emissions = rows.map((row, index) => mappingRule.emitRows(row, contexts[index])[0]);
   const normalIndex = rows.findIndex(({ tipo }) => tipo === "0");
   const attachmentIndex = rows.findIndex(({ tipo }) => tipo === "6");
 
+  assert.deepEqual(ruleExports.mapWorkspaceMessageType(rows[normalIndex].tipo), {
+    status: "mapped",
+    value: "Message",
+    attachment: false,
+  });
+  assert.deepEqual(
+    ruleExports.mapWorkspaceMessageType(rows[attachmentIndex].tipo, {
+      correlated: false,
+      mediaType: "application/pdf",
+      storageSupported: false,
+    }),
+    {
+      status: "quarantine",
+      field: "mensagem",
+      reasonCode: "WORKSPACE_ATTACHMENT_CORRELATION_UNRESOLVED",
+    },
+  );
+  assert.deepEqual(
+    ruleExports.mapWorkspaceMessageType("6", {
+      correlated: true,
+      mediaType: "image/png",
+      storageSupported: true,
+    }),
+    { status: "mapped", value: "Message", attachment: true },
+  );
+  assert.deepEqual(ruleExports.mapWorkspaceMessageType("7"), {
+    status: "quarantine",
+    field: "tipo",
+    reasonCode: "WORKSPACE_MESSAGE_TYPE_INVALID",
+  });
+  assert.deepEqual(ruleExports.mapWorkspaceMessageType(""), {
+    status: "quarantine",
+    field: "tipo",
+    reasonCode: "WORKSPACE_MESSAGE_TYPE_INVALID",
+  });
   assert.equal(rows[attachmentIndex].mensagem, "");
   assert.equal(emissions[normalIndex].reasonCode, "WORKSPACE_MESSAGE_READ_STATE_UNMAPPABLE");
   assert.equal(
@@ -479,6 +648,63 @@ test("mensagens Workspace reais preservam texto somente quando não há estado s
     "WORKSPACE_ATTACHMENT_CORRELATION_UNRESOLVED",
   );
   assert.deepEqual(summary(emissions), { quarantine: 2 });
+  assert.equal(
+    requestRows
+      .flatMap((row, index) =>
+        rule("tb_workspace.solicitacoes").emitRows(row, requestContexts[index])[0].status ===
+        "prepared"
+          ? [index]
+          : [],
+      )
+      .every((index) => requestContexts[index].resolutions.category.migrationState === "prepared"),
+    true,
+  );
+  assert.equal(
+    contexts.every(({ resolutions }) => resolutions.request.migrationState === "prepared"),
+    true,
+  );
+  assert.throws(
+    () =>
+      buildWorkspaceRequestContexts({
+        rows: requestRows,
+        userRows,
+        departmentRows,
+        categoryRows,
+        categoryContexts: categoryContexts.map((context) => ({ ...context })),
+      }),
+    /preflight opaco/i,
+  );
+  assert.throws(
+    () =>
+      buildWorkspaceMessageContexts({
+        rows,
+        requestRows,
+        requestContexts: [...requestContexts].reverse(),
+        userRows,
+      }),
+    /preflight opaco/i,
+  );
+  assert.throws(
+    () =>
+      buildWorkspaceRequestContexts({
+        rows: requestRows,
+        userRows,
+        departmentRows,
+        categoryRows,
+        categoryContexts: categoryContexts.slice(1),
+      }),
+    /preflight opaco completo/i,
+  );
+  assert.throws(
+    () =>
+      buildWorkspaceMessageContexts({
+        rows,
+        requestRows,
+        requestContexts: requestContexts.slice(1),
+        userRows,
+      }),
+    /preflight opaco completo/i,
+  );
   await assert.doesNotReject(
     access(path.join(LEGACY_ROOT, "uploads/Workspace/solicitacoes/67ea8f65eca6d.pdf")),
   );
@@ -502,12 +728,279 @@ test("senha Marketing exige builder opaco com criptografia e nunca vaza o segred
     { quarantine: 54 },
   );
   assert.deepEqual(summary(rows.map((row, index) => mappingRule.emitRows(row, ready[index])[0])), {
-    prepared: 54,
+    prepared: 52,
+    quarantine: 2,
   });
-  assert.doesNotMatch(
-    JSON.stringify(mappingRule.emitRows(rows[0], ready[0])),
-    new RegExp(rows[0].password),
+  const audits = rows.map((row, index) =>
+    ruleExports.projectRemainingRow({
+      sourceTable: "tb_mkt.senhas",
+      row,
+      context: ready[index],
+    }),
   );
+  const audit = audits[0];
+  assert.deepEqual(audit.payload.credential, {
+    sourcePresent: true,
+    encryptionRequired: true,
+    plaintextIncluded: false,
+  });
+  const secretObservationIndexes = rows.flatMap((row, index) => {
+    const password = String(row.password).trim();
+    const observation = String(row.obs).trim();
+    return password.length > 0 && observation.includes(password) ? [index] : [];
+  });
+  assert.equal(secretObservationIndexes.length, 2);
+  assert.equal(
+    secretObservationIndexes.every(
+      (index) =>
+        audits[index].payload === null &&
+        audits[index].decision.reasonCode === "MKT_PASSWORD_OBSERVATION_CONTAINS_SECRET",
+    ),
+    true,
+  );
+  assert.equal(
+    audits
+      .map((rowAudit) => JSON.stringify(rowAudit))
+      .every((serializedAudit) =>
+        rows.every((row) => !serializedAudit.includes(String(row.password))),
+      ),
+    true,
+  );
+});
+
+test("payloads reais das 14 regras materializam valores significativos sem ampliar emissão", async () => {
+  const organizationId = "e8048d1c-0830-45d7-84de-68e20abd685b";
+  const stockBundle = await stockContexts();
+  const workspaceBundle = await workspaceContexts();
+  const [users, entries, inventory, exits, emails, socialRows, passwordRows, pecRows, triageRows] =
+    await Promise.all(
+      [
+        "tb_admin.usuarios",
+        "tb_cbs.estoque_entradas",
+        "tb_cbs.estoque_inventario",
+        "tb_cbs.estoque_saidas",
+        "tb_cbc.emails",
+        "tb_mkt.redes_sociais",
+        "tb_mkt.senhas",
+        "tb_pec.notas",
+        "tb_triagem.campos",
+      ].map(loadRows),
+    );
+  const entryContexts = buildCbsStockEntryContexts({
+    rows: entries,
+    stockRows: stockBundle.rows,
+    stockContexts: stockBundle.contexts,
+    userRows: users,
+  });
+  const exitContexts = buildCbsStockExitContexts({
+    rows: exits,
+    stockRows: stockBundle.rows,
+    stockContexts: stockBundle.contexts,
+    userRows: users,
+  });
+  const clientResolver = await auditedClientResolver();
+  const socialContexts = buildMarketingSocialContexts({ rows: socialRows, clientResolver });
+  const passwordContexts = buildMarketingPasswordContexts({
+    rows: passwordRows,
+    encryptionConfigured: true,
+  });
+  const pecContexts = buildPecNoteContexts({ rows: pecRows, userRows: users, clientResolver });
+  const triageContexts = buildTriageClientSlotContexts({ rows: triageRows, clientResolver });
+  const projectById = (sourceTable, rows, contexts, id) => {
+    const index = rows.findIndex((row) => row.id === id);
+    assert.notEqual(index, -1, `${sourceTable}:${id}`);
+    return ruleExports.projectRemainingRow({
+      sourceTable,
+      row: rows[index],
+      context: contexts[index],
+    });
+  };
+
+  assert.deepEqual(
+    projectById(
+      "tb_cbc.emails",
+      emails,
+      emails.map(() => ({})),
+      "3",
+    ).payload,
+    {
+      id: "7a9ed02f-ecba-5def-9339-da1535648910",
+      email: "castelo.infoproduto@gmail.com",
+      responsible: "Alef",
+      new_client_sending: true,
+      task_stalled_sending: true,
+      organization_id: organizationId,
+    },
+  );
+  assert.deepEqual(
+    projectById(
+      "tb_cbs.estoque_categorias",
+      stockBundle.categoryRows,
+      stockBundle.categoryContexts,
+      "11",
+    ).payload,
+    {
+      id: "ee027dc5-f6d8-55dc-b75f-18d5d91a9923",
+      name: "CABOS",
+      department_id: "b439168d-8152-5b57-bd9c-440773d07d5b",
+      status: true,
+      organization_id: organizationId,
+    },
+  );
+  assert.deepEqual(
+    projectById("tb_cbs.estoque", stockBundle.rows, stockBundle.contexts, "413").payload,
+    {
+      id: "18c1460c-ce60-53d0-8939-a6a3d98c29c7",
+      department_id: "b439168d-8152-5b57-bd9c-440773d07d5b",
+      name: "Fonte para Notebook N11CASTELO",
+      description: "Defeituosa",
+      status: false,
+      category_id: "f1a7aae0-9d8d-5c75-a2e3-bb30a4de6f8e",
+      quantity: 1,
+      location_id: "31f592ca-e7f3-5840-950d-c449f2860d26",
+      organization_id: organizationId,
+    },
+  );
+  assert.deepEqual(projectById("tb_cbs.estoque_entradas", entries, entryContexts, "315").payload, {
+    id: "d3e53e20-0ab9-5ce3-9616-a7aca8ecf212",
+    stock_id: "18c1460c-ce60-53d0-8939-a6a3d98c29c7",
+    quantity: 11,
+    entry_date: "2023-08-31 14:55:00",
+    entry_by_user_id: "65c120df-02f4-51ac-8541-0e69e3ce5214",
+    organization_id: organizationId,
+  });
+  assert.deepEqual(
+    projectById(
+      "tb_cbs.estoque_inventario",
+      inventory,
+      inventory.map(() => ({})),
+      "1",
+    ).payload,
+    {
+      id: "7ed37dc7-498c-5cbd-9c46-47aab2f53d75",
+      name: "Carrinho",
+      tag: null,
+      active: true,
+      organization_id: organizationId,
+    },
+  );
+  assert.deepEqual(
+    projectById(
+      "tb_cbs.estoque_localizacoes",
+      stockBundle.locationRows,
+      stockBundle.locationContexts,
+      "21",
+    ).payload,
+    {
+      id: "31f592ca-e7f3-5840-950d-c449f2860d26",
+      name: "Armários",
+      floor: 2,
+      department_id: "b439168d-8152-5b57-bd9c-440773d07d5b",
+      status: true,
+      organization_id: organizationId,
+    },
+  );
+  assert.deepEqual(projectById("tb_cbs.estoque_saidas", exits, exitContexts, "1185").payload, {
+    id: "9067f7f9-4b29-5ca8-8fed-1903f8ca40b2",
+    stock_id: "e079d279-1d93-5eb5-8db0-011167300e67",
+    quantity: 1,
+    exit_date: "2023-11-16 11:31:00",
+    destination: "11",
+    requester_id: "7b41c726-8f87-581e-a0f8-18adb1fccfaf",
+    approver_id: "43b3a318-4ed8-58f1-ac3b-9cd44d0fb9d2",
+    operator_id: "126778dc-0e9e-52b8-b541-8d9cb0a29874",
+    location_destination_id: null,
+    organization_id: organizationId,
+  });
+  assert.deepEqual(
+    projectById("tb_mkt.redes_sociais", socialRows, socialContexts, "3121").payload,
+    { id: "c54d2373-4929-5377-92b2-078ec84a584d", instagram: "cantor.roby" },
+  );
+  assert.deepEqual(projectById("tb_mkt.senhas", passwordRows, passwordContexts, "23").payload, {
+    id: "fbfb5fee-356b-599f-9dc4-7b1178b7d3be",
+    local: "CANVA",
+    userPresent: true,
+    notes: null,
+    organization_id: organizationId,
+    credential: {
+      sourcePresent: true,
+      encryptionRequired: true,
+      plaintextIncluded: false,
+    },
+  });
+  assert.deepEqual(projectById("tb_pec.notas", pecRows, pecContexts, "2").payload, {
+    id: "4536afc7-eddd-50bb-9705-d47538636135",
+    user_id: "48ca6e10-17c0-56aa-bcf5-e27013261b71",
+    number: 1,
+    note: "Verificar proposta assinada do projeto Matheus - Alice Embalagens, mudar de MEI para ME e enviar mudança para o financeiro;",
+    created_at: "2024-03-04 08:45:58",
+    due_date: null,
+    completion_date: "2024-03-05 18:04:52",
+    status: true,
+    week_start_date: "2024-03-04",
+    week_end_date: "2024-03-08",
+    original_creation_date: "2024-03-04 08:45:58",
+    has_penalty: false,
+    is_urgent: false,
+    is_internal: true,
+    client_id: null,
+    organization_id: organizationId,
+  });
+  assert.deepEqual(projectById("tb_triagem.campos", triageRows, triageContexts, "4").payload, {
+    id: "417c8249-e23f-567a-8740-582af574c40e",
+    client_id: "a8203615-6f07-526c-ba24-5a158ed0b53f",
+    type: "FISCAL",
+    active_items: ["nfce_documents"],
+    organization_id: organizationId,
+  });
+  assert.deepEqual(
+    projectById(
+      "tb_workspace.solicitacoes_categorias",
+      workspaceBundle.categoryRows,
+      workspaceBundle.categoryContexts,
+      "1",
+    ).payload,
+    {
+      id: "eb70dfea-f4fc-5b97-a19e-f976b45e8e95",
+      name: "Troca de Equipamento",
+      active: true,
+      organization_id: organizationId,
+    },
+  );
+  assert.deepEqual(
+    projectById(
+      "tb_workspace.solicitacoes",
+      workspaceBundle.requestRows,
+      workspaceBundle.requestContexts,
+      "26",
+    ).payload,
+    {
+      id: "fb7a6a07-92ee-57b1-a024-88813734f32e",
+      title: "TESTE",
+      description: "MEU PC PEGOU FOGO",
+      status: "In_Progress",
+      requester_id: "34f9ea61-838f-5d32-9004-6b1c6ecf7b21",
+      assigned_to_id: "126778dc-0e9e-52b8-b541-8d9cb0a29874",
+      category_id: "eb70dfea-f4fc-5b97-a19e-f976b45e8e95",
+      urgency: "High",
+      attachment: null,
+      created_at: "2025-03-31 16:41:51",
+      updated_at: "2025-09-01 13:21:31",
+      organization_id: organizationId,
+    },
+  );
+  const quarantinedMessage = projectById(
+    "tb_workspace.solicitacoes_mensagens",
+    workspaceBundle.messageRows,
+    workspaceBundle.messageContexts,
+    "1",
+  );
+  assert.equal(quarantinedMessage.payload, null);
+  assert.deepEqual(quarantinedMessage.candidate, {
+    type: "Message",
+    content: { present: true, length: 39 },
+    attachment: false,
+  });
 });
 
 test("comportamento real cobre as 15 origens originalmente confirmadas após downgrade", async () => {
@@ -566,10 +1059,12 @@ test("comportamento real cobre as 15 origens originalmente confirmadas após dow
     userRows: users,
     departmentRows: departments,
     categoryRows: workspaceCategories,
+    categoryContexts: workspaceCategoryContexts,
   });
   const workspaceMessageContexts = buildWorkspaceMessageContexts({
     rows: workspaceMessages,
     requestRows: workspaceRequests,
+    requestContexts: workspaceRequestContexts,
     userRows: users,
   });
   const emailRows = await loadRows("tb_cbc.emails");
@@ -593,7 +1088,7 @@ test("comportamento real cobre as 15 origens originalmente confirmadas após dow
       socialContexts,
       { prepared: 203, not_emitted: 1, quarantine: 1 },
     ],
-    ["tb_mkt.senhas", passwordRows, passwordContexts, { prepared: 54 }],
+    ["tb_mkt.senhas", passwordRows, passwordContexts, { prepared: 52, quarantine: 2 }],
     ["tb_pec.notas", pecRows, pecContexts, { prepared: 41612, quarantine: 16 }],
     [
       "tb_triagem.campos",

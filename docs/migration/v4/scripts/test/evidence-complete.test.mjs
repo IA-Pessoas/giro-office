@@ -13,6 +13,7 @@ import {
 import { createPendingMapping } from "../lib/mapping-contract.mjs";
 import { validateEvidenceCoverage } from "../lib/semantic-evidence.mjs";
 import { iterateSqlRows } from "../lib/sql-dump-parser.mjs";
+import { buildTriageClientSlotContexts, createV2ClientIdentityResolver } from "../rules/index.mjs";
 
 const LEGACY_ROOT = "/home/bruno/Documents/workspace2";
 const DUMP_ROOT = "/home/bruno/Documents/03.08.2026";
@@ -253,4 +254,61 @@ test("ramais sem tipo fiel ficam pending e orçamento documenta o contrato parci
   );
   assert.match(budgets.reason, /parcial.*Budget.*items.*JSON.*categoria/i);
   assert.equal((await loadRows("tb_cbc.orcamentos")).length, 510);
+});
+
+test("evidence confirmed registra subsets reais obrigatórios de quarantine sem equivalência plena", async () => {
+  const bySource = new Map(REMAINING_EVIDENCE.map((decision) => [decision.sourceTable, decision]));
+  const exitRows = await loadRows("tb_cbs.estoque_saidas");
+  const exitsWithObservation = exitRows.filter((row) => String(row.obs).trim().length > 0);
+  assert.equal(exitRows.length, 3000);
+  assert.equal(exitsWithObservation.length, 1807);
+  const exits = bySource.get("tb_cbs.estoque_saidas");
+  assert.match(exits.reason, /1\.807.*obs.*quarentena/i);
+  assert.match(exits.reason, /não.*equivalência plena/i);
+
+  const [triageRows, regularizeRows, integrationRows] = await Promise.all([
+    loadRows("tb_triagem.campos"),
+    loadRows("tb_regularize.clientes"),
+    loadRows("tb_integracao.clientes"),
+  ]);
+  const functionalIndexes = triageRows.flatMap((row, index) =>
+    !["", "0"].includes(String(row.faturamento).trim()) || String(row.envio).trim().length > 0
+      ? [index]
+      : [],
+  );
+  assert.equal(functionalIndexes.length, 307);
+  const clientResolver = createV2ClientIdentityResolver({ regularizeRows, integrationRows });
+  const triageContexts = buildTriageClientSlotContexts({ rows: triageRows, clientResolver });
+  assert.equal(
+    functionalIndexes.filter(
+      (index) => triageContexts[index].resolutions.clientSlot.state === "conflict",
+    ).length,
+    5,
+  );
+  const triage = bySource.get("tb_triagem.campos");
+  assert.match(triage.reason, /307.*faturamento.*envio.*quarentena/i);
+  assert.match(triage.reason, /5.*conflito.*blockers/i);
+
+  const passwordRows = await loadRows("tb_mkt.senhas");
+  const secretObservationRows = passwordRows.filter((row) => {
+    const password = String(row.password).trim();
+    const observation = String(row.obs).trim();
+    return password.length > 0 && observation.includes(password);
+  });
+  assert.equal(passwordRows.length, 54);
+  assert.equal(secretObservationRows.length, 2);
+  const passwords = bySource.get("tb_mkt.senhas");
+  assert.match(passwords.reason, /2.*54.*obs.*segredo.*quarentena/i);
+
+  const messageRows = await loadRows("tb_workspace.solicitacoes_mensagens");
+  assert.equal(messageRows.length, 2);
+  assert.deepEqual(messageRows.map(({ tipo }) => tipo).sort(), ["0", "6"]);
+  assert.equal(messageRows.find(({ tipo }) => tipo === "6")?.mensagem, "");
+  await readFile(path.join(LEGACY_ROOT, "uploads/Workspace/solicitacoes/67ea8f65eca6d.pdf"));
+  const messages = bySource.get("tb_workspace.solicitacoes_mensagens");
+  assert.match(messages.reason, /2.*quarentena/i);
+  assert.match(messages.reason, /tipo 6.*vazi.*PDF.*não.*migrável/i);
+  assert.doesNotMatch(messages.reason, /capacidade explícita.*suficiente/i);
+  assert.ok(messages.legacyReferences.includes("classes/Solicitacao.php:550"));
+  assert.ok(messages.currentContractEvidence.includes("infra/prisma/schema.prisma:2028"));
 });

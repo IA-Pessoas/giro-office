@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { REMAINING_EVIDENCE } from "../evidence/remaining.mjs";
 import { REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
+import { uuidV5 } from "../lib/uuid-v5.mjs";
 import {
   isAuthenticLegacyReferenceResolution,
   isAuthoritativeV2ClientIdentityResolution,
@@ -118,16 +119,49 @@ export function buildRemainingReferenceContext({
   });
 }
 
+export function projectRemainingRow({ sourceTable, row, context }) {
+  const mappingRule = REMAINING_RULES.find((rule) => rule.sourceTable === sourceTable);
+  if (mappingRule === undefined || !isObject(row)) {
+    throw new TypeError("sourceTable confirmado e row são obrigatórios para a projeção");
+  }
+  const decision = mappingRule.emitRows(row, context)[0];
+  const blockers = auditBlockers(sourceTable, row, context, decision);
+  const payload =
+    decision.status === "prepared" ? projectPreparedPayload(sourceTable, row, context) : null;
+  const candidate = projectSanitizedCandidate(sourceTable, row);
+  return Object.freeze({
+    sourceTable,
+    decision: Object.freeze({ ...decision }),
+    blockers: Object.freeze(blockers),
+    payload,
+    candidate,
+  });
+}
+
 export function buildCbsStockContexts({
   rows,
   departmentRows,
   itemRows,
   categoryRows,
+  categoryContexts,
   categoryItemRows,
   locationRows,
+  locationContexts,
   floorRows,
 }) {
   assertAuditedCorpus("tb_cbs.estoque", rows);
+  const categoryMigrationStates = auditedParentMigrationStates({
+    kind: "cbs-stock-category",
+    sourceTable: "tb_cbs.estoque_categorias",
+    rows: categoryRows,
+    contexts: categoryContexts,
+  });
+  const locationMigrationStates = auditedParentMigrationStates({
+    kind: "cbs-stock-location",
+    sourceTable: "tb_cbs.estoque_localizacoes",
+    rows: locationRows,
+    contexts: locationContexts,
+  });
   const departments = auditedLookup("tb_admin.departamentos", departmentRows, (row) => ({
     scope: departmentScope(row),
   }));
@@ -139,12 +173,14 @@ export function buildCbsStockContexts({
   }));
   const categories = auditedLookup("tb_cbs.estoque_categorias", categoryRows, (row) => ({
     departmentSourceKey: normalizeKey(row?.departamento_id),
+    migrationState: categoryMigrationStates.get(normalizeKey(row?.id)),
   }));
   assertAuditedCorpus("tb_cbs.estoque_categorias_itens", categoryItemRows);
   const categoryLinks = Map.groupBy(categoryItemRows, ({ item }) => normalizeKey(item));
   const locations = auditedLookup("tb_cbs.estoque_localizacoes", locationRows, (row) => ({
     departmentSourceKey: normalizeKey(row?.departamento_id),
     floorSourceKey: normalizeKey(row?.andar),
+    migrationState: locationMigrationStates.get(normalizeKey(row?.id)),
   }));
   const floors = auditedLookup("tb_cbs.estoque_andares", floorRows, (row) => ({
     departmentSourceKey: normalizeKey(row?.departamento_id),
@@ -176,6 +212,8 @@ export function buildCbsStockContexts({
           categoryCandidates.length === 1
             ? categoryCandidates[0].departmentSourceKey
             : normalizeKey(row?.departamento_id),
+        migrationState:
+          categoryCandidates.length === 1 ? categoryCandidates[0].migrationState : null,
       });
       return issueContext("cbs-stock", "tb_cbs.estoque", row, {
         department: departments.resolve(row?.departamento_id),
@@ -319,14 +357,27 @@ export function buildWorkspaceCategoryContexts({ rows, departmentRows }) {
   );
 }
 
-export function buildWorkspaceRequestContexts({ rows, userRows, departmentRows, categoryRows }) {
+export function buildWorkspaceRequestContexts({
+  rows,
+  userRows,
+  departmentRows,
+  categoryRows,
+  categoryContexts,
+}) {
   assertAuditedCorpus("tb_workspace.solicitacoes", rows);
+  const categoryMigrationStates = auditedParentMigrationStates({
+    kind: "workspace-category",
+    sourceTable: "tb_workspace.solicitacoes_categorias",
+    rows: categoryRows,
+    contexts: categoryContexts,
+  });
   const users = auditedUserLookup(userRows);
   const departments = auditedLookup("tb_admin.departamentos", departmentRows, (row) => ({
     scope: departmentScope(row),
   }));
   const categories = auditedLookup("tb_workspace.solicitacoes_categorias", categoryRows, (row) => ({
     departmentSourceKey: normalizeKey(row?.departamento_id),
+    migrationState: categoryMigrationStates.get(normalizeKey(row?.id)),
   }));
   return issueContexts("workspace-request", "tb_workspace.solicitacoes", rows, (row) => ({
     requester: users.resolve(row?.requerente),
@@ -336,16 +387,47 @@ export function buildWorkspaceRequestContexts({ rows, userRows, departmentRows, 
   }));
 }
 
-export function buildWorkspaceMessageContexts({ rows, requestRows, userRows }) {
+export function buildWorkspaceMessageContexts({ rows, requestRows, requestContexts, userRows }) {
   assertAuditedCorpus("tb_workspace.solicitacoes_mensagens", rows);
+  const requestMigrationStates = auditedParentMigrationStates({
+    kind: "workspace-request",
+    sourceTable: "tb_workspace.solicitacoes",
+    rows: requestRows,
+    contexts: requestContexts,
+  });
   const requests = auditedLookup("tb_workspace.solicitacoes", requestRows, (row) => ({
     departmentSourceKey: normalizeKey(row?.departamento),
+    migrationState: requestMigrationStates.get(normalizeKey(row?.id)),
   }));
   const users = auditedUserLookup(userRows);
   return issueContexts("workspace-message", "tb_workspace.solicitacoes_mensagens", rows, (row) => ({
     request: requests.resolve(row?.solicitacao),
     sender: users.resolve(row?.remetente),
   }));
+}
+
+export function mapWorkspaceMessageType(value, attachmentState = {}) {
+  const type = String(value ?? "").trim();
+  const mappedTypes = new Map([
+    ["0", "Message"],
+    ["1", "Solution"],
+    ["2", "Rejection"],
+    ["3", "Rejection"],
+    ["4", "Acceptance"],
+    ["5", "Acceptance"],
+  ]);
+  if (mappedTypes.has(type)) {
+    return { status: "mapped", value: mappedTypes.get(type), attachment: false };
+  }
+  if (type !== "6") {
+    return quarantine("tipo", "WORKSPACE_MESSAGE_TYPE_INVALID");
+  }
+  const supportedMediaTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+  return attachmentState.correlated === true &&
+    attachmentState.storageSupported === true &&
+    supportedMediaTypes.has(attachmentState.mediaType)
+    ? { status: "mapped", value: "Message", attachment: true }
+    : quarantine("mensagem", "WORKSPACE_ATTACHMENT_CORRELATION_UNRESOLVED");
 }
 
 export const REMAINING_RULES = Object.freeze(
@@ -633,6 +715,7 @@ export const REMAINING_RULES = Object.freeze(
           requiredText(row?.local, "local", "MKT_PASSWORD_LOCAL_EMPTY"),
           requiredText(row?.user, "user", "MKT_PASSWORD_USER_EMPTY"),
           requiredText(row?.password, "password", "MKT_PASSWORD_EMPTY"),
+          passwordObservationDoesNotContainSecret(row),
           context.capabilities.encryption === true
             ? prepared()
             : quarantine("password", "ENCRYPTION_CONFIGURATION_MISSING"),
@@ -724,8 +807,8 @@ export const REMAINING_RULES = Object.freeze(
             "cliente_id",
             "TRIAGE_CONFIG_CLIENT",
           ),
-          triageClientSlot(context, row),
           triageUnmappedFunctionalValue(row),
+          triageClientSlot(context, row),
         ]);
       },
     }),
@@ -1106,6 +1189,12 @@ function classifyWorkspaceRequest(row, context) {
       "categoria",
       "WORKSPACE_REQUEST_CATEGORY",
     ),
+    preparedParentResolution(
+      context,
+      "category",
+      "categoria",
+      "WORKSPACE_REQUEST_CATEGORY_QUARANTINED",
+    ),
     resolutionDepartmentMatch(
       context,
       "category",
@@ -1119,19 +1208,9 @@ function classifyWorkspaceRequest(row, context) {
 function classifyWorkspaceMessage(row, context) {
   const bound = authenticContext("tb_workspace.solicitacoes_mensagens", row, context);
   if (bound.status !== "prepared") return bound;
-  const type = Number(row?.tipo);
-  if (!Number.isSafeInteger(type) || type < 0 || type > 6) {
-    return quarantine("tipo", "WORKSPACE_MESSAGE_TYPE_INVALID");
-  }
-  if (type === 6) {
-    return quarantine("mensagem", "WORKSPACE_ATTACHMENT_CORRELATION_UNRESOLVED");
-  }
-  if (!emptyReference(row?.destinatario) || String(row?.lida ?? "0").trim() !== "0") {
-    return quarantine("lida", "WORKSPACE_MESSAGE_READ_STATE_UNMAPPABLE");
-  }
-  return firstFailure([
+  const type = mapWorkspaceMessageType(row?.tipo);
+  const references = firstFailure([
     validId(row?.id, "id", "WORKSPACE_MESSAGE_ID_INVALID"),
-    requiredText(row?.mensagem, "mensagem", "WORKSPACE_MESSAGE_EMPTY"),
     validDate(row?.data_envio, "data_envio", "WORKSPACE_MESSAGE_DATE_INVALID"),
     requiredResolution(
       context,
@@ -1146,6 +1225,12 @@ function classifyWorkspaceMessage(row, context) {
       "request",
       "solicitacao",
       "WORKSPACE_MESSAGE_REQUEST_NOT_TECHNOLOGY",
+    ),
+    preparedParentResolution(
+      context,
+      "request",
+      "solicitacao",
+      "WORKSPACE_MESSAGE_REQUEST_QUARANTINED",
     ),
     requiredResolution(
       context,
@@ -1162,6 +1247,14 @@ function classifyWorkspaceMessage(row, context) {
       "WORKSPACE_MESSAGE_SENDER_QUARANTINED",
     ),
   ]);
+  if (references.status !== "prepared") return references;
+  if (type.status !== "mapped") return type;
+  if (!emptyReference(row?.destinatario) || String(row?.lida ?? "0").trim() !== "0") {
+    return quarantine("lida", "WORKSPACE_MESSAGE_READ_STATE_UNMAPPABLE");
+  }
+  return type.attachment
+    ? prepared()
+    : requiredText(row?.mensagem, "mensagem", "WORKSPACE_MESSAGE_EMPTY");
 }
 
 function categoryResolution(context, row) {
@@ -1185,11 +1278,271 @@ function categoryResolution(context, row) {
   if (resolution.departmentSourceKey !== normalizeKey(row?.departamento_id)) {
     return quarantine("departamento_id", "CBS_STOCK_CATEGORY_DEPARTMENT_MISMATCH");
   }
-  return prepared();
+  return preparedParentResolution(
+    context,
+    "category",
+    "produto_id",
+    "CBS_STOCK_CATEGORY_QUARANTINED",
+  );
 }
 
 function triageClientSlot(context, row) {
   return canonicalClientSlot(context, row, "tb_triagem.campos", "TRIAGE_CONFIG_CANONICAL_CLIENT");
+}
+
+function auditBlockers(sourceTable, row, context, decision) {
+  if (sourceTable !== "tb_triagem.campos") {
+    return decision.status === "prepared" ? [] : [sanitizeBlocker(decision)];
+  }
+  const bound = authenticContext(sourceTable, row, context);
+  if (bound.status !== "prepared") return [sanitizeBlocker(bound)];
+  return [triageUnmappedFunctionalValue(row), triageClientSlot(context, row)]
+    .filter(({ status }) => status !== "prepared")
+    .map(sanitizeBlocker);
+}
+
+function sanitizeBlocker(classification) {
+  return Object.freeze({
+    status: classification.status,
+    field: classification.status === "quarantine" ? classification.field : null,
+    reasonCode: classification.reasonCode,
+  });
+}
+
+function projectPreparedPayload(sourceTable, row, context) {
+  const id = generatedIdentityId(sourceTable, row?.id);
+  switch (sourceTable) {
+    case "tb_cbc.emails":
+      return Object.freeze({
+        id,
+        email: normalizeText(row?.email),
+        responsible: normalizeText(row?.responsavel),
+        new_client_sending: normalizeLegacyBoolean(row?.cliente_novo_integracao),
+        task_stalled_sending: normalizeLegacyBoolean(row?.tarefa_paralisada_integracao),
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_cbs.estoque":
+      return Object.freeze({
+        id,
+        department_id: resolvedIdentityId(context, "department"),
+        name: context.resolutions.item.itemName,
+        description: context.resolutions.item.itemDescription,
+        status: context.resolutions.item.itemActive,
+        category_id: resolvedIdentityId(context, "category"),
+        quantity: Number(row?.quantidade),
+        location_id: resolvedIdentityId(context, "location"),
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_cbs.estoque_categorias":
+      return Object.freeze({
+        id,
+        name: normalizeText(row?.nome),
+        department_id: resolvedIdentityId(context, "department"),
+        status: true,
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_cbs.estoque_entradas":
+      return Object.freeze({
+        id,
+        stock_id: resolvedIdentityId(context, "stock"),
+        quantity: Number(row?.quantidade),
+        entry_date: normalizeText(row?.data_entrada),
+        entry_by_user_id: resolvedIdentityId(context, "user"),
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_cbs.estoque_inventario":
+      return Object.freeze({
+        id,
+        name: normalizeText(row?.tipo_item),
+        tag: normalizeNullableText(row?.tag),
+        active: normalizeActiveText(row?.status),
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_cbs.estoque_localizacoes":
+      return Object.freeze({
+        id,
+        name: normalizeText(row?.nome),
+        floor: context.resolutions.floor.floor,
+        department_id: resolvedIdentityId(context, "department"),
+        status: true,
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_cbs.estoque_saidas":
+      return Object.freeze({
+        id,
+        stock_id: resolvedIdentityId(context, "stock"),
+        quantity: Number(row?.quantidade),
+        exit_date: normalizeText(row?.data_saida),
+        destination: normalizeNullableText(row?.destino),
+        requester_id: resolvedIdentityId(context, "requester"),
+        approver_id: optionalResolvedIdentityId(context, "approver"),
+        operator_id: optionalResolvedIdentityId(context, "operator"),
+        location_destination_id: null,
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_mkt.redes_sociais":
+      return Object.freeze({
+        id: resolvedIdentityId(context, "client"),
+        instagram: normalizeNullableText(row?.instagram),
+      });
+    case "tb_mkt.senhas":
+      return Object.freeze({
+        id,
+        local: normalizeText(row?.local),
+        userPresent: normalizeText(row?.user) !== null,
+        notes: normalizeNullableText(row?.obs),
+        organization_id: ORGANIZATION_ID,
+        credential: Object.freeze({
+          sourcePresent: normalizeText(row?.password) !== null,
+          encryptionRequired: context?.capabilities?.encryption === true,
+          plaintextIncluded: false,
+        }),
+      });
+    case "tb_pec.notas":
+      return Object.freeze({
+        id,
+        user_id: resolvedIdentityId(context, "user"),
+        number: Number(row?.numero),
+        note: normalizeText(row?.tarefa),
+        created_at: normalizeText(row?.cadastro),
+        due_date: normalizeLegacyZeroDate(row?.previsao),
+        completion_date: normalizeLegacyZeroDate(row?.conclusao),
+        status: String(row?.status).trim() !== "0",
+        week_start_date: normalizeText(row?.inicio_semana),
+        week_end_date: normalizeText(row?.fim_semana),
+        original_creation_date: normalizeText(row?.cadastro_original),
+        has_penalty: normalizeLegacyBoolean(row?.multa),
+        is_urgent: normalizeLegacyBoolean(row?.urgente),
+        is_internal: emptyReference(row?.cliente_id),
+        client_id: emptyReference(row?.cliente_id) ? null : resolvedIdentityId(context, "client"),
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_triagem.campos":
+      return Object.freeze({
+        id,
+        client_id: resolvedIdentityId(context, "client"),
+        type: "FISCAL",
+        active_items: Object.freeze(projectTriageActiveItems(row)),
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_workspace.solicitacoes_categorias":
+      return Object.freeze({
+        id,
+        name: normalizeText(row?.nome),
+        active: normalizeLegacyBoolean(row?.status),
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_workspace.solicitacoes":
+      return Object.freeze({
+        id,
+        title: normalizeText(row?.titulo),
+        description: normalizeText(row?.descricao),
+        status: projectWorkspaceRequestStatus(row?.status),
+        requester_id: resolvedIdentityId(context, "requester"),
+        assigned_to_id: optionalResolvedIdentityId(context, "assignee"),
+        category_id: resolvedIdentityId(context, "category"),
+        urgency: projectWorkspaceRequestUrgency(row?.urgencia),
+        attachment: null,
+        created_at: normalizeText(row?.data_cadastro),
+        updated_at: normalizeText(row?.data_atualizacao),
+        organization_id: ORGANIZATION_ID,
+      });
+    case "tb_workspace.solicitacoes_mensagens": {
+      const type = mapWorkspaceMessageType(row?.tipo);
+      return Object.freeze({
+        id,
+        request_id: resolvedIdentityId(context, "request"),
+        sender_id: resolvedIdentityId(context, "sender"),
+        message: normalizeText(row?.mensagem),
+        attachment: null,
+        type: type.status === "mapped" ? type.value : null,
+        created_at: normalizeText(row?.data_envio),
+        organization_id: ORGANIZATION_ID,
+      });
+    }
+    default:
+      throw new TypeError(`projetor de payload ausente para ${sourceTable}`);
+  }
+}
+
+function projectSanitizedCandidate(sourceTable, row) {
+  if (sourceTable !== "tb_workspace.solicitacoes_mensagens") return null;
+  const type = mapWorkspaceMessageType(row?.tipo);
+  const content = normalizeNullableText(row?.mensagem);
+  return Object.freeze({
+    type: type.status === "mapped" ? type.value : null,
+    content: Object.freeze({ present: content !== null, length: content?.length ?? 0 }),
+    attachment: type.status === "mapped" && type.attachment,
+  });
+}
+
+function generatedIdentityId(sourceTable, sourceKey) {
+  return uuidV5(REQUIRED_IDENTITY_NAMESPACE, rowIdentity(sourceTable, sourceKey));
+}
+
+function resolvedIdentityId(context, name) {
+  return uuidV5(REQUIRED_IDENTITY_NAMESPACE, context.resolutions[name].identityRef);
+}
+
+function optionalResolvedIdentityId(context, name) {
+  return context.resolutions[name] === null ? null : resolvedIdentityId(context, name);
+}
+
+function normalizeLegacyBoolean(value) {
+  return String(value ?? "").trim() === "1";
+}
+
+function passwordObservationDoesNotContainSecret(row) {
+  const password = normalizeText(row?.password);
+  const observation = normalizeNullableText(row?.obs);
+  return password !== null && observation?.includes(password)
+    ? quarantine("obs", "MKT_PASSWORD_OBSERVATION_CONTAINS_SECRET")
+    : prepared();
+}
+
+function normalizeActiveText(value) {
+  return (
+    String(value ?? "")
+      .trim()
+      .toLocaleLowerCase("pt-BR") === "ativo"
+  );
+}
+
+function normalizeLegacyZeroDate(value) {
+  const text = String(value ?? "").trim();
+  return text.length === 0 || text.startsWith("0000-00-00") ? null : text;
+}
+
+function projectTriageActiveItems(row) {
+  const fields = [
+    ["nfce", "nfce_documents"],
+    ["sped", "sped_fiscal"],
+    ["spedContribuicoes", "sped_contributions"],
+    ["nfce_tomados", "nfse_received"],
+    ["modelo_21", "model_21_invoice"],
+    ["cte_emitente", "cte_as_issuer"],
+    ["prestadas_mei", "services_provided_as_mei"],
+  ];
+  return fields.flatMap(([column, token]) =>
+    String(row?.[column] ?? "").trim() === "1" ? [token] : [],
+  );
+}
+
+function projectWorkspaceRequestStatus(value) {
+  return new Map([
+    ["0", "New"],
+    ["1", "In_Progress"],
+    ["2", "Resolved"],
+    ["3", "Closed"],
+  ]).get(String(value).trim());
+}
+
+function projectWorkspaceRequestUrgency(value) {
+  return new Map([
+    ["1", "Low"],
+    ["2", "Medium"],
+    ["3", "High"],
+  ]).get(String(value).trim());
 }
 
 function canonicalClientSlot(context, row, sourceTable, prefix) {
@@ -1226,6 +1579,13 @@ function stockLocationResolution(context, row) {
     "CBS_STOCK_LOCATION",
   );
   if (result.status !== "prepared") return result;
+  const parent = preparedParentResolution(
+    context,
+    "location",
+    "localizacao",
+    "CBS_STOCK_LOCATION_QUARANTINED",
+  );
+  if (parent.status !== "prepared") return parent;
   if (context.resolutions.location.floorSourceKey !== normalizeKey(row?.andar)) {
     return quarantine("andar", "CBS_STOCK_LOCATION_FLOOR_MISMATCH");
   }
