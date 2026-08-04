@@ -50,14 +50,20 @@ export const V2_EVIDENCE = Object.freeze([
   decision({
     sourceTable: "tb_rh.colaboradores",
     legacyModule: "recursos humanos",
-    legacyReferences: ["classes/Colaborador.php:24", "classes/Colaborador.php:83"],
+    legacyReferences: [
+      "classes/Colaborador.php:24",
+      "classes/Colaborador.php:83",
+      "rh/pages/colaboradores/colaborador.php:485",
+      "rh/pages/colaboradores/colaborador.php:611",
+    ],
     operations: ["insert", "select", "update"],
     legacyRelationships: [
       "user_id resolve tb_admin.usuarios.id e fornece a faceta cadastral do mesmo usuário.",
+      "cargo referencia tb_rh.cargos.id e o legado resolve o nome do cargo antes de exibi-lo.",
     ],
-    currentContractEvidence: ["infra/prisma/schema.prisma:247"],
+    currentContractEvidence: ["infra/prisma/schema.prisma:247", "infra/prisma/schema.prisma:269"],
     reason:
-      "Os dados do colaborador complementam por merge a identidade User administrativa explícita.",
+      "Os dados do colaborador complementam o User; cargo exige resolver a FK legada para nome antes do merge opcional em job_title.",
   }),
   decision({
     sourceTable: "tb_integracao.clientes",

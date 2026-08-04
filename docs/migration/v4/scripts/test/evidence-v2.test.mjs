@@ -81,3 +81,12 @@ test("cada decisão V2 referencia código legado e contrato atual reais", async 
     }
   }
 });
+
+test("evidência de colaborador registra cargo como FK legada resolvida para texto atual", () => {
+  const collaborator = V2_EVIDENCE.find(({ sourceTable }) => sourceTable === "tb_rh.colaboradores");
+  assert.ok(collaborator);
+  assert.ok(collaborator.legacyReferences.includes("rh/pages/colaboradores/colaborador.php:485"));
+  assert.ok(collaborator.legacyReferences.includes("rh/pages/colaboradores/colaborador.php:611"));
+  assert.ok(collaborator.currentContractEvidence.includes("infra/prisma/schema.prisma:269"));
+  assert.match(collaborator.legacyRelationships.join("\n"), /cargo.*tb_rh\.cargos\.id.*nome/i);
+});

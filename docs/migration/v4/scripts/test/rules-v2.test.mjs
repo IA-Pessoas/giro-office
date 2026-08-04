@@ -288,17 +288,108 @@ test("colaborador faz merge somente no User administrativo ligado por user_id", 
   assert.equal(mappingRule.cardinality, "N:1");
   assert.deepEqual(
     mappingRule.destinations.map(({ destinationTable, mode }) => [destinationTable, mode]),
-    [["users", "merge"]],
+    [
+      ["users", "merge"],
+      ["users", "merge"],
+    ],
   );
-  assert.deepEqual(mappingRule.destinations[0].identity, {
-    kind: "resolve",
-    sourceTable: "tb_admin.usuarios",
-    sourceColumn: "user_id",
-    targetLegacyColumn: "id",
-  });
+  assert.ok(mappingRule.dependencies.includes("tb_rh.cargos"));
+  for (const destination of mappingRule.destinations) {
+    assert.deepEqual(destination.identity, {
+      kind: "resolve",
+      sourceTable: "tb_admin.usuarios",
+      sourceColumn: "user_id",
+      targetLegacyColumn: "id",
+    });
+  }
 
-  assert.equal(mappingRule.emitRows({ id: 4, user_id: 9 }, {})[0].status, "prepared");
-  assert.equal(mappingRule.emitRows({ id: 4, user_id: "" }, {})[0].reasonCode, "USER_LINK_EMPTY");
+  const profile = step(mappingRule, "collaborator-user-merge");
+  const jobTitle = step(mappingRule, "collaborator-job-title-merge");
+  assert.equal(
+    profile.columns.some(
+      ({ sourceColumn, destinationColumn }) =>
+        sourceColumn === "cargo" || destinationColumn === "job_title",
+    ),
+    false,
+  );
+  assert.ok(jobTitle.dependencies.includes("tb_rh.cargos"));
+  assert.deepEqual(
+    jobTitle.columns.map(({ sourceColumn, destinationColumn, transformation, referenceRole }) => ({
+      sourceColumn,
+      destinationColumn,
+      transformation,
+      referenceRole,
+    })),
+    [
+      {
+        sourceColumn: "cargo",
+        destinationColumn: "job_title",
+        transformation: "resolve_legacy_cargo_name",
+        referenceRole: "lookup_key",
+      },
+    ],
+  );
+  assert.doesNotMatch(jobTitle.columns[0].transformation, /normalize_text|copy|numeric/i);
+
+  const resolved = mappingRule.emitRows(
+    { id: 4, user_id: 9, cargo: 7 },
+    { cargoResolution: "one", cargoResolvedName: "Analista" },
+  );
+  assert.equal(byStep(resolved, "collaborator-user-merge")[0].status, "prepared");
+  assert.equal(byStep(resolved, "collaborator-job-title-merge")[0].status, "prepared");
+  assert.doesNotMatch(JSON.stringify(resolved), /Analista|"cargo"\s*:\s*7/);
+  assert.deepEqual(
+    mappingRule.classifySourceRow(
+      { id: 4, user_id: 9, cargo: 7 },
+      { cargoResolution: "one", cargoResolvedName: "Analista" },
+    ),
+    { status: "prepared", jobTitleDecision: { status: "prepared" } },
+  );
+
+  for (const cargo of ["", "0", 0, null]) {
+    const withoutCargo = mappingRule.emitRows({ id: 4, user_id: 9, cargo }, {});
+    assert.equal(byStep(withoutCargo, "collaborator-user-merge")[0].status, "prepared");
+    assert.equal(byStep(withoutCargo, "collaborator-job-title-merge")[0].status, "not_emitted");
+    assert.equal(
+      byStep(withoutCargo, "collaborator-job-title-merge")[0].reasonCode,
+      "COLLABORATOR_CARGO_EMPTY_NO_JOB_TITLE",
+    );
+  }
+
+  for (const [cargoResolution, reasonCode] of [
+    ["not_executed", "COLLABORATOR_CARGO_LOOKUP_NOT_EXECUTED"],
+    ["zero", "COLLABORATOR_CARGO_NOT_FOUND"],
+    ["many", "COLLABORATOR_CARGO_AMBIGUOUS"],
+  ]) {
+    const unresolved = mappingRule.emitRows({ id: 4, user_id: 9, cargo: 7 }, { cargoResolution });
+    assert.equal(byStep(unresolved, "collaborator-user-merge")[0].status, "prepared");
+    assert.equal(byStep(unresolved, "collaborator-job-title-merge")[0].status, "quarantine");
+    assert.equal(byStep(unresolved, "collaborator-job-title-merge")[0].reasonCode, reasonCode);
+  }
+
+  for (const cargoResolvedName of [7, "7"]) {
+    const numericName = mappingRule.emitRows(
+      { id: 4, user_id: 9, cargo: 7 },
+      { cargoResolution: "one", cargoResolvedName },
+    );
+    assert.equal(
+      byStep(numericName, "collaborator-job-title-merge")[0].reasonCode,
+      "COLLABORATOR_CARGO_NAME_INVALID",
+    );
+  }
+
+  const malformedCargo = mappingRule.emitRows(
+    { id: 4, user_id: 9, cargo: "cargo inválido" },
+    { cargoResolution: "one", cargoResolvedName: "Analista" },
+  );
+  assert.equal(
+    byStep(malformedCargo, "collaborator-job-title-merge")[0].reasonCode,
+    "COLLABORATOR_CARGO_LINK_INVALID",
+  );
+
+  const invalidUser = mappingRule.emitRows({ id: 4, user_id: "", cargo: 7 }, {});
+  assert.ok(invalidUser.every(({ status }) => status === "quarantine"));
+  assert.ok(invalidUser.every(({ reasonCode }) => reasonCode === "USER_LINK_EMPTY"));
 });
 
 test("cliente Regularize faz merge pelo cliente_id explícito ou insert próprio sem vínculo", () => {

@@ -104,7 +104,7 @@ export const V2_RULES = [
     sourceTable: "tb_rh.colaboradores",
     domain: "human-resources",
     cardinality: "N:1",
-    dependencies: ["tb_admin.usuarios", "tb_admin.departamentos"],
+    dependencies: ["tb_admin.usuarios", "tb_admin.departamentos", "tb_rh.cargos"],
     destinations: [
       {
         stepId: "collaborator-user-merge",
@@ -129,7 +129,6 @@ export const V2_RULES = [
           mapped("cpf", "cpf", "normalize_cpf", { sensitivity: "personal" }),
           mapped("rg", "rg", "normalize_rg", { sensitivity: "personal" }),
           mapped("endereco", "address", "normalize_text", { sensitivity: "personal" }),
-          mapped("cargo", "job_title", "normalize_text"),
           mapped("departamento_id", "department_id", "resolve_department_reference"),
           mapped("email", "email", "normalize_email", { sensitivity: "personal" }),
           mapped("telefone", "phone", "normalize_phone", { sensitivity: "personal" }),
@@ -141,19 +140,46 @@ export const V2_RULES = [
         precedence: ["explicit_legacy_link", "rh_profile", "existing_admin_user"],
         dependencies: ["tb_admin.usuarios", "tb_admin.departamentos"],
       },
+      {
+        stepId: "collaborator-job-title-merge",
+        destinationTable: "users",
+        mode: "merge",
+        identity: resolveIdentity("tb_admin.usuarios", "user_id", "id"),
+        columns: [
+          mapped("cargo", "job_title", "resolve_legacy_cargo_name", {
+            nullHandling: "not_emit_when_legacy_cargo_is_empty_or_zero",
+            referenceRole: "lookup_key",
+            reason:
+              "cargo é FK para tb_rh.cargos.id e somente o nome resolvido pode alimentar User.job_title.",
+          }),
+        ],
+        constants: {},
+        defaults: {},
+        precedence: ["explicit_legacy_link", "cargo_name_lookup", "existing_admin_user"],
+        dependencies: ["tb_admin.usuarios", "tb_rh.cargos"],
+      },
     ],
     classifySourceRow: classifyCollaboratorRow,
-    emitRows(row) {
-      const classification = classifyCollaboratorRow(row);
+    emitRows(row, context) {
+      const classification = classifyCollaboratorRow(row, context);
+      const jobTitleClassification =
+        classification.status === "prepared" ? classification.jobTitleDecision : classification;
+      const identityRef =
+        classification.status === "prepared"
+          ? reference("tb_admin.usuarios", row?.user_id)
+          : invalidIdentityReference("tb_rh.colaboradores", "user_id");
       return [
         emission({
           stepId: "collaborator-user-merge",
           destinationTable: "users",
-          identityRef:
-            classification.status === "prepared"
-              ? reference("tb_admin.usuarios", row?.user_id)
-              : invalidIdentityReference("tb_rh.colaboradores", "user_id"),
+          identityRef,
           classification,
+        }),
+        emission({
+          stepId: "collaborator-job-title-merge",
+          destinationTable: "users",
+          identityRef,
+          classification: jobTitleClassification,
         }),
       ];
     },
@@ -1327,13 +1353,46 @@ function classifyRequiredIdentity(value, field, reasonCode) {
   return isValidLegacyIdentity(value) ? prepared() : quarantine(field, reasonCode);
 }
 
-function classifyCollaboratorRow(row) {
+function classifyCollaboratorRow(row, context) {
   if (!hasExplicitLegacyLink(row?.user_id)) {
     return quarantine("user_id", "USER_LINK_EMPTY");
   }
-  return isValidLegacyIdentity(row?.user_id)
+  if (!isValidLegacyIdentity(row?.user_id)) {
+    return quarantine("user_id", "USER_LINK_INVALID");
+  }
+  return {
+    status: "prepared",
+    jobTitleDecision: classifyCollaboratorJobTitle(row, context),
+  };
+}
+
+function classifyCollaboratorJobTitle(row, context) {
+  if (!hasExplicitLegacyLink(row?.cargo)) {
+    return notEmitted("COLLABORATOR_CARGO_EMPTY_NO_JOB_TITLE");
+  }
+  if (!isValidLegacyCargoId(row?.cargo)) {
+    return quarantine("cargo", "COLLABORATOR_CARGO_LINK_INVALID");
+  }
+  if (context?.cargoResolution === "zero") {
+    return quarantine("cargo", "COLLABORATOR_CARGO_NOT_FOUND");
+  }
+  if (context?.cargoResolution === "many") {
+    return quarantine("cargo", "COLLABORATOR_CARGO_AMBIGUOUS");
+  }
+  if (context?.cargoResolution !== "one") {
+    return quarantine("cargo", "COLLABORATOR_CARGO_LOOKUP_NOT_EXECUTED");
+  }
+  return isResolvedJobTitleName(context?.cargoResolvedName)
     ? prepared()
-    : quarantine("user_id", "USER_LINK_INVALID");
+    : quarantine("cargo", "COLLABORATOR_CARGO_NAME_INVALID");
+}
+
+function isValidLegacyCargoId(value) {
+  return /^\d+$/.test(String(value)) && BigInt(String(value)) > 0n;
+}
+
+function isResolvedJobTitleName(value) {
+  return typeof value === "string" && value.trim().length > 0 && !/^\d+$/.test(value.trim());
 }
 
 function classifyClientLink(row) {
