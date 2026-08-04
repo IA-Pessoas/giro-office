@@ -198,6 +198,7 @@ test("permissões fixas fazem merge pelo vínculo explícito User/Organization e
       assert.equal(contexts[index].permissionSourceRowId, row.id, sourceTable);
       assert.match(contexts[index].permissionNaturalKeyFingerprint, /^[a-f0-9]{64}$/);
       assert.match(contexts[index].permissionRowFingerprint, /^[a-f0-9]{64}$/);
+      assert.match(contexts[index].permissionDedupSignature, /^[a-f0-9]{64}$/);
       rowCount += 1;
       const normalized = ADMIN_BUSINESS_TRANSFORMATIONS.normalize_legacy_permission_level_plus_one(
         row.permissao,
@@ -300,6 +301,7 @@ test("duplicatas naturais reais respeitam as identidades únicas/lógicas atuais
     assert.equal(contexts[index].icmsSourceRowId, row.id);
     assert.match(contexts[index].icmsNaturalKeyFingerprint, /^[a-f0-9]{64}$/);
     assert.match(contexts[index].icmsRowFingerprint, /^[a-f0-9]{64}$/);
+    assert.match(contexts[index].icmsDedupSignature, /^[a-f0-9]{64}$/);
     const emission = icmsRule.emitRows(row, contexts[index])[0];
     statusCounts.set(emission.status, (statusCounts.get(emission.status) ?? 0) + 1);
     if (emission.reasonCode !== null) {
@@ -720,6 +722,45 @@ test("owner, duplicate e conflict de permissão não podem ser aplicados a outra
   assert.equal(conflictEmission.reasonCode, "PERMISSION_DEDUP_CONTEXT_MISMATCH");
 });
 
+test("estado owner, duplicate ou conflict de permissão não pode ser mutado sem nova assinatura", async () => {
+  const userResolver = createLegacyReferenceResolver({
+    sourceTable: "tb_admin.usuarios",
+    legacyColumn: "id",
+    rows: await loadRows("tb_admin.usuarios"),
+  });
+  const examples = new Map();
+  for (const sourceTable of PERMISSION_SOURCES) {
+    const rows = await loadRows(sourceTable);
+    const contexts = buildPermissionResolutionContexts({ sourceTable, rows, userResolver });
+    for (const [index, context] of contexts.entries()) {
+      if (!examples.has(context.permissionUserModuleResolution)) {
+        examples.set(context.permissionUserModuleResolution, {
+          sourceTable,
+          row: rows[index],
+          context,
+        });
+      }
+    }
+  }
+  assert.deepEqual([...examples.keys()].sort(), ["conflict", "duplicate", "owner"]);
+
+  for (const [producedState, { sourceTable, row, context }] of examples) {
+    for (const mutatedState of ["owner", "duplicate", "conflict"]) {
+      if (mutatedState === producedState) continue;
+      const emission = rule(sourceTable).emitRows(row, {
+        ...context,
+        permissionUserModuleResolution: mutatedState,
+      })[0];
+      assert.equal(emission.status, "quarantine", `${producedState}->${mutatedState}`);
+      assert.equal(
+        emission.reasonCode,
+        "PERMISSION_DEDUP_CONTEXT_MISMATCH",
+        `${producedState}->${mutatedState}`,
+      );
+    }
+  }
+});
+
 test("contexto ICMS owner, duplicate ou conflict não pode ser trocado ou reordenado", async () => {
   const rows = await loadRows("tb_fiscal.icms");
   const contexts = buildIcmsResolutionContexts(rows);
@@ -746,6 +787,34 @@ test("contexto ICMS owner, duplicate ou conflict não pode ser trocado ou reorde
     const emission = rule("tb_fiscal.icms").emitRows(rows[rowIndex], contexts[contextIndex])[0];
     assert.equal(emission.status, "quarantine");
     assert.equal(emission.reasonCode, "ICMS_DEDUP_CONTEXT_MISMATCH");
+  }
+});
+
+test("estado owner, duplicate ou conflict de ICMS não pode ser mutado sem nova assinatura", async () => {
+  const rows = await loadRows("tb_fiscal.icms");
+  const contexts = buildIcmsResolutionContexts(rows);
+  const examples = new Map();
+  for (const [index, context] of contexts.entries()) {
+    if (!examples.has(context.icmsNaturalKeyResolution)) {
+      examples.set(context.icmsNaturalKeyResolution, { row: rows[index], context });
+    }
+  }
+  assert.deepEqual([...examples.keys()].sort(), ["conflict", "duplicate", "owner"]);
+
+  for (const [producedState, { row, context }] of examples) {
+    for (const mutatedState of ["owner", "duplicate", "conflict"]) {
+      if (mutatedState === producedState) continue;
+      const emission = rule("tb_fiscal.icms").emitRows(row, {
+        ...context,
+        icmsNaturalKeyResolution: mutatedState,
+      })[0];
+      assert.equal(emission.status, "quarantine", `${producedState}->${mutatedState}`);
+      assert.equal(
+        emission.reasonCode,
+        "ICMS_DEDUP_CONTEXT_MISMATCH",
+        `${producedState}->${mutatedState}`,
+      );
+    }
   }
 });
 

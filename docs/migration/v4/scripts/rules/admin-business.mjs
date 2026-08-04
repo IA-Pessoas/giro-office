@@ -122,7 +122,7 @@ export function buildPermissionResolutionContexts({ sourceTable, rows, userResol
         userLookupSourceTable: user.sourceTable,
         userLookupSourceKey: user.sourceKey,
         permissionUserModuleResolution: dedupStates[index],
-        ...permissionContextBinding(sourceTable, row),
+        ...permissionContextBinding(sourceTable, row, dedupStates[index]),
       });
     }),
   );
@@ -162,7 +162,7 @@ export function buildIcmsResolutionContexts(rows) {
     states.map((icmsNaturalKeyResolution, index) =>
       Object.freeze({
         icmsNaturalKeyResolution,
-        ...icmsContextBinding(rows[index]),
+        ...icmsContextBinding(rows[index], icmsNaturalKeyResolution),
       }),
     ),
   );
@@ -930,8 +930,8 @@ function referenceResolutionFingerprint(state, identityRef, sourceTable, sourceK
   return stableFingerprint(["reference-resolution-v1", state, identityRef, sourceTable, sourceKey]);
 }
 
-function permissionContextBinding(sourceTable, row) {
-  return {
+function permissionContextBinding(sourceTable, row, dedupState) {
+  const binding = {
     permissionSourceTable: sourceTable,
     permissionSourceRowId: strictPositiveIntegerLiteral(row?.id),
     permissionNaturalKeyFingerprint: permissionNaturalKeyFingerprint(sourceTable, row),
@@ -942,6 +942,17 @@ function permissionContextBinding(sourceTable, row) {
       strictPositiveIntegerLiteral(row?.user_id),
       canonicalLegacyText(row?.permissao),
     ]),
+  };
+  return {
+    ...binding,
+    permissionDedupSignature: dedupDecisionSignature(
+      "permission-dedup-v1",
+      dedupState,
+      binding.permissionSourceTable,
+      binding.permissionSourceRowId,
+      binding.permissionNaturalKeyFingerprint,
+      binding.permissionRowFingerprint,
+    ),
   };
 }
 
@@ -956,17 +967,22 @@ function permissionNaturalKeyFingerprint(sourceTable, row) {
 function isPermissionContextBound(row, context, sourceTable) {
   const sourceRowId = strictPositiveIntegerLiteral(row?.id);
   if (sourceRowId === null) return false;
-  const expected = permissionContextBinding(sourceTable, row);
+  const expected = permissionContextBinding(
+    sourceTable,
+    row,
+    context?.permissionUserModuleResolution,
+  );
   return (
     context?.permissionSourceTable === expected.permissionSourceTable &&
     context?.permissionSourceRowId === sourceRowId &&
     context?.permissionNaturalKeyFingerprint === expected.permissionNaturalKeyFingerprint &&
-    context?.permissionRowFingerprint === expected.permissionRowFingerprint
+    context?.permissionRowFingerprint === expected.permissionRowFingerprint &&
+    context?.permissionDedupSignature === expected.permissionDedupSignature
   );
 }
 
-function icmsContextBinding(row) {
-  return {
+function icmsContextBinding(row, dedupState) {
+  const binding = {
     icmsSourceTable: "tb_fiscal.icms",
     icmsSourceRowId: strictPositiveIntegerLiteral(row?.id),
     icmsNaturalKeyFingerprint: stableFingerprint([
@@ -980,18 +996,48 @@ function icmsContextBinding(row) {
       ...icmsFiscalPayloadValues(row),
     ]),
   };
+  return {
+    ...binding,
+    icmsDedupSignature: dedupDecisionSignature(
+      "icms-dedup-v1",
+      dedupState,
+      binding.icmsSourceTable,
+      binding.icmsSourceRowId,
+      binding.icmsNaturalKeyFingerprint,
+      binding.icmsRowFingerprint,
+    ),
+  };
 }
 
 function isIcmsContextBound(row, context) {
   const sourceRowId = strictPositiveIntegerLiteral(row?.id);
   if (sourceRowId === null) return false;
-  const expected = icmsContextBinding(row);
+  const expected = icmsContextBinding(row, context?.icmsNaturalKeyResolution);
   return (
     context?.icmsSourceTable === expected.icmsSourceTable &&
     context?.icmsSourceRowId === sourceRowId &&
     context?.icmsNaturalKeyFingerprint === expected.icmsNaturalKeyFingerprint &&
-    context?.icmsRowFingerprint === expected.icmsRowFingerprint
+    context?.icmsRowFingerprint === expected.icmsRowFingerprint &&
+    context?.icmsDedupSignature === expected.icmsDedupSignature
   );
+}
+
+function dedupDecisionSignature(
+  scope,
+  state,
+  sourceTable,
+  sourceRowId,
+  naturalKeyFingerprint,
+  rowFingerprint,
+) {
+  return stableFingerprint([
+    scope,
+    state,
+    sourceTable,
+    sourceRowId,
+    naturalKeyFingerprint,
+    rowFingerprint,
+  ]);
 }
 
 function icmsNaturalKeyValues(row) {
