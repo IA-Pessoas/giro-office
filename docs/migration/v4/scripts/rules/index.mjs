@@ -1,12 +1,36 @@
 import { RH_PESSOAL_EVIDENCE } from "../evidence/rh-pessoal.mjs";
+import {
+  CERTIFICATE_EVIDENCE,
+  PARCELAMENTO_EVIDENCE,
+  SPECIALIZED_EVIDENCE,
+  TECHNOLOGY_EVIDENCE,
+} from "../evidence/technology-certificates-parcelamento.mjs";
 import { V2_EVIDENCE } from "../evidence/v2.mjs";
 import { buildRuleRegistry as createRuleRegistry } from "../lib/mapping-contract.mjs";
+import { CERTIFICATE_RULES } from "./certificates.mjs";
+import { PARCELAMENTO_RULES } from "./parcelamento.mjs";
 import { RH_PESSOAL_RULES } from "./rh-pessoal.mjs";
+import { TECHNOLOGY_RULES } from "./tecnologia.mjs";
 import { V2_RULES } from "./v2.mjs";
 
-export { RH_PESSOAL_EVIDENCE, RH_PESSOAL_RULES, V2_EVIDENCE, V2_RULES };
+export {
+  CERTIFICATE_EVIDENCE,
+  CERTIFICATE_RULES,
+  PARCELAMENTO_EVIDENCE,
+  PARCELAMENTO_RULES,
+  RH_PESSOAL_EVIDENCE,
+  RH_PESSOAL_RULES,
+  SPECIALIZED_EVIDENCE,
+  TECHNOLOGY_EVIDENCE,
+  TECHNOLOGY_RULES,
+  V2_EVIDENCE,
+  V2_RULES,
+};
 export const v2Rules = V2_RULES;
 export const rhPessoalRules = RH_PESSOAL_RULES;
+export const technologyRules = TECHNOLOGY_RULES;
+export const certificateRules = CERTIFICATE_RULES;
+export const parcelamentoRules = PARCELAMENTO_RULES;
 
 export function buildRuleRegistry(...additionalRuleGroups) {
   return createRuleRegistry([V2_RULES, ...additionalRuleGroups]);
