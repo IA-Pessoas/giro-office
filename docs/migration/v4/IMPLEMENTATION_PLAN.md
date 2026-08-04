@@ -2,6 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Execution notice (2026-08-04):** Tasks 1–4 deste plano foram concluídas e revisadas. A
+> auditoria posterior do código legado invalidou o contrato usado a partir da Task 5. Não execute
+> as Tasks 5–11 deste arquivo. A continuação obrigatória está em
+> `docs/migration/v4/SEMANTIC_IMPLEMENTATION_PLAN.md`.
+
 **Goal:** Implementar um pacote V4 autocontido que inventarie e classifique as 312 tabelas do backup legado de 03.08.2026, gere mapeamentos e quarentenas auditáveis e valide o destino Supabase em modo estritamente somente leitura.
 
 **Architecture:** Os scripts em docs/migration/v4/scripts serão divididos em bibliotecas pequenas: parser incremental de dumps, inventário, catálogo Prisma, regras por domínio, motor de classificação, comparação histórica, serialização segura e preflight PostgreSQL. As CLIs apenas orquestram essas bibliotecas. Toda tabela de origem terá exatamente uma classificação confirmed ou pending; registros incompatíveis de tabelas confirmadas irão para quarantine. O Supabase será acessado apenas pelo preflight, dentro de BEGIN TRANSACTION READ ONLY.
