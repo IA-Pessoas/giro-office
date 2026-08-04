@@ -8,7 +8,14 @@ import {
 } from "../evidence/technology-certificates-parcelamento.mjs";
 import { V2_EVIDENCE } from "../evidence/v2.mjs";
 import { buildRuleRegistry as createRuleRegistry } from "../lib/mapping-contract.mjs";
-import { ADMIN_BUSINESS_RULES, ADMIN_BUSINESS_TRANSFORMATIONS } from "./admin-business.mjs";
+import {
+  ADMIN_BUSINESS_RULES,
+  ADMIN_BUSINESS_TRANSFORMATIONS,
+  buildIcmsResolutionContexts,
+  buildPermissionResolutionContexts,
+  createLegacyReferenceResolver,
+  createV2ClientIdentityResolver,
+} from "./admin-business.mjs";
 import { CERTIFICATE_RULES } from "./certificates.mjs";
 import { PARCELAMENTO_RULES } from "./parcelamento.mjs";
 import { RH_PESSOAL_RULES } from "./rh-pessoal.mjs";
@@ -19,8 +26,12 @@ export {
   ADMIN_BUSINESS_EVIDENCE,
   ADMIN_BUSINESS_RULES,
   ADMIN_BUSINESS_TRANSFORMATIONS,
+  buildIcmsResolutionContexts,
+  buildPermissionResolutionContexts,
   CERTIFICATE_EVIDENCE,
   CERTIFICATE_RULES,
+  createLegacyReferenceResolver,
+  createV2ClientIdentityResolver,
   PARCELAMENTO_EVIDENCE,
   PARCELAMENTO_RULES,
   RH_PESSOAL_EVIDENCE,

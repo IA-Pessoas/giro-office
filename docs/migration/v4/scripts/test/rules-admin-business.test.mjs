@@ -9,8 +9,12 @@ import { iterateSqlRows } from "../lib/sql-dump-parser.mjs";
 import {
   ADMIN_BUSINESS_RULES,
   ADMIN_BUSINESS_TRANSFORMATIONS,
+  buildIcmsResolutionContexts,
+  buildPermissionResolutionContexts,
   buildRuleRegistry,
   CERTIFICATE_RULES,
+  createLegacyReferenceResolver,
+  createV2ClientIdentityResolver,
   PARCELAMENTO_RULES,
   RH_PESSOAL_RULES,
   TECHNOLOGY_RULES,
@@ -44,6 +48,14 @@ async function inspectDeclaredColumns(sourceTable) {
   const createBody = dump.match(/CREATE TABLE[\s\S]*?\(([\s\S]*?)\) ENGINE=/)?.[1];
   assert.ok(createBody, `CREATE TABLE ausente: ${sourceTable}`);
   return [...createBody.matchAll(/^\s*`([^`]+)`/gm)].map((match) => match[1]);
+}
+
+async function loadRows(sourceTable) {
+  const rows = [];
+  for await (const row of iterateSqlRows(path.join(LEGACY_DUMP_ROOT, `${sourceTable}.sql`))) {
+    rows.push(row);
+  }
+  return rows;
 }
 
 test("as 20 regras administrativas/empresariais são válidas no Prisma atual e não colidem", async () => {
@@ -90,10 +102,27 @@ test("toda coluna real de origem confirmed é mapped ou not_preserved com motivo
 
 test("permissões fixas fazem merge pelo vínculo explícito User/Organization e normalizam -1..2 para 0..3", async () => {
   assert.deepEqual(
-    [-1, 0, 1, 2].map(ADMIN_BUSINESS_TRANSFORMATIONS.normalize_legacy_permission_level_plus_one),
-    [0, 1, 2, 3],
+    [-1, "-1", 0, "0", 1, "1", 2, "2"].map(
+      ADMIN_BUSINESS_TRANSFORMATIONS.normalize_legacy_permission_level_plus_one,
+    ),
+    [0, 0, 1, 1, 2, 2, 3, 3],
   );
-  for (const invalid of [-2, 3, 1.5, "admin", null]) {
+  for (const invalid of [
+    -2,
+    3,
+    1.5,
+    "-2",
+    "3",
+    "1.5",
+    " 1",
+    "1 ",
+    "+1",
+    "01",
+    "1e0",
+    "admin",
+    "",
+    null,
+  ]) {
     assert.equal(
       ADMIN_BUSINESS_TRANSFORMATIONS.normalize_legacy_permission_level_plus_one(invalid),
       null,
@@ -120,34 +149,112 @@ test("permissões fixas fazem merge pelo vínculo explícito User/Organization e
       "normalize_legacy_permission_level_plus_one",
     );
 
-    const prepared = mappingRule.emitRows({ id: 99, user_id: 7, permissao: 2 }, {});
-    assert.equal(prepared[0].status, "prepared", sourceTable);
-    assert.equal(prepared[0].identityRef, `permissions:tb_admin.usuarios:7:${ORGANIZATION_ID}`);
-    assert.doesNotMatch(JSON.stringify(prepared), /permissao|SENTINEL/);
+    const notExecuted = mappingRule.emitRows({ id: "99", user_id: "7", permissao: "2" }, {});
+    assert.equal(notExecuted[0].status, "quarantine", sourceTable);
+    assert.equal(notExecuted[0].reasonCode, "PERMISSION_USER_LOOKUP_NOT_EXECUTED", sourceTable);
     assert.equal(
-      mappingRule.emitRows({ id: 99, user_id: 7, permissao: 3 }, {})[0].reasonCode,
+      mappingRule.emitRows(
+        { id: "99", user_id: "7", permissao: "3" },
+        {
+          userResolution: "one",
+          userIdentityRef: "tb_admin.usuarios:7",
+          permissionUserModuleResolution: "owner",
+        },
+      )[0].reasonCode,
       "PERMISSION_LEVEL_INVALID",
     );
     assert.equal(
-      mappingRule.emitRows({ id: 99, user_id: "", permissao: 1 }, {})[0].reasonCode,
+      mappingRule.emitRows(
+        { id: "99", user_id: "", permissao: "1" },
+        {
+          userResolution: "zero",
+          permissionUserModuleResolution: "owner",
+        },
+      )[0].reasonCode,
       "PERMISSION_USER_LINK_INVALID",
     );
   }
 
-  const certificateRule = rule("tb_admin.permissoes_certificado");
+  const users = await loadRows("tb_admin.usuarios");
+  const userResolver = createLegacyReferenceResolver({
+    sourceTable: "tb_admin.usuarios",
+    legacyColumn: "id",
+    rows: users,
+  });
+  const statusCounts = new Map();
+  const reasonCounts = new Map();
+  const normalizedLevelCounts = new Map();
+  let rowCount = 0;
+
+  for (const sourceTable of PERMISSION_SOURCES) {
+    const rows = await loadRows(sourceTable);
+    const contexts = buildPermissionResolutionContexts({ sourceTable, rows, userResolver });
+    assert.equal(contexts.length, rows.length, sourceTable);
+    for (const [index, row] of rows.entries()) {
+      rowCount += 1;
+      const normalized = ADMIN_BUSINESS_TRANSFORMATIONS.normalize_legacy_permission_level_plus_one(
+        row.permissao,
+      );
+      assert.notEqual(normalized, null, `${sourceTable}.${row.id}`);
+      normalizedLevelCounts.set(normalized, (normalizedLevelCounts.get(normalized) ?? 0) + 1);
+      const emission = rule(sourceTable).emitRows(row, contexts[index])[0];
+      statusCounts.set(emission.status, (statusCounts.get(emission.status) ?? 0) + 1);
+      if (emission.reasonCode !== null) {
+        reasonCounts.set(emission.reasonCode, (reasonCounts.get(emission.reasonCode) ?? 0) + 1);
+      }
+      assert.match(emission.identityRef, /^[A-Za-z0-9_.:-]+$/);
+      assert.doesNotMatch(JSON.stringify(emission), /SENTINEL/);
+    }
+  }
+
+  assert.equal(rowCount, 1175);
+  assert.deepEqual(Object.fromEntries(normalizedLevelCounts), { 0: 10, 1: 817, 2: 79, 3: 269 });
+  assert.deepEqual(Object.fromEntries(statusCounts), {
+    prepared: 1167,
+    quarantine: 7,
+    not_emitted: 1,
+  });
+  assert.equal(reasonCounts.get("PERMISSION_USER_NOT_FOUND"), 4);
+  assert.equal(reasonCounts.get("PERMISSION_MODULE_LEVEL_CONFLICT"), 3);
+  assert.equal(reasonCounts.get("PERMISSION_MODULE_DUPLICATE"), 1);
+
+  const actualOwner = (await loadRows("tb_admin.permissoes_comercial"))[0];
+  const missingDedup = rule("tb_admin.permissoes_comercial").emitRows(actualOwner, {
+    userResolution: "one",
+    userIdentityRef: `tb_admin.usuarios:${actualOwner.user_id}`,
+  })[0];
+  assert.equal(missingDedup.status, "quarantine");
+  assert.equal(missingDedup.reasonCode, "PERMISSION_DEDUP_NOT_EXECUTED");
+  const unknownDedup = rule("tb_admin.permissoes_comercial").emitRows(actualOwner, {
+    userResolution: "one",
+    userIdentityRef: `tb_admin.usuarios:${actualOwner.user_id}`,
+    permissionUserModuleResolution: "unknown",
+  })[0];
+  assert.equal(unknownDedup.status, "quarantine");
+  assert.equal(unknownDedup.reasonCode, "PERMISSION_DEDUP_STATE_INVALID");
+  const matchingUser = users.find(({ id }) => id === actualOwner.user_id);
+  assert.ok(matchingUser);
+  const ambiguousUser = createLegacyReferenceResolver({
+    sourceTable: "tb_admin.usuarios",
+    legacyColumn: "id",
+    rows: [...users, matchingUser],
+  }).resolve(actualOwner.user_id);
+  assert.equal(ambiguousUser.state, "many");
   assert.equal(
-    certificateRule.emitRows(
-      { id: 99, user_id: 7, permissao: 2 },
-      { permissionUserModuleResolution: "duplicate" },
-    )[0].reasonCode,
-    "PERMISSION_MODULE_DUPLICATE",
+    rule("tb_admin.permissoes_comercial").emitRows(actualOwner, {
+      userResolution: ambiguousUser.state,
+      userIdentityRef: ambiguousUser.identityRef,
+      permissionUserModuleResolution: "owner",
+    })[0].reasonCode,
+    "PERMISSION_USER_AMBIGUOUS",
   );
   assert.equal(
-    certificateRule.emitRows(
-      { id: 99, user_id: 7, permissao: 2 },
-      { permissionUserModuleResolution: "conflict" },
-    )[0].reasonCode,
-    "PERMISSION_MODULE_LEVEL_CONFLICT",
+    rule("tb_admin.permissoes_comercial").emitRows(actualOwner, {
+      userResolution: "one",
+      userIdentityRef: `tb_admin.usuarios:${actualOwner.user_id}:unsafe`,
+      permissionUserModuleResolution: "owner",
+    })[0].reasonCode,
+    "PERMISSION_USER_IDENTITY_INVALID",
   );
 
   const schema = await readFile("infra/prisma/schema.prisma", "utf8");
@@ -162,40 +269,37 @@ test("permissões fixas fazem merge pelo vínculo explícito User/Organization e
 });
 
 test("duplicatas naturais reais respeitam as identidades únicas/lógicas atuais", async () => {
-  const permissionByUser = new Map();
-  for await (const row of iterateSqlRows(
-    path.join(LEGACY_DUMP_ROOT, "tb_admin.permissoes_certificado.sql"),
-  )) {
-    const levels = permissionByUser.get(row.user_id) ?? [];
-    levels.push(row.permissao);
-    permissionByUser.set(row.user_id, levels);
-  }
-  assert.ok([...permissionByUser.values()].some((levels) => new Set(levels).size > 1));
-
-  assert.equal(
-    await countDuplicateKeys("tb_fiscal.icms", [
-      "estado",
-      "item",
-      "cest",
-      "descricao",
-      "acordo",
-      "mva_original_aplicada",
-      "mva_ajustado",
-      "mva_original",
-    ]),
-    4,
-  );
+  const rows = await loadRows("tb_fiscal.icms");
+  const contexts = buildIcmsResolutionContexts(rows);
+  assert.equal(contexts.length, 368);
   const icmsRule = rule("tb_fiscal.icms");
   assert.ok(icmsRule.destinations[0].precedence.includes("lowest_legacy_id_owner"));
-  const icmsRow = { id: 7, estado: "BA", descricao: "Regra fiscal" };
-  assert.equal(
-    icmsRule.emitRows(icmsRow, { icmsNaturalKeyResolution: "owner" })[0].status,
-    "prepared",
-  );
-  assert.equal(
-    icmsRule.emitRows(icmsRow, { icmsNaturalKeyResolution: "duplicate" })[0].reasonCode,
-    "ICMS_NATURAL_DUPLICATE",
-  );
+  const statusCounts = new Map();
+  const reasonCounts = new Map();
+  for (const [index, row] of rows.entries()) {
+    const emission = icmsRule.emitRows(row, contexts[index])[0];
+    statusCounts.set(emission.status, (statusCounts.get(emission.status) ?? 0) + 1);
+    if (emission.reasonCode !== null) {
+      reasonCounts.set(emission.reasonCode, (reasonCounts.get(emission.reasonCode) ?? 0) + 1);
+    }
+  }
+  assert.deepEqual(Object.fromEntries(statusCounts), {
+    prepared: 361,
+    not_emitted: 3,
+    quarantine: 4,
+  });
+  assert.equal(reasonCounts.get("ICMS_NATURAL_DUPLICATE"), 3);
+  assert.equal(reasonCounts.get("ICMS_NATURAL_KEY_CONFLICT"), 4);
+
+  const actualOwner = rows[0];
+  const missingResolution = icmsRule.emitRows(actualOwner, {})[0];
+  assert.equal(missingResolution.status, "quarantine");
+  assert.equal(missingResolution.reasonCode, "ICMS_DEDUP_NOT_EXECUTED");
+  const unknownResolution = icmsRule.emitRows(actualOwner, {
+    icmsNaturalKeyResolution: "unknown",
+  })[0];
+  assert.equal(unknownResolution.status, "quarantine");
+  assert.equal(unknownResolution.reasonCode, "ICMS_DEDUP_STATE_INVALID");
 
   assert.equal(await countDuplicateKeys("tb_contabil.clientes_mov", ["cliente_id"]), 0);
   assert.equal(await countDuplicateKeys("tb_contabil.relacoes", ["cliente_id"]), 0);
@@ -222,8 +326,9 @@ test("permissão dinâmica e módulos aposentados não ganham regra por inferên
   assert.ok(dynamicPairs.has("workspace:0"));
 });
 
-test("logs preservam o evento auditável, mas não comprimem local em changes", () => {
-  const destination = rule("tb_admin.logs").destinations[0];
+test("logs exigem resolução User executada e não comprimem local em changes", async () => {
+  const logsRule = rule("tb_admin.logs");
+  const destination = logsRule.destinations[0];
   assert.equal(destination.destinationTable, "logs");
   assert.equal(destination.constants.organization_id, ORGANIZATION_ID);
   assert.equal(destination.defaults.changes, "{}");
@@ -243,6 +348,221 @@ test("logs preservam o evento auditável, mas não comprimem local em changes", 
   const local = destination.columns.find(({ sourceColumn }) => sourceColumn === "local");
   assert.equal(local.status, "not_preserved");
   assert.equal(local.destinationColumn, null);
+
+  const userResolver = createLegacyReferenceResolver({
+    sourceTable: "tb_admin.usuarios",
+    legacyColumn: "id",
+    rows: await loadRows("tb_admin.usuarios"),
+  });
+  let preparedCount = 0;
+  let missingUserCount = 0;
+  let rowCount = 0;
+  let firstResolved = null;
+  for await (const row of iterateSqlRows(path.join(LEGACY_DUMP_ROOT, "tb_admin.logs.sql"))) {
+    rowCount += 1;
+    const user = userResolver.resolve(row.usuario_id);
+    const emission = logsRule.emitRows(row, {
+      userResolution: user.state,
+      userIdentityRef: user.identityRef,
+    })[0];
+    if (emission.status === "prepared") preparedCount += 1;
+    if (emission.reasonCode === "LOG_USER_NOT_FOUND") missingUserCount += 1;
+    if (firstResolved === null && user.state === "one") firstResolved = { row, emission };
+    assert.match(emission.identityRef, /^[A-Za-z0-9_.:-]+$/);
+  }
+  assert.equal(rowCount, 470127);
+  assert.equal(preparedCount, 470099);
+  assert.equal(missingUserCount, 28);
+
+  assert.ok(firstResolved);
+  assert.equal(
+    logsRule.emitRows(firstResolved.row, {})[0].reasonCode,
+    "LOG_USER_LOOKUP_NOT_EXECUTED",
+  );
+  assert.equal(
+    logsRule.emitRows(firstResolved.row, {
+      userResolution: "unknown",
+      userIdentityRef: "tb_admin.usuarios:unknown",
+    })[0].reasonCode,
+    "LOG_USER_LOOKUP_STATE_INVALID",
+  );
+  const actualUser = (await loadRows("tb_admin.usuarios")).find(
+    ({ id }) => id === firstResolved.row.usuario_id,
+  );
+  assert.ok(actualUser);
+  const ambiguousUser = createLegacyReferenceResolver({
+    sourceTable: "tb_admin.usuarios",
+    legacyColumn: "id",
+    rows: [...(await loadRows("tb_admin.usuarios")), actualUser],
+  }).resolve(firstResolved.row.usuario_id);
+  assert.equal(
+    logsRule.emitRows(firstResolved.row, {
+      userResolution: ambiguousUser.state,
+      userIdentityRef: ambiguousUser.identityRef,
+    })[0].reasonCode,
+    "LOG_USER_AMBIGUOUS",
+  );
+  assert.equal(
+    logsRule.emitRows(firstResolved.row, {
+      userResolution: "one",
+      userIdentityRef: `tb_admin.usuarios:${firstResolved.row.usuario_id}:unsafe`,
+    })[0].reasonCode,
+    "LOG_USER_IDENTITY_INVALID",
+  );
+});
+
+test("referências contábeis seguem codigo Regularize até a identidade Client produzida pela V2", async () => {
+  const regularizeRows = await loadRows("tb_regularize.clientes");
+  const integrationRows = await loadRows("tb_integracao.clientes");
+  const clientResolver = createV2ClientIdentityResolver({ regularizeRows, integrationRows });
+  const userResolver = createLegacyReferenceResolver({
+    sourceTable: "tb_admin.usuarios",
+    legacyColumn: "id",
+    rows: await loadRows("tb_admin.usuarios"),
+  });
+  const sources = [
+    "tb_contabil.clientes_mov",
+    "tb_contabil.clientes_observacao",
+    "tb_contabil.controle",
+    "tb_contabil.relacoes",
+  ];
+  const sourceResolutionCounts = new Map();
+  const statusCounts = new Map();
+  const reasonCounts = new Map();
+  let rowCount = 0;
+  const validExamples = new Map();
+  let unavailableExample = null;
+
+  for (const sourceTable of sources) {
+    for (const row of await loadRows(sourceTable)) {
+      rowCount += 1;
+      const client = clientResolver.resolve(row.cliente_id);
+      sourceResolutionCounts.set(
+        client.sourceState,
+        (sourceResolutionCounts.get(client.sourceState) ?? 0) + 1,
+      );
+      const context = {
+        clientResolution: client.state,
+        clientIdentityRef: client.identityRef,
+      };
+      if (sourceTable === "tb_contabil.clientes_observacao") {
+        const user = userResolver.resolve(row.user_id);
+        context.userResolution = user.state;
+        context.userIdentityRef = user.identityRef;
+      }
+      const emission = rule(sourceTable).emitRows(row, context)[0];
+      statusCounts.set(emission.status, (statusCounts.get(emission.status) ?? 0) + 1);
+      if (emission.reasonCode !== null) {
+        reasonCounts.set(emission.reasonCode, (reasonCounts.get(emission.reasonCode) ?? 0) + 1);
+      }
+      if (client.state === "one") {
+        assert.match(client.identityRef, /^(tb_integracao|tb_regularize)\.clientes:[1-9]\d*$/);
+        if (!validExamples.has(sourceTable)) validExamples.set(sourceTable, { row, client });
+      } else {
+        unavailableExample ??= { row, sourceTable, client };
+      }
+    }
+  }
+
+  assert.equal(rowCount, 3274);
+  assert.deepEqual(Object.fromEntries(sourceResolutionCounts), { one: 3274 });
+  assert.deepEqual(Object.fromEntries(statusCounts), { prepared: 3273, quarantine: 1 });
+  assert.equal(reasonCounts.get("CLIENT_REFERENCE_NOT_FOUND"), 1);
+  assert.ok(unavailableExample);
+  assert.equal(unavailableExample.client.sourceState, "one");
+  assert.equal(unavailableExample.client.state, "zero");
+
+  assert.equal(validExamples.size, 4);
+  for (const [sourceTable, { row, client }] of validExamples) {
+    const missingContext = rule(sourceTable).emitRows(row, {})[0];
+    assert.equal(missingContext.status, "quarantine", sourceTable);
+    assert.equal(missingContext.reasonCode, "CLIENT_LOOKUP_NOT_EXECUTED", sourceTable);
+    const unknownContext = rule(sourceTable).emitRows(row, {
+      clientResolution: "unknown",
+      clientIdentityRef: "tb_regularize.clientes:unknown",
+    })[0];
+    assert.equal(unknownContext.status, "quarantine", sourceTable);
+    assert.equal(unknownContext.reasonCode, "CLIENT_LOOKUP_STATE_INVALID", sourceTable);
+    assert.equal(
+      rule(sourceTable).emitRows(row, {
+        clientResolution: "one",
+        clientIdentityRef: `${client.identityRef}:unsafe`,
+      })[0].reasonCode,
+      "CLIENT_IDENTITY_INVALID",
+      sourceTable,
+    );
+  }
+
+  const [validSourceTable, validExample] = validExamples.entries().next().value;
+
+  const actualRegularizeRow = regularizeRows.find(
+    ({ codigo }) => codigo === validExample.row.cliente_id,
+  );
+  assert.ok(actualRegularizeRow);
+  const zeroResolver = createV2ClientIdentityResolver({
+    regularizeRows: regularizeRows.filter(({ codigo }) => codigo !== actualRegularizeRow.codigo),
+    integrationRows,
+  });
+  const zero = zeroResolver.resolve(validExample.row.cliente_id);
+  assert.equal(zero.sourceState, "zero");
+  assert.equal(
+    rule(validSourceTable).emitRows(validExample.row, {
+      clientResolution: zero.state,
+      clientIdentityRef: zero.identityRef,
+    })[0].reasonCode,
+    "CLIENT_REFERENCE_NOT_FOUND",
+  );
+  const manyResolver = createV2ClientIdentityResolver({
+    regularizeRows: [...regularizeRows, actualRegularizeRow],
+    integrationRows,
+  });
+  const many = manyResolver.resolve(validExample.row.cliente_id);
+  assert.equal(many.sourceState, "many");
+  assert.equal(
+    rule(validSourceTable).emitRows(validExample.row, {
+      clientResolution: many.state,
+      clientIdentityRef: many.identityRef,
+    })[0].reasonCode,
+    "CLIENT_REFERENCE_AMBIGUOUS",
+  );
+});
+
+test("NCM/PIS/COFINS exige tributação federal e data civil exata nos 31.362 registros reais", async () => {
+  const mappingRule = rule("tb_fiscal.tributacao_pis_cofins");
+  const statusCounts = new Map();
+  const reasonCounts = new Map();
+  let rowCount = 0;
+  let validRow = null;
+  for await (const row of iterateSqlRows(
+    path.join(LEGACY_DUMP_ROOT, "tb_fiscal.tributacao_pis_cofins.sql"),
+  )) {
+    rowCount += 1;
+    const emission = mappingRule.emitRows(row, {})[0];
+    statusCounts.set(emission.status, (statusCounts.get(emission.status) ?? 0) + 1);
+    if (emission.reasonCode !== null) {
+      reasonCounts.set(emission.reasonCode, (reasonCounts.get(emission.reasonCode) ?? 0) + 1);
+    }
+    if (emission.status === "prepared") validRow ??= row;
+  }
+
+  assert.equal(rowCount, 31362);
+  assert.deepEqual(Object.fromEntries(statusCounts), { prepared: 31358, quarantine: 4 });
+  assert.equal(reasonCounts.get("NCM_FEDERAL_TAXATION_EMPTY"), 3);
+  assert.equal(reasonCounts.get("NCM_VALIDITY_START_DATE_INVALID"), 1);
+
+  assert.ok(validRow);
+  assert.equal(
+    mappingRule.emitRows({ ...validRow, inicio_virgencia: "2024-02-29" }, {})[0].status,
+    "prepared",
+  );
+  assert.equal(
+    mappingRule.emitRows({ ...validRow, inicio_virgencia: "2023-02-29" }, {})[0].reasonCode,
+    "NCM_VALIDITY_START_DATE_INVALID",
+  );
+  assert.equal(
+    mappingRule.emitRows({ ...validRow, inicio_virgencia: " 2024-02-29" }, {})[0].reasonCode,
+    "NCM_VALIDITY_START_DATE_INVALID",
+  );
 });
 
 test("histórico contábil preserva texto integral e não o mistura com departamento", () => {

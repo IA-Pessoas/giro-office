@@ -10,6 +10,147 @@ export const ADMIN_BUSINESS_TRANSFORMATIONS = Object.freeze({
   normalize_legacy_permission_level_plus_one: normalizeLegacyPermissionLevelPlusOne,
 });
 
+export function createLegacyReferenceResolver({ sourceTable, legacyColumn, rows }) {
+  if (typeof sourceTable !== "string" || !/^[A-Za-z0-9_.]+$/.test(sourceTable)) {
+    throw new TypeError("sourceTable de referência deve ser um identificador sanitizado");
+  }
+  if (typeof legacyColumn !== "string" || legacyColumn.length === 0) {
+    throw new TypeError("legacyColumn de referência deve ser informado");
+  }
+  if (!Array.isArray(rows)) {
+    throw new TypeError("rows de referência deve ser um array");
+  }
+  const rowsByKey = new Map();
+  for (const row of rows) {
+    const key = strictPositiveIntegerLiteral(row?.[legacyColumn]);
+    if (key === null) continue;
+    const candidates = rowsByKey.get(key) ?? [];
+    candidates.push(row);
+    rowsByKey.set(key, candidates);
+  }
+
+  return Object.freeze({
+    resolve(value) {
+      const key = strictPositiveIntegerLiteral(value);
+      const candidates = key === null ? [] : (rowsByKey.get(key) ?? []);
+      if (candidates.length === 0) return referenceResolution("zero");
+      if (candidates.length > 1) return referenceResolution("many");
+      return referenceResolution("one", `${sourceTable}:${key}`);
+    },
+  });
+}
+
+export function createV2ClientIdentityResolver({ regularizeRows, integrationRows }) {
+  if (!Array.isArray(regularizeRows) || !Array.isArray(integrationRows)) {
+    throw new TypeError("regularizeRows e integrationRows devem ser arrays");
+  }
+  const regularizeByCode = new Map();
+  for (const row of regularizeRows) {
+    const code = strictPositiveIntegerLiteral(row?.codigo);
+    if (code === null) continue;
+    const candidates = regularizeByCode.get(code) ?? [];
+    candidates.push(row);
+    regularizeByCode.set(code, candidates);
+  }
+  const integrationResolver = createLegacyReferenceResolver({
+    sourceTable: "tb_integracao.clientes",
+    legacyColumn: "id",
+    rows: integrationRows,
+  });
+
+  return Object.freeze({
+    resolve(value) {
+      const code = strictPositiveIntegerLiteral(value);
+      const candidates = code === null ? [] : (regularizeByCode.get(code) ?? []);
+      if (candidates.length === 0) return clientResolution("zero", "zero");
+      if (candidates.length > 1) return clientResolution("many", "many");
+      const regularizeRow = candidates[0];
+      if (!hasExplicitV2ClientLink(regularizeRow?.cliente_id)) {
+        return clientResolution("one", "one", `tb_regularize.clientes:${code}`);
+      }
+      const integration = integrationResolver.resolve(regularizeRow.cliente_id);
+      return clientResolution("one", integration.state, integration.identityRef);
+    },
+  });
+}
+
+export function buildPermissionResolutionContexts({ sourceTable, rows, userResolver }) {
+  if (typeof sourceTable !== "string" || !sourceTable.startsWith("tb_admin.permissoes_")) {
+    throw new TypeError("sourceTable deve identificar uma tabela fixa de permissões");
+  }
+  if (!Array.isArray(rows)) throw new TypeError("rows de permissões deve ser um array");
+  const groups = new Map();
+  for (const [index, row] of rows.entries()) {
+    const userKey = strictPositiveIntegerLiteral(row?.user_id);
+    const groupKey = userKey === null ? `invalid:${index}` : userKey;
+    const entries = groups.get(groupKey) ?? [];
+    entries.push({ index, row });
+    groups.set(groupKey, entries);
+  }
+  const dedupStates = new Array(rows.length);
+  for (const entries of groups.values()) {
+    const levels = new Set(
+      entries.map(({ row }) => normalizeLegacyPermissionLevelPlusOne(row?.permissao)),
+    );
+    if (levels.size > 1) {
+      for (const { index } of entries) dedupStates[index] = "conflict";
+      continue;
+    }
+    const [owner, ...duplicates] = [...entries].sort(compareEntriesByLegacyId);
+    dedupStates[owner.index] = "owner";
+    for (const { index } of duplicates) dedupStates[index] = "duplicate";
+  }
+
+  return Object.freeze(
+    rows.map((row, index) => {
+      const user =
+        typeof userResolver?.resolve === "function"
+          ? userResolver.resolve(row?.user_id)
+          : referenceResolution("not_executed");
+      return Object.freeze({
+        userResolution: user.state,
+        userIdentityRef: user.identityRef,
+        permissionUserModuleResolution: dedupStates[index],
+      });
+    }),
+  );
+}
+
+export function buildIcmsResolutionContexts(rows) {
+  if (!Array.isArray(rows)) throw new TypeError("rows de ICMS deve ser um array");
+  const groups = new Map();
+  for (const [index, row] of rows.entries()) {
+    const naturalKey = JSON.stringify(
+      ["estado", "item", "cest", "descricao"].map((column) => canonicalLegacyText(row?.[column])),
+    );
+    const entries = groups.get(naturalKey) ?? [];
+    entries.push({ index, row });
+    groups.set(naturalKey, entries);
+  }
+  const states = new Array(rows.length);
+  for (const entries of groups.values()) {
+    const fiscalPayloads = new Set(
+      entries.map(({ row }) =>
+        JSON.stringify(
+          ["acordo", "mva_original_aplicada", "mva_ajustado", "mva_original"].map((column) =>
+            canonicalLegacyText(row?.[column]),
+          ),
+        ),
+      ),
+    );
+    if (fiscalPayloads.size > 1) {
+      for (const { index } of entries) states[index] = "conflict";
+      continue;
+    }
+    const [owner, ...duplicates] = [...entries].sort(compareEntriesByLegacyId);
+    states[owner.index] = "owner";
+    for (const { index } of duplicates) states[index] = "duplicate";
+  }
+  return Object.freeze(
+    states.map((icmsNaturalKeyResolution) => Object.freeze({ icmsNaturalKeyResolution })),
+  );
+}
+
 const PERMISSION_MODULES = [
   "certificado",
   "comercial",
@@ -46,9 +187,20 @@ const rules = [
       ),
     ],
     defaults: { changes: "{}" },
-    classifySourceRow(row) {
+    classifySourceRow(row, context) {
       return firstQuarantine([
-        classifyRequiredReference(row?.usuario_id, "usuario_id", "LOG_USER_LINK_INVALID"),
+        classifyResolvedReference(row?.usuario_id, context, {
+          stateKey: "userResolution",
+          identityKey: "userIdentityRef",
+          allowedSources: ["tb_admin.usuarios"],
+          field: "usuario_id",
+          invalidReason: "LOG_USER_LINK_INVALID",
+          notFoundReason: "LOG_USER_NOT_FOUND",
+          ambiguousReason: "LOG_USER_AMBIGUOUS",
+          notExecutedReason: "LOG_USER_LOOKUP_NOT_EXECUTED",
+          invalidStateReason: "LOG_USER_LOOKUP_STATE_INVALID",
+          invalidIdentityReason: "LOG_USER_IDENTITY_INVALID",
+        }),
         classifyRequiredValue(row?.tipo, "tipo", "LOG_ACTION_EMPTY"),
         classifyRequiredValue(row?.referente, "referente", "LOG_REFERRING_EMPTY"),
       ]);
@@ -91,10 +243,21 @@ const rules = [
       }),
     ],
     defaults: { file: null },
-    classifySourceRow(row) {
+    classifySourceRow(row, context) {
       return firstQuarantine([
-        classifyClientReference(row),
-        classifyRequiredReference(row?.user_id, "user_id", "HISTORY_USER_LINK_INVALID"),
+        classifyClientReference(row, context),
+        classifyResolvedReference(row?.user_id, context, {
+          stateKey: "userResolution",
+          identityKey: "userIdentityRef",
+          allowedSources: ["tb_admin.usuarios"],
+          field: "user_id",
+          invalidReason: "HISTORY_USER_LINK_INVALID",
+          notFoundReason: "HISTORY_USER_NOT_FOUND",
+          ambiguousReason: "HISTORY_USER_AMBIGUOUS",
+          notExecutedReason: "HISTORY_USER_LOOKUP_NOT_EXECUTED",
+          invalidStateReason: "HISTORY_USER_LOOKUP_STATE_INVALID",
+          invalidIdentityReason: "HISTORY_USER_IDENTITY_INVALID",
+        }),
         classifyRequiredValue(row?.observacao, "observacao", "HISTORY_TEXT_EMPTY"),
       ]);
     },
@@ -135,9 +298,9 @@ const rules = [
       mapped("obs", "notes", "normalize_text", { sensitivity: "personal" }),
     ],
     defaults: {},
-    classifySourceRow(row) {
+    classifySourceRow(row, context) {
       return firstQuarantine([
-        classifyClientReference(row),
+        classifyClientReference(row, context),
         classifyRequiredValue(row?.competencia, "competencia", "CONTROL_COMPETENCE_EMPTY"),
       ]);
     },
@@ -180,10 +343,8 @@ const rules = [
     defaults: {},
     precedence: ["natural_key", "lowest_legacy_id_owner", "source", "defaults"],
     classifySourceRow(row, context) {
-      if (context?.icmsNaturalKeyResolution === "duplicate") {
-        return notEmitted("ICMS_NATURAL_DUPLICATE");
-      }
       return firstQuarantine([
+        classifyIcmsNaturalKeyResolution(context),
         classifyRequiredValue(row?.estado, "estado", "ICMS_STATE_EMPTY"),
         classifyRequiredValue(row?.descricao, "descricao", "ICMS_DESCRIPTION_EMPTY"),
       ]);
@@ -229,6 +390,18 @@ const rules = [
       mapped("fim_virgencia", "validity_end_date", "normalize_datetime"),
     ],
     defaults: {},
+    classifySourceRow(row) {
+      return firstQuarantine([
+        classifyRequiredValue(
+          row?.tributacao_federal,
+          "tributacao_federal",
+          "NCM_FEDERAL_TAXATION_EMPTY",
+        ),
+        isExactCivilDate(row?.inicio_virgencia)
+          ? prepared()
+          : quarantine("inicio_virgencia", "NCM_VALIDITY_START_DATE_INVALID"),
+      ]);
+    },
   }),
 ];
 
@@ -279,13 +452,19 @@ function createPermissionRule(module) {
     classifySourceRow: classifyPermissionRow,
     emitRows(row, context) {
       const classification = classifyPermissionRow(row, context);
+      const userIdentityRef = isSafeResolvedIdentity(context?.userIdentityRef, [
+        "tb_admin.usuarios",
+      ])
+        ? context.userIdentityRef
+        : null;
       return [
         emission({
           stepId,
           destinationTable: "permissions",
-          identityRef: isValidLegacyReference(row?.user_id)
-            ? `permissions:tb_admin.usuarios:${safePart(row.user_id)}:${ORGANIZATION_ID}`
-            : `quarantine:${sourceTable}:user_id:invalid`,
+          identityRef:
+            userIdentityRef === null
+              ? "quarantine:permissions:user_id:invalid"
+              : `permissions:${userIdentityRef}:${ORGANIZATION_ID}`,
           classification,
         }),
       ];
@@ -414,7 +593,11 @@ function referenceOptions() {
 }
 
 function normalizeLegacyPermissionLevelPlusOne(value) {
-  return Number.isInteger(value) && value >= -1 && value <= 2 ? value + 1 : null;
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= -1 && value <= 2 ? value + 1 : null;
+  }
+  if (typeof value !== "string" || !/^(?:-1|0|1|2)$/.test(value)) return null;
+  return Number(value) + 1;
 }
 
 function classifyPermissionRow(row, context) {
@@ -424,17 +607,97 @@ function classifyPermissionRow(row, context) {
   if (normalizeLegacyPermissionLevelPlusOne(row?.permissao) === null) {
     return quarantine("permissao", "PERMISSION_LEVEL_INVALID");
   }
-  if (context?.permissionUserModuleResolution === "conflict") {
-    return quarantine("permissao", "PERMISSION_MODULE_LEVEL_CONFLICT");
+  const user = classifyResolvedReference(row.user_id, context, {
+    stateKey: "userResolution",
+    identityKey: "userIdentityRef",
+    allowedSources: ["tb_admin.usuarios"],
+    field: "user_id",
+    invalidReason: "PERMISSION_USER_LINK_INVALID",
+    notFoundReason: "PERMISSION_USER_NOT_FOUND",
+    ambiguousReason: "PERMISSION_USER_AMBIGUOUS",
+    notExecutedReason: "PERMISSION_USER_LOOKUP_NOT_EXECUTED",
+    invalidStateReason: "PERMISSION_USER_LOOKUP_STATE_INVALID",
+    invalidIdentityReason: "PERMISSION_USER_IDENTITY_INVALID",
+  });
+  if (user.status !== "prepared") return user;
+  switch (context?.permissionUserModuleResolution) {
+    case "owner":
+      return prepared();
+    case "duplicate":
+      return notEmitted("PERMISSION_MODULE_DUPLICATE");
+    case "conflict":
+      return quarantine("permissao", "PERMISSION_MODULE_LEVEL_CONFLICT");
+    case undefined:
+    case "not_executed":
+      return quarantine("user_id", "PERMISSION_DEDUP_NOT_EXECUTED");
+    default:
+      return quarantine("user_id", "PERMISSION_DEDUP_STATE_INVALID");
   }
-  if (context?.permissionUserModuleResolution === "duplicate") {
-    return notEmitted("PERMISSION_MODULE_DUPLICATE");
-  }
-  return prepared();
 }
 
-function classifyClientReference(row) {
-  return classifyRequiredReference(row?.cliente_id, "cliente_id", "CLIENT_LINK_INVALID");
+function classifyClientReference(row, context) {
+  return classifyResolvedReference(row?.cliente_id, context, {
+    stateKey: "clientResolution",
+    identityKey: "clientIdentityRef",
+    allowedSources: ["tb_integracao.clientes", "tb_regularize.clientes"],
+    field: "cliente_id",
+    invalidReason: "CLIENT_LINK_INVALID",
+    notFoundReason: "CLIENT_REFERENCE_NOT_FOUND",
+    ambiguousReason: "CLIENT_REFERENCE_AMBIGUOUS",
+    notExecutedReason: "CLIENT_LOOKUP_NOT_EXECUTED",
+    invalidStateReason: "CLIENT_LOOKUP_STATE_INVALID",
+    invalidIdentityReason: "CLIENT_IDENTITY_INVALID",
+  });
+}
+
+function classifyIcmsNaturalKeyResolution(context) {
+  switch (context?.icmsNaturalKeyResolution) {
+    case "owner":
+      return prepared();
+    case "duplicate":
+      return notEmitted("ICMS_NATURAL_DUPLICATE");
+    case "conflict":
+      return quarantine("natural_key", "ICMS_NATURAL_KEY_CONFLICT");
+    case undefined:
+    case "not_executed":
+      return quarantine("natural_key", "ICMS_DEDUP_NOT_EXECUTED");
+    default:
+      return quarantine("natural_key", "ICMS_DEDUP_STATE_INVALID");
+  }
+}
+
+function classifyResolvedReference(
+  value,
+  context,
+  {
+    stateKey,
+    identityKey,
+    allowedSources,
+    field,
+    invalidReason,
+    notFoundReason,
+    ambiguousReason,
+    notExecutedReason,
+    invalidStateReason,
+    invalidIdentityReason,
+  },
+) {
+  if (!isValidLegacyReference(value)) return quarantine(field, invalidReason);
+  switch (context?.[stateKey]) {
+    case "one":
+      return isSafeResolvedIdentity(context?.[identityKey], allowedSources)
+        ? prepared()
+        : quarantine(field, invalidIdentityReason);
+    case "zero":
+      return quarantine(field, notFoundReason);
+    case "many":
+      return quarantine(field, ambiguousReason);
+    case undefined:
+    case "not_executed":
+      return quarantine(field, notExecutedReason);
+    default:
+      return quarantine(field, invalidStateReason);
+  }
 }
 
 function classifyRequiredReference(value, field, reasonCode) {
@@ -456,6 +719,66 @@ function isValidLegacyReference(value) {
     (Number.isSafeInteger(value) && value > 0) ||
     (typeof value === "string" && /^[1-9]\d*$/.test(value))
   );
+}
+
+function strictPositiveIntegerLiteral(value) {
+  if (Number.isSafeInteger(value) && value > 0) return String(value);
+  return typeof value === "string" && /^[1-9]\d*$/.test(value) ? value : null;
+}
+
+function isSafeResolvedIdentity(identityRef, allowedSources) {
+  if (typeof identityRef !== "string") return false;
+  return allowedSources.some(
+    (sourceTable) =>
+      identityRef.startsWith(`${sourceTable}:`) &&
+      strictPositiveIntegerLiteral(identityRef.slice(sourceTable.length + 1)) !== null,
+  );
+}
+
+function referenceResolution(state, identityRef = null) {
+  return Object.freeze({ state, identityRef });
+}
+
+function clientResolution(sourceState, state, identityRef = null) {
+  return Object.freeze({ sourceState, state, identityRef });
+}
+
+function hasExplicitV2ClientLink(value) {
+  if (value === null || value === undefined) return false;
+  const normalized = String(value).trim();
+  return normalized.length > 0 && normalized !== "0";
+}
+
+function compareEntriesByLegacyId(left, right) {
+  const leftId = strictPositiveIntegerLiteral(left.row?.id);
+  const rightId = strictPositiveIntegerLiteral(right.row?.id);
+  if (leftId === null && rightId === null) return left.index - right.index;
+  if (leftId === null) return 1;
+  if (rightId === null) return -1;
+  const order = BigInt(leftId) - BigInt(rightId);
+  return order < 0n ? -1 : order > 0n ? 1 : left.index - right.index;
+}
+
+function canonicalLegacyText(value) {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  return normalized.length === 0 ? null : normalized;
+}
+
+function isExactCivilDate(value) {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match === null) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year === 0 || month < 1 || month > 12 || day < 1) return false;
+  const daysInMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= daysInMonth[month - 1];
+}
+
+function isLeapYear(year) {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
 function safePart(value) {
