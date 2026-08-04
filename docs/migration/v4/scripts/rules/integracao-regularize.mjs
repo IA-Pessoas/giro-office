@@ -2,32 +2,96 @@ import { createHash } from "node:crypto";
 
 import { INTEGRACAO_REGULARIZE_EVIDENCE } from "../evidence/integracao-regularize.mjs";
 import { REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
+import { uuidV5 } from "../lib/uuid-v5.mjs";
 
 const ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const EVIDENCE_BY_SOURCE = new Map(
   INTEGRACAO_REGULARIZE_EVIDENCE.map((decision) => [decision.sourceTable, decision]),
 );
 const RESOLUTION_STATES = new Set(["one", "zero", "many"]);
+const DECISION_STATES = new Set(["owner", "duplicate", "conflict"]);
+const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/;
 
-export function buildIntegrationRegularizeContext(sourceTable, row, resolutions) {
+export function buildIntegrationRegularizeReferenceContext(sourceTable, row, resolutions) {
   if (typeof sourceTable !== "string" || !/^[A-Za-z0-9_.]+$/.test(sourceTable)) {
     throw new TypeError("sourceTable deve ser um identificador legado sanitizado");
   }
   if (!isPlainObject(row) || !isPlainObject(resolutions)) {
     throw new TypeError("row e resolutions devem ser objetos");
   }
+  if (Object.values(resolutions).some(hasDecisionFields)) {
+    throw new TypeError("decisões de owner/duplicata exigem builder dedicado");
+  }
+  return buildIntegrationRegularizeContext({
+    sourceTable,
+    row,
+    resolutions,
+    decisionBinding: null,
+  });
+}
+
+function buildIntegrationRegularizeDecisionContext({
+  sourceTable,
+  row,
+  resolutions,
+  kind,
+  corpusFingerprint,
+  stateFingerprint,
+}) {
+  if (!FINGERPRINT_PATTERN.test(corpusFingerprint) || !FINGERPRINT_PATTERN.test(stateFingerprint)) {
+    throw new TypeError("fingerprints do corpus e estado são obrigatórios");
+  }
+  const rowFingerprint = fingerprintRow(row);
   const normalizedResolutions = Object.fromEntries(
     Object.entries(resolutions)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([name, resolution]) => [name, normalizeResolution(resolution)]),
+      .map(([name, resolution]) => [name, normalizeResolution(resolution, true)]),
   );
-  const rowFingerprint = fingerprintRow(row);
-  const signature = contextSignature(sourceTable, rowFingerprint, normalizedResolutions);
+  const decisionBinding = Object.freeze({
+    kind,
+    corpusFingerprint,
+    stateFingerprint,
+    signature: decisionBindingSignature({
+      kind,
+      sourceTable,
+      rowFingerprint,
+      corpusFingerprint,
+      stateFingerprint,
+      resolutions: normalizedResolutions,
+    }),
+  });
   return Object.freeze({
     sourceTable,
     rowFingerprint,
     resolutions: Object.freeze(normalizedResolutions),
-    signature,
+    decisionBinding,
+    signature: contextSignature(
+      sourceTable,
+      rowFingerprint,
+      normalizedResolutions,
+      decisionBinding,
+    ),
+  });
+}
+
+function buildIntegrationRegularizeContext({ sourceTable, row, resolutions, decisionBinding }) {
+  const normalizedResolutions = Object.fromEntries(
+    Object.entries(resolutions)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, resolution]) => [name, normalizeResolution(resolution, false)]),
+  );
+  const rowFingerprint = fingerprintRow(row);
+  return Object.freeze({
+    sourceTable,
+    rowFingerprint,
+    resolutions: Object.freeze(normalizedResolutions),
+    decisionBinding,
+    signature: contextSignature(
+      sourceTable,
+      rowFingerprint,
+      normalizedResolutions,
+      decisionBinding,
+    ),
   });
 }
 
@@ -36,6 +100,22 @@ export function buildClientPfResolutionContexts({ rows, currentRows = [] }) {
     throw new TypeError("rows e currentRows de ClientPF devem ser arrays");
   }
   const normalizedRows = rows.map(normalizeClientPfSourceRow);
+  const corpusFingerprint = stableCollectionFingerprint(
+    "client-pf-source-corpus-v2",
+    rows.map((row, index) => ({
+      sourceIdentityRef: rowReference("tb_regularize.pf", row?.codigo ?? `invalid-${index}`),
+      normalized: normalizedRows[index],
+    })),
+  );
+  const stateFingerprint = stableCollectionFingerprint(
+    "client-pf-current-state-v2",
+    currentRows.map((row) => ({
+      identityRef: currentClientPfIdentityRef(row),
+      code: normalizeClientPfCurrentUniqueValue("code", row?.code),
+      cpf: normalizeClientPfCurrentUniqueValue("cpf", row?.cpf),
+      rg: normalizeClientPfCurrentUniqueValue("rg", row?.rg),
+    })),
+  );
   const slotDefinitions = [
     ["uniqueCode", "code"],
     ["uniqueCpf", "cpf"],
@@ -52,9 +132,10 @@ export function buildClientPfResolutionContexts({ rows, currentRows = [] }) {
     const currentByValue = new Map();
     for (const current of currentRows) {
       const normalizedValue = normalizeClientPfCurrentUniqueValue(field, current?.[field]);
-      if (normalizedValue.length > 0 && !currentByValue.has(normalizedValue)) {
-        currentByValue.set(normalizedValue, current);
-      }
+      if (normalizedValue.length === 0) continue;
+      const identities = currentByValue.get(normalizedValue) ?? new Set();
+      identities.add(currentClientPfIdentityRef(current));
+      currentByValue.set(normalizedValue, identities);
     }
     for (const [normalizedValue, indexes] of groups) {
       const sorted = [...indexes].sort((left, right) =>
@@ -62,22 +143,30 @@ export function buildClientPfResolutionContexts({ rows, currentRows = [] }) {
       );
       const [ownerIndex] = sorted;
       const sourceOwnerIdentityRef = rowReference("tb_regularize.pf", rows[ownerIndex]?.codigo);
-      const currentConflict = currentByValue.get(normalizedValue);
+      const currentIdentityRefs = [...(currentByValue.get(normalizedValue) ?? [])].sort();
+      const currentState =
+        currentIdentityRefs.length === 0
+          ? "zero"
+          : currentIdentityRefs.length === 1
+            ? "one"
+            : "many";
       const payloads = new Set(
         sorted.map((index) =>
           canonicalRow({ ...normalizedRows[index], code: undefined, [field]: undefined }),
         ),
       );
-      const isConflict = currentConflict !== undefined || payloads.size > 1;
+      const isConflict = currentState !== "zero" || payloads.size > 1;
       for (const index of sorted) {
         const row = rows[index];
         const sourceKey = normalizeKey(row?.codigo) ?? `invalid-${index}`;
         const sourceIdentityRef = `tb_regularize.pf:${sourceKey}`;
         const decision = isConflict ? "conflict" : index === ownerIndex ? "owner" : "duplicate";
         const ownerIdentityRef =
-          currentConflict === undefined
+          currentState === "zero"
             ? sourceOwnerIdentityRef
-            : `clients.pf:${normalizeKey(currentConflict?.id) ?? "existing"}`;
+            : currentState === "one"
+              ? currentIdentityRefs[0]
+              : null;
         decisions[index][resolutionName] = {
           state: decision === "owner" ? "one" : "many",
           sourceTable: "tb_regularize.pf",
@@ -86,7 +175,12 @@ export function buildClientPfResolutionContexts({ rows, currentRows = [] }) {
           identityRef: sourceIdentityRef,
           targetTable: "clients.pf",
           targetIdentityRef: `clients.pf:${field}:${normalizedValue}`,
-          criteria: { field, normalizedValue },
+          criteria: {
+            field,
+            normalizedValue,
+            currentState,
+            currentIdentityCount: currentIdentityRefs.length,
+          },
           decision,
           ownerIdentityRef,
         };
@@ -95,7 +189,14 @@ export function buildClientPfResolutionContexts({ rows, currentRows = [] }) {
   }
   return Object.freeze(
     rows.map((row, index) =>
-      buildIntegrationRegularizeContext("tb_regularize.pf", row, decisions[index]),
+      buildIntegrationRegularizeDecisionContext({
+        sourceTable: "tb_regularize.pf",
+        row,
+        resolutions: decisions[index],
+        kind: "client-pf-unique-v2",
+        corpusFingerprint,
+        stateFingerprint,
+      }),
     ),
   );
 }
@@ -114,11 +215,47 @@ export function buildPartnerPairResolutionContexts({
   ) {
     throw new TypeError("rows e resoluções de sócios devem ser arrays de mesmo tamanho");
   }
-  const normalizedClientPf = clientPfResolutions.map(normalizeResolution);
-  const normalizedClients = clientResolutions.map(normalizeResolution);
+  const normalizedClientPf = clientPfResolutions.map((resolution, index) =>
+    validatePartnerReferenceResolution({
+      resolution,
+      value: rows[index]?.pf_id,
+      sourceTable: "tb_regularize.pf",
+      label: "clientPF",
+      canonicalClient: false,
+    }),
+  );
+  const normalizedClients = clientResolutions.map((resolution, index) =>
+    validatePartnerReferenceResolution({
+      resolution,
+      value: rows[index]?.empresa_id,
+      sourceTable: "tb_regularize.clientes",
+      label: "client",
+      canonicalClient: true,
+    }),
+  );
+  const corpusFingerprint = stableCollectionFingerprint(
+    "partner-source-corpus-v2",
+    rows.map((row) => ({
+      sourceIdentityRef: rowReference("tb_regularize.pf_empresas", row?.id),
+      row,
+    })),
+  );
+  const stateFingerprint = stableCollectionFingerprint(
+    "partner-canonical-resolution-state-v2",
+    rows.map((row, index) => ({
+      sourceIdentityRef: rowReference("tb_regularize.pf_empresas", row?.id),
+      client: normalizedClients[index],
+      clientPf: normalizedClientPf[index],
+    })),
+  );
   const groups = new Map();
   for (const [index, row] of rows.entries()) {
-    const pairKey = `${normalizeKey(row?.empresa_id) ?? `invalid-pj-${index}`}|${normalizeKey(row?.pf_id) ?? `invalid-pf-${index}`}`;
+    const client = normalizedClients[index];
+    const clientPf = normalizedClientPf[index];
+    const pairKey =
+      client.state === "one" && clientPf.state === "one"
+        ? `${client.identityRef}|${clientPf.identityRef}`
+        : `invalid:${rowReference("tb_regularize.pf_empresas", row?.id ?? index)}`;
     const entries = groups.get(pairKey) ?? [];
     entries.push(index);
     groups.set(pairKey, entries);
@@ -143,23 +280,30 @@ export function buildPartnerPairResolutionContexts({
       const sourceKey = normalizeKey(row?.id) ?? `invalid-${index}`;
       const sourceIdentityRef = `tb_regularize.pf_empresas:${sourceKey}`;
       const pair = pairDecisions[index];
-      return buildIntegrationRegularizeContext("tb_regularize.pf_empresas", row, {
-        clientPf,
-        client,
-        partnerPair: {
-          state: pair.decision === "conflict" ? "many" : "one",
-          sourceTable: "tb_regularize.pf_empresas",
-          sourceKey,
-          sourceIdentityRef,
-          identityRef: sourceIdentityRef,
-          targetTable: "regularize.partners",
-          targetIdentityRef: `regularize.partners:${client.identityRef}:${clientPf.identityRef}`,
-          criteria: {
-            pjIdentityRef: client.identityRef,
-            pfIdentityRef: clientPf.identityRef,
+      return buildIntegrationRegularizeDecisionContext({
+        sourceTable: "tb_regularize.pf_empresas",
+        row,
+        kind: "partner-pair-v2",
+        corpusFingerprint,
+        stateFingerprint,
+        resolutions: {
+          clientPf,
+          client,
+          partnerPair: {
+            state: pair.decision === "conflict" ? "many" : "one",
+            sourceTable: "tb_regularize.pf_empresas",
+            sourceKey,
+            sourceIdentityRef,
+            identityRef: sourceIdentityRef,
+            targetTable: "regularize.partners",
+            targetIdentityRef: `regularize.partners:${client.identityRef}:${clientPf.identityRef}`,
+            criteria: {
+              pjIdentityRef: client.identityRef,
+              pfIdentityRef: clientPf.identityRef,
+            },
+            decision: pair.decision,
+            ownerIdentityRef: pair.ownerIdentityRef,
           },
-          decision: pair.decision,
-          ownerIdentityRef: pair.ownerIdentityRef,
         },
       });
     }),
@@ -171,7 +315,6 @@ export const INTEGRACAO_REGULARIZE_RULES = Object.freeze([
   createPaRule(),
   createPaHistoryRule(),
   createTaskDependentRule(),
-  createTerminationTaskRule(),
   createTerminationTaskModelRule(),
   createTaskRegularizeRule(),
   createRegularizeGroupRule(),
@@ -595,7 +738,7 @@ function createRegularizeGroupMemberRule() {
       mapped(
         "codigo_cliente",
         "client_id",
-        "resolve_explicit_regularize_client_reference",
+        "resolve_canonical_v2_client_reference",
         referenceOptions(),
       ),
       mapped(
@@ -660,6 +803,9 @@ function createPartnerRule() {
       ],
     });
     if (linked.status !== "prepared") return linked;
+    if (!isDecisionContextBound(context, "partner-pair-v2")) {
+      return quarantine("id", "INTEGRATION_CONTEXT_MISMATCH");
+    }
     const pair = context.resolutions.partnerPair;
     if (!pair || !RESOLUTION_STATES.has(pair.state)) {
       return quarantine("id", "PARTNER_PAIR_DECISION_NOT_EXECUTED");
@@ -706,250 +852,6 @@ function createPartnerRule() {
   });
 }
 
-function createTerminationTaskRule() {
-  const sourceTable = "tb_integracao.tarefas_distrato";
-  const dependencies = [
-    "tb_integracao.tarefas_express_distrato",
-    "tb_integracao.clientes",
-    "tb_admin.departamentos",
-    "tb_admin.usuarios",
-  ];
-  const destinations = [
-    lookupStep({
-      stepId: "termination-task-model-lookup",
-      destinationTable: "integracao.tasksModel",
-      criteria: [
-        ["nome", "name"],
-        ["departamento_id", "department_id"],
-      ],
-      columns: [
-        mapped("nome", "name", "normalize_lookup_text"),
-        mapped(
-          "departamento_id",
-          "department_id",
-          "resolve_explicit_department_reference",
-          referenceOptions(),
-        ),
-      ],
-      dependencies: ["tb_integracao.tarefas_express_distrato"],
-    }),
-    lookupStep({
-      stepId: "termination-project-lookup",
-      destinationTable: "integracao.projects",
-      criteria: [["cliente_id", "client_id"]],
-      columns: [
-        mapped("cliente_id", "client_id", "resolve_explicit_client_reference", referenceOptions()),
-      ],
-      dependencies: ["tb_integracao.clientes"],
-    }),
-    destination({
-      stepId: "termination-project-derived",
-      destinationTable: "integracao.projects",
-      mode: "derived",
-      identity: generateIdentity("id", `${sourceTable}:derived-project`),
-      columns: [
-        mapped("id", "id", "uuid_v5_derived_project"),
-        mapped("nome", "name", "derive_termination_project_name"),
-        mapped("cliente_id", "client_id", "resolve_explicit_client_reference", referenceOptions()),
-        mapped("estado", "status", "normalize_task_status"),
-        mapped("data_previsao", "end_date", "normalize_zero_date_to_null"),
-        mapped("obs", "objective", "normalize_text", personalOptions()),
-      ],
-      constants: { organization_id: ORGANIZATION_ID },
-      defaults: { status: "Migrado", porcentage: 0 },
-      precedence: ["derive_only_when_lookup_zero", "preserve_task_client"],
-      dependencies: ["tb_integracao.clientes"],
-    }),
-    destination({
-      stepId: "termination-task-insert",
-      destinationTable: "integracao.tasks",
-      mode: "insert",
-      identity: generateIdentity("id", sourceTable),
-      columns: [
-        mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
-        mapped(null, "model_id", "resolve_catalog_task_model"),
-        mapped(null, "project_id", "resolve_or_derive_project"),
-        mapped("cliente_id", "client_id", "resolve_explicit_client_reference", referenceOptions()),
-        mapped("nome", "name", "normalize_required_text"),
-        mapped("estado", "status", "normalize_task_status"),
-        mapped(
-          "departamento_id",
-          "department_id",
-          "resolve_explicit_department_reference",
-          referenceOptions(),
-        ),
-        mapped(
-          "responsavel_id",
-          "responsible_id",
-          "resolve_explicit_user_reference",
-          referenceOptions(),
-        ),
-        mapped(
-          "responsavel_id_dois",
-          "responsible2_id",
-          "resolve_optional_user_reference",
-          referenceOptions(),
-        ),
-        mapped(
-          "responsavel_id_tres",
-          "responsible3_id",
-          "resolve_optional_user_reference",
-          referenceOptions(),
-        ),
-        notPreserved(
-          "realizado",
-          "O indicador é redundante com status e datas preservados na Task.",
-        ),
-        mapped("data_previsao", "prevision_date", "normalize_zero_date_to_null"),
-        mapped("data_resolucao", "end_date", "normalize_zero_date_to_null"),
-        mapped("obs", "observations", "normalize_text", personalOptions()),
-        notPreserved(
-          "ano",
-          "O ano é derivável das datas e não possui campo autônomo na Task atual.",
-        ),
-        mapped("cobranca", "billing", "normalize_task_billing"),
-      ],
-      constants: { organization_id: ORGANIZATION_ID },
-      defaults: { billing: "0", urgency: "0" },
-      precedence: ["source", "resolved_or_derived_dependencies"],
-      dependencies,
-    }),
-  ];
-  return createRule({
-    sourceTable,
-    domain: "integration",
-    cardinality: "1:N",
-    dependencies,
-    destinations,
-    classifySourceRow: classifyTerminationTask,
-    emitRows(row, context) {
-      const classification = classifyTerminationTask(row, context);
-      const identityRef = rowReference(sourceTable, row?.id);
-      if (classification.status !== "prepared") {
-        return destinations.map((step) =>
-          emission(step, classification, `${identityRef}:${step.stepId}`),
-        );
-      }
-      const projectState = context.resolutions.project.state;
-      return [
-        emission(destinations[0], prepared(), `${identityRef}:model-lookup`),
-        emission(
-          destinations[1],
-          projectState === "one" ? prepared() : notEmitted("TASK_PROJECT_NOT_FOUND_DERIVE"),
-          `${identityRef}:project-lookup`,
-        ),
-        emission(
-          destinations[2],
-          projectState === "zero" ? prepared() : notEmitted("TASK_PROJECT_RESOLVED_NO_DERIVE"),
-          `${identityRef}:project-derived`,
-        ),
-        emission(destinations[3], prepared(), identityRef),
-      ];
-    },
-  });
-}
-
-function classifyTerminationTask(row, context) {
-  const basic = firstQuarantine([
-    classifyIdentity(row?.id, "id", "TERMINATION_TASK_ID_INVALID"),
-    classifyText(row?.nome, "nome", "TERMINATION_TASK_NAME_EMPTY"),
-    classifyIdentity(row?.cliente_id, "cliente_id", "TERMINATION_TASK_CLIENT_INVALID"),
-    classifyIdentity(
-      row?.departamento_id,
-      "departamento_id",
-      "TERMINATION_TASK_DEPARTMENT_INVALID",
-    ),
-    classifyIdentity(row?.responsavel_id, "responsavel_id", "TERMINATION_TASK_RESPONSIBLE_INVALID"),
-  ]);
-  if (basic.status !== "prepared") return basic;
-  if (!isContextBound("tb_integracao.tarefas_distrato", row, context)) {
-    return quarantine("id", "INTEGRATION_CONTEXT_MISMATCH");
-  }
-  const specifications = [
-    requiredResolution("client", "cliente_id", ["tb_integracao.clientes"], "TASK_CLIENT"),
-    requiredResolution(
-      "department",
-      "departamento_id",
-      ["tb_admin.departamentos"],
-      "TASK_DEPARTMENT",
-    ),
-    requiredResolution("responsible", "responsavel_id", ["tb_admin.usuarios"], "TASK_RESPONSIBLE"),
-    optionalResolution(
-      "responsible2",
-      "responsavel_id_dois",
-      ["tb_admin.usuarios"],
-      "TASK_RESPONSIBLE2",
-    ),
-    optionalResolution(
-      "responsible3",
-      "responsavel_id_tres",
-      ["tb_admin.usuarios"],
-      "TASK_RESPONSIBLE3",
-    ),
-  ];
-  for (const specification of specifications) {
-    const classification = classifyResolution(context, specification, row);
-    if (classification.status !== "prepared") return classification;
-  }
-  const responsibleDepartment = classifyResponsibleDepartments({
-    row,
-    context,
-    departmentResolutionName: "department",
-    responsibleResolutionNames: [
-      ["responsible", "responsavel_id"],
-      ["responsible2", "responsavel_id_dois"],
-      ["responsible3", "responsavel_id_tres"],
-    ],
-    reasonCode: "TASK_RESPONSIBLE_DEPARTMENT_MISMATCH",
-  });
-  if (responsibleDepartment.status !== "prepared") return responsibleDepartment;
-  const model = context.resolutions.taskModel;
-  if (!model || !RESOLUTION_STATES.has(model.state))
-    return quarantine("nome", "TASK_MODEL_LOOKUP_NOT_EXECUTED");
-  if (model.state === "many") return quarantine("nome", "TASK_MODEL_AMBIGUOUS");
-  if (model.state === "zero") return quarantine("nome", "TASK_MODEL_NOT_FOUND");
-  const expectedModelCriteria = {
-    name: normalizeText(row.nome),
-    departmentIdentityRef: context.resolutions.department.identityRef,
-  };
-  if (
-    model.sourceTable !== "tb_integracao.tarefas_express_distrato" ||
-    !isValidIdentity(model.sourceKey) ||
-    model.sourceIdentityRef !== rowReference(model.sourceTable, model.sourceKey) ||
-    model.identityRef !== model.sourceIdentityRef ||
-    model.targetTable !== "integracao.tasksModel" ||
-    model.targetIdentityRef !== model.identityRef ||
-    !sameCriteria(model.criteria, expectedModelCriteria)
-  ) {
-    return quarantine("nome", "TASK_MODEL_LOOKUP_CONTEXT_MISMATCH");
-  }
-  if (model.relatedIdentityRef !== context.resolutions.department.identityRef) {
-    return quarantine("departamento_id", "TASK_MODEL_DEPARTMENT_MISMATCH");
-  }
-  const project = context.resolutions.project;
-  if (!project || !RESOLUTION_STATES.has(project.state))
-    return quarantine("cliente_id", "TASK_PROJECT_LOOKUP_NOT_EXECUTED");
-  if (project.state === "many") return quarantine("cliente_id", "TASK_PROJECT_AMBIGUOUS");
-  const expectedProjectCriteria = {
-    clientIdentityRef: context.resolutions.client.identityRef,
-  };
-  if (project.relatedIdentityRef !== context.resolutions.client.identityRef) {
-    return quarantine("cliente_id", "TASK_PROJECT_CLIENT_MISMATCH");
-  }
-  if (
-    project.sourceTable !== "integracao.projects" ||
-    project.sourceIdentityRef !== rowReference(project.sourceTable, project.sourceKey) ||
-    project.targetTable !== "integracao.projects" ||
-    !sameCriteria(project.criteria, expectedProjectCriteria) ||
-    (project.state === "one" &&
-      (project.identityRef !== project.sourceIdentityRef ||
-        project.targetIdentityRef !== project.identityRef))
-  ) {
-    return quarantine("cliente_id", "TASK_PROJECT_LOOKUP_CONTEXT_MISMATCH");
-  }
-  return prepared();
-}
-
 function createGuidanceActivityRule() {
   const sourceTable = "tb_regularize.orientaoes_processual.atividades";
   const step = destination({
@@ -963,12 +865,12 @@ function createGuidanceActivityRule() {
       childForeignKey: "op_id",
     },
     columns: [
-      notPreserved("id", "A identidade filha não substitui a identidade da orientação agregada."),
+      mapped("id", "economic_activities", "aggregate_activity_uuid"),
       notPreserved(
         "cliente_id",
         "O cliente é contexto redundante e não é tratado como FK de catálogo.",
       ),
-      mapped("op_id", "id", "resolve_explicit_guidance_parent", referenceOptions()),
+      mapped("op_id", "economic_activities", "aggregate_parent_reference", referenceOptions()),
       mapped("atividade", "economic_activities", "aggregate_normalized_economic_activities"),
       mapped("tipo", "economic_activities", "normalize_economic_activity_type"),
     ],
@@ -1004,7 +906,11 @@ function createGuidanceActivityRule() {
     classifySourceRow: classify,
     emitRows(row, context) {
       const classification = classify(row, context);
-      return [emission(step, classification, rowReference(sourceTable, row?.id))];
+      const identityRef =
+        classification.status === "prepared"
+          ? `${context.resolutions.guidance.identityRef}:activity-${normalizeKey(row?.id)}`
+          : rowReference(sourceTable, row?.id);
+      return [emission(step, classification, identityRef)];
     },
   });
 }
@@ -1081,6 +987,9 @@ function createClientPfRule() {
     ]);
     if (required.status !== "prepared") return required;
     if (!isContextBound(sourceTable, row, context)) {
+      return quarantine("codigo", "INTEGRATION_CONTEXT_MISMATCH");
+    }
+    if (!isDecisionContextBound(context, "client-pf-unique-v2")) {
       return quarantine("codigo", "INTEGRATION_CONTEXT_MISMATCH");
     }
     const uniqueSlots = [
@@ -1259,8 +1168,17 @@ export function buildGuidanceActivityPayload(row) {
   const match = activity.match(/^(\d[\d./-]*\d)\s*(?:-\s*)?(.+)$/u);
   const code = normalizeText(match?.[1]);
   const description = normalizeText(match?.[2]).replace(/;+$/, "").trim();
-  return normalizedType !== null && code.length > 0 && description.length > 0
-    ? { code, description, type: normalizedType }
+  const sourceKey = normalizeKey(row?.id);
+  return normalizedType !== null && sourceKey !== null && code.length > 0 && description.length > 0
+    ? {
+        id: uuidV5(
+          REQUIRED_IDENTITY_NAMESPACE,
+          `tb_regularize.orientaoes_processual.atividades:${sourceKey}`,
+        ),
+        code,
+        description,
+        type: normalizedType,
+      }
     : null;
 }
 
@@ -1311,6 +1229,13 @@ function normalizeClientPfCurrentUniqueValue(field, value) {
       .toUpperCase();
   }
   return normalizeText(value);
+}
+
+function currentClientPfIdentityRef(row) {
+  const currentKey = normalizeKey(row?.id);
+  return currentKey === null
+    ? `clients.pf:invalid-${stableFingerprint(["client-pf-current-invalid-v2", canonicalRow(row)]).slice(0, 16)}`
+    : `clients.pf:${currentKey}`;
 }
 
 function compareClientPfRows(left, right) {
@@ -1371,7 +1296,20 @@ function classifyClientPfUniqueSlot({ row, resolution, field, normalizedValue })
     resolution.identityRef !== sourceIdentityRef ||
     resolution.targetTable !== "clients.pf" ||
     resolution.targetIdentityRef !== `clients.pf:${field}:${normalizedValue}` ||
-    !sameCriteria(resolution.criteria, { field, normalizedValue })
+    !sameCriteria(resolution.criteria, {
+      field,
+      normalizedValue,
+      currentState: resolution.criteria?.currentState,
+      currentIdentityCount: resolution.criteria?.currentIdentityCount,
+    }) ||
+    !new Set(["zero", "one", "many"]).has(resolution.criteria?.currentState) ||
+    !Number.isSafeInteger(resolution.criteria?.currentIdentityCount) ||
+    resolution.criteria.currentIdentityCount < 0 ||
+    (resolution.criteria.currentState === "zero" &&
+      resolution.criteria.currentIdentityCount !== 0) ||
+    (resolution.criteria.currentState === "one" &&
+      resolution.criteria.currentIdentityCount !== 1) ||
+    (resolution.criteria.currentState === "many" && resolution.criteria.currentIdentityCount < 2)
   ) {
     return quarantine(field, "INTEGRATION_CONTEXT_MISMATCH");
   }
@@ -1515,9 +1453,23 @@ function classifyResolution(context, specification, row) {
   }
   if (
     !specification.allowedSources.includes(resolution.sourceTable) ||
-    normalizeKey(value) !== resolution.sourceKey ||
-    resolution.sourceIdentityRef !== `${resolution.sourceTable}:${resolution.sourceKey}`
+    normalizeKey(value) !== resolution.sourceKey
   ) {
+    return quarantine(specification.field, "INTEGRATION_CONTEXT_MISMATCH");
+  }
+  if (specification.canonicalClient) {
+    if (!isCanonicalV2ClientResolution(resolution, value)) {
+      return quarantine(specification.field, "INTEGRATION_CONTEXT_MISMATCH");
+    }
+    if (resolution.state === "zero") {
+      return quarantine(specification.field, `${specification.prefix}_NOT_FOUND`);
+    }
+    if (resolution.state === "many") {
+      return quarantine(specification.field, `${specification.prefix}_AMBIGUOUS`);
+    }
+    return prepared();
+  }
+  if (resolution.sourceIdentityRef !== `${resolution.sourceTable}:${resolution.sourceKey}`) {
     return quarantine(specification.field, "INTEGRATION_CONTEXT_MISMATCH");
   }
   if (resolution.state === "zero") {
@@ -1525,19 +1477,6 @@ function classifyResolution(context, specification, row) {
   }
   if (resolution.state === "many") {
     return quarantine(specification.field, `${specification.prefix}_AMBIGUOUS`);
-  }
-  if (specification.canonicalClient) {
-    const sourceIdentityRef = `${resolution.sourceTable}:${resolution.sourceKey}`;
-    const canonicalIdentity = resolution.identityRef;
-    const canonicalIsValid =
-      canonicalIdentity === sourceIdentityRef ||
-      /^tb_integracao\.clientes:[1-9]\d*$/.test(canonicalIdentity ?? "");
-    return canonicalIsValid &&
-      resolution.targetTable === "clients" &&
-      resolution.targetIdentityRef === canonicalIdentity &&
-      sameCriteria(resolution.criteria, { legacyCode: normalizeText(value) })
-      ? prepared()
-      : quarantine(specification.field, "INTEGRATION_CONTEXT_MISMATCH");
   }
   return resolution.identityRef === `${resolution.sourceTable}:${resolution.sourceKey}`
     ? prepared()
@@ -1563,7 +1502,69 @@ function canonicalClientResolution(name, field, prefix) {
   };
 }
 
-function normalizeResolution(resolution) {
+function isCanonicalV2ClientResolution(resolution, value) {
+  const sourceKey = normalizeKey(value);
+  const canonicalIdentity = resolution.identityRef;
+  const canonicalIdentityValid =
+    resolution.state !== "one" ||
+    canonicalIdentity === `tb_regularize.clientes:${sourceKey}` ||
+    /^tb_integracao\.clientes:[1-9]\d*$/.test(canonicalIdentity ?? "");
+  return (
+    sourceKey !== null &&
+    resolution.sourceTable === "tb_regularize.clientes" &&
+    resolution.sourceKey === sourceKey &&
+    RESOLUTION_STATES.has(resolution.sourceState) &&
+    canonicalIdentityValid &&
+    resolution.fingerprint ===
+      referenceResolutionFingerprint(
+        resolution.state,
+        resolution.identityRef,
+        resolution.sourceTable,
+        resolution.sourceKey,
+      ) &&
+    resolution.targetTable === null &&
+    resolution.targetIdentityRef === null &&
+    resolution.criteria === null &&
+    resolution.relatedIdentityRef === null
+  );
+}
+
+function validatePartnerReferenceResolution({
+  resolution,
+  value,
+  sourceTable,
+  label,
+  canonicalClient,
+}) {
+  const normalized = normalizeResolution(resolution, false);
+  const sourceKey = normalizeKey(value);
+  const fingerprintValid =
+    normalized.fingerprint ===
+    referenceResolutionFingerprint(
+      normalized.state,
+      normalized.identityRef,
+      normalized.sourceTable,
+      normalized.sourceKey,
+    );
+  const identityValid =
+    normalized.state !== "one" ||
+    (canonicalClient
+      ? isCanonicalV2ClientResolution(normalized, value)
+      : /^tb_regularize\.pf:[1-9]\d*$/.test(normalized.identityRef ?? ""));
+  if (
+    sourceKey === null ||
+    normalized.sourceTable !== sourceTable ||
+    normalized.sourceKey !== sourceKey ||
+    normalized.sourceIdentityRef !== `${sourceTable}:${sourceKey}` ||
+    !fingerprintValid ||
+    !identityValid
+  ) {
+    throw new TypeError(`${label} deve ser uma resolução canônica vinculada à linha`);
+  }
+  return normalized;
+}
+
+function normalizeResolution(resolution, allowDecisions = false) {
   if (!isPlainObject(resolution) || !RESOLUTION_STATES.has(resolution.state)) {
     throw new TypeError("resolução deve possuir state one, zero ou many");
   }
@@ -1594,11 +1595,18 @@ function normalizeResolution(resolution) {
   const criteria =
     resolution.criteria == null ? null : normalizeContextCriteria(resolution.criteria);
   const decision = resolution.decision == null ? null : normalizeKey(resolution.decision);
-  if (decision !== null && !new Set(["owner", "duplicate", "conflict"]).has(decision)) {
+  if (decision !== null && !DECISION_STATES.has(decision)) {
     throw new TypeError("decision deve ser owner, duplicate ou conflict");
   }
   const ownerIdentityRef =
     resolution.ownerIdentityRef == null ? null : normalizeReference(resolution.ownerIdentityRef);
+  if (!allowDecisions && (decision !== null || ownerIdentityRef !== null)) {
+    throw new TypeError("decisões de owner/duplicata exigem builder dedicado");
+  }
+  const fingerprint =
+    resolution.fingerprint == null ? null : normalizeFingerprint(resolution.fingerprint);
+  const sourceState =
+    resolution.sourceState == null ? null : normalizeResolutionState(resolution.sourceState);
   return Object.freeze({
     state: resolution.state,
     sourceTable,
@@ -1611,7 +1619,31 @@ function normalizeResolution(resolution) {
     criteria,
     decision,
     ownerIdentityRef,
+    fingerprint,
+    sourceState,
   });
+}
+
+function hasDecisionFields(resolution) {
+  return (
+    isPlainObject(resolution) &&
+    (Object.hasOwn(resolution, "decision") || Object.hasOwn(resolution, "ownerIdentityRef"))
+  );
+}
+
+function normalizeFingerprint(value) {
+  const normalized = normalizeText(value);
+  if (!FINGERPRINT_PATTERN.test(normalized)) {
+    throw new TypeError("fingerprint de resolução inválido");
+  }
+  return normalized;
+}
+
+function normalizeResolutionState(value) {
+  if (!RESOLUTION_STATES.has(value)) {
+    throw new TypeError("sourceState deve ser one, zero ou many");
+  }
+  return value;
 }
 
 function normalizeContextCriteria(value) {
@@ -1654,30 +1686,33 @@ function isContextBound(sourceTable, row, context) {
   return (
     context.sourceTable === sourceTable &&
     context.rowFingerprint === rowFingerprint &&
-    context.signature === contextSignature(sourceTable, rowFingerprint, context.resolutions)
+    context.signature ===
+      contextSignature(
+        sourceTable,
+        rowFingerprint,
+        context.resolutions,
+        context.decisionBinding ?? null,
+      )
   );
 }
 
-function lookupStep({ stepId, destinationTable, criteria, columns, dependencies }) {
-  return {
-    stepId,
-    destinationTable,
-    mode: "lookup",
-    identity: {
-      kind: "lookup",
-      criteria: criteria.map(([sourceColumn, destinationColumn]) => ({
-        sourceColumn,
-        destinationColumn,
-      })),
-      onZero: "null",
-      onMany: "quarantine",
-    },
-    columns,
-    constants: {},
-    defaults: {},
-    precedence: ["normalized_lookup", "on_many_quarantine"],
-    dependencies,
-  };
+function isDecisionContextBound(context, kind) {
+  const binding = context?.decisionBinding;
+  return (
+    isPlainObject(binding) &&
+    binding.kind === kind &&
+    FINGERPRINT_PATTERN.test(binding.corpusFingerprint ?? "") &&
+    FINGERPRINT_PATTERN.test(binding.stateFingerprint ?? "") &&
+    binding.signature ===
+      decisionBindingSignature({
+        kind,
+        sourceTable: context.sourceTable,
+        rowFingerprint: context.rowFingerprint,
+        corpusFingerprint: binding.corpusFingerprint,
+        stateFingerprint: binding.stateFingerprint,
+        resolutions: context.resolutions,
+      })
+  );
 }
 
 function destination({
@@ -1838,13 +1873,43 @@ function fingerprintRow(row) {
   return stableFingerprint(["integration-regularize-row-v1", canonicalRow(row)]);
 }
 
-function contextSignature(sourceTable, rowFingerprint, resolutions) {
+function contextSignature(sourceTable, rowFingerprint, resolutions, decisionBinding) {
   return stableFingerprint([
-    "integration-regularize-context-v1",
+    "integration-regularize-context-v2",
     sourceTable,
     rowFingerprint,
     canonicalRow(resolutions),
+    canonicalRow(decisionBinding),
   ]);
+}
+
+function decisionBindingSignature({
+  kind,
+  sourceTable,
+  rowFingerprint,
+  corpusFingerprint,
+  stateFingerprint,
+  resolutions,
+}) {
+  return stableFingerprint([
+    "integration-regularize-decision-v2",
+    kind,
+    sourceTable,
+    rowFingerprint,
+    corpusFingerprint,
+    stateFingerprint,
+    canonicalRow(resolutions),
+  ]);
+}
+
+function referenceResolutionFingerprint(state, identityRef, sourceTable, sourceKey) {
+  return createHash("sha256")
+    .update(JSON.stringify(["reference-resolution-v1", state, identityRef, sourceTable, sourceKey]))
+    .digest("hex");
+}
+
+function stableCollectionFingerprint(label, values) {
+  return stableFingerprint([label, ...values.map(canonicalRow).sort()]);
 }
 
 function stableFingerprint(parts) {

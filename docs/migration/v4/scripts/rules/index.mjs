@@ -24,7 +24,7 @@ import { CERTIFICATE_RULES } from "./certificates.mjs";
 import {
   buildClientPfResolutionContexts,
   buildGuidanceActivityPayload,
-  buildIntegrationRegularizeContext,
+  buildIntegrationRegularizeReferenceContext,
   buildPartnerPairResolutionContexts,
   INTEGRACAO_REGULARIZE_RULES,
   normalizeClientPfSourceRow,
@@ -43,7 +43,7 @@ export {
   buildIcmsResolutionContexts,
   buildGuidanceActivityPayload,
   buildPermissionResolutionContexts,
-  buildIntegrationRegularizeContext,
+  buildIntegrationRegularizeReferenceContext,
   buildPartnerPairResolutionContexts,
   CERTIFICATE_EVIDENCE,
   CERTIFICATE_RULES,

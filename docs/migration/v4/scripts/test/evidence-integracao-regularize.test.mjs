@@ -6,6 +6,7 @@ import test from "node:test";
 import { V2_EVIDENCE } from "../evidence/v2.mjs";
 import { createPendingMapping } from "../lib/mapping-contract.mjs";
 import { validateEvidenceCoverage } from "../lib/semantic-evidence.mjs";
+import { iterateSqlRows } from "../lib/sql-dump-parser.mjs";
 
 const LEGACY_ROOT = "/home/bruno/Documents/workspace2";
 const LEGACY_DUMP_ROOT = "/home/bruno/Documents/03.08.2026";
@@ -17,7 +18,6 @@ const CONFIRMED_SOURCE_TABLES = [
   "tb_integracao.pa",
   "tb_integracao.pa_historicos",
   "tb_integracao.tarefas_dependentes",
-  "tb_integracao.tarefas_distrato",
   "tb_integracao.tarefas_express_distrato",
   "tb_integracao.tarefas_regularize",
   "tb_regularize.grupos",
@@ -44,6 +44,14 @@ async function assertReferenceExists(root, reference) {
   const { file, line } = parseReference(reference);
   const content = await readFile(path.join(root, file), "utf8");
   assert.ok(content.split(/\r?\n/)[line - 1]?.trim().length > 0, reference);
+}
+
+async function loadRows(sourceTable) {
+  const rows = [];
+  for await (const row of iterateSqlRows(path.join(LEGACY_DUMP_ROOT, `${sourceTable}.sql`))) {
+    rows.push(row);
+  }
+  return rows;
 }
 
 test("deriva 69 origens restantes ao subtrair V2 das 82 origens reais", async () => {
@@ -80,7 +88,7 @@ test("deriva 69 origens restantes ao subtrair V2 das 82 origens reais", async ()
   );
 });
 
-test("somente 13 decisões comprovadas possuem regra; 56 pending não sugerem destino", () => {
+test("somente 12 decisões comprovadas possuem regra; 57 pending não sugerem destino", () => {
   const { INTEGRACAO_REGULARIZE_EVIDENCE, INTEGRACAO_REGULARIZE_RULES, buildRuleRegistry } =
     implementation();
   const registry = buildRuleRegistry(INTEGRACAO_REGULARIZE_RULES);
@@ -95,9 +103,9 @@ test("somente 13 decisões comprovadas possuem regra; 56 pending não sugerem de
     confirmed.map(({ sourceTable }) => sourceTable),
     CONFIRMED_SOURCE_TABLES,
   );
-  assert.equal(confirmed.length, 13);
-  assert.equal(pending.length, 56);
-  assert.equal(INTEGRACAO_REGULARIZE_RULES.length, 13);
+  assert.equal(confirmed.length, 12);
+  assert.equal(pending.length, 57);
+  assert.equal(INTEGRACAO_REGULARIZE_RULES.length, 12);
 
   for (const decision of confirmed) {
     const mappingRule = registry.get(decision.sourceTable);
@@ -160,6 +168,7 @@ test("agenda materializada, DTE, anexos e controles permanecem pending sem desti
     "tb_regularize.sites_estado",
     "tb_regularize.sites_prefeituras",
     "tb_integracao.agenda_status",
+    "tb_integracao.tarefas_distrato",
     "tb_integracao.tarefas_docs",
     "tb_integracao.tarefas_imagens",
     "tb_regularize.agenda_controle",
@@ -175,13 +184,16 @@ test("agenda materializada, DTE, anexos e controles permanecem pending sem desti
   }
 });
 
-test("catálogo de distrato preserva TaskModel e agenda não fabrica série recorrente", () => {
+test("catálogo de distrato preserva TaskModel sem inventar Project para ocorrências", () => {
   const { INTEGRACAO_REGULARIZE_EVIDENCE } = implementation();
   const catalog = INTEGRACAO_REGULARIZE_EVIDENCE.find(
     ({ sourceTable }) => sourceTable === "tb_integracao.tarefas_express_distrato",
   );
   const agenda = INTEGRACAO_REGULARIZE_EVIDENCE.find(
     ({ sourceTable }) => sourceTable === "tb_regularize.agenda",
+  );
+  const occurrences = INTEGRACAO_REGULARIZE_EVIDENCE.find(
+    ({ sourceTable }) => sourceTable === "tb_integracao.tarefas_distrato",
   );
 
   assert.equal(catalog?.finalStatus, "confirmed");
@@ -197,4 +209,36 @@ test("catálogo de distrato preserva TaskModel e agenda não fabrica série reco
   assert.equal(agenda?.reasonCode, "CURRENT_CONTRACT_NOT_FAITHFUL");
   assert.match(agenda?.reason ?? "", /materializad|série|recorr/i);
   assert.deepEqual(agenda?.currentContractEvidence, []);
+
+  assert.equal(occurrences?.finalStatus, "pending");
+  assert.equal(occurrences?.ruleId, null);
+  assert.equal(occurrences?.reasonCode, "CURRENT_CONTRACT_NOT_FAITHFUL");
+  assert.match(occurrences?.reason ?? "", /projeto|evento|competência|lote/i);
+  assert.deepEqual(occurrences?.currentContractEvidence, []);
+});
+
+test("dump não contém chave total e inequívoca entre tarefas e evento de distrato", async () => {
+  const tasks = await loadRows("tb_integracao.tarefas_distrato");
+  const events = (await loadRows("tb_historico.integracao")).filter(
+    ({ tipo }) => String(tipo) === "2",
+  );
+  const taskClients = new Set(tasks.map(({ cliente_id }) => String(cliente_id)));
+  const eventsByClient = new Map();
+  for (const event of events) {
+    const key = String(event.item_id);
+    const entries = eventsByClient.get(key) ?? [];
+    entries.push(event);
+    eventsByClient.set(key, entries);
+  }
+
+  assert.equal(tasks.length, 1759);
+  assert.equal(taskClients.size, 312);
+  assert.equal(events.length, 615);
+  assert.equal([...taskClients].filter((key) => !eventsByClient.has(key)).length, 61);
+  assert.equal(
+    [...eventsByClient].filter(([key, entries]) => taskClients.has(key) && entries.length > 1)
+      .length,
+    15,
+  );
+  assert.ok(tasks.every((row) => !("project_id" in row) && !("evento_id" in row)));
 });

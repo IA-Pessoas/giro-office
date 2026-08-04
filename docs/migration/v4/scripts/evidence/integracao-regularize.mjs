@@ -41,19 +41,6 @@ const CONFIRMED = new Map(
         "A dependência entre modelos possui contrato atual equivalente e proíbe auto-relação.",
     },
     {
-      sourceTable: "tb_integracao.tarefas_distrato",
-      references: ["classes/Tarefa.php:684", "classes/Tarefa.php:1112", "classes/Tarefa.php:1122"],
-      relationships: [
-        "cliente_id, departamento_id e responsáveis são vínculos explícitos; o modelo e projeto precisam ser resolvidos ou derivados preservando o mesmo cliente.",
-      ],
-      current: [
-        "infra/prisma/schema.prisma:857",
-        "services/task-service/src/services/taskCrudService.ts:284",
-      ],
-      reason:
-        "A tarefa de distrato é uma Task atual somente após resolver modelo, projeto, cliente, departamento e responsáveis, com paridade obrigatória entre projeto e tarefa.",
-    },
-    {
       sourceTable: "tb_integracao.tarefas_express_distrato",
       references: [
         "classes/Tarefa.php:684",
@@ -165,6 +152,18 @@ const CONFIRMED = new Map(
 );
 
 const PENDING = new Map([
+  [
+    "tb_integracao.tarefas_distrato",
+    {
+      relationships: [
+        "cliente_id, departamento_id e responsáveis são vínculos explícitos, mas a ocorrência não armazena o evento, a competência nem uma chave de Project.",
+        "O evento tipo 2 de tb_historico.integracao guarda cliente e competência sem FK para as tarefas; há clientes sem evento e com eventos múltiplos no backup.",
+      ],
+      reasonCode: "CURRENT_CONTRACT_NOT_FAITHFUL",
+      reason:
+        "Não é possível vincular cada lote de tarefas a um Project fiel: o CRUD copia o catálogo por evento, porém a tabela final omite a identidade do evento e a competência usada na geração.",
+    },
+  ],
   [
     "tb_regularize.agenda",
     {
