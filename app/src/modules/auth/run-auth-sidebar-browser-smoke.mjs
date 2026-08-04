@@ -1,54 +1,48 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { chromium } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
-const PORT = process.env.PLAYWRIGHT_PORT || "3115";
-const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
-let baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
-const APP_ROOT = fileURLToPath(new URL("../../../..", import.meta.url));
-const MODULE_KEYS = [
-  "certificado",
-  "comercial",
-  "contabil",
-  "financeiro",
-  "fiscal",
-  "integracao",
-  "marketing",
-  "parcelamento",
-  "pessoal",
-  "regularize",
-  "rh",
-  "ti",
-  "triagem",
-];
+import {
+  APP_ROUTE_MODULE_MAP,
+  MODULE_KEYS,
+  canViewIntegrationRoute,
+  canViewTasksOnlyIntegrationRoute,
+  getModulePermissionLevel,
+  hasAnyModuleAccess,
+  normalizeRoutePath,
+  resolveModuleAccess,
+} from "./utils/moduleAccess.ts";
 
-function createModules(overrides = {}) {
-  return {
-    ...Object.fromEntries(MODULE_KEYS.map((moduleKey) => [moduleKey, 0])),
-    ...overrides,
-  };
-}
+const appShellSource = await readFile(
+  new URL("../../shared/components/newLayout/AppShell.tsx", import.meta.url),
+  "utf8",
+);
 
-function createUser({
-  id,
-  name,
-  login,
-  permission = 0,
-  type = "user",
-  modules = {},
-}) {
-  return {
-    id,
-    name,
-    login,
-    permission,
-    department_id: "department-auth-sidebar-smoke",
-    organization_id: "org-auth-sidebar-smoke",
-    type,
-    modules: createModules(modules),
-  };
-}
+const getModuleKeyFromRoutePath = compileSnippet(
+  extractFunctionDeclaration(appShellSource, "getModuleKeyFromRoutePath"),
+  {
+    APP_ROUTE_MODULE_MAP,
+    moduleCategories: [],
+    normalizeRoutePath,
+  },
+);
+const getNavigationModuleName = compileSnippet(
+  extractFunctionDeclaration(appShellSource, "getNavigationModuleName"),
+  {
+    getModulePermissionLevel,
+  },
+);
+const canViewModuleFromPathSource = extractConstInitializer(appShellSource, "canViewModuleFromPath");
+const canViewTasksOnlyRouteSource = extractConstInitializer(appShellSource, "canViewTasksOnlyRoute");
+const canViewCurrentModuleRouteSource = extractConstInitializer(
+  appShellSource,
+  "canViewCurrentModuleRoute",
+);
+const shouldRenderModuleAccessDeniedSource = extractConstInitializer(
+  appShellSource,
+  "shouldRenderModuleAccessDenied",
+);
+const deniedFallbackHrefSource = extractJsxPropExpression(appShellSource, "fallbackHref");
+const deniedFallbackLabelSource = extractJsxPropExpression(appShellSource, "fallbackLabel");
 
 const integrationRestrictedProfiles = [
   createUser({
@@ -71,180 +65,381 @@ const integrationRestrictedProfiles = [
   }),
 ];
 
-function createToken(payload) {
-  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${header}.${body}.signature`;
-}
-
-async function installApiMocks(page, currentUser) {
-  await page.route("**/user/me", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ success: true, data: currentUser }),
-    });
-  });
-
-  await page.route("**/department/list**", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ success: true, data: [] }),
-    });
-  });
-
-  await page.route("**/socket.io/**", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "text/plain",
-      body: route.request().method() === "POST" ? "ok" : '0{"sid":"auth-sidebar-smoke"}',
-    });
-  });
-}
-
-async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUser) {
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    baseURL: baseUrl,
-    viewport: { width: 1366, height: 768 },
-  });
-
-  await context.addCookies([
-    {
-      name: "cw.token",
-      value: createToken({
-        id: currentUser.id,
-        permission: currentUser.permission,
-        type: currentUser.type,
-        modules: currentUser.modules,
-      }),
-      url: baseUrl,
-      httpOnly: false,
-      sameSite: "Lax",
+for (const currentUser of integrationRestrictedProfiles) {
+  await runTest(
+    `integracao=0 preserves contabil sidebar/url access for contabil=${currentUser.modules.contabil}`,
+    () => {
+      assertSidebarVisibility(currentUser);
+      assertDirectUrlAccess("/contabil", currentUser, {
+        shouldRenderDenied: false,
+        shouldRestrictToTasksOnly: false,
+        shouldViewCurrentRoute: true,
+      });
+      assertDirectUrlAccess("/clients/123", currentUser, {
+        shouldRenderDenied: true,
+        shouldRestrictToTasksOnly: true,
+        shouldViewCurrentRoute: false,
+        expectedFallbackHref: "/tasks",
+        expectedFallbackLabel: "Ir para Minhas tarefas",
+      });
     },
-  ]);
-
-  const page = await context.newPage();
-  await installApiMocks(page, currentUser);
-
-  await page.goto("/contabil", { waitUntil: "networkidle" });
-  await page.locator("aside").waitFor({ state: "visible" });
-  await page.waitForTimeout(250);
-
-  await page.getByRole("link", { name: "Contábil", exact: true }).waitFor({ state: "visible" });
-  await page.getByRole("link", { name: "Minhas tarefas", exact: true }).waitFor({
-    state: "visible",
-  });
-
-  assert.equal(
-    await page
-      .locator("aside")
-      .getByRole("link", { name: "Clientes", exact: true })
-      .count(),
-    0,
-    "Clientes must stay hidden when integração is 0.",
   );
-  assert.equal(
-    await page
-      .locator("aside")
-      .getByRole("link", { name: "Projetos", exact: true })
-      .count(),
-    0,
-    "Projetos must stay hidden when integração is 0.",
-  );
-  assert.equal(
-    await page.getByText("Você não tem acesso a este módulo no perfil atual.").count(),
-    0,
-    "Contábil must not be blocked by the integração level 0 task-only guard.",
-  );
-
-  await page.goto("/clients/123", { waitUntil: "networkidle" });
-  await page.getByText("Você não tem acesso a este módulo no perfil atual.").waitFor({
-    state: "visible",
-  });
-  await page.getByRole("link", { name: "Ir para Minhas tarefas", exact: true }).waitFor({
-    state: "visible",
-  });
-
-  await browser.close();
 }
 
-await withNextServer(async () => {
-  for (const currentUser of integrationRestrictedProfiles) {
-    await assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUser);
-    console.log(
-      `PASS integracao=0 preserves contabil sidebar/url access for contabil=${currentUser.modules.contabil}`,
+async function runTest(name, fn) {
+  try {
+    await fn();
+    console.log(`PASS ${name}`);
+  } catch (error) {
+    console.error(`FAIL ${name}`);
+    throw error;
+  }
+}
+
+function assertSidebarVisibility(currentUser) {
+  const context = createViewContext("/contabil", currentUser);
+  const canViewModuleFromPath = compileSnippet(canViewModuleFromPathSource, context);
+
+  assert.equal(
+    canViewModuleFromPath("/contabil"),
+    true,
+    "Contábil deve permanecer visível quando integração=0 e contábil>=1.",
+  );
+  assert.equal(
+    canViewModuleFromPath("/tasks"),
+    true,
+    "Minhas tarefas deve permanecer visível quando integração=0.",
+  );
+  assert.equal(
+    canViewModuleFromPath("/clients"),
+    false,
+    "Clientes deve permanecer oculto quando integração=0.",
+  );
+  assert.equal(
+    canViewModuleFromPath("/projects"),
+    false,
+    "Projetos deve permanecer oculto quando integração=0.",
+  );
+  assert.equal(
+    getNavigationModuleName({ name: "Tarefas", path: "/tasks" }, currentUser),
+    "Minhas tarefas",
+    "O item de tarefas deve continuar renomeado para Minhas tarefas no nível 0 de Integração.",
+  );
+  assert.equal(
+    getNavigationModuleName({ name: "Contábil", path: "/contabil" }, currentUser),
+    "Contábil",
+    "O item de Contábil deve manter o rótulo original.",
+  );
+}
+
+function assertDirectUrlAccess(pathname, currentUser, expected) {
+  const routeContext = createRouteContext(pathname, currentUser);
+  const canViewTasksOnlyRoute = evaluateExpression(canViewTasksOnlyRouteSource, {
+    canViewTasksOnlyIntegrationRoute,
+    currentModuleKey: routeContext.currentModuleKey,
+    moduleAccessUser: currentUser,
+    pathname,
+  });
+  const canViewCurrentModuleRoute = evaluateExpression(canViewCurrentModuleRouteSource, {
+    canViewCurrentModuleRoute: undefined,
+    canViewIntegrationRoute,
+    canViewTasksOnlyRoute,
+    currentModuleAccess: routeContext.currentModuleAccess,
+    currentModuleKey: routeContext.currentModuleKey,
+    moduleAccessUser: currentUser,
+    pathname,
+  });
+  const shouldRenderDenied = evaluateExpression(shouldRenderModuleAccessDeniedSource, {
+    Boolean,
+    canViewCurrentModuleRoute,
+    canViewTasksOnlyRoute,
+    currentModuleKey: routeContext.currentModuleKey,
+    getModulePermissionLevel,
+    isModuleAccessLoading: false,
+    isSelfProfileRoute: false,
+    moduleAccessUser: currentUser,
+  });
+
+  assert.equal(
+    canViewTasksOnlyRoute === false,
+    expected.shouldRestrictToTasksOnly,
+    `${pathname} shouldRestrictToTasksOnly`,
+  );
+  assert.equal(
+    canViewCurrentModuleRoute,
+    expected.shouldViewCurrentRoute,
+    `${pathname} shouldViewCurrentRoute`,
+  );
+  assert.equal(
+    shouldRenderDenied,
+    expected.shouldRenderDenied,
+    `${pathname} shouldRenderDenied`,
+  );
+
+  if (expected.expectedFallbackHref) {
+    assert.equal(
+      evaluateExpression(deniedFallbackHrefSource, {
+        getModulePermissionLevel,
+        moduleAccessUser: currentUser,
+      }),
+      expected.expectedFallbackHref,
+      `${pathname} fallbackHref`,
     );
   }
-});
 
-async function withNextServer(test) {
-  if (configuredBaseUrl) {
-    await test();
-    return;
-  }
-
-  const command = process.platform === "win32" ? "cmd" : "corepack";
-  const args =
-    process.platform === "win32"
-      ? ["/c", "corepack", "pnpm", "exec", "next", "dev", "--webpack", "--port", PORT]
-      : ["pnpm", "exec", "next", "dev", "--webpack", "--port", PORT];
-  const serverProcess = spawn(command, args, {
-    cwd: APP_ROOT,
-    env: process.env,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  let output = "";
-  serverProcess.stdout.on("data", (chunk) => {
-    output += chunk.toString();
-  });
-  serverProcess.stderr.on("data", (chunk) => {
-    output += chunk.toString();
-  });
-
-  try {
-    await waitForServer(serverProcess, () => output);
-    await test();
-  } finally {
-    stopServer(serverProcess);
+  if (expected.expectedFallbackLabel) {
+    assert.equal(
+      evaluateExpression(deniedFallbackLabelSource, {
+        getModulePermissionLevel,
+        moduleAccessUser: currentUser,
+      }),
+      expected.expectedFallbackLabel,
+      `${pathname} fallbackLabel`,
+    );
   }
 }
 
-async function waitForServer(serverProcess, getOutput) {
-  const startedAt = Date.now();
+function createViewContext(pathname, currentUser) {
+  const moduleAccessMap = createModuleAccessMap(currentUser);
 
-  while (Date.now() - startedAt < 45_000) {
-    if (serverProcess.exitCode !== null) {
-      throw new Error(`Next dev server exited before smoke test.\n${getOutput()}`);
+  return {
+    canManageOrganization: false,
+    canManageUsers: false,
+    canViewIntegrationRoute,
+    canViewTasksOnlyIntegrationRoute,
+    getModuleKeyFromRoutePath,
+    isAdministrationAccessLoading: false,
+    isModuleAccessLoading: false,
+    moduleAccessMap,
+    moduleAccessUser: currentUser,
+    shouldShowDashboard: hasAnyModuleAccess(moduleAccessMap),
+  };
+}
+
+function createRouteContext(pathname, currentUser) {
+  const moduleAccessMap = createModuleAccessMap(currentUser);
+  const currentModuleKey = getModuleKeyFromRoutePath(pathname);
+
+  return {
+    currentModuleAccess: currentModuleKey ? moduleAccessMap[currentModuleKey] : null,
+    currentModuleKey,
+    moduleAccessMap,
+  };
+}
+
+function createModuleAccessMap(currentUser) {
+  const isGlobalAdmin = currentUser.type === "owner";
+
+  return Object.fromEntries(
+    MODULE_KEYS.map((moduleKey) => [
+      moduleKey,
+      resolveModuleAccess({
+        additionalModulePermissions: currentUser.modules,
+        isGlobalAdmin,
+        module: moduleKey,
+        userPermission: currentUser.permission,
+      }),
+    ]),
+  );
+}
+
+function createModules(overrides = {}) {
+  return {
+    ...Object.fromEntries(MODULE_KEYS.map((moduleKey) => [moduleKey, 0])),
+    ...overrides,
+  };
+}
+
+function createUser({ id, name, login, permission = 0, type = "user", modules = {} }) {
+  return {
+    department_id: "department-auth-sidebar-smoke",
+    id,
+    login,
+    modules: createModules(modules),
+    name,
+    organization_id: "org-auth-sidebar-smoke",
+    permission,
+    type,
+  };
+}
+
+function extractFunctionDeclaration(source, functionName) {
+  return extractBlockFromMarker(source, `function ${functionName}`);
+}
+
+function extractConstInitializer(source, constName) {
+  const marker = `const ${constName} =`;
+  const start = source.indexOf(marker);
+  assert.notEqual(start, -1, `Could not find ${constName}.`);
+
+  const valueStart = start + marker.length;
+  const valueEnd = findStatementEnd(source, valueStart);
+  return source.slice(valueStart, valueEnd).trim();
+}
+
+function extractJsxPropExpression(source, propName) {
+  const marker = `${propName}={`;
+  const start = source.indexOf(marker);
+  assert.notEqual(start, -1, `Could not find JSX prop ${propName}.`);
+
+  const expressionStart = start + marker.length;
+  let depth = 1;
+
+  for (let index = expressionStart; index < source.length; index += 1) {
+    const character = source[index];
+
+    if (character === "{") {
+      depth += 1;
     }
 
-    try {
-      const response = await fetch(baseUrl);
-      if (response.ok || response.status < 500) {
-        return;
+    if (character === "}") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return source.slice(expressionStart, index).trim();
       }
-    } catch {
-      // Retry until the dev server binds the port.
     }
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  throw new Error(`Timed out waiting for Next dev server at ${baseUrl}.\n${getOutput()}`);
+  assert.fail(`Could not close JSX prop ${propName}.`);
 }
 
-function stopServer(serverProcess) {
-  if (!serverProcess.pid || serverProcess.exitCode !== null) {
-    return;
+function extractBlockFromMarker(source, marker) {
+  const start = source.indexOf(marker);
+  assert.notEqual(start, -1, `Could not find marker ${marker}.`);
+
+  const bodyStart = source.indexOf("{", start);
+  assert.notEqual(bodyStart, -1, `Could not find body for ${marker}.`);
+
+  let depth = 0;
+
+  for (let index = bodyStart; index < source.length; index += 1) {
+    const character = source[index];
+
+    if (character === "{") {
+      depth += 1;
+    }
+
+    if (character === "}") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
   }
 
-  if (process.platform === "win32") {
-    execFileSync("taskkill", ["/pid", String(serverProcess.pid), "/T", "/F"], {
-      stdio: "ignore",
-    });
-    return;
+  assert.fail(`Could not close block for ${marker}.`);
+}
+
+function findStatementEnd(source, startIndex) {
+  let depthParen = 0;
+  let depthBrace = 0;
+  let depthBracket = 0;
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let inTemplate = false;
+
+  for (let index = startIndex; index < source.length; index += 1) {
+    const character = source[index];
+    const previousCharacter = source[index - 1];
+
+    if (inSingleQuote) {
+      if (character === "'" && previousCharacter !== "\\") {
+        inSingleQuote = false;
+      }
+      continue;
+    }
+
+    if (inDoubleQuote) {
+      if (character === '"' && previousCharacter !== "\\") {
+        inDoubleQuote = false;
+      }
+      continue;
+    }
+
+    if (inTemplate) {
+      if (character === "`" && previousCharacter !== "\\") {
+        inTemplate = false;
+      }
+      continue;
+    }
+
+    if (character === "'") {
+      inSingleQuote = true;
+      continue;
+    }
+
+    if (character === '"') {
+      inDoubleQuote = true;
+      continue;
+    }
+
+    if (character === "`") {
+      inTemplate = true;
+      continue;
+    }
+
+    if (character === "(") {
+      depthParen += 1;
+      continue;
+    }
+
+    if (character === ")") {
+      depthParen -= 1;
+      continue;
+    }
+
+    if (character === "{") {
+      depthBrace += 1;
+      continue;
+    }
+
+    if (character === "}") {
+      depthBrace -= 1;
+      continue;
+    }
+
+    if (character === "[") {
+      depthBracket += 1;
+      continue;
+    }
+
+    if (character === "]") {
+      depthBracket -= 1;
+      continue;
+    }
+
+    if (
+      character === ";" &&
+      depthParen === 0 &&
+      depthBrace === 0 &&
+      depthBracket === 0
+    ) {
+      return index;
+    }
   }
 
-  serverProcess.kill("SIGTERM");
+  assert.fail("Could not find end of statement.");
+}
+
+function stripTypeScript(source) {
+  return source
+    .replace(/\s+as\s+[A-Za-z_$][\w$<>, |&.\[\]?]*/g, "")
+    .replace(/([,(]\s*[A-Za-z_$][\w$]*)\s*:\s*([^,)=]+)/g, "$1")
+    .replace(/\)\s*:\s*([^=<{]+)\{/g, "){")
+    .replace(/\)\s*:\s*([^=<{]+)=>/g, ") =>");
+}
+
+function compileSnippet(source, dependencies) {
+  const dependencyNames = Object.keys(dependencies);
+  const dependencyValues = Object.values(dependencies);
+  return Function(
+    ...dependencyNames,
+    `"use strict"; return (${stripTypeScript(source)});`,
+  )(...dependencyValues);
+}
+
+function evaluateExpression(source, dependencies) {
+  return compileSnippet(source, dependencies);
 }
