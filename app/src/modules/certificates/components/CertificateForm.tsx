@@ -76,6 +76,11 @@ type PFEditFormProps = BaseEditProps & {
 
 type CertificateFormProps = PJCreateFormProps | PFCreateFormProps | PJEditFormProps | PFEditFormProps;
 
+const CERTIFICATE_STATUS_OPTIONS = [
+  { value: "false", label: "Não regularizado" },
+  { value: "true", label: "Regularizado" },
+] as const;
+
 function toInputDate(value: string | null | undefined): string {
   if (!value) {
     return "";
@@ -151,6 +156,10 @@ function getHasChanges(
 
 function boolToLabel(value: boolean) {
   return value ? "Sim" : "Não";
+}
+
+function certificateStatusValue(value: boolean): string {
+  return value ? "true" : "false";
 }
 
 export function CertificateForm({
@@ -499,16 +508,19 @@ export function CertificateForm({
             <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Castelo</span>
             <FieldHelp
               label="Situação Castelo"
-              description="Indica se o certificado está regularizado no sistema Castelo."
+              description="Indica se este certificado está regularizado no sistema Castelo."
             />
           </span>
           <CertificateNativeSelect
-            value={boolToLabel(formState.clientCasteloStatus)}
-            onChange={(event) => setBoolField("clientCasteloStatus", event.target.value === "Sim")}
+            value={certificateStatusValue(formState.clientCasteloStatus)}
+            onChange={(event) => setBoolField("clientCasteloStatus", event.target.value === "true")}
             disabled={isSubmitting}
           >
-            <option value="Não">Não</option>
-            <option value="Sim">Sim</option>
+            {CERTIFICATE_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </CertificateNativeSelect>
         </label>
 
@@ -517,16 +529,19 @@ export function CertificateForm({
             <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Focus</span>
             <FieldHelp
               label="Situação Focus"
-              description="Indica se o certificado está regularizado no sistema Focus."
+              description="Indica se este certificado está regularizado no sistema Focus."
             />
           </span>
           <CertificateNativeSelect
-            value={boolToLabel(formState.clientFocusStatus)}
-            onChange={(event) => setBoolField("clientFocusStatus", event.target.value === "Sim")}
+            value={certificateStatusValue(formState.clientFocusStatus)}
+            onChange={(event) => setBoolField("clientFocusStatus", event.target.value === "true")}
             disabled={isSubmitting}
           >
-            <option value="Não">Não</option>
-            <option value="Sim">Sim</option>
+            {CERTIFICATE_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </CertificateNativeSelect>
         </label>
 
