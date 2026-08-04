@@ -1,11 +1,16 @@
-import { readdir, readFile } from "node:fs/promises";
+import { open, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const TEXT_EXTENSIONS = new Set([".js", ".php", ".sql"]);
 const EXCLUDED_DIRECTORIES = new Set(["node_modules", "uploads", "vendor"]);
 const SQL_OPERATIONS = ["select", "insert", "update", "delete"];
 
-export async function scanLegacyUsage({ legacyDir, sourceTables, readTextFile = readFile }) {
+export async function scanLegacyUsage({
+  legacyDir,
+  sourceTables,
+  readTextFile = readFile,
+  openSqlFile = open,
+}) {
   const files = await listLegacyTextFiles(legacyDir);
   const orderedSourceTables = [...sourceTables].sort(compareText);
   const records = new Map(orderedSourceTables.map((sourceTable) => [sourceTable, createRecord()]));
@@ -15,16 +20,28 @@ export async function scanLegacyUsage({ legacyDir, sourceTables, readTextFile = 
   const directMatcher = createDirectMatcher(orderedSourceTables);
 
   for (const filePath of files) {
-    const content = await readTextFile(filePath, "utf8");
-    scanFile({
-      content,
-      directMatcher,
-      filePath,
-      legacyDir,
-      orderedSourceTables,
-      records,
-      sourceTablesByNormalizedName,
-    });
+    if (path.extname(filePath).toLowerCase() === ".sql") {
+      await scanSqlFile({
+        directMatcher,
+        filePath,
+        legacyDir,
+        openSqlFile,
+        orderedSourceTables,
+        records,
+        sourceTablesByNormalizedName,
+      });
+    } else {
+      const content = await readTextFile(filePath, "utf8");
+      scanFile({
+        content,
+        directMatcher,
+        filePath,
+        legacyDir,
+        orderedSourceTables,
+        records,
+        sourceTablesByNormalizedName,
+      });
+    }
   }
 
   return {
@@ -33,6 +50,46 @@ export async function scanLegacyUsage({ legacyDir, sourceTables, readTextFile = 
       formatRecord(sourceTable, records.get(sourceTable)),
     ),
   };
+}
+
+async function scanSqlFile({
+  directMatcher,
+  filePath,
+  legacyDir,
+  openSqlFile,
+  orderedSourceTables,
+  records,
+  sourceTablesByNormalizedName,
+}) {
+  const file = await openSqlFile(filePath, "r");
+  let header = "";
+  let position = 0;
+  const byte = Buffer.allocUnsafe(1);
+  try {
+    while (true) {
+      const { bytesRead } = await file.read(byte, 0, 1, position);
+      if (bytesRead === 0) {
+        break;
+      }
+      header += byte.toString("utf8", 0, bytesRead);
+      position += bytesRead;
+      if (/\bvalues$/i.test(header)) {
+        break;
+      }
+    }
+  } finally {
+    await file.close();
+  }
+
+  scanFile({
+    content: header,
+    directMatcher,
+    filePath,
+    legacyDir,
+    orderedSourceTables,
+    records,
+    sourceTablesByNormalizedName,
+  });
 }
 
 async function listLegacyTextFiles(directory) {

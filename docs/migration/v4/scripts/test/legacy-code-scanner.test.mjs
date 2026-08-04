@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -7,6 +9,15 @@ import { scanLegacyUsage } from "../lib/legacy-code-scanner.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const fixtureDirectory = path.join(testDirectory, "fixtures/legacy-mini");
+
+async function withTemporaryDirectory(run) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "giro-v4-legacy-scanner-"));
+  try {
+    await run(directory);
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+}
 
 test("scanLegacyUsage registra referências sanitizadas e ignora árvores excluídas", async () => {
   const usage = await scanLegacyUsage({
@@ -95,4 +106,47 @@ test("scanLegacyUsage reconhece referências estáticas adjacentes", async () =>
     "modules/admin/usuarios.php:6",
     "modules/admin/usuarios.php:7",
   ]);
+});
+
+test("scanLegacyUsage interrompe a leitura de dump SQL antes dos valores de INSERT", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const legacyDirectory = path.join(directory, "legacy");
+    const sqlPath = path.join(legacyDirectory, "dump.sql");
+    const sql = "INSERT INTO tb_admin.usuarios (nome) VALUES ('raw-value-must-not-be-read');";
+    const lastHeaderByte = sql.indexOf("VALUES") + "VALUES".length - 1;
+    const bytes = Buffer.from(sql, "utf8");
+    const positions = [];
+    await mkdir(legacyDirectory, { recursive: true });
+    await writeFile(sqlPath, sql, "utf8");
+
+    const usage = await scanLegacyUsage({
+      legacyDir: legacyDirectory,
+      sourceTables: ["tb_admin.usuarios"],
+      readTextFile: async () => {
+        throw new Error("Arquivo SQL não pode ter leitura textual integral.");
+      },
+      openSqlFile: async () => ({
+        close: async () => {},
+        read: async (buffer, offset, length, position) => {
+          assert.equal(length, 1);
+          assert.ok(position <= lastHeaderByte, "Não deve ler bytes de VALUES.");
+          positions.push(position);
+          buffer[offset] = bytes[position];
+          return { buffer, bytesRead: 1 };
+        },
+      }),
+    });
+
+    assert.deepEqual(usage.tables, [
+      {
+        legacyModule: ".",
+        legacyReferences: ["dump.sql:1"],
+        legacyRelationships: [],
+        operations: ["insert"],
+        sourceTable: "tb_admin.usuarios",
+      },
+    ]);
+    assert.equal(Math.max(...positions), lastHeaderByte);
+    assert.doesNotMatch(JSON.stringify(usage), /raw-value-must-not-be-read/);
+  });
 });
