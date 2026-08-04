@@ -63,7 +63,12 @@ async function scanSqlFile({
 }) {
   const file = await openSqlFile(filePath, "r");
   let header = "";
+  let headerStartLine = 0;
+  let lineNumber = 0;
   let position = 0;
+  let skippingValues = false;
+  let quote = null;
+  let escaped = false;
   const byte = Buffer.allocUnsafe(1);
   try {
     while (true) {
@@ -71,25 +76,91 @@ async function scanSqlFile({
       if (bytesRead === 0) {
         break;
       }
-      header += byte.toString("utf8", 0, bytesRead);
+      const character = byte.toString("utf8", 0, bytesRead);
       position += bytesRead;
-      if (/\bvalues$/i.test(header)) {
-        break;
+
+      if (skippingValues) {
+        const nextValueState = consumeInsertValueByte({ character, escaped, quote });
+        skippingValues = !nextValueState.complete;
+        quote = nextValueState.quote;
+        escaped = nextValueState.escaped;
+      } else {
+        if (header.length === 0) {
+          headerStartLine = lineNumber;
+        }
+        header += character;
+        if (/\bvalues$/i.test(header)) {
+          scanSqlHeader({
+            content: header,
+            directMatcher,
+            filePath,
+            headerStartLine,
+            legacyDir,
+            orderedSourceTables,
+            records,
+            sourceTablesByNormalizedName,
+          });
+          header = "";
+          skippingValues = true;
+        } else if (character === ";") {
+          scanSqlHeader({
+            content: header,
+            directMatcher,
+            filePath,
+            headerStartLine,
+            legacyDir,
+            orderedSourceTables,
+            records,
+            sourceTablesByNormalizedName,
+          });
+          header = "";
+        }
+      }
+
+      if (character === "\n") {
+        lineNumber += 1;
       }
     }
   } finally {
     await file.close();
   }
 
-  scanFile({
+  scanSqlHeader({
     content: header,
     directMatcher,
     filePath,
+    headerStartLine,
     legacyDir,
     orderedSourceTables,
     records,
     sourceTablesByNormalizedName,
   });
+}
+
+function consumeInsertValueByte({ character, escaped, quote }) {
+  if (quote === null) {
+    if (character === "'" || character === '"') {
+      return { complete: false, escaped: false, quote: character };
+    }
+    return { complete: character === ";", escaped: false, quote: null };
+  }
+  if (escaped) {
+    return { complete: false, escaped: false, quote };
+  }
+  if (character === "\\") {
+    return { complete: false, escaped: true, quote };
+  }
+  if (character === quote) {
+    return { complete: false, escaped: false, quote: null };
+  }
+  return { complete: false, escaped: false, quote };
+}
+
+function scanSqlHeader({ content, headerStartLine, ...options }) {
+  if (content.length === 0) {
+    return;
+  }
+  scanFile({ content, lineOffset: headerStartLine, ...options });
 }
 
 async function listLegacyTextFiles(directory) {
@@ -119,6 +190,7 @@ function scanFile({
   directMatcher,
   filePath,
   legacyDir,
+  lineOffset = 0,
   orderedSourceTables,
   records,
   sourceTablesByNormalizedName,
@@ -130,12 +202,16 @@ function scanFile({
       directMatcher,
       sourceTablesByNormalizedName,
     )) {
-      addUsage(records.get(sourceTable), { line, lineNumber, relativePath });
+      addUsage(records.get(sourceTable), {
+        line,
+        lineNumber: lineNumber + lineOffset,
+        relativePath,
+      });
     }
     for (const { sourceTable, pattern } of findDynamicMatches(line, orderedSourceTables)) {
       addUsage(records.get(sourceTable), {
         line,
-        lineNumber,
+        lineNumber: lineNumber + lineOffset,
         relativePath,
         dynamicPattern: pattern,
       });

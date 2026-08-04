@@ -108,20 +108,22 @@ test("scanLegacyUsage reconhece referências estáticas adjacentes", async () =>
   ]);
 });
 
-test("scanLegacyUsage interrompe a leitura de dump SQL antes dos valores de INSERT", async () => {
+test("scanLegacyUsage cataloga múltiplos INSERTs e operação posterior sem materializar valores", async () => {
   await withTemporaryDirectory(async (directory) => {
     const legacyDirectory = path.join(directory, "legacy");
     const sqlPath = path.join(legacyDirectory, "dump.sql");
-    const sql = "INSERT INTO tb_admin.usuarios (nome) VALUES ('raw-value-must-not-be-read');";
-    const lastHeaderByte = sql.indexOf("VALUES") + "VALUES".length - 1;
+    const sql = [
+      "INSERT INTO tb_admin.usuarios (nome) VALUES ('first-raw-value');",
+      "INSERT INTO tb_admin.perfis (nome) VALUES ('second-raw-value');",
+      "UPDATE tb_admin.usuarios SET ativo = 1;",
+    ].join("\n");
     const bytes = Buffer.from(sql, "utf8");
-    const positions = [];
     await mkdir(legacyDirectory, { recursive: true });
     await writeFile(sqlPath, sql, "utf8");
 
     const usage = await scanLegacyUsage({
       legacyDir: legacyDirectory,
-      sourceTables: ["tb_admin.usuarios"],
+      sourceTables: ["tb_admin.usuarios", "tb_admin.perfis"],
       readTextFile: async () => {
         throw new Error("Arquivo SQL não pode ter leitura textual integral.");
       },
@@ -129,10 +131,8 @@ test("scanLegacyUsage interrompe a leitura de dump SQL antes dos valores de INSE
         close: async () => {},
         read: async (buffer, offset, length, position) => {
           assert.equal(length, 1);
-          assert.ok(position <= lastHeaderByte, "Não deve ler bytes de VALUES.");
-          positions.push(position);
           buffer[offset] = bytes[position];
-          return { buffer, bytesRead: 1 };
+          return { buffer, bytesRead: position < bytes.length ? 1 : 0 };
         },
       }),
     });
@@ -140,13 +140,19 @@ test("scanLegacyUsage interrompe a leitura de dump SQL antes dos valores de INSE
     assert.deepEqual(usage.tables, [
       {
         legacyModule: ".",
-        legacyReferences: ["dump.sql:1"],
+        legacyReferences: ["dump.sql:2"],
         legacyRelationships: [],
         operations: ["insert"],
+        sourceTable: "tb_admin.perfis",
+      },
+      {
+        legacyModule: ".",
+        legacyReferences: ["dump.sql:1", "dump.sql:3"],
+        legacyRelationships: [],
+        operations: ["insert", "update"],
         sourceTable: "tb_admin.usuarios",
       },
     ]);
-    assert.equal(Math.max(...positions), lastHeaderByte);
-    assert.doesNotMatch(JSON.stringify(usage), /raw-value-must-not-be-read/);
+    assert.doesNotMatch(JSON.stringify(usage), /first-raw-value|second-raw-value/);
   });
 });
