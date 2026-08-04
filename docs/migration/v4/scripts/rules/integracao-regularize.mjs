@@ -31,14 +31,149 @@ export function buildIntegrationRegularizeContext(sourceTable, row, resolutions)
   });
 }
 
+export function buildClientPfResolutionContexts({ rows, currentRows = [] }) {
+  if (!Array.isArray(rows) || !Array.isArray(currentRows)) {
+    throw new TypeError("rows e currentRows de ClientPF devem ser arrays");
+  }
+  const normalizedRows = rows.map(normalizeClientPfSourceRow);
+  const slotDefinitions = [
+    ["uniqueCode", "code"],
+    ["uniqueCpf", "cpf"],
+    ["uniqueRg", "rg"],
+  ];
+  const decisions = rows.map(() => ({}));
+  for (const [resolutionName, field] of slotDefinitions) {
+    const groups = new Map();
+    for (const [index, normalized] of normalizedRows.entries()) {
+      const entries = groups.get(normalized[field]) ?? [];
+      entries.push(index);
+      groups.set(normalized[field], entries);
+    }
+    const currentByValue = new Map();
+    for (const current of currentRows) {
+      const normalizedValue = normalizeClientPfCurrentUniqueValue(field, current?.[field]);
+      if (normalizedValue.length > 0 && !currentByValue.has(normalizedValue)) {
+        currentByValue.set(normalizedValue, current);
+      }
+    }
+    for (const [normalizedValue, indexes] of groups) {
+      const sorted = [...indexes].sort((left, right) =>
+        compareClientPfRows(rows[left], rows[right]),
+      );
+      const [ownerIndex] = sorted;
+      const sourceOwnerIdentityRef = rowReference("tb_regularize.pf", rows[ownerIndex]?.codigo);
+      const currentConflict = currentByValue.get(normalizedValue);
+      const payloads = new Set(
+        sorted.map((index) =>
+          canonicalRow({ ...normalizedRows[index], code: undefined, [field]: undefined }),
+        ),
+      );
+      const isConflict = currentConflict !== undefined || payloads.size > 1;
+      for (const index of sorted) {
+        const row = rows[index];
+        const sourceKey = normalizeKey(row?.codigo) ?? `invalid-${index}`;
+        const sourceIdentityRef = `tb_regularize.pf:${sourceKey}`;
+        const decision = isConflict ? "conflict" : index === ownerIndex ? "owner" : "duplicate";
+        const ownerIdentityRef =
+          currentConflict === undefined
+            ? sourceOwnerIdentityRef
+            : `clients.pf:${normalizeKey(currentConflict?.id) ?? "existing"}`;
+        decisions[index][resolutionName] = {
+          state: decision === "owner" ? "one" : "many",
+          sourceTable: "tb_regularize.pf",
+          sourceKey,
+          sourceIdentityRef,
+          identityRef: sourceIdentityRef,
+          targetTable: "clients.pf",
+          targetIdentityRef: `clients.pf:${field}:${normalizedValue}`,
+          criteria: { field, normalizedValue },
+          decision,
+          ownerIdentityRef,
+        };
+      }
+    }
+  }
+  return Object.freeze(
+    rows.map((row, index) =>
+      buildIntegrationRegularizeContext("tb_regularize.pf", row, decisions[index]),
+    ),
+  );
+}
+
+export function buildPartnerPairResolutionContexts({
+  rows,
+  clientPfResolutions,
+  clientResolutions,
+}) {
+  if (
+    !Array.isArray(rows) ||
+    !Array.isArray(clientPfResolutions) ||
+    !Array.isArray(clientResolutions) ||
+    clientPfResolutions.length !== rows.length ||
+    clientResolutions.length !== rows.length
+  ) {
+    throw new TypeError("rows e resoluções de sócios devem ser arrays de mesmo tamanho");
+  }
+  const normalizedClientPf = clientPfResolutions.map(normalizeResolution);
+  const normalizedClients = clientResolutions.map(normalizeResolution);
+  const groups = new Map();
+  for (const [index, row] of rows.entries()) {
+    const pairKey = `${normalizeKey(row?.empresa_id) ?? `invalid-pj-${index}`}|${normalizeKey(row?.pf_id) ?? `invalid-pf-${index}`}`;
+    const entries = groups.get(pairKey) ?? [];
+    entries.push(index);
+    groups.set(pairKey, entries);
+  }
+  const pairDecisions = new Array(rows.length);
+  for (const indexes of groups.values()) {
+    const conflict = partnerPeriodsConflict(indexes.map((index) => rows[index]));
+    const sorted = [...indexes].sort((left, right) => comparePartnerOwner(rows[left], rows[right]));
+    const [ownerIndex] = sorted;
+    const ownerIdentityRef = rowReference("tb_regularize.pf_empresas", rows[ownerIndex]?.id);
+    for (const index of sorted) {
+      pairDecisions[index] = {
+        decision: conflict ? "conflict" : index === ownerIndex ? "owner" : "duplicate",
+        ownerIdentityRef,
+      };
+    }
+  }
+  return Object.freeze(
+    rows.map((row, index) => {
+      const clientPf = normalizedClientPf[index];
+      const client = normalizedClients[index];
+      const sourceKey = normalizeKey(row?.id) ?? `invalid-${index}`;
+      const sourceIdentityRef = `tb_regularize.pf_empresas:${sourceKey}`;
+      const pair = pairDecisions[index];
+      return buildIntegrationRegularizeContext("tb_regularize.pf_empresas", row, {
+        clientPf,
+        client,
+        partnerPair: {
+          state: pair.decision === "conflict" ? "many" : "one",
+          sourceTable: "tb_regularize.pf_empresas",
+          sourceKey,
+          sourceIdentityRef,
+          identityRef: sourceIdentityRef,
+          targetTable: "regularize.partners",
+          targetIdentityRef: `regularize.partners:${client.identityRef}:${clientPf.identityRef}`,
+          criteria: {
+            pjIdentityRef: client.identityRef,
+            pfIdentityRef: clientPf.identityRef,
+          },
+          decision: pair.decision,
+          ownerIdentityRef: pair.ownerIdentityRef,
+        },
+      });
+    }),
+  );
+}
+
 export const INTEGRACAO_REGULARIZE_RULES = Object.freeze([
   createIntegrationGroupRule(),
   createPaRule(),
   createPaHistoryRule(),
   createTaskDependentRule(),
   createTerminationTaskRule(),
+  createTerminationTaskModelRule(),
   createTaskRegularizeRule(),
-  createRegularizeAgendaRule(),
   createRegularizeGroupRule(),
   createRegularizeGroupMemberRule(),
   createGuidanceActivityRule(),
@@ -228,14 +363,127 @@ function createTaskDependentRule() {
   });
 }
 
-function createTaskRegularizeRule() {
+function createTerminationTaskModelRule() {
+  const sourceTable = "tb_integracao.tarefas_express_distrato";
   return createInsertRule({
-    sourceTable: "tb_integracao.tarefas_regularize",
+    sourceTable,
     domain: "integration",
+    stepId: "termination-task-model-insert",
+    destinationTable: "integracao.tasksModel",
+    identityColumn: "id",
+    dependencies: ["tb_admin.departamentos", "tb_admin.usuarios"],
+    columns: [
+      mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
+      mapped("nome", "name", "normalize_required_text"),
+      mapped(
+        "departamento_id",
+        "department_id",
+        "resolve_explicit_department_reference",
+        referenceOptions(),
+      ),
+      mapped(
+        "responsavel_id",
+        "responsible_id",
+        "resolve_explicit_user_reference",
+        referenceOptions(),
+      ),
+      mapped(
+        "responsavel_id_dois",
+        "responsible2_id",
+        "resolve_optional_user_reference",
+        referenceOptions(),
+      ),
+      mapped(
+        "responsavel_id_tres",
+        "responsible3_id",
+        "resolve_optional_user_reference",
+        referenceOptions(),
+      ),
+      notPreserved(
+        "estado",
+        "Estado pertence à ocorrência Task e não ao modelo reutilizável atual.",
+      ),
+      notPreserved(
+        "realizado",
+        "O indicador pertence à execução e não ao contrato reutilizável de TaskModel.",
+      ),
+      mapped("obs", "observations", "normalize_text", personalOptions()),
+      notPreserved("ano", "O ano legado não possui semântica de previsão no TaskModel atual."),
+      mapped("cobranca", "billing", "normalize_task_billing"),
+    ],
+    constants: { type: "legacy-termination" },
+    defaults: { billing: "0", prevision: 0 },
+    classify(row, context) {
+      const base = firstQuarantine([
+        classifyIdentity(row?.id, "id", "TERMINATION_TASK_MODEL_ID_INVALID"),
+        classifyText(row?.nome, "nome", "TERMINATION_TASK_MODEL_NAME_EMPTY"),
+        classifyIdentity(
+          row?.departamento_id,
+          "departamento_id",
+          "TERMINATION_TASK_MODEL_DEPARTMENT_INVALID",
+        ),
+        classifyIdentity(
+          row?.responsavel_id,
+          "responsavel_id",
+          "TERMINATION_TASK_MODEL_RESPONSIBLE_INVALID",
+        ),
+      ]);
+      if (base.status !== "prepared") return base;
+      const linked = classifyWithContext({
+        sourceTable,
+        row,
+        context,
+        identityField: "id",
+        resolutions: [
+          requiredResolution(
+            "department",
+            "departamento_id",
+            ["tb_admin.departamentos"],
+            "TASK_MODEL_DEPARTMENT",
+          ),
+          requiredResolution(
+            "responsible",
+            "responsavel_id",
+            ["tb_admin.usuarios"],
+            "TASK_MODEL_RESPONSIBLE",
+          ),
+          optionalResolution(
+            "responsible2",
+            "responsavel_id_dois",
+            ["tb_admin.usuarios"],
+            "TASK_MODEL_RESPONSIBLE2",
+          ),
+          optionalResolution(
+            "responsible3",
+            "responsavel_id_tres",
+            ["tb_admin.usuarios"],
+            "TASK_MODEL_RESPONSIBLE3",
+          ),
+        ],
+      });
+      if (linked.status !== "prepared") return linked;
+      return classifyResponsibleDepartments({
+        row,
+        context,
+        departmentResolutionName: "department",
+        responsibleResolutionNames: [
+          ["responsible", "responsavel_id"],
+          ["responsible2", "responsavel_id_dois"],
+          ["responsible3", "responsavel_id_tres"],
+        ],
+        reasonCode: "TASK_MODEL_RESPONSIBLE_DEPARTMENT_MISMATCH",
+      });
+    },
+  });
+}
+
+function createTaskRegularizeRule() {
+  const sourceTable = "tb_integracao.tarefas_regularize";
+  const step = destination({
     stepId: "task-regularize-link-insert",
     destinationTable: "integracao.tasksIntegrationRegularize",
-    identityColumn: "id",
-    dependencies: ["tb_integracao.tarefas_express"],
+    mode: "insert",
+    identity: generateIdentity("id", sourceTable),
     columns: [
       mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
       mapped(
@@ -245,27 +493,69 @@ function createTaskRegularizeRule() {
         referenceOptions(),
       ),
       mapped("vinculo", "referring", "normalize_required_text"),
-      mapped(null, "referring_type", "derive_legacy_regularize_referring_type"),
+      mapped(null, "referring_type", "resolve_legacy_regularize_referring_type_lookup"),
     ],
-    defaults: { referring_type: "legacy-regularize" },
-    classify(row, context) {
-      const base = classifyWithContext({
-        sourceTable: "tb_integracao.tarefas_regularize",
-        row,
-        context,
-        identityField: "id",
-        resolutions: [
-          requiredResolution(
-            "taskModel",
-            "tarefa",
-            ["tb_integracao.tarefas_express"],
-            "TASK_REGULARIZE_MODEL",
-          ),
-        ],
-      });
-      return base.status === "prepared"
-        ? classifyText(row?.vinculo, "vinculo", "TASK_REGULARIZE_REFERRING_EMPTY")
-        : base;
+    constants: { organization_id: ORGANIZATION_ID },
+    dependencies: ["tb_integracao.tarefas_express"],
+  });
+  function classify(row, context) {
+    const base = classifyWithContext({
+      sourceTable,
+      row,
+      context,
+      identityField: "id",
+      resolutions: [
+        requiredResolution(
+          "taskModel",
+          "tarefa",
+          ["tb_integracao.tarefas_express"],
+          "TASK_REGULARIZE_MODEL",
+        ),
+      ],
+    });
+    if (base.status !== "prepared") return base;
+    const text = classifyText(row?.vinculo, "vinculo", "TASK_REGULARIZE_REFERRING_EMPTY");
+    if (text.status !== "prepared") return text;
+    const referringType = resolveRegularizeReferringType(row.vinculo);
+    if (referringType === null) {
+      return quarantine("vinculo", "TASK_REGULARIZE_REFERRING_TYPE_UNKNOWN");
+    }
+    const resolution = context.resolutions.referringType;
+    if (!resolution || !RESOLUTION_STATES.has(resolution.state)) {
+      return quarantine("vinculo", "TASK_REGULARIZE_REFERRING_TYPE_LOOKUP_NOT_EXECUTED");
+    }
+    if (resolution.state === "many") {
+      return quarantine("vinculo", "TASK_REGULARIZE_REFERRING_TYPE_AMBIGUOUS");
+    }
+    if (resolution.state === "zero") {
+      return quarantine("vinculo", "TASK_REGULARIZE_REFERRING_TYPE_UNKNOWN");
+    }
+    const sourceIdentityRef = rowReference(sourceTable, row.id);
+    const expectedTarget = `regularize.${referringType}`;
+    if (
+      resolution.sourceTable !== sourceTable ||
+      resolution.sourceKey !== normalizeKey(row.id) ||
+      resolution.sourceIdentityRef !== sourceIdentityRef ||
+      resolution.identityRef !== sourceIdentityRef ||
+      resolution.targetTable !== "integracao.tasksIntegrationRegularize" ||
+      resolution.targetIdentityRef !== expectedTarget ||
+      resolution.relatedIdentityRef !== expectedTarget ||
+      !sameCriteria(resolution.criteria, { legacyValue: normalizeText(row.vinculo) })
+    ) {
+      return quarantine("vinculo", "INTEGRATION_CONTEXT_MISMATCH");
+    }
+    return prepared();
+  }
+  return createRule({
+    sourceTable,
+    domain: "integration",
+    cardinality: "1:1",
+    dependencies: ["tb_integracao.tarefas_express"],
+    destinations: [step],
+    classifySourceRow: classify,
+    emitRows(row, context) {
+      const classification = classify(row, context);
+      return [emission(step, classification, rowReference(sourceTable, row?.id))];
     },
   });
 }
@@ -322,12 +612,7 @@ function createRegularizeGroupMemberRule() {
         context,
         identityField: "id",
         resolutions: [
-          requiredResolution(
-            "client",
-            "codigo_cliente",
-            ["tb_regularize.clientes"],
-            "GROUP_MEMBER_CLIENT",
-          ),
+          canonicalClientResolution("client", "codigo_cliente", "GROUP_MEMBER_CLIENT"),
           requiredResolution("group", "grupo_id", ["tb_regularize.grupos"], "GROUP_MEMBER_GROUP"),
         ],
       });
@@ -336,44 +621,99 @@ function createRegularizeGroupMemberRule() {
 }
 
 function createPartnerRule() {
-  return createInsertRule({
-    sourceTable: "tb_regularize.pf_empresas",
-    domain: "regularize",
+  const sourceTable = "tb_regularize.pf_empresas";
+  const step = destination({
     stepId: "regularize-partner-insert",
     destinationTable: "regularize.partners",
-    identityColumn: "id",
-    dependencies: ["tb_regularize.pf", "tb_regularize.clientes"],
+    mode: "insert",
+    identity: generateIdentity("id", sourceTable),
     columns: [
       mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
       mapped("pf_id", "pf_id", "resolve_explicit_client_pf_reference", referenceOptions()),
-      mapped(
-        "empresa_id",
-        "pj_id",
-        "resolve_explicit_regularize_client_reference",
-        referenceOptions(),
-      ),
+      mapped("empresa_id", "pj_id", "resolve_canonical_v2_client_reference", referenceOptions()),
       mapped("parte", "part", "normalize_percentage"),
       mapped("entrada", "entry", "normalize_required_date"),
       mapped("saida", "exit", "normalize_zero_date_to_null"),
     ],
-    classify(row, context) {
-      return classifyWithContext({
-        sourceTable: "tb_regularize.pf_empresas",
-        row,
-        context,
-        identityField: "id",
-        resolutions: [
-          requiredResolution("clientPf", "pf_id", ["tb_regularize.pf"], "PARTNER_PF"),
-          requiredResolution("client", "empresa_id", ["tb_regularize.clientes"], "PARTNER_PJ"),
-        ],
-      });
+    constants: { organization_id: ORGANIZATION_ID },
+    precedence: ["active_period", "latest_entry", "lowest_legacy_id"],
+    dependencies: ["tb_regularize.pf", "tb_regularize.clientes"],
+  });
+  function classify(row, context) {
+    const entry = classifyDate(row?.entrada, "entrada", "PARTNER_ENTRY_DATE_INVALID");
+    if (entry.status !== "prepared") return entry;
+    if (hasNonZeroDate(row?.saida)) {
+      const exit = classifyDate(row.saida, "saida", "PARTNER_EXIT_DATE_INVALID");
+      if (exit.status !== "prepared") return exit;
+      if (String(row.saida) < String(row.entrada)) {
+        return quarantine("saida", "PARTNER_EXIT_BEFORE_ENTRY");
+      }
+    }
+    const linked = classifyWithContext({
+      sourceTable,
+      row,
+      context,
+      identityField: "id",
+      resolutions: [
+        requiredResolution("clientPf", "pf_id", ["tb_regularize.pf"], "PARTNER_PF"),
+        canonicalClientResolution("client", "empresa_id", "PARTNER_PJ"),
+      ],
+    });
+    if (linked.status !== "prepared") return linked;
+    const pair = context.resolutions.partnerPair;
+    if (!pair || !RESOLUTION_STATES.has(pair.state)) {
+      return quarantine("id", "PARTNER_PAIR_DECISION_NOT_EXECUTED");
+    }
+    const expectedOwner = rowReference(sourceTable, row.id);
+    const expectedTarget = `regularize.partners:${context.resolutions.client.identityRef}:${context.resolutions.clientPf.identityRef}`;
+    if (
+      pair.sourceTable !== sourceTable ||
+      pair.sourceKey !== normalizeKey(row.id) ||
+      pair.sourceIdentityRef !== expectedOwner ||
+      pair.identityRef !== expectedOwner ||
+      pair.targetTable !== "regularize.partners" ||
+      pair.targetIdentityRef !== expectedTarget ||
+      !sameCriteria(pair.criteria, {
+        pjIdentityRef: context.resolutions.client.identityRef,
+        pfIdentityRef: context.resolutions.clientPf.identityRef,
+      }) ||
+      !new Set(["owner", "duplicate", "conflict"]).has(pair.decision)
+    ) {
+      return quarantine("id", "INTEGRATION_CONTEXT_MISMATCH");
+    }
+    if (pair.decision === "conflict" || pair.state === "many") {
+      return quarantine("id", "PARTNER_PAIR_HISTORY_CONFLICT");
+    }
+    if (pair.decision === "duplicate") {
+      return pair.ownerIdentityRef && pair.ownerIdentityRef !== expectedOwner
+        ? notEmitted("PARTNER_PAIR_HISTORICAL_DUPLICATE")
+        : quarantine("id", "INTEGRATION_CONTEXT_MISMATCH");
+    }
+    return pair.ownerIdentityRef === expectedOwner
+      ? prepared()
+      : quarantine("id", "INTEGRATION_CONTEXT_MISMATCH");
+  }
+  return createRule({
+    sourceTable,
+    domain: "regularize",
+    cardinality: "1:1",
+    dependencies: ["tb_regularize.pf", "tb_regularize.clientes"],
+    destinations: [step],
+    classifySourceRow: classify,
+    emitRows(row, context) {
+      return [emission(step, classify(row, context), rowReference(sourceTable, row?.id))];
     },
   });
 }
 
 function createTerminationTaskRule() {
   const sourceTable = "tb_integracao.tarefas_distrato";
-  const dependencies = ["tb_integracao.clientes", "tb_admin.departamentos", "tb_admin.usuarios"];
+  const dependencies = [
+    "tb_integracao.tarefas_express_distrato",
+    "tb_integracao.clientes",
+    "tb_admin.departamentos",
+    "tb_admin.usuarios",
+  ];
   const destinations = [
     lookupStep({
       stepId: "termination-task-model-lookup",
@@ -391,47 +731,7 @@ function createTerminationTaskRule() {
           referenceOptions(),
         ),
       ],
-      dependencies: ["tb_admin.departamentos"],
-    }),
-    destination({
-      stepId: "termination-task-model-derived",
-      destinationTable: "integracao.tasksModel",
-      mode: "derived",
-      identity: generateIdentity("id", `${sourceTable}:derived-model`),
-      columns: [
-        mapped("id", "id", "uuid_v5_derived_task_model"),
-        mapped("nome", "name", "normalize_required_text"),
-        mapped(
-          "departamento_id",
-          "department_id",
-          "resolve_explicit_department_reference",
-          referenceOptions(),
-        ),
-        mapped(
-          "responsavel_id",
-          "responsible_id",
-          "resolve_explicit_user_reference",
-          referenceOptions(),
-        ),
-        mapped(
-          "responsavel_id_dois",
-          "responsible2_id",
-          "resolve_optional_user_reference",
-          referenceOptions(),
-        ),
-        mapped(
-          "responsavel_id_tres",
-          "responsible3_id",
-          "resolve_optional_user_reference",
-          referenceOptions(),
-        ),
-        mapped("obs", "observations", "normalize_text", personalOptions()),
-        mapped("cobranca", "billing", "normalize_task_billing"),
-      ],
-      constants: { organization_id: ORGANIZATION_ID, type: "legacy-termination" },
-      defaults: { billing: "0", prevision: 0 },
-      precedence: ["derive_only_when_lookup_zero"],
-      dependencies: ["tb_admin.departamentos", "tb_admin.usuarios"],
+      dependencies: ["tb_integracao.tarefas_express_distrato"],
     }),
     lookupStep({
       stepId: "termination-project-lookup",
@@ -467,7 +767,7 @@ function createTerminationTaskRule() {
       identity: generateIdentity("id", sourceTable),
       columns: [
         mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
-        mapped(null, "model_id", "resolve_or_derive_task_model"),
+        mapped(null, "model_id", "resolve_catalog_task_model"),
         mapped(null, "project_id", "resolve_or_derive_project"),
         mapped("cliente_id", "client_id", "resolve_explicit_client_reference", referenceOptions()),
         mapped("nome", "name", "normalize_required_text"),
@@ -530,30 +830,20 @@ function createTerminationTaskRule() {
           emission(step, classification, `${identityRef}:${step.stepId}`),
         );
       }
-      const modelState = context.resolutions.taskModel.state;
       const projectState = context.resolutions.project.state;
       return [
-        emission(
-          destinations[0],
-          modelState === "one" ? prepared() : notEmitted("TASK_MODEL_NOT_FOUND_DERIVE"),
-          `${identityRef}:model-lookup`,
-        ),
+        emission(destinations[0], prepared(), `${identityRef}:model-lookup`),
         emission(
           destinations[1],
-          modelState === "zero" ? prepared() : notEmitted("TASK_MODEL_RESOLVED_NO_DERIVE"),
-          `${identityRef}:model-derived`,
-        ),
-        emission(
-          destinations[2],
           projectState === "one" ? prepared() : notEmitted("TASK_PROJECT_NOT_FOUND_DERIVE"),
           `${identityRef}:project-lookup`,
         ),
         emission(
-          destinations[3],
+          destinations[2],
           projectState === "zero" ? prepared() : notEmitted("TASK_PROJECT_RESOLVED_NO_DERIVE"),
           `${identityRef}:project-derived`,
         ),
-        emission(destinations[4], prepared(), identityRef),
+        emission(destinations[3], prepared(), identityRef),
       ];
     },
   });
@@ -601,10 +891,38 @@ function classifyTerminationTask(row, context) {
     const classification = classifyResolution(context, specification, row);
     if (classification.status !== "prepared") return classification;
   }
+  const responsibleDepartment = classifyResponsibleDepartments({
+    row,
+    context,
+    departmentResolutionName: "department",
+    responsibleResolutionNames: [
+      ["responsible", "responsavel_id"],
+      ["responsible2", "responsavel_id_dois"],
+      ["responsible3", "responsavel_id_tres"],
+    ],
+    reasonCode: "TASK_RESPONSIBLE_DEPARTMENT_MISMATCH",
+  });
+  if (responsibleDepartment.status !== "prepared") return responsibleDepartment;
   const model = context.resolutions.taskModel;
   if (!model || !RESOLUTION_STATES.has(model.state))
     return quarantine("nome", "TASK_MODEL_LOOKUP_NOT_EXECUTED");
   if (model.state === "many") return quarantine("nome", "TASK_MODEL_AMBIGUOUS");
+  if (model.state === "zero") return quarantine("nome", "TASK_MODEL_NOT_FOUND");
+  const expectedModelCriteria = {
+    name: normalizeText(row.nome),
+    departmentIdentityRef: context.resolutions.department.identityRef,
+  };
+  if (
+    model.sourceTable !== "tb_integracao.tarefas_express_distrato" ||
+    !isValidIdentity(model.sourceKey) ||
+    model.sourceIdentityRef !== rowReference(model.sourceTable, model.sourceKey) ||
+    model.identityRef !== model.sourceIdentityRef ||
+    model.targetTable !== "integracao.tasksModel" ||
+    model.targetIdentityRef !== model.identityRef ||
+    !sameCriteria(model.criteria, expectedModelCriteria)
+  ) {
+    return quarantine("nome", "TASK_MODEL_LOOKUP_CONTEXT_MISMATCH");
+  }
   if (model.relatedIdentityRef !== context.resolutions.department.identityRef) {
     return quarantine("departamento_id", "TASK_MODEL_DEPARTMENT_MISMATCH");
   }
@@ -612,136 +930,24 @@ function classifyTerminationTask(row, context) {
   if (!project || !RESOLUTION_STATES.has(project.state))
     return quarantine("cliente_id", "TASK_PROJECT_LOOKUP_NOT_EXECUTED");
   if (project.state === "many") return quarantine("cliente_id", "TASK_PROJECT_AMBIGUOUS");
+  const expectedProjectCriteria = {
+    clientIdentityRef: context.resolutions.client.identityRef,
+  };
   if (project.relatedIdentityRef !== context.resolutions.client.identityRef) {
     return quarantine("cliente_id", "TASK_PROJECT_CLIENT_MISMATCH");
   }
-  return prepared();
-}
-
-function createRegularizeAgendaRule() {
-  const sourceTable = "tb_regularize.agenda";
-  const dependencies = ["tb_regularize.clientes", "tb_admin.departamentos", "tb_admin.usuarios"];
-  const commonColumns = [
-    mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
-    mapped("title", "agenda", "normalize_required_text"),
-    mapped("subject", "obs", "normalize_text", personalOptions()),
-    mapped(
-      "departamento",
-      "department_control_id",
-      "resolve_explicit_department_reference",
-      referenceOptions(),
-    ),
-    mapped(
-      "responsavel_id",
-      "participant_id",
-      "resolve_optional_user_reference",
-      referenceOptions(),
-    ),
-    mapped(
-      "cliente_id",
-      "client_id",
-      "resolve_optional_regularize_client_reference",
-      referenceOptions(),
-    ),
-  ];
-  const destinations = [
-    destination({
-      stepId: "regularize-agenda-insert",
-      destinationTable: "agenda",
-      mode: "insert",
-      identity: generateIdentity("id", `${sourceTable}:single`),
-      columns: [
-        ...commonColumns,
-        mapped("start", "date", "normalize_required_datetime"),
-        mapped("status", "status", "normalize_text"),
-        notPreserved("recorrente", "O indicador apenas seleciona o destino não recorrente."),
-      ],
-      constants: { organization_id: ORGANIZATION_ID },
-      defaults: { location: null, task_id: null },
-      precedence: ["emit_when_not_recurring"],
-      dependencies,
-    }),
-    destination({
-      stepId: "regularize-recurring-agenda-insert",
-      destinationTable: "agenda.recurring",
-      mode: "insert",
-      identity: generateIdentity("id", `${sourceTable}:recurring`),
-      columns: [
-        ...commonColumns,
-        mapped("start", "day", "derive_day_of_month"),
-        mapped("recorrente", "recurrence", "normalize_legacy_recurrence"),
-        notPreserved("status", "A agenda recorrente atual não possui status autônomo equivalente."),
-      ],
-      constants: { organization_id: ORGANIZATION_ID },
-      defaults: { location: null },
-      precedence: ["emit_when_recurring"],
-      dependencies,
-    }),
-  ];
-  function classify(row, context) {
-    const basic = firstQuarantine([
-      classifyIdentity(row?.id, "id", "REGULARIZE_AGENDA_ID_INVALID"),
-      classifyText(row?.title, "title", "REGULARIZE_AGENDA_TITLE_EMPTY"),
-      classifyIdentity(row?.departamento, "departamento", "REGULARIZE_AGENDA_DEPARTMENT_INVALID"),
-    ]);
-    if (basic.status !== "prepared") return basic;
-    return classifyWithContext({
-      sourceTable,
-      row,
-      context,
-      identityField: "id",
-      resolutions: [
-        requiredResolution(
-          "department",
-          "departamento",
-          ["tb_admin.departamentos"],
-          "REGULARIZE_AGENDA_DEPARTMENT",
-        ),
-        optionalResolution(
-          "responsible",
-          "responsavel_id",
-          ["tb_admin.usuarios"],
-          "REGULARIZE_AGENDA_RESPONSIBLE",
-        ),
-        optionalResolution(
-          "client",
-          "cliente_id",
-          ["tb_regularize.clientes"],
-          "REGULARIZE_AGENDA_CLIENT",
-        ),
-      ],
-    });
+  if (
+    project.sourceTable !== "integracao.projects" ||
+    project.sourceIdentityRef !== rowReference(project.sourceTable, project.sourceKey) ||
+    project.targetTable !== "integracao.projects" ||
+    !sameCriteria(project.criteria, expectedProjectCriteria) ||
+    (project.state === "one" &&
+      (project.identityRef !== project.sourceIdentityRef ||
+        project.targetIdentityRef !== project.identityRef))
+  ) {
+    return quarantine("cliente_id", "TASK_PROJECT_LOOKUP_CONTEXT_MISMATCH");
   }
-  return createRule({
-    sourceTable,
-    domain: "regularize",
-    cardinality: "1:N",
-    dependencies,
-    destinations,
-    classifySourceRow: classify,
-    emitRows(row, context) {
-      const classification = classify(row, context);
-      const identityRef = rowReference(sourceTable, row?.id);
-      if (classification.status !== "prepared") {
-        return destinations.map((step) =>
-          emission(step, classification, `${identityRef}:${step.stepId}`),
-        );
-      }
-      const recurring = normalizeBoolean(row?.recorrente);
-      return [
-        emission(
-          destinations[0],
-          recurring ? notEmitted("RECURRING_AGENDA_USES_RECURRING_DESTINATION") : prepared(),
-          `${identityRef}:single`,
-        ),
-        emission(
-          destinations[1],
-          recurring ? prepared() : notEmitted("SINGLE_AGENDA_USES_SINGLE_DESTINATION"),
-          `${identityRef}:recurring`,
-        ),
-      ];
-    },
-  });
+  return prepared();
 }
 
 function createGuidanceActivityRule() {
@@ -771,6 +977,9 @@ function createGuidanceActivityRule() {
     dependencies: ["tb_regularize.orientaoes_processual"],
   });
   function classify(row, context) {
+    if (buildGuidanceActivityPayload(row) === null) {
+      return quarantine("atividade", "GUIDANCE_ACTIVITY_VALUE_INVALID");
+    }
     return classifyWithContext({
       sourceTable,
       row,
@@ -794,76 +1003,111 @@ function createGuidanceActivityRule() {
     destinations: [step],
     classifySourceRow: classify,
     emitRows(row, context) {
-      return [
-        emission(
-          step,
-          classify(row, context),
-          `${rowReference("tb_regularize.orientaoes_processual", row?.op_id)}:activities`,
-        ),
-      ];
+      const classification = classify(row, context);
+      return [emission(step, classification, rowReference(sourceTable, row?.id))];
     },
   });
 }
 
 function createClientPfRule() {
-  return createInsertRule({
-    sourceTable: "tb_regularize.pf",
-    domain: "regularize",
+  const sourceTable = "tb_regularize.pf";
+  const step = destination({
     stepId: "regularize-client-pf-insert",
     destinationTable: "clients.pf",
-    identityColumn: "codigo",
+    mode: "insert",
+    identity: generateIdentity("codigo", sourceTable),
     columns: [
       mapped("codigo", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
       mapped("codigo", "code", "normalize_required_text"),
       mapped("nome", "name", "normalize_required_text", personalOptions()),
-      mapped("sexo", "sex", "normalize_text", personalOptions()),
-      mapped("endereco", "address", "normalize_text", personalOptions()),
-      mapped("cidade", "city", "normalize_text"),
-      mapped("cep", "zip_code", "normalize_digits", personalOptions()),
-      mapped("uf", "state", "normalize_state"),
-      mapped("profissao", "profession", "normalize_text", personalOptions()),
-      mapped("pai", "father", "normalize_text", personalOptions()),
-      mapped("mae", "mother", "normalize_text", personalOptions()),
-      mapped("estado_civil", "marital_status", "normalize_text", personalOptions()),
+      mapped("sexo", "sex", "normalize_person_sex", personalOptions()),
+      mapped("endereco", "address", "normalize_required_text", personalOptions()),
+      mapped("cidade", "city", "normalize_required_text"),
+      mapped("cep", "zip_code", "normalize_required_digits", personalOptions()),
+      mapped("uf", "state", "normalize_required_state"),
+      mapped("profissao", "profession", "normalize_required_text", personalOptions()),
+      mapped("pai", "father", "normalize_required_text", personalOptions()),
+      mapped("mae", "mother", "normalize_required_text", personalOptions()),
+      mapped(
+        "estado_civil",
+        "marital_status",
+        "normalize_legacy_marital_status",
+        personalOptions(),
+      ),
       mapped("nascimento", "date_of_birth", "normalize_required_date", personalOptions()),
-      mapped("cpf_cnpj", "cpf", "normalize_cpf", personalOptions()),
-      mapped("identidade", "rg", "normalize_rg", personalOptions()),
+      mapped("cpf_cnpj", "cpf", "normalize_required_cpf", personalOptions()),
+      mapped("identidade", "rg", "normalize_required_rg", personalOptions()),
       mapped("reservista", "military_certificate", "normalize_text", personalOptions()),
       mapped("ctps", "ctps", "normalize_text", personalOptions()),
       mapped("cnh", "cnh", "normalize_text", personalOptions()),
       mapped("conjuge", "spouse", "normalize_text", personalOptions()),
-      mapped("status", "status", "normalize_status"),
+      mapped("status", "status", "normalize_required_status"),
       mapped("obs", "notes", "normalize_text", personalOptions()),
       notPreserved(
         "telefone",
         "ClientPF não possui telefone; o dado pessoal não é anexado a notes.",
       ),
     ],
+    constants: { organization_id: ORGANIZATION_ID },
     defaults: {
-      sex: "",
-      address: "",
-      city: "",
-      zip_code: "",
-      state: "",
-      profession: "",
-      father: "",
-      mother: "",
-      marital_status: "",
-      cpf: "",
-      rg: "",
       military_certificate: "",
       ctps: "",
       cnh: "",
       spouse: "",
-      status: "Migrado",
       notes: "",
     },
-    classify(row) {
-      return firstQuarantine([
-        classifyIdentity(row?.codigo, "codigo", "CLIENT_PF_IDENTITY_INVALID"),
-        classifyText(row?.nome, "nome", "CLIENT_PF_NAME_EMPTY"),
-        classifyDate(row?.nascimento, "nascimento", "CLIENT_PF_BIRTH_DATE_INVALID"),
-      ]);
+    precedence: ["validated_source", "signed_unique_owner"],
+  });
+  function classify(row, context) {
+    const normalized = normalizeClientPfSourceRow(row);
+    const required = firstQuarantine([
+      classifyIdentity(row?.codigo, "codigo", "CLIENT_PF_IDENTITY_INVALID"),
+      classifyText(row?.nome, "nome", "CLIENT_PF_NAME_EMPTY"),
+      normalized.sex === null ? quarantine("sexo", "CLIENT_PF_SEX_INVALID") : prepared(),
+      classifyText(row?.endereco, "endereco", "CLIENT_PF_ADDRESS_EMPTY"),
+      classifyText(row?.cidade, "cidade", "CLIENT_PF_CITY_EMPTY"),
+      normalized.zip_code.length === 0 ? quarantine("cep", "CLIENT_PF_ZIP_CODE_EMPTY") : prepared(),
+      normalized.state === null ? quarantine("uf", "CLIENT_PF_STATE_INVALID") : prepared(),
+      classifyText(row?.profissao, "profissao", "CLIENT_PF_PROFESSION_EMPTY"),
+      classifyText(row?.pai, "pai", "CLIENT_PF_FATHER_EMPTY"),
+      classifyText(row?.mae, "mae", "CLIENT_PF_MOTHER_EMPTY"),
+      normalized.marital_status === null
+        ? quarantine("estado_civil", "CLIENT_PF_MARITAL_STATUS_INVALID")
+        : prepared(),
+      classifyDate(row?.nascimento, "nascimento", "CLIENT_PF_BIRTH_DATE_INVALID"),
+      normalized.cpf.length === 11 ? prepared() : quarantine("cpf_cnpj", "CLIENT_PF_CPF_INVALID"),
+      normalized.rg.length > 0 ? prepared() : quarantine("identidade", "CLIENT_PF_RG_EMPTY"),
+      normalized.status === null ? quarantine("status", "CLIENT_PF_STATUS_INVALID") : prepared(),
+    ]);
+    if (required.status !== "prepared") return required;
+    if (!isContextBound(sourceTable, row, context)) {
+      return quarantine("codigo", "INTEGRATION_CONTEXT_MISMATCH");
+    }
+    const uniqueSlots = [
+      ["uniqueCode", "code", normalized.code],
+      ["uniqueCpf", "cpf", normalized.cpf],
+      ["uniqueRg", "rg", normalized.rg],
+    ];
+    for (const [resolutionName, field, value] of uniqueSlots) {
+      const classification = classifyClientPfUniqueSlot({
+        row,
+        resolution: context.resolutions[resolutionName],
+        field,
+        normalizedValue: value,
+      });
+      if (classification.status !== "prepared") return classification;
+    }
+    return prepared();
+  }
+  return createRule({
+    sourceTable,
+    domain: "regularize",
+    cardinality: "1:1",
+    dependencies: [],
+    destinations: [step],
+    classifySourceRow: classify,
+    emitRows(row, context) {
+      return [emission(step, classify(row, context), rowReference(sourceTable, row?.codigo))];
     },
   });
 }
@@ -983,6 +1227,191 @@ function createClientPfExpirationRule() {
   });
 }
 
+export function resolveRegularizeReferringType(value) {
+  const normalized = normalizeText(value).toLocaleUpperCase("pt-BR");
+  const licenses = new Set([
+    "SANITÁRIO",
+    "FUNCIONAMENTO",
+    "LICENÇA AMBIENTA",
+    "LICENÇA AMBIENTAL",
+    "PUBLICIDADE",
+  ]);
+  const processes = new Set([
+    "ALTERAÇÃO CONTRATUAL",
+    "ALTERAÇÃO DE PORTE",
+    "ALTERAÇÃO DO NOME FANTASIA",
+    "CONSTITUIÇÃO",
+    "CONSTITUIÇÃO DE MEI",
+    "DISTRATO SOCIAL",
+    "MIGRAÇÃO",
+    "MIGRAÇÃO MEI / ME",
+    "TRANSFORMAÇÃO",
+  ]);
+  if (licenses.has(normalized)) return "license";
+  if (processes.has(normalized)) return "process";
+  return null;
+}
+
+export function buildGuidanceActivityPayload(row) {
+  const type = normalizeKey(row?.tipo);
+  const normalizedType = type === "1" ? "Principal" : type === "0" ? "Secundária" : null;
+  const activity = normalizeText(row?.atividade);
+  const match = activity.match(/^(\d[\d./-]*\d)\s*(?:-\s*)?(.+)$/u);
+  const code = normalizeText(match?.[1]);
+  const description = normalizeText(match?.[2]).replace(/;+$/, "").trim();
+  return normalizedType !== null && code.length > 0 && description.length > 0
+    ? { code, description, type: normalizedType }
+    : null;
+}
+
+export function normalizeClientPfSourceRow(row) {
+  const maritalStatus = new Map([
+    ["1", "Solteiro"],
+    ["2", "Casado"],
+    ["3", "Viúvo(a)"],
+    ["4", "Divorciado(a)"],
+    ["5", "Concubinato(a)"],
+    ["6", "Separado(a) Judicialmente"],
+    ["7", "União Estável"],
+  ]).get(normalizeText(row?.estado_civil));
+  const sex = normalizeText(row?.sexo).toUpperCase();
+  const state = normalizeText(row?.uf).toUpperCase();
+  const status = normalizeText(row?.status);
+  return {
+    code: normalizeText(row?.codigo),
+    name: normalizeText(row?.nome),
+    sex: new Set(["F", "M"]).has(sex) ? sex : null,
+    address: normalizeText(row?.endereco),
+    city: normalizeText(row?.cidade),
+    zip_code: normalizeDigits(row?.cep),
+    state: /^[A-Z]{2}$/.test(state) ? state : null,
+    profession: normalizeText(row?.profissao),
+    father: normalizeText(row?.pai),
+    mother: normalizeText(row?.mae),
+    marital_status: maritalStatus ?? null,
+    date_of_birth: normalizeText(row?.nascimento),
+    cpf: normalizeDigits(row?.cpf_cnpj),
+    rg: normalizeText(row?.identidade)
+      .replace(/[^\p{L}\p{N}]/gu, "")
+      .toUpperCase(),
+    military_certificate: normalizeText(row?.reservista),
+    ctps: normalizeText(row?.ctps),
+    cnh: normalizeText(row?.cnh),
+    spouse: normalizeText(row?.conjuge),
+    status: status.length > 0 && status !== "Selecione um..." ? status : null,
+    notes: normalizeText(row?.obs),
+  };
+}
+
+function normalizeClientPfCurrentUniqueValue(field, value) {
+  if (field === "cpf") return normalizeDigits(value);
+  if (field === "rg") {
+    return normalizeText(value)
+      .replace(/[^\p{L}\p{N}]/gu, "")
+      .toUpperCase();
+  }
+  return normalizeText(value);
+}
+
+function compareClientPfRows(left, right) {
+  const leftCode = Number.parseInt(normalizeText(left?.codigo), 10);
+  const rightCode = Number.parseInt(normalizeText(right?.codigo), 10);
+  const leftOrder = Number.isSafeInteger(leftCode) ? leftCode : Number.MAX_SAFE_INTEGER;
+  const rightOrder = Number.isSafeInteger(rightCode) ? rightCode : Number.MAX_SAFE_INTEGER;
+  return leftOrder - rightOrder || canonicalRow(left).localeCompare(canonicalRow(right), "pt-BR");
+}
+
+function comparePartnerOwner(left, right) {
+  const leftActive = hasNonZeroDate(left?.saida) ? 1 : 0;
+  const rightActive = hasNonZeroDate(right?.saida) ? 1 : 0;
+  if (leftActive !== rightActive) return leftActive - rightActive;
+  const entryOrder = normalizeText(right?.entrada).localeCompare(
+    normalizeText(left?.entrada),
+    "en-US",
+  );
+  if (entryOrder !== 0) return entryOrder;
+  const leftId = Number.parseInt(normalizeText(left?.id), 10);
+  const rightId = Number.parseInt(normalizeText(right?.id), 10);
+  return leftId - rightId;
+}
+
+function partnerPeriodsConflict(rows) {
+  const valid = rows.every(
+    (row) =>
+      classifyDate(row?.entrada, "entrada", "INVALID").status === "prepared" &&
+      (!hasNonZeroDate(row?.saida) ||
+        classifyDate(row.saida, "saida", "INVALID").status === "prepared"),
+  );
+  if (!valid) return true;
+  const activeCount = rows.filter((row) => !hasNonZeroDate(row?.saida)).length;
+  if (activeCount > 1) return true;
+  const ordered = [...rows].sort((left, right) =>
+    normalizeText(left?.entrada).localeCompare(normalizeText(right?.entrada), "en-US"),
+  );
+  for (let index = 1; index < ordered.length; index += 1) {
+    const previous = ordered[index - 1];
+    const current = ordered[index];
+    if (!hasNonZeroDate(previous?.saida) || String(current.entrada) <= String(previous.saida)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function classifyClientPfUniqueSlot({ row, resolution, field, normalizedValue }) {
+  const reasonField = field.toUpperCase();
+  if (!resolution || !RESOLUTION_STATES.has(resolution.state)) {
+    return quarantine(field, `CLIENT_PF_${reasonField}_UNIQUE_LOOKUP_NOT_EXECUTED`);
+  }
+  const sourceIdentityRef = rowReference("tb_regularize.pf", row?.codigo);
+  if (
+    resolution.sourceTable !== "tb_regularize.pf" ||
+    resolution.sourceKey !== normalizeKey(row?.codigo) ||
+    resolution.sourceIdentityRef !== sourceIdentityRef ||
+    resolution.identityRef !== sourceIdentityRef ||
+    resolution.targetTable !== "clients.pf" ||
+    resolution.targetIdentityRef !== `clients.pf:${field}:${normalizedValue}` ||
+    !sameCriteria(resolution.criteria, { field, normalizedValue })
+  ) {
+    return quarantine(field, "INTEGRATION_CONTEXT_MISMATCH");
+  }
+  if (resolution.decision === "conflict" || resolution.state === "zero") {
+    return quarantine(field, `CLIENT_PF_${reasonField}_CONFLICT`);
+  }
+  if (resolution.decision === "duplicate" || resolution.state === "many") {
+    return resolution.decision === "duplicate" &&
+      resolution.ownerIdentityRef !== null &&
+      resolution.ownerIdentityRef !== sourceIdentityRef
+      ? notEmitted(`CLIENT_PF_${reasonField}_DUPLICATE`)
+      : quarantine(field, `CLIENT_PF_${reasonField}_CONFLICT`);
+  }
+  return resolution.decision === "owner" && resolution.ownerIdentityRef === sourceIdentityRef
+    ? prepared()
+    : quarantine(field, "INTEGRATION_CONTEXT_MISMATCH");
+}
+
+function classifyResponsibleDepartments({
+  row,
+  context,
+  departmentResolutionName,
+  responsibleResolutionNames,
+  reasonCode,
+}) {
+  const departmentIdentityRef = context?.resolutions?.[departmentResolutionName]?.identityRef;
+  for (const [resolutionName, field] of responsibleResolutionNames) {
+    if (!hasReference(row?.[field])) continue;
+    if (context.resolutions[resolutionName]?.relatedIdentityRef !== departmentIdentityRef) {
+      return quarantine(field, reasonCode);
+    }
+  }
+  return prepared();
+}
+
+function hasNonZeroDate(value) {
+  const normalized = normalizeText(value);
+  return normalized.length > 0 && normalized !== "0000-00-00";
+}
+
 function createInsertRule({
   sourceTable,
   domain,
@@ -1086,7 +1515,8 @@ function classifyResolution(context, specification, row) {
   }
   if (
     !specification.allowedSources.includes(resolution.sourceTable) ||
-    normalizeKey(value) !== resolution.sourceKey
+    normalizeKey(value) !== resolution.sourceKey ||
+    resolution.sourceIdentityRef !== `${resolution.sourceTable}:${resolution.sourceKey}`
   ) {
     return quarantine(specification.field, "INTEGRATION_CONTEXT_MISMATCH");
   }
@@ -1095,6 +1525,19 @@ function classifyResolution(context, specification, row) {
   }
   if (resolution.state === "many") {
     return quarantine(specification.field, `${specification.prefix}_AMBIGUOUS`);
+  }
+  if (specification.canonicalClient) {
+    const sourceIdentityRef = `${resolution.sourceTable}:${resolution.sourceKey}`;
+    const canonicalIdentity = resolution.identityRef;
+    const canonicalIsValid =
+      canonicalIdentity === sourceIdentityRef ||
+      /^tb_integracao\.clientes:[1-9]\d*$/.test(canonicalIdentity ?? "");
+    return canonicalIsValid &&
+      resolution.targetTable === "clients" &&
+      resolution.targetIdentityRef === canonicalIdentity &&
+      sameCriteria(resolution.criteria, { legacyCode: normalizeText(value) })
+      ? prepared()
+      : quarantine(specification.field, "INTEGRATION_CONTEXT_MISMATCH");
   }
   return resolution.identityRef === `${resolution.sourceTable}:${resolution.sourceKey}`
     ? prepared()
@@ -1109,6 +1552,17 @@ function optionalResolution(name, field, allowedSources, prefix) {
   return { name, field, allowedSources, prefix, optional: true };
 }
 
+function canonicalClientResolution(name, field, prefix) {
+  return {
+    name,
+    field,
+    allowedSources: ["tb_regularize.clientes"],
+    prefix,
+    optional: false,
+    canonicalClient: true,
+  };
+}
+
 function normalizeResolution(resolution) {
   if (!isPlainObject(resolution) || !RESOLUTION_STATES.has(resolution.state)) {
     throw new TypeError("resolução deve possuir state one, zero ou many");
@@ -1118,21 +1572,80 @@ function normalizeResolution(resolution) {
   if (sourceTable === null || sourceKey === null) {
     throw new TypeError("resolução deve possuir sourceTable e sourceKey sanitizados");
   }
+  const sourceIdentityRef = normalizeReference(
+    resolution.sourceIdentityRef ?? `${sourceTable}:${sourceKey}`,
+  );
   const identityRef =
-    resolution.state === "one"
-      ? normalizeReference(resolution.identityRef ?? `${sourceTable}:${sourceKey}`)
-      : null;
+    resolution.identityRef == null
+      ? resolution.state === "one"
+        ? `${sourceTable}:${sourceKey}`
+        : null
+      : normalizeReference(resolution.identityRef);
   const relatedIdentityRef =
     resolution.relatedIdentityRef == null
       ? null
       : normalizeReference(resolution.relatedIdentityRef);
+  const targetTable = resolution.targetTable == null ? null : normalizeKey(resolution.targetTable);
+  if (resolution.targetTable != null && targetTable === null) {
+    throw new TypeError("targetTable deve ser um identificador sanitizado");
+  }
+  const targetIdentityRef =
+    resolution.targetIdentityRef == null ? null : normalizeReference(resolution.targetIdentityRef);
+  const criteria =
+    resolution.criteria == null ? null : normalizeContextCriteria(resolution.criteria);
+  const decision = resolution.decision == null ? null : normalizeKey(resolution.decision);
+  if (decision !== null && !new Set(["owner", "duplicate", "conflict"]).has(decision)) {
+    throw new TypeError("decision deve ser owner, duplicate ou conflict");
+  }
+  const ownerIdentityRef =
+    resolution.ownerIdentityRef == null ? null : normalizeReference(resolution.ownerIdentityRef);
   return Object.freeze({
     state: resolution.state,
     sourceTable,
     sourceKey,
+    sourceIdentityRef,
     identityRef,
     relatedIdentityRef,
+    targetTable,
+    targetIdentityRef,
+    criteria,
+    decision,
+    ownerIdentityRef,
   });
+}
+
+function normalizeContextCriteria(value) {
+  if (!isPlainObject(value)) {
+    throw new TypeError("criteria deve ser um objeto simples");
+  }
+  const entries = Object.entries(value)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, item]) => {
+      if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(key)) {
+        throw new TypeError("criteria possui chave inválida");
+      }
+      if (isPlainObject(item)) return [key, normalizeContextCriteria(item)];
+      if (typeof item === "string") {
+        const normalized = item.trim();
+        if (
+          [...normalized].some((character) => {
+            const codePoint = character.codePointAt(0);
+            return codePoint !== undefined && (codePoint <= 31 || codePoint === 127);
+          })
+        ) {
+          throw new TypeError("criteria possui texto inválido");
+        }
+        return [key, normalized];
+      }
+      if (typeof item === "number" && Number.isFinite(item)) return [key, item];
+      if (typeof item === "boolean" || item === null) return [key, item];
+      throw new TypeError("criteria possui valor inválido");
+    });
+  return Object.freeze(Object.fromEntries(entries));
+}
+
+function sameCriteria(actual, expected) {
+  return isPlainObject(actual) && canonicalRow(actual) === canonicalRow(expected);
 }
 
 function isContextBound(sourceTable, row, context) {
@@ -1296,12 +1809,12 @@ function isValidIdentity(value) {
   );
 }
 
-function normalizeBoolean(value) {
-  return value === true || value === 1 || value === "1" || value === "true";
-}
-
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : String(value ?? "").trim();
+}
+
+function normalizeDigits(value) {
+  return normalizeText(value).replace(/\D/g, "");
 }
 
 function normalizeKey(value) {

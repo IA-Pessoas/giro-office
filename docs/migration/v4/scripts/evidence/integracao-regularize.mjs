@@ -54,6 +54,24 @@ const CONFIRMED = new Map(
         "A tarefa de distrato é uma Task atual somente após resolver modelo, projeto, cliente, departamento e responsáveis, com paridade obrigatória entre projeto e tarefa.",
     },
     {
+      sourceTable: "tb_integracao.tarefas_express_distrato",
+      references: [
+        "classes/Tarefa.php:684",
+        "classes/Tarefa.php:1112",
+        "classes/Colaborador.php:250",
+      ],
+      relationships: [
+        "id identifica o catálogo de modelos; nome e departamento vinculam as ocorrências de tb_integracao.tarefas_distrato sem derivar novos modelos das ocorrências.",
+        "responsáveis referenciam tb_admin.usuarios e precisam pertencer ao departamento explícito do modelo.",
+      ],
+      current: [
+        "infra/prisma/schema.prisma:774",
+        "services/task-service/src/services/taskModelService.ts:117",
+      ],
+      reason:
+        "O catálogo legado de distrato corresponde a TaskModel e preserva a origem do modelo mesmo quando o backup não contém linhas.",
+    },
+    {
       sourceTable: "tb_integracao.tarefas_regularize",
       references: ["classes/Tarefa.php:28", "classes/Tarefa.php:186", "classes/Tarefa.php:833"],
       relationships: [
@@ -65,16 +83,6 @@ const CONFIRMED = new Map(
       ],
       reason:
         "O vínculo entre modelo de tarefa e tipo Regularize possui contrato atual equivalente.",
-    },
-    {
-      sourceTable: "tb_regularize.agenda",
-      references: ["classes/Agenda.php:231", "classes/Agenda.php:245", "classes/Agenda.php:271"],
-      relationships: [
-        "departamento referencia tb_admin.departamentos, responsavel_id referencia tb_admin.usuarios e cliente_id referencia tb_regularize.clientes.codigo quando não é zero.",
-      ],
-      current: ["infra/prisma/schema.prisma:922", "infra/prisma/schema.prisma:947"],
-      reason:
-        "A agenda Regularize se adapta a agenda comum ou recorrente conforme o indicador legado, preservando vínculos explícitos.",
     },
     {
       sourceTable: "tb_regularize.grupos",
@@ -155,6 +163,20 @@ const CONFIRMED = new Map(
     },
   ].map((item) => [item.sourceTable, item]),
 );
+
+const PENDING = new Map([
+  [
+    "tb_regularize.agenda",
+    {
+      relationships: [
+        "status referencia tb_regularize.agenda_status, cliente_id referencia tb_regularize.clientes.codigo e o gerador legado copia a ocorrência do mês anterior sem armazenar identidade de série.",
+      ],
+      reasonCode: "CURRENT_CONTRACT_NOT_FAITHFUL",
+      reason:
+        "O backup contém ocorrências recorrentes já materializadas e datas deslocadas por calendário, sem identidade de série; não é possível reconstruir fielmente um único template recorrente atual.",
+    },
+  ],
+]);
 
 const LEGACY_USAGE = [
   ["tb_integracao.admin_tarefas", "backend/tb_integracao.admin_tarefas.sql:27", []],
@@ -299,19 +321,24 @@ export const INTEGRACAO_REGULARIZE_EVIDENCE = Object.freeze(
       });
     }
 
+    const pending = PENDING.get(sourceTable);
     const withoutBehavior = operations.length === 0;
     return decision({
       sourceTable,
       legacyModule: moduleFromSourceTable(sourceTable),
       legacyReferences: [fallbackReference],
       operations,
-      legacyRelationships: [],
+      legacyRelationships: pending?.relationships ?? [],
       currentContractEvidence: [],
       finalStatus: "pending",
-      reasonCode: withoutBehavior ? "NO_LEGACY_CODE_REFERENCE" : "CURRENT_CONTRACT_NOT_FAITHFUL",
-      reason: withoutBehavior
-        ? "Somente o artefato estrutural legado foi localizado; sem comportamento executável não há base para confirmar uma adaptação."
-        : "O comportamento legado não possui destino atual integral e comprovado; a origem permanece pending sem sugerir destino parcial.",
+      reasonCode:
+        pending?.reasonCode ??
+        (withoutBehavior ? "NO_LEGACY_CODE_REFERENCE" : "CURRENT_CONTRACT_NOT_FAITHFUL"),
+      reason:
+        pending?.reason ??
+        (withoutBehavior
+          ? "Somente o artefato estrutural legado foi localizado; sem comportamento executável não há base para confirmar uma adaptação."
+          : "O comportamento legado não possui destino atual integral e comprovado; a origem permanece pending sem sugerir destino parcial."),
       confidence: "low",
       ruleId: null,
     });

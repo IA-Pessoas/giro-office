@@ -22,8 +22,13 @@ import {
 } from "./admin-business.mjs";
 import { CERTIFICATE_RULES } from "./certificates.mjs";
 import {
+  buildClientPfResolutionContexts,
+  buildGuidanceActivityPayload,
   buildIntegrationRegularizeContext,
+  buildPartnerPairResolutionContexts,
   INTEGRACAO_REGULARIZE_RULES,
+  normalizeClientPfSourceRow,
+  resolveRegularizeReferringType,
 } from "./integracao-regularize.mjs";
 import { PARCELAMENTO_RULES } from "./parcelamento.mjs";
 import { RH_PESSOAL_RULES } from "./rh-pessoal.mjs";
@@ -34,9 +39,12 @@ export {
   ADMIN_BUSINESS_EVIDENCE,
   ADMIN_BUSINESS_RULES,
   ADMIN_BUSINESS_TRANSFORMATIONS,
+  buildClientPfResolutionContexts,
   buildIcmsResolutionContexts,
+  buildGuidanceActivityPayload,
   buildPermissionResolutionContexts,
   buildIntegrationRegularizeContext,
+  buildPartnerPairResolutionContexts,
   CERTIFICATE_EVIDENCE,
   CERTIFICATE_RULES,
   createLegacyReferenceResolver,
@@ -44,10 +52,12 @@ export {
   INTEGRACAO_REGULARIZE_EVIDENCE,
   INTEGRACAO_REGULARIZE_RULES,
   INTEGRACAO_REGULARIZE_SOURCE_TABLES,
+  normalizeClientPfSourceRow,
   PARCELAMENTO_EVIDENCE,
   PARCELAMENTO_RULES,
   RH_PESSOAL_EVIDENCE,
   RH_PESSOAL_RULES,
+  resolveRegularizeReferringType,
   SPECIALIZED_EVIDENCE,
   TECHNOLOGY_EVIDENCE,
   TECHNOLOGY_RULES,

@@ -18,8 +18,8 @@ const CONFIRMED_SOURCE_TABLES = [
   "tb_integracao.pa_historicos",
   "tb_integracao.tarefas_dependentes",
   "tb_integracao.tarefas_distrato",
+  "tb_integracao.tarefas_express_distrato",
   "tb_integracao.tarefas_regularize",
-  "tb_regularize.agenda",
   "tb_regularize.grupos",
   "tb_regularize.grupos_integrantes",
   "tb_regularize.orientaoes_processual.atividades",
@@ -150,11 +150,12 @@ test("evidência cita arquivos reais e confirmação cita contrato atual real", 
   }
 });
 
-test("DTE, catálogos, anexos e controles permanecem pending sem destino fabricado", () => {
+test("agenda materializada, DTE, anexos e controles permanecem pending sem destino fabricado", () => {
   const { INTEGRACAO_REGULARIZE_EVIDENCE } = implementation();
   const requiredPending = [
     "tb_regularize.dte",
     "tb_regularize.dte_status",
+    "tb_regularize.agenda",
     "tb_regularize.atividades",
     "tb_regularize.sites_estado",
     "tb_regularize.sites_prefeituras",
@@ -172,4 +173,28 @@ test("DTE, catálogos, anexos e controles permanecem pending sem destino fabrica
     assert.equal(decision.finalStatus, "pending", sourceTable);
     assert.equal(decision.ruleId, null, sourceTable);
   }
+});
+
+test("catálogo de distrato preserva TaskModel e agenda não fabrica série recorrente", () => {
+  const { INTEGRACAO_REGULARIZE_EVIDENCE } = implementation();
+  const catalog = INTEGRACAO_REGULARIZE_EVIDENCE.find(
+    ({ sourceTable }) => sourceTable === "tb_integracao.tarefas_express_distrato",
+  );
+  const agenda = INTEGRACAO_REGULARIZE_EVIDENCE.find(
+    ({ sourceTable }) => sourceTable === "tb_regularize.agenda",
+  );
+
+  assert.equal(catalog?.finalStatus, "confirmed");
+  assert.equal(catalog?.ruleId, "integracao-regularize:tb_integracao.tarefas_express_distrato");
+  assert.match(catalog?.reason ?? "", /catálogo|modelo/i);
+  assert.deepEqual(catalog?.currentContractEvidence, [
+    "infra/prisma/schema.prisma:774",
+    "services/task-service/src/services/taskModelService.ts:117",
+  ]);
+
+  assert.equal(agenda?.finalStatus, "pending");
+  assert.equal(agenda?.ruleId, null);
+  assert.equal(agenda?.reasonCode, "CURRENT_CONTRACT_NOT_FAITHFUL");
+  assert.match(agenda?.reason ?? "", /materializad|série|recorr/i);
+  assert.deepEqual(agenda?.currentContractEvidence, []);
 });
