@@ -33,6 +33,7 @@ import {
 } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { PaginationControls } from "@shared/components";
+import { Dialog } from "@shared/components/ui/Dialog";
 import { useDebouncedValue } from "@shared/hooks";
 import { getLastPage } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
@@ -692,6 +693,209 @@ function getSiteCredentialDetailStatus(error: unknown): string {
   return "Credencial indisponivel para revelacao.";
 }
 
+function ProcessDetailContent({
+  canManageRegularizeCore,
+  currentProcessId,
+  guidanceQuery,
+  onRemoveGuidanceActivity,
+  onRemoveGuidancePartner,
+  onSetActiveForm,
+  processDetailQuery,
+  processSelectionOrigin,
+}: {
+  canManageRegularizeCore: boolean;
+  currentProcessId?: RegularizeId;
+  guidanceQuery: ReturnType<typeof useRegularizeGuidance>;
+  onRemoveGuidanceActivity: (
+    guidanceId: RegularizeId,
+    processId: RegularizeId,
+    itemId: RegularizeId | undefined,
+  ) => void | Promise<void>;
+  onRemoveGuidancePartner: (
+    guidanceId: RegularizeId,
+    processId: RegularizeId,
+    itemId: RegularizeId | undefined,
+  ) => void | Promise<void>;
+  onSetActiveForm: (form: RegularizeFormState) => void;
+  processDetailQuery: ReturnType<typeof useRegularizeProcessDetail>;
+  processSelectionOrigin: ProcessSelectionOrigin;
+}) {
+  return (
+    <>
+      <p
+        role="status"
+        aria-live="polite"
+        className="text-xs font-medium text-gray-500 dark:text-slate-400"
+      >
+        {processSelectionOrigin === "manual"
+          ? "Processo selecionado manualmente."
+          : "Primeiro processo desta página selecionado automaticamente."}
+      </p>
+      {processDetailQuery.isLoading ? (
+        <FieldLine label="Status" value="Carregando..." />
+      ) : processDetailQuery.data ? (
+        <>
+          <FieldLine label="Tipo" value={formatText(processDetailQuery.data.process_type)} />
+          <FieldLine
+            label="Status"
+            value={
+              <StatusBadge
+                config={getStatusBadgeConfig(processDetailQuery.data.status)}
+                size="sm"
+              />
+            }
+          />
+          <FieldLine label="Entrada" value={formatDate(processDetailQuery.data.entry_date)} />
+          <FieldLine label="Previsto" value={formatDate(processDetailQuery.data.expected_date)} />
+          <FieldLine label="Urgência" value={formatText(processDetailQuery.data.urgency)} />
+        </>
+      ) : (
+        <FieldLine label="Status" value="Sem seleção." />
+      )}
+
+      {canManageRegularizeCore && currentProcessId ? (
+        <div className="pt-2">
+          <PrimaryActionButton
+            icon={Plus}
+            label="Nova orientação"
+            onClick={() =>
+              onSetActiveForm({ type: "guidance", mode: "create", processId: currentProcessId })
+            }
+          />
+        </div>
+      ) : null}
+
+      <div className="pt-2">
+        <QueryStatePanel query={guidanceQuery} emptyTitle="Sem orientações.">
+          {(guidanceRows) => (
+            <div className="space-y-3">
+              {guidanceRows.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-lg border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {getGuidanceTitle(item)}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-slate-400">
+                        {getGuidanceDescription(item)}
+                      </p>
+                    </div>
+                    {canManageRegularizeCore ? (
+                      <TableActionButton
+                        icon={Pencil}
+                        title="Editar orientação"
+                        onClick={() =>
+                          onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
+                        }
+                      />
+                    ) : null}
+                  </div>
+
+                  {canManageRegularizeCore ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <PrimaryActionButton
+                        icon={Plus}
+                        label="Adicionar atividade"
+                        onClick={() =>
+                          onSetActiveForm({
+                            type: "guidance-activity",
+                            guidanceId: item.id,
+                            processId: item.process_id,
+                          })
+                        }
+                      />
+                      <PrimaryActionButton
+                        icon={Plus}
+                        label="Adicionar sócio"
+                        onClick={() =>
+                          onSetActiveForm({
+                            type: "guidance-partner",
+                            guidanceId: item.id,
+                            processId: item.process_id,
+                          })
+                        }
+                      />
+                    </div>
+                  ) : null}
+
+                  {(item.economic_activities?.length ?? 0) > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-500">
+                        Atividades
+                      </p>
+                      {item.economic_activities?.map(
+                        (activity: RegularizeGuidanceEconomicActivity, index) => (
+                          <div
+                            key={activity.id ?? `${activity.code}-${index}`}
+                            className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-800/70"
+                          >
+                            <span className="min-w-0 text-gray-700 dark:text-slate-200">
+                              {formatText(activity.code)} - {formatText(activity.description)}
+                            </span>
+                            {canManageRegularizeCore ? (
+                              <TableActionButton
+                                disabled={!activity.id}
+                                icon={Trash2}
+                                title="Remover atividade"
+                                onClick={() => {
+                                  void onRemoveGuidanceActivity(
+                                    item.id,
+                                    item.process_id,
+                                    activity.id,
+                                  );
+                                }}
+                              />
+                            ) : null}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : null}
+
+                  {(item.partners?.length ?? 0) > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-500">
+                        Sócios
+                      </p>
+                      {item.partners?.map((partner: RegularizeGuidancePartner, index) => (
+                        <div
+                          key={partner.id ?? `${partner.name}-${index}`}
+                          className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-800/70"
+                        >
+                          <span className="min-w-0 text-gray-700 dark:text-slate-200">
+                            {formatText(partner.name)} - {formatDocument(partner.cpf ?? partner.document)}
+                          </span>
+                          {canManageRegularizeCore ? (
+                            <TableActionButton
+                              disabled={!partner.id}
+                              icon={Trash2}
+                              title="Remover sócio"
+                              onClick={() => {
+                                void onRemoveGuidancePartner(
+                                  item.id,
+                                  item.process_id,
+                                  partner.id,
+                                );
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </QueryStatePanel>
+      </div>
+    </>
+  );
+}
+
 export function RegularizePage() {
   const [activeTab, setActiveTab] = useState<RegularizeTabId>("dashboard");
   const [selectedClientPfId, setSelectedClientPfId] = useState<RegularizeId>();
@@ -702,6 +906,7 @@ export function RegularizePage() {
   const [processSelectionOrigin, setProcessSelectionOrigin] = useState<ProcessSelectionOrigin>(
     "automatic",
   );
+  const [isProcessDetailDialogOpen, setIsProcessDetailDialogOpen] = useState(false);
   const selectedProcessDetailRef = useRef<HTMLElement | null>(null);
   const [activePasswordId, setActivePasswordId] = useState<RegularizeId>();
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
@@ -1006,6 +1211,12 @@ export function RegularizePage() {
       selectedProcessDetailRef.current?.focus({ preventScroll: true });
       selectedProcessDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  }
+
+  function openProcessDetail(processId: RegularizeId) {
+    setSelectedProcessId(processId);
+    setProcessSelectionOrigin("manual");
+    setIsProcessDetailDialogOpen(true);
   }
 
   function handleRefreshRegularize() {
@@ -1569,7 +1780,7 @@ export function RegularizePage() {
                           <TableActionButton
                             icon={Eye}
                             title="Ver detalhe"
-                            onClick={() => selectProcessManually(item.id)}
+                            onClick={() => openProcessDetail(item.id)}
                           />
                           {canManageRegularizeCore ? (
                             <TableActionButton
@@ -1608,195 +1819,39 @@ export function RegularizePage() {
 
             {hasProcessRows ? (
               <DetailPanel title="Processo selecionado" panelRef={selectedProcessDetailRef}>
-                <p
-                  role="status"
-                  aria-live="polite"
-                  className="text-xs font-medium text-gray-500 dark:text-slate-400"
-                >
-                  {processSelectionOrigin === "manual"
-                    ? "Processo selecionado manualmente."
-                    : "Primeiro processo desta página selecionado automaticamente."}
-                </p>
-                {processDetailQuery.isLoading ? (
-                  <FieldLine label="Status" value="Carregando..." />
-                ) : processDetailQuery.data ? (
-                  <>
-                    <FieldLine
-                      label="Tipo"
-                      value={formatText(processDetailQuery.data.process_type)}
-                    />
-                    <FieldLine
-                      label="Status"
-                      value={
-                        <StatusBadge
-                          config={getStatusBadgeConfig(processDetailQuery.data.status)}
-                          size="sm"
-                        />
-                      }
-                    />
-                    <FieldLine
-                      label="Entrada"
-                      value={formatDate(processDetailQuery.data.entry_date)}
-                    />
-                    <FieldLine
-                      label="Previsto"
-                      value={formatDate(processDetailQuery.data.expected_date)}
-                    />
-                    <FieldLine
-                      label="Urgência"
-                      value={formatText(processDetailQuery.data.urgency)}
-                    />
-                  </>
-                ) : (
-                  <FieldLine label="Status" value="Sem seleção." />
-                )}
-
-                {canManageRegularizeCore && currentProcessId ? (
-                  <div className="pt-2">
-                    <PrimaryActionButton
-                      icon={Plus}
-                      label="Nova orientação"
-                      onClick={() =>
-                        setActiveForm({ type: "guidance", mode: "create", processId: currentProcessId })
-                      }
-                    />
-                  </div>
-                ) : null}
-
-                <div className="pt-2">
-                  <QueryStatePanel query={guidanceQuery} emptyTitle="Sem orientações.">
-                    {(guidanceRows) => (
-                      <div className="space-y-3">
-                        {guidanceRows.map((item) => (
-                          <div
-                            key={item.id}
-                            className="rounded-lg border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {getGuidanceTitle(item)}
-                                </p>
-                                <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-slate-400">
-                                  {getGuidanceDescription(item)}
-                                </p>
-                              </div>
-                              {canManageRegularizeCore ? (
-                                <TableActionButton
-                                  icon={Pencil}
-                                  title="Editar orientação"
-                                  onClick={() =>
-                                    setActiveForm({ type: "guidance", mode: "edit", guidance: item })
-                                  }
-                                />
-                              ) : null}
-                            </div>
-
-                            {canManageRegularizeCore ? (
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <PrimaryActionButton
-                                  icon={Plus}
-                                  label="Adicionar atividade"
-                                  onClick={() =>
-                                    setActiveForm({
-                                      type: "guidance-activity",
-                                      guidanceId: item.id,
-                                      processId: item.process_id,
-                                    })
-                                  }
-                                />
-                                <PrimaryActionButton
-                                  icon={Plus}
-                                  label="Adicionar sócio"
-                                  onClick={() =>
-                                    setActiveForm({
-                                      type: "guidance-partner",
-                                      guidanceId: item.id,
-                                      processId: item.process_id,
-                                    })
-                                  }
-                                />
-                              </div>
-                            ) : null}
-
-                            {(item.economic_activities?.length ?? 0) > 0 ? (
-                              <div className="mt-3 space-y-2">
-                                <p className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-500">
-                                  Atividades
-                                </p>
-                                {item.economic_activities?.map(
-                                  (activity: RegularizeGuidanceEconomicActivity, index) => (
-                                    <div
-                                      key={activity.id ?? `${activity.code}-${index}`}
-                                      className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-800/70"
-                                    >
-                                      <span className="min-w-0 text-gray-700 dark:text-slate-200">
-                                        {formatText(activity.code)} -{" "}
-                                        {formatText(activity.description)}
-                                      </span>
-                                      {canManageRegularizeCore ? (
-                                        <TableActionButton
-                                          disabled={!activity.id}
-                                          icon={Trash2}
-                                          title="Remover atividade"
-                                          onClick={() => {
-                                            void handleRemoveGuidanceActivity(
-                                              item.id,
-                                              item.process_id,
-                                              activity.id,
-                                            );
-                                          }}
-                                        />
-                                      ) : null}
-                                    </div>
-                                  ),
-                                )}
-                              </div>
-                            ) : null}
-
-                            {(item.partners?.length ?? 0) > 0 ? (
-                              <div className="mt-3 space-y-2">
-                                <p className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-500">
-                                  Sócios
-                                </p>
-                                {item.partners?.map(
-                                  (partner: RegularizeGuidancePartner, index) => (
-                                    <div
-                                      key={partner.id ?? `${partner.name}-${index}`}
-                                      className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-800/70"
-                                    >
-                                      <span className="min-w-0 text-gray-700 dark:text-slate-200">
-                                        {formatText(partner.name)} -{" "}
-                                        {formatDocument(partner.cpf ?? partner.document)}
-                                      </span>
-                                      {canManageRegularizeCore ? (
-                                        <TableActionButton
-                                          disabled={!partner.id}
-                                          icon={Trash2}
-                                          title="Remover sócio"
-                                          onClick={() => {
-                                            void handleRemoveGuidancePartner(
-                                              item.id,
-                                              item.process_id,
-                                              partner.id,
-                                            );
-                                          }}
-                                        />
-                                      ) : null}
-                                    </div>
-                                  ),
-                                )}
-                              </div>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </QueryStatePanel>
-                </div>
+                <ProcessDetailContent
+                  canManageRegularizeCore={canManageRegularizeCore}
+                  currentProcessId={currentProcessId}
+                  guidanceQuery={guidanceQuery}
+                  onRemoveGuidanceActivity={handleRemoveGuidanceActivity}
+                  onRemoveGuidancePartner={handleRemoveGuidancePartner}
+                  onSetActiveForm={setActiveForm}
+                  processDetailQuery={processDetailQuery}
+                  processSelectionOrigin={processSelectionOrigin}
+                />
               </DetailPanel>
             ) : null}
           </div>
+
+          <Dialog
+            open={isProcessDetailDialogOpen}
+            onOpenChange={setIsProcessDetailDialogOpen}
+            title="Detalhes do processo"
+            description="Informações do processo selecionado"
+          >
+            {hasProcessRows ? (
+              <ProcessDetailContent
+                canManageRegularizeCore={canManageRegularizeCore}
+                currentProcessId={currentProcessId}
+                guidanceQuery={guidanceQuery}
+                onRemoveGuidanceActivity={handleRemoveGuidanceActivity}
+                onRemoveGuidancePartner={handleRemoveGuidancePartner}
+                onSetActiveForm={setActiveForm}
+                processDetailQuery={processDetailQuery}
+                processSelectionOrigin={processSelectionOrigin}
+              />
+            ) : null}
+          </Dialog>
         </section>
       ) : null}
 
