@@ -35,21 +35,21 @@ test("registro V2 porta mecanicamente as 16 origens em um passo insert draft", a
   for (const rule of registry.values()) {
     assert.equal(rule.status, "confirmed");
     assert.equal(rule.cardinality, "1:1");
+    assert.equal(Array.isArray(rule.dependencies), true);
     assert.equal(rule.destinations.length, 1);
     assert.equal(rule.destinations[0]?.stepId, "v2-insert");
     assert.equal(rule.destinations[0]?.mode, "insert");
+    assert.equal(rule.destinations[0]?.identity.kind, "generate");
+    assert.deepEqual(rule.destinations[0]?.constants, {});
+    assert.deepEqual(rule.destinations[0]?.defaults, {});
+    assert.deepEqual(rule.destinations[0]?.precedence, ["source"]);
     assert.match(rule.ruleOrigin, /draft.*Task 3/i);
     assert.ok(rule.evidence.legacy.every((item) => /Task 3/i.test(item)));
     assert.ok(rule.evidence.current.every((item) => /Task 3/i.test(item)));
-    for (const field of [
-      "destinationTable",
-      "identity",
-      "columns",
-      "classifyRow",
-      "dependencies",
-    ]) {
+    for (const field of ["destinationTable", "identity", "columns", "classifyRow", "reason"]) {
       assert.equal(field in rule, false, `${rule.sourceTable}.${field}`);
     }
+    assert.equal(typeof rule.classifySourceRow, "function");
   }
 });
 
@@ -67,13 +67,17 @@ test("emitRows V2 retorna apenas decisões sanitizadas por passo", () => {
 
     assert.equal(Array.isArray(emissions), true, rule.sourceTable);
     assert.equal(emissions.length, 1, rule.sourceTable);
-    assert.ok(
-      Object.keys(emissions[0]).every((key) =>
-        ["stepId", "status", "field", "reasonCode"].includes(key),
-      ),
-      rule.sourceTable,
-    );
+    assert.deepEqual(Object.keys(emissions[0]).sort(), [
+      "destinationTable",
+      "field",
+      "identityRef",
+      "reasonCode",
+      "status",
+      "stepId",
+    ]);
     assert.equal(emissions[0].stepId, "v2-insert");
+    assert.equal(emissions[0].destinationTable, rule.destinations[0]?.destinationTable);
+    assert.equal(typeof emissions[0].identityRef, "string");
     assert.ok(["prepared", "quarantine"].includes(emissions[0].status), rule.sourceTable);
     assert.doesNotMatch(JSON.stringify(emissions), /payload|value/i);
   }

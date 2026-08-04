@@ -376,45 +376,73 @@ function rule({
     status: "confirmed",
     domain,
     ruleOrigin: RULE_ORIGIN,
-    reason: "Portada mecanicamente da V2; decisão semântica pendente na Task 3.",
     evidence: {
       legacy: [...DRAFT_EVIDENCE.legacy],
       current: [...DRAFT_EVIDENCE.current],
     },
     cardinality: "1:1",
+    dependencies,
     destinations: [
       {
         stepId: "v2-insert",
         destinationTable,
         mode: "insert",
         identity: {
-          strategy: "create",
+          kind: "generate",
           legacyColumn,
           scope: sourceTable,
           namespace: REQUIRED_IDENTITY_NAMESPACE,
         },
-        dependencies,
         columns: pairs.map(([sourceColumn, destinationColumn, transformation, sensitivity]) =>
           mappedColumn({ sourceColumn, destinationColumn, transformation, sensitivity }),
         ),
+        constants: {},
+        defaults: {},
+        precedence: ["source"],
+        dependencies,
       },
     ],
+    classifySourceRow: classifyRow,
     emitRows(row, context) {
-      return [toEmissionDecision(classifyRow(row, context))];
+      return [
+        toEmissionDecision({
+          sourceTable,
+          destinationTable,
+          legacyColumn,
+          row,
+          classification: classifyRow(row, context),
+        }),
+      ];
     },
   };
 }
 
-function toEmissionDecision(decision) {
-  const emission = { stepId: "v2-insert", status: decision.status };
-  if (decision.status !== "quarantine") {
-    return emission;
+function toEmissionDecision({ sourceTable, destinationTable, legacyColumn, row, classification }) {
+  const emission = {
+    stepId: "v2-insert",
+    destinationTable,
+    status: classification.status,
+    identityRef: legacyIdentityRef(sourceTable, legacyColumn, row),
+  };
+  if (classification.status !== "quarantine") {
+    return { ...emission, field: null, reasonCode: null };
   }
   return {
     ...emission,
-    field: decision.field,
-    reasonCode: decision.reasonCode,
+    field: classification.field,
+    reasonCode: classification.reasonCode,
   };
+}
+
+function legacyIdentityRef(sourceTable, legacyColumn, row) {
+  const legacyValue = row?.[legacyColumn];
+  if (
+    (typeof legacyValue === "string" || typeof legacyValue === "number") &&
+    /^[A-Za-z0-9_.-]+$/.test(String(legacyValue))
+  ) {
+    return `${sourceTable}:${legacyValue}`;
+  }
+  return `${sourceTable}:unknown`;
 }
 
 function mappedColumn({ sourceColumn, destinationColumn, transformation, sensitivity }) {
