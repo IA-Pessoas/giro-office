@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { IoClose } from "react-icons/io5";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 interface DialogProps {
   open: boolean;
@@ -12,6 +12,7 @@ interface DialogProps {
   overlayClassName?: string;
   contentClassName?: string;
   bodyClassName?: string;
+  contentRef?: Ref<HTMLDivElement>;
   preventClose?: boolean;
 }
 
@@ -25,6 +26,7 @@ export function Dialog({
   overlayClassName = "",
   contentClassName = "",
   bodyClassName = "",
+  contentRef,
   preventClose = false,
 }: DialogProps) {
   const handleOpenChange = (nextOpen: boolean) => {
@@ -42,6 +44,7 @@ export function Dialog({
           className={`fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:duration-150 data-[state=closed]:duration-150 motion-reduce:animate-none ${overlayClassName}`}
         />
         <DialogPrimitive.Content
+          ref={contentRef}
           onEscapeKeyDown={(event) => {
             if (preventClose) {
               event.preventDefault();

@@ -271,6 +271,7 @@ export function CertificatesWorkspace() {
   const { access, isLoading: isModuleAccessLoading } = useModuleAccess("certificado");
   const [activeTab, setActiveTab] = useState<CertificateTab>("pj");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("view");
+  const [formDialogContent, setFormDialogContent] = useState<HTMLDivElement | null>(null);
   const [selected, setSelected] = useState<DetailTarget>(null);
   const [showDetailPassword, setShowDetailPassword] = useState(false);
   const [pjPage, setPjPage] = useState(FIRST_PAGE);
@@ -1652,6 +1653,7 @@ export function CertificatesWorkspace() {
         onOpenChange={handleFormOpenChange}
         title={formDialogTitle}
         description={formDialogDescription}
+        contentRef={setFormDialogContent}
         contentClassName={CERTIFICATE_FORM_MODAL_CONTENT_CLASSNAME}
         bodyClassName={CERTIFICATE_FORM_MODAL_BODY_CLASSNAME}
         footer={
@@ -1682,6 +1684,7 @@ export function CertificatesWorkspace() {
             formId={activeFormId}
             kind="pj"
             mode="create"
+            tooltipContainer={formDialogContent}
             isSubmitting={formSubmitting}
             onSubmit={handleSubmitCreatePj}
           />
@@ -1693,6 +1696,7 @@ export function CertificatesWorkspace() {
             formId={activeFormId}
             kind="pf"
             mode="create"
+            tooltipContainer={formDialogContent}
             isSubmitting={formSubmitting}
             onSubmit={handleSubmitCreatePf}
           />
@@ -1714,6 +1718,7 @@ export function CertificatesWorkspace() {
               formId={activeFormId}
               kind="pj"
               mode="edit"
+              tooltipContainer={formDialogContent}
               initialData={pjDetail}
               isSubmitting={formSubmitting}
               onSubmit={handleSubmitEditPj}
@@ -1737,6 +1742,7 @@ export function CertificatesWorkspace() {
               formId={activeFormId}
               kind="pf"
               mode="edit"
+              tooltipContainer={formDialogContent}
               initialData={pfDetail}
               isSubmitting={formSubmitting}
               onSubmit={handleSubmitEditPf}
