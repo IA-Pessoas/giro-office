@@ -35,6 +35,12 @@ import {
   resolveRegularizeReferringType,
 } from "./integracao-regularize.mjs";
 import { PARCELAMENTO_RULES } from "./parcelamento.mjs";
+import {
+  buildExtensionNumberSlotContexts,
+  buildRemainingReferenceContext,
+  buildTriageClientSlotContexts,
+  REMAINING_RULES,
+} from "./remaining.mjs";
 import { RH_PESSOAL_RULES } from "./rh-pessoal.mjs";
 import { TECHNOLOGY_RULES } from "./tecnologia.mjs";
 import { V2_RULES } from "./v2.mjs";
@@ -63,6 +69,10 @@ export {
   normalizeClientPfSourceRow,
   PARCELAMENTO_EVIDENCE,
   PARCELAMENTO_RULES,
+  buildRemainingReferenceContext,
+  buildExtensionNumberSlotContexts,
+  buildTriageClientSlotContexts,
+  REMAINING_RULES,
   RH_PESSOAL_EVIDENCE,
   RH_PESSOAL_RULES,
   resolveRegularizeReferringType,
@@ -79,6 +89,7 @@ export const rhPessoalRules = RH_PESSOAL_RULES;
 export const technologyRules = TECHNOLOGY_RULES;
 export const certificateRules = CERTIFICATE_RULES;
 export const parcelamentoRules = PARCELAMENTO_RULES;
+export const remainingRules = REMAINING_RULES;
 
 export function buildRuleRegistry(...additionalRuleGroups) {
   return createRuleRegistry([V2_RULES, ...additionalRuleGroups]);
