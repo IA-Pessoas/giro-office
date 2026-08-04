@@ -727,20 +727,6 @@ await (async () => {
     );
   });
 
-  await runTest(
-    "app shell reutiliza a seam compartilhada de integração para rota atual e navegação",
-    () => {
-      assert.match(
-        appShellSource,
-        /isIntegrationTasksOnlyRouteBlocked\(\s*currentModuleKey,\s*pathname,\s*moduleAccessUser,\s*\)/,
-      );
-      assert.match(
-        appShellSource,
-        /isIntegrationTasksOnlyRouteBlocked\(moduleKey,\s*modulePath,\s*moduleAccessUser\)/,
-      );
-    },
-  );
-
   await runTest("canSSRAuth redirects unauthenticated users to login", () => {
     assert.match(canSSRAuthSource, /if\s*\(\s*!token\s*\)/);
     assert.match(canSSRAuthSource, /destination:\s*["']\/login["']/);

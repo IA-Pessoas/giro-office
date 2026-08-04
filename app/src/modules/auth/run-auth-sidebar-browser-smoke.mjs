@@ -65,6 +65,12 @@ const integrationRestrictedProfiles = [
   }),
 ];
 
+const noAccessUser = createUser({
+  id: "user-dashboard-no-access",
+  name: "No Access Smoke",
+  login: "dashboard.no-access@castelo.test",
+});
+
 function createToken(payload) {
   const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -111,16 +117,54 @@ function appendDiagnostics(message, pageErrors, consoleErrors) {
   return details.length > 0 ? `${message}\n${details.join("\n")}` : message;
 }
 
+async function assertContabilPageRendered(page, pageErrors, consoleErrors, label) {
+  const heading = page.getByRole("heading", { name: "Contábil", level: 1 });
+  const description = page.getByText(
+    "Controle mensal, responsáveis e relacionamento contábil por cliente.",
+    {
+      exact: true,
+    },
+  );
+  const controlTab = page.getByRole("tab", { name: "Controle", exact: true });
+  const emptyState = page.getByText("Selecione um cliente para começar", { exact: false });
+
+  await heading.waitFor({ state: "visible" });
+  await description.waitFor({ state: "visible" });
+  await controlTab.waitFor({ state: "visible" });
+  await emptyState.waitFor({ state: "visible" });
+
+  assert.equal(
+    await controlTab.getAttribute("aria-selected"),
+    "true",
+    appendDiagnostics(
+      `${label}: a aba Controle deve estar selecionada ao abrir o módulo Contábil.`,
+      pageErrors,
+      consoleErrors,
+    ),
+  );
+  assert.equal(
+    await page.getByRole("heading", { name: "Acesso indisponível", exact: true }).count(),
+    0,
+    appendDiagnostics(
+      `${label}: o estado global de acesso indisponível não deve renderizar em /contabil.`,
+      pageErrors,
+      consoleErrors,
+    ),
+  );
+}
+
 async function waitForTasksRedirect(page, deniedPath, pageErrors, consoleErrors) {
   try {
     await page.waitForURL((url) => url.pathname === "/tasks", { timeout: 5_000 });
   } catch (error) {
+    const message = appendDiagnostics(
+      `A rota bloqueada ${deniedPath} não redirecionou observavelmente para /tasks.`,
+      pageErrors,
+      consoleErrors,
+    );
+    console.error(message);
     throw new Error(
-      appendDiagnostics(
-        `A rota bloqueada ${deniedPath} não redirecionou observavelmente para /tasks.`,
-        pageErrors,
-        consoleErrors,
-      ),
+      message,
       { cause: error },
     );
   }
@@ -170,7 +214,9 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
   try {
     await page.goto("/contabil", { waitUntil: "networkidle" });
     await page.locator("aside").waitFor({ state: "visible" });
-    await page.getByRole("link", { name: "Contábil", exact: true }).waitFor({ state: "visible" });
+    const contabilLink = page.getByRole("link", { name: "Contábil", exact: true });
+
+    await contabilLink.waitFor({ state: "visible" });
     await page.getByRole("link", { name: "Minhas tarefas", exact: true }).waitFor({
       state: "visible",
     });
@@ -183,6 +229,12 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
         pageErrors,
         consoleErrors,
       ),
+    );
+    await assertContabilPageRendered(
+      page,
+      pageErrors,
+      consoleErrors,
+      "Abertura direta de /contabil",
     );
     assert.equal(
       await page.locator("aside").getByRole("link", { name: "Clientes", exact: true }).count(),
@@ -203,6 +255,15 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
       "A navegação observável da sidebar deve levar para /tasks.",
     );
 
+    await contabilLink.click();
+    await page.waitForURL((url) => url.pathname === "/contabil");
+    await assertContabilPageRendered(
+      page,
+      pageErrors,
+      consoleErrors,
+      "Navegação via link Contábil da sidebar",
+    );
+
     await page.goto("/clients/123", { waitUntil: "networkidle" });
     await waitForTasksRedirect(page, "/clients/123", pageErrors, consoleErrors);
 
@@ -213,7 +274,49 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
   }
 }
 
+async function assertDashboardIsHiddenWithoutModuleAccess() {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    baseURL: baseUrl,
+    viewport: { width: 1366, height: 768 },
+  });
+
+  await context.addCookies([
+    {
+      httpOnly: false,
+      name: "cw.token",
+      sameSite: "Lax",
+      url: baseUrl,
+      value: createToken({
+        id: noAccessUser.id,
+        modules: noAccessUser.modules,
+        permission: noAccessUser.permission,
+        type: noAccessUser.type,
+      }),
+    },
+  ]);
+
+  const page = await context.newPage();
+  await installApiMocks(page, noAccessUser);
+
+  try {
+    await page.goto("/dashboard", { waitUntil: "networkidle" });
+    await page.locator("aside").waitFor({ state: "visible" });
+
+    assert.equal(
+      await page.locator("aside").getByRole("link", { name: "Dashboard", exact: true }).count(),
+      0,
+      "Dashboard deve permanecer oculto na sidebar sem acesso a módulos.",
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
 await withNextServer(async () => {
+  await assertDashboardIsHiddenWithoutModuleAccess();
+  console.log("PASS dashboard is hidden from sidebar without module access");
+
   for (const currentUser of integrationRestrictedProfiles) {
     await assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUser);
     console.log(
@@ -259,8 +362,14 @@ async function waitForServer(serverProcess, getOutput) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < 45_000) {
+    const output = getOutput();
+
     if (serverProcess.exitCode !== null) {
-      throw new Error(`Next dev server exited before smoke test.\n${getOutput()}`);
+      throw new Error(`Next dev server exited before smoke test.\n${output}`);
+    }
+
+    if (output.includes("Module not found: Can't resolve")) {
+      throw new Error(`Next dev server failed to compile the app before smoke test.\n${output}`);
     }
 
     try {
