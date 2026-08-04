@@ -1,4 +1,8 @@
 import { ADMIN_BUSINESS_EVIDENCE } from "../evidence/admin-business.mjs";
+import {
+  INTEGRACAO_REGULARIZE_EVIDENCE,
+  INTEGRACAO_REGULARIZE_SOURCE_TABLES,
+} from "../evidence/integracao-regularize.mjs";
 import { RH_PESSOAL_EVIDENCE } from "../evidence/rh-pessoal.mjs";
 import {
   CERTIFICATE_EVIDENCE,
@@ -17,6 +21,10 @@ import {
   createV2ClientIdentityResolver,
 } from "./admin-business.mjs";
 import { CERTIFICATE_RULES } from "./certificates.mjs";
+import {
+  buildIntegrationRegularizeContext,
+  INTEGRACAO_REGULARIZE_RULES,
+} from "./integracao-regularize.mjs";
 import { PARCELAMENTO_RULES } from "./parcelamento.mjs";
 import { RH_PESSOAL_RULES } from "./rh-pessoal.mjs";
 import { TECHNOLOGY_RULES } from "./tecnologia.mjs";
@@ -28,10 +36,14 @@ export {
   ADMIN_BUSINESS_TRANSFORMATIONS,
   buildIcmsResolutionContexts,
   buildPermissionResolutionContexts,
+  buildIntegrationRegularizeContext,
   CERTIFICATE_EVIDENCE,
   CERTIFICATE_RULES,
   createLegacyReferenceResolver,
   createV2ClientIdentityResolver,
+  INTEGRACAO_REGULARIZE_EVIDENCE,
+  INTEGRACAO_REGULARIZE_RULES,
+  INTEGRACAO_REGULARIZE_SOURCE_TABLES,
   PARCELAMENTO_EVIDENCE,
   PARCELAMENTO_RULES,
   RH_PESSOAL_EVIDENCE,
