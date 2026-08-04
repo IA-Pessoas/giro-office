@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "typecheck": "tsc --noEmit && pnpm run typecheck:usefetch",
     "test:auth": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/auth/run-auth-tests.mjs",
-    "test:auth-sidebar": "node --experimental-strip-types src/modules/auth/run-auth-sidebar-browser-smoke.mjs",
+    "test:auth-sidebar": "node src/modules/auth/run-auth-sidebar-browser-smoke.mjs",
     "test:users": "node --experimental-strip-types src/modules/users/run-users-tests.mjs",
     "test:clients": "node --experimental-strip-types src/modules/clients/run-clients-tests.mjs",
     "test:departments": "node --experimental-strip-types src/modules/departments/run-departments-tests.mjs",

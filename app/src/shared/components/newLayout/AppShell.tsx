@@ -33,7 +33,7 @@ import {
 import {
   APP_ROUTE_MODULE_MAP,
   canViewIntegrationRoute,
-  canViewTasksOnlyIntegrationRoute,
+  isIntegrationTasksOnlyRouteBlocked,
   hasAnyModuleAccess,
   MODULE_KEYS,
   getModulePermissionLevel,
@@ -353,10 +353,12 @@ export function AppShell({
   const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
   const shouldShowDashboard = isModuleAccessLoading || hasAnyModuleAccess(moduleAccessMap);
   const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
-  const canViewTasksOnlyRoute =
-    currentModuleKey === "integracao"
-      ? canViewTasksOnlyIntegrationRoute(pathname, moduleAccessUser)
-      : true;
+  const isCurrentRouteBlockedByIntegrationTasksOnly = isIntegrationTasksOnlyRouteBlocked(
+    currentModuleKey,
+    pathname,
+    moduleAccessUser,
+  );
+  const canViewTasksOnlyRoute = !isCurrentRouteBlockedByIntegrationTasksOnly;
   const canViewCurrentModuleRoute =
     canViewTasksOnlyRoute &&
     (currentModuleKey === "integracao"
@@ -395,7 +397,7 @@ export function AppShell({
       return true;
     }
 
-    if (moduleKey === "integracao" && !canViewTasksOnlyIntegrationRoute(modulePath, moduleAccessUser)) {
+    if (isIntegrationTasksOnlyRouteBlocked(moduleKey, modulePath, moduleAccessUser)) {
       return false;
     }
 

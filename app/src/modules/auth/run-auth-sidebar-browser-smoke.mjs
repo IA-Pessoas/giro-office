@@ -1,48 +1,48 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { execFileSync, spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-import {
-  APP_ROUTE_MODULE_MAP,
-  MODULE_KEYS,
-  canViewIntegrationRoute,
-  canViewTasksOnlyIntegrationRoute,
-  getModulePermissionLevel,
-  hasAnyModuleAccess,
-  normalizeRoutePath,
-  resolveModuleAccess,
-} from "./utils/moduleAccess.ts";
+import { chromium } from "@playwright/test";
 
-const appShellSource = await readFile(
-  new URL("../../shared/components/newLayout/AppShell.tsx", import.meta.url),
-  "utf8",
-);
+const PORT = process.env.PLAYWRIGHT_PORT || "3115";
+const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
+const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
+const APP_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+const MODULE_KEYS = [
+  "certificado",
+  "comercial",
+  "contabil",
+  "financeiro",
+  "fiscal",
+  "integracao",
+  "marketing",
+  "parcelamento",
+  "pessoal",
+  "regularize",
+  "rh",
+  "ti",
+  "triagem",
+];
 
-const getModuleKeyFromRoutePath = compileSnippet(
-  extractFunctionDeclaration(appShellSource, "getModuleKeyFromRoutePath"),
-  {
-    APP_ROUTE_MODULE_MAP,
-    moduleCategories: [],
-    normalizeRoutePath,
-  },
-);
-const getNavigationModuleName = compileSnippet(
-  extractFunctionDeclaration(appShellSource, "getNavigationModuleName"),
-  {
-    getModulePermissionLevel,
-  },
-);
-const canViewModuleFromPathSource = extractConstInitializer(appShellSource, "canViewModuleFromPath");
-const canViewTasksOnlyRouteSource = extractConstInitializer(appShellSource, "canViewTasksOnlyRoute");
-const canViewCurrentModuleRouteSource = extractConstInitializer(
-  appShellSource,
-  "canViewCurrentModuleRoute",
-);
-const shouldRenderModuleAccessDeniedSource = extractConstInitializer(
-  appShellSource,
-  "shouldRenderModuleAccessDenied",
-);
-const deniedFallbackHrefSource = extractJsxPropExpression(appShellSource, "fallbackHref");
-const deniedFallbackLabelSource = extractJsxPropExpression(appShellSource, "fallbackLabel");
+function createModules(overrides = {}) {
+  return {
+    ...Object.fromEntries(MODULE_KEYS.map((moduleKey) => [moduleKey, 0])),
+    ...overrides,
+  };
+}
+
+function createUser({ id, name, login, permission = 0, type = "user", modules = {} }) {
+  return {
+    department_id: "department-auth-sidebar-smoke",
+    id,
+    login,
+    modules: createModules(modules),
+    name,
+    organization_id: "org-auth-sidebar-smoke",
+    permission,
+    type,
+  };
+}
 
 const integrationRestrictedProfiles = [
   createUser({
@@ -65,381 +65,230 @@ const integrationRestrictedProfiles = [
   }),
 ];
 
-for (const currentUser of integrationRestrictedProfiles) {
-  await runTest(
-    `integracao=0 preserves contabil sidebar/url access for contabil=${currentUser.modules.contabil}`,
-    () => {
-      assertSidebarVisibility(currentUser);
-      assertDirectUrlAccess("/contabil", currentUser, {
-        shouldRenderDenied: false,
-        shouldRestrictToTasksOnly: false,
-        shouldViewCurrentRoute: true,
-      });
-      assertDirectUrlAccess("/clients/123", currentUser, {
-        shouldRenderDenied: true,
-        shouldRestrictToTasksOnly: true,
-        shouldViewCurrentRoute: false,
-        expectedFallbackHref: "/tasks",
-        expectedFallbackLabel: "Ir para Minhas tarefas",
-      });
-    },
-  );
+function createToken(payload) {
+  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${header}.${body}.signature`;
 }
 
-async function runTest(name, fn) {
+async function installApiMocks(page, currentUser) {
+  await page.route("**/user/me", async (route) => {
+    await route.fulfill({
+      body: JSON.stringify({ success: true, data: currentUser }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.route("**/department/list**", async (route) => {
+    await route.fulfill({
+      body: JSON.stringify({ success: true, data: [] }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.route("**/socket.io/**", async (route) => {
+    await route.fulfill({
+      body: route.request().method() === "POST" ? "ok" : '0{"sid":"auth-sidebar-smoke"}',
+      contentType: "text/plain",
+      status: 200,
+    });
+  });
+}
+
+function appendDiagnostics(message, pageErrors, consoleErrors) {
+  const details = [];
+
+  if (pageErrors.length > 0) {
+    details.push(`pageErrors=${pageErrors.join(" | ")}`);
+  }
+
+  if (consoleErrors.length > 0) {
+    details.push(`consoleErrors=${consoleErrors.join(" | ")}`);
+  }
+
+  return details.length > 0 ? `${message}\n${details.join("\n")}` : message;
+}
+
+async function waitForTasksRedirect(page, deniedPath, pageErrors, consoleErrors) {
   try {
-    await fn();
-    console.log(`PASS ${name}`);
+    await page.waitForURL((url) => url.pathname === "/tasks", { timeout: 5_000 });
   } catch (error) {
-    console.error(`FAIL ${name}`);
-    throw error;
-  }
-}
-
-function assertSidebarVisibility(currentUser) {
-  const context = createViewContext("/contabil", currentUser);
-  const canViewModuleFromPath = compileSnippet(canViewModuleFromPathSource, context);
-
-  assert.equal(
-    canViewModuleFromPath("/contabil"),
-    true,
-    "Contábil deve permanecer visível quando integração=0 e contábil>=1.",
-  );
-  assert.equal(
-    canViewModuleFromPath("/tasks"),
-    true,
-    "Minhas tarefas deve permanecer visível quando integração=0.",
-  );
-  assert.equal(
-    canViewModuleFromPath("/clients"),
-    false,
-    "Clientes deve permanecer oculto quando integração=0.",
-  );
-  assert.equal(
-    canViewModuleFromPath("/projects"),
-    false,
-    "Projetos deve permanecer oculto quando integração=0.",
-  );
-  assert.equal(
-    getNavigationModuleName({ name: "Tarefas", path: "/tasks" }, currentUser),
-    "Minhas tarefas",
-    "O item de tarefas deve continuar renomeado para Minhas tarefas no nível 0 de Integração.",
-  );
-  assert.equal(
-    getNavigationModuleName({ name: "Contábil", path: "/contabil" }, currentUser),
-    "Contábil",
-    "O item de Contábil deve manter o rótulo original.",
-  );
-}
-
-function assertDirectUrlAccess(pathname, currentUser, expected) {
-  const routeContext = createRouteContext(pathname, currentUser);
-  const canViewTasksOnlyRoute = evaluateExpression(canViewTasksOnlyRouteSource, {
-    canViewTasksOnlyIntegrationRoute,
-    currentModuleKey: routeContext.currentModuleKey,
-    moduleAccessUser: currentUser,
-    pathname,
-  });
-  const canViewCurrentModuleRoute = evaluateExpression(canViewCurrentModuleRouteSource, {
-    canViewCurrentModuleRoute: undefined,
-    canViewIntegrationRoute,
-    canViewTasksOnlyRoute,
-    currentModuleAccess: routeContext.currentModuleAccess,
-    currentModuleKey: routeContext.currentModuleKey,
-    moduleAccessUser: currentUser,
-    pathname,
-  });
-  const shouldRenderDenied = evaluateExpression(shouldRenderModuleAccessDeniedSource, {
-    Boolean,
-    canViewCurrentModuleRoute,
-    canViewTasksOnlyRoute,
-    currentModuleKey: routeContext.currentModuleKey,
-    getModulePermissionLevel,
-    isModuleAccessLoading: false,
-    isSelfProfileRoute: false,
-    moduleAccessUser: currentUser,
-  });
-
-  assert.equal(
-    canViewTasksOnlyRoute === false,
-    expected.shouldRestrictToTasksOnly,
-    `${pathname} shouldRestrictToTasksOnly`,
-  );
-  assert.equal(
-    canViewCurrentModuleRoute,
-    expected.shouldViewCurrentRoute,
-    `${pathname} shouldViewCurrentRoute`,
-  );
-  assert.equal(
-    shouldRenderDenied,
-    expected.shouldRenderDenied,
-    `${pathname} shouldRenderDenied`,
-  );
-
-  if (expected.expectedFallbackHref) {
-    assert.equal(
-      evaluateExpression(deniedFallbackHrefSource, {
-        getModulePermissionLevel,
-        moduleAccessUser: currentUser,
-      }),
-      expected.expectedFallbackHref,
-      `${pathname} fallbackHref`,
+    throw new Error(
+      appendDiagnostics(
+        `A rota bloqueada ${deniedPath} não redirecionou observavelmente para /tasks.`,
+        pageErrors,
+        consoleErrors,
+      ),
+      { cause: error },
     );
   }
 
-  if (expected.expectedFallbackLabel) {
-    assert.equal(
-      evaluateExpression(deniedFallbackLabelSource, {
-        getModulePermissionLevel,
-        moduleAccessUser: currentUser,
-      }),
-      expected.expectedFallbackLabel,
-      `${pathname} fallbackLabel`,
-    );
-  }
-}
-
-function createViewContext(pathname, currentUser) {
-  const moduleAccessMap = createModuleAccessMap(currentUser);
-
-  return {
-    canManageOrganization: false,
-    canManageUsers: false,
-    canViewIntegrationRoute,
-    canViewTasksOnlyIntegrationRoute,
-    getModuleKeyFromRoutePath,
-    isAdministrationAccessLoading: false,
-    isModuleAccessLoading: false,
-    moduleAccessMap,
-    moduleAccessUser: currentUser,
-    shouldShowDashboard: hasAnyModuleAccess(moduleAccessMap),
-  };
-}
-
-function createRouteContext(pathname, currentUser) {
-  const moduleAccessMap = createModuleAccessMap(currentUser);
-  const currentModuleKey = getModuleKeyFromRoutePath(pathname);
-
-  return {
-    currentModuleAccess: currentModuleKey ? moduleAccessMap[currentModuleKey] : null,
-    currentModuleKey,
-    moduleAccessMap,
-  };
-}
-
-function createModuleAccessMap(currentUser) {
-  const isGlobalAdmin = currentUser.type === "owner";
-
-  return Object.fromEntries(
-    MODULE_KEYS.map((moduleKey) => [
-      moduleKey,
-      resolveModuleAccess({
-        additionalModulePermissions: currentUser.modules,
-        isGlobalAdmin,
-        module: moduleKey,
-        userPermission: currentUser.permission,
-      }),
-    ]),
+  assert.equal(
+    new URL(page.url()).pathname,
+    "/tasks",
+    `${deniedPath} deve terminar em /tasks via router.replace("/tasks").`,
   );
 }
 
-function createModules(overrides = {}) {
-  return {
-    ...Object.fromEntries(MODULE_KEYS.map((moduleKey) => [moduleKey, 0])),
-    ...overrides,
-  };
-}
+async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUser) {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    baseURL: baseUrl,
+    viewport: { width: 1366, height: 768 },
+  });
+  const pageErrors = [];
+  const consoleErrors = [];
 
-function createUser({ id, name, login, permission = 0, type = "user", modules = {} }) {
-  return {
-    department_id: "department-auth-sidebar-smoke",
-    id,
-    login,
-    modules: createModules(modules),
-    name,
-    organization_id: "org-auth-sidebar-smoke",
-    permission,
-    type,
-  };
-}
+  await context.addCookies([
+    {
+      httpOnly: false,
+      name: "cw.token",
+      sameSite: "Lax",
+      url: baseUrl,
+      value: createToken({
+        id: currentUser.id,
+        modules: currentUser.modules,
+        permission: currentUser.permission,
+        type: currentUser.type,
+      }),
+    },
+  ]);
 
-function extractFunctionDeclaration(source, functionName) {
-  return extractBlockFromMarker(source, `function ${functionName}`);
-}
-
-function extractConstInitializer(source, constName) {
-  const marker = `const ${constName} =`;
-  const start = source.indexOf(marker);
-  assert.notEqual(start, -1, `Could not find ${constName}.`);
-
-  const valueStart = start + marker.length;
-  const valueEnd = findStatementEnd(source, valueStart);
-  return source.slice(valueStart, valueEnd).trim();
-}
-
-function extractJsxPropExpression(source, propName) {
-  const marker = `${propName}={`;
-  const start = source.indexOf(marker);
-  assert.notEqual(start, -1, `Could not find JSX prop ${propName}.`);
-
-  const expressionStart = start + marker.length;
-  let depth = 1;
-
-  for (let index = expressionStart; index < source.length; index += 1) {
-    const character = source[index];
-
-    if (character === "{") {
-      depth += 1;
+  const page = await context.newPage();
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      consoleErrors.push(message.text());
     }
+  });
+  await installApiMocks(page, currentUser);
 
-    if (character === "}") {
-      depth -= 1;
+  try {
+    await page.goto("/contabil", { waitUntil: "networkidle" });
+    await page.locator("aside").waitFor({ state: "visible" });
+    await page.getByRole("link", { name: "Contábil", exact: true }).waitFor({ state: "visible" });
+    await page.getByRole("link", { name: "Minhas tarefas", exact: true }).waitFor({
+      state: "visible",
+    });
 
-      if (depth === 0) {
-        return source.slice(expressionStart, index).trim();
-      }
-    }
+    assert.equal(
+      new URL(page.url()).pathname,
+      "/contabil",
+      appendDiagnostics(
+        "O acesso direto a /contabil deve permanecer na URL observável.",
+        pageErrors,
+        consoleErrors,
+      ),
+    );
+    assert.equal(
+      await page.locator("aside").getByRole("link", { name: "Clientes", exact: true }).count(),
+      0,
+      "Clientes deve permanecer oculto quando integração=0.",
+    );
+    assert.equal(
+      await page.locator("aside").getByRole("link", { name: "Projetos", exact: true }).count(),
+      0,
+      "Projetos deve permanecer oculto quando integração=0.",
+    );
+
+    await page.getByRole("link", { name: "Minhas tarefas", exact: true }).click();
+    await page.waitForURL((url) => url.pathname === "/tasks");
+    assert.equal(
+      new URL(page.url()).pathname,
+      "/tasks",
+      "A navegação observável da sidebar deve levar para /tasks.",
+    );
+
+    await page.goto("/clients/123", { waitUntil: "networkidle" });
+    await waitForTasksRedirect(page, "/clients/123", pageErrors, consoleErrors);
+
+    await page.goto("/projects/123", { waitUntil: "networkidle" });
+    await waitForTasksRedirect(page, "/projects/123", pageErrors, consoleErrors);
+  } finally {
+    await browser.close();
+  }
+}
+
+await withNextServer(async () => {
+  for (const currentUser of integrationRestrictedProfiles) {
+    await assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUser);
+    console.log(
+      `PASS integracao=0 preserves contabil sidebar/url access for contabil=${currentUser.modules.contabil}`,
+    );
+  }
+});
+
+async function withNextServer(test) {
+  if (configuredBaseUrl) {
+    await test();
+    return;
   }
 
-  assert.fail(`Could not close JSX prop ${propName}.`);
+  const command = process.platform === "win32" ? "cmd" : "corepack";
+  const args =
+    process.platform === "win32"
+      ? ["/c", "corepack", "pnpm", "exec", "next", "dev", "--webpack", "--port", PORT]
+      : ["pnpm", "exec", "next", "dev", "--webpack", "--port", PORT];
+  const serverProcess = spawn(command, args, {
+    cwd: APP_ROOT,
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+
+  serverProcess.stdout.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  serverProcess.stderr.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+
+  try {
+    await waitForServer(serverProcess, () => output);
+    await test();
+  } finally {
+    stopServer(serverProcess);
+  }
 }
 
-function extractBlockFromMarker(source, marker) {
-  const start = source.indexOf(marker);
-  assert.notEqual(start, -1, `Could not find marker ${marker}.`);
+async function waitForServer(serverProcess, getOutput) {
+  const startedAt = Date.now();
 
-  const bodyStart = source.indexOf("{", start);
-  assert.notEqual(bodyStart, -1, `Could not find body for ${marker}.`);
-
-  let depth = 0;
-
-  for (let index = bodyStart; index < source.length; index += 1) {
-    const character = source[index];
-
-    if (character === "{") {
-      depth += 1;
+  while (Date.now() - startedAt < 45_000) {
+    if (serverProcess.exitCode !== null) {
+      throw new Error(`Next dev server exited before smoke test.\n${getOutput()}`);
     }
 
-    if (character === "}") {
-      depth -= 1;
-
-      if (depth === 0) {
-        return source.slice(start, index + 1);
+    try {
+      const response = await fetch(baseUrl);
+      if (response.ok || response.status < 500) {
+        return;
       }
+    } catch {
+      // Retry until the dev server binds the port.
     }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  assert.fail(`Could not close block for ${marker}.`);
+  throw new Error(`Timed out waiting for Next dev server at ${baseUrl}.\n${getOutput()}`);
 }
 
-function findStatementEnd(source, startIndex) {
-  let depthParen = 0;
-  let depthBrace = 0;
-  let depthBracket = 0;
-  let inSingleQuote = false;
-  let inDoubleQuote = false;
-  let inTemplate = false;
-
-  for (let index = startIndex; index < source.length; index += 1) {
-    const character = source[index];
-    const previousCharacter = source[index - 1];
-
-    if (inSingleQuote) {
-      if (character === "'" && previousCharacter !== "\\") {
-        inSingleQuote = false;
-      }
-      continue;
-    }
-
-    if (inDoubleQuote) {
-      if (character === '"' && previousCharacter !== "\\") {
-        inDoubleQuote = false;
-      }
-      continue;
-    }
-
-    if (inTemplate) {
-      if (character === "`" && previousCharacter !== "\\") {
-        inTemplate = false;
-      }
-      continue;
-    }
-
-    if (character === "'") {
-      inSingleQuote = true;
-      continue;
-    }
-
-    if (character === '"') {
-      inDoubleQuote = true;
-      continue;
-    }
-
-    if (character === "`") {
-      inTemplate = true;
-      continue;
-    }
-
-    if (character === "(") {
-      depthParen += 1;
-      continue;
-    }
-
-    if (character === ")") {
-      depthParen -= 1;
-      continue;
-    }
-
-    if (character === "{") {
-      depthBrace += 1;
-      continue;
-    }
-
-    if (character === "}") {
-      depthBrace -= 1;
-      continue;
-    }
-
-    if (character === "[") {
-      depthBracket += 1;
-      continue;
-    }
-
-    if (character === "]") {
-      depthBracket -= 1;
-      continue;
-    }
-
-    if (
-      character === ";" &&
-      depthParen === 0 &&
-      depthBrace === 0 &&
-      depthBracket === 0
-    ) {
-      return index;
-    }
+function stopServer(serverProcess) {
+  if (!serverProcess.pid || serverProcess.exitCode !== null) {
+    return;
   }
 
-  assert.fail("Could not find end of statement.");
-}
+  if (process.platform === "win32") {
+    execFileSync("taskkill", ["/pid", String(serverProcess.pid), "/T", "/F"], {
+      stdio: "ignore",
+    });
+    return;
+  }
 
-function stripTypeScript(source) {
-  return source
-    .replace(/\s+as\s+[A-Za-z_$][\w$<>, |&.\[\]?]*/g, "")
-    .replace(/([,(]\s*[A-Za-z_$][\w$]*)\s*:\s*([^,)=]+)/g, "$1")
-    .replace(/\)\s*:\s*([^=<{]+)\{/g, "){")
-    .replace(/\)\s*:\s*([^=<{]+)=>/g, ") =>");
-}
-
-function compileSnippet(source, dependencies) {
-  const dependencyNames = Object.keys(dependencies);
-  const dependencyValues = Object.values(dependencies);
-  return Function(
-    ...dependencyNames,
-    `"use strict"; return (${stripTypeScript(source)});`,
-  )(...dependencyValues);
-}
-
-function evaluateExpression(source, dependencies) {
-  return compileSnippet(source, dependencies);
+  serverProcess.kill("SIGTERM");
 }
