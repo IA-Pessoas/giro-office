@@ -108,7 +108,7 @@ test("scanLegacyUsage reconhece referências estáticas adjacentes", async () =>
   ]);
 });
 
-test("scanLegacyUsage cataloga múltiplos INSERTs e operação posterior sem materializar valores", async () => {
+test("scanLegacyUsage preserva multi-statement em script SQL de código sem emitir valores", async () => {
   await withTemporaryDirectory(async (directory) => {
     const legacyDirectory = path.join(directory, "legacy");
     const sqlPath = path.join(legacyDirectory, "dump.sql");
@@ -117,24 +117,13 @@ test("scanLegacyUsage cataloga múltiplos INSERTs e operação posterior sem mat
       "INSERT INTO tb_admin.perfis (nome) VALUES ('second-raw-value');",
       "UPDATE tb_admin.usuarios SET ativo = 1;",
     ].join("\n");
-    const bytes = Buffer.from(sql, "utf8");
     await mkdir(legacyDirectory, { recursive: true });
     await writeFile(sqlPath, sql, "utf8");
 
     const usage = await scanLegacyUsage({
       legacyDir: legacyDirectory,
       sourceTables: ["tb_admin.usuarios", "tb_admin.perfis"],
-      readTextFile: async () => {
-        throw new Error("Arquivo SQL não pode ter leitura textual integral.");
-      },
-      openSqlFile: async () => ({
-        close: async () => {},
-        read: async (buffer, offset, length, position) => {
-          assert.equal(length, 1);
-          buffer[offset] = bytes[position];
-          return { buffer, bytesRead: position < bytes.length ? 1 : 0 };
-        },
-      }),
+      readTextFile: async () => sql,
     });
 
     assert.deepEqual(usage.tables, [
@@ -154,5 +143,48 @@ test("scanLegacyUsage cataloga múltiplos INSERTs e operação posterior sem mat
       },
     ]);
     assert.doesNotMatch(JSON.stringify(usage), /first-raw-value|second-raw-value/);
+  });
+});
+
+test("scanLegacyUsage ignora dump SQL assinado antes de alcançar valores de INSERT", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const legacyDirectory = path.join(directory, "legacy");
+    const sqlPath = path.join(legacyDirectory, "export.sql");
+    const sql = [
+      "-- MySQL dump 10.13",
+      "INSERT INTO tb_admin.usuarios (nome) VALUES ('dump-raw-value-must-not-be-read');",
+    ].join("\n");
+    const bytes = Buffer.from(sql, "utf8");
+    const lastHeaderByte = sql.indexOf("\n");
+    await mkdir(legacyDirectory, { recursive: true });
+    await writeFile(sqlPath, sql, "utf8");
+
+    const usage = await scanLegacyUsage({
+      legacyDir: legacyDirectory,
+      sourceTables: ["tb_admin.usuarios"],
+      readTextFile: async () => {
+        throw new Error("Dump assinado não pode ter leitura textual integral.");
+      },
+      openSqlFile: async () => ({
+        close: async () => {},
+        read: async (buffer, offset, length, position) => {
+          assert.equal(length, 1);
+          assert.ok(position <= lastHeaderByte, "Não deve ler além do cabeçalho do dump.");
+          buffer[offset] = bytes[position];
+          return { buffer, bytesRead: 1 };
+        },
+      }),
+    });
+
+    assert.deepEqual(usage.tables, [
+      {
+        legacyModule: null,
+        legacyReferences: [],
+        legacyRelationships: [],
+        operations: [],
+        sourceTable: "tb_admin.usuarios",
+      },
+    ]);
+    assert.doesNotMatch(JSON.stringify(usage), /dump-raw-value-must-not-be-read/);
   });
 });
