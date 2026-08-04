@@ -191,6 +191,13 @@ test("permissões fixas fazem merge pelo vínculo explícito User/Organization e
     const contexts = buildPermissionResolutionContexts({ sourceTable, rows, userResolver });
     assert.equal(contexts.length, rows.length, sourceTable);
     for (const [index, row] of rows.entries()) {
+      assert.equal(contexts[index].userLookupSourceTable, "tb_admin.usuarios", sourceTable);
+      assert.equal(contexts[index].userLookupSourceKey, row.user_id, sourceTable);
+      assert.match(contexts[index].userResolutionFingerprint, /^[a-f0-9]{64}$/);
+      assert.equal(contexts[index].permissionSourceTable, sourceTable);
+      assert.equal(contexts[index].permissionSourceRowId, row.id, sourceTable);
+      assert.match(contexts[index].permissionNaturalKeyFingerprint, /^[a-f0-9]{64}$/);
+      assert.match(contexts[index].permissionRowFingerprint, /^[a-f0-9]{64}$/);
       rowCount += 1;
       const normalized = ADMIN_BUSINESS_TRANSFORMATIONS.normalize_legacy_permission_level_plus_one(
         row.permissao,
@@ -219,15 +226,22 @@ test("permissões fixas fazem merge pelo vínculo explícito User/Organization e
   assert.equal(reasonCounts.get("PERMISSION_MODULE_DUPLICATE"), 1);
 
   const actualOwner = (await loadRows("tb_admin.permissoes_comercial"))[0];
+  const actualOwnerUser = userResolver.resolve(actualOwner.user_id);
   const missingDedup = rule("tb_admin.permissoes_comercial").emitRows(actualOwner, {
-    userResolution: "one",
-    userIdentityRef: `tb_admin.usuarios:${actualOwner.user_id}`,
+    userResolution: actualOwnerUser.state,
+    userIdentityRef: actualOwnerUser.identityRef,
+    userResolutionFingerprint: actualOwnerUser.fingerprint,
+    userLookupSourceTable: actualOwnerUser.sourceTable,
+    userLookupSourceKey: actualOwnerUser.sourceKey,
   })[0];
   assert.equal(missingDedup.status, "quarantine");
   assert.equal(missingDedup.reasonCode, "PERMISSION_DEDUP_NOT_EXECUTED");
   const unknownDedup = rule("tb_admin.permissoes_comercial").emitRows(actualOwner, {
-    userResolution: "one",
-    userIdentityRef: `tb_admin.usuarios:${actualOwner.user_id}`,
+    userResolution: actualOwnerUser.state,
+    userIdentityRef: actualOwnerUser.identityRef,
+    userResolutionFingerprint: actualOwnerUser.fingerprint,
+    userLookupSourceTable: actualOwnerUser.sourceTable,
+    userLookupSourceKey: actualOwnerUser.sourceKey,
     permissionUserModuleResolution: "unknown",
   })[0];
   assert.equal(unknownDedup.status, "quarantine");
@@ -244,6 +258,9 @@ test("permissões fixas fazem merge pelo vínculo explícito User/Organization e
     rule("tb_admin.permissoes_comercial").emitRows(actualOwner, {
       userResolution: ambiguousUser.state,
       userIdentityRef: ambiguousUser.identityRef,
+      userResolutionFingerprint: ambiguousUser.fingerprint,
+      userLookupSourceTable: ambiguousUser.sourceTable,
+      userLookupSourceKey: ambiguousUser.sourceKey,
       permissionUserModuleResolution: "owner",
     })[0].reasonCode,
     "PERMISSION_USER_AMBIGUOUS",
@@ -252,6 +269,8 @@ test("permissões fixas fazem merge pelo vínculo explícito User/Organization e
     rule("tb_admin.permissoes_comercial").emitRows(actualOwner, {
       userResolution: "one",
       userIdentityRef: `tb_admin.usuarios:${actualOwner.user_id}:unsafe`,
+      userLookupSourceTable: "tb_admin.usuarios",
+      userLookupSourceKey: actualOwner.user_id,
       permissionUserModuleResolution: "owner",
     })[0].reasonCode,
     "PERMISSION_USER_IDENTITY_INVALID",
@@ -277,6 +296,10 @@ test("duplicatas naturais reais respeitam as identidades únicas/lógicas atuais
   const statusCounts = new Map();
   const reasonCounts = new Map();
   for (const [index, row] of rows.entries()) {
+    assert.equal(contexts[index].icmsSourceTable, "tb_fiscal.icms");
+    assert.equal(contexts[index].icmsSourceRowId, row.id);
+    assert.match(contexts[index].icmsNaturalKeyFingerprint, /^[a-f0-9]{64}$/);
+    assert.match(contexts[index].icmsRowFingerprint, /^[a-f0-9]{64}$/);
     const emission = icmsRule.emitRows(row, contexts[index])[0];
     statusCounts.set(emission.status, (statusCounts.get(emission.status) ?? 0) + 1);
     if (emission.reasonCode !== null) {
@@ -361,9 +384,15 @@ test("logs exigem resolução User executada e não comprimem local em changes",
   for await (const row of iterateSqlRows(path.join(LEGACY_DUMP_ROOT, "tb_admin.logs.sql"))) {
     rowCount += 1;
     const user = userResolver.resolve(row.usuario_id);
+    assert.equal(user.sourceTable, "tb_admin.usuarios");
+    assert.equal(user.sourceKey, row.usuario_id);
+    assert.match(user.fingerprint, /^[a-f0-9]{64}$/);
     const emission = logsRule.emitRows(row, {
       userResolution: user.state,
       userIdentityRef: user.identityRef,
+      userResolutionFingerprint: user.fingerprint,
+      userLookupSourceTable: user.sourceTable,
+      userLookupSourceKey: user.sourceKey,
     })[0];
     if (emission.status === "prepared") preparedCount += 1;
     if (emission.reasonCode === "LOG_USER_NOT_FOUND") missingUserCount += 1;
@@ -399,6 +428,9 @@ test("logs exigem resolução User executada e não comprimem local em changes",
     logsRule.emitRows(firstResolved.row, {
       userResolution: ambiguousUser.state,
       userIdentityRef: ambiguousUser.identityRef,
+      userResolutionFingerprint: ambiguousUser.fingerprint,
+      userLookupSourceTable: ambiguousUser.sourceTable,
+      userLookupSourceKey: ambiguousUser.sourceKey,
     })[0].reasonCode,
     "LOG_USER_AMBIGUOUS",
   );
@@ -406,9 +438,26 @@ test("logs exigem resolução User executada e não comprimem local em changes",
     logsRule.emitRows(firstResolved.row, {
       userResolution: "one",
       userIdentityRef: `tb_admin.usuarios:${firstResolved.row.usuario_id}:unsafe`,
+      userLookupSourceTable: "tb_admin.usuarios",
+      userLookupSourceKey: firstResolved.row.usuario_id,
     })[0].reasonCode,
     "LOG_USER_IDENTITY_INVALID",
   );
+});
+
+test("User 7 não aceita contexto one produzido para a chave legada 8", () => {
+  const emission = rule("tb_admin.logs").emitRows(
+    { id: "1", usuario_id: "7", tipo: "update", referente: "cliente" },
+    {
+      userResolution: "one",
+      userIdentityRef: "tb_admin.usuarios:8",
+      userLookupSourceTable: "tb_admin.usuarios",
+      userLookupSourceKey: "8",
+    },
+  )[0];
+
+  assert.equal(emission.status, "quarantine");
+  assert.equal(emission.reasonCode, "LOG_USER_CONTEXT_MISMATCH");
 });
 
 test("referências contábeis seguem codigo Regularize até a identidade Client produzida pela V2", async () => {
@@ -437,6 +486,9 @@ test("referências contábeis seguem codigo Regularize até a identidade Client 
     for (const row of await loadRows(sourceTable)) {
       rowCount += 1;
       const client = clientResolver.resolve(row.cliente_id);
+      assert.equal(client.sourceTable, "tb_regularize.clientes");
+      assert.equal(client.sourceKey, row.cliente_id);
+      assert.match(client.fingerprint, /^[a-f0-9]{64}$/);
       sourceResolutionCounts.set(
         client.sourceState,
         (sourceResolutionCounts.get(client.sourceState) ?? 0) + 1,
@@ -444,11 +496,17 @@ test("referências contábeis seguem codigo Regularize até a identidade Client 
       const context = {
         clientResolution: client.state,
         clientIdentityRef: client.identityRef,
+        clientResolutionFingerprint: client.fingerprint,
+        clientLookupSourceTable: client.sourceTable,
+        clientLookupSourceKey: client.sourceKey,
       };
       if (sourceTable === "tb_contabil.clientes_observacao") {
         const user = userResolver.resolve(row.user_id);
         context.userResolution = user.state;
         context.userIdentityRef = user.identityRef;
+        context.userResolutionFingerprint = user.fingerprint;
+        context.userLookupSourceTable = user.sourceTable;
+        context.userLookupSourceKey = user.sourceKey;
       }
       const emission = rule(sourceTable).emitRows(row, context)[0];
       statusCounts.set(emission.status, (statusCounts.get(emission.status) ?? 0) + 1);
@@ -487,6 +545,8 @@ test("referências contábeis seguem codigo Regularize até a identidade Client 
       rule(sourceTable).emitRows(row, {
         clientResolution: "one",
         clientIdentityRef: `${client.identityRef}:unsafe`,
+        clientLookupSourceTable: client.sourceTable,
+        clientLookupSourceKey: client.sourceKey,
       })[0].reasonCode,
       "CLIENT_IDENTITY_INVALID",
       sourceTable,
@@ -509,6 +569,9 @@ test("referências contábeis seguem codigo Regularize até a identidade Client 
     rule(validSourceTable).emitRows(validExample.row, {
       clientResolution: zero.state,
       clientIdentityRef: zero.identityRef,
+      clientResolutionFingerprint: zero.fingerprint,
+      clientLookupSourceTable: zero.sourceTable,
+      clientLookupSourceKey: zero.sourceKey,
     })[0].reasonCode,
     "CLIENT_REFERENCE_NOT_FOUND",
   );
@@ -522,9 +585,168 @@ test("referências contábeis seguem codigo Regularize até a identidade Client 
     rule(validSourceTable).emitRows(validExample.row, {
       clientResolution: many.state,
       clientIdentityRef: many.identityRef,
+      clientResolutionFingerprint: many.fingerprint,
+      clientLookupSourceTable: many.sourceTable,
+      clientLookupSourceKey: many.sourceKey,
     })[0].reasonCode,
     "CLIENT_REFERENCE_AMBIGUOUS",
   );
+});
+
+test("cliente contábil A não aceita contexto de resolução produzido para codigo B", async () => {
+  const rows = await loadRows("tb_contabil.clientes_mov");
+  const rowA = rows[0];
+  const rowB = rows.find(({ cliente_id }) => cliente_id !== rowA.cliente_id);
+  assert.ok(rowB);
+  const resolutionB = createV2ClientIdentityResolver({
+    regularizeRows: await loadRows("tb_regularize.clientes"),
+    integrationRows: await loadRows("tb_integracao.clientes"),
+  }).resolve(rowB.cliente_id);
+  const emission = rule("tb_contabil.clientes_mov").emitRows(rowA, {
+    clientResolution: resolutionB.state,
+    clientIdentityRef: resolutionB.identityRef,
+    clientResolutionFingerprint: resolutionB.fingerprint,
+    clientLookupSourceTable: resolutionB.sourceTable,
+    clientLookupSourceKey: resolutionB.sourceKey,
+  })[0];
+
+  assert.equal(emission.status, "quarantine");
+  assert.equal(emission.reasonCode, "CLIENT_CONTEXT_MISMATCH");
+  assert.equal(resolutionB.sourceTable, "tb_regularize.clientes");
+  assert.equal(resolutionB.sourceKey, rowB.cliente_id);
+
+  const mixedParallelContext = rule("tb_contabil.clientes_mov").emitRows(rowA, {
+    clientResolution: resolutionB.state,
+    clientIdentityRef: resolutionB.identityRef,
+    clientLookupSourceTable: resolutionB.sourceTable,
+    clientLookupSourceKey: rowA.cliente_id,
+    clientResolutionFingerprint: resolutionB.fingerprint,
+  })[0];
+  assert.equal(mixedParallelContext.status, "quarantine");
+  assert.equal(mixedParallelContext.reasonCode, "CLIENT_CONTEXT_MISMATCH");
+});
+
+test("owner, duplicate e conflict de permissão não podem ser aplicados a outra source row", async () => {
+  const users = await loadRows("tb_admin.usuarios");
+  const userResolver = createLegacyReferenceResolver({
+    sourceTable: "tb_admin.usuarios",
+    legacyColumn: "id",
+    rows: users,
+  });
+  let identicalPair = null;
+  let conflictPair = null;
+
+  for (const sourceTable of PERMISSION_SOURCES) {
+    const rows = await loadRows(sourceTable);
+    const contexts = buildPermissionResolutionContexts({ sourceTable, rows, userResolver });
+    const duplicateIndex = contexts.findIndex(
+      ({ permissionUserModuleResolution }) => permissionUserModuleResolution === "duplicate",
+    );
+    if (duplicateIndex !== -1) {
+      const duplicateContext = contexts[duplicateIndex];
+      const ownerIndex = contexts.findIndex(
+        (context) =>
+          context.permissionUserModuleResolution === "owner" &&
+          context.permissionNaturalKeyFingerprint ===
+            duplicateContext.permissionNaturalKeyFingerprint,
+      );
+      if (ownerIndex !== -1) {
+        identicalPair = { sourceTable, rows, contexts, ownerIndex, duplicateIndex };
+      }
+    }
+    const conflictIndexes = contexts
+      .map((context, index) => ({ context, index }))
+      .filter(({ context }) => context.permissionUserModuleResolution === "conflict");
+    const firstConflict = conflictIndexes.find(({ context }, index) =>
+      conflictIndexes
+        .slice(index + 1)
+        .some(
+          ({ context: other }) =>
+            other.permissionNaturalKeyFingerprint === context.permissionNaturalKeyFingerprint,
+        ),
+    );
+    if (firstConflict) {
+      const secondConflict = conflictIndexes.find(
+        ({ context, index }) =>
+          index !== firstConflict.index &&
+          context.permissionNaturalKeyFingerprint ===
+            firstConflict.context.permissionNaturalKeyFingerprint,
+      );
+      conflictPair = {
+        sourceTable,
+        rows,
+        contexts,
+        firstIndex: firstConflict.index,
+        secondIndex: secondConflict.index,
+      };
+    }
+  }
+
+  assert.ok(identicalPair);
+  const ownerRow = identicalPair.rows[identicalPair.ownerIndex];
+  const duplicateRow = identicalPair.rows[identicalPair.duplicateIndex];
+  const ownerContext = identicalPair.contexts[identicalPair.ownerIndex];
+  const duplicateContext = identicalPair.contexts[identicalPair.duplicateIndex];
+  for (const [row, foreignDedupContext] of [
+    [duplicateRow, ownerContext],
+    [ownerRow, duplicateContext],
+  ]) {
+    const correctUser = userResolver.resolve(row.user_id);
+    const emission = rule(identicalPair.sourceTable).emitRows(row, {
+      ...foreignDedupContext,
+      userResolution: correctUser.state,
+      userIdentityRef: correctUser.identityRef,
+      userResolutionFingerprint: correctUser.fingerprint,
+      userLookupSourceTable: correctUser.sourceTable,
+      userLookupSourceKey: correctUser.sourceKey,
+    })[0];
+    assert.equal(emission.status, "quarantine");
+    assert.equal(emission.reasonCode, "PERMISSION_DEDUP_CONTEXT_MISMATCH");
+  }
+
+  assert.ok(conflictPair);
+  const conflictRow = conflictPair.rows[conflictPair.firstIndex];
+  const foreignConflictContext = conflictPair.contexts[conflictPair.secondIndex];
+  const correctUser = userResolver.resolve(conflictRow.user_id);
+  const conflictEmission = rule(conflictPair.sourceTable).emitRows(conflictRow, {
+    ...foreignConflictContext,
+    userResolution: correctUser.state,
+    userIdentityRef: correctUser.identityRef,
+    userResolutionFingerprint: correctUser.fingerprint,
+    userLookupSourceTable: correctUser.sourceTable,
+    userLookupSourceKey: correctUser.sourceKey,
+  })[0];
+  assert.equal(conflictEmission.status, "quarantine");
+  assert.equal(conflictEmission.reasonCode, "PERMISSION_DEDUP_CONTEXT_MISMATCH");
+});
+
+test("contexto ICMS owner, duplicate ou conflict não pode ser trocado ou reordenado", async () => {
+  const rows = await loadRows("tb_fiscal.icms");
+  const contexts = buildIcmsResolutionContexts(rows);
+  const duplicateIndex = contexts.findIndex(
+    ({ icmsNaturalKeyResolution }) => icmsNaturalKeyResolution === "duplicate",
+  );
+  assert.notEqual(duplicateIndex, -1);
+  const ownerIndex = contexts.findIndex(
+    (context) =>
+      context.icmsNaturalKeyResolution === "owner" &&
+      context.icmsNaturalKeyFingerprint === contexts[duplicateIndex].icmsNaturalKeyFingerprint,
+  );
+  assert.notEqual(ownerIndex, -1);
+  const conflictIndexes = contexts
+    .map((context, index) => ({ context, index }))
+    .filter(({ context }) => context.icmsNaturalKeyResolution === "conflict");
+  assert.ok(conflictIndexes.length >= 2);
+
+  for (const [rowIndex, contextIndex] of [
+    [duplicateIndex, ownerIndex],
+    [ownerIndex, duplicateIndex],
+    [conflictIndexes[0].index, conflictIndexes[1].index],
+  ]) {
+    const emission = rule("tb_fiscal.icms").emitRows(rows[rowIndex], contexts[contextIndex])[0];
+    assert.equal(emission.status, "quarantine");
+    assert.equal(emission.reasonCode, "ICMS_DEDUP_CONTEXT_MISMATCH");
+  }
 });
 
 test("NCM/PIS/COFINS exige tributação federal e data civil exata nos 31.362 registros reais", async () => {

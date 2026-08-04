@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { ADMIN_BUSINESS_EVIDENCE } from "../evidence/admin-business.mjs";
 import { REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
 
@@ -5,6 +7,8 @@ const ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const EVIDENCE_BY_SOURCE = new Map(
   ADMIN_BUSINESS_EVIDENCE.map((decision) => [decision.sourceTable, decision]),
 );
+const REFERENCE_RESOLUTION_STATES = new Set(["one", "zero", "many"]);
+const DEDUP_RESOLUTION_STATES = new Set(["owner", "duplicate", "conflict"]);
 
 export const ADMIN_BUSINESS_TRANSFORMATIONS = Object.freeze({
   normalize_legacy_permission_level_plus_one: normalizeLegacyPermissionLevelPlusOne,
@@ -33,9 +37,9 @@ export function createLegacyReferenceResolver({ sourceTable, legacyColumn, rows 
     resolve(value) {
       const key = strictPositiveIntegerLiteral(value);
       const candidates = key === null ? [] : (rowsByKey.get(key) ?? []);
-      if (candidates.length === 0) return referenceResolution("zero");
-      if (candidates.length > 1) return referenceResolution("many");
-      return referenceResolution("one", `${sourceTable}:${key}`);
+      if (candidates.length === 0) return referenceResolution("zero", sourceTable, key);
+      if (candidates.length > 1) return referenceResolution("many", sourceTable, key);
+      return referenceResolution("one", sourceTable, key, `${sourceTable}:${key}`);
     },
   });
 }
@@ -62,14 +66,14 @@ export function createV2ClientIdentityResolver({ regularizeRows, integrationRows
     resolve(value) {
       const code = strictPositiveIntegerLiteral(value);
       const candidates = code === null ? [] : (regularizeByCode.get(code) ?? []);
-      if (candidates.length === 0) return clientResolution("zero", "zero");
-      if (candidates.length > 1) return clientResolution("many", "many");
+      if (candidates.length === 0) return clientResolution("zero", "zero", code);
+      if (candidates.length > 1) return clientResolution("many", "many", code);
       const regularizeRow = candidates[0];
       if (!hasExplicitV2ClientLink(regularizeRow?.cliente_id)) {
-        return clientResolution("one", "one", `tb_regularize.clientes:${code}`);
+        return clientResolution("one", "one", code, `tb_regularize.clientes:${code}`);
       }
       const integration = integrationResolver.resolve(regularizeRow.cliente_id);
-      return clientResolution("one", integration.state, integration.identityRef);
+      return clientResolution("one", integration.state, code, integration.identityRef);
     },
   });
 }
@@ -106,11 +110,19 @@ export function buildPermissionResolutionContexts({ sourceTable, rows, userResol
       const user =
         typeof userResolver?.resolve === "function"
           ? userResolver.resolve(row?.user_id)
-          : referenceResolution("not_executed");
+          : referenceResolution(
+              "not_executed",
+              "tb_admin.usuarios",
+              strictPositiveIntegerLiteral(row?.user_id),
+            );
       return Object.freeze({
         userResolution: user.state,
         userIdentityRef: user.identityRef,
+        userResolutionFingerprint: user.fingerprint,
+        userLookupSourceTable: user.sourceTable,
+        userLookupSourceKey: user.sourceKey,
         permissionUserModuleResolution: dedupStates[index],
+        ...permissionContextBinding(sourceTable, row),
       });
     }),
   );
@@ -147,7 +159,12 @@ export function buildIcmsResolutionContexts(rows) {
     for (const { index } of duplicates) states[index] = "duplicate";
   }
   return Object.freeze(
-    states.map((icmsNaturalKeyResolution) => Object.freeze({ icmsNaturalKeyResolution })),
+    states.map((icmsNaturalKeyResolution, index) =>
+      Object.freeze({
+        icmsNaturalKeyResolution,
+        ...icmsContextBinding(rows[index]),
+      }),
+    ),
   );
 }
 
@@ -192,7 +209,12 @@ const rules = [
         classifyResolvedReference(row?.usuario_id, context, {
           stateKey: "userResolution",
           identityKey: "userIdentityRef",
+          fingerprintKey: "userResolutionFingerprint",
           allowedSources: ["tb_admin.usuarios"],
+          sourceTableKey: "userLookupSourceTable",
+          sourceKeyKey: "userLookupSourceKey",
+          allowedLookupSources: ["tb_admin.usuarios"],
+          identityMustMatchLookup: true,
           field: "usuario_id",
           invalidReason: "LOG_USER_LINK_INVALID",
           notFoundReason: "LOG_USER_NOT_FOUND",
@@ -200,6 +222,7 @@ const rules = [
           notExecutedReason: "LOG_USER_LOOKUP_NOT_EXECUTED",
           invalidStateReason: "LOG_USER_LOOKUP_STATE_INVALID",
           invalidIdentityReason: "LOG_USER_IDENTITY_INVALID",
+          contextMismatchReason: "LOG_USER_CONTEXT_MISMATCH",
         }),
         classifyRequiredValue(row?.tipo, "tipo", "LOG_ACTION_EMPTY"),
         classifyRequiredValue(row?.referente, "referente", "LOG_REFERRING_EMPTY"),
@@ -249,7 +272,12 @@ const rules = [
         classifyResolvedReference(row?.user_id, context, {
           stateKey: "userResolution",
           identityKey: "userIdentityRef",
+          fingerprintKey: "userResolutionFingerprint",
           allowedSources: ["tb_admin.usuarios"],
+          sourceTableKey: "userLookupSourceTable",
+          sourceKeyKey: "userLookupSourceKey",
+          allowedLookupSources: ["tb_admin.usuarios"],
+          identityMustMatchLookup: true,
           field: "user_id",
           invalidReason: "HISTORY_USER_LINK_INVALID",
           notFoundReason: "HISTORY_USER_NOT_FOUND",
@@ -257,6 +285,7 @@ const rules = [
           notExecutedReason: "HISTORY_USER_LOOKUP_NOT_EXECUTED",
           invalidStateReason: "HISTORY_USER_LOOKUP_STATE_INVALID",
           invalidIdentityReason: "HISTORY_USER_IDENTITY_INVALID",
+          contextMismatchReason: "HISTORY_USER_CONTEXT_MISMATCH",
         }),
         classifyRequiredValue(row?.observacao, "observacao", "HISTORY_TEXT_EMPTY"),
       ]);
@@ -344,7 +373,7 @@ const rules = [
     precedence: ["natural_key", "lowest_legacy_id_owner", "source", "defaults"],
     classifySourceRow(row, context) {
       return firstQuarantine([
-        classifyIcmsNaturalKeyResolution(context),
+        classifyIcmsNaturalKeyResolution(row, context),
         classifyRequiredValue(row?.estado, "estado", "ICMS_STATE_EMPTY"),
         classifyRequiredValue(row?.descricao, "descricao", "ICMS_DESCRIPTION_EMPTY"),
       ]);
@@ -449,14 +478,36 @@ function createPermissionRule(module) {
         dependencies: ["tb_admin.usuarios"],
       },
     ],
-    classifySourceRow: classifyPermissionRow,
+    classifySourceRow(row, context) {
+      return classifyPermissionRow(row, context, sourceTable);
+    },
     emitRows(row, context) {
-      const classification = classifyPermissionRow(row, context);
-      const userIdentityRef = isSafeResolvedIdentity(context?.userIdentityRef, [
-        "tb_admin.usuarios",
-      ])
-        ? context.userIdentityRef
-        : null;
+      const classification = classifyPermissionRow(row, context, sourceTable);
+      const userIdentityRef =
+        isSafeResolvedIdentity(context?.userIdentityRef, ["tb_admin.usuarios"]) &&
+        isResolvedReferenceContextBound(row?.user_id, context, {
+          stateKey: "userResolution",
+          identityKey: "userIdentityRef",
+          fingerprintKey: "userResolutionFingerprint",
+          sourceTableKey: "userLookupSourceTable",
+          sourceKeyKey: "userLookupSourceKey",
+          allowedLookupSources: ["tb_admin.usuarios"],
+          identityMustMatchLookup: true,
+        }) &&
+        isResolvedReferenceFingerprintValid(context, {
+          stateKey: "userResolution",
+          identityKey: "userIdentityRef",
+          fingerprintKey: "userResolutionFingerprint",
+          sourceTableKey: "userLookupSourceTable",
+          sourceKeyKey: "userLookupSourceKey",
+        }) &&
+        isResolvedIdentityMatchingLookup(context, {
+          identityKey: "userIdentityRef",
+          sourceTableKey: "userLookupSourceTable",
+          sourceKeyKey: "userLookupSourceKey",
+        })
+          ? context.userIdentityRef
+          : null;
       return [
         emission({
           stepId,
@@ -600,7 +651,7 @@ function normalizeLegacyPermissionLevelPlusOne(value) {
   return Number(value) + 1;
 }
 
-function classifyPermissionRow(row, context) {
+function classifyPermissionRow(row, context, sourceTable) {
   if (!isValidLegacyReference(row?.user_id)) {
     return quarantine("user_id", "PERMISSION_USER_LINK_INVALID");
   }
@@ -610,7 +661,12 @@ function classifyPermissionRow(row, context) {
   const user = classifyResolvedReference(row.user_id, context, {
     stateKey: "userResolution",
     identityKey: "userIdentityRef",
+    fingerprintKey: "userResolutionFingerprint",
     allowedSources: ["tb_admin.usuarios"],
+    sourceTableKey: "userLookupSourceTable",
+    sourceKeyKey: "userLookupSourceKey",
+    allowedLookupSources: ["tb_admin.usuarios"],
+    identityMustMatchLookup: true,
     field: "user_id",
     invalidReason: "PERMISSION_USER_LINK_INVALID",
     notFoundReason: "PERMISSION_USER_NOT_FOUND",
@@ -618,20 +674,26 @@ function classifyPermissionRow(row, context) {
     notExecutedReason: "PERMISSION_USER_LOOKUP_NOT_EXECUTED",
     invalidStateReason: "PERMISSION_USER_LOOKUP_STATE_INVALID",
     invalidIdentityReason: "PERMISSION_USER_IDENTITY_INVALID",
+    contextMismatchReason: "PERMISSION_USER_CONTEXT_MISMATCH",
   });
   if (user.status !== "prepared") return user;
-  switch (context?.permissionUserModuleResolution) {
+  const dedupState = context?.permissionUserModuleResolution;
+  if (dedupState === undefined || dedupState === "not_executed") {
+    return quarantine("user_id", "PERMISSION_DEDUP_NOT_EXECUTED");
+  }
+  if (!DEDUP_RESOLUTION_STATES.has(dedupState)) {
+    return quarantine("user_id", "PERMISSION_DEDUP_STATE_INVALID");
+  }
+  if (!isPermissionContextBound(row, context, sourceTable)) {
+    return quarantine("id", "PERMISSION_DEDUP_CONTEXT_MISMATCH");
+  }
+  switch (dedupState) {
     case "owner":
       return prepared();
     case "duplicate":
       return notEmitted("PERMISSION_MODULE_DUPLICATE");
     case "conflict":
       return quarantine("permissao", "PERMISSION_MODULE_LEVEL_CONFLICT");
-    case undefined:
-    case "not_executed":
-      return quarantine("user_id", "PERMISSION_DEDUP_NOT_EXECUTED");
-    default:
-      return quarantine("user_id", "PERMISSION_DEDUP_STATE_INVALID");
   }
 }
 
@@ -639,7 +701,12 @@ function classifyClientReference(row, context) {
   return classifyResolvedReference(row?.cliente_id, context, {
     stateKey: "clientResolution",
     identityKey: "clientIdentityRef",
+    fingerprintKey: "clientResolutionFingerprint",
     allowedSources: ["tb_integracao.clientes", "tb_regularize.clientes"],
+    sourceTableKey: "clientLookupSourceTable",
+    sourceKeyKey: "clientLookupSourceKey",
+    allowedLookupSources: ["tb_regularize.clientes"],
+    identityMustMatchLookup: false,
     field: "cliente_id",
     invalidReason: "CLIENT_LINK_INVALID",
     notFoundReason: "CLIENT_REFERENCE_NOT_FOUND",
@@ -647,22 +714,28 @@ function classifyClientReference(row, context) {
     notExecutedReason: "CLIENT_LOOKUP_NOT_EXECUTED",
     invalidStateReason: "CLIENT_LOOKUP_STATE_INVALID",
     invalidIdentityReason: "CLIENT_IDENTITY_INVALID",
+    contextMismatchReason: "CLIENT_CONTEXT_MISMATCH",
   });
 }
 
-function classifyIcmsNaturalKeyResolution(context) {
-  switch (context?.icmsNaturalKeyResolution) {
+function classifyIcmsNaturalKeyResolution(row, context) {
+  const dedupState = context?.icmsNaturalKeyResolution;
+  if (dedupState === undefined || dedupState === "not_executed") {
+    return quarantine("natural_key", "ICMS_DEDUP_NOT_EXECUTED");
+  }
+  if (!DEDUP_RESOLUTION_STATES.has(dedupState)) {
+    return quarantine("natural_key", "ICMS_DEDUP_STATE_INVALID");
+  }
+  if (!isIcmsContextBound(row, context)) {
+    return quarantine("natural_key", "ICMS_DEDUP_CONTEXT_MISMATCH");
+  }
+  switch (dedupState) {
     case "owner":
       return prepared();
     case "duplicate":
       return notEmitted("ICMS_NATURAL_DUPLICATE");
     case "conflict":
       return quarantine("natural_key", "ICMS_NATURAL_KEY_CONFLICT");
-    case undefined:
-    case "not_executed":
-      return quarantine("natural_key", "ICMS_DEDUP_NOT_EXECUTED");
-    default:
-      return quarantine("natural_key", "ICMS_DEDUP_STATE_INVALID");
   }
 }
 
@@ -672,7 +745,12 @@ function classifyResolvedReference(
   {
     stateKey,
     identityKey,
+    fingerprintKey,
     allowedSources,
+    sourceTableKey,
+    sourceKeyKey,
+    allowedLookupSources,
+    identityMustMatchLookup,
     field,
     invalidReason,
     notFoundReason,
@@ -680,23 +758,73 @@ function classifyResolvedReference(
     notExecutedReason,
     invalidStateReason,
     invalidIdentityReason,
+    contextMismatchReason,
   },
 ) {
   if (!isValidLegacyReference(value)) return quarantine(field, invalidReason);
-  switch (context?.[stateKey]) {
-    case "one":
-      return isSafeResolvedIdentity(context?.[identityKey], allowedSources)
-        ? prepared()
-        : quarantine(field, invalidIdentityReason);
+  const resolutionState = context?.[stateKey];
+  if (resolutionState === undefined || resolutionState === "not_executed") {
+    return quarantine(field, notExecutedReason);
+  }
+  if (!REFERENCE_RESOLUTION_STATES.has(resolutionState)) {
+    return quarantine(field, invalidStateReason);
+  }
+  if (
+    !isResolvedReferenceContextBound(value, context, {
+      stateKey,
+      identityKey,
+      sourceTableKey,
+      sourceKeyKey,
+      allowedLookupSources,
+      identityMustMatchLookup,
+    })
+  ) {
+    return quarantine(field, contextMismatchReason);
+  }
+  if (
+    resolutionState !== "one" &&
+    !isResolvedReferenceFingerprintValid(context, {
+      stateKey,
+      identityKey,
+      fingerprintKey,
+      sourceTableKey,
+      sourceKeyKey,
+    })
+  ) {
+    return quarantine(field, contextMismatchReason);
+  }
+  switch (resolutionState) {
+    case "one": {
+      if (!isSafeResolvedIdentity(context?.[identityKey], allowedSources)) {
+        return quarantine(field, invalidIdentityReason);
+      }
+      if (
+        !isResolvedReferenceFingerprintValid(context, {
+          stateKey,
+          identityKey,
+          fingerprintKey,
+          sourceTableKey,
+          sourceKeyKey,
+        })
+      ) {
+        return quarantine(field, contextMismatchReason);
+      }
+      if (
+        identityMustMatchLookup &&
+        !isResolvedIdentityMatchingLookup(context, {
+          identityKey,
+          sourceTableKey,
+          sourceKeyKey,
+        })
+      ) {
+        return quarantine(field, contextMismatchReason);
+      }
+      return prepared();
+    }
     case "zero":
       return quarantine(field, notFoundReason);
     case "many":
       return quarantine(field, ambiguousReason);
-    case undefined:
-    case "not_executed":
-      return quarantine(field, notExecutedReason);
-    default:
-      return quarantine(field, invalidStateReason);
   }
 }
 
@@ -735,12 +863,151 @@ function isSafeResolvedIdentity(identityRef, allowedSources) {
   );
 }
 
-function referenceResolution(state, identityRef = null) {
-  return Object.freeze({ state, identityRef });
+function isResolvedReferenceContextBound(
+  value,
+  context,
+  { sourceTableKey, sourceKeyKey, allowedLookupSources },
+) {
+  const expectedSourceKey = strictPositiveIntegerLiteral(value);
+  const contextSourceTable = context?.[sourceTableKey];
+  const contextSourceKey = strictPositiveIntegerLiteral(context?.[sourceKeyKey]);
+  if (
+    expectedSourceKey === null ||
+    contextSourceKey !== expectedSourceKey ||
+    !allowedLookupSources.includes(contextSourceTable)
+  ) {
+    return false;
+  }
+  return true;
 }
 
-function clientResolution(sourceState, state, identityRef = null) {
-  return Object.freeze({ sourceState, state, identityRef });
+function isResolvedIdentityMatchingLookup(context, { identityKey, sourceTableKey, sourceKeyKey }) {
+  return context?.[identityKey] === `${context?.[sourceTableKey]}:${context?.[sourceKeyKey]}`;
+}
+
+function isResolvedReferenceFingerprintValid(
+  context,
+  { stateKey, identityKey, fingerprintKey, sourceTableKey, sourceKeyKey },
+) {
+  return (
+    context?.[fingerprintKey] ===
+    referenceResolutionFingerprint(
+      context?.[stateKey],
+      context?.[identityKey],
+      context?.[sourceTableKey],
+      context?.[sourceKeyKey],
+    )
+  );
+}
+
+function referenceResolution(state, sourceTable, sourceKey, identityRef = null) {
+  return Object.freeze({
+    state,
+    identityRef,
+    sourceTable,
+    sourceKey,
+    fingerprint: referenceResolutionFingerprint(state, identityRef, sourceTable, sourceKey),
+  });
+}
+
+function clientResolution(sourceState, state, sourceKey, identityRef = null) {
+  return Object.freeze({
+    sourceState,
+    state,
+    identityRef,
+    sourceTable: "tb_regularize.clientes",
+    sourceKey,
+    fingerprint: referenceResolutionFingerprint(
+      state,
+      identityRef,
+      "tb_regularize.clientes",
+      sourceKey,
+    ),
+  });
+}
+
+function referenceResolutionFingerprint(state, identityRef, sourceTable, sourceKey) {
+  return stableFingerprint(["reference-resolution-v1", state, identityRef, sourceTable, sourceKey]);
+}
+
+function permissionContextBinding(sourceTable, row) {
+  return {
+    permissionSourceTable: sourceTable,
+    permissionSourceRowId: strictPositiveIntegerLiteral(row?.id),
+    permissionNaturalKeyFingerprint: permissionNaturalKeyFingerprint(sourceTable, row),
+    permissionRowFingerprint: stableFingerprint([
+      "permission-row-v1",
+      sourceTable,
+      strictPositiveIntegerLiteral(row?.id),
+      strictPositiveIntegerLiteral(row?.user_id),
+      canonicalLegacyText(row?.permissao),
+    ]),
+  };
+}
+
+function permissionNaturalKeyFingerprint(sourceTable, row) {
+  return stableFingerprint([
+    "permission-natural-key-v1",
+    sourceTable,
+    strictPositiveIntegerLiteral(row?.user_id),
+  ]);
+}
+
+function isPermissionContextBound(row, context, sourceTable) {
+  const sourceRowId = strictPositiveIntegerLiteral(row?.id);
+  if (sourceRowId === null) return false;
+  const expected = permissionContextBinding(sourceTable, row);
+  return (
+    context?.permissionSourceTable === expected.permissionSourceTable &&
+    context?.permissionSourceRowId === sourceRowId &&
+    context?.permissionNaturalKeyFingerprint === expected.permissionNaturalKeyFingerprint &&
+    context?.permissionRowFingerprint === expected.permissionRowFingerprint
+  );
+}
+
+function icmsContextBinding(row) {
+  return {
+    icmsSourceTable: "tb_fiscal.icms",
+    icmsSourceRowId: strictPositiveIntegerLiteral(row?.id),
+    icmsNaturalKeyFingerprint: stableFingerprint([
+      "icms-natural-key-v1",
+      ...icmsNaturalKeyValues(row),
+    ]),
+    icmsRowFingerprint: stableFingerprint([
+      "icms-row-v1",
+      strictPositiveIntegerLiteral(row?.id),
+      ...icmsNaturalKeyValues(row),
+      ...icmsFiscalPayloadValues(row),
+    ]),
+  };
+}
+
+function isIcmsContextBound(row, context) {
+  const sourceRowId = strictPositiveIntegerLiteral(row?.id);
+  if (sourceRowId === null) return false;
+  const expected = icmsContextBinding(row);
+  return (
+    context?.icmsSourceTable === expected.icmsSourceTable &&
+    context?.icmsSourceRowId === sourceRowId &&
+    context?.icmsNaturalKeyFingerprint === expected.icmsNaturalKeyFingerprint &&
+    context?.icmsRowFingerprint === expected.icmsRowFingerprint
+  );
+}
+
+function icmsNaturalKeyValues(row) {
+  return ["estado", "item", "cest", "descricao"].map((column) =>
+    canonicalLegacyText(row?.[column]),
+  );
+}
+
+function icmsFiscalPayloadValues(row) {
+  return ["acordo", "mva_original_aplicada", "mva_ajustado", "mva_original"].map((column) =>
+    canonicalLegacyText(row?.[column]),
+  );
+}
+
+function stableFingerprint(parts) {
+  return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
 }
 
 function hasExplicitV2ClientLink(value) {
