@@ -188,3 +188,52 @@ test("scanLegacyUsage ignora dump SQL assinado antes de alcançar valores de INS
     assert.doesNotMatch(JSON.stringify(usage), /dump-raw-value-must-not-be-read/);
   });
 });
+
+for (const { label, signature } of [
+  { label: "whitespace inicial", signature: " \t-- MySQL dump 10.13" },
+  { label: "BOM UTF-8", signature: "\uFEFF-- PostgreSQL database dump" },
+  { label: "BOM UTF-8 e whitespace inicial", signature: "\uFEFF  -- pg_dump" },
+]) {
+  test(`scanLegacyUsage reconhece dump SQL com ${label} antes dos dados`, async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const legacyDirectory = path.join(directory, "legacy");
+      const sqlPath = path.join(legacyDirectory, "export.sql");
+      const sql = [
+        signature,
+        "INSERT INTO tb_admin.usuarios (nome) VALUES ('dump-raw-value-must-not-be-read');",
+      ].join("\n");
+      const bytes = Buffer.from(sql, "utf8");
+      const lastHeaderByte = bytes.indexOf("\n");
+      await mkdir(legacyDirectory, { recursive: true });
+      await writeFile(sqlPath, sql, "utf8");
+
+      const usage = await scanLegacyUsage({
+        legacyDir: legacyDirectory,
+        sourceTables: ["tb_admin.usuarios"],
+        readTextFile: async () => {
+          throw new Error("Dump assinado não pode ter leitura textual integral.");
+        },
+        openSqlFile: async () => ({
+          close: async () => {},
+          read: async (buffer, offset, length, position) => {
+            assert.equal(length, 1);
+            assert.ok(position <= lastHeaderByte, "Não deve ler além do cabeçalho do dump.");
+            buffer[offset] = bytes[position];
+            return { buffer, bytesRead: 1 };
+          },
+        }),
+      });
+
+      assert.deepEqual(usage.tables, [
+        {
+          legacyModule: null,
+          legacyReferences: [],
+          legacyRelationships: [],
+          operations: [],
+          sourceTable: "tb_admin.usuarios",
+        },
+      ]);
+      assert.doesNotMatch(JSON.stringify(usage), /dump-raw-value-must-not-be-read/);
+    });
+  });
+}

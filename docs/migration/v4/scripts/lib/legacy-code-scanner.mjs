@@ -54,7 +54,7 @@ export async function scanLegacyUsage({
 
 async function hasSqlDumpSignature({ filePath, openSqlFile }) {
   const file = await openSqlFile(filePath, "r");
-  let line = "";
+  let lineBytes = [];
   let position = 0;
   const byte = Buffer.allocUnsafe(1);
   try {
@@ -63,28 +63,29 @@ async function hasSqlDumpSignature({ filePath, openSqlFile }) {
       if (bytesRead === 0) {
         break;
       }
-      const character = byte.toString("utf8", 0, bytesRead);
       position += bytesRead;
-      if (character === "\n") {
+      if (byte[0] === 0x0a) {
+        const line = Buffer.from(lineBytes).toString("utf8");
         if (isSqlDumpSignature(line)) {
           return true;
         }
         if (line.trim().length > 0 && !line.trimStart().startsWith("--")) {
           return false;
         }
-        line = "";
-      } else if (character !== "\r") {
-        line += character;
+        lineBytes = [];
+      } else if (byte[0] !== 0x0d) {
+        lineBytes.push(byte[0]);
       }
     }
   } finally {
     await file.close();
   }
-  return isSqlDumpSignature(line);
+  return isSqlDumpSignature(Buffer.from(lineBytes).toString("utf8"));
 }
 
 function isSqlDumpSignature(line) {
-  return SQL_DUMP_SIGNATURES.some((signature) => signature.test(line));
+  const normalizedLine = line.replace(/^\uFEFF/, "").trimStart();
+  return SQL_DUMP_SIGNATURES.some((signature) => signature.test(normalizedLine));
 }
 
 async function listLegacyTextFiles(directory) {
