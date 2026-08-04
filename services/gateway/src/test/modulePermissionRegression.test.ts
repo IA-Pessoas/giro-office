@@ -164,6 +164,19 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(level >= 1);
   });
 
+  it.each([0, 1, 2, 3])("avalia o módulo Parcelamento no nível %i", (level) => {
+    const policy = requiredRoutePolicy("GET", "/parcelamento/installments");
+
+    expect(
+      canAccessRoute(
+        authContext({
+          modules: { parcelamento: level },
+        }),
+        policy,
+      ),
+    ).toBe(level >= 1);
+  });
+
   it.each([1, 2, 3])("respeita o limiar modular %i em toda a matriz 0-3", (minPermission) => {
     const observed = [0, 1, 2, 3].map((level) =>
       canAccessRoute(authContext({ modules: { integracao: level } }), {

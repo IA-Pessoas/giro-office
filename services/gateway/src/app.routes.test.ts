@@ -1094,7 +1094,8 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/certificate/pf/{id}/file"]).toBeTruthy();
     expect(body.paths["/certificate/notifications"]).toBeTruthy();
     expect(body.paths["/audit/requests"]).toBeTruthy();
-    expect(body.paths["/parcelamento/installments"]).toBeUndefined();
+    expect(body.paths["/parcelamento/installments"]).toBeTruthy();
+    expect(body.paths["/parcelamento/panoramas"]).toBeTruthy();
     expect(body.paths["/pessoal/health"]).toBeUndefined();
     expect(body.paths["/pessoal/ready"]).toBeUndefined();
     expect(body.paths["/parcelamento/health"]).toBeUndefined();
@@ -1578,16 +1579,18 @@ it("proxies pessoal-service routes mapped in the gateway", async () => {
   }
 });
 
-it("blocks /parcelamento before proxying even for global admins", async () => {
+it("proxies /parcelamento requests and forwards the owner permission", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
     permission: 2,
-    modules: { parcelamento: 2 },
+    modules: { parcelamento: 0 },
   });
   let upstreamHits = 0;
-  const parcelamentoService = createServer((_request, response) => {
+  let seenPermission: string | undefined;
+  const parcelamentoService = createServer((request, response) => {
     upstreamHits += 1;
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ success: true, data: { ok: true } }));
@@ -1606,8 +1609,75 @@ it("blocks /parcelamento before proxying even for global admins", async () => {
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    expect(response.status).toBe(404);
-    expect(body.code).toBe("NOT_FOUND");
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(upstreamHits).toBe(1);
+    expect(seenPermission).toBe("3");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(parcelamentoService);
+  }
+});
+
+it("forwards the parcelamento module permission to the upstream", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 0,
+    modules: { parcelamento: 1 },
+  });
+  let seenPermission: string | undefined;
+  const parcelamentoService = createServer((request, response) => {
+    seenPermission = request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const parcelamentoServiceUrl = await startServer(parcelamentoService);
+  const app = createApp(createEnv({ parcelamentoServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/parcelamento/installments`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(seenPermission).toBe("1");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(parcelamentoService);
+  }
+});
+
+it("blocks a user without parcelamento permission before proxying", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 0,
+    modules: { parcelamento: 0 },
+  });
+  let upstreamHits = 0;
+  const parcelamentoService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const parcelamentoServiceUrl = await startServer(parcelamentoService);
+  const app = createApp(createEnv({ parcelamentoServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/parcelamento/installments`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(403);
+    expect(body.code).toBe("FORBIDDEN");
     expect(upstreamHits).toBe(0);
   } finally {
     await stopServer(gateway);
@@ -2392,17 +2462,15 @@ it("records pessoal-service route targets when audit is enabled", async () => {
   }
 });
 
-it("does not record parcelamento-service route targets when disabled", async () => {
+it("records parcelamento-service route targets when audit is enabled", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
     permission: 3,
-    modules: { parcelamento: 2 },
+    modules: { parcelamento: 1 },
   });
   const auditService = await startAuditIngestServer();
-  let upstreamHits = 0;
   const upstream = createServer((_request, response) => {
-    upstreamHits += 1;
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ ok: true }));
@@ -2427,9 +2495,9 @@ it("does not record parcelamento-service route targets when disabled", async () 
       },
     });
 
-    expect(response.status).toBe(404);
-    expect(upstreamHits).toBe(0);
-    expect(auditService.records).toHaveLength(0);
+    expect(response.status).toBe(200);
+    await waitForRecords(auditService.records, 1);
+    expect(auditService.records[0]?.metadata?.routeTarget).toBe("parcelamento-service");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
