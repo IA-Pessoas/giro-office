@@ -165,6 +165,34 @@ test("credencial TI exige User correto e criptografia sem expor valor", () => {
   );
   assert.equal(passwordColumn.transformation, "encrypt_credential");
   assert.equal(passwordColumn.sensitivity, "credential");
+
+  const observationColumn = mappingRule.destinations[0].columns.find(
+    ({ sourceColumn }) => sourceColumn === "obs",
+  );
+  assert.deepEqual(
+    {
+      destinationColumn: observationColumn.destinationColumn,
+      sensitivity: observationColumn.sensitivity,
+      status: observationColumn.status,
+      transformation: observationColumn.transformation,
+    },
+    {
+      destinationColumn: null,
+      sensitivity: "credential",
+      status: "not_preserved",
+      transformation: "redact_and_not_preserve",
+    },
+  );
+  assert.equal(
+    mappingRule.destinations[0].columns.some(
+      ({ destinationColumn, sourceColumn }) =>
+        sourceColumn === "obs" && destinationColumn === "notes",
+    ),
+    false,
+  );
+  assert.equal(Object.hasOwn(prepared[0], "notes"), false);
+  assert.equal(Object.hasOwn(prepared[0], "obs"), false);
+  assert.doesNotMatch(JSON.stringify(prepared), /SENTINEL_TI_NOTES/);
 });
 
 test("reset legado permanece pending e nenhuma decisão carrega token", () => {
@@ -306,6 +334,29 @@ test("parcelamento resolve cliente, identidade do acordo, estado e competência 
     agreementIdentityResolution: "zero",
   });
   assert.equal(preparedInstallment[0].status, "prepared");
+
+  const enrollmentDateColumn = installmentStep.columns.find(
+    ({ sourceColumn }) => sourceColumn === "data_adesao",
+  );
+  assert.equal(enrollmentDateColumn.transformation, "normalize_zero_date_to_null");
+  for (const dataAdesao of ["0000-00-00", "", null]) {
+    const nullableEnrollment = installmentRule.emitRows(
+      { ...installment, data_adesao: dataAdesao },
+      { integrationClientResolution: "one", agreementIdentityResolution: "zero" },
+    );
+    assert.equal(nullableEnrollment[0].status, "prepared", String(dataAdesao));
+  }
+  const nullableEnrollmentCollision = installmentRule.emitRows(
+    { ...installment, data_adesao: "0000-00-00" },
+    { integrationClientResolution: "one", agreementIdentityResolution: "one" },
+  );
+  assert.equal(nullableEnrollmentCollision[0].reasonCode, "INSTALLMENT_IDENTITY_DUPLICATE");
+  const invalidEnrollmentDate = installmentRule.emitRows(
+    { ...installment, data_adesao: "2026-02-30" },
+    { integrationClientResolution: "one", agreementIdentityResolution: "zero" },
+  );
+  assert.equal(invalidEnrollmentDate[0].reasonCode, "INSTALLMENT_ENROLLMENT_DATE_INVALID");
+
   const unknownState = installmentRule.emitRows(
     { ...installment, situacao: 99 },
     { integrationClientResolution: "one", agreementIdentityResolution: "zero" },

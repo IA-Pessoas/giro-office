@@ -89,7 +89,7 @@ function createInstallmentRule() {
         "normalize_non_negative_integer",
       ),
       mapped("parcelas_vencidas", "overdue_installments_count", "normalize_non_negative_integer"),
-      mapped("data_adesao", "enrollment_date", "normalize_required_date"),
+      mapped("data_adesao", "enrollment_date", "normalize_zero_date_to_null"),
       mapped("documento", "document_url", "normalize_legacy_document_url_preferred"),
       notPreserved(
         "externo",
@@ -119,7 +119,7 @@ function createInstallmentRule() {
         classifyRequiredText(row, "tipo", "INSTALLMENT_TYPE_REQUIRED"),
         classifyRequiredText(row, "estancia", "INSTALLMENT_JURISDICTION_REQUIRED"),
         classifyBooleanCode(row, "debito_automatico", "INSTALLMENT_AUTOMATIC_DEBIT_UNMAPPED"),
-        classifyRequiredDate(row, "data_adesao", "INSTALLMENT_ENROLLMENT_DATE_INVALID"),
+        classifyOptionalDate(row, "data_adesao", "INSTALLMENT_ENROLLMENT_DATE_INVALID"),
         classifyOptionalDate(row, "data_finalizacao", "INSTALLMENT_COMPLETION_DATE_INVALID"),
         ...["total_consolidado", "primeira_parcela", "parcela_mes_vigente", "saldo_devedor"].map(
           (field) => classifyNonNegativeNumber(row, field, "INSTALLMENT_AMOUNT_INVALID"),
@@ -355,10 +355,6 @@ function classifyBooleanCode(row, field, reasonCode) {
 
 function classifyNullableBooleanCode(row, field, reasonCode) {
   return [0, 1].includes(Number(row?.[field])) ? prepared() : quarantine(field, reasonCode);
-}
-
-function classifyRequiredDate(row, field, reasonCode) {
-  return isValidDate(row?.[field]) ? prepared() : quarantine(field, reasonCode);
 }
 
 function classifyOptionalDate(row, field, reasonCode) {

@@ -78,7 +78,9 @@ const CERTIFICATE_FILE_CONTRACT = [
 ];
 const PARCELAMENTO_IDENTITY_CONTRACT = [
   "infra/prisma/schema.prisma:1297",
+  "infra/prisma/schema.prisma:1311",
   "infra/prisma/migrations/20260710120000_parcelamento_agreement_identity/migration.sql:1",
+  "services/parcelamento-service/src/services/installmentService.ts:196",
   "services/parcelamento-service/src/services/installmentService.ts:449",
 ];
 
@@ -255,13 +257,15 @@ const technologyEvidence = [
     operations: ["delete", "insert", "select", "update"],
     legacyRelationships: [
       "tipo 0 usa id_usuario como User; tipo 1 usa id_usuario como localização e não cabe no user_id obrigatório atual.",
+      "obs é texto livre de credencial não estruturada; notes atual é exposto e pesquisável, portanto não pode receber esse conteúdo sem canal criptografado comprovado.",
     ],
     currentContractEvidence: [
       "infra/prisma/schema.prisma:1888",
+      "services/ti-service/src/services/tiPasswordService.ts:91",
       "services/ti-service/src/services/tiPasswordService.ts:153",
     ],
     reason:
-      "Credenciais de usuário tipo 0 possuem destino criptografado; tipo 1 e falhas de criptografia ou referência ficam em quarentena por emissão.",
+      "Credenciais de usuário tipo 0 preservam somente a senha criptografada; login e observação ficam not_preserved, e tipo 1 ou falhas de criptografia/referência ficam em quarentena.",
     rulePrefix: "technology",
   }),
   confirmed({
@@ -395,10 +399,11 @@ const parcelamentoEvidence = [
     legacyRelationships: [
       "cliente_id aponta para cliente interno quando externo=0 e para tb_parcelamento.clientes quando externo=1.",
       "Sem agreement_number legado, a identidade atual usa o fallback cliente/tipo/natureza/jurisdição/data de adesão.",
+      "data_adesao zero-date ou ausente normaliza para enrollment_date null, valor aceito pelo contrato e pela identidade fallback atuais.",
     ],
     currentContractEvidence: PARCELAMENTO_IDENTITY_CONTRACT,
     reason:
-      "O acordo possui contrato atual e identidade fallback explícita; cliente, estados e colisões são validados por emissão.",
+      "O acordo possui contrato atual e identidade fallback explícita, inclusive com enrollment_date null; cliente, datas não nulas, estados e colisões são validados por emissão.",
     rulePrefix: "parcelamento",
   }),
   pending({

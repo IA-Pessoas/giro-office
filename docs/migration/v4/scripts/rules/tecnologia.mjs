@@ -441,7 +441,11 @@ function createTiPasswordRule() {
         { sensitivity: "credential", transformation: "redact_and_not_preserve" },
       ),
       mapped("password", "password", "encrypt_credential", credentialOptions()),
-      mapped("obs", "notes", "normalize_optional_text", personalOptions()),
+      notPreserved(
+        "obs",
+        "A observação legada contém credencial não estruturada e notes é exposto e pesquisável; sem canal criptografado comprovado, o texto não pode ser preservado.",
+        { sensitivity: "credential", transformation: "redact_and_not_preserve" },
+      ),
       notPreserved(
         "item",
         "O vínculo Anydesk com item de inventário não existe no contrato atual de senhas de usuário.",
