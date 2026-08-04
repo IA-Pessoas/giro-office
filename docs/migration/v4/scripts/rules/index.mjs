@@ -1,3 +1,4 @@
+import { ADMIN_BUSINESS_EVIDENCE } from "../evidence/admin-business.mjs";
 import { RH_PESSOAL_EVIDENCE } from "../evidence/rh-pessoal.mjs";
 import {
   CERTIFICATE_EVIDENCE,
@@ -7,6 +8,7 @@ import {
 } from "../evidence/technology-certificates-parcelamento.mjs";
 import { V2_EVIDENCE } from "../evidence/v2.mjs";
 import { buildRuleRegistry as createRuleRegistry } from "../lib/mapping-contract.mjs";
+import { ADMIN_BUSINESS_RULES, ADMIN_BUSINESS_TRANSFORMATIONS } from "./admin-business.mjs";
 import { CERTIFICATE_RULES } from "./certificates.mjs";
 import { PARCELAMENTO_RULES } from "./parcelamento.mjs";
 import { RH_PESSOAL_RULES } from "./rh-pessoal.mjs";
@@ -14,6 +16,9 @@ import { TECHNOLOGY_RULES } from "./tecnologia.mjs";
 import { V2_RULES } from "./v2.mjs";
 
 export {
+  ADMIN_BUSINESS_EVIDENCE,
+  ADMIN_BUSINESS_RULES,
+  ADMIN_BUSINESS_TRANSFORMATIONS,
   CERTIFICATE_EVIDENCE,
   CERTIFICATE_RULES,
   PARCELAMENTO_EVIDENCE,
@@ -27,6 +32,7 @@ export {
   V2_RULES,
 };
 export const v2Rules = V2_RULES;
+export const adminBusinessRules = ADMIN_BUSINESS_RULES;
 export const rhPessoalRules = RH_PESSOAL_RULES;
 export const technologyRules = TECHNOLOGY_RULES;
 export const certificateRules = CERTIFICATE_RULES;
