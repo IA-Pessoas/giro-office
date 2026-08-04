@@ -9,6 +9,8 @@ const EVIDENCE_BY_SOURCE = new Map(
 );
 const REFERENCE_RESOLUTION_STATES = new Set(["one", "zero", "many"]);
 const DEDUP_RESOLUTION_STATES = new Set(["owner", "duplicate", "conflict"]);
+const LEGACY_REFERENCE_ISSUANCE = new WeakMap();
+const V2_CLIENT_IDENTITY_ISSUANCE = new WeakMap();
 
 export const ADMIN_BUSINESS_TRANSFORMATIONS = Object.freeze({
   normalize_legacy_permission_level_plus_one: normalizeLegacyPermissionLevelPlusOne,
@@ -76,6 +78,30 @@ export function createV2ClientIdentityResolver({ regularizeRows, integrationRows
       return clientResolution("one", integration.state, code, integration.identityRef);
     },
   });
+}
+
+export function isAuthenticLegacyReferenceResolution(
+  resolution,
+  expectedSourceTable,
+  expectedSourceKey,
+) {
+  const snapshot = LEGACY_REFERENCE_ISSUANCE.get(resolution);
+  return (
+    snapshot !== undefined &&
+    snapshot.sourceTable === expectedSourceTable &&
+    snapshot.sourceKey === strictPositiveIntegerLiteral(expectedSourceKey) &&
+    matchesIssuedResolution(resolution, snapshot, false)
+  );
+}
+
+export function isAuthenticV2ClientIdentityResolution(resolution, expectedSourceKey) {
+  const snapshot = V2_CLIENT_IDENTITY_ISSUANCE.get(resolution);
+  return (
+    snapshot !== undefined &&
+    snapshot.sourceTable === "tb_regularize.clientes" &&
+    snapshot.sourceKey === strictPositiveIntegerLiteral(expectedSourceKey) &&
+    matchesIssuedResolution(resolution, snapshot, true)
+  );
 }
 
 export function buildPermissionResolutionContexts({ sourceTable, rows, userResolver }) {
@@ -901,17 +927,19 @@ function isResolvedReferenceFingerprintValid(
 }
 
 function referenceResolution(state, sourceTable, sourceKey, identityRef = null) {
-  return Object.freeze({
+  const resolution = Object.freeze({
     state,
     identityRef,
     sourceTable,
     sourceKey,
     fingerprint: referenceResolutionFingerprint(state, identityRef, sourceTable, sourceKey),
   });
+  LEGACY_REFERENCE_ISSUANCE.set(resolution, resolutionSnapshot(resolution, false));
+  return resolution;
 }
 
 function clientResolution(sourceState, state, sourceKey, identityRef = null) {
-  return Object.freeze({
+  const resolution = Object.freeze({
     sourceState,
     state,
     identityRef,
@@ -924,6 +952,31 @@ function clientResolution(sourceState, state, sourceKey, identityRef = null) {
       sourceKey,
     ),
   });
+  V2_CLIENT_IDENTITY_ISSUANCE.set(resolution, resolutionSnapshot(resolution, true));
+  return resolution;
+}
+
+function resolutionSnapshot(resolution, includeSourceState) {
+  return Object.freeze({
+    ...(includeSourceState ? { sourceState: resolution.sourceState } : {}),
+    state: resolution.state,
+    identityRef: resolution.identityRef,
+    sourceTable: resolution.sourceTable,
+    sourceKey: resolution.sourceKey,
+    fingerprint: resolution.fingerprint,
+  });
+}
+
+function matchesIssuedResolution(resolution, snapshot, includeSourceState) {
+  return (
+    Object.isFrozen(resolution) &&
+    (!includeSourceState || resolution.sourceState === snapshot.sourceState) &&
+    resolution.state === snapshot.state &&
+    resolution.identityRef === snapshot.identityRef &&
+    resolution.sourceTable === snapshot.sourceTable &&
+    resolution.sourceKey === snapshot.sourceKey &&
+    resolution.fingerprint === snapshot.fingerprint
+  );
 }
 
 function referenceResolutionFingerprint(state, identityRef, sourceTable, sourceKey) {

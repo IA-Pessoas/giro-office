@@ -116,6 +116,7 @@ const CONFIRMED = new Map(
       references: ["classes/PF.php:4", "classes/PF.php:14", "classes/PF.php:16"],
       relationships: [
         "codigo é a identidade legada usada por processos, vencimentos e participações em empresas.",
+        "owner de codigo, CPF ou RG somente pode ser emitido após preflight completo e vinculado dos uniques atuais de clients.pf.",
       ],
       current: [
         "infra/prisma/schema.prisma:740",
@@ -296,6 +297,20 @@ const LEGACY_USAGE = [
   ["tb_regularize.sites_prefeituras", "classes/Sites.php:13", ["insert", "select", "update"]],
   ["tb_regularize.vencimento", "classes/PF.php:53", ["insert", "select", "update"]],
 ];
+
+export const INTEGRACAO_REGULARIZE_AUDITED_CORPORA = Object.freeze({
+  "tb_regularize.pf": Object.freeze({
+    identityColumn: "codigo",
+    rowCount: 1287,
+    digest: "3c5bef80a524001b1c4c385a216adaf37ab1294ae2762d13804cace9dbab6432",
+  }),
+  "tb_regularize.pf_empresas": Object.freeze({
+    identityColumn: "id",
+    rowCount: 1437,
+    digest: "46b40aea61dc445aae0d4513525168eca310471f7eaa5f257f6151340f862374",
+    resolutionStateDigest: "1d013b33f0125118b199af27bb517d904150a61dcbe72bf8b2d7b533e3d7bc4d",
+  }),
+});
 
 export const INTEGRACAO_REGULARIZE_SOURCE_TABLES = Object.freeze(
   LEGACY_USAGE.map(([sourceTable]) => sourceTable),

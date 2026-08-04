@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -282,13 +283,57 @@ test("grupo consome diretamente resolução Client produzida pela V2", async () 
     "resolve_canonical_v2_client_reference",
   );
 
-  const secondaryIdentity = referenceContext("tb_regularize.grupos_integrantes", row, {
-    ...resolutions,
-    client: { ...client, fingerprint: "0".repeat(64) },
-  });
-  assert.equal(
-    mappingRule.emitRows(row, secondaryIdentity)[0].reasonCode,
-    "INTEGRATION_CONTEXT_MISMATCH",
+  assert.throws(
+    () =>
+      referenceContext("tb_regularize.grupos_integrantes", row, {
+        ...resolutions,
+        client: { ...client, fingerprint: "0".repeat(64) },
+      }),
+    /proveniência|autêntica/i,
+  );
+
+  assert.throws(
+    () =>
+      referenceContext("tb_regularize.grupos_integrantes", row, {
+        ...resolutions,
+        client: { ...client },
+      }),
+    /proveniência|autêntica/i,
+  );
+  assert.throws(
+    () =>
+      referenceContext("tb_regularize.grupos_integrantes", row, {
+        ...resolutions,
+        client: { ...client, sourceState: client.sourceState === "one" ? "zero" : "one" },
+      }),
+    /proveniência|autêntica/i,
+  );
+
+  const fabricated = {
+    sourceState: client.sourceState,
+    state: client.state,
+    identityRef: client.identityRef,
+    sourceTable: client.sourceTable,
+    sourceKey: client.sourceKey,
+    fingerprint: createHash("sha256")
+      .update(
+        JSON.stringify([
+          "reference-resolution-v1",
+          client.state,
+          client.identityRef,
+          client.sourceTable,
+          client.sourceKey,
+        ]),
+      )
+      .digest("hex"),
+  };
+  assert.throws(
+    () =>
+      referenceContext("tb_regularize.grupos_integrantes", row, {
+        ...resolutions,
+        client: fabricated,
+      }),
+    /proveniência|autêntica/i,
   );
 });
 
@@ -337,36 +382,28 @@ test("vínculo Regularize resolve process ou license sem fabricar referring_type
   );
 });
 
-test("ClientPF exige campos atuais, normaliza estado civil e vincula as três unicidades", () => {
-  const { buildClientPfResolutionContexts, normalizeClientPfSourceRow } = implementation();
+test("ClientPF usa o corpus real completo e exige preflight do estado atual", async () => {
+  const {
+    buildClientPfResolutionContexts,
+    INTEGRACAO_REGULARIZE_AUDITED_CORPORA,
+    normalizeClientPfSourceRow,
+  } = implementation();
   const mappingRule = rule("tb_regularize.pf");
-  const row = {
-    codigo: 101,
-    nome: "Pessoa Exemplo",
-    sexo: "F",
-    endereco: "Rua Exemplo",
-    cidade: "Salvador",
-    cep: "40000-000",
-    uf: "BA",
-    profissao: "Contadora",
-    pai: "Pai Exemplo",
-    mae: "Mãe Exemplo",
-    estado_civil: "2",
-    nascimento: "1990-02-03",
-    cpf_cnpj: "123.456.789-01",
-    identidade: "12.345.678-9",
-    reservista: "",
-    ctps: "",
-    cnh: "",
-    conjuge: "",
-    status: "Ativo",
-    obs: "",
-    telefone: "",
-  };
-  const [context] = buildClientPfResolutionContexts({ rows: [row], currentRows: [] });
-  const [prepared] = mappingRule.emitRows(row, context);
+  const rows = await loadRows("tb_regularize.pf");
+  const contexts = buildClientPfResolutionContexts({ rows, currentRows: [] });
+  const row = rows[0];
+  const context = contexts[0];
+  const [preflightRequired] = mappingRule.emitRows(row, context);
 
-  assert.equal(prepared.status, "prepared");
+  assert.equal(rows.length, 1287);
+  assert.equal(
+    context.decisionBinding.corpusFingerprint,
+    INTEGRACAO_REGULARIZE_AUDITED_CORPORA["tb_regularize.pf"].digest,
+  );
+  assert.equal(context.resolutions.uniqueCode.criteria.currentState, "zero");
+  assert.equal(context.resolutions.uniqueCode.criteria.currentIdentityCount, 0);
+  assert.equal(preflightRequired.status, "quarantine");
+  assert.equal(preflightRequired.reasonCode, "CLIENT_PF_CURRENT_STATE_PREFLIGHT_REQUIRED");
   assert.equal(normalizeClientPfSourceRow(row).marital_status, "Casado");
   for (const required of [
     "sex",
@@ -385,147 +422,91 @@ test("ClientPF exige campos atuais, normaliza estado civil e vincula as três un
   }
 
   const invalidMarital = { ...row, estado_civil: "0" };
-  const [invalidContext] = buildClientPfResolutionContexts({
-    rows: [invalidMarital],
-    currentRows: [],
-  });
   assert.equal(
-    mappingRule.emitRows(invalidMarital, invalidContext)[0].reasonCode,
+    mappingRule.emitRows(invalidMarital, context)[0].reasonCode,
     "CLIENT_PF_MARITAL_STATUS_INVALID",
   );
 
   const missingRequired = { ...row, profissao: "" };
-  const [missingContext] = buildClientPfResolutionContexts({
-    rows: [missingRequired],
-    currentRows: [],
-  });
   assert.equal(
-    mappingRule.emitRows(missingRequired, missingContext)[0].reasonCode,
+    mappingRule.emitRows(missingRequired, context)[0].reasonCode,
     "CLIENT_PF_PROFESSION_EMPTY",
   );
 });
 
-test("ClientPF não permite reassinar duplicata como owner pelo builder genérico", () => {
+test("builder ClientPF rejeita subset, linha alterada e duplicação do corpus autoritativo", async () => {
+  const { buildClientPfResolutionContexts } = implementation();
+  const rows = await loadRows("tb_regularize.pf");
+
+  assert.throws(
+    () => buildClientPfResolutionContexts({ rows: [rows[0]], currentRows: [] }),
+    /corpus autoritativo.*tb_regularize\.pf/i,
+  );
+  assert.throws(
+    () =>
+      buildClientPfResolutionContexts({
+        rows: [{ ...rows[0], nome: `${rows[0].nome} ALTERADO` }, ...rows.slice(1)],
+        currentRows: [],
+      }),
+    /corpus autoritativo.*tb_regularize\.pf/i,
+  );
+  assert.throws(
+    () => buildClientPfResolutionContexts({ rows: [...rows, rows[0]], currentRows: [] }),
+    /corpus autoritativo.*tb_regularize\.pf/i,
+  );
+
+  const contexts = buildClientPfResolutionContexts({ rows, currentRows: [] });
+  const reversed = buildClientPfResolutionContexts({ rows: [...rows].reverse(), currentRows: [] });
+  assert.deepEqual(
+    contexts.find(({ resolutions }) => resolutions.uniqueCode.sourceKey === "1"),
+    reversed.find(({ resolutions }) => resolutions.uniqueCode.sourceKey === "1"),
+  );
+});
+
+test("contexto ClientPF é opaco e preserva zero, um ou muitos resultados do preflight", async () => {
   const { buildClientPfResolutionContexts, buildIntegrationRegularizeContext } = implementation();
   const mappingRule = rule("tb_regularize.pf");
-  const owner = {
-    codigo: 101,
-    nome: "Pessoa Exemplo",
-    sexo: "M",
-    endereco: "Rua Exemplo",
-    cidade: "Salvador",
-    cep: "40000000",
-    uf: "BA",
-    profissao: "Contador",
-    pai: "Pai Exemplo",
-    mae: "Mãe Exemplo",
-    estado_civil: "1",
-    nascimento: "1990-02-03",
-    cpf_cnpj: "12345678901",
-    identidade: "123456789",
-    reservista: "",
-    ctps: "",
-    cnh: "",
-    conjuge: "",
-    status: "Ativo",
-    obs: "",
-    telefone: "",
-  };
-  const duplicate = { ...owner, codigo: 102 };
-  const contexts = buildClientPfResolutionContexts({ rows: [owner, duplicate] });
-  const duplicateContext = contexts[1];
-  const [notEmitted] = mappingRule.emitRows(duplicate, duplicateContext);
-  assert.equal(notEmitted.status, "not_emitted");
-  assert.equal(notEmitted.reasonCode, "CLIENT_PF_CPF_DUPLICATE");
+  const rows = await loadRows("tb_regularize.pf");
+  const row = rows[0];
+  const contexts = buildClientPfResolutionContexts({ rows, currentRows: [] });
+  const context = contexts[0];
   assert.equal(buildIntegrationRegularizeContext, undefined);
 
   assert.throws(
-    () => referenceContext("tb_regularize.pf", duplicate, duplicateContext.resolutions),
+    () => referenceContext("tb_regularize.pf", row, context.resolutions),
     /decis.+builder dedicado/i,
   );
-  const forged = {
-    ...duplicateContext,
-    resolutions: {
-      ...duplicateContext.resolutions,
-      uniqueCpf: {
-        ...duplicateContext.resolutions.uniqueCpf,
-        state: "one",
-        decision: "owner",
-        ownerIdentityRef: "tb_regularize.pf:102",
-      },
-    },
-  };
-  const [quarantined] = mappingRule.emitRows(duplicate, forged);
-  assert.equal(quarantined.status, "quarantine");
-  assert.equal(quarantined.reasonCode, "INTEGRATION_CONTEXT_MISMATCH");
-});
-
-test("builder ClientPF é estável e trata zero, um ou vários destinos por unique", () => {
-  const { buildClientPfResolutionContexts } = implementation();
-  const mappingRule = rule("tb_regularize.pf");
-  const first = {
-    codigo: 101,
-    nome: "Pessoa Exemplo",
-    sexo: "M",
-    endereco: "Rua Exemplo",
-    cidade: "Salvador",
-    cep: "40000000",
-    uf: "BA",
-    profissao: "Contador",
-    pai: "Pai Exemplo",
-    mae: "Mãe Exemplo",
-    estado_civil: "1",
-    nascimento: "1990-02-03",
-    cpf_cnpj: "12345678901",
-    identidade: "123456789",
-    reservista: "",
-    ctps: "",
-    cnh: "",
-    conjuge: "",
-    status: "Ativo",
-    obs: "",
-    telefone: "",
-  };
-  const duplicate = { ...first, codigo: 102 };
-  const contexts = buildClientPfResolutionContexts({ rows: [first, duplicate] });
-
-  assert.equal(mappingRule.emitRows(first, contexts[0])[0].status, "prepared");
   assert.equal(
-    mappingRule.emitRows(duplicate, contexts[1])[0].reasonCode,
-    "CLIENT_PF_CPF_DUPLICATE",
+    mappingRule.emitRows(row, { ...context })[0].reasonCode,
+    "INTEGRATION_CONTEXT_MISMATCH",
   );
-
-  const reversed = buildClientPfResolutionContexts({ rows: [duplicate, first] });
-  assert.deepEqual(
-    contexts.find(({ resolutions }) => resolutions.uniqueCode.sourceKey === "101"),
-    reversed.find(({ resolutions }) => resolutions.uniqueCode.sourceKey === "101"),
+  assert.equal(
+    mappingRule.emitRows(row, structuredClone(context))[0].reasonCode,
+    "INTEGRATION_CONTEXT_MISMATCH",
   );
 
   const currentRows = [
-    { id: "current-b", code: "other-b", cpf: "12345678901", rg: "other-b" },
-    { id: "current-a", code: "other-a", cpf: "12345678901", rg: "other-a" },
+    { id: "current-b", code: row.codigo, cpf: "other-b", rg: "other-b" },
+    { id: "current-a", code: row.codigo, cpf: "other-a", rg: "other-a" },
   ];
-  const [multipleCurrent] = buildClientPfResolutionContexts({ rows: [first], currentRows });
-  const [permutedCurrent] = buildClientPfResolutionContexts({
-    rows: [first],
+  const multipleCurrent = buildClientPfResolutionContexts({ rows, currentRows })[0];
+  const permutedCurrent = buildClientPfResolutionContexts({
+    rows,
     currentRows: [...currentRows].reverse(),
-  });
+  })[0];
   assert.deepEqual(multipleCurrent, permutedCurrent);
-  assert.equal(multipleCurrent.resolutions.uniqueCpf.decision, "conflict");
-  assert.equal(multipleCurrent.resolutions.uniqueCpf.ownerIdentityRef, null);
-  assert.equal(
-    mappingRule.emitRows(first, multipleCurrent)[0].reasonCode,
-    "CLIENT_PF_CPF_CONFLICT",
-  );
+  assert.equal(multipleCurrent.resolutions.uniqueCode.criteria.currentState, "many");
+  assert.equal(multipleCurrent.resolutions.uniqueCode.criteria.currentIdentityCount, 2);
+  assert.equal(multipleCurrent.resolutions.uniqueCode.decision, "conflict");
+  assert.equal(mappingRule.emitRows(row, multipleCurrent)[0].reasonCode, "CLIENT_PF_CODE_CONFLICT");
 
-  const [currentConflict] = buildClientPfResolutionContexts({
-    rows: [first],
-    currentRows: [{ id: "existing", code: "other", cpf: "12345678901", rg: "other" }],
-  });
-  assert.equal(
-    mappingRule.emitRows(first, currentConflict)[0].reasonCode,
-    "CLIENT_PF_CPF_CONFLICT",
-  );
+  const currentConflict = buildClientPfResolutionContexts({
+    rows,
+    currentRows: [{ id: "existing", code: row.codigo, cpf: "other", rg: "other" }],
+  })[0];
+  assert.equal(currentConflict.resolutions.uniqueCode.criteria.currentState, "one");
+  assert.equal(currentConflict.resolutions.uniqueCode.criteria.currentIdentityCount, 1);
+  assert.equal(mappingRule.emitRows(row, currentConflict)[0].reasonCode, "CLIENT_PF_CODE_CONFLICT");
 });
 
 test("sócios reais agrupam os 10 pares canônicos e bloqueiam reassinatura", async () => {
@@ -533,17 +514,21 @@ test("sócios reais agrupam os 10 pares canônicos e bloqueiam reassinatura", as
     buildPartnerPairResolutionContexts,
     createLegacyReferenceResolver,
     createV2ClientIdentityResolver,
+    INTEGRACAO_REGULARIZE_AUDITED_CORPORA,
   } = implementation();
   const mappingRule = rule("tb_regularize.pf_empresas");
   const rows = await loadRows("tb_regularize.pf_empresas");
+  const regularizeRows = await loadRows("tb_regularize.clientes");
+  const integrationRows = await loadRows("tb_integracao.clientes");
+  const clientPfRows = await loadRows("tb_regularize.pf");
   const clientResolver = createV2ClientIdentityResolver({
-    regularizeRows: await loadRows("tb_regularize.clientes"),
-    integrationRows: await loadRows("tb_integracao.clientes"),
+    regularizeRows,
+    integrationRows,
   });
   const clientPfResolver = createLegacyReferenceResolver({
     sourceTable: "tb_regularize.pf",
     legacyColumn: "codigo",
-    rows: await loadRows("tb_regularize.pf"),
+    rows: clientPfRows,
   });
   const clientResolutions = rows.map((row) => clientResolver.resolve(row.empresa_id));
   const clientPfResolutions = rows.map((row) => clientPfResolver.resolve(row.pf_id));
@@ -552,6 +537,14 @@ test("sócios reais agrupam os 10 pares canônicos e bloqueiam reassinatura", as
     clientPfResolutions,
     clientResolutions,
   });
+  assert.equal(
+    contexts[0].decisionBinding.corpusFingerprint,
+    INTEGRACAO_REGULARIZE_AUDITED_CORPORA["tb_regularize.pf_empresas"].digest,
+  );
+  assert.equal(
+    contexts[0].decisionBinding.stateFingerprint,
+    INTEGRACAO_REGULARIZE_AUDITED_CORPORA["tb_regularize.pf_empresas"].resolutionStateDigest,
+  );
 
   const byCanonicalPair = new Map();
   for (const [index, context] of contexts.entries()) {
@@ -639,30 +632,77 @@ test("sócios reais agrupam os 10 pares canônicos e bloqueiam reassinatura", as
     mappingRule.emitRows(rows[duplicateIndex], forged)[0].reasonCode,
     "INTEGRATION_CONTEXT_MISMATCH",
   );
-
-  const mismatchedIndex = rows.findIndex(
-    (row, index) =>
-      row.empresa_id !== rows[0].empresa_id && clientResolutions[index].state === "one",
+  assert.equal(
+    mappingRule.emitRows(rows[duplicateIndex], { ...contexts[duplicateIndex] })[0].reasonCode,
+    "INTEGRATION_CONTEXT_MISMATCH",
   );
-  assert.notEqual(mismatchedIndex, -1);
+  assert.equal(
+    mappingRule.emitRows(rows[duplicateIndex], structuredClone(contexts[duplicateIndex]))[0]
+      .reasonCode,
+    "INTEGRATION_CONTEXT_MISMATCH",
+  );
+
+  const row40Index = rows.findIndex(({ id }) => String(id) === "40");
+  assert.notEqual(row40Index, -1);
   assert.throws(
     () =>
       buildPartnerPairResolutionContexts({
-        rows: [rows[0]],
-        clientPfResolutions: [clientPfResolutions[0]],
-        clientResolutions: [clientResolutions[mismatchedIndex]],
+        rows: [rows[row40Index]],
+        clientPfResolutions: [clientPfResolutions[row40Index]],
+        clientResolutions: [clientResolutions[row40Index]],
       }),
-    /client.+vinculada|bound/i,
+    /corpus autoritativo.*tb_regularize\.pf_empresas/i,
+  );
+
+  const copiedClientPfResolutions = [...clientPfResolutions];
+  copiedClientPfResolutions[0] = { ...copiedClientPfResolutions[0] };
+  assert.throws(
+    () =>
+      buildPartnerPairResolutionContexts({
+        rows,
+        clientPfResolutions: copiedClientPfResolutions,
+        clientResolutions,
+      }),
+    /clientPF.+proveniência|autêntica/i,
+  );
+
+  const mutatedClientResolutions = [...clientResolutions];
+  mutatedClientResolutions[0] = {
+    ...mutatedClientResolutions[0],
+    sourceState: mutatedClientResolutions[0].sourceState === "one" ? "zero" : "one",
+  };
+  assert.throws(
+    () =>
+      buildPartnerPairResolutionContexts({
+        rows,
+        clientPfResolutions,
+        clientResolutions: mutatedClientResolutions,
+      }),
+    /client.+proveniência|autêntica/i,
+  );
+
+  const alternativeClientResolver = createV2ClientIdentityResolver({
+    regularizeRows: regularizeRows.filter(
+      ({ codigo }) => String(codigo) !== String(rows[0].empresa_id),
+    ),
+    integrationRows,
+  });
+  const alternativeClientResolutions = [...clientResolutions];
+  alternativeClientResolutions[0] = alternativeClientResolver.resolve(rows[0].empresa_id);
+  assert.equal(alternativeClientResolutions[0].sourceState, "zero");
+  assert.throws(
+    () =>
+      buildPartnerPairResolutionContexts({
+        rows,
+        clientPfResolutions,
+        clientResolutions: alternativeClientResolutions,
+      }),
+    /estado canônico autoritativo/i,
   );
 
   const invalidDates = { ...rows[0], id: "999999", entrada: "2025-01-01", saida: "2024-01-01" };
-  const [invalidContext] = buildPartnerPairResolutionContexts({
-    rows: [invalidDates],
-    clientPfResolutions: [clientPfResolver.resolve(invalidDates.pf_id)],
-    clientResolutions: [clientResolver.resolve(invalidDates.empresa_id)],
-  });
   assert.equal(
-    mappingRule.emitRows(invalidDates, invalidContext)[0].reasonCode,
+    mappingRule.emitRows(invalidDates, contexts[0])[0].reasonCode,
     "PARTNER_EXIT_BEFORE_ENTRY",
   );
 });

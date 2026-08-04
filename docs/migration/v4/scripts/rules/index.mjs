@@ -1,5 +1,6 @@
 import { ADMIN_BUSINESS_EVIDENCE } from "../evidence/admin-business.mjs";
 import {
+  INTEGRACAO_REGULARIZE_AUDITED_CORPORA,
   INTEGRACAO_REGULARIZE_EVIDENCE,
   INTEGRACAO_REGULARIZE_SOURCE_TABLES,
 } from "../evidence/integracao-regularize.mjs";
@@ -19,6 +20,8 @@ import {
   buildPermissionResolutionContexts,
   createLegacyReferenceResolver,
   createV2ClientIdentityResolver,
+  isAuthenticLegacyReferenceResolution,
+  isAuthenticV2ClientIdentityResolution,
 } from "./admin-business.mjs";
 import { CERTIFICATE_RULES } from "./certificates.mjs";
 import {
@@ -49,6 +52,9 @@ export {
   CERTIFICATE_RULES,
   createLegacyReferenceResolver,
   createV2ClientIdentityResolver,
+  isAuthenticLegacyReferenceResolution,
+  isAuthenticV2ClientIdentityResolution,
+  INTEGRACAO_REGULARIZE_AUDITED_CORPORA,
   INTEGRACAO_REGULARIZE_EVIDENCE,
   INTEGRACAO_REGULARIZE_RULES,
   INTEGRACAO_REGULARIZE_SOURCE_TABLES,

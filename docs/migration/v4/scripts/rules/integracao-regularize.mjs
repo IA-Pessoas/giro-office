@@ -1,8 +1,15 @@
 import { createHash } from "node:crypto";
 
-import { INTEGRACAO_REGULARIZE_EVIDENCE } from "../evidence/integracao-regularize.mjs";
+import {
+  INTEGRACAO_REGULARIZE_AUDITED_CORPORA,
+  INTEGRACAO_REGULARIZE_EVIDENCE,
+} from "../evidence/integracao-regularize.mjs";
 import { REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
 import { uuidV5 } from "../lib/uuid-v5.mjs";
+import {
+  isAuthenticLegacyReferenceResolution,
+  isAuthenticV2ClientIdentityResolution,
+} from "./admin-business.mjs";
 
 const ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const EVIDENCE_BY_SOURCE = new Map(
@@ -11,6 +18,7 @@ const EVIDENCE_BY_SOURCE = new Map(
 const RESOLUTION_STATES = new Set(["one", "zero", "many"]);
 const DECISION_STATES = new Set(["owner", "duplicate", "conflict"]);
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/;
+const INTEGRATION_CONTEXT_ISSUANCE = new WeakMap();
 
 export function buildIntegrationRegularizeReferenceContext(sourceTable, row, resolutions) {
   if (typeof sourceTable !== "string" || !/^[A-Za-z0-9_.]+$/.test(sourceTable)) {
@@ -21,6 +29,12 @@ export function buildIntegrationRegularizeReferenceContext(sourceTable, row, res
   }
   if (Object.values(resolutions).some(hasDecisionFields)) {
     throw new TypeError("decisões de owner/duplicata exigem builder dedicado");
+  }
+  if (
+    sourceTable === "tb_regularize.grupos_integrantes" &&
+    !isAuthenticV2ClientIdentityResolution(resolutions.client, row.codigo_cliente)
+  ) {
+    throw new TypeError("client deve possuir proveniência autêntica do resolver V2");
   }
   return buildIntegrationRegularizeContext({
     sourceTable,
@@ -60,18 +74,21 @@ function buildIntegrationRegularizeDecisionContext({
       resolutions: normalizedResolutions,
     }),
   });
-  return Object.freeze({
-    sourceTable,
-    rowFingerprint,
-    resolutions: Object.freeze(normalizedResolutions),
-    decisionBinding,
-    signature: contextSignature(
+  return issueIntegrationContext(
+    Object.freeze({
       sourceTable,
       rowFingerprint,
-      normalizedResolutions,
+      resolutions: Object.freeze(normalizedResolutions),
       decisionBinding,
-    ),
-  });
+      signature: contextSignature(
+        sourceTable,
+        rowFingerprint,
+        normalizedResolutions,
+        decisionBinding,
+      ),
+    }),
+    kind,
+  );
 }
 
 function buildIntegrationRegularizeContext({ sourceTable, row, resolutions, decisionBinding }) {
@@ -81,32 +98,29 @@ function buildIntegrationRegularizeContext({ sourceTable, row, resolutions, deci
       .map(([name, resolution]) => [name, normalizeResolution(resolution, false)]),
   );
   const rowFingerprint = fingerprintRow(row);
-  return Object.freeze({
-    sourceTable,
-    rowFingerprint,
-    resolutions: Object.freeze(normalizedResolutions),
-    decisionBinding,
-    signature: contextSignature(
+  return issueIntegrationContext(
+    Object.freeze({
       sourceTable,
       rowFingerprint,
-      normalizedResolutions,
+      resolutions: Object.freeze(normalizedResolutions),
       decisionBinding,
-    ),
-  });
+      signature: contextSignature(
+        sourceTable,
+        rowFingerprint,
+        normalizedResolutions,
+        decisionBinding,
+      ),
+    }),
+    "reference-v3",
+  );
 }
 
 export function buildClientPfResolutionContexts({ rows, currentRows = [] }) {
   if (!Array.isArray(rows) || !Array.isArray(currentRows)) {
     throw new TypeError("rows e currentRows de ClientPF devem ser arrays");
   }
+  const corpusFingerprint = assertAuthoritativeLegacyCorpus("tb_regularize.pf", rows);
   const normalizedRows = rows.map(normalizeClientPfSourceRow);
-  const corpusFingerprint = stableCollectionFingerprint(
-    "client-pf-source-corpus-v2",
-    rows.map((row, index) => ({
-      sourceIdentityRef: rowReference("tb_regularize.pf", row?.codigo ?? `invalid-${index}`),
-      normalized: normalizedRows[index],
-    })),
-  );
   const stateFingerprint = stableCollectionFingerprint(
     "client-pf-current-state-v2",
     currentRows.map((row) => ({
@@ -180,6 +194,7 @@ export function buildClientPfResolutionContexts({ rows, currentRows = [] }) {
             normalizedValue,
             currentState,
             currentIdentityCount: currentIdentityRefs.length,
+            currentStatePreflight: "required",
           },
           decision,
           ownerIdentityRef,
@@ -215,6 +230,7 @@ export function buildPartnerPairResolutionContexts({
   ) {
     throw new TypeError("rows e resoluções de sócios devem ser arrays de mesmo tamanho");
   }
+  const corpusFingerprint = assertAuthoritativeLegacyCorpus("tb_regularize.pf_empresas", rows);
   const normalizedClientPf = clientPfResolutions.map((resolution, index) =>
     validatePartnerReferenceResolution({
       resolution,
@@ -233,21 +249,19 @@ export function buildPartnerPairResolutionContexts({
       canonicalClient: true,
     }),
   );
-  const corpusFingerprint = stableCollectionFingerprint(
-    "partner-source-corpus-v2",
-    rows.map((row) => ({
-      sourceIdentityRef: rowReference("tb_regularize.pf_empresas", row?.id),
-      row,
-    })),
+  const stateFingerprint = partnerAuthoritativeResolutionStateFingerprint(
+    rows,
+    normalizedClients,
+    normalizedClientPf,
   );
-  const stateFingerprint = stableCollectionFingerprint(
-    "partner-canonical-resolution-state-v2",
-    rows.map((row, index) => ({
-      sourceIdentityRef: rowReference("tb_regularize.pf_empresas", row?.id),
-      client: normalizedClients[index],
-      clientPf: normalizedClientPf[index],
-    })),
-  );
+  if (
+    stateFingerprint !==
+    INTEGRACAO_REGULARIZE_AUDITED_CORPORA["tb_regularize.pf_empresas"].resolutionStateDigest
+  ) {
+    throw new TypeError(
+      "estado canônico autoritativo de sócios não corresponde ao backup auditado",
+    );
+  }
   const groups = new Map();
   for (const [index, row] of rows.entries()) {
     const client = normalizedClients[index];
@@ -962,7 +976,12 @@ function createClientPfRule() {
       spouse: "",
       notes: "",
     },
-    precedence: ["validated_source", "signed_unique_owner"],
+    precedence: [
+      "validated_source",
+      "authoritative_source_corpus",
+      "current_state_preflight_required",
+      "signed_unique_owner",
+    ],
   });
   function classify(row, context) {
     const normalized = normalizeClientPfSourceRow(row);
@@ -1301,7 +1320,9 @@ function classifyClientPfUniqueSlot({ row, resolution, field, normalizedValue })
       normalizedValue,
       currentState: resolution.criteria?.currentState,
       currentIdentityCount: resolution.criteria?.currentIdentityCount,
+      currentStatePreflight: resolution.criteria?.currentStatePreflight,
     }) ||
+    resolution.criteria?.currentStatePreflight !== "required" ||
     !new Set(["zero", "one", "many"]).has(resolution.criteria?.currentState) ||
     !Number.isSafeInteger(resolution.criteria?.currentIdentityCount) ||
     resolution.criteria.currentIdentityCount < 0 ||
@@ -1322,6 +1343,9 @@ function classifyClientPfUniqueSlot({ row, resolution, field, normalizedValue })
       resolution.ownerIdentityRef !== sourceIdentityRef
       ? notEmitted(`CLIENT_PF_${reasonField}_DUPLICATE`)
       : quarantine(field, `CLIENT_PF_${reasonField}_CONFLICT`);
+  }
+  if (resolution.criteria.currentStatePreflight === "required") {
+    return quarantine(field, "CLIENT_PF_CURRENT_STATE_PREFLIGHT_REQUIRED");
   }
   return resolution.decision === "owner" && resolution.ownerIdentityRef === sourceIdentityRef
     ? prepared()
@@ -1536,6 +1560,12 @@ function validatePartnerReferenceResolution({
   label,
   canonicalClient,
 }) {
+  const authentic = canonicalClient
+    ? isAuthenticV2ClientIdentityResolution(resolution, value)
+    : isAuthenticLegacyReferenceResolution(resolution, sourceTable, value);
+  if (!authentic) {
+    throw new TypeError(`${label} deve possuir proveniência autêntica do resolver oficial`);
+  }
   const normalized = normalizeResolution(resolution, false);
   const sourceKey = normalizeKey(value);
   const fingerprintValid =
@@ -1682,6 +1712,8 @@ function sameCriteria(actual, expected) {
 
 function isContextBound(sourceTable, row, context) {
   if (!isPlainObject(context) || !isPlainObject(context.resolutions)) return false;
+  const issuance = INTEGRATION_CONTEXT_ISSUANCE.get(context);
+  if (issuance === undefined || issuance.snapshot !== canonicalRow(context)) return false;
   const rowFingerprint = fingerprintRow(row);
   return (
     context.sourceTable === sourceTable &&
@@ -1698,7 +1730,9 @@ function isContextBound(sourceTable, row, context) {
 
 function isDecisionContextBound(context, kind) {
   const binding = context?.decisionBinding;
+  const issuance = INTEGRATION_CONTEXT_ISSUANCE.get(context);
   return (
+    issuance?.kind === kind &&
     isPlainObject(binding) &&
     binding.kind === kind &&
     FINGERPRINT_PATTERN.test(binding.corpusFingerprint ?? "") &&
@@ -1712,6 +1746,62 @@ function isDecisionContextBound(context, kind) {
         stateFingerprint: binding.stateFingerprint,
         resolutions: context.resolutions,
       })
+  );
+}
+
+function issueIntegrationContext(context, kind) {
+  INTEGRATION_CONTEXT_ISSUANCE.set(
+    context,
+    Object.freeze({ kind, snapshot: canonicalRow(context) }),
+  );
+  return context;
+}
+
+function assertAuthoritativeLegacyCorpus(sourceTable, rows) {
+  const manifest = INTEGRACAO_REGULARIZE_AUDITED_CORPORA[sourceTable];
+  const digest = authoritativeLegacyCorpusFingerprint(sourceTable, manifest?.identityColumn, rows);
+  if (manifest === undefined || rows.length !== manifest.rowCount || digest !== manifest.digest) {
+    throw new TypeError(`corpus autoritativo inválido para ${sourceTable}`);
+  }
+  return digest;
+}
+
+function authoritativeLegacyCorpusFingerprint(sourceTable, identityColumn, rows) {
+  return stableCollectionFingerprint(
+    "integration-regularize-authoritative-corpus-v1",
+    rows.map((row) => ({
+      sourceTable,
+      sourceIdentityRef: rowReference(sourceTable, row?.[identityColumn]),
+      row,
+    })),
+  );
+}
+
+function partnerAuthoritativeResolutionStateFingerprint(
+  rows,
+  clientResolutions,
+  clientPfResolutions,
+) {
+  return stableCollectionFingerprint(
+    "partner-authoritative-resolution-state-v3",
+    rows.map((row, index) => ({
+      sourceIdentityRef: rowReference("tb_regularize.pf_empresas", row?.id),
+      client: {
+        sourceState: clientResolutions[index].sourceState,
+        state: clientResolutions[index].state,
+        sourceTable: clientResolutions[index].sourceTable,
+        sourceKey: clientResolutions[index].sourceKey,
+        identityRef: clientResolutions[index].identityRef,
+        fingerprint: clientResolutions[index].fingerprint,
+      },
+      clientPf: {
+        state: clientPfResolutions[index].state,
+        sourceTable: clientPfResolutions[index].sourceTable,
+        sourceKey: clientPfResolutions[index].sourceKey,
+        identityRef: clientPfResolutions[index].identityRef,
+        fingerprint: clientPfResolutions[index].fingerprint,
+      },
+    })),
   );
 }
 

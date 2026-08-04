@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -6,6 +7,7 @@ import test from "node:test";
 import { validateMappingRule } from "../lib/mapping-contract.mjs";
 import { loadPrismaCatalog } from "../lib/prisma-catalog.mjs";
 import { iterateSqlRows } from "../lib/sql-dump-parser.mjs";
+import * as migrationRules from "../rules/index.mjs";
 import {
   ADMIN_BUSINESS_RULES,
   ADMIN_BUSINESS_TRANSFORMATIONS,
@@ -593,6 +595,40 @@ test("referências contábeis seguem codigo Regularize até a identidade Client 
     })[0].reasonCode,
     "CLIENT_REFERENCE_AMBIGUOUS",
   );
+});
+
+test("resolver V2 autentica a emissão completa e rejeita cópia, mutação ou SHA manual", async () => {
+  const resolver = createV2ClientIdentityResolver({
+    regularizeRows: await loadRows("tb_regularize.clientes"),
+    integrationRows: await loadRows("tb_integracao.clientes"),
+  });
+  const resolution = resolver.resolve("2");
+  const validate = migrationRules.isAuthenticV2ClientIdentityResolution;
+
+  assert.equal(typeof validate, "function");
+  assert.equal(validate(resolution, "2"), true);
+  assert.equal(validate({ ...resolution }, "2"), false);
+  assert.equal(validate({ ...resolution, sourceState: "zero" }, "2"), false);
+
+  const fabricated = {
+    sourceState: resolution.sourceState,
+    state: resolution.state,
+    identityRef: resolution.identityRef,
+    sourceTable: resolution.sourceTable,
+    sourceKey: resolution.sourceKey,
+    fingerprint: createHash("sha256")
+      .update(
+        JSON.stringify([
+          "reference-resolution-v1",
+          resolution.state,
+          resolution.identityRef,
+          resolution.sourceTable,
+          resolution.sourceKey,
+        ]),
+      )
+      .digest("hex"),
+  };
+  assert.equal(validate(fabricated, "2"), false);
 });
 
 test("cliente contábil A não aceita contexto de resolução produzido para codigo B", async () => {
