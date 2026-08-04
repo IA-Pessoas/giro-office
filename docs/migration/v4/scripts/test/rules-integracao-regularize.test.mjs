@@ -261,11 +261,10 @@ test("grupo consome diretamente resolução Client produzida pela V2", async () 
     rows: await loadRows("tb_regularize.grupos"),
   });
   const row = (await loadRows("tb_regularize.grupos_integrantes")).find(
-    (candidate) =>
-      clientResolver.resolve(candidate.codigo_cliente).state === "one" &&
-      groupResolver.resolve(candidate.grupo_id).state === "one",
+    ({ id }) => String(id) === "20",
   );
   assert.ok(row);
+  assert.equal(row.codigo_cliente, "507");
   const client = clientResolver.resolve(row.codigo_cliente);
   const resolutions = {
     client,
@@ -334,6 +333,21 @@ test("grupo consome diretamente resolução Client produzida pela V2", async () 
         client: fabricated,
       }),
     /proveniência|autêntica/i,
+  );
+
+  const fakeResolver = createV2ClientIdentityResolver({
+    regularizeRows: [{ codigo: "507", cliente_id: "999999999" }],
+    integrationRows: [{ id: "999999999" }],
+  });
+  const fakeClient = fakeResolver.resolve("507");
+  assert.equal(fakeClient.identityRef, "tb_integracao.clientes:999999999");
+  assert.throws(
+    () =>
+      referenceContext("tb_regularize.grupos_integrantes", row, {
+        client: fakeClient,
+        group: groupResolver.resolve(row.grupo_id),
+      }),
+    /corpus autoritativo|proveniência autoritativa/i,
   );
 });
 
@@ -697,7 +711,7 @@ test("sócios reais agrupam os 10 pares canônicos e bloqueiam reassinatura", as
         clientPfResolutions,
         clientResolutions: alternativeClientResolutions,
       }),
-    /estado canônico autoritativo/i,
+    /proveniência autoritativa|corpus autoritativo/i,
   );
 
   const invalidDates = { ...rows[0], id: "999999", entrada: "2025-01-01", saida: "2024-01-01" };

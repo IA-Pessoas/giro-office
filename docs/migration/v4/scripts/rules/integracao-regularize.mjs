@@ -8,7 +8,7 @@ import { REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
 import { uuidV5 } from "../lib/uuid-v5.mjs";
 import {
   isAuthenticLegacyReferenceResolution,
-  isAuthenticV2ClientIdentityResolution,
+  isAuthoritativeV2ClientIdentityResolution,
 } from "./admin-business.mjs";
 
 const ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
@@ -32,9 +32,9 @@ export function buildIntegrationRegularizeReferenceContext(sourceTable, row, res
   }
   if (
     sourceTable === "tb_regularize.grupos_integrantes" &&
-    !isAuthenticV2ClientIdentityResolution(resolutions.client, row.codigo_cliente)
+    !isAuthoritativeV2ClientIdentityResolution(resolutions.client, row.codigo_cliente)
   ) {
-    throw new TypeError("client deve possuir proveniência autêntica do resolver V2");
+    throw new TypeError("client deve possuir proveniência autoritativa do corpus V2 auditado");
   }
   return buildIntegrationRegularizeContext({
     sourceTable,
@@ -1561,10 +1561,14 @@ function validatePartnerReferenceResolution({
   canonicalClient,
 }) {
   const authentic = canonicalClient
-    ? isAuthenticV2ClientIdentityResolution(resolution, value)
+    ? isAuthoritativeV2ClientIdentityResolution(resolution, value)
     : isAuthenticLegacyReferenceResolution(resolution, sourceTable, value);
   if (!authentic) {
-    throw new TypeError(`${label} deve possuir proveniência autêntica do resolver oficial`);
+    throw new TypeError(
+      canonicalClient
+        ? `${label} deve possuir proveniência autoritativa do corpus V2 auditado`
+        : `${label} deve possuir proveniência autêntica do resolver oficial`,
+    );
   }
   const normalized = normalizeResolution(resolution, false);
   const sourceKey = normalizeKey(value);

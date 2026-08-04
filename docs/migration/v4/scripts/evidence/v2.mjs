@@ -22,6 +22,19 @@ function decision({
   });
 }
 
+export const V2_CLIENT_AUDITED_CORPORA = Object.freeze({
+  "tb_regularize.clientes": Object.freeze({
+    identityColumn: "codigo",
+    rowCount: 1319,
+    digest: "d02842cb05f648a82659ee1d7f53cea55f1a595500186332ea77cb5659c94cc3",
+  }),
+  "tb_integracao.clientes": Object.freeze({
+    identityColumn: "id",
+    rowCount: 2339,
+    digest: "2254b25a426ce1250ceaa0ce6f42dda8b0cafcfc6178017ecac67759ba0f8f67",
+  }),
+});
+
 export const V2_EVIDENCE = Object.freeze([
   decision({
     sourceTable: "tb_admin.departamentos",

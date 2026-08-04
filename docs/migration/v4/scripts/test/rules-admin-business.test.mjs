@@ -597,18 +597,26 @@ test("referências contábeis seguem codigo Regularize até a identidade Client 
   );
 });
 
-test("resolver V2 autentica a emissão completa e rejeita cópia, mutação ou SHA manual", async () => {
+test("resolver V2 separa emissão genérica de autoridade dos corpora completos", async () => {
+  const regularizeRows = await loadRows("tb_regularize.clientes");
+  const integrationRows = await loadRows("tb_integracao.clientes");
   const resolver = createV2ClientIdentityResolver({
-    regularizeRows: await loadRows("tb_regularize.clientes"),
-    integrationRows: await loadRows("tb_integracao.clientes"),
+    regularizeRows,
+    integrationRows,
   });
   const resolution = resolver.resolve("2");
-  const validate = migrationRules.isAuthenticV2ClientIdentityResolution;
+  const isIssued = migrationRules.isIssuedV2ClientIdentityResolution;
+  const isAuthoritative = migrationRules.isAuthoritativeV2ClientIdentityResolution;
 
-  assert.equal(typeof validate, "function");
-  assert.equal(validate(resolution, "2"), true);
-  assert.equal(validate({ ...resolution }, "2"), false);
-  assert.equal(validate({ ...resolution, sourceState: "zero" }, "2"), false);
+  assert.equal(migrationRules.isAuthenticV2ClientIdentityResolution, undefined);
+  assert.equal(typeof isIssued, "function");
+  assert.equal(typeof isAuthoritative, "function");
+  assert.equal(isIssued(resolution, "2"), true);
+  assert.equal(isAuthoritative(resolution, "2"), true);
+  assert.equal(isIssued({ ...resolution }, "2"), false);
+  assert.equal(isAuthoritative({ ...resolution }, "2"), false);
+  assert.equal(isIssued({ ...resolution, sourceState: "zero" }, "2"), false);
+  assert.equal(isAuthoritative({ ...resolution, sourceState: "zero" }, "2"), false);
 
   const fabricated = {
     sourceState: resolution.sourceState,
@@ -628,7 +636,51 @@ test("resolver V2 autentica a emissão completa e rejeita cópia, mutação ou S
       )
       .digest("hex"),
   };
-  assert.equal(validate(fabricated, "2"), false);
+  assert.equal(isIssued(fabricated, "2"), false);
+  assert.equal(isAuthoritative(fabricated, "2"), false);
+
+  const subsetResolver = createV2ClientIdentityResolver({
+    regularizeRows: regularizeRows.slice(0, -1),
+    integrationRows,
+  });
+  const alteredResolver = createV2ClientIdentityResolver({
+    regularizeRows: regularizeRows.map((row) =>
+      String(row.codigo) === "507" ? { ...row, cliente_id: "999999999" } : row,
+    ),
+    integrationRows: [...integrationRows, { id: "999999999" }],
+  });
+  const duplicatedResolver = createV2ClientIdentityResolver({
+    regularizeRows: [...regularizeRows, regularizeRows[0]],
+    integrationRows,
+  });
+  const genericIssued = subsetResolver.resolve("2");
+  const alteredIssued = alteredResolver.resolve("507");
+  const duplicatedIssued = duplicatedResolver.resolve("2");
+
+  assert.equal(isIssued(genericIssued, "2"), true);
+  assert.equal(isAuthoritative(genericIssued, "2"), false);
+  assert.equal(alteredIssued.identityRef, "tb_integracao.clientes:999999999");
+  assert.equal(isIssued(alteredIssued, "507"), true);
+  assert.equal(isAuthoritative(alteredIssued, "507"), false);
+  assert.equal(isIssued(duplicatedIssued, "2"), true);
+  assert.equal(isAuthoritative(duplicatedIssued, "2"), false);
+
+  const mutableRegularizeRows = regularizeRows.map((row) => ({ ...row }));
+  const stableResolver = createV2ClientIdentityResolver({
+    regularizeRows: mutableRegularizeRows,
+    integrationRows,
+  });
+  const beforeMutation = stableResolver.resolve("507");
+  const mutableRow = mutableRegularizeRows.find(({ codigo }) => String(codigo) === "507");
+  const alternateIntegration = integrationRows.find(
+    ({ id }) => `tb_integracao.clientes:${id}` !== beforeMutation.identityRef,
+  );
+  assert.ok(mutableRow);
+  assert.ok(alternateIntegration);
+  mutableRow.cliente_id = alternateIntegration.id;
+  const afterMutation = stableResolver.resolve("507");
+  assert.equal(afterMutation.identityRef, beforeMutation.identityRef);
+  assert.equal(isAuthoritative(afterMutation, "507"), true);
 });
 
 test("cliente contábil A não aceita contexto de resolução produzido para codigo B", async () => {

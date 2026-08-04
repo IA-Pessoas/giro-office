@@ -11,7 +11,7 @@ import {
   SPECIALIZED_EVIDENCE,
   TECHNOLOGY_EVIDENCE,
 } from "../evidence/technology-certificates-parcelamento.mjs";
-import { V2_EVIDENCE } from "../evidence/v2.mjs";
+import { V2_CLIENT_AUDITED_CORPORA, V2_EVIDENCE } from "../evidence/v2.mjs";
 import { buildRuleRegistry as createRuleRegistry } from "../lib/mapping-contract.mjs";
 import {
   ADMIN_BUSINESS_RULES,
@@ -21,7 +21,8 @@ import {
   createLegacyReferenceResolver,
   createV2ClientIdentityResolver,
   isAuthenticLegacyReferenceResolution,
-  isAuthenticV2ClientIdentityResolution,
+  isAuthoritativeV2ClientIdentityResolution,
+  isIssuedV2ClientIdentityResolution,
 } from "./admin-business.mjs";
 import { CERTIFICATE_RULES } from "./certificates.mjs";
 import {
@@ -52,8 +53,9 @@ export {
   CERTIFICATE_RULES,
   createLegacyReferenceResolver,
   createV2ClientIdentityResolver,
+  isAuthoritativeV2ClientIdentityResolution,
   isAuthenticLegacyReferenceResolution,
-  isAuthenticV2ClientIdentityResolution,
+  isIssuedV2ClientIdentityResolution,
   INTEGRACAO_REGULARIZE_AUDITED_CORPORA,
   INTEGRACAO_REGULARIZE_EVIDENCE,
   INTEGRACAO_REGULARIZE_RULES,
@@ -68,6 +70,7 @@ export {
   TECHNOLOGY_EVIDENCE,
   TECHNOLOGY_RULES,
   V2_EVIDENCE,
+  V2_CLIENT_AUDITED_CORPORA,
   V2_RULES,
 };
 export const v2Rules = V2_RULES;

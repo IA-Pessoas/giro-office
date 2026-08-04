@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { ADMIN_BUSINESS_EVIDENCE } from "../evidence/admin-business.mjs";
+import { V2_CLIENT_AUDITED_CORPORA } from "../evidence/v2.mjs";
 import { REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
 
 const ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
@@ -50,8 +51,13 @@ export function createV2ClientIdentityResolver({ regularizeRows, integrationRows
   if (!Array.isArray(regularizeRows) || !Array.isArray(integrationRows)) {
     throw new TypeError("regularizeRows e integrationRows devem ser arrays");
   }
+  const regularizeSnapshot = snapshotLegacyRows(regularizeRows);
+  const integrationSnapshot = snapshotLegacyRows(integrationRows);
+  const authoritative =
+    isAuditedV2ClientCorpus("tb_regularize.clientes", regularizeSnapshot) &&
+    isAuditedV2ClientCorpus("tb_integracao.clientes", integrationSnapshot);
   const regularizeByCode = new Map();
-  for (const row of regularizeRows) {
+  for (const row of regularizeSnapshot) {
     const code = strictPositiveIntegerLiteral(row?.codigo);
     if (code === null) continue;
     const candidates = regularizeByCode.get(code) ?? [];
@@ -61,23 +67,40 @@ export function createV2ClientIdentityResolver({ regularizeRows, integrationRows
   const integrationResolver = createLegacyReferenceResolver({
     sourceTable: "tb_integracao.clientes",
     legacyColumn: "id",
-    rows: integrationRows,
+    rows: integrationSnapshot,
   });
 
   return Object.freeze({
     resolve(value) {
       const code = strictPositiveIntegerLiteral(value);
       const candidates = code === null ? [] : (regularizeByCode.get(code) ?? []);
-      if (candidates.length === 0) return clientResolution("zero", "zero", code);
-      if (candidates.length > 1) return clientResolution("many", "many", code);
+      if (candidates.length === 0)
+        return clientResolution("zero", "zero", code, null, authoritative);
+      if (candidates.length > 1) return clientResolution("many", "many", code, null, authoritative);
       const regularizeRow = candidates[0];
       if (!hasExplicitV2ClientLink(regularizeRow?.cliente_id)) {
-        return clientResolution("one", "one", code, `tb_regularize.clientes:${code}`);
+        return clientResolution(
+          "one",
+          "one",
+          code,
+          `tb_regularize.clientes:${code}`,
+          authoritative,
+        );
       }
       const integration = integrationResolver.resolve(regularizeRow.cliente_id);
-      return clientResolution("one", integration.state, code, integration.identityRef);
+      return clientResolution(
+        "one",
+        integration.state,
+        code,
+        integration.identityRef,
+        authoritative,
+      );
     },
   });
+}
+
+function snapshotLegacyRows(rows) {
+  return Object.freeze(rows.map((row) => Object.freeze({ ...row })));
 }
 
 export function isAuthenticLegacyReferenceResolution(
@@ -94,13 +117,21 @@ export function isAuthenticLegacyReferenceResolution(
   );
 }
 
-export function isAuthenticV2ClientIdentityResolution(resolution, expectedSourceKey) {
-  const snapshot = V2_CLIENT_IDENTITY_ISSUANCE.get(resolution);
+export function isIssuedV2ClientIdentityResolution(resolution, expectedSourceKey) {
+  const issuance = V2_CLIENT_IDENTITY_ISSUANCE.get(resolution);
   return (
-    snapshot !== undefined &&
-    snapshot.sourceTable === "tb_regularize.clientes" &&
-    snapshot.sourceKey === strictPositiveIntegerLiteral(expectedSourceKey) &&
-    matchesIssuedResolution(resolution, snapshot, true)
+    issuance !== undefined &&
+    issuance.snapshot.sourceTable === "tb_regularize.clientes" &&
+    issuance.snapshot.sourceKey === strictPositiveIntegerLiteral(expectedSourceKey) &&
+    matchesIssuedResolution(resolution, issuance.snapshot, true)
+  );
+}
+
+export function isAuthoritativeV2ClientIdentityResolution(resolution, expectedSourceKey) {
+  const issuance = V2_CLIENT_IDENTITY_ISSUANCE.get(resolution);
+  return (
+    issuance?.authoritative === true &&
+    isIssuedV2ClientIdentityResolution(resolution, expectedSourceKey)
   );
 }
 
@@ -938,7 +969,7 @@ function referenceResolution(state, sourceTable, sourceKey, identityRef = null) 
   return resolution;
 }
 
-function clientResolution(sourceState, state, sourceKey, identityRef = null) {
+function clientResolution(sourceState, state, sourceKey, identityRef, authoritative) {
   const resolution = Object.freeze({
     sourceState,
     state,
@@ -952,7 +983,13 @@ function clientResolution(sourceState, state, sourceKey, identityRef = null) {
       sourceKey,
     ),
   });
-  V2_CLIENT_IDENTITY_ISSUANCE.set(resolution, resolutionSnapshot(resolution, true));
+  V2_CLIENT_IDENTITY_ISSUANCE.set(
+    resolution,
+    Object.freeze({
+      authoritative,
+      snapshot: resolutionSnapshot(resolution, true),
+    }),
+  );
   return resolution;
 }
 
@@ -981,6 +1018,41 @@ function matchesIssuedResolution(resolution, snapshot, includeSourceState) {
 
 function referenceResolutionFingerprint(state, identityRef, sourceTable, sourceKey) {
   return stableFingerprint(["reference-resolution-v1", state, identityRef, sourceTable, sourceKey]);
+}
+
+function isAuditedV2ClientCorpus(sourceTable, rows) {
+  const manifest = V2_CLIENT_AUDITED_CORPORA[sourceTable];
+  return (
+    manifest !== undefined &&
+    rows.length === manifest.rowCount &&
+    v2ClientCorpusFingerprint(sourceTable, manifest.identityColumn, rows) === manifest.digest
+  );
+}
+
+function v2ClientCorpusFingerprint(sourceTable, identityColumn, rows) {
+  return stableFingerprint([
+    "v2-client-authoritative-corpus-v1",
+    ...rows
+      .map((row) =>
+        canonicalCorpusValue({
+          sourceTable,
+          sourceIdentityRef: `${sourceTable}:${row?.[identityColumn]}`,
+          row,
+        }),
+      )
+      .sort(),
+  ]);
+}
+
+function canonicalCorpusValue(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalCorpusValue).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalCorpusValue(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
 }
 
 function permissionContextBinding(sourceTable, row, dedupState) {
