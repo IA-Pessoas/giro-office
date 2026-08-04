@@ -2,7 +2,11 @@ import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CertificateNotificationListQuery } from "../schemas/certificateNotification.schemas.js";
-import { getPaginationParams } from "../schemas/pagination.schemas.js";
+import {
+  buildPaginatedResult,
+  getPaginationParams,
+  type PaginatedResult,
+} from "../schemas/pagination.schemas.js";
 
 export interface CertificateNotificationListInput {
   organizationId: string;
@@ -18,7 +22,7 @@ export interface CertificateNotificationResult {
   organization_id: string;
 }
 
-export type CertificateNotificationListResult = CertificateNotificationResult[];
+export type CertificateNotificationListResult = PaginatedResult<CertificateNotificationResult>;
 
 export interface CertificateNotificationRunInput {
   now?: Date;
@@ -85,12 +89,17 @@ export class CertificateNotificationService {
     input: CertificateNotificationListInput,
   ): Promise<CertificateNotificationListResult> {
     const pagination = getPaginationParams(input.query);
+    const where = { organization_id: input.organizationId };
+    const [total, items] = await Promise.all([
+      this.prisma.certificateNotification.count({ where }),
+      this.prisma.certificateNotification.findMany({
+        where,
+        orderBy: [{ date: "asc" }, { client_name: "asc" }],
+        ...pagination,
+      }),
+    ]);
 
-    return this.prisma.certificateNotification.findMany({
-      where: { organization_id: input.organizationId },
-      orderBy: [{ date: "asc" }, { client_name: "asc" }],
-      ...pagination,
-    });
+    return buildPaginatedResult(items, total, input.query);
   }
 
   async runCertificateNotificationReconciliation(

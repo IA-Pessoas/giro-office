@@ -35,14 +35,20 @@ describe("certificate notification routes", () => {
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       success: true,
-      data: [
-        {
-          certificate_id: "20000000-0000-4000-8000-000000000001",
-          client_name: "Empresa Castelo",
-          type: "PJ",
-          organization_id: certificateOrganizationId,
-        },
-      ],
+      data: {
+        items: [
+          {
+            certificate_id: "20000000-0000-4000-8000-000000000001",
+            client_name: "Empresa Castelo",
+            type: "PJ",
+            organization_id: certificateOrganizationId,
+          },
+        ],
+        total: 1,
+        page: 1,
+        page_size: 50,
+        has_more: false,
+      },
     });
     expect(prisma.certificateNotification.findMany).toHaveBeenCalledWith({
       where: { organization_id: certificateOrganizationId },

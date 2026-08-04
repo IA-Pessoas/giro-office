@@ -24,6 +24,7 @@ describe("CertificateNotificationService", () => {
   it("listCertificateNotifications filters by organization_id and orders by date", async () => {
     const prisma = {
       certificateNotification: {
+        count: vi.fn(async () => 21),
         findMany: vi.fn(async () => [createNotificationRecord()]),
       },
     };
@@ -40,7 +41,13 @@ describe("CertificateNotificationService", () => {
       skip: 10,
       take: 10,
     });
-    expect(result).toEqual([createNotificationRecord()]);
+    expect(result).toEqual({
+      items: [createNotificationRecord()],
+      total: 21,
+      page: 2,
+      page_size: 10,
+      has_more: true,
+    });
   });
 
   it("runCertificateNotificationReconciliation creates notifications for expired and upcoming certificates", async () => {

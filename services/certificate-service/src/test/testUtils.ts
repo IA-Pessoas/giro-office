@@ -149,6 +149,7 @@ export function createCertificatePrismaMock(): PrismaClient {
       })),
     },
     certificateNotification: {
+      count: vi.fn(async () => 1),
       findMany: vi.fn(async () => [
         {
           id: "40000000-0000-4000-8000-000000000001",
