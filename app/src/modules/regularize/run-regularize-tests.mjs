@@ -166,9 +166,16 @@ await runTest("regularize PF forms search every paginated PF option and preserve
 });
 
 await runTest("regularize document inputs keep masks while payloads use canonical digits", async () => {
-  const [processFormSource, guidancePartnerFormSource] = await Promise.all([
+  const [
+    processFormSource,
+    guidancePartnerFormSource,
+    guidanceFormSource,
+    clientPfFormSource,
+  ] = await Promise.all([
     readModuleSource("components/RegularizeProcessForm.tsx"),
     readModuleSource("components/RegularizeGuidancePartnerForm.tsx"),
+    readModuleSource("components/RegularizeGuidanceForm.tsx"),
+    readModuleSource("components/RegularizeClientPfForm.tsx"),
   ]);
 
   assert.match(processFormSource, /formatCpfCnpjInput/);
@@ -190,6 +197,28 @@ await runTest("regularize document inputs keep masks while payloads use canonica
   );
   assert.match(
     guidancePartnerFormSource,
+    /cpf: normalizeDigits\(trimRegularizeText\(formState\.cpf\)\)/,
+  );
+
+  assert.match(guidanceFormSource, /formatCpfCnpjInput/);
+  assert.match(guidanceFormSource, /normalizeDigits/);
+  assert.match(
+    guidanceFormSource,
+    /handleChange\("cpf_cnpj", formatCpfCnpjInput\(event\.target\.value\)\)/,
+  );
+  assert.match(
+    guidanceFormSource,
+    /cpf_cnpj: normalizeDigits\(trimRegularizeOptionalText\(formState\.cpf_cnpj\)\)/,
+  );
+
+  assert.match(clientPfFormSource, /formatCpfInput/);
+  assert.match(clientPfFormSource, /normalizeDigits/);
+  assert.match(
+    clientPfFormSource,
+    /handleChange\("cpf", formatCpfInput\(event\.target\.value\)\)/,
+  );
+  assert.match(
+    clientPfFormSource,
     /cpf: normalizeDigits\(trimRegularizeText\(formState\.cpf\)\)/,
   );
 });

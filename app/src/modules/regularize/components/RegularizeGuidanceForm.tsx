@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { formatCpfCnpjInput, normalizeDigits } from "@shared/utils/inputFormatting";
 
 import type {
   CreateRegularizeGuidancePayload,
@@ -77,7 +78,7 @@ function buildGuidanceFormState(
     legal_nature: guidance.legal_nature ?? "",
     company_name: guidance.company_name ?? "",
     trade_name: guidance.trade_name ?? "",
-    cpf_cnpj: guidance.cpf_cnpj ?? "",
+    cpf_cnpj: formatCpfCnpjInput(guidance.cpf_cnpj ?? ""),
     share_capital:
       guidance.share_capital === null || guidance.share_capital === undefined
         ? ""
@@ -100,7 +101,7 @@ function buildGuidancePayload(formState: RegularizeGuidanceFormState) {
     legal_nature: trimRegularizeOptionalText(formState.legal_nature),
     company_name: trimRegularizeOptionalText(formState.company_name),
     trade_name: trimRegularizeOptionalText(formState.trade_name),
-    cpf_cnpj: trimRegularizeOptionalText(formState.cpf_cnpj),
+    cpf_cnpj: normalizeDigits(trimRegularizeOptionalText(formState.cpf_cnpj)),
     share_capital: toRegularizeOptionalNumber(formState.share_capital),
     iptu: trimRegularizeOptionalText(formState.iptu),
     address: trimRegularizeOptionalText(formState.address),
@@ -281,7 +282,9 @@ export function RegularizeGuidanceForm({
           <RegularizeFormField label="CPF/CNPJ">
             <input
               value={formState.cpf_cnpj}
-              onChange={(event) => handleChange("cpf_cnpj", event.target.value)}
+              onChange={(event) =>
+                handleChange("cpf_cnpj", formatCpfCnpjInput(event.target.value))
+              }
               className={regularizeTextFieldClassName}
             />
           </RegularizeFormField>
