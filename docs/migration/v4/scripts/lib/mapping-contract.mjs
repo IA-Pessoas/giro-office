@@ -117,7 +117,9 @@ export function validateDestinationStep(step, prismaCatalog) {
     },
     prismaCatalog,
   );
-  validateDestinationRecordKeys(step, prismaCatalog);
+  const destinationModel = getModelByDatabaseName(prismaCatalog, step.destinationTable);
+  validateLookupDestinationColumns(step.identity, destinationModel);
+  validateDestinationRecordKeys(step, destinationModel);
   return true;
 }
 
@@ -289,10 +291,20 @@ function validateColumns(columns) {
   }
 }
 
-function validateDestinationRecordKeys(step, prismaCatalog) {
-  const model = getModelByDatabaseName(prismaCatalog, step.destinationTable);
+function validateLookupDestinationColumns(identity, destinationModel) {
+  if (identity.kind !== "lookup") {
+    return;
+  }
+  for (const { destinationColumn } of identity.criteria) {
+    if (getFieldByDatabaseName(destinationModel, destinationColumn) === null) {
+      throw new Error(`Coluna de destino inexistente: ${destinationColumn}`);
+    }
+  }
+}
+
+function validateDestinationRecordKeys(step, destinationModel) {
   for (const destinationColumn of [...Object.keys(step.constants), ...Object.keys(step.defaults)]) {
-    if (getFieldByDatabaseName(model, destinationColumn) === null) {
+    if (getFieldByDatabaseName(destinationModel, destinationColumn) === null) {
       throw new Error(`Coluna de destino inexistente: ${destinationColumn}`);
     }
   }

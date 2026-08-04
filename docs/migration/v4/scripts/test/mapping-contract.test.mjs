@@ -256,6 +256,24 @@ test("lookup exige IdentitySpec lookup, critérios e onMany quarantine", async (
       ),
     /lookup.*onMany.*quarantine/i,
   );
+  assert.throws(
+    () =>
+      validateMappingRule(
+        validRule({
+          destinations: [
+            destinationStep({
+              mode: "lookup",
+              identity: {
+                ...lookupIdentity,
+                criteria: [{ sourceColumn: "workspace_name", destinationColumn: "missing_column" }],
+              },
+            }),
+          ],
+        }),
+        catalog,
+      ),
+    /coluna de destino inexistente/i,
+  );
 });
 
 test("validateMappingRule rejeita stepId duplicado, destino/coluna ausentes e evidence vazia", async () => {
