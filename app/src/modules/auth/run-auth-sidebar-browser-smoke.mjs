@@ -6,7 +6,7 @@ import { chromium } from "@playwright/test";
 const PORT = process.env.PLAYWRIGHT_PORT || "3115";
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 let baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
-const APP_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+const APP_ROOT = fileURLToPath(new URL("../../../..", import.meta.url));
 const MODULE_KEYS = [
   "certificado",
   "comercial",
@@ -23,16 +23,53 @@ const MODULE_KEYS = [
   "triagem",
 ];
 
-const noAccessUser = {
-  id: "user-dashboard-no-access",
-  name: "No Access Smoke",
-  login: "dashboard.no-access@castelo.test",
-  permission: 0,
-  department_id: "department-no-access",
-  organization_id: "org-no-access",
-  type: "user",
-  modules: Object.fromEntries(MODULE_KEYS.map((moduleKey) => [moduleKey, 0])),
-};
+function createModules(overrides = {}) {
+  return {
+    ...Object.fromEntries(MODULE_KEYS.map((moduleKey) => [moduleKey, 0])),
+    ...overrides,
+  };
+}
+
+function createUser({
+  id,
+  name,
+  login,
+  permission = 0,
+  type = "user",
+  modules = {},
+}) {
+  return {
+    id,
+    name,
+    login,
+    permission,
+    department_id: "department-auth-sidebar-smoke",
+    organization_id: "org-auth-sidebar-smoke",
+    type,
+    modules: createModules(modules),
+  };
+}
+
+const integrationRestrictedProfiles = [
+  createUser({
+    id: "user-integracao-0-contabil-1",
+    name: "Contabil View Smoke",
+    login: "contabil.view@castelo.test",
+    modules: { integracao: 0, contabil: 1 },
+  }),
+  createUser({
+    id: "user-integracao-0-contabil-2",
+    name: "Contabil Edit Smoke",
+    login: "contabil.edit@castelo.test",
+    modules: { integracao: 0, contabil: 2 },
+  }),
+  createUser({
+    id: "user-integracao-0-contabil-3",
+    name: "Contabil Admin Smoke",
+    login: "contabil.admin@castelo.test",
+    modules: { integracao: 0, contabil: 3 },
+  }),
+];
 
 function createToken(payload) {
   const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
@@ -40,12 +77,12 @@ function createToken(payload) {
   return `${header}.${body}.signature`;
 }
 
-async function installApiMocks(page) {
+async function installApiMocks(page, currentUser) {
   await page.route("**/user/me", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ success: true, data: noAccessUser }),
+      body: JSON.stringify({ success: true, data: currentUser }),
     });
   });
 
@@ -66,7 +103,7 @@ async function installApiMocks(page) {
   });
 }
 
-async function assertDashboardIsHidden() {
+async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUser) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     baseURL: baseUrl,
@@ -77,10 +114,10 @@ async function assertDashboardIsHidden() {
     {
       name: "cw.token",
       value: createToken({
-        id: noAccessUser.id,
-        permission: noAccessUser.permission,
-        type: noAccessUser.type,
-        modules: noAccessUser.modules,
+        id: currentUser.id,
+        permission: currentUser.permission,
+        type: currentUser.type,
+        modules: currentUser.modules,
       }),
       url: baseUrl,
       httpOnly: false,
@@ -89,28 +126,57 @@ async function assertDashboardIsHidden() {
   ]);
 
   const page = await context.newPage();
-  await installApiMocks(page);
-  await page.goto("/dashboard", { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: "Recolher sidebar" }).waitFor({ state: "visible" });
+  await installApiMocks(page, currentUser);
+
+  await page.goto("/contabil", { waitUntil: "networkidle" });
+  await page.locator("aside").waitFor({ state: "visible" });
   await page.waitForTimeout(250);
 
-  const dashboardLink = page.locator("aside").getByRole("link", {
-    name: "Dashboard",
-    exact: true,
+  await page.getByRole("link", { name: "Contábil", exact: true }).waitFor({ state: "visible" });
+  await page.getByRole("link", { name: "Minhas tarefas", exact: true }).waitFor({
+    state: "visible",
   });
 
   assert.equal(
-    await dashboardLink.count(),
+    await page
+      .locator("aside")
+      .getByRole("link", { name: "Clientes", exact: true })
+      .count(),
     0,
-    "Dashboard must not be rendered in the sidebar without module access.",
+    "Clientes must stay hidden when integração is 0.",
   );
+  assert.equal(
+    await page
+      .locator("aside")
+      .getByRole("link", { name: "Projetos", exact: true })
+      .count(),
+    0,
+    "Projetos must stay hidden when integração is 0.",
+  );
+  assert.equal(
+    await page.getByText("Você não tem acesso a este módulo no perfil atual.").count(),
+    0,
+    "Contábil must not be blocked by the integração level 0 task-only guard.",
+  );
+
+  await page.goto("/clients/123", { waitUntil: "networkidle" });
+  await page.getByText("Você não tem acesso a este módulo no perfil atual.").waitFor({
+    state: "visible",
+  });
+  await page.getByRole("link", { name: "Ir para Minhas tarefas", exact: true }).waitFor({
+    state: "visible",
+  });
 
   await browser.close();
 }
 
 await withNextServer(async () => {
-  await assertDashboardIsHidden();
-  console.log("PASS dashboard is hidden from sidebar without module access");
+  for (const currentUser of integrationRestrictedProfiles) {
+    await assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUser);
+    console.log(
+      `PASS integracao=0 preserves contabil sidebar/url access for contabil=${currentUser.modules.contabil}`,
+    );
+  }
 });
 
 async function withNextServer(test) {

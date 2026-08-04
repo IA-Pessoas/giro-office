@@ -685,6 +685,20 @@ await (async () => {
     );
   });
 
+  await runTest(
+    "app shell aplica a exceção de tarefas da integração apenas nas rotas da integração",
+    () => {
+      assert.match(
+        appShellSource,
+        /const canViewTasksOnlyRoute\s*=\s*currentModuleKey === "integracao"\s*\?\s*canViewTasksOnlyIntegrationRoute\(pathname, moduleAccessUser\)\s*:\s*true;/,
+      );
+      assert.match(
+        appShellSource,
+        /if \(moduleKey === "integracao" && !canViewTasksOnlyIntegrationRoute\(modulePath, moduleAccessUser\)\) \{\s*return false;\s*\}/,
+      );
+    },
+  );
+
   await runTest("canSSRAuth redirects unauthenticated users to login", () => {
     assert.match(canSSRAuthSource, /if\s*\(\s*!token\s*\)/);
     assert.match(canSSRAuthSource, /destination:\s*["']\/login["']/);

@@ -353,7 +353,10 @@ export function AppShell({
   const currentModuleAccess = currentModuleKey ? moduleAccessMap[currentModuleKey] : null;
   const shouldShowDashboard = isModuleAccessLoading || hasAnyModuleAccess(moduleAccessMap);
   const shouldRenderModuleAccessLoading = Boolean(currentModuleKey) && isModuleAccessLoading;
-  const canViewTasksOnlyRoute = canViewTasksOnlyIntegrationRoute(pathname, moduleAccessUser);
+  const canViewTasksOnlyRoute =
+    currentModuleKey === "integracao"
+      ? canViewTasksOnlyIntegrationRoute(pathname, moduleAccessUser)
+      : true;
   const canViewCurrentModuleRoute =
     canViewTasksOnlyRoute &&
     (currentModuleKey === "integracao"
@@ -392,7 +395,7 @@ export function AppShell({
       return true;
     }
 
-    if (!canViewTasksOnlyIntegrationRoute(modulePath, moduleAccessUser)) {
+    if (moduleKey === "integracao" && !canViewTasksOnlyIntegrationRoute(modulePath, moduleAccessUser)) {
       return false;
     }
 
