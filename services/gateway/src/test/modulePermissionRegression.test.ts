@@ -263,4 +263,10 @@ describe("matriz de regressão das políticas modulares", () => {
       ),
     ).toBe(true);
   });
+
+  it("protects PUT /user/:id with the user-management policy", () => {
+    expect(requiredRoutePolicy("PUT", "/user/user-1")).toEqual({
+      special: "manageUsers",
+    });
+  });
 });

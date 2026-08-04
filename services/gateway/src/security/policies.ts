@@ -113,6 +113,11 @@ const routePolicyMatchers: Array<{
     policy: userManagementPolicy,
   },
   {
+    method: "PUT",
+    path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
+    policy: userManagementPolicy,
+  },
+  {
     method: "DELETE",
     path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
     policy: userManagementPolicy,
