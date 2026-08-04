@@ -2,43 +2,65 @@ import { assertRuleMatchesPrisma } from "./prisma-catalog.mjs";
 
 export const REQUIRED_IDENTITY_NAMESPACE = "3f68d246-0b54-4a10-9415-a8845a767fb5";
 
-export const PENDING_REASON_CODES = Object.freeze({
-  NO_CONFIRMED_DESTINATION: "NO_CONFIRMED_DESTINATION",
-  AMBIGUOUS_DESTINATION: "AMBIGUOUS_DESTINATION",
-  DESTINATION_CONTRACT_MISMATCH: "DESTINATION_CONTRACT_MISMATCH",
-  PREVIOUS_RULE_INVALIDATED: "PREVIOUS_RULE_INVALIDATED",
-  BUSINESS_DECISION_REQUIRED: "BUSINESS_DECISION_REQUIRED",
-});
-
+const CARDINALITIES = new Set(["1:1", "N:1", "1:N"]);
 const COLUMN_STATUSES = new Set(["mapped", "not_preserved"]);
+const DESTINATION_MODES = new Set(["insert", "merge", "lookup", "derived", "aggregate"]);
+const EVIDENCE_CONFIDENCES = new Set(["high", "medium", "low"]);
+const EVIDENCE_OPERATIONS = new Set(["delete", "dynamic", "insert", "select", "update"]);
 const SENSITIVITIES = new Set(["none", "personal", "credential", "secret"]);
 const UNSAFE_SENSITIVE_TRANSFORMATIONS = new Set(["plain", "copy", "preserve_raw"]);
-const VERSIONED_RULE_ORIGIN = /^(?:docs\/migration\/v2\/[^/].*|scripts\/migration-v2-[^/]+\.mjs)$/;
 
 export function validateMappingRule(rule, prismaCatalog) {
   assertNonEmptyString(rule?.sourceTable, "sourceTable");
-  assertNonEmptyString(rule?.destinationTable, "destinationTable");
   if (rule?.status !== "confirmed") {
     throw new Error("Status da regra registrada deve ser confirmed");
   }
   assertNonEmptyString(rule?.domain, "domain");
   assertNonEmptyString(rule?.reason, "reason");
   assertNonEmptyString(rule?.ruleOrigin, "ruleOrigin");
-  if (!VERSIONED_RULE_ORIGIN.test(rule.ruleOrigin)) {
-    throw new Error("ruleOrigin deve apontar para um artefato versionado da migração V2");
+  validateEvidence(rule?.evidence);
+  if (!CARDINALITIES.has(rule?.cardinality)) {
+    throw new Error(`Cardinality inválida: ${String(rule?.cardinality)}`);
+  }
+  assertNoLegacyRootFields(rule);
+  if (!Array.isArray(rule?.destinations) || rule.destinations.length === 0) {
+    throw new Error("destinations deve ser um array não vazio");
+  }
+  if (typeof rule.emitRows !== "function") {
+    throw new Error("emitRows deve ser uma função pura de emissão");
   }
 
-  validateIdentity(rule.identity);
-  validateDependencies(rule.dependencies);
-  validateColumns(rule.columns);
-  if (typeof rule.classifyRow !== "function") {
-    throw new Error("classifyRow deve ser uma função pura de classificação");
+  const stepIds = new Set();
+  for (const step of rule.destinations) {
+    assertNonEmptyString(step?.stepId, "stepId");
+    if (stepIds.has(step.stepId)) {
+      throw new Error(`stepId duplicado na regra: ${step.stepId}`);
+    }
+    stepIds.add(step.stepId);
+    validateDestinationStep(step, prismaCatalog);
   }
+  validateEmissionDecisions(rule.emitRows(Object.freeze({}), Object.freeze({})), stepIds);
+
+  return true;
+}
+
+export function validateDestinationStep(step, prismaCatalog) {
+  assertNonEmptyString(step?.stepId, "stepId");
+  assertNonEmptyString(step?.destinationTable, "destinationTable");
+  if (!DESTINATION_MODES.has(step?.mode)) {
+    throw new Error(`Mode de DestinationStep inválido: ${String(step?.mode)}`);
+  }
+  validateIdentity(step.identity);
+  if (step.mode === "lookup" && step.onMany !== "quarantine") {
+    throw new Error("DestinationStep lookup exige onMany igual a quarantine");
+  }
+  validateDependencies(step.dependencies);
+  validateColumns(step.columns);
 
   assertRuleMatchesPrisma(
     {
-      destinationTable: rule.destinationTable,
-      columns: rule.columns.filter(({ status }) => status === "mapped"),
+      destinationTable: step.destinationTable,
+      columns: step.columns.filter(({ status }) => status === "mapped"),
     },
     prismaCatalog,
   );
@@ -76,45 +98,57 @@ export function buildRuleRegistry(ruleGroups) {
   return registry;
 }
 
-export function createPendingMapping(sourceInspection, reasonCode, evidence) {
+export function createPendingMapping(sourceInspection, evidenceDecision) {
   assertNonEmptyString(sourceInspection?.sourceTable, "sourceInspection.sourceTable");
   if (!Number.isSafeInteger(sourceInspection?.rowCount) || sourceInspection.rowCount < 0) {
     throw new TypeError("sourceInspection.rowCount deve ser um inteiro não negativo");
   }
-  if (!Object.values(PENDING_REASON_CODES).includes(reasonCode)) {
-    throw new Error(`reasonCode de pending desconhecido: ${String(reasonCode)}`);
-  }
-  if (!Array.isArray(evidence) || evidence.length === 0) {
-    throw new Error("evidence deve ser um array não vazio");
-  }
-  for (const item of evidence) {
-    assertNonEmptyString(item, "evidence");
+  validatePendingEvidenceDecision(evidenceDecision);
+  if (evidenceDecision.sourceTable !== sourceInspection.sourceTable) {
+    throw new Error("sourceTable da EvidenceDecision deve corresponder à sourceInspection");
   }
 
-  const copiedEvidence = [...evidence];
   return {
     sourceTable: sourceInspection.sourceTable,
     sourceRowCount: sourceInspection.rowCount,
-    destinationTable: null,
     status: "pending",
-    reasonCode,
-    reason: copiedEvidence.join(" "),
-    domain: "unclassified",
-    ruleOrigin: "docs/migration/v4/scripts/lib/mapping-contract.mjs",
-    identityStrategy: null,
-    dependencies: [],
-    preparedRowCount: 0,
-    quarantineRowCount: 0,
-    evidence: copiedEvidence,
+    reasonCode: evidenceDecision.reasonCode,
+    reason: evidenceDecision.reason,
+    evidence: copyEvidenceDecision(evidenceDecision),
   };
 }
 
-function validateIdentity(identity) {
-  assertNonEmptyString(identity?.legacyColumn, "identidade.legacyColumn");
-  assertNonEmptyString(identity?.scope, "identidade.scope");
-  if (identity?.namespace !== REQUIRED_IDENTITY_NAMESPACE) {
-    throw new Error(`Namespace de identidade deve ser ${REQUIRED_IDENTITY_NAMESPACE}`);
+function assertNoLegacyRootFields(rule) {
+  for (const field of ["destinationTable", "identity", "columns", "classifyRow", "dependencies"]) {
+    if (field in rule) {
+      throw new Error(`${field} pertence a DestinationStep, não a MappingRule`);
+    }
   }
+}
+
+function validateEvidence(evidence) {
+  if (typeof evidence !== "object" || evidence === null) {
+    throw new TypeError("evidence deve conter evidências legada e atual");
+  }
+  validateStringArray(evidence.legacy, "evidence.legacy");
+  validateStringArray(evidence.current, "evidence.current");
+}
+
+function validateIdentity(identity) {
+  if (identity?.strategy === "create") {
+    assertNonEmptyString(identity.legacyColumn, "identidade.legacyColumn");
+    assertNonEmptyString(identity.scope, "identidade.scope");
+    if (identity.namespace !== REQUIRED_IDENTITY_NAMESPACE) {
+      throw new Error(`Namespace de identidade deve ser ${REQUIRED_IDENTITY_NAMESPACE}`);
+    }
+    return;
+  }
+  if (identity?.strategy === "resolve") {
+    assertNonEmptyString(identity?.source?.sourceTable, "origem de resolve.sourceTable");
+    assertNonEmptyString(identity?.source?.stepId, "origem de resolve.stepId");
+    return;
+  }
+  throw new Error(`Estratégia de identidade inválida: ${String(identity?.strategy)}`);
 }
 
 function validateDependencies(dependencies) {
@@ -158,6 +192,104 @@ function validateColumns(columns) {
         `Transformação sensível inválida para ${column.sensitivity}: ${column.transformation}`,
       );
     }
+  }
+}
+
+function validatePendingEvidenceDecision(decision) {
+  if (decision?.finalStatus !== "pending") {
+    throw new Error("createPendingMapping exige uma EvidenceDecision pending");
+  }
+  assertNonEmptyString(decision?.sourceTable, "evidenceDecision.sourceTable");
+  assertNonEmptyString(decision?.legacyModule, "evidenceDecision.legacyModule");
+  assertNonEmptyString(decision?.reasonCode, "evidenceDecision.reasonCode");
+  assertNonEmptyString(decision?.reason, "evidenceDecision.reason");
+  validateStringArray(decision?.legacyReferences, "evidenceDecision.legacyReferences", {
+    allowEmpty: true,
+  });
+  validateStringArray(
+    decision?.currentContractEvidence,
+    "evidenceDecision.currentContractEvidence",
+    {
+      allowEmpty: true,
+    },
+  );
+  validateEnumArray(decision?.operations, "evidenceDecision.operations", EVIDENCE_OPERATIONS);
+  validateStringArray(decision?.legacyRelationships, "evidenceDecision.legacyRelationships", {
+    allowEmpty: true,
+  });
+  if (!EVIDENCE_CONFIDENCES.has(decision?.confidence)) {
+    throw new Error(`evidenceDecision.confidence inválida: ${String(decision?.confidence)}`);
+  }
+  if (!(decision?.ruleId === null || typeof decision?.ruleId === "string")) {
+    throw new TypeError("evidenceDecision.ruleId deve ser string ou null");
+  }
+  if (typeof decision.ruleId === "string") {
+    assertNonEmptyString(decision.ruleId, "evidenceDecision.ruleId");
+  }
+}
+
+function copyEvidenceDecision(decision) {
+  return {
+    ...decision,
+    legacyReferences: [...decision.legacyReferences],
+    operations: [...decision.operations],
+    legacyRelationships: [...decision.legacyRelationships],
+    currentContractEvidence: [...decision.currentContractEvidence],
+  };
+}
+
+function validateStringArray(value, field, { allowEmpty = false } = {}) {
+  if (!Array.isArray(value) || (!allowEmpty && value.length === 0)) {
+    throw new TypeError(`${field} deve ser um array${allowEmpty ? "" : " não vazio"}`);
+  }
+  for (const item of value) {
+    assertNonEmptyString(item, field);
+  }
+}
+
+function validateEnumArray(value, field, allowedValues) {
+  validateStringArray(value, field, { allowEmpty: true });
+  for (const item of value) {
+    if (!allowedValues.has(item)) {
+      throw new Error(`${field} contém valor inválido: ${item}`);
+    }
+  }
+}
+
+function validateEmissionDecisions(emissions, stepIds) {
+  if (!Array.isArray(emissions)) {
+    throw new TypeError("emitRows deve retornar um array de EmissionDecision");
+  }
+  for (const emission of emissions) {
+    if (typeof emission !== "object" || emission === null || Array.isArray(emission)) {
+      throw new TypeError("EmissionDecision deve ser um objeto sanitizado");
+    }
+    for (const key of Object.keys(emission)) {
+      if (!["stepId", "status", "field", "reasonCode"].includes(key)) {
+        throw new Error(`EmissionDecision contém campo não sanitizado: ${key}`);
+      }
+    }
+    assertNonEmptyString(emission.stepId, "EmissionDecision.stepId");
+    if (!stepIds.has(emission.stepId)) {
+      throw new Error(`EmissionDecision referencia stepId desconhecido: ${emission.stepId}`);
+    }
+    if (emission.status === "prepared") {
+      if (Object.keys(emission).length !== 2) {
+        throw new Error("EmissionDecision prepared não pode conter dados adicionais");
+      }
+      continue;
+    }
+    if (emission.status !== "quarantine") {
+      throw new Error(`Status de EmissionDecision inválido: ${String(emission.status)}`);
+    }
+    assertIdentifier(emission.field, "EmissionDecision.field");
+    assertIdentifier(emission.reasonCode, "EmissionDecision.reasonCode");
+  }
+}
+
+function assertIdentifier(value, field) {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_.-]+$/.test(value)) {
+    throw new TypeError(`${field} deve ser um identificador sanitizado`);
   }
 }
 

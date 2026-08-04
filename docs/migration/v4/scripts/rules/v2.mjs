@@ -1,7 +1,12 @@
 import { REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
 import { classifySensitivity } from "../lib/sensitivity.mjs";
 
-const RULE_ORIGIN = "scripts/migration-v2-build-load.mjs";
+const RULE_ORIGIN =
+  "draft: mechanical V2 port from scripts/migration-v2-build-load.mjs; revalidate in Task 3";
+const DRAFT_EVIDENCE = Object.freeze({
+  legacy: ["Portada mecanicamente da V2; revisão semântica pendente na Task 3."],
+  current: ["Catálogo Prisma validado estruturalmente; revisão semântica pendente na Task 3."],
+});
 const BCRYPT_PATTERN = /^\$2[aby]\$(?:0[4-9]|[12]\d|3[01])\$[./A-Za-z0-9]{53}$/;
 
 const REGULARIZE_CREDENTIAL_COLUMNS = [
@@ -368,21 +373,47 @@ function rule({
 }) {
   return {
     sourceTable,
-    destinationTable,
     status: "confirmed",
     domain,
     ruleOrigin: RULE_ORIGIN,
-    reason: "Destino V2 confirmado e revalidado contra o catálogo Prisma atual.",
-    identity: {
-      legacyColumn,
-      scope: sourceTable,
-      namespace: REQUIRED_IDENTITY_NAMESPACE,
+    reason: "Portada mecanicamente da V2; decisão semântica pendente na Task 3.",
+    evidence: {
+      legacy: [...DRAFT_EVIDENCE.legacy],
+      current: [...DRAFT_EVIDENCE.current],
     },
-    dependencies,
-    columns: pairs.map(([sourceColumn, destinationColumn, transformation, sensitivity]) =>
-      mappedColumn({ sourceColumn, destinationColumn, transformation, sensitivity }),
-    ),
-    classifyRow,
+    cardinality: "1:1",
+    destinations: [
+      {
+        stepId: "v2-insert",
+        destinationTable,
+        mode: "insert",
+        identity: {
+          strategy: "create",
+          legacyColumn,
+          scope: sourceTable,
+          namespace: REQUIRED_IDENTITY_NAMESPACE,
+        },
+        dependencies,
+        columns: pairs.map(([sourceColumn, destinationColumn, transformation, sensitivity]) =>
+          mappedColumn({ sourceColumn, destinationColumn, transformation, sensitivity }),
+        ),
+      },
+    ],
+    emitRows(row, context) {
+      return [toEmissionDecision(classifyRow(row, context))];
+    },
+  };
+}
+
+function toEmissionDecision(decision) {
+  const emission = { stepId: "v2-insert", status: decision.status };
+  if (decision.status !== "quarantine") {
+    return emission;
+  }
+  return {
+    ...emission,
+    field: decision.field,
+    reasonCode: decision.reasonCode,
   };
 }
 

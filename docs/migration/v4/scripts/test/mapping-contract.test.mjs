@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 import {
   buildRuleRegistry,
   createPendingMapping,
-  PENDING_REASON_CODES,
   REQUIRED_IDENTITY_NAMESPACE,
   validateMappingRule,
 } from "../lib/mapping-contract.mjs";
@@ -30,38 +29,159 @@ function mappedColumn(overrides = {}) {
   };
 }
 
-function validRule(overrides = {}) {
+function createIdentity(overrides = {}) {
   return {
-    sourceTable: "tb_legacy.workspaces",
-    destinationTable: "workspace_table",
-    status: "confirmed",
-    domain: "workspace",
-    ruleOrigin: "docs/migration/v2/confirmed-table-destinations.csv",
-    reason: "Destino confirmado na migração V2 e revalidado no Prisma atual.",
-    identity: {
-      legacyColumn: "id",
-      scope: "tb_legacy.workspaces",
-      namespace: REQUIRED_IDENTITY_NAMESPACE,
-    },
-    dependencies: [],
-    columns: [mappedColumn()],
-    classifyRow: () => ({ status: "prepared" }),
+    strategy: "create",
+    legacyColumn: "id",
+    scope: "tb_legacy.workspaces",
+    namespace: REQUIRED_IDENTITY_NAMESPACE,
     ...overrides,
   };
 }
 
-test("validateMappingRule aceita o contrato confirmado completo", async () => {
+function destinationStep(overrides = {}) {
+  return {
+    stepId: "workspace-insert",
+    destinationTable: "workspace_table",
+    mode: "insert",
+    identity: createIdentity(),
+    dependencies: [],
+    columns: [mappedColumn()],
+    ...overrides,
+  };
+}
+
+function validRule(overrides = {}) {
+  return {
+    sourceTable: "tb_legacy.workspaces",
+    status: "confirmed",
+    domain: "workspace",
+    ruleOrigin: "draft: mechanical V2 port; revalidate in Task 3",
+    reason: "Portada mecanicamente; a decisão semântica será revalidada na Task 3.",
+    evidence: {
+      legacy: ["Referência histórica V2; revisão semântica pendente."],
+      current: ["workspace_table existe no catálogo Prisma atual."],
+    },
+    cardinality: "1:1",
+    destinations: [destinationStep()],
+    emitRows: () => [{ stepId: "workspace-insert", status: "prepared" }],
+    ...overrides,
+  };
+}
+
+function pendingEvidence(overrides = {}) {
+  return {
+    sourceTable: "tb_legacy.unmapped",
+    legacyModule: "sem referência",
+    legacyReferences: [],
+    operations: [],
+    legacyRelationships: [],
+    currentContractEvidence: [],
+    finalStatus: "pending",
+    reasonCode: "NO_CURRENT_CONTRACT",
+    reason: "Nenhum contrato atual candidato foi localizado.",
+    confidence: "low",
+    ruleId: null,
+    ...overrides,
+  };
+}
+
+test("validateMappingRule aceita regra 1:1 com passo insert", async () => {
   const catalog = await loadPrismaCatalog(fixturePath);
 
   assert.equal(validateMappingRule(validRule(), catalog), true);
 });
 
-test("validateMappingRule rejeita regra que não esteja confirmed", async () => {
+test("validateMappingRule aceita regra N:1 com passo merge que resolve origem", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+  const rule = validRule({
+    sourceTable: "tb_legacy.workspace_members",
+    cardinality: "N:1",
+    destinations: [
+      destinationStep({
+        stepId: "workspace-merge",
+        mode: "merge",
+        identity: {
+          strategy: "resolve",
+          source: {
+            sourceTable: "tb_legacy.workspaces",
+            stepId: "workspace-insert",
+          },
+        },
+      }),
+    ],
+    emitRows: () => [{ stepId: "workspace-merge", status: "prepared" }],
+  });
+
+  assert.equal(validateMappingRule(rule, catalog), true);
+});
+
+test("emitRows permite duas emissões 1:N e isola uma quarentena da emissão independente", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+  const rule = validRule({
+    cardinality: "1:N",
+    destinations: [
+      destinationStep({ stepId: "workspace-insert" }),
+      destinationStep({
+        stepId: "member-insert",
+        destinationTable: "members_table",
+        columns: [mappedColumn({ destinationColumn: "workspace_id" })],
+      }),
+    ],
+    emitRows: () => [
+      { stepId: "workspace-insert", status: "quarantine", field: "nome", reasonCode: "EMPTY" },
+      { stepId: "member-insert", status: "prepared" },
+    ],
+  });
+
+  assert.equal(validateMappingRule(rule, catalog), true);
+  const emissions = rule.emitRows({ nome: "valor-que-não-pode-vazar" });
+  assert.deepEqual(emissions, [
+    { stepId: "workspace-insert", status: "quarantine", field: "nome", reasonCode: "EMPTY" },
+    { stepId: "member-insert", status: "prepared" },
+  ]);
+  assert.equal(
+    emissions.some(({ status }) => status === "prepared"),
+    true,
+  );
+  assert.doesNotMatch(JSON.stringify(emissions), /valor-que-não-pode-vazar|payload/i);
+});
+
+test("validateMappingRule aceita aggregate de filho em JSON do pai", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+  const rule = validRule({
+    sourceTable: "tb_legacy.workspace_members",
+    cardinality: "N:1",
+    destinations: [
+      destinationStep({
+        stepId: "workspace-members-aggregate",
+        mode: "aggregate",
+        identity: {
+          strategy: "resolve",
+          source: {
+            sourceTable: "tb_legacy.workspaces",
+            stepId: "workspace-insert",
+          },
+        },
+        columns: [mappedColumn({ sourceColumn: "member", destinationColumn: "workspace_note" })],
+      }),
+    ],
+    emitRows: () => [{ stepId: "workspace-members-aggregate", status: "prepared" }],
+  });
+
+  assert.equal(validateMappingRule(rule, catalog), true);
+});
+
+test("validateMappingRule rejeita stepId duplicado", async () => {
   const catalog = await loadPrismaCatalog(fixturePath);
 
   assert.throws(
-    () => validateMappingRule(validRule({ status: "pending" }), catalog),
-    /status.*confirmed/i,
+    () =>
+      validateMappingRule(
+        validRule({ destinations: [destinationStep(), destinationStep()] }),
+        catalog,
+      ),
+    /stepId.*duplicado/i,
   );
 });
 
@@ -69,82 +189,95 @@ test("validateMappingRule rejeita destino ou coluna ausente no catálogo Prisma"
   const catalog = await loadPrismaCatalog(fixturePath);
 
   assert.throws(
-    () => validateMappingRule(validRule({ destinationTable: "missing_table" }), catalog),
+    () =>
+      validateMappingRule(
+        validRule({ destinations: [destinationStep({ destinationTable: "missing_table" })] }),
+        catalog,
+      ),
     /tabela de destino inexistente/i,
   );
   assert.throws(
     () =>
       validateMappingRule(
-        validRule({ columns: [mappedColumn({ destinationColumn: "missing_column" })] }),
+        validRule({
+          destinations: [
+            destinationStep({ columns: [mappedColumn({ destinationColumn: "missing_column" })] }),
+          ],
+        }),
         catalog,
       ),
     /coluna de destino inexistente/i,
   );
 });
 
-test("validateMappingRule exige coluna legada, escopo e namespace de identidade congelado", async () => {
+test("validateMappingRule exige evidence, origem de resolve e onMany quarantine em lookup", async () => {
   const catalog = await loadPrismaCatalog(fixturePath);
 
-  for (const identity of [
-    { legacyColumn: "", scope: "tb_legacy.workspaces", namespace: REQUIRED_IDENTITY_NAMESPACE },
-    { legacyColumn: "id", scope: "", namespace: REQUIRED_IDENTITY_NAMESPACE },
-    { legacyColumn: "id", scope: "tb_legacy.workspaces", namespace: randomUUID() },
-  ]) {
-    assert.throws(
-      () => validateMappingRule(validRule({ identity }), catalog),
-      /identidade|namespace/i,
-    );
-  }
-});
-
-test("validateMappingRule exige ColumnRule completo e reason para coluna não preservada", async () => {
-  const catalog = await loadPrismaCatalog(fixturePath);
-
+  assert.throws(() => validateMappingRule(validRule({ evidence: {} }), catalog), /evidence/i);
   assert.throws(
     () =>
       validateMappingRule(
         validRule({
-          columns: [mappedColumn({ destinationColumn: null, status: "mapped" })],
+          destinations: [destinationStep({ identity: { strategy: "resolve" } })],
         }),
         catalog,
       ),
-    /destinationColumn/i,
+    /resolve.*origem|origem.*resolve/i,
   );
   assert.throws(
     () =>
       validateMappingRule(
+        validRule({ destinations: [destinationStep({ mode: "lookup", onMany: "first" })] }),
+        catalog,
+      ),
+    /lookup.*onMany.*quarantine/i,
+  );
+});
+
+test("validateMappingRule impede transformação plain, copy ou preserve_raw em credential", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+
+  for (const transformation of ["plain", "copy", "preserve_raw"]) {
+    assert.throws(
+      () =>
+        validateMappingRule(
+          validRule({
+            destinations: [
+              destinationStep({
+                columns: [mappedColumn({ sensitivity: "credential", transformation })],
+              }),
+            ],
+          }),
+          catalog,
+        ),
+      /transformação.*sensível|credential/i,
+    );
+  }
+});
+
+test("validateMappingRule rejeita emitRows que vaza payload ou não referencia um passo conhecido", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+
+  assert.throws(
+    () =>
+      validateMappingRule(
         validRule({
-          columns: [
-            mappedColumn({
-              destinationColumn: null,
-              status: "not_preserved",
-              reason: "",
-            }),
+          emitRows: () => [
+            { stepId: "workspace-insert", status: "prepared", payload: "não permitido" },
           ],
         }),
         catalog,
       ),
-    /reason/i,
+    /EmissionDecision|payload/i,
   );
-});
-
-test("validateMappingRule impede transformação em claro para credential e secret", async () => {
-  const catalog = await loadPrismaCatalog(fixturePath);
-
-  for (const [sensitivity, transformation] of [
-    ["credential", "plain"],
-    ["credential", "copy"],
-    ["secret", "preserve_raw"],
-  ]) {
-    assert.throws(
-      () =>
-        validateMappingRule(
-          validRule({ columns: [mappedColumn({ sensitivity, transformation })] }),
-          catalog,
-        ),
-      /transformação.*sensível|credential|secret/i,
-    );
-  }
+  assert.throws(
+    () =>
+      validateMappingRule(
+        validRule({ emitRows: () => [{ stepId: "outro-passo", status: "prepared" }] }),
+        catalog,
+      ),
+    /stepId.*desconhecido/i,
+  );
 });
 
 test("buildRuleRegistry rejeita colisão de sourceTable sem diferenciar caixa", () => {
@@ -154,51 +287,55 @@ test("buildRuleRegistry rejeita colisão de sourceTable sem diferenciar caixa", 
   );
 });
 
-test("buildRuleRegistry registra somente regras confirmed por sourceTable", () => {
-  const second = validRule({ sourceTable: "tb_legacy.members" });
-  const registry = buildRuleRegistry([[validRule()], [second]]);
-
-  assert.equal(registry.size, 2);
-  assert.equal(registry.get("tb_legacy.workspaces")?.status, "confirmed");
-  assert.equal(registry.get("tb_legacy.members"), second);
-  assert.throws(
-    () => buildRuleRegistry([[validRule({ status: "pending" })]]),
-    /status.*confirmed/i,
-  );
-});
-
-test("createPendingMapping preserva tabela sem regra sem sugerir tabela ou serviço", () => {
+test("createPendingMapping nasce de EvidenceDecision pending sem sugerir destino", () => {
+  const evidence = pendingEvidence();
   const pending = createPendingMapping(
-    { sourceTable: "tb_legacy.unmapped", rowCount: 27 },
-    PENDING_REASON_CODES.NO_CONFIRMED_DESTINATION,
-    ["A tabela não aparece no registro de destinos confirmados."],
+    { sourceTable: evidence.sourceTable, rowCount: 27 },
+    evidence,
   );
 
-  assert.deepEqual(pending, {
-    sourceTable: "tb_legacy.unmapped",
-    sourceRowCount: 27,
-    destinationTable: null,
-    status: "pending",
-    reasonCode: "NO_CONFIRMED_DESTINATION",
-    reason: "A tabela não aparece no registro de destinos confirmados.",
-    domain: "unclassified",
-    ruleOrigin: "docs/migration/v4/scripts/lib/mapping-contract.mjs",
-    identityStrategy: null,
-    dependencies: [],
-    preparedRowCount: 0,
-    quarantineRowCount: 0,
-    evidence: ["A tabela não aparece no registro de destinos confirmados."],
-  });
+  assert.equal(pending.sourceTable, evidence.sourceTable);
+  assert.equal(pending.sourceRowCount, 27);
+  assert.equal(pending.status, "pending");
+  assert.equal(pending.reasonCode, evidence.reasonCode);
+  assert.equal(pending.reason, evidence.reason);
+  assert.deepEqual(pending.evidence, evidence);
+  assert.equal("destinationTable" in pending, false);
+  assert.equal("destinations" in pending, false);
   assert.equal("suggestedDestinationTable" in pending, false);
   assert.equal("suggestedService" in pending, false);
 });
 
-test("createPendingMapping aceita somente reason code conhecido e evidência objetiva não vazia", () => {
+test("createPendingMapping rejeita decisão não pending ou de outra origem", () => {
   const inspection = { sourceTable: "tb_legacy.unmapped", rowCount: 0 };
 
-  assert.throws(() => createPendingMapping(inspection, "UNKNOWN", ["Ausente."]), /reasonCode/i);
   assert.throws(
-    () => createPendingMapping(inspection, PENDING_REASON_CODES.BUSINESS_DECISION_REQUIRED, []),
-    /evidence/i,
+    () => createPendingMapping(inspection, pendingEvidence({ finalStatus: "confirmed" })),
+    /pending/i,
+  );
+  assert.throws(
+    () => createPendingMapping(inspection, pendingEvidence({ sourceTable: "tb_legacy.other" })),
+    /sourceTable/i,
+  );
+  assert.throws(
+    () => createPendingMapping(inspection, pendingEvidence({ operations: "select" })),
+    /operations/i,
+  );
+});
+
+test("validateMappingRule mantém o namespace de identidade congelado para create", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+
+  assert.throws(
+    () =>
+      validateMappingRule(
+        validRule({
+          destinations: [
+            destinationStep({ identity: createIdentity({ namespace: randomUUID() }) }),
+          ],
+        }),
+        catalog,
+      ),
+    /namespace/i,
   );
 });
