@@ -544,14 +544,22 @@ export const RH_PESSOAL_EVIDENCE = Object.freeze(
     confirmed({
       sourceTable: "tb_rh.score_nitro",
       legacyModule: "recursos humanos",
-      legacyReferences: ["classes/Score.php:244", "classes/Score.php:337"],
+      legacyReferences: [
+        "classes/Score.php:250",
+        "classes/Score.php:255",
+        "classes/Score.php:262",
+        "classes/Score.php:264",
+        "classes/Score.php:266",
+      ],
       operations: ["insert", "select", "update"],
       legacyRelationships: ["col_id e trimestre resolvem a identidade única de tb_rh.score."],
       currentContractEvidence: [
         "infra/prisma/schema.prisma:1794",
-        "services/rh-service/src/services/scoreNitroService.ts:25",
+        "services/rh-service/src/services/scoreNitroService.ts:95",
+        "services/rh-service/src/services/scoreNitroService.ts:98",
       ],
-      reason: "O score Nitro consolidado possui contrato atual em rh.score_nitro.",
+      reason:
+        "O score Nitro consolidado possui contrato atual; bônus de avaliações/horas, sinal de erros e faixa de pastas são normalizados para preservar a contribuição da fórmula legada.",
     }),
     confirmed({
       sourceTable: "tb_rh.score_perguntas",

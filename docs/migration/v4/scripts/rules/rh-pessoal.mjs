@@ -4,6 +4,15 @@ import { REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
 const ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const EVIDENCE_BY_SOURCE = new Map(RH_PESSOAL_EVIDENCE.map((item) => [item.sourceTable, item]));
 
+export const SCORE_NITRO_TRANSFORMATIONS = Object.freeze({
+  derive_legacy_nitro_hours_score: deriveLegacyNitroHoursScore,
+  normalize_legacy_nitro_total_hours: normalizeLegacyNitroTotalHours,
+  normalize_legacy_nitro_projects_score: normalizeLegacyNitroProjectsScore,
+  normalize_legacy_nitro_errors_score: normalizeLegacyNitroErrorsScore,
+  normalize_legacy_nitro_total_errors: normalizeLegacyNitroTotalErrors,
+  normalize_legacy_nitro_folders_score: normalizeLegacyNitroFoldersScore,
+});
+
 const passwordColumns = {
   "tb_pessoal.bem": [
     mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
@@ -448,16 +457,25 @@ export const RH_PESSOAL_RULES = [
         "resolve_score_by_collaborator_and_quarter",
         referenceOptions(),
       ),
-      notPreserved(
-        "avaliacoes",
-        "O contrato atual não possui contador de avaliações separado no consolidado Nitro.",
-      ),
-      mapped("ch", "hours_score", "normalize_number"),
-      mapped("ch", "total_hours", "normalize_integer"),
-      mapped("projetos", "projects_score", "normalize_number"),
-      mapped("erros", "errors_score", "normalize_number"),
-      mapped("erros", "total_errors", "normalize_integer"),
-      mapped("pastas", "folders_score", "normalize_number"),
+      mapped("avaliacoes", "hours_score", "derive_legacy_nitro_hours_score", {
+        reason:
+          "Avaliações >= 8 acrescentam 0,5 ao Nitro legado; o bônus é somado ao bônus de horas no campo aditivo hours_score.",
+      }),
+      mapped("ch", "hours_score", "derive_legacy_nitro_hours_score", {
+        reason:
+          "Carga horária >= 10 acrescenta 1 ao Nitro legado; o bônus é somado ao bônus de avaliações em hours_score.",
+      }),
+      mapped("ch", "total_hours", "normalize_legacy_nitro_total_hours"),
+      mapped("projetos", "projects_score", "normalize_legacy_nitro_projects_score"),
+      mapped("erros", "errors_score", "normalize_legacy_nitro_errors_score", {
+        reason:
+          "O legado soma erros negativos; o contrato atual subtrai errors_score, portanto o sinal é invertido para preservar a contribuição.",
+      }),
+      mapped("erros", "total_errors", "normalize_legacy_nitro_total_errors"),
+      mapped("pastas", "folders_score", "normalize_legacy_nitro_folders_score", {
+        reason:
+          "Pastas positivas acrescentam 0,5, negativas subtraem 0,5 e zero não altera o Nitro.",
+      }),
     ],
     defaults: {
       projects_score: 0,
@@ -468,6 +486,9 @@ export const RH_PESSOAL_RULES = [
       total_errors: 0,
     },
     precedence: ["legacy_identity", "unique_score_id"],
+    classifyAfterBase(row) {
+      return classifyLegacyNitroMetrics(row);
+    },
   }),
   createInsertRule({
     sourceTable: "tb_rh.score_perguntas",
@@ -625,6 +646,8 @@ function createRhRequestRule() {
   const classifySourceRow = (row, context) => {
     const base = firstQuarantine([
       classifyIdentity(row, "id"),
+      classifyRequiredString(row, "titulo", "RH_REQUEST_TITLE_REQUIRED"),
+      classifyRequiredString(row, "descricao", "RH_REQUEST_DESCRIPTION_REQUIRED"),
       classifyReference(
         row,
         context,
@@ -638,17 +661,32 @@ function createRhRequestRule() {
     ]);
     if (base.status === "quarantine") return base;
 
+    if (!isResolvedUserId(context?.requesterUserId)) {
+      return quarantine("requerente", "REQUESTER_RESOLVED_USER_INVALID");
+    }
+
     if (isMissingLegacyReference(row?.atribuido)) {
-      return classifyResolution(
-        context?.eligibleAssigneeResolution,
-        "atribuido",
-        "ELIGIBLE_RH_ASSIGNEE",
+      return classifyEligibleRhAssigneeCandidates(
+        context?.eligibleAssigneeCandidates,
+        context.requesterUserId,
       );
     }
     if (!isValidLegacyIdentity(row?.atribuido)) {
       return quarantine("atribuido", "ASSIGNEE_REFERENCE_INVALID");
     }
-    return classifyResolution(context?.assigneeResolution, "atribuido", "ASSIGNEE_REFERENCE");
+    const assigneeResolution = classifyResolution(
+      context?.assigneeResolution,
+      "atribuido",
+      "ASSIGNEE_REFERENCE",
+    );
+    if (assigneeResolution.status === "quarantine") return assigneeResolution;
+    if (!isResolvedUserId(context?.assigneeUserId)) {
+      return quarantine("atribuido", "ASSIGNEE_RESOLVED_USER_INVALID");
+    }
+    if (context.assigneeUserId === context.requesterUserId) {
+      return quarantine("atribuido", "ASSIGNEE_EQUALS_REQUESTER");
+    }
+    return prepared();
   };
 
   return {
@@ -692,7 +730,7 @@ function createRhRequestRule() {
           mapped("data_atualizacao", "updated_at", "normalize_required_date_with_created_fallback"),
         ],
         constants: { organization_id: ORGANIZATION_ID },
-        defaults: { description: "", urgency: "Low", status: "New" },
+        defaults: { urgency: "Low", status: "New" },
         precedence: ["legacy_identity", "explicit_assignee_user", "single_eligible_rh_assignee"],
         dependencies: ["tb_rh.colaboradores", "tb_admin.usuarios", "tb_rh.solicitacoes_categorias"],
       },
@@ -818,6 +856,74 @@ function scoreEvaluationColumns() {
   ];
 }
 
+function deriveLegacyNitroHoursScore(row) {
+  const evaluations = requireLegacyNitroNumber(row, "avaliacoes");
+  const hours = requireLegacyNitroInteger(row, "ch");
+  return (evaluations >= 8 ? 0.5 : 0) + (hours >= 10 ? 1 : 0);
+}
+
+function normalizeLegacyNitroTotalHours(row) {
+  return requireLegacyNitroInteger(row, "ch");
+}
+
+function normalizeLegacyNitroProjectsScore(row) {
+  return requireLegacyNitroInteger(row, "projetos");
+}
+
+function normalizeLegacyNitroErrorsScore(row) {
+  const errors = requireLegacyNitroInteger(row, "erros");
+  return errors === 0 ? 0 : -errors;
+}
+
+function normalizeLegacyNitroTotalErrors(row) {
+  return Math.abs(requireLegacyNitroInteger(row, "erros"));
+}
+
+function normalizeLegacyNitroFoldersScore(row) {
+  const folders = requireLegacyNitroNumber(row, "pastas");
+  if (folders > 0) return 0.5;
+  if (folders < 0) return -0.5;
+  return 0;
+}
+
+function classifyLegacyNitroMetrics(row) {
+  for (const field of ["avaliacoes", "pastas"]) {
+    if (!isLegacyNitroNumber(row?.[field])) {
+      return quarantine(field, "SCORE_NITRO_METRIC_INVALID");
+    }
+  }
+  for (const field of ["ch", "projetos", "erros"]) {
+    if (!isLegacyNitroInteger(row?.[field])) {
+      return quarantine(field, "SCORE_NITRO_METRIC_INVALID");
+    }
+  }
+  return prepared();
+}
+
+function requireLegacyNitroNumber(row, field) {
+  const value = row?.[field];
+  if (!isLegacyNitroNumber(value)) {
+    throw new TypeError(`Métrica Nitro legada inválida: ${field}`);
+  }
+  return Number(value);
+}
+
+function requireLegacyNitroInteger(row, field) {
+  const value = row?.[field];
+  if (!isLegacyNitroInteger(value)) {
+    throw new TypeError(`Métrica Nitro inteira inválida: ${field}`);
+  }
+  return Number(value);
+}
+
+function isLegacyNitroNumber(value) {
+  return hasValue(value) && Number.isFinite(Number(value));
+}
+
+function isLegacyNitroInteger(value) {
+  return isLegacyNitroNumber(value) && Number.isSafeInteger(Number(value));
+}
+
 function mapped(sourceColumn, destinationColumn, transformation, options = {}) {
   return {
     sourceColumn,
@@ -905,6 +1011,49 @@ function classifyResolution(state, field, reasonPrefix) {
   return quarantine(field, `${reasonPrefix}_LOOKUP_NOT_EXECUTED`);
 }
 
+function classifyEligibleRhAssigneeCandidates(candidates, requesterUserId) {
+  if (!Array.isArray(candidates)) {
+    return quarantine("atribuido", "ELIGIBLE_RH_ASSIGNEE_LOOKUP_NOT_EXECUTED");
+  }
+  if (candidates.length === 0) {
+    return quarantine("atribuido", "ELIGIBLE_RH_ASSIGNEE_NOT_FOUND");
+  }
+  const eligible = candidates.filter((candidate) =>
+    isEligibleRhAssigneeCandidate(candidate, requesterUserId),
+  );
+  if (eligible.length === 0) {
+    return quarantine("atribuido", "ELIGIBLE_RH_ASSIGNEE_INELIGIBLE");
+  }
+  if (eligible.length > 1) {
+    return quarantine("atribuido", "ELIGIBLE_RH_ASSIGNEE_AMBIGUOUS");
+  }
+  return prepared();
+}
+
+function isEligibleRhAssigneeCandidate(candidate, requesterUserId) {
+  if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return false;
+  }
+  if (!isResolvedUserId(candidate.id) || candidate.id === requesterUserId) return false;
+  if (candidate.status !== "active") return false;
+
+  const belongsToOrganization =
+    candidate.organizationId === ORGANIZATION_ID ||
+    (candidate.organizationId === null && candidate.departmentOrganizationId === ORGANIZATION_ID);
+  if (!belongsToOrganization || !Array.isArray(candidate.permissions)) return false;
+
+  return candidate.permissions.some(
+    (permission) =>
+      permission?.organizationId === ORGANIZATION_ID &&
+      typeof permission.rh === "number" &&
+      permission.rh >= 1,
+  );
+}
+
+function isResolvedUserId(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 function classifyUniqueResolution(state, reasonPrefix) {
   if (state === "zero") return prepared();
   if (state === "one" || state === "many") {
@@ -921,6 +1070,13 @@ function classifyIdentity(row, field) {
 
 function classifyRequiredValue(row, field) {
   return hasValue(row?.[field]) ? prepared() : quarantine(field, "REQUIRED_SOURCE_VALUE_EMPTY");
+}
+
+function classifyRequiredString(row, field, reasonCode) {
+  const value = row?.[field];
+  return typeof value === "string" && value.trim().length > 0
+    ? prepared()
+    : quarantine(field, reasonCode);
 }
 
 function firstQuarantine(classifications) {

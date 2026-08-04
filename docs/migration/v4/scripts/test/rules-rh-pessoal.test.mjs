@@ -5,6 +5,7 @@ import test from "node:test";
 
 import { validateMappingRule } from "../lib/mapping-contract.mjs";
 import { loadPrismaCatalog } from "../lib/prisma-catalog.mjs";
+import { iterateSqlRows } from "../lib/sql-dump-parser.mjs";
 import { buildRuleRegistry, RH_PESSOAL_RULES, V2_RULES } from "../rules/index.mjs";
 
 const LEGACY_DUMP_ROOT = "/home/bruno/Documents/03.08.2026";
@@ -163,18 +164,38 @@ test("solicitação resolve requester pelo colaborador e exige assignee explíci
   assert.ok(destination.dependencies.includes("tb_rh.colaboradores"));
   assert.ok(destination.dependencies.includes("tb_admin.usuarios"));
 
-  const base = { id: 17, requerente: 145, categoria: 3 };
-  const required = { requesterResolution: "one", categoryResolution: "one" };
+  const base = {
+    id: 17,
+    titulo: "Solicitação válida",
+    descricao: "Descrição válida",
+    requerente: 145,
+    categoria: 3,
+  };
+  const required = {
+    requesterResolution: "one",
+    requesterUserId: "user-requester",
+    categoryResolution: "one",
+  };
   assert.equal(
-    mappingRule.emitRows({ ...base, atribuido: 44 }, { ...required, assigneeResolution: "one" })[0]
-      .status,
+    mappingRule.emitRows(
+      { ...base, atribuido: 44 },
+      { ...required, assigneeResolution: "one", assigneeUserId: "user-assignee" },
+    )[0].status,
     "prepared",
+  );
+
+  assert.equal(
+    mappingRule.emitRows(
+      { ...base, atribuido: 44 },
+      { ...required, assigneeResolution: "one", assigneeUserId: "user-requester" },
+    )[0].reasonCode,
+    "ASSIGNEE_EQUALS_REQUESTER",
   );
 
   for (const assigneeResolution of ["zero", "many", "not_executed"]) {
     const [emission] = mappingRule.emitRows(
       { ...base, atribuido: 44 },
-      { ...required, assigneeResolution },
+      { ...required, assigneeResolution, assigneeUserId: "user-assignee" },
     );
     assert.equal(emission.status, "quarantine", assigneeResolution);
     assert.match(emission.reasonCode, /^ASSIGNEE_REFERENCE_/, assigneeResolution);
@@ -182,26 +203,107 @@ test("solicitação resolve requester pelo colaborador e exige assignee explíci
   assert.equal(
     mappingRule.emitRows(
       { ...base, atribuido: "id inválido" },
-      { ...required, assigneeResolution: "one" },
+      { ...required, assigneeResolution: "one", assigneeUserId: "user-assignee" },
     )[0].reasonCode,
     "ASSIGNEE_REFERENCE_INVALID",
   );
 
+  const organizationId = "e8048d1c-0830-45d7-84de-68e20abd685b";
+  const eligible = {
+    id: "user-assignee",
+    status: "active",
+    organizationId,
+    departmentOrganizationId: null,
+    permissions: [{ organizationId, rh: 1 }],
+  };
+  assert.equal(
+    mappingRule.emitRows(
+      { ...base, atribuido: 0 },
+      { ...required, eligibleAssigneeCandidates: [eligible] },
+    )[0].status,
+    "prepared",
+  );
+
+  const invalidCandidateCases = [
+    { ...eligible, id: "user-requester" },
+    { ...eligible, status: "inactive" },
+    { ...eligible, organizationId: "other-organization" },
+    { ...eligible, permissions: [{ organizationId, rh: 0 }] },
+  ];
+  for (const candidate of invalidCandidateCases) {
+    const [emission] = mappingRule.emitRows(
+      { ...base, atribuido: 0 },
+      { ...required, eligibleAssigneeCandidates: [candidate] },
+    );
+    assert.equal(emission.status, "quarantine");
+    assert.equal(emission.reasonCode, "ELIGIBLE_RH_ASSIGNEE_INELIGIBLE");
+  }
+
+  assert.equal(
+    mappingRule.emitRows({ ...base, atribuido: 0 }, required)[0].reasonCode,
+    "ELIGIBLE_RH_ASSIGNEE_LOOKUP_NOT_EXECUTED",
+  );
   assert.equal(
     mappingRule.emitRows(
       { ...base, atribuido: 0 },
       { ...required, eligibleAssigneeResolution: "one" },
-    )[0].status,
-    "prepared",
+    )[0].reasonCode,
+    "ELIGIBLE_RH_ASSIGNEE_LOOKUP_NOT_EXECUTED",
   );
-  for (const eligibleAssigneeResolution of ["zero", "many", "not_executed"]) {
-    const [emission] = mappingRule.emitRows(
+  assert.equal(
+    mappingRule.emitRows(
       { ...base, atribuido: 0 },
-      { ...required, eligibleAssigneeResolution },
-    );
-    assert.equal(emission.status, "quarantine", eligibleAssigneeResolution);
-    assert.match(emission.reasonCode, /^ELIGIBLE_RH_ASSIGNEE_/, eligibleAssigneeResolution);
+      { ...required, eligibleAssigneeCandidates: [] },
+    )[0].reasonCode,
+    "ELIGIBLE_RH_ASSIGNEE_NOT_FOUND",
+  );
+  assert.equal(
+    mappingRule.emitRows(
+      { ...base, atribuido: 0 },
+      {
+        ...required,
+        eligibleAssigneeCandidates: [eligible, { ...eligible, id: "user-assignee-2" }],
+      },
+    )[0].reasonCode,
+    "ELIGIBLE_RH_ASSIGNEE_AMBIGUOUS",
+  );
+});
+
+test("solicitação exige title e description como strings não vazias sem fallback", () => {
+  const mappingRule = rule("tb_rh.solicitacoes");
+  const destination = step(mappingRule, "rh-request-insert");
+  const validRow = {
+    id: 17,
+    titulo: "Solicitação válida",
+    descricao: "Descrição válida",
+    requerente: 145,
+    atribuido: 44,
+    categoria: 3,
+  };
+  const validContext = {
+    requesterResolution: "one",
+    requesterUserId: "user-requester",
+    assigneeResolution: "one",
+    assigneeUserId: "user-assignee",
+    categoryResolution: "one",
+  };
+  const invalidCases = [
+    ["titulo", undefined, "RH_REQUEST_TITLE_REQUIRED"],
+    ["titulo", "   ", "RH_REQUEST_TITLE_REQUIRED"],
+    ["titulo", 123, "RH_REQUEST_TITLE_REQUIRED"],
+    ["descricao", undefined, "RH_REQUEST_DESCRIPTION_REQUIRED"],
+    ["descricao", "\t", "RH_REQUEST_DESCRIPTION_REQUIRED"],
+    ["descricao", 123, "RH_REQUEST_DESCRIPTION_REQUIRED"],
+  ];
+
+  for (const [field, value, reasonCode] of invalidCases) {
+    const [emission] = mappingRule.emitRows({ ...validRow, [field]: value }, validContext);
+    assert.equal(emission.status, "quarantine", `${field}:${String(value)}`);
+    assert.equal(emission.field, field);
+    assert.equal(emission.reasonCode, reasonCode);
   }
+  assert.equal(mappingRule.emitRows(validRow, validContext)[0].status, "prepared");
+  assert.equal("description" in destination.defaults, false);
 });
 
 test("IDs de operador RH legados resolvem o User pelo vínculo de colaborador", () => {
@@ -249,6 +351,116 @@ test("score_avaliacoes usa user_id como avaliador e avaliador como código de pa
         sourceColumn === "tipo" && destinationColumn === "evaluator_role",
     ),
     false,
+  );
+});
+
+test("score_nitro executa a fórmula legada nos limiares e em linhas reais do dump", async () => {
+  const { SCORE_NITRO_TRANSFORMATIONS } = await import("../rules/rh-pessoal.mjs");
+  const mappingRule = rule("tb_rh.score_nitro");
+  const destination = step(mappingRule, "rh-score-nitro-insert");
+
+  function transformRow(row) {
+    const transformed = {};
+    for (const column of destination.columns) {
+      if (
+        ![
+          "hours_score",
+          "projects_score",
+          "errors_score",
+          "folders_score",
+          "total_hours",
+          "total_errors",
+        ].includes(column.destinationColumn)
+      ) {
+        continue;
+      }
+      const transform = SCORE_NITRO_TRANSFORMATIONS?.[column.transformation];
+      assert.equal(typeof transform, "function", column.transformation);
+      transformed[column.destinationColumn] = transform(row);
+    }
+    return transformed;
+  }
+
+  assert.deepEqual(transformRow({ avaliacoes: 7.999, ch: 9, projetos: 0, erros: 0, pastas: 0 }), {
+    hours_score: 0,
+    total_hours: 9,
+    projects_score: 0,
+    errors_score: 0,
+    total_errors: 0,
+    folders_score: 0,
+  });
+  assert.deepEqual(transformRow({ avaliacoes: 8, ch: 10, projetos: 2, erros: -3, pastas: -4 }), {
+    hours_score: 1.5,
+    total_hours: 10,
+    projects_score: 2,
+    errors_score: 3,
+    total_errors: 3,
+    folders_score: -0.5,
+  });
+
+  const dumpRows = [];
+  for await (const row of iterateSqlRows(path.join(LEGACY_DUMP_ROOT, "tb_rh.score_nitro.sql"))) {
+    dumpRows.push(row);
+  }
+  assert.equal(dumpRows.length, 48);
+  for (const row of dumpRows) {
+    const transformed = transformRow(row);
+    const legacyContribution =
+      (Number(row.avaliacoes) >= 8 ? 0.5 : 0) +
+      (Number(row.ch) >= 10 ? 1 : 0) +
+      Number(row.projetos) +
+      Number(row.erros) +
+      (Number(row.pastas) > 0 ? 0.5 : Number(row.pastas) < 0 ? -0.5 : 0);
+    const currentContribution =
+      transformed.projects_score +
+      transformed.hours_score -
+      transformed.errors_score +
+      transformed.folders_score;
+    assert.equal(currentContribution, legacyContribution, `score_nitro id=${row.id}`);
+  }
+  const realRows = new Map(dumpRows.map((row) => [Number(row.id), row]));
+  const row19 = transformRow(realRows.get(19));
+  assert.deepEqual(row19, {
+    hours_score: 1.5,
+    total_hours: 14,
+    projects_score: 0,
+    errors_score: 0,
+    total_errors: 0,
+    folders_score: 0,
+  });
+  assert.deepEqual(transformRow(realRows.get(7)), {
+    hours_score: 0,
+    total_hours: 0,
+    projects_score: 1,
+    errors_score: 1,
+    total_errors: 1,
+    folders_score: 0,
+  });
+  const row49 = transformRow(realRows.get(49));
+  assert.deepEqual(row49, {
+    hours_score: 0,
+    total_hours: 0,
+    projects_score: 1,
+    errors_score: 0,
+    total_errors: 0,
+    folders_score: 0.5,
+  });
+
+  const currentContribution = transformRow(realRows.get(7));
+  assert.equal(
+    currentContribution.projects_score +
+      currentContribution.hours_score -
+      currentContribution.errors_score +
+      currentContribution.folders_score,
+    0,
+  );
+  assert.equal(
+    row19.projects_score + row19.hours_score - row19.errors_score + row19.folders_score,
+    1.5,
+  );
+  assert.equal(
+    row49.projects_score + row49.hours_score - row49.errors_score + row49.folders_score,
+    1.5,
   );
 });
 
