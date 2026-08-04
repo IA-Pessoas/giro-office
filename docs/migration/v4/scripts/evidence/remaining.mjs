@@ -54,14 +54,6 @@ const CONFIRMED = new Map(
       ],
     ],
     [
-      "tb_cbs.ramais",
-      ["infra/prisma/schema.prisma:1908", "services/src/src/services/ti/TiAccessService.ts:117"],
-      "O ramal por usuário possui contrato atual equivalente em tecnologia.extensions.",
-      [
-        "usuario_id referencia tb_admin.usuarios.id e número é único por organização no contrato atual.",
-      ],
-    ],
-    [
       "tb_mkt.redes_sociais",
       [
         "infra/prisma/schema.prisma:536",
@@ -130,6 +122,36 @@ const CONFIRMED = new Map(
     { current, reason, relationships },
   ]),
 );
+
+const PENDING_OVERRIDES = new Map([
+  [
+    "tb_cbc.orcamentos",
+    {
+      current: ["infra/prisma/schema.prisma:1078", "services/src/src/services/BudgetService.ts:45"],
+      reasonCode: "PARTIAL_CURRENT_CONTRACT_UNRESOLVED_ADAPTATION",
+      reason:
+        "O contrato atual parcial Budget preserva departamento, título, status e items em JSON, mas o legado registra cada item como uma linha com categoria, fornecedor e pagamento sem uma identidade explícita do orçamento-pai. Falta comprovar como agrupar as 510 linhas, derivar title/status do Budget e adaptar tb_cbc.orcamentos_categorias sem fabricar cardinalidade.",
+      relationships: [
+        "categoria referencia tb_cbc.orcamentos_categorias.id; o destino parcial agrupa itens em Budget.items JSON, mas o legado não contém uma chave estável do agrupamento-pai.",
+      ],
+    },
+  ],
+  [
+    "tb_cbs.ramais",
+    {
+      current: [
+        "infra/prisma/schema.prisma:1908",
+        "services/src/src/services/ti/TiAccessService.ts:117",
+      ],
+      reasonCode: "FUNCTIONAL_FIELD_NO_CURRENT_DESTINATION",
+      reason:
+        "O destino tecnologia.extensions preserva usuário e número, porém não possui coluna fiel para o tipo funcional do ramal; o backup contém 14 Móvel, 90 Fixo e 90 Computador. Sem autorização explícita de descarte, nenhuma das 194 linhas pode ser emitida parcialmente.",
+      relationships: [
+        "usuario_id referencia tb_admin.usuarios.id; numero é único por organização no destino, enquanto tipo diferencia Móvel, Fixo e Computador no legado.",
+      ],
+    },
+  ],
+]);
 
 const LEGACY_USAGE = [
   [
@@ -609,6 +631,22 @@ DECLARED_COLUMNS["tb_historico.integracao_exclusoes"] = [
 
 export const REMAINING_EVIDENCE = Object.freeze(
   LEGACY_USAGE.map(([sourceTable, reference, operations]) => {
+    const pendingOverride = PENDING_OVERRIDES.get(sourceTable);
+    if (pendingOverride !== undefined) {
+      return decision({
+        sourceTable,
+        legacyModule: moduleFromSource(sourceTable),
+        legacyReferences: Array.isArray(reference) ? reference : [reference],
+        operations,
+        legacyRelationships: pendingOverride.relationships,
+        currentContractEvidence: pendingOverride.current,
+        finalStatus: "pending",
+        reasonCode: pendingOverride.reasonCode,
+        reason: pendingOverride.reason,
+        confidence: "high",
+        ruleId: null,
+      });
+    }
     const confirmed = CONFIRMED.get(sourceTable);
     if (confirmed !== undefined) {
       return decision({

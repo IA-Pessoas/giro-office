@@ -12,6 +12,7 @@ import {
 } from "../evidence/index.mjs";
 import { createPendingMapping } from "../lib/mapping-contract.mjs";
 import { validateEvidenceCoverage } from "../lib/semantic-evidence.mjs";
+import { iterateSqlRows } from "../lib/sql-dump-parser.mjs";
 
 const LEGACY_ROOT = "/home/bruno/Documents/workspace2";
 const DUMP_ROOT = "/home/bruno/Documents/03.08.2026";
@@ -33,6 +34,14 @@ async function declaredColumns(sourceTable) {
   const dump = await readFile(path.join(DUMP_ROOT, `${sourceTable}.sql`), "utf8");
   const body = dump.match(/CREATE TABLE[\s\S]*?\(([\s\S]*?)\) ENGINE=/)?.[1] ?? "";
   return [...body.matchAll(/^\s*`([^`]+)`/gm)].map((match) => match[1]);
+}
+
+async function loadRows(sourceTable) {
+  const rows = [];
+  for await (const row of iterateSqlRows(path.join(DUMP_ROOT, `${sourceTable}.sql`))) {
+    rows.push(row);
+  }
+  return rows;
 }
 
 test("a união final cobre exatamente as 312 origens do inventário sem colisões", async () => {
@@ -136,9 +145,9 @@ test("toda decisão restante possui referência auditável e pending preserva co
   const pending = REMAINING_EVIDENCE.filter(({ finalStatus }) => finalStatus === "pending");
   assert.equal(
     REMAINING_EVIDENCE.filter(({ finalStatus }) => finalStatus === "confirmed").length,
-    15,
+    14,
   );
-  assert.equal(pending.length, 72);
+  assert.equal(pending.length, 73);
   assert.deepEqual(
     Object.keys(REMAINING_PENDING_COLUMN_DECISIONS).sort(),
     pending.map(({ sourceTable }) => sourceTable),
@@ -216,4 +225,32 @@ test("operações complementares preservam referências específicas de delete e
   const messages = bySource.get("tb_workspace.solicitacoes_mensagens");
   assert.ok(messages?.operations.includes("select"));
   assert.ok(messages?.legacyReferences.includes("classes/Solicitacao.php:569"));
+});
+
+test("ramais sem tipo fiel ficam pending e orçamento documenta o contrato parcial real", async () => {
+  const bySource = new Map(REMAINING_EVIDENCE.map((decision) => [decision.sourceTable, decision]));
+  const extensions = bySource.get("tb_cbs.ramais");
+  assert.equal(extensions?.finalStatus, "pending");
+  assert.equal(extensions?.reasonCode, "FUNCTIONAL_FIELD_NO_CURRENT_DESTINATION");
+  assert.match(extensions?.reason ?? "", /tipo.*Móvel.*Fixo.*Computador/i);
+  const extensionRows = await loadRows("tb_cbs.ramais");
+  assert.equal(extensionRows.length, 194);
+  assert.deepEqual(
+    Object.fromEntries(
+      [...Map.groupBy(extensionRows, ({ tipo }) => tipo)].map(([type, rows]) => [
+        type,
+        rows.length,
+      ]),
+    ),
+    { Móvel: 14, Fixo: 90, Computador: 90 },
+  );
+
+  const budgets = bySource.get("tb_cbc.orcamentos");
+  assert.equal(budgets?.finalStatus, "pending");
+  assert.ok(budgets.currentContractEvidence.includes("infra/prisma/schema.prisma:1078"));
+  assert.ok(
+    budgets.currentContractEvidence.includes("services/src/src/services/BudgetService.ts:45"),
+  );
+  assert.match(budgets.reason, /parcial.*Budget.*items.*JSON.*categoria/i);
+  assert.equal((await loadRows("tb_cbc.orcamentos")).length, 510);
 });

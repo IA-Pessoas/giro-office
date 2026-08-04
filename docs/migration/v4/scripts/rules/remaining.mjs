@@ -6,25 +6,83 @@ import {
   isAuthenticLegacyReferenceResolution,
   isAuthoritativeV2ClientIdentityResolution,
 } from "./admin-business.mjs";
+import { V2_RULES } from "./v2.mjs";
 
 const ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const EVIDENCE_BY_SOURCE = new Map(
   REMAINING_EVIDENCE.map((decision) => [decision.sourceTable, decision]),
 );
-const ISSUED_CONTEXTS = new WeakSet();
-const EXTENSION_SLOT_ISSUANCE = new WeakSet();
-const CANONICAL_CLIENT_COLUMNS = new Map([
-  ["tb_mkt.redes_sociais", "cliente_id"],
-  ["tb_pec.notas", "cliente_id"],
-  ["tb_triagem.campos", "cliente_id"],
-]);
-const TRIAGE_AUDITED_CORPUS = Object.freeze({
-  rowCount: 553,
-  digest: "4e6754d092be5d594a5c90a7d53fe3c507a951354a5eedf0ec306e47675f23ca",
-});
-const EXTENSION_AUDITED_CORPUS = Object.freeze({
-  rowCount: 194,
-  digest: "e32a90da960776e2a6d0f619c1ae54dd3cd7b0642e231ac25949c9df55b395c0",
+const CONTEXT_ISSUANCE = new WeakMap();
+const RESOLUTION_ISSUANCE = new WeakMap();
+const REMAINING_AUDITED_CORPORA = Object.freeze({
+  "tb_admin.departamentos": Object.freeze({
+    rowCount: 48,
+    digest: "077a330c4884224db1450214ea344a70524023160106f5b5017794c59994048c",
+  }),
+  "tb_admin.usuarios": Object.freeze({
+    rowCount: 306,
+    digest: "3700feded01eed70e321c015d262222f0f5a37eb12b1c98065a7340918895582",
+  }),
+  "tb_cbs.estoque": Object.freeze({
+    rowCount: 433,
+    digest: "c4da376a54ad6c5bcb55b1b534eccc0eeb4c3349ab8d83cf42ecd1f321fe847b",
+  }),
+  "tb_cbs.estoque_categorias": Object.freeze({
+    rowCount: 65,
+    digest: "e48f5dccdc728fe964b2e4263d6d81d89cbab5c6a078e534d66668c0c51d85e4",
+  }),
+  "tb_cbs.estoque_categorias_itens": Object.freeze({
+    rowCount: 234,
+    digest: "80de431a3799afcfd2234250c3ff0949facd55543fe868037ff7b14f82134cc3",
+  }),
+  "tb_cbs.estoque_entradas": Object.freeze({
+    rowCount: 2215,
+    digest: "51035d4d0fad577bfe625214540d4427e5f15931eb818ce546fc5b15fd1fdd7b",
+  }),
+  "tb_cbs.estoque_itens": Object.freeze({
+    rowCount: 451,
+    digest: "68260b165404fb3d142acc9c772c74dc9f94376ff68c08994ea932a9bb7c0b5f",
+  }),
+  "tb_cbs.estoque_localizacoes": Object.freeze({
+    rowCount: 27,
+    digest: "63df748197ae94b08719c4cb735d1824cbb9b46ac13734cc46716d8ee0a01e55",
+  }),
+  "tb_cbs.estoque_andares": Object.freeze({
+    rowCount: 14,
+    digest: "f303bdef46e5237fa8b1e82b0bc970071a8255cd509dcaab9638c2f08c5de15b",
+  }),
+  "tb_cbs.estoque_saidas": Object.freeze({
+    rowCount: 3000,
+    digest: "372bb5d1565a96b939d455e0ea99eca283c0c7ce29268d8fa777236ab895a21f",
+  }),
+  "tb_mkt.redes_sociais": Object.freeze({
+    rowCount: 205,
+    digest: "20dda56fe29ce7137ea01bb361e6b25aa2380a6633dfd57f22ff7177bf9ea5b6",
+  }),
+  "tb_mkt.senhas": Object.freeze({
+    rowCount: 54,
+    digest: "30fad1aa531ac3412a5994812c18c3e47224885911720926747d1e1936c052db",
+  }),
+  "tb_pec.notas": Object.freeze({
+    rowCount: 41628,
+    digest: "170963e85faaa2898089244d13e61e0daac51e44c386ea1f8df21dac345e171b",
+  }),
+  "tb_triagem.campos": Object.freeze({
+    rowCount: 553,
+    digest: "4e6754d092be5d594a5c90a7d53fe3c507a951354a5eedf0ec306e47675f23ca",
+  }),
+  "tb_workspace.solicitacoes": Object.freeze({
+    rowCount: 5,
+    digest: "6ca12c4225dbc9c4ed8a2b4cde671c5663f601bebd430d96cd1c68243af2244a",
+  }),
+  "tb_workspace.solicitacoes_categorias": Object.freeze({
+    rowCount: 1,
+    digest: "dbe1db3435c627bd35b8bedbc4b41fbaf9a602e9d49f356d65cef0843425af69",
+  }),
+  "tb_workspace.solicitacoes_mensagens": Object.freeze({
+    rowCount: 2,
+    digest: "03713d3f76c79f60d4ce03bbee6d41a82484a86d56a3c525a629bbfadd337d82",
+  }),
 });
 const TRIAGE_ACTIVE_COLUMNS = Object.freeze([
   "nfce",
@@ -48,136 +106,246 @@ export function buildRemainingReferenceContext({
   if (!isObject(row) || !isObject(resolutions) || !isObject(capabilities)) {
     throw new TypeError("row, resolutions e capabilities devem ser objetos");
   }
-  const canonicalClientColumn = CANONICAL_CLIENT_COLUMNS.get(sourceTable);
-  const canonicalClientKey =
-    canonicalClientColumn === undefined ? null : row[canonicalClientColumn];
-  if (
-    canonicalClientColumn !== undefined &&
-    validLegacyId(canonicalClientKey) &&
-    !isAuthoritativeV2ClientIdentityResolution(resolutions.client, canonicalClientKey)
-  ) {
-    throw new TypeError("client deve possuir proveniência autoritativa do corpus V2 auditado");
-  }
-  if (
-    sourceTable === "tb_cbs.ramais" &&
-    validLegacyId(row?.id) &&
-    typeof row?.numero === "string" &&
-    row.numero.trim().length > 0 &&
-    !EXTENSION_SLOT_ISSUANCE.has(resolutions.numberSlot)
-  ) {
-    throw new TypeError("numberSlot deve ser emitido pelo preflight autoritativo de ramal");
-  }
-  const context = Object.freeze({
+  return Object.freeze({
     sourceTable,
     rowFingerprint: fingerprint(row),
-    resolutions: Object.freeze(
-      Object.fromEntries(
-        Object.entries(resolutions).map(([name, resolution]) => [
-          name,
-          Object.freeze(normalizeResolution(resolution)),
-        ]),
-      ),
-    ),
+    resolutions: Object.freeze({ ...resolutions }),
     capabilities: Object.freeze(
       Object.fromEntries(
         Object.entries(capabilities).map(([name, value]) => [name, value === true]),
       ),
     ),
   });
-  ISSUED_CONTEXTS.add(context);
-  return context;
 }
 
-export function buildExtensionNumberSlotContexts({ rows, userResolver }) {
-  if (!Array.isArray(rows) || typeof userResolver?.resolve !== "function") {
-    throw new TypeError("rows e userResolver são obrigatórios para o preflight de ramais");
-  }
-  if (
-    rows.length !== EXTENSION_AUDITED_CORPUS.rowCount ||
-    corpusFingerprint(rows) !== EXTENSION_AUDITED_CORPUS.digest
-  ) {
-    throw new TypeError("O preflight exige o corpus completo auditado de tb_cbs.ramais");
-  }
+export function buildCbsStockContexts({
+  rows,
+  departmentRows,
+  itemRows,
+  categoryRows,
+  categoryItemRows,
+  locationRows,
+  floorRows,
+}) {
+  assertAuditedCorpus("tb_cbs.estoque", rows);
+  const departments = auditedLookup("tb_admin.departamentos", departmentRows, (row) => ({
+    scope: departmentScope(row),
+  }));
+  const items = auditedLookup("tb_cbs.estoque_itens", itemRows, (row) => ({
+    itemName: normalizeText(row?.nome),
+    itemDescription: normalizeNullableText(row?.descricao),
+    itemActive: normalizeLegacyStockItemActive(row?.status),
+    departmentSourceKey: normalizeKey(row?.departamento_id),
+  }));
+  const categories = auditedLookup("tb_cbs.estoque_categorias", categoryRows, (row) => ({
+    departmentSourceKey: normalizeKey(row?.departamento_id),
+  }));
+  assertAuditedCorpus("tb_cbs.estoque_categorias_itens", categoryItemRows);
+  const categoryLinks = Map.groupBy(categoryItemRows, ({ item }) => normalizeKey(item));
+  const locations = auditedLookup("tb_cbs.estoque_localizacoes", locationRows, (row) => ({
+    departmentSourceKey: normalizeKey(row?.departamento_id),
+    floorSourceKey: normalizeKey(row?.andar),
+  }));
+  const floors = auditedLookup("tb_cbs.estoque_andares", floorRows, (row) => ({
+    departmentSourceKey: normalizeKey(row?.departamento_id),
+    floor: normalizeLegacyFloor(row?.nome),
+    floorLabel: normalizeText(row?.nome),
+  }));
 
-  const groups = Map.groupBy(rows, ({ numero }) => String(numero ?? "").trim());
   return Object.freeze(
     rows.map((row) => {
-      const number = String(row?.numero ?? "").trim();
-      const group = groups.get(number) ?? [];
-      const numberSlot = extensionSlot(
-        group.length === 1 ? "one" : "many",
-        number,
-        group.length === 1 ? row?.id : null,
-      );
-      const user = userResolver.resolve(row?.usuario_id);
-      if (!isAuthenticLegacyReferenceResolution(user, "tb_admin.usuarios", row?.usuario_id)) {
-        throw new TypeError("userResolver não produziu resolução autêntica para o ramal");
-      }
-      return buildRemainingReferenceContext({
-        sourceTable: "tb_cbs.ramais",
-        row,
-        resolutions: { numberSlot, user },
+      const item = items.resolve(row?.produto_id);
+      const location = locations.resolve(row?.localizacao);
+      const links = categoryLinks.get(normalizeKey(row?.produto_id)) ?? [];
+      const categoryCandidates = links
+        .map(({ categoria }) => categories.resolve(categoria))
+        .filter(({ state }) => state === "one");
+      const category = issueResolution({
+        state:
+          categoryCandidates.length === 0
+            ? "zero"
+            : categoryCandidates.length === 1
+              ? "one"
+              : "many",
+        sourceTable: "tb_cbs.estoque_categorias",
+        sourceKey: categoryCandidates.length === 1 ? categoryCandidates[0].sourceKey : null,
+        identityRef: categoryCandidates.length === 1 ? categoryCandidates[0].identityRef : null,
+        joinSourceTable: "tb_cbs.estoque_categorias_itens",
+        itemSourceKey: normalizeKey(row?.produto_id),
+        departmentSourceKey:
+          categoryCandidates.length === 1
+            ? categoryCandidates[0].departmentSourceKey
+            : normalizeKey(row?.departamento_id),
+      });
+      return issueContext("cbs-stock", "tb_cbs.estoque", row, {
+        department: departments.resolve(row?.departamento_id),
+        item,
+        category,
+        location,
+        floor: floors.resolve(row?.andar),
+        locationFloor: floors.resolve(location.floorSourceKey),
       });
     }),
   );
 }
 
-export function buildTriageClientSlotContexts({ rows, clientResolver }) {
-  if (!Array.isArray(rows) || typeof clientResolver?.resolve !== "function") {
-    throw new TypeError("rows e clientResolver são obrigatórios para o preflight de Triagem");
-  }
-  if (
-    rows.length !== TRIAGE_AUDITED_CORPUS.rowCount ||
-    corpusFingerprint(rows) !== TRIAGE_AUDITED_CORPUS.digest
-  ) {
-    throw new TypeError("O preflight exige o corpus completo auditado de tb_triagem.campos");
-  }
+export function buildCbsStockCategoryContexts({ rows, departmentRows }) {
+  assertAuditedCorpus("tb_cbs.estoque_categorias", rows);
+  const departments = auditedLookup("tb_admin.departamentos", departmentRows, (row) => ({
+    scope: departmentScope(row),
+  }));
+  return issueContexts("cbs-stock-category", "tb_cbs.estoque_categorias", rows, (row) => ({
+    department: departments.resolve(row?.departamento_id),
+  }));
+}
 
-  const entries = rows.map((row, index) => {
-    const client = clientResolver.resolve(row?.cliente_id);
-    if (!isAuthoritativeV2ClientIdentityResolution(client, row?.cliente_id)) {
-      throw new TypeError("clientResolver não produziu resolução V2 autoritativa");
-    }
-    return { row, index, client };
+export function buildCbsStockEntryContexts({ rows, stockRows, stockContexts, userRows }) {
+  assertAuditedCorpus("tb_cbs.estoque_entradas", rows);
+  const stockMigrationStates = auditedParentMigrationStates({
+    kind: "cbs-stock",
+    sourceTable: "tb_cbs.estoque",
+    rows: stockRows,
+    contexts: stockContexts,
   });
-  const groups = Map.groupBy(
-    entries.filter(({ client }) => client.state === "one"),
-    ({ client }) => client.identityRef,
-  );
-  const slots = new Array(rows.length);
+  const stocks = auditedLookup("tb_cbs.estoque", stockRows, (row) => ({
+    departmentSourceKey: normalizeKey(row?.departamento_id),
+    migrationState: stockMigrationStates.get(normalizeKey(row?.id)),
+  }));
+  const users = auditedUserLookup(userRows);
+  return issueContexts("cbs-stock-entry", "tb_cbs.estoque_entradas", rows, (row) => ({
+    stock: stocks.resolve(row?.produto_id),
+    user: users.resolve(row?.repositor),
+  }));
+}
 
-  for (const [identityRef, group] of groups) {
-    if (group.length === 1) {
-      const [owner] = group;
-      slots[owner.index] = triageSlot("owner", identityRef, owner.row?.id);
-      continue;
-    }
-    const payloads = new Set(group.map(({ row }) => triagePayloadFingerprint(row)));
-    if (payloads.size > 1) {
-      for (const entry of group) {
-        slots[entry.index] = triageSlot("conflict", identityRef, null);
-      }
-      continue;
-    }
-    const [owner, ...duplicates] = [...group].sort(compareEntriesByLegacyId);
-    slots[owner.index] = triageSlot("owner", identityRef, owner.row?.id);
-    for (const duplicate of duplicates) {
-      slots[duplicate.index] = triageSlot("duplicate", identityRef, owner.row?.id);
-    }
-  }
+export function buildCbsStockLocationContexts({ rows, floorRows, departmentRows }) {
+  assertAuditedCorpus("tb_cbs.estoque_localizacoes", rows);
+  const floors = auditedLookup("tb_cbs.estoque_andares", floorRows, (row) => ({
+    departmentSourceKey: normalizeKey(row?.departamento_id),
+    floor: normalizeLegacyFloor(row?.nome),
+    floorLabel: normalizeText(row?.nome),
+  }));
+  const departments = auditedLookup("tb_admin.departamentos", departmentRows, (row) => ({
+    scope: departmentScope(row),
+  }));
+  return issueContexts("cbs-stock-location", "tb_cbs.estoque_localizacoes", rows, (row) => ({
+    floor: floors.resolve(row?.andar),
+    department: departments.resolve(row?.departamento_id),
+  }));
+}
 
+export function buildCbsStockExitContexts({ rows, stockRows, stockContexts, userRows }) {
+  assertAuditedCorpus("tb_cbs.estoque_saidas", rows);
+  const stockMigrationStates = auditedParentMigrationStates({
+    kind: "cbs-stock",
+    sourceTable: "tb_cbs.estoque",
+    rows: stockRows,
+    contexts: stockContexts,
+  });
+  const stocks = auditedLookup("tb_cbs.estoque", stockRows, (row) => ({
+    departmentSourceKey: normalizeKey(row?.departamento_id),
+    migrationState: stockMigrationStates.get(normalizeKey(row?.id)),
+  }));
+  const users = auditedUserLookup(userRows);
+  return issueContexts("cbs-stock-exit", "tb_cbs.estoque_saidas", rows, (row) => ({
+    stock: stocks.resolve(row?.produto_id),
+    requester: users.resolve(row?.solicitante),
+    approver: emptyReference(row?.autorizador) ? null : users.resolve(row?.autorizador),
+    operator: emptyReference(row?.operador) ? null : users.resolve(row?.operador),
+  }));
+}
+
+export function buildMarketingPasswordContexts({ rows, encryptionConfigured }) {
+  assertAuditedCorpus("tb_mkt.senhas", rows);
+  return issueContexts("mkt-password", "tb_mkt.senhas", rows, () => ({}), {
+    encryption: encryptionConfigured === true,
+  });
+}
+
+export function buildMarketingSocialContexts({ rows, clientResolver }) {
+  assertAuditedCorpus("tb_mkt.redes_sociais", rows);
+  const entries = authoritativeClientEntries(rows, clientResolver);
+  const slots = canonicalClientSlots(entries, socialPayloadFingerprint, "tb_mkt.redes_sociais");
   return Object.freeze(
     entries.map(({ row, index, client }) =>
-      buildRemainingReferenceContext({
-        sourceTable: "tb_triagem.campos",
-        row,
-        resolutions: {
-          client,
-          clientSlot: slots[index] ?? triageSlot("unresolved", null, null),
-        },
+      issueContext("mkt-social", "tb_mkt.redes_sociais", row, {
+        client,
+        clientSlot: slots[index] ?? canonicalSlot("unresolved", "tb_mkt.redes_sociais"),
       }),
     ),
   );
+}
+
+export function buildPecNoteContexts({ rows, userRows, clientResolver }) {
+  assertAuditedCorpus("tb_pec.notas", rows);
+  const users = auditedUserLookup(userRows);
+  return issueContexts("pec-note", "tb_pec.notas", rows, (row) => {
+    const client = emptyReference(row?.cliente_id)
+      ? null
+      : clientResolver?.resolve(row?.cliente_id);
+    if (client !== null && !isAuthoritativeV2ClientIdentityResolution(client, row?.cliente_id)) {
+      throw new TypeError("clientResolver não produziu resolução V2 autoritativa para PEC");
+    }
+    return { user: users.resolve(row?.usuario_id), client };
+  });
+}
+
+export function buildTriageClientSlotContexts({ rows, clientResolver }) {
+  assertAuditedCorpus("tb_triagem.campos", rows);
+
+  const entries = authoritativeClientEntries(rows, clientResolver);
+  const slots = canonicalClientSlots(entries, triagePayloadFingerprint, "tb_triagem.campos");
+
+  return Object.freeze(
+    entries.map(({ row, index, client }) =>
+      issueContext("triage", "tb_triagem.campos", row, {
+        client,
+        clientSlot: slots[index] ?? canonicalSlot("unresolved", "tb_triagem.campos"),
+      }),
+    ),
+  );
+}
+
+export function buildWorkspaceCategoryContexts({ rows, departmentRows }) {
+  assertAuditedCorpus("tb_workspace.solicitacoes_categorias", rows);
+  const departments = auditedLookup("tb_admin.departamentos", departmentRows, (row) => ({
+    scope: departmentScope(row),
+  }));
+  return issueContexts(
+    "workspace-category",
+    "tb_workspace.solicitacoes_categorias",
+    rows,
+    (row) => ({ department: departments.resolve(row?.departamento_id) }),
+  );
+}
+
+export function buildWorkspaceRequestContexts({ rows, userRows, departmentRows, categoryRows }) {
+  assertAuditedCorpus("tb_workspace.solicitacoes", rows);
+  const users = auditedUserLookup(userRows);
+  const departments = auditedLookup("tb_admin.departamentos", departmentRows, (row) => ({
+    scope: departmentScope(row),
+  }));
+  const categories = auditedLookup("tb_workspace.solicitacoes_categorias", categoryRows, (row) => ({
+    departmentSourceKey: normalizeKey(row?.departamento_id),
+  }));
+  return issueContexts("workspace-request", "tb_workspace.solicitacoes", rows, (row) => ({
+    requester: users.resolve(row?.requerente),
+    assignee: emptyReference(row?.atribuido) ? null : users.resolve(row?.atribuido),
+    category: categories.resolve(row?.categoria),
+    department: departments.resolve(row?.departamento),
+  }));
+}
+
+export function buildWorkspaceMessageContexts({ rows, requestRows, userRows }) {
+  assertAuditedCorpus("tb_workspace.solicitacoes_mensagens", rows);
+  const requests = auditedLookup("tb_workspace.solicitacoes", requestRows, (row) => ({
+    departmentSourceKey: normalizeKey(row?.departamento),
+  }));
+  const users = auditedUserLookup(userRows);
+  return issueContexts("workspace-message", "tb_workspace.solicitacoes_mensagens", rows, (row) => ({
+    request: requests.resolve(row?.solicitacao),
+    sender: users.resolve(row?.remetente),
+  }));
 }
 
 export const REMAINING_RULES = Object.freeze(
@@ -223,6 +391,8 @@ export const REMAINING_RULES = Object.freeze(
           reference(),
         ),
         mapped("produto_id", "name", "resolve_stock_item_name", reference()),
+        mapped("produto_id", "description", "resolve_stock_item_description", reference()),
+        mapped("produto_id", "status", "map_legacy_stock_item_zero_active_status", reference()),
         mapped("produto_id", "category_id", "resolve_item_category_join", reference()),
         mapped("quantidade", "quantity", "normalize_non_negative_integer"),
         notPreserved(
@@ -236,7 +406,6 @@ export const REMAINING_RULES = Object.freeze(
           reference(),
         ),
       ],
-      defaults: { description: null, status: true },
       classify(row, context) {
         const bound = authenticContext("tb_cbs.estoque", row, context);
         if (bound.status !== "prepared") return bound;
@@ -251,6 +420,12 @@ export const REMAINING_RULES = Object.freeze(
             "departamento_id",
             "CBS_STOCK_DEPARTMENT",
           ),
+          technologyResolution(
+            context,
+            "department",
+            "departamento_id",
+            "CBS_STOCK_NOT_TECHNOLOGY",
+          ),
           requiredResolution(
             context,
             "item",
@@ -258,6 +433,13 @@ export const REMAINING_RULES = Object.freeze(
             ["tb_cbs.estoque_itens"],
             "produto_id",
             "CBS_STOCK_ITEM",
+          ),
+          resolutionDepartmentMatch(
+            context,
+            "item",
+            row?.departamento_id,
+            "produto_id",
+            "CBS_STOCK_ITEM_DEPARTMENT_MISMATCH",
           ),
           categoryResolution(context, row),
           stockLocationResolution(context, row),
@@ -294,6 +476,12 @@ export const REMAINING_RULES = Object.freeze(
             ["tb_admin.departamentos"],
             "departamento_id",
             "CBS_STOCK_CATEGORY_DEPARTMENT",
+          ),
+          technologyResolution(
+            context,
+            "department",
+            "departamento_id",
+            "CBS_STOCK_CATEGORY_NOT_TECHNOLOGY",
           ),
         ]);
       },
@@ -383,39 +571,6 @@ export const REMAINING_RULES = Object.freeze(
       classify: classifyStockExit,
     }),
     createRule({
-      sourceTable: "tb_cbs.ramais",
-      domain: "technology-access",
-      stepId: "cbs-extension-insert",
-      destinationTable: "tecnologia.extensions",
-      dependencies: ["tb_admin.usuarios"],
-      columns: [
-        mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
-        notPreserved(
-          "tipo",
-          "O contrato atual de ramal não possui tipo e não há transformação equivalente comprovada.",
-        ),
-        mapped("numero", "number", "normalize_required_extension"),
-        mapped("usuario_id", "user_id", "resolve_explicit_user_reference", reference()),
-      ],
-      classify(row, context) {
-        const bound = authenticContext("tb_cbs.ramais", row, context);
-        if (bound.status !== "prepared") return bound;
-        return firstFailure([
-          validId(row?.id, "id", "EXTENSION_ID_INVALID"),
-          requiredText(row?.numero, "numero", "EXTENSION_NUMBER_EMPTY"),
-          extensionNumberSlot(context, row),
-          requiredResolution(
-            context,
-            "user",
-            row?.usuario_id,
-            ["tb_admin.usuarios"],
-            "usuario_id",
-            "EXTENSION_USER",
-          ),
-        ]);
-      },
-    }),
-    createRule({
       sourceTable: "tb_mkt.redes_sociais",
       domain: "marketing",
       stepId: "mkt-client-social-merge",
@@ -424,6 +579,9 @@ export const REMAINING_RULES = Object.freeze(
       identity: resolveIdentity("tb_regularize.clientes", "cliente_id", "codigo"),
       dependencies: ["tb_regularize.clientes"],
       precedence: ["explicit_legacy_link", "source_row"],
+      cardinality: "N:1",
+      emissionIdentity: (_row, context) =>
+        context?.resolutions?.client?.identityRef ?? "tb_mkt.redes_sociais:unresolved",
       columns: [
         notPreserved(
           "id",
@@ -451,6 +609,7 @@ export const REMAINING_RULES = Object.freeze(
             "cliente_id",
             "MKT_SOCIAL_CLIENT",
           ),
+          canonicalClientSlot(context, row, "tb_mkt.redes_sociais", "MKT_SOCIAL_CANONICAL_CLIENT"),
         ]);
       },
     }),
@@ -531,7 +690,7 @@ export const REMAINING_RULES = Object.freeze(
           "active_items",
           "aggregate_enabled_fiscal_field_sped_contributions",
         ),
-        mapped("nfce_tomados", "active_items", "aggregate_enabled_fiscal_field_nfce_received"),
+        mapped("nfce_tomados", "active_items", "aggregate_enabled_fiscal_field_nfse_received"),
         mapped("modelo_21", "active_items", "aggregate_enabled_fiscal_field_model_21_invoice"),
         mapped("cte_emitente", "active_items", "aggregate_enabled_fiscal_field_cte_as_issuer"),
         mapped(
@@ -541,14 +700,17 @@ export const REMAINING_RULES = Object.freeze(
         ),
         notPreserved(
           "faturamento",
-          "FISCAL_FIELDS não possui token para faturamento; o valor não é emitido como item inválido.",
+          "FISCAL_FIELDS não possui token para faturamento; somente linhas com zero podem prosseguir e qualquer valor funcional coloca a linha integral em quarentena.",
         ),
         notPreserved(
           "envio",
-          "A preferência legada de envio não integra o checklist fiscal atual.",
+          "A preferência legada de envio não integra o checklist fiscal atual; somente valor vazio pode prosseguir e qualquer preferência funcional coloca a linha integral em quarentena.",
         ),
       ],
       constants: { organization_id: ORGANIZATION_ID, type: "FISCAL" },
+      cardinality: "N:1",
+      emissionIdentity: (_row, context) =>
+        context?.resolutions?.client?.identityRef ?? "tb_triagem.campos:unresolved",
       classify(row, context) {
         const bound = authenticContext("tb_triagem.campos", row, context);
         if (bound.status !== "prepared") return bound;
@@ -563,6 +725,7 @@ export const REMAINING_RULES = Object.freeze(
             "TRIAGE_CONFIG_CLIENT",
           ),
           triageClientSlot(context, row),
+          triageUnmappedFunctionalValue(row),
         ]);
       },
     }),
@@ -625,15 +788,19 @@ export const REMAINING_RULES = Object.freeze(
         mapped("remetente", "sender_id", "resolve_explicit_user_reference", reference()),
         notPreserved(
           "destinatario",
-          "A leitura atual é controlada por acesso ao chamado e não persiste destinatário por mensagem.",
+          "TIMessage não persiste destinatário; somente zero pode prosseguir e qualquer destinatário funcional coloca a linha integral em quarentena.",
         ),
         notPreserved(
           "lida",
-          "TIMessage não possui recibo de leitura; o indicador não é convertido em estado incompatível.",
+          "TIMessage não possui recibo de leitura; somente zero pode prosseguir e qualquer indicador funcional coloca a linha integral em quarentena.",
         ),
         mapped("data_envio", "created_at", "normalize_required_datetime"),
-        mapped("mensagem", "message", "normalize_message_or_attachment_placeholder", personal()),
-        mapped("mensagem", "attachment", "migrate_legacy_attachment_reference", personal()),
+        mapped("mensagem", "message", "normalize_required_non_attachment_message", personal()),
+        notPreserved(
+          "mensagem",
+          "Anexos tipo 6 só poderiam alimentar attachment após correlação inequívoca e MIME JPEG/PNG/WEBP; o PDF real não possui vínculo pelo nome vazio do backup.",
+          personal(),
+        ),
       ],
       defaults: { attachment: null },
       classify: classifyWorkspaceMessage,
@@ -654,6 +821,8 @@ function createRule({
   mode = "insert",
   identity = generateIdentity("id", sourceTable),
   precedence = ["legacy_identity"],
+  cardinality = "1:1",
+  emissionIdentity = (row) => rowIdentity(sourceTable, row?.id),
 }) {
   const evidence = EVIDENCE_BY_SOURCE.get(sourceTable);
   if (evidence?.finalStatus !== "confirmed" || evidence.ruleId === null) {
@@ -679,12 +848,12 @@ function createRule({
       legacy: [...evidence.legacyReferences, ...evidence.legacyRelationships],
       current: [...evidence.currentContractEvidence],
     },
-    cardinality: "1:1",
+    cardinality,
     dependencies,
     destinations: [step],
     classifySourceRow: classify,
     emitRows(row, context) {
-      return [toEmission(step, rowIdentity(sourceTable, row?.id), classify(row, context))];
+      return [toEmission(step, emissionIdentity(row, context), classify(row, context))];
     },
   };
 }
@@ -708,6 +877,8 @@ function classifyStockEntry(row, context) {
       "produto_id",
       "CBS_STOCK_ENTRY_STOCK",
     ),
+    technologyStockResolution(context, "stock", "produto_id", "CBS_STOCK_ENTRY_NOT_TECHNOLOGY"),
+    preparedParentResolution(context, "stock", "produto_id", "CBS_STOCK_ENTRY_TARGET_QUARANTINED"),
     requiredResolution(
       context,
       "user",
@@ -716,6 +887,7 @@ function classifyStockEntry(row, context) {
       "repositor",
       "CBS_STOCK_ENTRY_USER",
     ),
+    preparedParentResolution(context, "user", "repositor", "CBS_STOCK_ENTRY_USER_QUARANTINED"),
   ]);
 }
 
@@ -731,8 +903,11 @@ function classifyStockLocation(row, context) {
     "CBS_STOCK_FLOOR",
   );
   if (floor.status !== "prepared") return floor;
-  if (!/^(?:0|[1-9]\d*)$/.test(String(context.resolutions.floor.floor ?? ""))) {
-    return quarantine("andar", "CBS_STOCK_FLOOR_NOT_NUMERIC");
+  if (!Number.isSafeInteger(context.resolutions.floor.floor)) {
+    return quarantine("andar", "CBS_STOCK_FLOOR_LABEL_UNMAPPABLE");
+  }
+  if (context.resolutions.floor.departmentSourceKey !== normalizeKey(row?.departamento_id)) {
+    return quarantine("andar", "CBS_STOCK_FLOOR_DEPARTMENT_MISMATCH");
   }
   return firstFailure([
     validId(row?.id, "id", "CBS_STOCK_LOCATION_ID_INVALID"),
@@ -744,6 +919,12 @@ function classifyStockLocation(row, context) {
       ["tb_admin.departamentos"],
       "departamento_id",
       "CBS_STOCK_LOCATION_DEPARTMENT",
+    ),
+    technologyResolution(
+      context,
+      "department",
+      "departamento_id",
+      "CBS_STOCK_LOCATION_NOT_TECHNOLOGY",
     ),
   ]);
 }
@@ -763,6 +944,8 @@ function classifyStockExit(row, context) {
       "produto_id",
       "CBS_STOCK_EXIT_STOCK",
     ),
+    technologyStockResolution(context, "stock", "produto_id", "CBS_STOCK_EXIT_NOT_TECHNOLOGY"),
+    preparedParentResolution(context, "stock", "produto_id", "CBS_STOCK_EXIT_TARGET_QUARANTINED"),
     requiredResolution(
       context,
       "requester",
@@ -770,6 +953,12 @@ function classifyStockExit(row, context) {
       ["tb_admin.usuarios"],
       "solicitante",
       "CBS_STOCK_EXIT_REQUESTER",
+    ),
+    preparedParentResolution(
+      context,
+      "requester",
+      "solicitante",
+      "CBS_STOCK_EXIT_REQUESTER_QUARANTINED",
     ),
     optionalResolution(
       context,
@@ -779,6 +968,13 @@ function classifyStockExit(row, context) {
       "autorizador",
       "CBS_STOCK_EXIT_APPROVER",
     ),
+    preparedOptionalParentResolution(
+      context,
+      "approver",
+      row?.autorizador,
+      "autorizador",
+      "CBS_STOCK_EXIT_APPROVER_QUARANTINED",
+    ),
     optionalResolution(
       context,
       "operator",
@@ -787,6 +983,16 @@ function classifyStockExit(row, context) {
       "operador",
       "CBS_STOCK_EXIT_OPERATOR",
     ),
+    preparedOptionalParentResolution(
+      context,
+      "operator",
+      row?.operador,
+      "operador",
+      "CBS_STOCK_EXIT_OPERATOR_QUARANTINED",
+    ),
+    normalizeNullableText(row?.obs) === null
+      ? prepared()
+      : quarantine("obs", "CBS_STOCK_EXIT_OBS_UNMAPPABLE"),
   ]);
 }
 
@@ -809,6 +1015,7 @@ function classifyPecNote(row, context) {
       "usuario_id",
       "PEC_NOTE_USER",
     ),
+    preparedParentResolution(context, "user", "usuario_id", "PEC_NOTE_USER_QUARANTINED"),
     optionalResolution(
       context,
       "client",
@@ -832,7 +1039,7 @@ function classifyWorkspaceCategory(row, context) {
     "WORKSPACE_CATEGORY_DEPARTMENT",
   );
   if (department.status !== "prepared") return department;
-  if (context.resolutions.department.relatedIdentityRef !== "technology") {
+  if (context.resolutions.department.scope !== "technology") {
     return quarantine("departamento_id", "WORKSPACE_CATEGORY_NOT_TECHNOLOGY");
   }
   return firstFailure([
@@ -853,7 +1060,7 @@ function classifyWorkspaceRequest(row, context) {
     "WORKSPACE_REQUEST_DEPARTMENT",
   );
   if (department.status !== "prepared") return department;
-  if (context.resolutions.department.relatedIdentityRef !== "technology") {
+  if (context.resolutions.department.scope !== "technology") {
     return quarantine("departamento", "WORKSPACE_REQUEST_NOT_TECHNOLOGY");
   }
   return firstFailure([
@@ -870,6 +1077,12 @@ function classifyWorkspaceRequest(row, context) {
       "requerente",
       "WORKSPACE_REQUEST_REQUESTER",
     ),
+    preparedParentResolution(
+      context,
+      "requester",
+      "requerente",
+      "WORKSPACE_REQUEST_REQUESTER_QUARANTINED",
+    ),
     optionalResolution(
       context,
       "assignee",
@@ -878,6 +1091,13 @@ function classifyWorkspaceRequest(row, context) {
       "atribuido",
       "WORKSPACE_REQUEST_ASSIGNEE",
     ),
+    preparedOptionalParentResolution(
+      context,
+      "assignee",
+      row?.atribuido,
+      "atribuido",
+      "WORKSPACE_REQUEST_ASSIGNEE_QUARANTINED",
+    ),
     requiredResolution(
       context,
       "category",
@@ -885,6 +1105,13 @@ function classifyWorkspaceRequest(row, context) {
       ["tb_workspace.solicitacoes_categorias"],
       "categoria",
       "WORKSPACE_REQUEST_CATEGORY",
+    ),
+    resolutionDepartmentMatch(
+      context,
+      "category",
+      row?.departamento,
+      "categoria",
+      "WORKSPACE_REQUEST_CATEGORY_DEPARTMENT_MISMATCH",
     ),
   ]);
 }
@@ -896,8 +1123,11 @@ function classifyWorkspaceMessage(row, context) {
   if (!Number.isSafeInteger(type) || type < 0 || type > 6) {
     return quarantine("tipo", "WORKSPACE_MESSAGE_TYPE_INVALID");
   }
-  if (type === 6 && context.capabilities.legacyAssets !== true) {
-    return quarantine("mensagem", "LEGACY_ATTACHMENT_NOT_MIGRATED");
+  if (type === 6) {
+    return quarantine("mensagem", "WORKSPACE_ATTACHMENT_CORRELATION_UNRESOLVED");
+  }
+  if (!emptyReference(row?.destinatario) || String(row?.lida ?? "0").trim() !== "0") {
+    return quarantine("lida", "WORKSPACE_MESSAGE_READ_STATE_UNMAPPABLE");
   }
   return firstFailure([
     validId(row?.id, "id", "WORKSPACE_MESSAGE_ID_INVALID"),
@@ -911,6 +1141,12 @@ function classifyWorkspaceMessage(row, context) {
       "solicitacao",
       "WORKSPACE_MESSAGE_REQUEST",
     ),
+    technologyStockResolution(
+      context,
+      "request",
+      "solicitacao",
+      "WORKSPACE_MESSAGE_REQUEST_NOT_TECHNOLOGY",
+    ),
     requiredResolution(
       context,
       "sender",
@@ -919,11 +1155,20 @@ function classifyWorkspaceMessage(row, context) {
       "remetente",
       "WORKSPACE_MESSAGE_SENDER",
     ),
+    preparedParentResolution(
+      context,
+      "sender",
+      "remetente",
+      "WORKSPACE_MESSAGE_SENDER_QUARANTINED",
+    ),
   ]);
 }
 
 function categoryResolution(context, row) {
   const resolution = context.resolutions.category;
+  if (!isAuthenticRemainingResolution(resolution)) {
+    return quarantine("produto_id", "CBS_STOCK_CATEGORY_CONTEXT_INVALID");
+  }
   if (resolution?.state === "many") return quarantine("produto_id", "CBS_STOCK_CATEGORY_AMBIGUOUS");
   if (resolution?.state === "zero") return quarantine("produto_id", "CBS_STOCK_CATEGORY_NOT_FOUND");
   if (resolution?.state !== "one")
@@ -943,46 +1188,30 @@ function categoryResolution(context, row) {
   return prepared();
 }
 
-function extensionNumberSlot(context, row) {
-  const resolution = context.resolutions.numberSlot;
-  if (resolution?.state === "many") {
-    return quarantine("numero", "EXTENSION_NUMBER_AMBIGUOUS");
-  }
-  if (resolution?.state === "zero") {
-    return quarantine("numero", "EXTENSION_NUMBER_NOT_FOUND");
-  }
-  if (resolution?.state !== "one") {
-    return quarantine("numero", "EXTENSION_NUMBER_LOOKUP_NOT_EXECUTED");
-  }
-  if (
-    resolution.sourceTable !== "tb_cbs.ramais" ||
-    resolution.sourceKey !== normalizeKey(row?.numero)
-  ) {
-    return quarantine("numero", "EXTENSION_NUMBER_REFERENCE_MISMATCH");
-  }
-  if (resolution.ownerSourceKey !== normalizeKey(row?.id)) {
-    return quarantine("id", "EXTENSION_NUMBER_OWNER_MISMATCH");
-  }
-  return prepared();
+function triageClientSlot(context, row) {
+  return canonicalClientSlot(context, row, "tb_triagem.campos", "TRIAGE_CONFIG_CANONICAL_CLIENT");
 }
 
-function triageClientSlot(context, row) {
+function canonicalClientSlot(context, row, sourceTable, prefix) {
   const resolution = context.resolutions.clientSlot;
+  if (!isAuthenticRemainingResolution(resolution)) {
+    return quarantine("cliente_id", `${prefix}_SLOT_CONTEXT_INVALID`);
+  }
   if (resolution?.state === "conflict") {
-    return quarantine("cliente_id", "TRIAGE_CONFIG_CANONICAL_CLIENT_CONFLICT");
+    return quarantine("cliente_id", `${prefix}_CONFLICT`);
   }
   if (resolution?.state === "duplicate") {
-    return notEmitted("TRIAGE_CONFIG_CANONICAL_CLIENT_DUPLICATE");
+    return notEmitted(`${prefix}_DUPLICATE`);
   }
   if (resolution?.state !== "owner") {
-    return quarantine("cliente_id", "TRIAGE_CONFIG_CLIENT_SLOT_NOT_RESOLVED");
+    return quarantine("cliente_id", `${prefix}_SLOT_NOT_RESOLVED`);
   }
   if (
-    resolution.sourceTable !== "tb_triagem.campos" ||
+    resolution.sourceTable !== sourceTable ||
     resolution.sourceKey !== context.resolutions.client.identityRef ||
     resolution.ownerSourceKey !== normalizeKey(row?.id)
   ) {
-    return quarantine("cliente_id", "TRIAGE_CONFIG_CLIENT_SLOT_MISMATCH");
+    return quarantine("cliente_id", `${prefix}_SLOT_MISMATCH`);
   }
   return prepared();
 }
@@ -997,19 +1226,45 @@ function stockLocationResolution(context, row) {
     "CBS_STOCK_LOCATION",
   );
   if (result.status !== "prepared") return result;
-  if (context.resolutions.location.relatedIdentityRef !== `floor:${normalizeKey(row?.andar)}`) {
+  if (context.resolutions.location.floorSourceKey !== normalizeKey(row?.andar)) {
     return quarantine("andar", "CBS_STOCK_LOCATION_FLOOR_MISMATCH");
   }
   if (context.resolutions.location.departmentSourceKey !== normalizeKey(row?.departamento_id)) {
     return quarantine("departamento_id", "CBS_STOCK_LOCATION_DEPARTMENT_MISMATCH");
   }
+  const floor = requiredResolution(
+    context,
+    "floor",
+    row?.andar,
+    ["tb_cbs.estoque_andares"],
+    "andar",
+    "CBS_STOCK_FLOOR",
+  );
+  if (floor.status !== "prepared") return floor;
+  const locationFloor = requiredResolution(
+    context,
+    "locationFloor",
+    context.resolutions.location.floorSourceKey,
+    ["tb_cbs.estoque_andares"],
+    "andar",
+    "CBS_STOCK_LOCATION_FLOOR",
+  );
+  if (locationFloor.status !== "prepared") return locationFloor;
+  if (
+    !Number.isSafeInteger(context.resolutions.floor.floor) ||
+    !Number.isSafeInteger(context.resolutions.locationFloor.floor)
+  ) {
+    return quarantine("andar", "CBS_STOCK_FLOOR_LABEL_UNMAPPABLE");
+  }
   return prepared();
 }
 
 function authenticContext(sourceTable, row, context) {
+  const issuance = CONTEXT_ISSUANCE.get(context);
   if (
     !isObject(context) ||
-    !ISSUED_CONTEXTS.has(context) ||
+    issuance === undefined ||
+    issuance.snapshot !== canonical(context) ||
     context.sourceTable !== sourceTable ||
     context.rowFingerprint !== fingerprint(row)
   ) {
@@ -1024,6 +1279,14 @@ function requiredResolution(context, name, sourceKey, sourceTables, field, prefi
   if (resolution?.state === "zero") return quarantine(field, `${prefix}_NOT_FOUND`);
   if (resolution?.state === "many") return quarantine(field, `${prefix}_AMBIGUOUS`);
   if (resolution?.state !== "one") return quarantine(field, `${prefix}_LOOKUP_NOT_EXECUTED`);
+  const authentic =
+    name === "client"
+      ? isAuthoritativeV2ClientIdentityResolution(resolution, sourceKey)
+      : isAuthenticRemainingResolution(resolution) ||
+        sourceTables.some((sourceTable) =>
+          isAuthenticLegacyReferenceResolution(resolution, sourceTable, sourceKey),
+        );
+  if (!authentic) return quarantine(field, `${prefix}_CONTEXT_INVALID`);
   if (
     !sourceTables.includes(resolution.sourceTable) ||
     resolution.sourceKey !== normalizeKey(sourceKey)
@@ -1036,22 +1299,6 @@ function requiredResolution(context, name, sourceKey, sourceTables, field, prefi
 function optionalResolution(context, name, sourceKey, sourceTables, field, prefix) {
   if (emptyReference(sourceKey)) return prepared();
   return requiredResolution(context, name, sourceKey, sourceTables, field, prefix);
-}
-
-function normalizeResolution(resolution) {
-  if (!isObject(resolution)) return { state: "invalid" };
-  return {
-    state: resolution.state,
-    sourceTable: resolution.sourceTable,
-    sourceKey: normalizeKey(resolution.sourceKey),
-    identityRef: safeOptionalReference(resolution.identityRef),
-    relatedIdentityRef: safeOptionalReference(resolution.relatedIdentityRef),
-    joinSourceTable: safeOptionalReference(resolution.joinSourceTable),
-    itemSourceKey: normalizeKey(resolution.itemSourceKey),
-    departmentSourceKey: normalizeKey(resolution.departmentSourceKey),
-    ownerSourceKey: normalizeKey(resolution.ownerSourceKey),
-    floor: resolution.floor,
-  };
 }
 
 function toEmission(step, identityRef, classification) {
@@ -1206,35 +1453,266 @@ function corpusFingerprint(rows) {
 }
 
 function triagePayloadFingerprint(row) {
-  return fingerprint(
-    TRIAGE_ACTIVE_COLUMNS.map((column) => String(row?.[column] ?? "").trim() === "1"),
-  );
+  return fingerprint({
+    activeItems: TRIAGE_ACTIVE_COLUMNS.map((column) => String(row?.[column] ?? "").trim() === "1"),
+    billing: String(row?.faturamento ?? "").trim(),
+    delivery: String(row?.envio ?? "").trim(),
+  });
 }
 
-function triageSlot(state, identityRef, ownerSourceKey) {
-  return Object.freeze({
+function socialPayloadFingerprint(row) {
+  return fingerprint(normalizeNullableText(row?.instagram));
+}
+
+function canonicalSlot(state, sourceTable, identityRef = null, ownerSourceKey = null) {
+  return issueResolution({
     state,
-    sourceTable: "tb_triagem.campos",
+    sourceTable,
     sourceKey: identityRef,
+    identityRef,
     ownerSourceKey: normalizeKey(ownerSourceKey),
   });
-}
-
-function extensionSlot(state, number, ownerSourceKey) {
-  const slot = Object.freeze({
-    state,
-    sourceTable: "tb_cbs.ramais",
-    sourceKey: number,
-    ownerSourceKey: normalizeKey(ownerSourceKey),
-  });
-  EXTENSION_SLOT_ISSUANCE.add(slot);
-  return slot;
 }
 
 function compareEntriesByLegacyId(left, right) {
   const leftId = Number(left.row?.id);
   const rightId = Number(right.row?.id);
   return leftId - rightId;
+}
+
+function authoritativeClientEntries(rows, clientResolver) {
+  if (typeof clientResolver?.resolve !== "function") {
+    throw new TypeError("clientResolver autoritativo é obrigatório");
+  }
+  return rows.map((row, index) => {
+    const client = clientResolver.resolve(row?.cliente_id);
+    if (!isAuthoritativeV2ClientIdentityResolution(client, row?.cliente_id)) {
+      throw new TypeError("clientResolver não produziu resolução V2 autoritativa");
+    }
+    return { row, index, client };
+  });
+}
+
+function canonicalClientSlots(entries, payloadFingerprint, sourceTable) {
+  const groups = Map.groupBy(
+    entries.filter(({ client }) => client.state === "one"),
+    ({ client }) => client.identityRef,
+  );
+  const slots = new Array(entries.length);
+  for (const [identityRef, group] of groups) {
+    if (group.length === 1) {
+      const [owner] = group;
+      slots[owner.index] = canonicalSlot("owner", sourceTable, identityRef, owner.row?.id);
+      continue;
+    }
+    const payloads = new Set(group.map(({ row }) => payloadFingerprint(row)));
+    if (payloads.size > 1) {
+      for (const entry of group) {
+        slots[entry.index] = canonicalSlot("conflict", sourceTable, identityRef);
+      }
+      continue;
+    }
+    const [owner, ...duplicates] = [...group].sort(compareEntriesByLegacyId);
+    slots[owner.index] = canonicalSlot("owner", sourceTable, identityRef, owner.row?.id);
+    for (const duplicate of duplicates) {
+      slots[duplicate.index] = canonicalSlot("duplicate", sourceTable, identityRef, owner.row?.id);
+    }
+  }
+  return slots;
+}
+
+function auditedLookup(sourceTable, rows, project = () => ({})) {
+  assertAuditedCorpus(sourceTable, rows);
+  const snapshots = rows.map((row) => Object.freeze({ ...row }));
+  const rowsById = Map.groupBy(snapshots, ({ id }) => normalizeKey(id));
+  return Object.freeze({
+    resolve(value) {
+      const sourceKey = validLegacyId(value) ? normalizeKey(value) : null;
+      const candidates = sourceKey === null ? [] : (rowsById.get(sourceKey) ?? []);
+      if (candidates.length === 0) {
+        return issueResolution({
+          state: "zero",
+          sourceTable,
+          sourceKey,
+          identityRef: null,
+        });
+      }
+      if (candidates.length > 1) {
+        return issueResolution({
+          state: "many",
+          sourceTable,
+          sourceKey,
+          identityRef: null,
+        });
+      }
+      return issueResolution({
+        state: "one",
+        sourceTable,
+        sourceKey,
+        identityRef: `${sourceTable}:${sourceKey}`,
+        ...project(candidates[0]),
+      });
+    },
+  });
+}
+
+function issueContexts(kind, sourceTable, rows, resolutionsForRow, capabilities = {}) {
+  return Object.freeze(
+    rows.map((row) => issueContext(kind, sourceTable, row, resolutionsForRow(row), capabilities)),
+  );
+}
+
+function issueContext(kind, sourceTable, row, resolutions, capabilities = {}) {
+  const context = Object.freeze({
+    sourceTable,
+    rowFingerprint: fingerprint(row),
+    resolutions: Object.freeze({ ...resolutions }),
+    capabilities: Object.freeze({ ...capabilities }),
+  });
+  CONTEXT_ISSUANCE.set(context, Object.freeze({ kind, snapshot: canonical(context) }));
+  return context;
+}
+
+function issueResolution(value) {
+  const resolution = Object.freeze({ ...value });
+  RESOLUTION_ISSUANCE.set(resolution, canonical(resolution));
+  return resolution;
+}
+
+function auditedUserLookup(rows) {
+  assertAuditedCorpus("tb_admin.usuarios", rows);
+  const userRule = V2_RULES.find(({ sourceTable }) => sourceTable === "tb_admin.usuarios");
+  if (userRule === undefined) {
+    throw new TypeError("regra-pai confirmada ausente para tb_admin.usuarios");
+  }
+  const migrationStates = new Map(
+    rows.map((row) => [normalizeKey(row?.id), userRule.emitRows(row)[0].status]),
+  );
+  return auditedLookup("tb_admin.usuarios", rows, (row) => ({
+    migrationState: migrationStates.get(normalizeKey(row?.id)),
+  }));
+}
+
+function auditedParentMigrationStates({ kind, sourceTable, rows, contexts }) {
+  assertAuditedCorpus(sourceTable, rows);
+  if (!Array.isArray(contexts) || contexts.length !== rows.length) {
+    throw new TypeError(`preflight opaco completo de ${sourceTable} é obrigatório`);
+  }
+  const parentRule = REMAINING_RULES.find((rule) => rule.sourceTable === sourceTable);
+  if (parentRule === undefined) {
+    throw new TypeError(`regra-pai confirmada ausente para ${sourceTable}`);
+  }
+  return new Map(
+    rows.map((row, index) => {
+      const context = contexts[index];
+      const issuance = CONTEXT_ISSUANCE.get(context);
+      if (
+        issuance?.kind !== kind ||
+        issuance.snapshot !== canonical(context) ||
+        context.sourceTable !== sourceTable ||
+        context.rowFingerprint !== fingerprint(row)
+      ) {
+        throw new TypeError(`preflight opaco inválido para ${sourceTable}:${String(row?.id)}`);
+      }
+      return [normalizeKey(row?.id), parentRule.emitRows(row, context)[0].status];
+    }),
+  );
+}
+
+function isAuthenticRemainingResolution(resolution) {
+  const snapshot = RESOLUTION_ISSUANCE.get(resolution);
+  return (
+    snapshot !== undefined && Object.isFrozen(resolution) && snapshot === canonical(resolution)
+  );
+}
+
+function assertAuditedCorpus(sourceTable, rows) {
+  if (!Array.isArray(rows)) throw new TypeError(`rows de ${sourceTable} deve ser um array`);
+  const manifest = REMAINING_AUDITED_CORPORA[sourceTable];
+  if (
+    manifest === undefined ||
+    rows.length !== manifest.rowCount ||
+    corpusFingerprint(rows) !== manifest.digest
+  ) {
+    throw new TypeError(`corpus completo auditado inválido para ${sourceTable}`);
+  }
+}
+
+function departmentScope(row) {
+  return normalizeKey(row?.id) === "27" && normalizeText(row?.nome) === "Tecnologia"
+    ? "technology"
+    : "other";
+}
+
+function technologyResolution(context, name, field, reasonCode) {
+  return context.resolutions[name]?.scope === "technology"
+    ? prepared()
+    : quarantine(field, reasonCode);
+}
+
+function technologyStockResolution(context, name, field, reasonCode) {
+  return context.resolutions[name]?.departmentSourceKey === "27"
+    ? prepared()
+    : quarantine(field, reasonCode);
+}
+
+function preparedParentResolution(context, name, field, reasonCode) {
+  return context.resolutions[name]?.migrationState === "prepared"
+    ? prepared()
+    : quarantine(field, reasonCode);
+}
+
+function preparedOptionalParentResolution(context, name, sourceKey, field, reasonCode) {
+  return emptyReference(sourceKey)
+    ? prepared()
+    : preparedParentResolution(context, name, field, reasonCode);
+}
+
+function resolutionDepartmentMatch(context, name, departmentSourceKey, field, reasonCode) {
+  return context.resolutions[name]?.departmentSourceKey === normalizeKey(departmentSourceKey)
+    ? prepared()
+    : quarantine(field, reasonCode);
+}
+
+function normalizeLegacyStockItemActive(value) {
+  if (String(value).trim() === "0") return true;
+  if (String(value).trim() === "1") return false;
+  return null;
+}
+
+function normalizeLegacyFloor(value) {
+  const text = normalizeText(value)
+    ?.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+  if (text === "terreo") return 0;
+  const named = new Map([
+    ["primeiro andar", 1],
+    ["segundo andar", 2],
+    ["terceiro andar", 3],
+  ]);
+  if (named.has(text)) return named.get(text);
+  const ordinal = text?.match(/^(\d+)\s*[º°o]\s*andar$/);
+  return ordinal === null || ordinal === undefined ? null : Number(ordinal[1]);
+}
+
+function normalizeText(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function normalizeNullableText(value) {
+  return normalizeText(value);
+}
+
+function triageUnmappedFunctionalValue(row) {
+  const billing = String(row?.faturamento ?? "").trim();
+  const delivery = String(row?.envio ?? "").trim();
+  if (!["", "0"].includes(billing)) {
+    return quarantine("faturamento", "TRIAGE_FUNCTIONAL_FIELD_UNMAPPABLE");
+  }
+  return delivery.length > 0
+    ? quarantine("envio", "TRIAGE_FUNCTIONAL_FIELD_UNMAPPABLE")
+    : prepared();
 }
 
 function validLegacyId(value) {
@@ -1248,10 +1726,6 @@ function emptyReference(value) {
 
 function normalizeKey(value) {
   return value === null || value === undefined ? null : String(value).trim();
-}
-
-function safeOptionalReference(value) {
-  return typeof value === "string" && /^[A-Za-z0-9_.:-]+$/.test(value) ? value : null;
 }
 
 function isObject(value) {
