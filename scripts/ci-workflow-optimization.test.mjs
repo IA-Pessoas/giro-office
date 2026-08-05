@@ -637,7 +637,11 @@ test("TI request image storage contract is explicit in docs and deploy manifests
     manifest,
     /^# crie\/configure esse bucket como privado no Supabase Storage \(nao existe BUCKET_VISIBILITY no env do servico\)\.$/m,
   );
-  assert.match(manifest, /^# SUPABASE_SERVICE_ROLE_KEY=<service role key somente no VPS\/servico>$/m);
+  assert.doesNotMatch(manifest, /^# BUCKET_VISIBILITY=/m);
+  assert.match(
+    manifest,
+    /^# SUPABASE_SERVICE_ROLE_KEY=<service role key somente no VPS\/servico>$/m,
+  );
 
   const envExample = await readFile(path.join(repoRoot, ".env.example"), "utf8");
   assert.match(envExample, /^TI_REQUEST_IMAGE_BUCKET=ti-request-attachments-private$/m);
@@ -664,6 +668,6 @@ test("TI request image storage contract is explicit in docs and deploy manifests
   );
   assert.match(
     tiServiceReadme,
-    /`SUPABASE_SERVICE_ROLE_KEY`[\s\S]*apenas no ambiente do[\s\S]*servico/i,
+    /`SUPABASE_SERVICE_ROLE_KEY` deve permanecer apenas no ambiente do[\s\S]*servico\/VPS/i,
   );
 });

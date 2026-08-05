@@ -39,7 +39,7 @@ configuracao ou as credenciais do Supabase. O upload guarda apenas a chave priva
 uma URL assinada de cinco minutos depois de validar o acesso ao chamado. Configure
 `TI_REQUEST_IMAGE_BUCKET` com o valor recomendado `ti-request-attachments-private`, em um
 bucket privado dedicado. Crie/configure esse bucket como privado no Supabase Storage (o servico nao le
-`BUCKET_VISIBILITY`). `SUPABASE_SERVICE_ROLE_KEY` devem permanecer apenas no ambiente do
+`BUCKET_VISIBILITY`). `SUPABASE_SERVICE_ROLE_KEY` deve permanecer apenas no ambiente do
 servico/VPS, junto com `SUPABASE_URL`.
 
 ## Gateway
