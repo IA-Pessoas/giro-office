@@ -4,6 +4,7 @@ import { AlertCircle, ChevronDown, Loader2, RefreshCw, Save, WalletCards } from 
 import { useAssignableUsers } from "@modules/rh";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
+import { formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCreatePessoalPayrollMutation,
@@ -15,11 +16,12 @@ import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
   pessoalCheckboxCardClassName,
+  pessoalNumberFieldClassName,
   pessoalPrimaryButtonClassName,
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
-import { finiteNumber, optional } from "./pessoalFormValueHelpers";
+import { optional } from "./pessoalFormValueHelpers";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
 interface PessoalPayrollSectionProps {
@@ -93,8 +95,8 @@ const textFields = [
 
 const numberFields = [
   { name: "employees", label: "Funcionários", required: true },
-  { name: "advance_amount", label: "Valor do adiantamento", required: false },
-  { name: "vt_value", label: "Valor do VT", required: false },
+  { name: "advance_amount", label: "Valor do adiantamento", required: false, money: true },
+  { name: "vt_value", label: "Valor do VT", required: false, money: true },
 ] as const;
 
 const checkboxFields = [
@@ -125,13 +127,17 @@ function buildPayrollFormValues(
     responsible_id: payroll.responsible_id ?? "",
     advance: payroll.advance,
     advance_type: payroll.advance_type ?? "",
-    advance_amount: payroll.advance_amount === null ? "" : String(payroll.advance_amount),
+    advance_amount:
+      payroll.advance_amount === null
+        ? ""
+        : formatBrlInput(String(Math.round(payroll.advance_amount * 100))),
     info: payroll.info,
     previous: payroll.previous,
     onvio: payroll.onvio,
     group: payroll.group,
     vt: payroll.vt,
-    vt_value: payroll.vt_value === null ? "" : String(payroll.vt_value),
+    vt_value:
+      payroll.vt_value === null ? "" : formatBrlInput(String(Math.round(payroll.vt_value * 100))),
     vt_type: payroll.vt_type ?? "",
     va: payroll.va,
     assistance_fee: payroll.assistance_fee,
@@ -153,13 +159,13 @@ function buildPayrollFormPayload(
     responsible_id: optional(values.responsible_id),
     advance: values.advance,
     advance_type: optional(values.advance_type),
-    advance_amount: optional(values.advance_amount, finiteNumber),
+    advance_amount: optional(values.advance_amount, parseBrlInput),
     info: values.info.trim(),
     previous: values.previous,
     onvio: values.onvio,
     group: values.group.trim(),
     vt: values.vt,
-    vt_value: optional(values.vt_value, finiteNumber),
+    vt_value: optional(values.vt_value, parseBrlInput),
     vt_type: optional(values.vt_type),
     va: values.va,
     assistance_fee: values.assistance_fee,
@@ -381,24 +387,34 @@ export function PessoalPayrollSection({
             </div>
           </label>
 
-          {numberFields.map((field) => (
-            <label
-              key={field.name}
-              className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
-            >
-              {field.label}
-              <input
-                type="number"
-                required={field.required}
-                min={0}
-                step={field.name === "employees" ? 1 : "0.01"}
-                value={String(formValues[field.name])}
-                onChange={(event) => handleFieldChange(field.name, event.target.value)}
-                disabled={isFormDisabled}
-                className={pessoalTextFieldClassName}
-              />
-            </label>
-          ))}
+          {numberFields.map((field) => {
+            const isMoney = "money" in field && field.money;
+
+            return (
+              <label
+                key={field.name}
+                className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
+              >
+                {field.label}
+                <input
+                  type={isMoney ? "text" : "number"}
+                  inputMode={isMoney ? "decimal" : "numeric"}
+                  required={field.required}
+                  min={isMoney ? undefined : 0}
+                  step={isMoney ? undefined : 1}
+                  value={String(formValues[field.name])}
+                  onChange={(event) =>
+                    handleFieldChange(
+                      field.name,
+                      isMoney ? formatBrlInput(event.target.value) : event.target.value,
+                    )
+                  }
+                  disabled={isFormDisabled}
+                  className={isMoney ? pessoalTextFieldClassName : pessoalNumberFieldClassName}
+                />
+              </label>
+            );
+          })}
 
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
             Sindicato

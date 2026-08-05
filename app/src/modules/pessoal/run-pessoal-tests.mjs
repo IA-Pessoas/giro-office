@@ -350,8 +350,36 @@ runTest("payroll and LDD forms reject negative money values before submit", () =
   assert.match(payroll, /payload\.advance_amount < 0/);
   assert.match(payroll, /payload\.vt_value < 0/);
   assert.match(tracking, /payload\.balance_amount < 0/);
-  assert.match(payroll, /min=\{0\}/);
+  assert.match(payroll, /min=\{isMoney \? undefined : 0\}/);
   assert.match(tracking, /min=\{field\.name === "balance_amount" \? 0 : undefined\}/);
+});
+
+runTest("pessoal money fields use the shared BRL mask and keep numeric payloads", () => {
+  const payroll = readFileSync(
+    "src/modules/pessoal/components/PessoalPayrollSection.tsx",
+    "utf8",
+  );
+  const tracking = readFileSync(
+    "src/modules/pessoal/components/PessoalTrackingSection.tsx",
+    "utf8",
+  );
+  const controls = readFileSync(
+    "src/modules/pessoal/components/pessoalFormControls.ts",
+    "utf8",
+  );
+
+  assert.match(payroll, /formatBrlInput/);
+  assert.match(payroll, /parseBrlInput/);
+  assert.match(payroll, /advance_amount: optional\(values\.advance_amount, parseBrlInput\)/);
+  assert.match(payroll, /vt_value: optional\(values\.vt_value, parseBrlInput\)/);
+  assert.match(payroll, /type=\{isMoney \? "text" : "number"\}/);
+  assert.match(payroll, /isMoney \? formatBrlInput\(event\.target\.value\)/);
+  assert.match(payroll, /pessoalNumberFieldClassName/);
+  assert.match(tracking, /formatBrlInput/);
+  assert.match(tracking, /parseBrlInput/);
+  assert.match(tracking, /balance_amount: optional\(lddFormValues\.balance_amount, parseBrlInput\)/);
+  assert.match(tracking, /isMoney \? "text"/);
+  assert.match(controls, /pessoalNumberFieldClassName/);
 });
 
 runTest("payroll responsible field uses a user selector instead of raw IDs", () => {
