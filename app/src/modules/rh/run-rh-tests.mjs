@@ -269,12 +269,18 @@ runTest("RH request timeline uses distinct semantic message type badges", () => 
 runTest("RH ponto nao invalida queries fora do dominio", () => {
   const pointSource = readFileSync("src/modules/rh/hooks/useRhPoint.ts", "utf8");
 
-  assert.match(pointSource, /RH_POINT_QUERY_KEY/);
+  assert.equal(
+    (pointSource.match(/invalidateQueries\(\{ queryKey: RH_POINT_QUERY_KEY \}\)/g) ?? []).length,
+    6,
+  );
   assert.doesNotMatch(pointSource, /invalidateQueries\(\{ queryKey: RH_QUERY_KEY \}\)/);
 });
 
 runTest("contador de solicitacoes so fica ativo na aba de solicitacoes", () => {
   const shellSource = readFileSync("src/shared/components/newLayout/RH.tsx", "utf8");
 
-  assert.match(shellSource, /enabled: canManageRhRequests && activeTab === "requests"/);
+  assert.equal(
+    (shellSource.match(/enabled: canManageRhRequests && activeTab === "requests"/g) ?? []).length,
+    2,
+  );
 });
