@@ -1,0 +1,3811 @@
+[
+  {
+    "blockedRows": 48,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "80f61c12b68f4bb3dacfb51e0a2a8e3968301c5501a9789bc6eba3b6ee342531",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "548199c5dcd1f3187968818035425921e0423e7f9c3be6dbf5376f635a6343c8"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:224"
+      ],
+      "legacy": [
+        "classes/Departamento.php:4",
+        "classes/Departamento.php:14"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 48,
+    "reason": "CRUD legado e modelo Department atual preservam a entidade departamental.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_admin.departamentos",
+    "sourceRowCount": 48,
+    "sourceTable": "tb_admin.departamentos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 470127,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "6eb6483f2ace6be7bb77c38d5022f3260f51c1f64154198b740136fcda50fd78",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "b9ecf2b67eb98155ed0a2fe4aa6c7bcd7d68bc6b88855f8b81442f8b35510f42"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:388",
+        "services/regularize-service/src/services/regularizeLogService.ts:26"
+      ],
+      "legacy": [
+        "classes/Painel.php:110",
+        "tecnologia/ajax/logs/logs.php:17"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 470127,
+    "reason": "O evento administrativo possui contrato atual equivalente em logs; local é metadado legado sem campo compatível e não é emitido.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.logs",
+    "sourceRowCount": 470127,
+    "sourceTable": "tb_admin.logs",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 67,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "6c65c1636bd6f89e94ddb180b9e392825ee3880bbdced07ea70e33dfdcd8c6b1",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "8e21ff3d7805cb7c7393bd691d15f1b09298bf04626bf58f02742b1bf810eb31"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Usuario.php:129",
+        "classes/Usuario.php:132"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 67,
+    "reason": "O módulo fixo certificado existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_certificado",
+    "sourceRowCount": 67,
+    "sourceTable": "tb_admin.permissoes_certificado",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 17,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "1f99eb4b786bab93e5ea4e900523f5ce7c950fd3babc5edafaac5dcb4fc81a93",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "d8567dd9092b36e5c195e586a6429dc2ec65fe8d633134e0d07e31949168a24a"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Usuario.php:241",
+        "classes/Usuario.php:244"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 17,
+    "reason": "O módulo fixo comercial existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_comercial",
+    "sourceRowCount": 17,
+    "sourceTable": "tb_admin.permissoes_comercial",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 38,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "be9e02bf8da4d5f1c88b09691aee12375c5030f9362c2380fe5409bf26ad2671",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "4ed489d7ab7d5678c2c89dc3671510b390699031d5b31d5875449e85a47701d6"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Colaborador.php:300",
+        "classes/Usuario.php:143"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 38,
+    "reason": "O módulo fixo contabil existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_contabil",
+    "sourceRowCount": 38,
+    "sourceTable": "tb_admin.permissoes_contabil",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 12,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "38073e55302bd700b24a0ae5d88e96fc5a9d1d0fffc26012dc241002d041bcdc",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "7d70d4d9d47a1cd7fe5f097aab572bd146f1db4cd6a313058047e975e0845625"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Usuario.php:171",
+        "classes/Usuario.php:174"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 12,
+    "reason": "O módulo fixo financeiro existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_financeiro",
+    "sourceRowCount": 12,
+    "sourceTable": "tb_admin.permissoes_financeiro",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 42,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "e7377265e1a090b0894964b134613f77c0a932a1dfc8742a22abf1750b728cee",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "5b7d18913e7e0bbeb6f0debf7350da52c1c9d76ca0014c36c6443a0be87e9fcd"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Usuario.php:199",
+        "classes/Usuario.php:202"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 42,
+    "reason": "O módulo fixo fiscal existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_fiscal",
+    "sourceRowCount": 42,
+    "sourceTable": "tb_admin.permissoes_fiscal",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 264,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "59e25a32fec1c2ded3c3ca28cf640c947065efc958e22269c62ae0c190bae8eb",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "1c2b6a3312494d6624f8ff8e2cf8ca0ea5f975eff35420a76b1448478344ee1b"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Colaborador.php:275",
+        "classes/Usuario.php:101"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 264,
+    "reason": "O módulo fixo integracao existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_integracao",
+    "sourceRowCount": 264,
+    "sourceTable": "tb_admin.permissoes_integracao",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 93,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "59ee3aee826620276eb3156f222923da82c1942996b377aecdf6a2446cb8883d",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "48a1804acc6f0bad8ec1082edf1b420a847362df6f64e55279000aeeb5ee23d6"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Sininho.php:34",
+        "classes/Usuario.php:213"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 93,
+    "reason": "O módulo fixo marketing existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_marketing",
+    "sourceRowCount": 93,
+    "sourceTable": "tb_admin.permissoes_marketing",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 26,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "d8bc7090b561d5466a209a7c26eaa689a33dc28b018406c5ce6a8b7154988613",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "85732fc752fa5b04c13aa96834a89d388909512d4cc704fc57cfdbabade6c75c"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Sininho.php:35",
+        "classes/Usuario.php:227"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 26,
+    "reason": "O módulo fixo parcelamento existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_parcelamento",
+    "sourceRowCount": 26,
+    "sourceTable": "tb_admin.permissoes_parcelamento",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 33,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "c273e8da28af06db7667cbd536bf2fd993476987c4d8f124d39aead819a09a56",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "99ab65966f3cc7d29eccbbcab947569d8ab166622d846ea9d161ece6ab9755dc"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Sininho.php:37",
+        "classes/Usuario.php:283"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 33,
+    "reason": "O módulo fixo pessoal existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_pessoal",
+    "sourceRowCount": 33,
+    "sourceTable": "tb_admin.permissoes_pessoal",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 258,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "bf24fd12a053e0c1ec53e2ec88f56106e58bb577f5191c98715ff755f9f183a9",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "7b686c2b97bf627512905b92d3ebeee365284136c2c9bb392a2b8c8764d275fd"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Colaborador.php:289",
+        "classes/Usuario.php:115"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 258,
+    "reason": "O módulo fixo regularize existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_regularize",
+    "sourceRowCount": 258,
+    "sourceTable": "tb_admin.permissoes_regularize",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 243,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "aa4bd1cf74e6bae7b49f097748d9e5b40bc7c3c7389326eae11ab44e64811dca",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "452258ce773a30c74fbcb2e16a15c2d544ab5d362005b45aea246227901e51d2"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Colaborador.php:317",
+        "classes/Usuario.php:157"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 243,
+    "reason": "O módulo fixo rh existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_rh",
+    "sourceRowCount": 243,
+    "sourceTable": "tb_admin.permissoes_rh",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 82,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "e12a505c41ff3f8b996c7775f1003cea814d7c70e78be70d3425337caa7744d4",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "6a7831ce40dcfa9f095444abb4cee1fb6d7eb5375d1772868831f76d422effe5"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:343",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:21",
+        "infra/prisma/migrations/20260727160000_normalize_permission_levels/migration.sql:41",
+        "services/user-service/src/services/permissionService.ts:38",
+        "shared/src/auth/modules.ts:3"
+      ],
+      "legacy": [
+        "classes/Usuario.php:255",
+        "classes/Usuario.php:258"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 82,
+    "reason": "O módulo fixo triagem existe no contrato Permission atual; o nível legado é incrementado para a faixa atual 0..3 e consolidado pela unique usuário/organização, com conflitos duplicados em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_admin.permissoes_triagem",
+    "sourceRowCount": 82,
+    "sourceTable": "tb_admin.permissoes_triagem",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 306,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "aa308b5af4596bf0e60cf8b14ddc1b5601448c35e84ada47abd3bd5ffc9b7469",
+    "dependencies": [
+      "tb_admin.departamentos"
+    ],
+    "destinationContractDigests": [
+      "37300e477d3aea07fd0ad95fc909e19f1ffda0f35595f44c93ccfa83c194bbf3"
+    ],
+    "destinationStepCount": 1,
+    "domain": "administration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:247"
+      ],
+      "legacy": [
+        "classes/Usuario.php:5",
+        "classes/Usuario.php:41"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 306,
+    "reason": "O usuário administrativo legado corresponde ao User atual e permanece a identidade base.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_admin.usuarios",
+    "sourceRowCount": 306,
+    "sourceTable": "tb_admin.usuarios",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 22,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "a37f3285bbf3cf79a6b72b02b8c7f968e680d6acf82d2626f5759ae5b6bc5baf",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "c6e09081aefbcc330996fa5335bec32bce4cf5eb4420ad4bd8eb64e58e85a799"
+    ],
+    "destinationStepCount": 1,
+    "domain": "shared-email",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:910",
+        "services/src/src/services/EmailService.ts:50"
+      ],
+      "legacy": [
+        "classes/Emails.php:109",
+        "classes/Emails.php:178",
+        "Cada linha é um destinatário independente, identificado pelo id legado."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 22,
+    "reason": "A lista de destinatários e os dois gatilhos de envio possuem contrato atual equivalente.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_cbc.emails",
+    "sourceRowCount": 22,
+    "sourceTable": "tb_cbc.emails",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 1240,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "63cf4aeee599adc88210e820e5181fb3832a641a0f0df15585c1d7ac7ba05f36",
+    "dependencies": [
+      "tb_regularize.clientes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "d20e19db1bcc42beb03ee1f89fc24c48f3c2274d90178d46f750f834617f3e5b"
+    ],
+    "destinationStepCount": 1,
+    "domain": "parcelamento",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1352",
+        "services/parcelamento-service/src/services/panoramaService.ts:160",
+        "services/parcelamento-service/src/services/panoramaService.ts:352"
+      ],
+      "legacy": [
+        "parcelamento/ajax/panorama.php:12",
+        "parcelamento/ajax/panorama.php:110"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 1240,
+    "reason": "O panorama por competência possui contrato atual fiel quando cliente, responsável, competência, estados booleanos e colisão de identidade são resolvidos explicitamente.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "parcelamento:tb_cbc.panorama_parcelamentos",
+    "sourceRowCount": 1240,
+    "sourceTable": "tb_cbc.panorama_parcelamentos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 433,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "c91e3630a6fa94db981db89f4213621c6b6a3318f6cbe22aaaf82736298f5532",
+    "dependencies": [
+      "tb_admin.departamentos",
+      "tb_cbs.estoque_itens",
+      "tb_cbs.estoque_categorias_itens",
+      "tb_cbs.estoque_categorias",
+      "tb_cbs.estoque_localizacoes",
+      "tb_cbs.estoque_andares"
+    ],
+    "destinationContractDigests": [
+      "da47d9a8c6d1f1db4285aecddd0482e39dd9aa97cc7643ad0b73ee4ecf43c087"
+    ],
+    "destinationStepCount": 1,
+    "domain": "stock",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:998",
+        "services/ti-service/src/services/tiStockService.ts:104"
+      ],
+      "legacy": [
+        "classes/Estoque.php:4",
+        "produto_id referencia tb_cbs.estoque_itens.id; localizacao referencia tb_cbs.estoque_localizacoes.id e a categoria é resolvida por tb_cbs.estoque_categorias_itens."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 433,
+    "reason": "O saldo legado vira Stock após resolver item, categoria, localização e departamento pelos vínculos explícitos.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_cbs.estoque",
+    "sourceRowCount": 433,
+    "sourceTable": "tb_cbs.estoque",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 65,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "dab0ce7d6eac5c9bfd51e648122a760180e14b5dfba05518b98b88f4bf6176ee",
+    "dependencies": [
+      "tb_admin.departamentos"
+    ],
+    "destinationContractDigests": [
+      "bc75dbc08e4cb0e3264f2459c0a7aba76bc58604f374a974e6a6f9f7432274d2"
+    ],
+    "destinationStepCount": 1,
+    "domain": "stock",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:985",
+        "services/ti-service/src/services/tiStockService.ts:56"
+      ],
+      "legacy": [
+        "classes/Estoque.php:112",
+        "departamento_id referencia tb_admin.departamentos.id."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 65,
+    "reason": "O catálogo legado de categorias possui entidade atual equivalente em stock.categories.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_cbs.estoque_categorias",
+    "sourceRowCount": 65,
+    "sourceTable": "tb_cbs.estoque_categorias",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 2215,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "d0bb6b1aa98836b34248501fb4a6dd18dc76e649a6d09709c25e98a2e3e2b2da",
+    "dependencies": [
+      "tb_cbs.estoque",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "7b21593cfd834d191e1a075ce2293ec2ea099d1ac4b0df3f0fea49e6f63b6927"
+    ],
+    "destinationStepCount": 1,
+    "domain": "stock",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1019",
+        "services/ti-service/src/services/tiStockService.ts:196"
+      ],
+      "legacy": [
+        "classes/Estoque.php:14",
+        "produto_id referencia tb_cbs.estoque.id, apesar do nome histórico da coluna; repositor referencia tb_admin.usuarios.id."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 2215,
+    "reason": "A entrada de saldo possui entidade atual equivalente em stock.entries.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_cbs.estoque_entradas",
+    "sourceRowCount": 2215,
+    "sourceTable": "tb_cbs.estoque_entradas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 26,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "1021d461857fef02a50de749cc339d7f18ad60dc30041baee5f98b2b6c1799a3",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "584a6cc03eb2f5cde4d845edfb01f45cb096a9c3c0030988866f10ef7bddcf09"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-inventory",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1922",
+        "services/ti-service/src/services/tiInventoryCategoryService.ts:42"
+      ],
+      "legacy": [
+        "classes/Estoque.php:350",
+        "tipo_item e tag formam a categoria consumida pelas telas de inventário legado."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 26,
+    "reason": "O catálogo de tipos e tags do inventário possui contrato atual em tecnologia.inventoryCategories.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_cbs.estoque_inventario",
+    "sourceRowCount": 26,
+    "sourceTable": "tb_cbs.estoque_inventario",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 27,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "2640439cb20e3d8faf49b7ffc964b8df37f8fe9636976e9034eff34b7b7cfdc5",
+    "dependencies": [
+      "tb_cbs.estoque_andares",
+      "tb_admin.departamentos"
+    ],
+    "destinationContractDigests": [
+      "14b747b6eb34073505cbfef416870e3dac0960e0adc59cd650c55aa5416efdfa"
+    ],
+    "destinationStepCount": 1,
+    "domain": "stock",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:970",
+        "services/ti-service/src/services/tiStockService.ts:517"
+      ],
+      "legacy": [
+        "classes/Estoque.php:250",
+        "andar referencia tb_cbs.estoque_andares.id e departamento_id referencia tb_admin.departamentos.id."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 27,
+    "reason": "A localização possui contrato atual e resolve o andar legado antes de normalizar floor.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_cbs.estoque_localizacoes",
+    "sourceRowCount": 27,
+    "sourceTable": "tb_cbs.estoque_localizacoes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 3000,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "cd1fa269abc3e68b7a668c72944ab88c6a7bd7133f0fbc6098090b2498899a51",
+    "dependencies": [
+      "tb_cbs.estoque",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "fed307f882a6e1d8e08a2cb6a83ff5cbc4a8319236777674696b55f690aa0452"
+    ],
+    "destinationStepCount": 1,
+    "domain": "stock",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1033",
+        "services/ti-service/src/services/tiStockService.ts:333"
+      ],
+      "legacy": [
+        "classes/Estoque.php:45",
+        "produto_id referencia tb_cbs.estoque.id; solicitante, autorizador e operador referenciam tb_admin.usuarios.id; qualquer pai não preparado também coloca a saída em quarentena."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 3000,
+    "reason": "O contrato atual cobre somente o subset fiel das saídas: as 1.807 linhas com obs funcional vão integralmente para quarentena porque stock.exits não possui essa coluna; portanto não há equivalência plena para as 3.000 linhas.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_cbs.estoque_saidas",
+    "sourceRowCount": 3000,
+    "sourceTable": "tb_cbs.estoque_saidas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 794,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "bf3798a9ab0429ebda1d7fa70761782690a1abd28a5b28f5c56776ab4b3e7ce7",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "15dd872a8b2175e7d221e71d9524639b72c9b0b3134e221a616dbceab9e301ca"
+    ],
+    "destinationStepCount": 1,
+    "domain": "certificates",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1131",
+        "services/certificate-service/src/services/certificateFileValidation.ts:29",
+        "services/certificate-service/src/services/certificateFileCrypto.ts:35",
+        "services/certificate-service/src/services/certificatePfService.ts:350"
+      ],
+      "legacy": [
+        "classes/Certificado.php:77",
+        "classes/Certificado.php:87"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 794,
+    "reason": "O certificado PF possui contrato atual, com datas e identidade validadas e arquivo somente quando o storage criptografado puder ser comprovado.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "certificates:tb_certificados.pf",
+    "sourceRowCount": 794,
+    "sourceTable": "tb_certificados.pf",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 780,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "84652a149b2333109a7518339dadddc069d2c28fa681ceebc18e12ecc9bf2915",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "0ccbc8b141d82cac7e5ee44a886b50da358d0848a0d83545afbf084b1a9e9c3b"
+    ],
+    "destinationStepCount": 1,
+    "domain": "certificates",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1093",
+        "services/certificate-service/src/services/certificateFileValidation.ts:29",
+        "services/certificate-service/src/services/certificateFileCrypto.ts:35",
+        "services/certificate-service/src/services/certificatePfService.ts:350"
+      ],
+      "legacy": [
+        "classes/Certificado.php:21",
+        "classes/Certificado.php:31"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 780,
+    "reason": "O certificado PJ possui contrato atual, com datas e identidade validadas e arquivo somente quando o storage criptografado puder ser comprovado.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "certificates:tb_certificados.pj",
+    "sourceRowCount": 780,
+    "sourceTable": "tb_certificados.pj",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 362,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "e892d884afb4671cd1cad1272a35b5909fba5f84ad10315c056c6a5f8eafcb5e",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_regularize.clientes"
+    ],
+    "destinationContractDigests": [
+      "2cbbda9acc9e2e2ab8677688efc9515066d883cca0a32774c72687b974d54f77"
+    ],
+    "destinationStepCount": 1,
+    "domain": "accounting",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1199",
+        "services/contabil-service/src/services/responsibleService.ts:53"
+      ],
+      "legacy": [
+        "classes/Cliente.php:1086",
+        "classes/Cliente.php:1096"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 362,
+    "reason": "O indicador de movimento possui campo equivalente em contabil.responsibles e mantém a referência explícita do cliente.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_contabil.clientes_mov",
+    "sourceRowCount": 362,
+    "sourceTable": "tb_contabil.clientes_mov",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 13,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "58a2629a7fe5a81d9e5f5c01d3db751da71d7b4973d1ca66162bd7e125e75c39",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_regularize.clientes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "b975345b44d86d3f7ef870d1c8c9baf07ae4b0922dfae40c05947b00dbd2a38d"
+    ],
+    "destinationStepCount": 1,
+    "domain": "accounting",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:656",
+        "services/client-service/src/services/clientHistoryService.ts:20"
+      ],
+      "legacy": [
+        "classes/Cliente.php:1106",
+        "classes/Cliente.php:1116"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 13,
+    "reason": "A observação, data e autoria possuem contrato equivalente em clients.history, sem concatenar departamento ao texto livre.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_contabil.clientes_observacao",
+    "sourceRowCount": 13,
+    "sourceTable": "tb_contabil.clientes_observacao",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 2763,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "8c4ff3444a95bac7296b55193e3b24e16826fffeb1207393512096441feea613",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_regularize.clientes"
+    ],
+    "destinationContractDigests": [
+      "3e625963a01f52d8df6f17c6240545a1be7c98bc47c9755b6d679cd586b249c8"
+    ],
+    "destinationStepCount": 1,
+    "domain": "accounting",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1169",
+        "services/contabil-service/src/services/controlService.ts:83"
+      ],
+      "legacy": [
+        "classes/Cliente.php:995",
+        "contabil/pages/clientes/cliente.php:416"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 2763,
+    "reason": "O checklist contábil atual preserva a competência, os 17 controles e as observações com semântica comprovada pelas telas legadas.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_contabil.controle",
+    "sourceRowCount": 2763,
+    "sourceTable": "tb_contabil.controle",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 136,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "4c088df6f43acdc6922f207435c41c000adb6182e703d0d626aab8f9445d4e9d",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_regularize.clientes"
+    ],
+    "destinationContractDigests": [
+      "47dddac518491bed15fc4dd5c4f945c2fcd6400129ce3bcfbe91c24dcd4edeed"
+    ],
+    "destinationStepCount": 1,
+    "domain": "accounting",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1214",
+        "services/contabil-service/src/services/relationshipService.ts:57"
+      ],
+      "legacy": [
+        "classes/Cliente.php:1584",
+        "classes/Cliente.php:1594"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 136,
+    "reason": "A relação contábil possui correspondência integral em contabil.relationship.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_contabil.relacoes",
+    "sourceRowCount": 136,
+    "sourceTable": "tb_contabil.relacoes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 368,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "96f9d032d8e675f6936a399b89be5516517b2e642924e7b61246b1ef76e18610",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "022ccbef1e1905863e32e9811173fc0521f6108db5547c4ada2134993bd4673c"
+    ],
+    "destinationStepCount": 1,
+    "domain": "fiscal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1251",
+        "services/fiscal-service/src/services/icmsService.ts:101"
+      ],
+      "legacy": [
+        "classes/Fiscal.php:1396",
+        "classes/Fiscal.php:1450"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 368,
+    "reason": "O catálogo ICMS possui contrato atual equivalente em fiscal.icms; duplicatas naturais idênticas do dump são deduplicadas sem escolher entre valores conflitantes.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_fiscal.icms",
+    "sourceRowCount": 368,
+    "sourceTable": "tb_fiscal.icms",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 11088,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "0a051cb3358af798654cd4c0c4993f5625fc2cd467dc6a3ace428807c41c8fab",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "748c8e95e2b839c22070c6d1ee069240a9e745a7607a9c776cae9579067682c7"
+    ],
+    "destinationStepCount": 1,
+    "domain": "fiscal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1269",
+        "services/fiscal-service/src/services/ipiService.ts:85"
+      ],
+      "legacy": [
+        "classes/Fiscal.php:1488",
+        "classes/Fiscal.php:1495"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 11088,
+    "reason": "O catálogo IPI possui contrato atual equivalente em fiscal.ipi.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_fiscal.ipi",
+    "sourceRowCount": 11088,
+    "sourceTable": "tb_fiscal.ipi",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 31362,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "ea0614a2d523aee8680146a5bfdaa924b336726c0144e42657083783d3de30ed",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "483688c072ec74f2f6542aec7a4eb0580cccab340f21ad70f0304cb88a2bc552"
+    ],
+    "destinationStepCount": 1,
+    "domain": "fiscal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1229",
+        "services/fiscal-service/src/services/ncmService.ts:117"
+      ],
+      "legacy": [
+        "classes/Fiscal.php:1387",
+        "classes/Fiscal.php:1407"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 31362,
+    "reason": "A tributação por NCM possui contrato atual equivalente em fiscal.ncm, incluindo vigência e legislação.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "admin-business:tb_fiscal.tributacao_pis_cofins",
+    "sourceRowCount": 31362,
+    "sourceTable": "tb_fiscal.tributacao_pis_cofins",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 2339,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "14f2b9707432b51be77fee9ba3d46828cdd5e8dc72be22eb6148e659f67747c2",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "47c8f45a7f034f8fde5cbd1a037b85bb57deb6eb8419d34dc938f48f3e1a55e2"
+    ],
+    "destinationStepCount": 1,
+    "domain": "clients",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:536",
+        "services/client-service/src/services/clientService.ts:416"
+      ],
+      "legacy": [
+        "classes/Cliente.php:177",
+        "classes/Cliente.php:228"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 2339,
+    "reason": "O cadastro de Integração é a identidade Client base para projetos e tarefas.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_integracao.clientes",
+    "sourceRowCount": 2339,
+    "sourceTable": "tb_integracao.clientes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 191,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "69405185e74ed5561d8e1c93c2f5c9f52022b088c9a53963784630464a5f867b",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "a9969a8c0945e279610832cb8f89df3500b869f14341c1508b7810af26842e8a"
+    ],
+    "destinationStepCount": 1,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:684"
+      ],
+      "legacy": [
+        "classes/Grupo.php:5",
+        "classes/Grupo.php:14",
+        "classes/Grupo.php:34"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 191,
+    "reason": "O catálogo legado de grupos possui entidade atual equivalente em clients.group.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_integracao.grupos",
+    "sourceRowCount": 191,
+    "sourceTable": "tb_integracao.grupos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 1256,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "0258c1a97b460f96bec88557f4f6f3259b5b6857dd2d926638d9953688527d31",
+    "dependencies": [
+      "tb_integracao.clientes"
+    ],
+    "destinationContractDigests": [
+      "e1a9c6f07fc987fabc6e4570cf6a4a96714b77ecc3e23cc5e8cafe55eeb8775e"
+    ],
+    "destinationStepCount": 1,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:624"
+      ],
+      "legacy": [
+        "classes/PA.php:11",
+        "classes/PA.php:30",
+        "classes/PA.php:39"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 1256,
+    "reason": "O panorama PA por cliente possui identidade e campos equivalentes em clients.pa.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_integracao.pa",
+    "sourceRowCount": 1256,
+    "sourceTable": "tb_integracao.pa",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 3494,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "0f4be0235c25c1ad95e2a86f4ef720c65f835ea1b274f57d38181d6e0248cc57",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "32f88da3f4074f8c7f08d0ce2532603cc35f5794d0233759968f497560759d7a"
+    ],
+    "destinationStepCount": 1,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:656"
+      ],
+      "legacy": [
+        "classes/PA.php:50",
+        "classes/PA.php:58",
+        "classes/PA.php:81"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 3494,
+    "reason": "Cada evento do histórico de PA possui destino fiel em clients.history.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_integracao.pa_historicos",
+    "sourceRowCount": 3494,
+    "sourceTable": "tb_integracao.pa_historicos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 6,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "a5b3843dca56c2a35a4e2255dc728ecef9ce073ec28359cc84d5b2e9243d97e6",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "c4ee78b9b2e351354bf039065c062dfa5d061cc82bec06120b3c09c8fd8d30d5"
+    ],
+    "destinationStepCount": 1,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:814",
+        "services/task-service/src/services/projectPlanService.ts:166"
+      ],
+      "legacy": [
+        "classes/Plano.php:4",
+        "classes/Plano.php:13"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 6,
+    "reason": "O plano legado corresponde diretamente ao ProjectPlan atual.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_integracao.planos",
+    "sourceRowCount": 6,
+    "sourceTable": "tb_integracao.planos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 4682,
+    "cardinality": "1:N",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "a0d9d759bcf9b147712a61f6cd4fecfb171f7704489f9525bde3e9c994639f54",
+    "dependencies": [
+      "tb_integracao.clientes"
+    ],
+    "destinationContractDigests": [
+      "883d2fd9f3ebee8ffdda78377e50fe826c0a7824f13774b4d6d47f8866641b52",
+      "7d40f9b020542eeee684ac3b3f7a004ea9d7ff2f4f3ec692c671c38fcdf7815d"
+    ],
+    "destinationStepCount": 2,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:536",
+        "infra/prisma/schema.prisma:838",
+        "services/project-service/src/services/projectCrudService.ts:125"
+      ],
+      "legacy": [
+        "classes/Prospeccao.php:4",
+        "classes/Prospeccao.php:23"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 2341,
+    "reason": "Campos comerciais complementam Client e o objetivo operacional produz Project.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_integracao.prospeccao_comercial",
+    "sourceRowCount": 2341,
+    "sourceTable": "tb_integracao.prospeccao_comercial",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 127145,
+    "cardinality": "1:N",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "cd195679e1559557d3d88dddf3033f6676e42da5eb535b43f87c2ca898d066e6",
+    "dependencies": [
+      "tb_integracao.tarefas_express",
+      "tb_integracao.prospeccao_comercial",
+      "tb_integracao.clientes",
+      "tb_admin.departamentos",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "fbb6b0fbacd6c208e8fc9e8e810c2e37d8d2aa1663bdf2b1680b647bcd65d872",
+      "6d02a0ae44313bd1f970f57c2b0ab7127158ff2d24eb6404a0e535c01e7a63ba",
+      "6e2867c49a71eb2b11a37560d6fdfd0b4edb22b125e6677b5210905dccd6e637",
+      "2023f1853fd4ef1ec6745147270f2aed402c35dde2406926003d7c4a42ea7916",
+      "06762b932d6872f087399ed24ffc943a7441376838af7f335c16e34216e7f176"
+    ],
+    "destinationStepCount": 5,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:857",
+        "services/task-service/src/services/taskCrudService.ts:275",
+        "services/task-service/src/services/taskModelService.ts:121"
+      ],
+      "legacy": [
+        "classes/Tarefa.php:11",
+        "classes/Tarefa.php:55"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 25429,
+    "reason": "O Task atual exige modelo e projeto coerentes com o cliente, demandando resolução ou derivação.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_integracao.tarefas",
+    "sourceRowCount": 25429,
+    "sourceTable": "tb_integracao.tarefas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 26,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "3b3ccc6b8071822948e38f9011544079fd16ad61a2841bb1e0507ad92d7926eb",
+    "dependencies": [
+      "tb_integracao.tarefas_express"
+    ],
+    "destinationContractDigests": [
+      "9e9018b937d3c9e57a8705203f6c2e4895812bb6acfa32179b390057008b1b10"
+    ],
+    "destinationStepCount": 1,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:800",
+        "services/task-service/src/services/taskDependentService.ts:49"
+      ],
+      "legacy": [
+        "classes/Tarefa.php:119",
+        "classes/Tarefa.php:1000",
+        "classes/Tarefa.php:1036"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 26,
+    "reason": "A dependência entre modelos possui contrato atual equivalente e proíbe auto-relação.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_integracao.tarefas_dependentes",
+    "sourceRowCount": 26,
+    "sourceTable": "tb_integracao.tarefas_dependentes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 386,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "79f3cc4b6d02d8418e0c507a87c527392945eccabdd11f869f0f488dd0f85ac0",
+    "dependencies": [
+      "tb_admin.departamentos",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "af742db6da7788325b1b3c9c1beaeea63659f8f5c49212f01df87b8832b54c00"
+    ],
+    "destinationStepCount": 1,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:774",
+        "services/task-service/src/services/taskModelService.ts:144"
+      ],
+      "legacy": [
+        "classes/Tarefa.php:767",
+        "classes/Tarefa.php:782"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 386,
+    "reason": "A tarefa expressa legada preserva o contrato do TaskModel atual.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_integracao.tarefas_express",
+    "sourceRowCount": 386,
+    "sourceTable": "tb_integracao.tarefas_express",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 0,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "719bd3fb8c7eaf28d246eca4a432a94dc89d3a1a07a51d546254952b66a65243",
+    "dependencies": [
+      "tb_admin.departamentos",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "921252d37f2c039ec8d7f1882b0b0cdd20d730c7e5bf1c347b3dedb381389dfd"
+    ],
+    "destinationStepCount": 1,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:774",
+        "services/task-service/src/services/taskModelService.ts:117"
+      ],
+      "legacy": [
+        "classes/Tarefa.php:684",
+        "classes/Tarefa.php:1112",
+        "classes/Colaborador.php:250"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 0,
+    "reason": "O catálogo legado de distrato corresponde a TaskModel e preserva a origem do modelo mesmo quando o backup não contém linhas.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_integracao.tarefas_express_distrato",
+    "sourceRowCount": 0,
+    "sourceTable": "tb_integracao.tarefas_express_distrato",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 47,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "6beb116a1ffc3c8f7e53c347f3bcf8962008303cf2296e6b7e3aae46d29693d1",
+    "dependencies": [
+      "tb_integracao.planos",
+      "tb_integracao.tarefas_express"
+    ],
+    "destinationContractDigests": [
+      "81e5a1d5ac8a7d8ecaa515a027e641371f513ac817b14fea3385bb5e187f02fc"
+    ],
+    "destinationStepCount": 1,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:825",
+        "services/task-service/src/services/projectPlanService.ts:356"
+      ],
+      "legacy": [
+        "classes/Tarefa.php:1170",
+        "classes/Tarefa.php:1180"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 47,
+    "reason": "A ligação ordenada entre plano e modelo corresponde ao ProjectPlanTasks atual.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_integracao.tarefas_planos",
+    "sourceRowCount": 47,
+    "sourceTable": "tb_integracao.tarefas_planos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 13,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "f88fc00382b66e0dda9fdde420ee5396c2ab28c213f9e1f8b4b24df3d2c8313d",
+    "dependencies": [
+      "tb_integracao.tarefas_express"
+    ],
+    "destinationContractDigests": [
+      "9dff9d6adbc991398fd3510343ebdd4a96cb84763be92192d620375f291f4017"
+    ],
+    "destinationStepCount": 1,
+    "domain": "integration",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1655",
+        "services/task-service/src/services/taskIntegrationRegularizeService.ts:42"
+      ],
+      "legacy": [
+        "classes/Tarefa.php:28",
+        "classes/Tarefa.php:186",
+        "classes/Tarefa.php:833"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 13,
+    "reason": "O vínculo entre modelo de tarefa e tipo Regularize possui contrato atual equivalente.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_integracao.tarefas_regularize",
+    "sourceRowCount": 13,
+    "sourceTable": "tb_integracao.tarefas_regularize",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 205,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "fb17633d6108f36d19c4f1a57cf68c2da151fe4aa66f9f364ec667f5592d5fad",
+    "dependencies": [
+      "tb_regularize.clientes"
+    ],
+    "destinationContractDigests": [
+      "3d12dd0385b07457b2cd48b091017497635d345b7f460d789cdc8a9d87290e46"
+    ],
+    "destinationStepCount": 1,
+    "domain": "marketing",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:536",
+        "services/client-service/src/services/clientIntegrationService.ts:180"
+      ],
+      "legacy": [
+        "marketing/pages/clientes/cliente.php:6",
+        "cliente_id referencia tb_regularize.clientes.codigo; o cliente_id dessa origem governa a identidade canônica V2."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 205,
+    "reason": "O Instagram complementa o Client canônico resolvido pelo código Regularize legado.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_mkt.redes_sociais",
+    "sourceRowCount": 205,
+    "sourceTable": "tb_mkt.redes_sociais",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 54,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "a7feae41b394e989a538da1237a09f777df8af1315768a07ca57c45426070acb",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "150d86a6791823999f309c797f59d55115cba57c7bab47bf40b1eb1d346bde8c"
+    ],
+    "destinationStepCount": 1,
+    "domain": "marketing",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1283",
+        "services/src/src/services/mkt/PasswordService.ts:20"
+      ],
+      "legacy": [
+        "classes/Senhas.php:10",
+        "local e user são a chave natural verificada pelo CRUD legado; password é segredo e qualquer repetição em obs bloqueia a linha completa."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 54,
+    "reason": "O contrato atual exige criptografia antes da emissão; 2 das 54 linhas têm obs contendo o próprio segredo e ficam integralmente em quarentena, sem copiar ou redigir parcialmente notes.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_mkt.senhas",
+    "sourceRowCount": 54,
+    "sourceTable": "tb_mkt.senhas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 13,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "d0a14f539d837d9ecfad1a7faacca24eeff3983676a5f40d75497b996192ccfe",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "6dc9bfe06ab0caed351f250289dc1ce4eeff01f0a6a3c38e5a92fad6381a8e55"
+    ],
+    "destinationStepCount": 1,
+    "domain": "parcelamento",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:536"
+      ],
+      "legacy": [
+        "classes/Parcelamento.php:48"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 13,
+    "reason": "Clientes externos são resolvidos por lookup explícito no catálogo Client atual, sem fabricar cadastro incompleto.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "parcelamento:tb_parcelamento.clientes",
+    "sourceRowCount": 13,
+    "sourceTable": "tb_parcelamento.clientes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 510,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "cf6d57ce4e44b24bd16796fa68f3e013d2c1a0b443c4864669cfaa0aa8dd629a",
+    "dependencies": [
+      "tb_parcelamento.parcelamentos"
+    ],
+    "destinationContractDigests": [
+      "66edf4da90e1e6bf2262b9dbf3881c76491d7b455cc8a63fb5df34b3a4120af6"
+    ],
+    "destinationStepCount": 1,
+    "domain": "parcelamento",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1330",
+        "services/parcelamento-service/src/services/installmentCompetencyService.ts:138"
+      ],
+      "legacy": [
+        "classes/Parcelamento.php:57",
+        "classes/Parcelamento.php:86"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 510,
+    "reason": "A competência possui contrato atual quando acordo, competência YYYY-MM e estados tri-state forem resolvidos sem ambiguidade.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "parcelamento:tb_parcelamento.competencia",
+    "sourceRowCount": 510,
+    "sourceTable": "tb_parcelamento.competencia",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 276,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "5b1a0bf8266f76a2a35a182ac64b403ec1a7f7eea52d6b5ffbb492ff67f8c0e2",
+    "dependencies": [
+      "tb_parcelamento.clientes",
+      "tb_regularize.clientes"
+    ],
+    "destinationContractDigests": [
+      "5b106078f5619855d256d2e4b51a3b80ce1ec96f55a0372ee2254da39cbf8a7c"
+    ],
+    "destinationStepCount": 1,
+    "domain": "parcelamento",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1297",
+        "infra/prisma/schema.prisma:1311",
+        "infra/prisma/migrations/20260710120000_parcelamento_agreement_identity/migration.sql:1",
+        "services/parcelamento-service/src/services/installmentService.ts:196",
+        "services/parcelamento-service/src/services/installmentService.ts:449"
+      ],
+      "legacy": [
+        "classes/Parcelamento.php:5",
+        "classes/Parcelamento.php:15"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 276,
+    "reason": "O acordo possui contrato atual e identidade fallback explícita, inclusive com enrollment_date null; cliente, datas não nulas, estados e colisões são validados por emissão.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "parcelamento:tb_parcelamento.parcelamentos",
+    "sourceRowCount": 276,
+    "sourceTable": "tb_parcelamento.parcelamentos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 41628,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "ec5e59b60806252f25c4ece4d61b49c0344bcb8355f00edc8ed35e29a8c0931a",
+    "dependencies": [
+      "tb_admin.usuarios",
+      "tb_regularize.clientes"
+    ],
+    "destinationContractDigests": [
+      "244bc09793b262ef9df8d8b5bf86d45f4d0f0ab4458a2e391ac4450dbf8c2660"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pec",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1054",
+        "services/src/src/services/NoteService.ts:40"
+      ],
+      "legacy": [
+        "pec/pages/notas/cliente-nota.php:39",
+        "usuario_id referencia tb_admin.usuarios.id; cliente_id referencia tb_regularize.clientes.codigo e zero significa nota interna sem cliente."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 41628,
+    "reason": "A nota semanal PEC possui contrato atual equivalente em notes, inclusive continuidade e cliente opcional.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_pec.notas",
+    "sourceRowCount": 41628,
+    "sourceTable": "tb_pec.notas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 96,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "c424c609b2e889b1d26ee8e250506e6b67e67959dc778836bd0cc0fa4737243e",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "393c2d53b3cf1917bea3670a9d853e9074ac47e47640d8983b9eca956a34119e"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pessoal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1391",
+        "services/pessoal-service/src/services/passwordService.ts:292",
+        "services/pessoal-service/src/services/pessoalPasswordCrypto.ts:30"
+      ],
+      "legacy": [
+        "classes/Pessoal.php:7",
+        "classes/Pessoal.php:70"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 96,
+    "reason": "As credenciais BEM formam um PasswordPessoal por cliente, sempre com campos secretos criptografados.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_pessoal.bem",
+    "sourceRowCount": 96,
+    "sourceTable": "tb_pessoal.bem",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 46,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "0dffce725b6505fead05788b539869536fc26e0f62021a3329fca2e9f899d3b9",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "1e957eee6b6fb31fac10deb128f18520ddcbeac985ea51b796663f7655df2df8"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pessoal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1391",
+        "services/pessoal-service/src/services/passwordService.ts:292",
+        "services/pessoal-service/src/services/pessoalPasswordCrypto.ts:30"
+      ],
+      "legacy": [
+        "classes/Pessoal.php:9",
+        "classes/Pessoal.php:61"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 46,
+    "reason": "As credenciais BSF formam um PasswordPessoal por cliente, sempre com campos secretos criptografados.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_pessoal.bsf",
+    "sourceRowCount": 46,
+    "sourceTable": "tb_pessoal.bsf",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 28,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "71372369952b4467829398b4725d0f7bd2bd47bdf1d189616a5df05f21f5eab0",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "da678216f4bb9748a5318574a78cc227a9aff7f3af4609d66657da270bebf3fe"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pessoal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1474",
+        "services/pessoal-service/src/services/situationService.ts:51"
+      ],
+      "legacy": [
+        "classes/Pessoal.php:276",
+        "classes/Pessoal.php:290"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 28,
+    "reason": "O histórico de situações possui contrato atual equivalente em pessoal.situations.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_pessoal.clientes_situacoes",
+    "sourceRowCount": 28,
+    "sourceTable": "tb_pessoal.clientes_situacoes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 15,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "0cde9ea7fb29d77229e92832b07692381ae5c65130532d4b99dbf4564cdf2de8",
+    "dependencies": [
+      "tb_integracao.clientes"
+    ],
+    "destinationContractDigests": [
+      "ba925dd72ef768622e2d513342b3981bfb35859d9c3641c2cf080d8e03c1c575"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pessoal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1391",
+        "services/pessoal-service/src/services/passwordService.ts:292",
+        "services/pessoal-service/src/services/pessoalPasswordCrypto.ts:30"
+      ],
+      "legacy": [
+        "classes/Pessoal.php:27",
+        "classes/Pessoal.php:79"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 15,
+    "reason": "Os códigos de acesso formam um PasswordPessoal por cliente, sem preservar certificado ou segredo em claro.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_pessoal.codigos_acesso",
+    "sourceRowCount": 15,
+    "sourceTable": "tb_pessoal.codigos_acesso",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 11,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "949847c3d168a409c922dd363264657fbe408fa2966e8f14c30e22bd85738361",
+    "dependencies": [
+      "tb_integracao.clientes"
+    ],
+    "destinationContractDigests": [
+      "06a4f464df0d849db8392650aa9f67942c46859b42db70e8f20a3233e22fe220"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pessoal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1391",
+        "services/pessoal-service/src/services/passwordService.ts:292",
+        "services/pessoal-service/src/services/pessoalPasswordCrypto.ts:30"
+      ],
+      "legacy": [
+        "classes/Pessoal.php:47",
+        "classes/Pessoal.php:97"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 11,
+    "reason": "As credenciais de contribuição assistencial formam um PasswordPessoal criptografado por cliente.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_pessoal.contri_assis",
+    "sourceRowCount": 11,
+    "sourceTable": "tb_pessoal.contri_assis",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 163,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "a14af476dcc54fb92a57325290692780a5fa9cc9cd6231cf55daefe7a07ff6c6",
+    "dependencies": [
+      "tb_integracao.clientes"
+    ],
+    "destinationContractDigests": [
+      "7a9a117518ea0deba628481e9f81baf9412f89e6e4e13c2d54a5de48e3b8f4d2"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pessoal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1391",
+        "services/pessoal-service/src/services/passwordService.ts:292",
+        "services/pessoal-service/src/services/pessoalPasswordCrypto.ts:30"
+      ],
+      "legacy": [
+        "classes/Pessoal.php:37",
+        "classes/Pessoal.php:88"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 163,
+    "reason": "Login e email do Empregador Web são credenciais e formam um PasswordPessoal criptografado por cliente.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_pessoal.empregador_web",
+    "sourceRowCount": 163,
+    "sourceTable": "tb_pessoal.empregador_web",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 185,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "aa9f7377de931017323a7a4a193a623bd2e7da64905016f71ae0042a603bf09c",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_admin.usuarios",
+      "tb_pessoal.sindicato"
+    ],
+    "destinationContractDigests": [
+      "9337085a43c6f37bd16acb42e237de240c6e10b4c86454d6808e14714995720a"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pessoal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1421",
+        "services/pessoal-service/src/services/payrollService.ts:71"
+      ],
+      "legacy": [
+        "classes/Pessoal.php:163",
+        "classes/Pessoal.php:216"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 185,
+    "reason": "A configuração de folha possui contrato atual equivalente e identidade única pelo cliente.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_pessoal.folhas",
+    "sourceRowCount": 185,
+    "sourceTable": "tb_pessoal.folhas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 958,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "eeceac9a9321073e6242ef969ae75b13c6cca232e3e4d9c81fffc883a285c1fa",
+    "dependencies": [
+      "tb_integracao.clientes"
+    ],
+    "destinationContractDigests": [
+      "03f7b060c512839b7521fe0dae32172110fcda12ea006a8080fd38eb3340e15b"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pessoal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1375",
+        "services/pessoal-service/src/services/lddService.ts:44"
+      ],
+      "legacy": [
+        "classes/Pessoal.php:113",
+        "classes/Pessoal.php:132"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 958,
+    "reason": "O controle LDD possui contrato atual equivalente em pessoal.ldd.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_pessoal.ldd",
+    "sourceRowCount": 958,
+    "sourceTable": "tb_pessoal.ldd",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 1881,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "0aae924fe0a2102ed50a9834e2c98432ca2c235d140387d2252c27775c3de916",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "3c225199d436a49e6bcc07f4e59a45737a53bbb57aef41cc9d38d130ee086323"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pessoal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1451",
+        "infra/prisma/schema.prisma:1469",
+        "services/pessoal-service/src/services/obligationService.ts:106"
+      ],
+      "legacy": [
+        "classes/Pessoal.php:213",
+        "classes/Pessoal.php:239"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 1881,
+    "reason": "A obrigação possui contrato equivalente e unicidade atual por organização, cliente e competência.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_pessoal.obrigacoes",
+    "sourceRowCount": 1881,
+    "sourceTable": "tb_pessoal.obrigacoes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 22,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "4159aab95627682139bd13a09948092b1bcbda8920a871349d96cd1a00f053d5",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "43b8450032e874b6ebbc6ecd48d45befed425299878fe4f89e0fe09dbac30ad1"
+    ],
+    "destinationStepCount": 1,
+    "domain": "pessoal",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1409",
+        "services/pessoal-service/src/services/unionService.ts:135"
+      ],
+      "legacy": [
+        "classes/Pessoal.php:317",
+        "classes/Pessoal.php:364"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 22,
+    "reason": "O sindicato possui contrato atual equivalente e a aplicação evita duplicidade por organização, nome, CNPJ e data-base.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_pessoal.sindicato",
+    "sourceRowCount": 22,
+    "sourceTable": "tb_pessoal.sindicato",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 340,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "b05c5a7ed437d86b7a8f08a9af47b492e8d9ca81e9098db965f7774ee2a2af83",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_regularize.clientes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "7e55adece383efc4f51d440fab32b2cf1666beac9b91224e363cff38ca44c2ee"
+    ],
+    "destinationStepCount": 1,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1523",
+        "services/regularize-service/src/services/licenseService.ts:60"
+      ],
+      "legacy": [
+        "classes/Alvara.php:7",
+        "classes/Alvara.php:18"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 340,
+    "reason": "O alvará legado corresponde diretamente ao License atual com reconciliação de cliente.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_regularize.alvaras",
+    "sourceRowCount": 340,
+    "sourceTable": "tb_regularize.alvaras",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 2638,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "6cd457668b9f007e38801fcb7fb38702a0b3ee412830f2c4f4de3b61b8790a11",
+    "dependencies": [
+      "tb_integracao.clientes"
+    ],
+    "destinationContractDigests": [
+      "c731e787b7a27cca269ef81a5f593346875b54ab5d70fa2c856806a18351d595",
+      "8c5659dc4eff4e5a376bbab9a2064f03658d5a186939137a526c7e3411b7af3c"
+    ],
+    "destinationStepCount": 2,
+    "domain": "clients",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:536",
+        "services/client-service/src/services/clientService.ts:416"
+      ],
+      "legacy": [
+        "classes/Cliente.php:535",
+        "classes/Cliente.php:619"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 1319,
+    "reason": "O vínculo explícito governa merge; sem vínculo, o cliente Regularize continua entidade própria.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_regularize.clientes",
+    "sourceRowCount": 1319,
+    "sourceTable": "tb_regularize.clientes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 16150,
+    "cardinality": "1:N",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "9a362221bc7ee7168d332ba8762b2b552f760bd622c246af7ca6212f6596867b",
+    "dependencies": [
+      "tb_regularize.clientes",
+      "tb_integracao.clientes"
+    ],
+    "destinationContractDigests": [
+      "641064345c169917e3e33da70ce7505c2b18f61bd4ded772d18cbd1384fec35d",
+      "895715acd0b9f528f9b538a2cdf9788dff0d804c27e1d4753679e95fc9e15d79",
+      "264127fa9389b418aaeb47db294cc6c7958b8ad8f8b88e28ac68d42bc8767f9e",
+      "ffb2c7bb939bf5cb51d6bc73eb84ea1cd40f5b8a24a49cfdb20e5771fc61d45a",
+      "b1b67d359e38a1b414309d53d90763f54727ba8954970d4293f8a599fddf1403",
+      "7e0f320f80fa20c8a48110e8797fd58baeb9a18901e3a687d64f493e79b43243",
+      "e028a504e97b9f8485ff58ecdacbd995268930826defc21a97b46d9da554bbbe",
+      "71bdc5854a6bb3dfed71bf2d2dcb738e453f6bcf2d86d742871fa6990057d412",
+      "517bc017d7336958f49bb1650679d1fc6b01339b30e73cd5b34156942b264a33",
+      "2ffa2ff30721644581de46e7c92eabb7df7ed404588cbb7c68a00cfd680b6d7a",
+      "758e53067b4b540d69b25efd761923d1334612faa319318827d8de8157325da0",
+      "d7249ae9df3f571b9236b49eace33f1263568609e6ed25a64f3daab0721a30d7",
+      "8ec75151840ff142f318e1278c14eba406bcb604d63a3dca79d7d9f2d432e48a",
+      "ee2cd33074cce70f0a274575be8eef098f2cdebef52a0111b31543a3c85d552e",
+      "6473985d3a8b0cff93bc24e4c8020b135c6224541d2c812fabc56de99c091abe",
+      "9307f24a92a56ccb27337fae06e1c5189a9d3575d6b0356ddcddef04732be241",
+      "a7361c91ee079023f04f72c205c4dd26e47000154cae811d6e5849cc7a336f03",
+      "4df491480df5002823df0f4b5fe37be8bee9efaa858878cdf605b2da4b7d2318",
+      "ec68440f4a700753179e4269ed19fa2450db77114007348964c93a6873ea3788"
+    ],
+    "destinationStepCount": 19,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1493",
+        "infra/prisma/schema.prisma:1508",
+        "services/regularize-service/src/services/passwordService.ts:58",
+        "services/regularize-service/src/services/passwordService.ts:66"
+      ],
+      "legacy": [
+        "classes/Cliente.php:665",
+        "regularize/ajax/senhas.php:20"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 850,
+    "reason": "A linha larga legada expande em sites lógicos e credenciais 1:N criptografadas.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_regularize.clientes_senhas",
+    "sourceRowCount": 850,
+    "sourceTable": "tb_regularize.clientes_senhas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 111,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "6eb2c33cab2c666c039e85006cbaf62dfb9a649237da64176b08e148fd852c2c",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "22d9db585f05b99bc80ea60c1eeed798d24443f61d1907b13fa7d369d2f336cc"
+    ],
+    "destinationStepCount": 1,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:684"
+      ],
+      "legacy": [
+        "classes/Grupo.php:101",
+        "classes/Grupo.php:110",
+        "classes/Grupo.php:142"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 111,
+    "reason": "O grupo Regularize possui entidade atual equivalente em clients.group.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_regularize.grupos",
+    "sourceRowCount": 111,
+    "sourceTable": "tb_regularize.grupos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 339,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "c4fbba5131df42b5f687c1e9243e3092efde1eb3310bf020c1ae32eae4479047",
+    "dependencies": [
+      "tb_regularize.grupos",
+      "tb_regularize.clientes"
+    ],
+    "destinationContractDigests": [
+      "e573c40681f1c4d84c439fe180e89b7ff5f46716741e081d1f2fb24366600b2a"
+    ],
+    "destinationStepCount": 1,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:695"
+      ],
+      "legacy": [
+        "classes/Grupo.php:150",
+        "classes/Grupo.php:158",
+        "regularize/pages/relatorios/padrao.php:769"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 339,
+    "reason": "A associação explícita cliente-grupo possui destino fiel em clients.clientsGroup.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_regularize.grupos_integrantes",
+    "sourceRowCount": 339,
+    "sourceTable": "tb_regularize.grupos_integrantes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 1323,
+    "cardinality": "1:N",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "d1fe596f7b07aec50b21f2d4533e370dee89045131729d6e759b5ad463177943",
+    "dependencies": [
+      "tb_regularize.processos",
+      "tb_regularize.clientes"
+    ],
+    "destinationContractDigests": [
+      "2e2d32783b39eebb534a536d0a510d898d7c8a0557389a73fe3735694d79e704",
+      "c690c4b03a12a3b28d223a9fc10348de5dcbea323906995c7869f257e86d9088",
+      "3f03de6acdd0f841bcf3ce4f17c82fff600f7f86212d3e7b655ad0149cbd6ba7"
+    ],
+    "destinationStepCount": 3,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1549",
+        "infra/prisma/schema.prisma:1580",
+        "services/regularize-service/src/services/guidanceService.ts:25"
+      ],
+      "legacy": [
+        "classes/Processo.php:136",
+        "classes/Processo.php:146"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 441,
+    "reason": "ProceduralGuidance exige Process, portanto orientações autônomas derivam processo técnico primeiro.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_regularize.orientaoes_processual",
+    "sourceRowCount": 441,
+    "sourceTable": "tb_regularize.orientaoes_processual",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 2546,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "9d0d3b5051543f7c84fc89163a3fce54a64aaf922515f8a0b6c01aa110aaa022",
+    "dependencies": [
+      "tb_regularize.orientaoes_processual"
+    ],
+    "destinationContractDigests": [
+      "cbb24efa20239ef3b03332c86b66e967d18a89f6a8b27e25125f9c85d5da311a"
+    ],
+    "destinationStepCount": 1,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1580",
+        "services/regularize-service/src/schemas/guidance.schemas.ts:3",
+        "services/regularize-service/src/services/guidanceService.ts:122"
+      ],
+      "legacy": [
+        "classes/Processo.php:277",
+        "classes/Processo.php:281",
+        "regularize/ajax/processo.php:34"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 2546,
+    "reason": "As atividades filhas agregam no JSON economic_activities da orientação, sem fabricar relação com o catálogo homônimo.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_regularize.orientaoes_processual.atividades",
+    "sourceRowCount": 2546,
+    "sourceTable": "tb_regularize.orientaoes_processual.atividades",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 538,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "26c3ea0984d045cc4e0d720fa7988add6686a9d8cbc2305ca3fec06ef3d1e3bb",
+    "dependencies": [
+      "tb_regularize.orientaoes_processual"
+    ],
+    "destinationContractDigests": [
+      "3d79044f2d35b3d576572ae33f28d984de8626b748a7e74001db7f793db08deb"
+    ],
+    "destinationStepCount": 1,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1599",
+        "services/regularize-service/src/schemas/guidance.schemas.ts:12",
+        "services/regularize-service/src/services/guidanceService.ts:32"
+      ],
+      "legacy": [
+        "classes/Processo.php:302",
+        "classes/Processo.php:317"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 538,
+    "reason": "Sócios da orientação pertencem ao JSON partners da orientação, não a identidades globais PF/PJ.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_regularize.orientaoes_processual.socios",
+    "sourceRowCount": 538,
+    "sourceTable": "tb_regularize.orientaoes_processual.socios",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 1287,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "a15ba5fcaf6ece6565428fba4a95f87fdc5cd5c36bcdc6df97b31c287ddb2a07",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "c9897ed87d02448bc23bc45a2e1cbc984d72cf7409ace6a0633ddf6135b766ee"
+    ],
+    "destinationStepCount": 1,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:740",
+        "services/regularize-service/src/services/clientPfService.ts:66"
+      ],
+      "legacy": [
+        "classes/PF.php:4",
+        "classes/PF.php:14",
+        "classes/PF.php:16"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 1287,
+    "reason": "O cadastro PF possui contrato atual equivalente em clients.pf.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_regularize.pf",
+    "sourceRowCount": 1287,
+    "sourceTable": "tb_regularize.pf",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 1437,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "eb894c95cd444f7ddb3ef09b296a05a27a3b701909b032b0624992f73b29fb44",
+    "dependencies": [
+      "tb_regularize.pf",
+      "tb_regularize.clientes"
+    ],
+    "destinationContractDigests": [
+      "96a6aaf66344ed5760761d897d50057cf8f85d4207c37528ffb6d9026e1feacc"
+    ],
+    "destinationStepCount": 1,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1607",
+        "services/regularize-service/src/services/partnersService.ts:32"
+      ],
+      "legacy": [
+        "classes/PF.php:90",
+        "classes/PF.php:100",
+        "regularize/pages/pf/pf.php:118"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 1437,
+    "reason": "A participação PF-PJ possui destino fiel em regularize.partners.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_regularize.pf_empresas",
+    "sourceRowCount": 1437,
+    "sourceTable": "tb_regularize.pf_empresas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 1117,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "4f5b0edf5c5dc335b7a4911a86e58ae7f1d95097770db1b0f754e902f7da333f",
+    "dependencies": [
+      "tb_integracao.clientes",
+      "tb_regularize.clientes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "3db29b3826772092d89d6d905034c69ec20dd63181319d42fa4b5340caf41982"
+    ],
+    "destinationStepCount": 1,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1549",
+        "services/regularize-service/src/services/processService.ts:55"
+      ],
+      "legacy": [
+        "classes/Processo.php:7",
+        "classes/Processo.php:19"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 1117,
+    "reason": "O processo legado corresponde ao Process atual; campos sem contrato ficam explicitamente descartados.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_regularize.processos",
+    "sourceRowCount": 1117,
+    "sourceTable": "tb_regularize.processos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 8,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "34feffd94ea38f13df8708d2d893a2a72c4e5e556485c4f4cb6950fb4af40e6a",
+    "dependencies": [
+      "tb_regularize.clientes",
+      "tb_integracao.clientes"
+    ],
+    "destinationContractDigests": [
+      "f3aa09418307da2d62c3fa75dc35533104dc26178e5a6cad3b840691ea2eeabb"
+    ],
+    "destinationStepCount": 1,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1622",
+        "services/regularize-service/src/services/municipalTaxesService.ts:89"
+      ],
+      "legacy": [
+        "classes/Taxas.php:13",
+        "classes/Taxas.php:23"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 8,
+    "reason": "TFF e TLP legados correspondem ao MunicipalTaxes atual; TLL recebe defaults explícitos.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_regularize.taxas_municipais",
+    "sourceRowCount": 8,
+    "sourceTable": "tb_regularize.taxas_municipais",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 362,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "e126bdde166123da70b6d1a28948979d0e2bac3661e2554d6412c7bc8727ae20",
+    "dependencies": [
+      "tb_regularize.pf"
+    ],
+    "destinationContractDigests": [
+      "597c66efa405048c1a7c530b6911e876f94314cbd41dbc89b40c79112640e79d",
+      "087b1ec843e2e6a19a6a827b40f56762e293408546acaf2aac678215d527b829"
+    ],
+    "destinationStepCount": 2,
+    "domain": "regularize",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:740",
+        "services/regularize-service/src/services/clientPfService.ts:8"
+      ],
+      "legacy": [
+        "classes/PF.php:53",
+        "classes/PF.php:62",
+        "regularize/pages/pf/pf.php:120"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 181,
+    "reason": "Datas de expedição e vencimento agregam por tipo nos campos RG ou CNH do mesmo ClientPF resolvido.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "integracao-regularize:tb_regularize.vencimento",
+    "sourceRowCount": 181,
+    "sourceTable": "tb_regularize.vencimento",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 24,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "ef29e0ea2ceaf3b839baa35b2ae60649b7325a52a3e621501acd8fc7c6bcf2d3",
+    "dependencies": [
+      "tb_rh.colaboradores",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "8d596d8ec1a6a18cceabe2af9091c1a3271d7becc05faee5ee922efe050a2418"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:247"
+      ],
+      "legacy": [
+        "classes/Colaborador.php:103",
+        "classes/Colaborador.php:113"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 24,
+    "reason": "Alergias complementam por merge a identidade User ligada ao colaborador.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.alergias",
+    "sourceRowCount": 24,
+    "sourceTable": "tb_rh.alergias",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 590,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "909ba69608a763304b24536a8e2ae3cb8620d64c8f63f23356ab8c267fb893ce",
+    "dependencies": [
+      "tb_admin.usuarios",
+      "tb_admin.departamentos",
+      "tb_rh.cargos"
+    ],
+    "destinationContractDigests": [
+      "85524ac7c371f7928307738ff0767f6bc73b5a1bb6643e5468d8bb0697072069",
+      "2f71909e181abbfddca99c1563cc5b9ace57adc38f9a9feb75ba3692015c8a3d"
+    ],
+    "destinationStepCount": 2,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:247",
+        "infra/prisma/schema.prisma:269"
+      ],
+      "legacy": [
+        "classes/Colaborador.php:24",
+        "classes/Colaborador.php:83",
+        "rh/pages/colaboradores/colaborador.php:485",
+        "rh/pages/colaboradores/colaborador.php:611"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 295,
+    "reason": "Os dados do colaborador complementam o User; cargo exige resolver a FK legada para nome antes do merge opcional em job_title.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "v2:tb_rh.colaboradores",
+    "sourceRowCount": 295,
+    "sourceTable": "tb_rh.colaboradores",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 185,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "08cd82f43683226c180723c9b233172e3bce6a01c646d2fe66bfa018fce2701a",
+    "dependencies": [
+      "tb_rh.colaboradores",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "125611c4e727da09448d7ecaee46958dffea46df1c37a06ae0256b11b7b312d6"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:247"
+      ],
+      "legacy": [
+        "classes/Colaborador.php:91",
+        "classes/Colaborador.php:95"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 185,
+    "reason": "Contatos de emergência complementam por merge a identidade User do colaborador.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.contatos_emergencia",
+    "sourceRowCount": 185,
+    "sourceTable": "tb_rh.contatos_emergencia",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 0,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "d5b27e222db0c7f337d08bc71c21eb6f117e1fdd392faa5bd9bb81fa4adf276a",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "aecfc875f86866567b5d750b99624e523e061315051561d4b82b99bb88eff2cd"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1762",
+        "services/rh-service/src/services/holidayService.ts:40"
+      ],
+      "legacy": [
+        "classes/RH.php:869",
+        "classes/RH.php:886"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 0,
+    "reason": "O cadastro de feriados possui contrato atual equivalente em rh.holidays.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.feriados",
+    "sourceRowCount": 0,
+    "sourceTable": "tb_rh.feriados",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 38,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "ff90e4120d944bbb24b8cc6c51208a2044b0d6474ba1f84b74ff8f232852ef4e",
+    "dependencies": [
+      "tb_rh.colaboradores"
+    ],
+    "destinationContractDigests": [
+      "fb8fd622b366c5960e747e3d4a3ca3b66575af666e30008c0e873165651d349c"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1670",
+        "services/rh-service/src/services/pointConfigService.ts:33"
+      ],
+      "legacy": [
+        "classes/RH.php:348",
+        "classes/RH.php:389"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 38,
+    "reason": "A jornada configurada do colaborador possui contrato atual em rh.pointConfig.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.pontos",
+    "sourceRowCount": 38,
+    "sourceTable": "tb_rh.pontos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 2,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "459eab64ca94a526ce49f659f5b40195dfec27aca0e2ca546ed69f99b1a78cb0",
+    "dependencies": [
+      "tb_rh.colaboradores"
+    ],
+    "destinationContractDigests": [
+      "cbc60a549341a78c35bc6f3a320c7dfa38e5c934f20da4394c7d274cb292d5ed"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1704",
+        "services/rh-service/src/services/timeBankReleaseService.ts:61"
+      ],
+      "legacy": [
+        "classes/RH.php:827",
+        "classes/RH.php:836",
+        "classes/RH.php:844"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 2,
+    "reason": "Ajustes adicionais de folha possuem contrato atual em rh.timeBankReleases.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.pontos_adicionais_folhas",
+    "sourceRowCount": 2,
+    "sourceTable": "tb_rh.pontos_adicionais_folhas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 80,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "3f94b5c933d1fef20f788316edf229ec3dcbaf629ed030c1737293b6c46ba379",
+    "dependencies": [
+      "tb_rh.colaboradores"
+    ],
+    "destinationContractDigests": [
+      "82cc0e3f008c3d745c6423518ee349e1e1b1e9fc31883215d47a2b3ed421aa23"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1687",
+        "services/rh-service/src/services/timeSheetService.ts:151"
+      ],
+      "legacy": [
+        "classes/RH.php:737",
+        "classes/RH.php:775"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 80,
+    "reason": "Folhas de ponto por período possuem contrato atual em rh.timeSheets.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.pontos_folhas",
+    "sourceRowCount": 80,
+    "sourceTable": "tb_rh.pontos_folhas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 2289,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "a665342f3df9b7770b74c4cc3f11684609fdb31659a7b949c3b1461c98a96e76",
+    "dependencies": [
+      "tb_rh.colaboradores"
+    ],
+    "destinationContractDigests": [
+      "bcee42a68b3040277bbd77b77a836673458de1081882d64096bbc953115c4255"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1720",
+        "services/rh-service/src/services/pointService.ts:123"
+      ],
+      "legacy": [
+        "classes/RH.php:401",
+        "classes/RH.php:475"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 2289,
+    "reason": "Registros diários de ponto possuem contrato atual em rh.points.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.pontos_registros",
+    "sourceRowCount": 2289,
+    "sourceTable": "tb_rh.pontos_registros",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 138,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "8ad1ebfc70e868db53e57e9b1b4177ca865d59ea9377f378050e9805c6e7a387",
+    "dependencies": [
+      "tb_rh.colaboradores",
+      "tb_rh.pontos_registros"
+    ],
+    "destinationContractDigests": [
+      "4bce48a26e4c4c570986fda53141d59cbd06511dccf594bbe45d554b343a433a"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1739",
+        "services/rh-service/src/services/timeClockRequestService.ts:59"
+      ],
+      "legacy": [
+        "classes/RH.php:664",
+        "classes/RH.php:697",
+        "classes/RH.php:710"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 138,
+    "reason": "Solicitações de ajuste de ponto possuem contrato atual em rh.timeClockRequest.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.pontos_solicitacoes",
+    "sourceRowCount": 138,
+    "sourceTable": "tb_rh.pontos_solicitacoes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 154,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "5facecd8f12b2c1f2b6e8f04c039d116cdc7971dd12ec3367a7e4e21257f77cd",
+    "dependencies": [
+      "tb_rh.colaboradores"
+    ],
+    "destinationContractDigests": [
+      "38df458476e2f4ad2a360693eac6cf520c306be9f3312c62124c47e949bd43d4"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1773",
+        "services/rh-service/src/services/scoreQuarterService.ts:52"
+      ],
+      "legacy": [
+        "classes/Score.php:5",
+        "classes/Score.php:229"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 154,
+    "reason": "O score trimestral consolidado possui contrato atual em rh.score.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.score",
+    "sourceRowCount": 154,
+    "sourceTable": "tb_rh.score",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 1158,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "d1b42731273a2e395dd791fa0d544799959392cb06286a2785a2303ac767f6c9",
+    "dependencies": [
+      "tb_rh.score",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "bcf80c3469b61473645fe8383020ca783c76dbe7d2c5afbf018f9285e754fcd1"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1822",
+        "services/rh-service/src/services/scoreEvaluationService.ts:38"
+      ],
+      "legacy": [
+        "classes/Score.php:17",
+        "classes/Score.php:523",
+        "classes/Score.php:651"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 1158,
+    "reason": "Avaliações de score são agregadas no JSON answers de rh.score_evaluations.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.score_avaliacoes",
+    "sourceRowCount": 1158,
+    "sourceTable": "tb_rh.score_avaliacoes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 48,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "83349798311a10712642ee113a5622063b69ead3218f8b930ad5b72f3add968d",
+    "dependencies": [
+      "tb_rh.score"
+    ],
+    "destinationContractDigests": [
+      "0a1a0110afcd660efdd3b98087f7c6edddc684d1ce31e0f16abf27e563d1efc7"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1794",
+        "services/rh-service/src/services/scoreNitroService.ts:95",
+        "services/rh-service/src/services/scoreNitroService.ts:98"
+      ],
+      "legacy": [
+        "classes/Score.php:250",
+        "classes/Score.php:255",
+        "classes/Score.php:262",
+        "classes/Score.php:264",
+        "classes/Score.php:266"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 48,
+    "reason": "O score Nitro consolidado possui contrato atual; bônus de avaliações/horas, sinal de erros e faixa de pastas são normalizados para preservar a contribuição da fórmula legada.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.score_nitro",
+    "sourceRowCount": 48,
+    "sourceTable": "tb_rh.score_nitro",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 26,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "64cfd602045af73e228477df704d595551a147a4607b428e6367aed983b7ec49",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "eeba50fc5cc0a927d202cf63ef4b2c46e891760435a967f661332bc4c12647db"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1810",
+        "services/rh-service/src/services/scoreQuestionService.ts:46"
+      ],
+      "legacy": [
+        "classes/Score.php:443",
+        "classes/Score.php:497"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 26,
+    "reason": "Perguntas de score possuem contrato atual em rh.score_questions.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.score_perguntas",
+    "sourceRowCount": 26,
+    "sourceTable": "tb_rh.score_perguntas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 915,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "24ce727f084c3cdb7d5e9850b4bab645af2bf767e3e407b1768f4465d1809896",
+    "dependencies": [
+      "tb_rh.colaboradores",
+      "tb_admin.usuarios",
+      "tb_rh.solicitacoes_categorias"
+    ],
+    "destinationContractDigests": [
+      "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1845",
+        "services/rh-service/src/services/requestService.ts:101",
+        "services/rh-service/src/services/requestService.ts:117"
+      ],
+      "legacy": [
+        "classes/Solicitacao.php:161",
+        "classes/Solicitacao.php:162",
+        "classes/Solicitacao.php:243",
+        "classes/Solicitacao.php:244",
+        "classes/Solicitacao.php:246",
+        "rh/pages/solicitacoes/solicitacao.php:4"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 915,
+    "reason": "Solicitações possuem contrato atual; atribuido = 0 representa ausência de responsável na criação legada e assumirRH registra a atribuição posterior. Valores não zero resolvem o User pelo vínculo de colaborador.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.solicitacoes",
+    "sourceRowCount": 915,
+    "sourceTable": "tb_rh.solicitacoes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 7,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "9581a5e535547aedf5fa376e57feed58a19dc53b43b5650d92174211c7dbb767",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "178febd9942f9c0a927b69c06eaa5b50e241e6bb4c0ea2f92f292f65b6aff51c"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1860",
+        "services/rh-service/src/services/categoryService.ts:39"
+      ],
+      "legacy": [
+        "classes/Solicitacao.php:313",
+        "classes/Solicitacao.php:341"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 7,
+    "reason": "Categorias de solicitação possuem contrato atual em rh.request_categories.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.solicitacoes_categorias",
+    "sourceRowCount": 7,
+    "sourceTable": "tb_rh.solicitacoes_categorias",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 1906,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "6ec15954a08bf7ef7752776cc3346a62278be9dfe96be14a72422961abb56ce5",
+    "dependencies": [
+      "tb_rh.solicitacoes",
+      "tb_rh.colaboradores"
+    ],
+    "destinationContractDigests": [
+      "9acbaaa4def82aed4af0192ac4e897bf17ad5de2807e553b9e1f09ff503bc942"
+    ],
+    "destinationStepCount": 1,
+    "domain": "human-resources",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1871",
+        "services/rh-service/src/services/messageService.ts:61"
+      ],
+      "legacy": [
+        "classes/Solicitacao.php:265",
+        "classes/Solicitacao.php:266",
+        "classes/Solicitacao.php:292",
+        "rh/ajax/solicitacoes.php:37"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 1906,
+    "reason": "Mensagens de solicitação possuem contrato atual em rh.request_messages.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "rh-pessoal:tb_rh.solicitacoes_mensagens",
+    "sourceRowCount": 1906,
+    "sourceTable": "tb_rh.solicitacoes_mensagens",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 537,
+    "cardinality": "1:N",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "a5cac740980598866ebdd32e6f61b247466ea9c0dae2796db1400e4854a58960",
+    "dependencies": [
+      "tb_cbs.estoque_localizacoes",
+      "tb_admin.departamentos"
+    ],
+    "destinationContractDigests": [
+      "0e934cf047deb507627a52c47f1741a90d160d3c26293c3488a4a913d384fe32",
+      "be3d51c33323af2a74b476a4d18c0e9f21cd131110ecb3dcd49bedaa828ee600",
+      "b1fba3cbb7a614f32583af27ae97a724e16abcf97b0fddf37295629d2720b505"
+    ],
+    "destinationStepCount": 3,
+    "domain": "technology-stock",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:970",
+        "infra/prisma/schema.prisma:985",
+        "infra/prisma/schema.prisma:998",
+        "services/ti-service/src/services/tiStockService.ts:122"
+      ],
+      "legacy": [
+        "classes/Estoque.php:363",
+        "classes/Estoque.php:373",
+        "tecnologia/pages/estoque/item.php:6"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 179,
+    "reason": "Cada linha origina categoria e localização deduplicadas por organização/nome, além do item ligado aos dois catálogos atuais.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "technology:tb_tecnologia.estoque",
+    "sourceRowCount": 179,
+    "sourceTable": "tb_tecnologia.estoque",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 865,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "aaedb0f6e2c1fded2194ce84cde2ed975fe8f0be32d1b753b3086fdf4e50c794",
+    "dependencies": [
+      "tb_tecnologia.estoque",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "63014870a9d2e20b5e1a9fd004f3b92cec141fb474674af346a8c44f48a4df23"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-stock",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1019",
+        "services/ti-service/src/services/tiStockService.ts:122"
+      ],
+      "legacy": [
+        "classes/Estoque.php:28",
+        "classes/Estoque.php:31"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 865,
+    "reason": "A entrada possui entidade atual equivalente e resolve item e usuário explicitamente.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "technology:tb_tecnologia.estoque_entradas",
+    "sourceRowCount": 865,
+    "sourceTable": "tb_tecnologia.estoque_entradas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 850,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "dbafd3a5dd133eb7f3540660a014e5450f2a7d148b9f9cd3dfc7ce16aca81a99",
+    "dependencies": [
+      "tb_tecnologia.estoque",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "7affd6a8cde52ee7c733b57874fcc22fb06649bd8831c443423e565116ae422e"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-stock",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1033",
+        "services/ti-service/src/services/tiStockService.ts:122"
+      ],
+      "legacy": [
+        "classes/Estoque.php:65",
+        "classes/Estoque.php:68"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 850,
+    "reason": "A saída possui contrato equivalente, com referências obrigatórias e opcionais explícitas.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "technology:tb_tecnologia.estoque_saidas",
+    "sourceRowCount": 850,
+    "sourceTable": "tb_tecnologia.estoque_saidas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 660,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "2514e4426e268a63e7f330d524f91193ef85399556d6538f7a659b06b1beb088",
+    "dependencies": [
+      "tb_tecnologia.opcoes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "b2131d867009af13fe10ff1a6ac848e291f50900b65f349a936989c960dbc424"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-inventory",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1922",
+        "infra/prisma/schema.prisma:1934",
+        "infra/prisma/schema.prisma:1945",
+        "services/ti-service/src/services/tiInventoryService.ts:63"
+      ],
+      "legacy": [
+        "classes/Usuario.php:311",
+        "classes/Usuario.php:333"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 660,
+    "reason": "O ativo atribuído possui contrato equivalente no inventário TI atual.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "technology:tb_tecnologia.inventario",
+    "sourceRowCount": 660,
+    "sourceTable": "tb_tecnologia.inventario",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 41,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "e5b81b7d1dbc9ec704f0e303e12a1c1c1a15034e828682f80b4499775f857092",
+    "dependencies": [
+      "tb_tecnologia.inventario_loc",
+      "tb_tecnologia.opcoes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "b12842b2defe720f3a0bc1d8c1ce09f3a5d679324ed2ed8f3cae7fd1ef780e77"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-inventory",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1922",
+        "infra/prisma/schema.prisma:1934",
+        "infra/prisma/schema.prisma:1945",
+        "services/ti-service/src/services/tiInventoryService.ts:63"
+      ],
+      "legacy": [
+        "classes/Usuario.php:408",
+        "classes/Usuario.php:559"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 41,
+    "reason": "O item em localização possui contrato equivalente no inventário TI atual.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "technology:tb_tecnologia.inventario_itens",
+    "sourceRowCount": 41,
+    "sourceTable": "tb_tecnologia.inventario_itens",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 21,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "b2fa94fcdd5f8f7e4f596bab122b25b720c1b11333636907d027b46237609d3e",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "3b21a00ae099372b33348a9de14b06368bf121a156392f945691a403c0fa43d8"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-inventory",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1922",
+        "infra/prisma/schema.prisma:1934",
+        "infra/prisma/schema.prisma:1945",
+        "services/ti-service/src/services/tiInventoryService.ts:63"
+      ],
+      "legacy": [
+        "classes/Estoque.php:260",
+        "classes/Estoque.php:298"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 21,
+    "reason": "A localização do inventário possui catálogo atual equivalente.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "technology:tb_tecnologia.inventario_loc",
+    "sourceRowCount": 21,
+    "sourceTable": "tb_tecnologia.inventario_loc",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 31,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "e8add6be32a4b50f6abf422fe500ad6fdb097ba8c1aa118b11b8aab9599e62ed",
+    "dependencies": [],
+    "destinationContractDigests": [
+      "ea81282b977a969a2649ab6cc8cb56693eb1b23d8a0619a00741bc2644f2bd5f"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-inventory",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1922",
+        "infra/prisma/schema.prisma:1934",
+        "infra/prisma/schema.prisma:1945",
+        "services/ti-service/src/services/tiInventoryService.ts:63"
+      ],
+      "legacy": [
+        "classes/Estoque.php:319",
+        "classes/Estoque.php:334"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 31,
+    "reason": "As opções de tipo formam categorias atuais deduplicadas por organização e nome.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "technology:tb_tecnologia.opcoes",
+    "sourceRowCount": 31,
+    "sourceTable": "tb_tecnologia.opcoes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 179,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "129c6710b74cc323b0ffafd0db844501660732b9d10f96396b1cc2f3e24e91e1",
+    "dependencies": [
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "bafb90daa55bea96fcce6b19000d7f22e29d9882a5c552dbc24edaaaf0ee6b59"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-credentials",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1888",
+        "services/ti-service/src/services/tiPasswordService.ts:91",
+        "services/ti-service/src/services/tiPasswordService.ts:153"
+      ],
+      "legacy": [
+        "classes/Senhas.php:54",
+        "classes/Senhas.php:58"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 179,
+    "reason": "Credenciais de usuário tipo 0 preservam somente a senha criptografada; login e observação ficam not_preserved, e tipo 1 ou falhas de criptografia/referência ficam em quarentena.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "technology:tb_tecnologia.senhas",
+    "sourceRowCount": 179,
+    "sourceTable": "tb_tecnologia.senhas",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 200,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "b7c159330b2a25b594b066735985475c9f8527215e6113af5e48a7c5a11a4241",
+    "dependencies": [
+      "tb_admin.usuarios",
+      "tb_admin.departamentos"
+    ],
+    "destinationContractDigests": [
+      "f541ab22d55640bd4664eeebce630c01ae5b72196a9768dda3aa92cbff98d508"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-terms",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1969",
+        "services/ti-service/src/services/tiTermService.ts:57"
+      ],
+      "legacy": [
+        "classes/Termos.php:4",
+        "classes/Termos.php:10"
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 200,
+    "reason": "Os dados estruturados do termo possuem contrato atual; arquivo de assinatura exige quarentena porque signed_at não armazena conteúdo.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "technology:tb_tecnologia.termos",
+    "sourceRowCount": 200,
+    "sourceTable": "tb_tecnologia.termos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 553,
+    "cardinality": "N:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "f9265de45e9aa205a8380bdaefedc14bf75c6caab980bdc71b0db7bc29c3b1f6",
+    "dependencies": [
+      "tb_regularize.clientes"
+    ],
+    "destinationContractDigests": [
+      "01ca1044328be8a3c9de5255443d7533be99d927c0645adba66ecf192bacd034"
+    ],
+    "destinationStepCount": 1,
+    "domain": "triage",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:2078",
+        "services/src/src/services/triagem/TriageService.ts:36"
+      ],
+      "legacy": [
+        "classes/Cliente.php:1275",
+        "cliente_id referencia tb_regularize.clientes.codigo; o resolver V2 fornece a identidade Client canônica e conflitos N:1 são preservados sem ocultar os blockers faturamento/envio."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 553,
+    "reason": "Os indicadores fiscais permitidos formam active_items; as 307 linhas com faturamento e/ou envio funcionais vão para quarentena nesses campos, incluindo 5 conflitos canônicos multi-causa registrados em blockers auditáveis.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_triagem.campos",
+    "sourceRowCount": 553,
+    "sourceTable": "tb_triagem.campos",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 5,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "8455289375bcb60ef4e2f97a8aa536762d030c6c1c0c16e38b7168503f6ff1e1",
+    "dependencies": [
+      "tb_workspace.solicitacoes_categorias",
+      "tb_admin.departamentos",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "95e1cf93b678250db2ae3deaadc5c7da25f56a7d0317dfe17b5d7fcd8158f6a8"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-request",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:1991",
+        "services/ti-service/src/services/tiRequestService.ts:104"
+      ],
+      "legacy": [
+        "classes/Solicitacao.php:451",
+        "categoria referencia tb_workspace.solicitacoes_categorias; requerente e atribuido referenciam usuários; departamento precisa resolver Tecnologia."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 5,
+    "reason": "Solicitações do departamento Tecnologia possuem contrato atual fiel em tecnologia.requests.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_workspace.solicitacoes",
+    "sourceRowCount": 5,
+    "sourceTable": "tb_workspace.solicitacoes",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 1,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "6e928574b2c04b87f35b37a1aa5bbec19359c9e4309e05a998ddcaa5906918be",
+    "dependencies": [
+      "tb_admin.departamentos"
+    ],
+    "destinationContractDigests": [
+      "cc8fc4484f9b1fcb015a8ed1676e3bfb3fc1354373a82295d51ceb90c00fe668"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-request",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:2017",
+        "services/ti-service/src/services/tiRequestCategoryService.ts:25"
+      ],
+      "legacy": [
+        "classes/Solicitacao.php:595",
+        "departamento_id referencia tb_admin.departamentos.id e delimita a adaptação ao módulo TI."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 1,
+    "reason": "Categorias do departamento Tecnologia possuem contrato atual fiel em tecnologia.request_categories.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_workspace.solicitacoes_categorias",
+    "sourceRowCount": 1,
+    "sourceTable": "tb_workspace.solicitacoes_categorias",
+    "status": "confirmed"
+  },
+  {
+    "blockedRows": 2,
+    "cardinality": "1:1",
+    "contextProviderMode": "conservative-read-only",
+    "contractDigest": "ac39ccab1d68453dbf13781149dba5303088dba7bb4e57175ca46302d775f030",
+    "dependencies": [
+      "tb_workspace.solicitacoes",
+      "tb_admin.usuarios"
+    ],
+    "destinationContractDigests": [
+      "8bf30c95c9bdb7b72de7c3ffb09735b99b31c3f4b962164687e8cf66e67f4201"
+    ],
+    "destinationStepCount": 1,
+    "domain": "technology-request",
+    "evidence": {
+      "current": [
+        "infra/prisma/schema.prisma:2028",
+        "services/ti-service/src/services/tiMessageService.ts:51",
+        "services/ti-service/src/schemas/tiRequest.schemas.ts:58",
+        "services/ti-service/src/services/tiRequestImageStorage.ts:6"
+      ],
+      "legacy": [
+        "classes/Solicitacao.php:550",
+        "classes/Solicitacao.php:569",
+        "solicitacao referencia tb_workspace.solicitacoes.id e remetente referencia tb_admin.usuarios.id; a cadeia categoria→solicitação→mensagem precisa estar prepared antes do filho.",
+        "classes/Solicitacao.php define tipo 0 como mensagem e tipo 6 como arquivo; o row tipo 6 do backup não contém o nome que permitiria correlacionar 67ea8f65eca6d.pdf."
+      ]
+    },
+    "notEmitted": 0,
+    "preflightComplete": false,
+    "preflightState": "preflight_blocked",
+    "prepared": 0,
+    "quarantine": 0,
+    "readRows": 2,
+    "reason": "As 2 mensagens reais vão para quarentena: a normal preserva estado funcional de leitura/destinatário sem destino, e a tipo 6 tem mensagem vazia, PDF real sem correlação e MIME não aceito; esse anexo não é migrável pela capacidade atual.",
+    "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
+    "ruleOrigin": "remaining:tb_workspace.solicitacoes_mensagens",
+    "sourceRowCount": 2,
+    "sourceTable": "tb_workspace.solicitacoes_mensagens",
+    "status": "confirmed"
+  }
+]
