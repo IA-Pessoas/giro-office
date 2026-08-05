@@ -71,7 +71,7 @@ async function cleanOutputs() {
 
 async function runPrismaGenerate() {
   await new Promise((resolve, reject) => {
-    const child = spawn("pnpm exec prisma generate", [], {
+    const child = spawn("corepack pnpm exec prisma generate", [], {
       cwd: infraDir,
       stdio: "inherit",
       shell: true,
