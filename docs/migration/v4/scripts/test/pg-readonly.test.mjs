@@ -20,7 +20,7 @@ test("assertReadOnlyQuery aceita somente SELECT e WITH finalizado por SELECT", (
       text: [
         "WITH typed_candidates AS (",
         "SELECT id FROM public.users WHERE FALSE UNION ALL",
-        "SELECT candidate_values.column1 FROM (VALUES ($1), ($2)) AS candidate_values",
+        "SELECT $1 UNION ALL SELECT $2",
         ") SELECT COUNT(*) FROM typed_candidates",
       ].join(" "),
       values: ["id-1", "id-2"],
@@ -57,6 +57,7 @@ test("assertReadOnlyQuery rejeita mutação, evasão, múltiplas instruções e 
     "SELECT set_config($1, $2, false)",
     "SELECT dblink_exec($1)",
     "SELECT lo_unlink($1)",
+    "WITH selected AS (SELECT id FROM (VALUES ($1)) AS candidate_values) SELECT id FROM selected",
   ];
 
   for (const sql of rejected) {

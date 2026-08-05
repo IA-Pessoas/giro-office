@@ -7,6 +7,8 @@ const CASTELO_ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const DATABASE_SCHEMA = "public";
 const MAX_CATALOG_ROWS = 100_000;
 const MAX_CONFLICT_CANDIDATES_PER_STEP = 1_000;
+const MAX_CONFLICT_PARAMETER_VALUES_PER_STEP = 4_000;
+const MAX_UNIQUE_CONFLICT_QUERY_LENGTH = 32 * 1024;
 const ID_QUERY_BATCH_SIZE = 1_000;
 const BLOCKER_CODES = new Set([
   "DEPENDENCY_CYCLE",
@@ -465,7 +467,20 @@ function validateConflictInputCoverage({
     : 0;
   const uniqueCount = Array.isArray(inputs.uniqueCandidates) ? inputs.uniqueCandidates.length : 0;
   const mergeCount = Array.isArray(inputs.mergeCandidates) ? inputs.mergeCandidates.length : 0;
-  const candidateLimitExceeded = uniqueCount + mergeCount > MAX_CONFLICT_CANDIDATES_PER_STEP;
+  const candidateCountExceeded = uniqueCount + mergeCount > MAX_CONFLICT_CANDIDATES_PER_STEP;
+  const conflictValueCount =
+    countCandidateValues(inputs.uniqueCandidates) + countCandidateValues(inputs.mergeCandidates);
+  const parameterValueLimitExceeded = conflictValueCount > MAX_CONFLICT_PARAMETER_VALUES_PER_STEP;
+  const uniqueQueryLengthExceeded =
+    !candidateCountExceeded &&
+    !parameterValueLimitExceeded &&
+    hasOversizedUniqueConflictQuery({
+      candidates: inputs.uniqueCandidates,
+      databaseTable,
+      table: step.destinationTable,
+    });
+  const candidateLimitExceeded =
+    candidateCountExceeded || parameterValueLimitExceeded || uniqueQueryLengthExceeded;
   let complete = true;
   const markIncomplete = (field) => {
     complete = false;
@@ -535,6 +550,39 @@ function validateConflictInputCoverage({
     },
     uniqueCheckAllowed: !candidateLimitExceeded,
   };
+}
+
+function countCandidateValues(candidates) {
+  if (!Array.isArray(candidates)) return 0;
+  let count = 0;
+  for (const candidate of candidates) {
+    if (!isPlainObject(candidate) || !Array.isArray(candidate.values)) continue;
+    count += candidate.values.length;
+    if (count > MAX_CONFLICT_PARAMETER_VALUES_PER_STEP) return count;
+  }
+  return count;
+}
+
+function hasOversizedUniqueConflictQuery({ candidates, databaseTable, table }) {
+  if (!Array.isArray(candidates)) return false;
+  const candidateCountBySignature = new Map();
+  for (const candidate of candidates) {
+    if (!isPlainObject(candidate) || !Array.isArray(candidate.columns)) continue;
+    const uniqueSet = databaseTable.uniqueSets.find(({ columns }) =>
+      sameArray(columns, candidate.columns),
+    );
+    if (uniqueSet === undefined) continue;
+    const signature = uniqueSet.columns.join("\0");
+    candidateCountBySignature.set(signature, {
+      candidateCount: (candidateCountBySignature.get(signature)?.candidateCount ?? 0) + 1,
+      uniqueSet,
+    });
+  }
+  return [...candidateCountBySignature.values()].some(
+    ({ candidateCount, uniqueSet }) =>
+      buildUniqueBatchConflictQuery(table, uniqueSet, candidateCount).length >
+      MAX_UNIQUE_CONFLICT_QUERY_LENGTH,
+  );
 }
 
 function getApplicableUniqueSets(databaseTable, prismaModel, step) {
@@ -748,15 +796,12 @@ async function validateUniqueCandidates({ addBlocker, databaseTable, inputs, ste
 function buildUniqueBatchConflictQuery(table, uniqueSet, candidateCount) {
   const quotedColumns = uniqueSet.columns.map(quoteIdentifier);
   const anchorProjection = quotedColumns.join(", ");
-  const candidateProjection = quotedColumns
-    .map((column, index) => `candidate_values.column${index + 1} AS ${column}`)
-    .join(", ");
-  const values = Array.from({ length: candidateCount }, (_, candidateIndex) => {
+  const candidateArms = Array.from({ length: candidateCount }, (_, candidateIndex) => {
     const placeholders = quotedColumns.map(
       (_, columnIndex) => `$${candidateIndex * quotedColumns.length + columnIndex + 1}`,
     );
-    return `(${placeholders.join(", ")})`;
-  }).join(", ");
+    return `UNION ALL SELECT ${placeholders.join(", ")}`;
+  }).join(" ");
   const eligibleFilter = uniqueSet.nullsNotDistinct
     ? ""
     : ` WHERE ${quotedColumns.map((column) => `${column} IS NOT NULL`).join(" AND ")}`;
@@ -769,8 +814,7 @@ function buildUniqueBatchConflictQuery(table, uniqueSet, candidateCount) {
   return [
     "WITH typed_candidates AS (",
     `SELECT ${anchorProjection} FROM ${quoteQualified(table)} WHERE FALSE`,
-    "UNION ALL",
-    `SELECT ${candidateProjection} FROM (VALUES ${values}) AS candidate_values`,
+    candidateArms,
     "), eligible_candidates AS (",
     `SELECT ${anchorProjection} FROM typed_candidates${eligibleFilter}`,
     "), intra_batch_conflicts AS (",

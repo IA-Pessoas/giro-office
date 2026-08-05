@@ -53,7 +53,7 @@ const FORBIDDEN_FUNCTIONS = new Set([
   "SETVAL",
 ]);
 const ALLOWED_READ_ONLY_FUNCTIONS = new Set(["ANY", "COUNT", "UNNEST"]);
-const PARENTHESIZED_SQL_KEYWORDS = new Set(["AS", "EXISTS", "FILTER", "FROM", "IN", "VALUES"]);
+const PARENTHESIZED_SQL_KEYWORDS = new Set(["AS", "EXISTS", "FILTER", "FROM", "IN"]);
 
 export async function loadPg() {
   const require = createRequire(import.meta.url);

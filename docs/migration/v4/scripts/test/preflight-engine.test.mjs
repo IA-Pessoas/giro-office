@@ -399,7 +399,11 @@ test("runPreflight reconhece CREATE UNIQUE INDEX simples e composto sem INCLUDE 
   );
   assert.ok(compoundQuery);
   assert.deepEqual(compoundQuery.values, [ORGANIZATION_ID, "alpha"]);
-  assert.match(compoundQuery.text, /FROM \(VALUES \(\$1, \$2\)\) AS candidate_values/);
+  assert.match(
+    compoundQuery.text,
+    /SELECT "organization_id", "slug" FROM "public"\."projects" WHERE FALSE UNION ALL SELECT \$1, \$2/,
+  );
+  assert.doesNotMatch(compoundQuery.text, /VALUES|candidate_values/);
 });
 
 test("runPreflight bloqueia cobertura ausente ou incompleta para todo passo preparado", async () => {
@@ -577,8 +581,11 @@ test("runPreflight detecta unique duplicado no próprio lote com SELECT tipado a
   );
   assert.equal(queries.length, 1);
   assert.deepEqual(queries[0].values, ["duplicado-no-lote", "duplicado-no-lote"]);
-  assert.match(queries[0].text, /SELECT "slug" FROM "public"\."projects" WHERE FALSE/);
-  assert.match(queries[0].text, /FROM \(VALUES \(\$1\), \(\$2\)\) AS candidate_values/);
+  assert.match(
+    queries[0].text,
+    /SELECT "slug" FROM "public"\."projects" WHERE FALSE UNION ALL SELECT \$1 UNION ALL SELECT \$2/,
+  );
+  assert.doesNotMatch(queries[0].text, /VALUES|candidate_values/);
   assert.doesNotMatch(queries[0].text, /duplicado-no-lote/);
   assert.doesNotMatch(JSON.stringify(report), /duplicado-no-lote/);
 });
@@ -691,6 +698,58 @@ test("runPreflight bloqueia candidatos acima do limite sem consultar conflitos",
   );
 });
 
+test("runPreflight bloqueia mais de 4.000 valores de conflito antes de consultar", async () => {
+  const scenario = createWideUniqueScenario({ candidateCount: 251, columnCount: 16 });
+  const client = createCatalogClient(scenario.catalog);
+
+  const report = await runPreflight({
+    client,
+    mappingPackage: scenario.mappingPackage,
+    prismaCatalog: scenario.prismaCatalog,
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+
+  assert.equal(report.readyForMigration, false);
+  assert.equal(report.steps[0].conflictChecks.complete, false);
+  assert.equal(report.steps[0].conflictChecks.candidateLimitExceeded, true);
+  assert.equal(report.steps[0].blockerCodes.includes("SEMANTIC_EVIDENCE_MISSING"), true);
+  assert.equal(
+    client.history.some(
+      (query) =>
+        typeof query !== "string" && query.text.includes("intra_batch_unique_conflict_count"),
+    ),
+    false,
+  );
+  assert.equal(client.history.at(-1), "COMMIT");
+});
+
+test("runPreflight bloqueia SQL unique estimado acima de 32 KiB antes do guard", async () => {
+  const scenario = createWideUniqueScenario({ candidateCount: 1_000, columnCount: 3 });
+  const client = createCatalogClient(scenario.catalog);
+
+  const report = await runPreflight({
+    client,
+    mappingPackage: scenario.mappingPackage,
+    prismaCatalog: scenario.prismaCatalog,
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+
+  assert.equal(report.readyForMigration, false);
+  assert.equal(report.steps[0].conflictChecks.complete, false);
+  assert.equal(report.steps[0].conflictChecks.candidateLimitExceeded, true);
+  assert.equal(report.steps[0].blockerCodes.includes("SEMANTIC_EVIDENCE_MISSING"), true);
+  assert.equal(
+    client.history.some(
+      (query) =>
+        typeof query !== "string" && query.text.includes("intra_batch_unique_conflict_count"),
+    ),
+    false,
+  );
+  assert.equal(client.history.at(-1), "COMMIT");
+});
+
 test("runPreflight exige todas as contagens finais inteiras e não negativas", async () => {
   for (const [field, invalid] of [
     ["readRows", undefined],
@@ -744,6 +803,62 @@ function createMappingPackage() {
         mergeCandidates: [],
       },
     },
+  };
+}
+
+function createWideUniqueScenario({ candidateCount, columnCount }) {
+  const mappingPackage = createMappingPackage();
+  const prismaCatalog = createPrismaCatalog();
+  const columns = Array.from(
+    { length: columnCount },
+    (_, index) => `unique_key_${String(index + 1).padStart(2, "0")}`,
+  );
+  const step = mappingPackage.destinationMappings[0];
+  Object.assign(step, {
+    identity: { kind: "resolve" },
+    identityKind: "resolve",
+    prepared: candidateCount,
+    readRows: candidateCount,
+  });
+  step.columns.push(
+    ...columns.map((columnName) => ({
+      destinationColumn: columnName,
+      sourceColumn: columnName,
+      status: "mapped",
+    })),
+  );
+  mappingPackage.columnMappings = mappingPackage.destinationMappings.flatMap(flattenColumns);
+  mappingPackage.preflightInputs["legacy.projects\0project-insert"] = {
+    preparedRowCount: candidateCount,
+    uniqueCandidates: Array.from({ length: candidateCount }, (_, candidateIndex) => ({
+      columns,
+      values: columns.map((_, columnIndex) => candidateIndex * columnCount + columnIndex),
+    })),
+    mergeCandidates: [],
+  };
+
+  const projectModel = prismaCatalog.models[0];
+  projectModel.fields.find(({ databaseName }) => databaseName === "slug").unique = false;
+  projectModel.fields.push(
+    ...columns.map((columnName) => createField("Project", columnName, columnName, "Int")),
+  );
+  projectModel.compoundUnique.push(columns);
+
+  return {
+    catalog: {
+      catalogRows: [
+        ...createCatalogRows(),
+        ...columns.map((columnName) => column("projects", columnName, "integer", "int4", "NO")),
+      ],
+      constraintRows: createConstraintRows().filter(
+        ({ constraint_name }) => constraint_name !== "projects_slug_key",
+      ),
+      uniqueIndexRows: columns.map((columnName, index) =>
+        uniqueIndex("projects", "projects_wide_unique_idx", columnName, index + 1),
+      ),
+    },
+    mappingPackage,
+    prismaCatalog,
   };
 }
 
