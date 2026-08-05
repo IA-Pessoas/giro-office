@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 import {
@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
-import { ConfirmationDialog } from "@shared/components";
+import { ConfirmationDialog, PaginationControls } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { formatCnpjInput, formatCpfInput } from "@shared/utils/inputFormatting";
 import {
@@ -186,17 +186,11 @@ function trimValue(value: string): string {
 }
 
 function mergeListById<T extends { id: string }>(current: T[], next: T[]): T[] {
-  const byId = new Map<string, T>();
+  const itemsById = new Map(current.map((item) => [item.id, item]));
 
-  for (const item of current) {
-    byId.set(item.id, item);
-  }
+  next.forEach((item) => itemsById.set(item.id, item));
 
-  for (const item of next) {
-    byId.set(item.id, item);
-  }
-
-  return Array.from(byId.values());
+  return [...itemsById.values()];
 }
 
 function buildStats(total: number, expiringInDays: number, expired: number, withCertificate: number) {
@@ -340,6 +334,7 @@ export function CertificatesWorkspace() {
   const { access, isLoading: isModuleAccessLoading } = useModuleAccess("certificado");
   const [activeTab, setActiveTab] = useState<CertificateTab>("pj");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("view");
+  const [formDialogContent, setFormDialogContent] = useState<HTMLDivElement | null>(null);
   const [selected, setSelected] = useState<DetailTarget>(null);
   const [showDetailPassword, setShowDetailPassword] = useState(false);
   const [pjPage, setPjPage] = useState(FIRST_PAGE);
@@ -351,8 +346,6 @@ export function CertificatesWorkspace() {
   const [pjSort, setPjSort] = useState<SortState<PjSortKey>>(null);
   const [pfSort, setPfSort] = useState<SortState<PfSortKey>>(null);
   const [notificationSort, setNotificationSort] = useState<SortState<NotificationSortKey>>(null);
-  const pjFiltersMountedRef = useRef(false);
-  const pfFiltersMountedRef = useRef(false);
   const [pendingDeletion, setPendingDeletion] = useState<PendingCertificateDeletion | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
 
@@ -573,13 +566,7 @@ export function CertificatesWorkspace() {
   }, [notificationSort, visibleNotificationItems]);
 
   useEffect(() => {
-    if (!pjFiltersMountedRef.current) {
-      pjFiltersMountedRef.current = true;
-      return;
-    }
-
     setPjPage(FIRST_PAGE);
-    setVisiblePjItems([]);
     setSelected((current) => (current?.type === "pj" ? null : current));
   }, [
     pjFilters.name,
@@ -593,13 +580,7 @@ export function CertificatesWorkspace() {
   ]);
 
   useEffect(() => {
-    if (!pfFiltersMountedRef.current) {
-      pfFiltersMountedRef.current = true;
-      return;
-    }
-
     setPfPage(FIRST_PAGE);
-    setVisiblePfItems([]);
     setSelected((current) => (current?.type === "pf" ? null : current));
   }, [
     pfFilters.search,
@@ -613,45 +594,52 @@ export function CertificatesWorkspace() {
     pfFilters.hasCertificate,
   ]);
 
+  const pjItems = pjListQuery.data?.data ?? [];
+  const pfItems = pfListQuery.data?.data ?? [];
+  const notificationItems = notificationsQuery.data?.data ?? [];
+  const pjTotal = pjListQuery.data?.total ?? pjItems.length;
+  const pfTotal = pfListQuery.data?.total ?? pfItems.length;
+  const notificationTotal = notificationsQuery.data?.total ?? notificationItems.length;
+  const pjTotalPages = Math.max(FIRST_PAGE, Math.ceil(pjTotal / PAGE_SIZE));
+  const pfTotalPages = Math.max(FIRST_PAGE, Math.ceil(pfTotal / PAGE_SIZE));
+  const notificationTotalPages = Math.max(FIRST_PAGE, Math.ceil(notificationTotal / PAGE_SIZE));
+
   const pjStats = useMemo(() => {
-    const total = visiblePjItems.length;
-    const expired = visiblePjItems.filter((item) => {
+    const expired = pjItems.filter((item) => {
       const days = calcDaysUntil(item.expiration_date);
       return days !== null && days < ZERO;
     }).length;
-    const dueSoon = visiblePjItems.filter((item) => {
+    const dueSoon = pjItems.filter((item) => {
       const days = calcDaysUntil(item.expiration_date);
       return days !== null && days >= ZERO && days <= 30;
     }).length;
-    const withCertificate = visiblePjItems.filter((item) => item.has_certificate).length;
+    const withCertificate = pjItems.filter((item) => item.has_certificate).length;
 
-    return buildStats(total, dueSoon, expired, withCertificate);
-  }, [visiblePjItems]);
+    return buildStats(pjTotal, dueSoon, expired, withCertificate);
+  }, [pjItems, pjTotal]);
 
   const pfStats = useMemo(() => {
-    const total = visiblePfItems.length;
-    const expired = visiblePfItems.filter((item) => {
+    const expired = pfItems.filter((item) => {
       const days = calcDaysUntil(item.expiration_date);
       return days !== null && days < ZERO;
     }).length;
-    const dueSoon = visiblePfItems.filter((item) => {
+    const dueSoon = pfItems.filter((item) => {
       const days = calcDaysUntil(item.expiration_date);
       return days !== null && days >= ZERO && days <= 30;
     }).length;
-    const withCertificate = visiblePfItems.filter((item) => item.has_certificate).length;
+    const withCertificate = pfItems.filter((item) => item.has_certificate).length;
 
-    return buildStats(total, dueSoon, expired, withCertificate);
-  }, [visiblePfItems]);
+    return buildStats(pfTotal, dueSoon, expired, withCertificate);
+  }, [pfItems, pfTotal]);
 
   const notificationsStats = useMemo(() => {
-    const total = visibleNotificationItems.length;
-    const pjCount = visibleNotificationItems.filter((item) => item.type === "PJ").length;
-    const pfCount = total - pjCount;
+    const pjCount = notificationItems.filter((item) => item.type === "PJ").length;
+    const pfCount = notificationTotal - pjCount;
 
     return [
       {
         label: "Total",
-        value: total,
+        value: notificationTotal,
       },
       {
         label: "PJ",
@@ -662,9 +650,25 @@ export function CertificatesWorkspace() {
         value: pfCount,
       },
     ];
-  }, [visibleNotificationItems]);
+  }, [notificationItems, notificationTotal]);
 
   const activeStats = activeTab === "pf" ? pfStats : activeTab === "pj" ? pjStats : notificationsStats;
+  const activePage = activeTab === "pf" ? pfPage : activeTab === "pj" ? pjPage : notificationPage;
+  const activeTotal = activeTab === "pf"
+    ? pfTotal
+    : activeTab === "pj"
+      ? pjTotal
+      : notificationTotal;
+  const activeTotalPages = activeTab === "pf"
+    ? pfTotalPages
+    : activeTab === "pj"
+      ? pjTotalPages
+      : notificationTotalPages;
+  const activeItemsCount = activeTab === "pf"
+    ? pfItems.length
+    : activeTab === "pj"
+      ? pjItems.length
+      : notificationItems.length;
   const activeListHasMore = activeTab === "pf"
     ? !pfListQuery.isPlaceholderData && pfListQuery.data?.page === pfPage && pfListQuery.data.hasMore
     : activeTab === "pj"
@@ -690,9 +694,9 @@ export function CertificatesWorkspace() {
       ? pjListQuery.isFetching
       : notificationsQuery.isFetching;
 
-  const hasPjRows = visiblePjItems.length > ZERO;
-  const hasPfRows = visiblePfItems.length > ZERO;
-  const hasNotificationRows = visibleNotificationItems.length > ZERO;
+  const hasPjRows = pjItems.length > ZERO;
+  const hasPfRows = pfItems.length > ZERO;
+  const hasNotificationRows = notificationItems.length > ZERO;
   const hasActiveRows = activeTab === "pf"
     ? hasPfRows
     : activeTab === "pj"
@@ -881,14 +885,12 @@ export function CertificatesWorkspace() {
     try {
       if (pendingDeletion.kind === "pj") {
         await deletePjMutation.mutateAsync({ id: certificate.id });
-        setVisiblePjItems((current) => current.filter((item) => item.id !== certificate.id));
         setSelected((current) =>
           current?.type === "pj" && current.id === certificate.id ? null : current,
         );
         toast.success("Certificado PJ excluído com sucesso.");
       } else {
         await deletePfMutation.mutateAsync({ id: certificate.id });
-        setVisiblePfItems((current) => current.filter((item) => item.id !== certificate.id));
         setSelected((current) =>
           current?.type === "pf" && current.id === certificate.id ? null : current,
         );
@@ -909,18 +911,16 @@ export function CertificatesWorkspace() {
     }
   }
 
-  function handleLoadMore() {
+  function setActivePage(nextPage: number) {
+    const page = Math.min(activeTotalPages, Math.max(FIRST_PAGE, nextPage));
+
     if (activeTab === "pj") {
-      setPjPage((current) => current + 1);
-      return;
+      setPjPage(page);
+    } else if (activeTab === "pf") {
+      setPfPage(page);
+    } else {
+      setNotificationPage(page);
     }
-
-    if (activeTab === "pf") {
-      setPfPage((current) => current + 1);
-      return;
-    }
-
-    setNotificationPage((current) => current + 1);
   }
 
   function handleStartCreatePj() {
@@ -1861,22 +1861,21 @@ export function CertificatesWorkspace() {
           ) : null}
         </div>
 
-        {hasActiveRows && activeListHasMore ? (
-          <div className="flex items-center justify-end border-t border-slate-200 px-4 py-3 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={handleLoadMore}
-              className={CERTIFICATE_COMPACT_BUTTON_CLASSNAME}
-              disabled={activeListIsFetching}
-            >
-              {activeListIsFetching ? (
-                <RefreshCcw className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <CalendarClock className="h-3.5 w-3.5" />
-              )}
-              Carregar mais
-            </button>
-          </div>
+        {hasActiveRows ? (
+          <PaginationControls
+            page={activePage}
+            limit={PAGE_SIZE}
+            total={activeTotal}
+            count={activeItemsCount}
+            totalPages={activeTotalPages}
+            hasMore={activeListHasMore}
+            isFetching={activeListIsFetching}
+            onFirst={() => setActivePage(FIRST_PAGE)}
+            onPrevious={() => setActivePage(activePage - 1)}
+            onPageChange={setActivePage}
+            onNext={() => setActivePage(activePage + 1)}
+            onLast={() => setActivePage(activeTotalPages)}
+          />
         ) : null}
       </section>
 
@@ -1885,6 +1884,7 @@ export function CertificatesWorkspace() {
         onOpenChange={handleFormOpenChange}
         title={formDialogTitle}
         description={formDialogDescription}
+        contentRef={setFormDialogContent}
         contentClassName={CERTIFICATE_FORM_MODAL_CONTENT_CLASSNAME}
         bodyClassName={CERTIFICATE_FORM_MODAL_BODY_CLASSNAME}
         footer={
@@ -1915,6 +1915,7 @@ export function CertificatesWorkspace() {
             formId={activeFormId}
             kind="pj"
             mode="create"
+            tooltipContainer={formDialogContent}
             isSubmitting={formSubmitting}
             onSubmit={handleSubmitCreatePj}
           />
@@ -1926,6 +1927,7 @@ export function CertificatesWorkspace() {
             formId={activeFormId}
             kind="pf"
             mode="create"
+            tooltipContainer={formDialogContent}
             isSubmitting={formSubmitting}
             onSubmit={handleSubmitCreatePf}
           />
@@ -1947,6 +1949,7 @@ export function CertificatesWorkspace() {
               formId={activeFormId}
               kind="pj"
               mode="edit"
+              tooltipContainer={formDialogContent}
               initialData={pjDetail}
               isSubmitting={formSubmitting}
               onSubmit={handleSubmitEditPj}
@@ -1970,6 +1973,7 @@ export function CertificatesWorkspace() {
               formId={activeFormId}
               kind="pf"
               mode="edit"
+              tooltipContainer={formDialogContent}
               initialData={pfDetail}
               isSubmitting={formSubmitting}
               onSubmit={handleSubmitEditPf}

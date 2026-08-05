@@ -1,5 +1,5 @@
 import type { ChangeEvent } from "react";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from "lucide-react";
 
 interface PaginationControlsProps {
   page: number;
@@ -11,6 +11,8 @@ interface PaginationControlsProps {
   totalPages?: number;
   onPrevious: () => void;
   onNext: () => void;
+  onFirst?: () => void;
+  onLast?: () => void;
   onPageChange?: (page: number) => void;
 }
 
@@ -28,6 +30,8 @@ export function PaginationControls({
   totalPages,
   onPrevious,
   onNext,
+  onFirst,
+  onLast,
   onPageChange,
 }: PaginationControlsProps) {
   const canSelectPage = Boolean(totalPages && onPageChange);
@@ -74,6 +78,18 @@ export function PaginationControls({
         ) : null}
       </div>
       <div className="flex items-center gap-2">
+        {onFirst ? (
+          <button
+            type="button"
+            className={buttonClassName}
+            aria-label="Primeira página"
+            title="Primeira página"
+            disabled={page <= 1 || isFetching}
+            onClick={onFirst}
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </button>
+        ) : null}
         <button
           type="button"
           className={buttonClassName}
@@ -96,6 +112,18 @@ export function PaginationControls({
           )}
           Próxima
         </button>
+        {onLast ? (
+          <button
+            type="button"
+            className={buttonClassName}
+            aria-label="Última página"
+            title="Última página"
+            disabled={!totalPages || page >= totalPages || isFetching}
+            onClick={onLast}
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
     </div>
   );

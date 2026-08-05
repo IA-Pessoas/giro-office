@@ -9,6 +9,7 @@ import {
   isAcceptedCertificateFileName,
   parseCertificateFilename,
   unwrapCertificateEnvelope,
+  unwrapCertificateList,
 } from "./services/certificateService.contract.ts";
 import {
   certificateNotificationsQueryKey,
@@ -156,8 +157,6 @@ runTest("certificate workspace requests table record deletion through the shared
   assert.match(workspaceSource, /async function handleConfirmPendingDeletion\(\)/);
   assert.match(workspaceSource, /await deletePjMutation\.mutateAsync\(\{ id: certificate\.id \}\)/);
   assert.match(workspaceSource, /await deletePfMutation\.mutateAsync\(\{ id: certificate\.id \}\)/);
-  assert.match(workspaceSource, /setVisiblePjItems\(\(current\) => current\.filter/);
-  assert.match(workspaceSource, /setVisiblePfItems\(\(current\) => current\.filter/);
   assert.match(workspaceSource, /toast\.success\("Certificado/);
   assert.match(workspaceSource, /toast\.error\(/);
   assert.match(workspaceSource, /canManageCertificateModule &&/);
@@ -231,6 +230,7 @@ runTest("buildCertificateListPage infers hasMore from page size", () => {
   const items = [{ id: "1" }];
   assert.deepEqual(buildCertificateListPage(items, { page: 2, page_size: 1 }), {
     data: items,
+    total: 1,
     page: 2,
     page_size: 1,
     hasMore: true,
@@ -241,7 +241,46 @@ runTest("buildCertificateListPage falls back to default page and page_size", () 
   const items = [{ id: "1" }];
   assert.equal(buildCertificateListPage(items).page, 1);
   assert.equal(buildCertificateListPage(items).page_size, 20);
+  assert.equal(buildCertificateListPage(items).total, 1);
   assert.equal(buildCertificateListPage(items).hasMore, false);
+});
+
+runTest("certificate list contract preserves server pagination metadata", () => {
+  const items = [{ id: "1" }];
+
+  assert.deepEqual(
+    unwrapCertificateList(
+      {
+        success: true,
+        data: {
+          items,
+          total: 41,
+          page: 2,
+          page_size: 20,
+          has_more: true,
+        },
+      },
+      { page: 2, page_size: 20 },
+    ),
+    {
+      data: items,
+      total: 41,
+      page: 2,
+      page_size: 20,
+      hasMore: true,
+    },
+  );
+});
+
+runTest("certificate workspace uses full pagination controls", () => {
+  const source = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /<PaginationControls/);
+  assert.match(source, /totalPages/);
+  assert.doesNotMatch(source, /Carregar mais/);
 });
 
 runTest("certificate PJ query key defaults omitted page_size to 20", () => {
@@ -319,44 +358,36 @@ runTest("issue 495 certificate notes preserve line breaks and wrap long tokens",
   }
 });
 
-runTest("certificate refresh keeps rows while a new first page is requested", () => {
+runTest("certificate pagination reads the active server page", () => {
   const workspaceSource = readFileSync(
     new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
     "utf8",
   );
 
+  assert.match(workspaceSource, /const pjItems = pjListQuery\.data\?\.data \?\? \[\];/);
+  assert.match(workspaceSource, /const pfItems = pfListQuery\.data\?\.data \?\? \[\];/);
+  assert.match(workspaceSource, /const notificationItems = notificationsQuery\.data\?\.data \?\? \[\];/);
   assert.match(workspaceSource, /pjListQuery\.isPlaceholderData/);
-  assert.match(workspaceSource, /pjListQuery\.data\.page !== pjPage/);
   assert.match(workspaceSource, /pfListQuery\.isPlaceholderData/);
-  assert.match(workspaceSource, /pfListQuery\.data\.page !== pfPage/);
   assert.match(workspaceSource, /notificationsQuery\.isPlaceholderData/);
-  assert.match(workspaceSource, /notificationsQuery\.data\.page !== notificationPage/);
   assert.match(workspaceSource, /const activeListIsLoading = activeTab === "pf"\n    \? pfListQuery\.isFetching/);
-  assert.doesNotMatch(workspaceSource, /setVisiblePjItems\(\[\]\);\n      void pjListQuery\.refetch\(\);/);
-  assert.doesNotMatch(workspaceSource, /setVisiblePfItems\(\[\]\);\n      void pfListQuery\.refetch\(\);/);
+  assert.match(workspaceSource, /onFirst=\{\(\) => setActivePage\(FIRST_PAGE\)\}/);
+  assert.match(workspaceSource, /onLast=\{\(\) => setActivePage\(activeTotalPages\)\}/);
   assert.match(
     workspaceSource,
     /if \(activeTab === "notifications"[\s\S]*setNotificationPage\(FIRST_PAGE\)/,
   );
 });
 
-runTest("certificate filters preserve the initial query result", () => {
+runTest("certificate filters reset their server page", () => {
   const workspaceSource = readFileSync(
     new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
     "utf8",
   );
 
-  assert.match(workspaceSource, /import \{[^}]*useRef[^}]*\} from "react"/);
-  assert.match(workspaceSource, /const pjFiltersMountedRef = useRef\(false\);/);
-  assert.match(workspaceSource, /const pfFiltersMountedRef = useRef\(false\);/);
-  assert.match(
-    workspaceSource,
-    /useEffect\(\(\) => \{\s*if \(!pjFiltersMountedRef\.current\) \{\s*pjFiltersMountedRef\.current = true;\s*return;\s*\}/,
-  );
-  assert.match(
-    workspaceSource,
-    /useEffect\(\(\) => \{\s*if \(!pfFiltersMountedRef\.current\) \{\s*pfFiltersMountedRef\.current = true;\s*return;\s*\}/,
-  );
+  assert.doesNotMatch(workspaceSource, /useRef/);
+  assert.match(workspaceSource, /setPjPage\(FIRST_PAGE\)/);
+  assert.match(workspaceSource, /setPfPage\(FIRST_PAGE\)/);
 });
 
 const certificateFileActionsSource = readFileSync(

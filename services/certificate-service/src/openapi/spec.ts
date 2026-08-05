@@ -168,6 +168,20 @@ function componentArrayRef(name: string) {
   };
 }
 
+function paginatedListSchema(name: string) {
+  return {
+    type: "object",
+    properties: {
+      items: componentArrayRef(name),
+      total: { type: "integer", minimum: 0 },
+      page: { type: "integer", minimum: 1 },
+      page_size: { type: "integer", minimum: 1 },
+      has_more: { type: "boolean" },
+    },
+    required: ["items", "total", "page", "page_size", "has_more"],
+  };
+}
+
 function certificateFileUploadOperation({
   idParameter,
   operationIdSuffix,
@@ -300,7 +314,7 @@ function certificateNotificationListOperation() {
     responses: {
       "200": successResponse(
         "Notificacoes de certificados listadas",
-        componentArrayRef("CertificateNotification"),
+        paginatedListSchema("CertificateNotification"),
       ),
       "400": errorResponse("Requisicao invalida"),
       "401": errorResponse("Autenticacao obrigatoria"),
@@ -400,7 +414,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PJ",
           summary: "Lista certificados PJ da organizacao autenticada",
           successDescription: "Certificados PJ listados",
-          successDataSchema: componentArrayRef("CertificatePj"),
+          successDataSchema: paginatedListSchema("CertificatePj"),
           notFoundDescription: "Certificado PJ nao encontrado",
           parameters: [
             ...paginationQueryParameters(),
@@ -499,7 +513,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PF",
           summary: "Lista certificados PF da organizacao autenticada",
           successDescription: "Certificados PF listados",
-          successDataSchema: componentArrayRef("CertificatePf"),
+          successDataSchema: paginatedListSchema("CertificatePf"),
           notFoundDescription: "Certificado PF nao encontrado",
           parameters: [
             ...paginationQueryParameters(),

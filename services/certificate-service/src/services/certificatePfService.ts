@@ -6,7 +6,11 @@ import type {
   CreateCertificatePfInput,
   UpdateCertificatePfInput,
 } from "../schemas/certificatePf.schemas.js";
-import { getPaginationParams } from "../schemas/pagination.schemas.js";
+import {
+  buildPaginatedResult,
+  getPaginationParams,
+  type PaginatedResult,
+} from "../schemas/pagination.schemas.js";
 import type { createCertificateFileCrypto } from "./certificateFileCrypto.js";
 import {
   buildCertificateObjectPath,
@@ -73,7 +77,7 @@ export interface CertificatePfDetailResult extends CertificatePfPublicResult {
   password?: string;
 }
 
-export type CertificatePfListResult = CertificatePfPublicResult[];
+export type CertificatePfListResult = PaginatedResult<CertificatePfPublicResult>;
 
 export interface CertificatePfFileMetadataResult {
   file_original_name: string;
@@ -204,14 +208,22 @@ export class CertificatePfService {
 
   async listCertificatePf(input: CertificatePfListInput): Promise<CertificatePfListResult> {
     const pagination = getPaginationParams(input.query);
-    const records = await this.prisma.certificatePF.findMany({
-      where: buildListWhere(input.organizationId, input.query),
-      orderBy: [{ expiration_date: "asc" }, { name: "asc" }],
-      ...pagination,
-      select: certificatePfPublicSelect,
-    });
+    const where = buildListWhere(input.organizationId, input.query);
+    const [total, records] = await Promise.all([
+      this.prisma.certificatePF.count({ where }),
+      this.prisma.certificatePF.findMany({
+        where,
+        orderBy: [{ expiration_date: "asc" }, { name: "asc" }],
+        ...pagination,
+        select: certificatePfPublicSelect,
+      }),
+    ]);
 
-    return records.map((record) => removePassword(removeFilePrivateMetadata(record)));
+    return buildPaginatedResult(
+      records.map((record) => removePassword(removeFilePrivateMetadata(record))),
+      total,
+      input.query,
+    );
   }
 
   async getCertificatePf(input: CertificatePfGetInput): Promise<CertificatePfDetailResult> {
