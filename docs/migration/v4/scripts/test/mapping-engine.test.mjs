@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import crypto from "node:crypto";
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
   buildMapping,
-  createMappingContextProvider,
+  createConservativeMappingContextProvider,
   validateMappingCompleteness,
   writeMappingPackage,
 } from "../lib/mapping-engine.mjs";
@@ -93,6 +94,19 @@ function emission(stepId, destinationTable, status, identityRef, reasonCode = nu
     identityRef,
     field: status === "quarantine" ? "id" : null,
     reasonCode,
+  };
+}
+
+function explicitContextFreeContract() {
+  return {
+    contextMode: "context_free",
+    contextRequirements: [],
+    emissionConditions: {
+      kind: "declarative",
+      prepared: "source row satisfies the step mapping",
+      quarantine: "declared field or reference validation fails",
+      notEmitted: "declared destination condition does not apply",
+    },
   };
 }
 
@@ -185,6 +199,7 @@ async function createFixture(directory) {
     evidence: { legacy: ["fixture.php:10"], current: ["fixture.prisma:1"] },
     cardinality: "1:N",
     dependencies: [],
+    executionContract: explicitContextFreeContract(),
     destinations,
     classifySourceRow() {
       return { status: "prepared" };
@@ -251,20 +266,9 @@ async function createFixture(directory) {
 }
 
 function contextProviderFor(fixture) {
-  return createMappingContextProvider({
+  return createConservativeMappingContextProvider({
     inventory: fixture.inventory,
     ruleRegistry: fixture.ruleRegistry,
-    sourcePreparers: new Map([
-      [
-        "legacy.multi",
-        async () => ({
-          preflightComplete: true,
-          contextForRow() {
-            return {};
-          },
-        }),
-      ],
-    ]),
   });
 }
 
@@ -299,7 +303,7 @@ test("buildMapping fecha insert, merge, derived e aggregate por linha sem reter 
 
     const result = await buildFixtureMapping(fixture);
 
-    assert.equal(validateMappingCompleteness(result, fixture.inventory), true);
+    assert.equal(validateMappingCompleteness(result, fixture), true);
     assert.equal(result.tableMappings.length, 1);
     assert.equal(result.pendingTables.length, 1);
     assert.equal(result.destinationMappings.length, 4);
@@ -354,8 +358,12 @@ test("buildMapping exige decisão explícita por step e rejeita passo duplicado"
   });
 });
 
-test("buildMapping aceita somente provider opaco vinculado a inventário e regras", async () => {
+test("motor expõe somente provider conservador oficial e rejeita providers forjados", async () => {
   await withSandbox(async (directory) => {
+    const engineModule = await import("../lib/mapping-engine.mjs");
+    assert.equal("createMappingContextProvider" in engineModule, false);
+    assert.equal(typeof engineModule.createConservativeMappingContextProvider, "function");
+
     const fixture = await createFixture(directory);
     for (const capabilities of [
       undefined,
@@ -372,11 +380,77 @@ test("buildMapping aceita somente provider opaco vinculado a inventário e regra
     const provider = contextProviderFor(fixture);
     assert.equal(Object.isFrozen(provider), true);
     assert.equal(Reflect.set(provider, "credentialEncryptionVerified", true), false);
-    const changedFixture = { ...fixture, ruleRegistry: new Map(fixture.ruleRegistry) };
-    changedFixture.ruleRegistry.get("legacy.multi").ruleOrigin = "fixture:mutated";
-    await assert.rejects(
-      () => buildMapping({ ...changedFixture, capabilities: provider }),
-      /provider.*registry/i,
+
+    const mutations = [
+      () => fixture.inventory.tables[0].columns.push("adulterada"),
+      () => {
+        fixture.inventory.tables[0].relativePath = "outro.sql";
+      },
+      () => {
+        fixture.ruleRegistry.get("legacy.multi").destinations[0].identity.scope = "mutated";
+      },
+      () => {
+        fixture.ruleRegistry.get("legacy.multi").classifySourceRow = () => ({ status: "mutated" });
+      },
+      () => {
+        fixture.ruleRegistry.get("legacy.multi").emitRows = () => [];
+      },
+    ];
+    for (const mutate of mutations) {
+      const changedFixture = await createFixture(path.join(directory, crypto.randomUUID()));
+      const changedProvider = contextProviderFor(changedFixture);
+      fixture.inventory = changedFixture.inventory;
+      fixture.ruleRegistry = changedFixture.ruleRegistry;
+      mutate();
+      await assert.rejects(
+        () => buildMapping({ ...fixture, capabilities: changedProvider }),
+        /provider.*(?:inventário|registry|regra|snapshot)/i,
+      );
+    }
+  });
+});
+
+test("regra sem contrato explícito fica preflight_blocked sem chamar callbacks ou quarantine", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const rule = fixture.ruleRegistry.get("legacy.multi");
+    delete rule.executionContract;
+    let callbackCalls = 0;
+    rule.classifySourceRow = () => {
+      callbackCalls += 1;
+      throw new Error("classificador bloqueado não pode executar");
+    };
+    rule.emitRows = () => {
+      callbackCalls += 1;
+      throw new Error("emissor bloqueado não pode executar");
+    };
+
+    const result = await buildFixtureMapping(fixture);
+
+    assert.equal(callbackCalls, 0);
+    assert.equal(result.quarantineSummary.total, 0);
+    assert.deepEqual(result.quarantineReasons, []);
+    assert.equal(result.preflightSummary.totalBlockedRows, 8);
+    assert.equal(result.preflightSummary.blockedSources, 1);
+    assert.equal(result.preflightSummary.blockedSteps, 4);
+    assert.equal(result.preflightBlocks.length, 4);
+    assert.equal(
+      result.destinationMappings.every(
+        ({ blockedRows, prepared, quarantine, notEmitted, preflightState }) =>
+          blockedRows === 2 &&
+          prepared === 0 &&
+          quarantine === 0 &&
+          notEmitted === 0 &&
+          preflightState === "preflight_blocked",
+      ),
+      true,
+    );
+    assert.equal(
+      result.preflightBlocks.every(
+        ({ count, reasonCode }) =>
+          count === 2 && reasonCode === "RUNTIME_CLASSIFIER_PREFLIGHT_REQUIRED",
+      ),
+      true,
     );
   });
 });
@@ -457,6 +531,8 @@ test("writeMappingPackage gera artefatos determinísticos e sem linha ou payload
         "mapping/tables.json",
         "pending-mapping/tables.csv",
         "pending-mapping/tables.json",
+        "preflight/blocked.csv",
+        "preflight/summary.json",
         "quarantine/reasons.csv",
         "quarantine/summary.json",
       ],
@@ -476,44 +552,49 @@ test("writeMappingPackage gera artefatos determinísticos e sem linha ou payload
     assert.deepEqual(merge.defaults, {});
     assert.deepEqual(merge.columns, [columnRule()]);
     assert.deepEqual(merge.emissionContract, {
+      kind: "declarative",
+      conditions: explicitContextFreeContract().emissionConditions,
       decisionRequiredPerSourceRow: true,
       omissionPolicy: "error",
-      preflightReasonCode: "SEMANTIC_CONTEXT_PREFLIGHT_REQUIRED",
+      runtimeClassifierRequired: false,
     });
+    assert.deepEqual(merge.contextContract, {
+      declared: true,
+      mode: "context_free",
+      requirements: [],
+    });
+    assert.deepEqual(merge.contractOrigin, {
+      ruleOrigin: "fixture:legacy.multi",
+      stepId: "merge",
+      classifyRef: "fixture:legacy.multi#classifySourceRow",
+      emitRef: "fixture:legacy.multi#emitRows",
+    });
+    assert.match(merge.contractDigest, /^[a-f0-9]{64}$/);
+    assert.match(merge.runtimeClassifier.classifyDigest, /^[a-f0-9]{64}$/);
+    assert.match(merge.runtimeClassifier.emitDigest, /^[a-f0-9]{64}$/);
+    assert.doesNotMatch(serialized, /classifySourceRow\s*\(|emitRows\s*\(|=>/);
   });
 });
 
-test("writeMappingPackage aborta conteúdo sensível, preserva pacote anterior e limpa só o temporário", async () => {
+test("writeMappingPackage rejeita resultado forjado antes de escrever e preserva pacote anterior", async () => {
   await withSandbox(async (directory) => {
     const fixture = await createFixture(directory);
     const result = await buildFixtureMapping(fixture);
     const packageDir = path.join(directory, "package");
     await mkdir(packageDir);
     await writeFile(path.join(packageDir, "sentinel.txt"), "PACKAGE_ANTERIOR\n");
-    for (const secret of [
-      ["postgresql", "://usuario:", "SUPER_SECRET_VALUE", "@db.example/base"].join(""),
-      '{"password":"SUPER_SECRET_VALUE"}',
-      "INSERT INTO clients (id) VALUES (1)",
-    ]) {
-      const unsafe = {
-        ...result,
-        tableMappings: result.tableMappings.map((mapping, index) =>
-          index === 0 ? { ...mapping, reason: secret } : mapping,
-        ),
-      };
+    const forged = structuredClone(result);
+    forged.destinationMappings[0].identity.scope = "forged";
+    forged.destinationMappings[0].columns[0].transformation = "forged";
+    forged.columnMappings[0].transformation = "forged";
 
-      await assert.rejects(
-        () =>
-          writeMappingPackage(packageDir, unsafe, {
-            protectedPaths: [fixture.sourceDir],
-          }),
-        (error) => {
-          assert.match(error.message, /sensivel/i);
-          assert.equal(error.message.includes("SUPER_SECRET_VALUE"), false);
-          return true;
-        },
-      );
-    }
+    await assert.rejects(
+      () =>
+        writeMappingPackage(packageDir, forged, {
+          protectedPaths: [fixture.sourceDir],
+        }),
+      /resultado.*(?:autenticado|provenance)|proveniência/i,
+    );
 
     assert.equal(
       await readFile(path.join(packageDir, "sentinel.txt"), "utf8"),
@@ -523,47 +604,26 @@ test("writeMappingPackage aborta conteúdo sensível, preserva pacote anterior e
   });
 });
 
-test("validateMappingCompleteness rejeita adulterações cruzadas de métricas e quarentena", async () => {
+test("resultado é opaco e completeness exige provenance e registries íntegros", async () => {
   await withSandbox(async (directory) => {
     const fixture = await createFixture(directory);
     const result = await buildFixtureMapping(fixture);
-    const mutations = [
-      (copy) => {
-        copy.destinationMappings[0].readRows -= 1;
-      },
-      (copy) => {
-        copy.destinationMappings.push({ ...copy.destinationMappings[0] });
-      },
-      (copy) => {
-        copy.destinationMappings[0].identityKind = "generate";
-      },
-      (copy) => {
-        copy.columnMappings.pop();
-      },
-      (copy) => {
-        copy.tableMappings[0].prepared += 1;
-      },
-      (copy) => {
-        copy.emissionCounts["legacy.multi"].insert.prepared += 1;
-      },
-      (copy) => {
-        copy.quarantineSummary.total += 1;
-      },
-      (copy) => {
-        copy.quarantineReasons[0].count += 1;
-      },
-      (copy) => {
-        copy.preflightComplete = true;
-      },
-    ];
-    for (const mutate of mutations) {
-      const copy = structuredClone(result);
-      mutate(copy);
-      assert.throws(
-        () => validateMappingCompleteness(copy, fixture.inventory),
-        /diverge|inválid|incomplet|duplicad/i,
-      );
-    }
+    assert.equal(Object.isFrozen(result), true);
+    assert.equal(Object.isFrozen(result.destinationMappings[0].identity), true);
+    const forged = structuredClone(result);
+    forged.destinationMappings[0].identity.scope = "forged";
+    forged.destinationMappings[0].columns[0].transformation = "forged";
+    forged.columnMappings[0].transformation = "forged";
+    assert.throws(
+      () => validateMappingCompleteness(forged, fixture),
+      /resultado.*(?:autenticado|provenance)|proveniência/i,
+    );
+
+    fixture.ruleRegistry.get("legacy.multi").destinations[0].constants.injected = true;
+    assert.throws(
+      () => validateMappingCompleteness(result, fixture),
+      /proveniência|registry|snapshot|diverge/i,
+    );
   });
 });
 
@@ -676,5 +736,100 @@ test("writeFileSetAtomically restaura pacote em falha de install e separa cleanu
     });
     assert.match(installed.recoveryEntry, /^\.package\.[0-9a-f-]+\.previous$/);
     assert.equal(await readFile(path.join(packageDir, "new.txt"), "utf8"), "NOVO\n");
+  });
+});
+
+test("writeFileSetAtomically rejeita symlink em qualquer nó do pacote existente", async () => {
+  await withSandbox(async (directory) => {
+    const packageDir = path.join(directory, "package");
+    const externalFile = path.join(directory, "external.txt");
+    await mkdir(path.join(packageDir, "nested"), { recursive: true });
+    await writeFile(externalFile, "EXTERNO\n");
+    await writeFile(path.join(packageDir, "sentinel.txt"), "ANTERIOR\n");
+    await symlink(externalFile, path.join(packageDir, "nested", "alias.txt"));
+
+    await assert.rejects(
+      () => writeFileSetAtomically(packageDir, new Map([["new.txt", "NOVO\n"]])),
+      /symlink/i,
+    );
+    assert.equal(await readFile(path.join(packageDir, "sentinel.txt"), "utf8"), "ANTERIOR\n");
+    assert.equal(await readFile(externalFile, "utf8"), "EXTERNO\n");
+  });
+});
+
+test("rollback informa restauração por cópia e preserva recovery quando todas tentativas falham", async () => {
+  await withSandbox(async (directory) => {
+    const packageDir = path.join(directory, "package");
+    await mkdir(packageDir);
+    await writeFile(path.join(packageDir, "sentinel.txt"), "ANTERIOR\n");
+    const baseAdapter = createNodeFileSystemAdapter();
+    const copyRestore = {
+      ...baseAdapter,
+      async rename(from, to) {
+        if ((from.endsWith(".tmp") || from.endsWith(".previous")) && to === packageDir) {
+          throw new Error("injected-rename-failure");
+        }
+        return baseAdapter.rename(from, to);
+      },
+    };
+    await assert.rejects(
+      () =>
+        writeFileSetAtomically(packageDir, new Map([["new.txt", "NOVO\n"]]), {
+          fileSystem: copyRestore,
+        }),
+      (error) => {
+        assert.equal(error.recovery.packageRestored, true);
+        assert.equal(error.recovery.restorationMethod, "copy");
+        assert.match(error.recovery.recoveryEntry, /^\.package\.[0-9a-f-]+\.previous$/);
+        assert.equal(error.recovery.recoveryPath, error.recovery.recoveryEntry);
+        return true;
+      },
+    );
+    assert.equal(await readFile(path.join(packageDir, "sentinel.txt"), "utf8"), "ANTERIOR\n");
+
+    await rm(packageDir, { recursive: true });
+    await mkdir(packageDir);
+    await writeFile(path.join(packageDir, "sentinel.txt"), "ANTERIOR-2\n");
+    const failedRestore = {
+      ...baseAdapter,
+      async rename(from, to) {
+        if ((from.endsWith(".tmp") || from.endsWith(".previous")) && to === packageDir) {
+          throw new Error("injected-rename-failure");
+        }
+        return baseAdapter.rename(from, to);
+      },
+      async cp(from, to, options) {
+        if (from.endsWith(".previous") && to === packageDir) {
+          throw new Error("injected-copy-restore-failure");
+        }
+        return baseAdapter.cp(from, to, options);
+      },
+    };
+    await assert.rejects(
+      () =>
+        writeFileSetAtomically(packageDir, new Map([["new.txt", "NOVO\n"]]), {
+          fileSystem: failedRestore,
+        }),
+      (error) => {
+        assert.equal(error.recovery.packageRestored, false);
+        assert.match(error.recovery.recoveryEntry, /^\.package\.[0-9a-f-]+\.previous$/);
+        assert.equal(error.recovery.recoveryPath, error.recovery.recoveryEntry);
+        return true;
+      },
+    );
+    const recoveryEntries = (await readdir(directory)).filter((entry) =>
+      entry.endsWith(".previous"),
+    );
+    assert.equal(recoveryEntries.length >= 1, true);
+    assert.equal(
+      (
+        await Promise.all(
+          recoveryEntries.map((entry) =>
+            readFile(path.join(directory, entry, "sentinel.txt"), "utf8"),
+          ),
+        )
+      ).includes("ANTERIOR-2\n"),
+      true,
+    );
   });
 });

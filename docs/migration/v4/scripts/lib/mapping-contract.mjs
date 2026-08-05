@@ -22,6 +22,7 @@ const RULE_FIELDS = new Set([
   "evidence",
   "cardinality",
   "dependencies",
+  "executionContract",
   "destinations",
   "classifySourceRow",
   "emitRows",
@@ -58,6 +59,14 @@ const EMISSION_FIELDS = new Set([
 const RAW_EMITTERS = new WeakMap();
 
 export function validateMappingRule(rule, prismaCatalog) {
+  validateMappingRuleStructure(rule, prismaCatalog);
+  const stepsById = new Map(rule.destinations.map((step) => [step.stepId, step]));
+  const emitRows = wrapEmissionBoundary(rule, stepsById);
+  emitRows(Object.freeze({}), Object.freeze({}));
+  return true;
+}
+
+export function validateMappingRuleStructure(rule, prismaCatalog) {
   assertKnownFields(rule, RULE_FIELDS, "MappingRule");
   assertNonEmptyString(rule?.sourceTable, "sourceTable");
   if (rule?.status !== "confirmed") {
@@ -70,6 +79,7 @@ export function validateMappingRule(rule, prismaCatalog) {
     throw new Error(`Cardinality inválida: ${String(rule?.cardinality)}`);
   }
   validateDependencies(rule?.dependencies);
+  validateExecutionContract(rule?.executionContract);
   if (!Array.isArray(rule?.destinations) || rule.destinations.length === 0) {
     throw new Error("destinations deve ser um array não vazio");
   }
@@ -90,9 +100,39 @@ export function validateMappingRule(rule, prismaCatalog) {
     stepsById.set(step.stepId, step);
   }
 
-  const emitRows = wrapEmissionBoundary(rule, stepsById);
-  emitRows(Object.freeze({}), Object.freeze({}));
   return true;
+}
+
+export function validateMappingEmissions(rule, emissions) {
+  const stepsById = new Map(rule.destinations.map((step) => [step.stepId, step]));
+  return validateEmissionDecisions(emissions, stepsById);
+}
+
+function validateExecutionContract(contract) {
+  if (contract === undefined) return;
+  assertExactFields(
+    contract,
+    ["contextMode", "contextRequirements", "emissionConditions"],
+    "ExecutionContract",
+  );
+  if (contract.contextMode !== "context_free") {
+    throw new Error("ExecutionContract desta fase aceita somente context_free explícito");
+  }
+  validateStringArray(contract.contextRequirements, "contextRequirements", { allowEmpty: true });
+  if (contract.contextRequirements.length !== 0) {
+    throw new Error("ExecutionContract context_free não aceita contextRequirements");
+  }
+  assertExactFields(
+    contract.emissionConditions,
+    ["kind", "prepared", "quarantine", "notEmitted"],
+    "EmissionConditions",
+  );
+  if (contract.emissionConditions.kind !== "declarative") {
+    throw new Error("ExecutionContract exige EmissionConditions declarativa");
+  }
+  for (const field of ["prepared", "quarantine", "notEmitted"]) {
+    assertNonEmptyString(contract.emissionConditions[field], `EmissionConditions.${field}`);
+  }
 }
 
 export function validateDestinationStep(step, prismaCatalog) {

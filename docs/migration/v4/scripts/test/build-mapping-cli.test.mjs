@@ -88,6 +88,8 @@ test("CLI aceita somente as cinco origens declaradas e gera pacote dry-run compl
     const pending = JSON.parse(
       await readFile(path.join(packageDir, "pending-mapping/tables.json")),
     );
+    const preflight = JSON.parse(await readFile(path.join(packageDir, "preflight/summary.json")));
+    const quarantine = JSON.parse(await readFile(path.join(packageDir, "quarantine/summary.json")));
     assert.equal(mappings.length + pending.length, 312);
     assert.equal(
       mappings.every(({ preflightComplete }) => preflightComplete === false),
@@ -97,6 +99,16 @@ test("CLI aceita somente as cinco origens declaradas e gera pacote dry-run compl
       mappings.every(({ prepared }) => prepared === 0),
       true,
     );
+    assert.equal(
+      mappings.every(
+        ({ blockedRows, quarantine: quarantined }) => blockedRows > 0 && quarantined === 0,
+      ),
+      true,
+    );
+    assert.equal(preflight.blockedSources, 102);
+    assert.equal(preflight.blockedSteps, 132);
+    assert.equal(preflight.totalBlockedRows, 132);
+    assert.equal(quarantine.total, 0);
   });
 });
 

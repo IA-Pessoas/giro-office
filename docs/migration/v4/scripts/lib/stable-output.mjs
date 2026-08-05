@@ -1,8 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { cp, lstat, mkdir, rename, rm, unlink, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, readdir, rename, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const DEFAULT_FILE_SYSTEM = Object.freeze({ cp, lstat, mkdir, rename, rm, unlink, writeFile });
+const DEFAULT_FILE_SYSTEM = Object.freeze({
+  cp,
+  lstat,
+  mkdir,
+  readdir,
+  rename,
+  rm,
+  unlink,
+  writeFile,
+});
 
 export function createNodeFileSystemAdapter() {
   return { ...DEFAULT_FILE_SYSTEM };
@@ -63,6 +72,7 @@ export async function writeFileSetAtomically(
       if (!current.isDirectory() || current.isSymbolicLink()) {
         throw createAtomicError("Destino do pacote deve ser diretório real", "validate");
       }
+      await assertNoSymlinkTree(resolvedDirectory, fileSystem);
       await fileSystem.cp(resolvedDirectory, temporaryPath, {
         recursive: true,
         errorOnExist: true,
@@ -82,6 +92,7 @@ export async function writeFileSetAtomically(
       await fileSystem.mkdir(path.dirname(stagedPath), { recursive: true });
       await fileSystem.writeFile(stagedPath, content, "utf8");
     }
+    await assertNoSymlinkTree(temporaryPath, fileSystem);
 
     if (await pathExists(resolvedDirectory, fileSystem)) {
       await fileSystem.rename(resolvedDirectory, backupPath);
@@ -91,22 +102,31 @@ export async function writeFileSetAtomically(
       await fileSystem.rename(temporaryPath, resolvedDirectory);
       installed = true;
     } catch {
-      const restored = await restorePrevious({
+      const restoration = await restorePrevious({
         backupPath,
         fileSystem,
         previousMoved,
         resolvedDirectory,
       });
-      previousMoved = !restored;
+      previousMoved =
+        restoration.restored && restoration.method === "rename" ? false : previousMoved;
       await cleanupExact(temporaryPath, fileSystem).catch(() => {});
-      if (!restored && previousMoved) {
+      if (!restoration.restored && previousMoved) {
         throw createAtomicError("Falha de instalação e restauração requer recuperação", "restore", {
           packageRestored: false,
           recoveryEntry: path.basename(backupPath),
+          recoveryPath: path.basename(backupPath),
         });
       }
       throw createAtomicError("Falha de instalação; pacote anterior restaurado", "install", {
         packageRestored: true,
+        restorationMethod: restoration.method,
+        ...(restoration.method === "copy"
+          ? {
+              recoveryEntry: path.basename(backupPath),
+              recoveryPath: path.basename(backupPath),
+            }
+          : {}),
       });
     }
   } catch (error) {
@@ -118,20 +138,34 @@ export async function writeFileSetAtomically(
         cleanupFailed = true;
       }
       if (previousMoved && !(await pathExists(resolvedDirectory, fileSystem))) {
-        const restored = await restorePrevious({
+        const restoration = await restorePrevious({
           backupPath,
           fileSystem,
           previousMoved,
           resolvedDirectory,
         });
-        if (!restored) {
+        if (!restoration.restored) {
           throw createAtomicError("Restauração falhou; recuperação manual necessária", "restore", {
             packageRestored: false,
             recoveryEntry: path.basename(backupPath),
+            recoveryPath: path.basename(backupPath),
             tempCleanupPending: cleanupFailed,
           });
         }
-        previousMoved = false;
+        previousMoved = restoration.method === "copy";
+        if (error?.atomicSafe === true && error.recovery?.packageRestored === false) {
+          throw createAtomicError("Pacote anterior restaurado após retry", "restore_retry", {
+            packageRestored: true,
+            restorationMethod: restoration.method,
+            ...(restoration.method === "copy"
+              ? {
+                  recoveryEntry: path.basename(backupPath),
+                  recoveryPath: path.basename(backupPath),
+                }
+              : {}),
+            tempCleanupPending: cleanupFailed,
+          });
+        }
       }
       if (error?.atomicSafe === true) throw error;
       throw createAtomicError(
@@ -181,17 +215,29 @@ async function writeAtomically(filePath, content) {
 }
 
 async function restorePrevious({ backupPath, fileSystem, previousMoved, resolvedDirectory }) {
-  if (!previousMoved) return true;
+  if (!previousMoved) return { restored: true, method: "none" };
   try {
     await fileSystem.rename(backupPath, resolvedDirectory);
-    return true;
+    return { restored: true, method: "rename" };
   } catch {
     try {
       await fileSystem.cp(backupPath, resolvedDirectory, { recursive: true, errorOnExist: true });
-      return true;
+      return { restored: true, method: "copy" };
     } catch {
-      return false;
+      return { restored: false, method: null };
     }
+  }
+}
+
+async function assertNoSymlinkTree(target, fileSystem) {
+  const inspection = await fileSystem.lstat(target);
+  if (inspection.isSymbolicLink()) {
+    throw createAtomicError("Symlink não permitido no pacote atômico", "validate_symlink");
+  }
+  if (!inspection.isDirectory()) return;
+  const entries = await fileSystem.readdir(target);
+  for (const entry of entries) {
+    await assertNoSymlinkTree(path.join(target, entry), fileSystem);
   }
 }
 
@@ -207,7 +253,7 @@ function createAtomicError(message, phase, recovery = {}) {
 }
 
 function validateFileSystemAdapter(fileSystem) {
-  for (const method of ["cp", "lstat", "mkdir", "rename", "rm", "writeFile"]) {
+  for (const method of ["cp", "lstat", "mkdir", "readdir", "rename", "rm", "writeFile"]) {
     if (typeof fileSystem?.[method] !== "function") {
       throw new TypeError("Adapter de filesystem incompleto");
     }

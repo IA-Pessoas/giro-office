@@ -9,6 +9,7 @@ import {
   createPendingMapping,
   REQUIRED_IDENTITY_NAMESPACE,
   validateMappingRule,
+  validateMappingRuleStructure,
 } from "../lib/mapping-contract.mjs";
 import { loadPrismaCatalog } from "../lib/prisma-catalog.mjs";
 
@@ -106,6 +107,25 @@ test("validateMappingRule aceita regra 1:1 com DestinationStep insert congelado"
   const catalog = await loadPrismaCatalog(fixturePath);
 
   assert.equal(validateMappingRule(validRule(), catalog), true);
+});
+
+test("validateMappingRuleStructure valida contrato sem executar ou substituir callbacks", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+  let calls = 0;
+  const classifySourceRow = () => {
+    calls += 1;
+    throw new Error("callback não deve executar");
+  };
+  const emitRows = () => {
+    calls += 1;
+    throw new Error("callback não deve executar");
+  };
+  const rule = validRule({ classifySourceRow, emitRows });
+
+  assert.equal(validateMappingRuleStructure(rule, catalog), true);
+  assert.equal(calls, 0);
+  assert.equal(rule.classifySourceRow, classifySourceRow);
+  assert.equal(rule.emitRows, emitRows);
 });
 
 test("merge N:1 prioriza vínculo legado explícito antes de lookup natural", async () => {

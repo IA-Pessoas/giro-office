@@ -2,7 +2,11 @@ import crypto from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 
-import { createPendingMapping, validateMappingRule } from "./mapping-contract.mjs";
+import {
+  createPendingMapping,
+  validateMappingEmissions,
+  validateMappingRuleStructure,
+} from "./mapping-contract.mjs";
 import { getModelByDatabaseName } from "./prisma-catalog.mjs";
 import { validateEvidenceCoverage } from "./semantic-evidence.mjs";
 import { assertNoSensitiveSerializedContent, assertNoSensitiveValues } from "./sensitivity.mjs";
@@ -10,39 +14,30 @@ import { iterateSqlRows } from "./sql-dump-parser.mjs";
 import { serializeCsv, serializeStableJson, writeFileSetAtomically } from "./stable-output.mjs";
 
 const CASTELO_ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
-const EMISSION_STATUSES = ["prepared", "quarantine", "not_emitted"];
+const PROVIDER_MODE = "conservative-read-only";
 const MAX_REASONS_PER_STEP = 64;
 const PROVIDER_STATE = new WeakMap();
-const SENSITIVE_CAPABILITY = /(?:encrypt|credential|secret|storage.*verified|key.*verified)/i;
+const RESULT_PROVENANCE = new WeakMap();
 
-export function createMappingContextProvider({
-  inventory,
-  ruleRegistry,
-  sourcePreparers = new Map(),
-}) {
+export function createConservativeMappingContextProvider({ inventory, ruleRegistry }) {
   if (!isObject(inventory) || !Array.isArray(inventory.tables)) {
     throw new TypeError("Provider exige SourceInventory válido");
   }
-  if (!(ruleRegistry instanceof Map) || !(sourcePreparers instanceof Map)) {
-    throw new TypeError("Provider exige RuleRegistry e sourcePreparers como Map");
-  }
-  for (const [sourceTable, prepare] of sourcePreparers) {
-    if (!ruleRegistry.has(sourceTable) || typeof prepare !== "function") {
-      throw new Error("Source preparer não corresponde ao RuleRegistry");
-    }
+  if (!(ruleRegistry instanceof Map)) {
+    throw new TypeError("Provider exige RuleRegistry como Map");
   }
 
   const provider = Object.freeze({
-    kind: "v4-authenticated-context-provider",
-    mode: sourcePreparers.size === 0 ? "conservative-read-only" : "authenticated-read-only",
+    kind: "v4-conservative-mapping-context-provider",
+    mode: PROVIDER_MODE,
     preflightComplete: false,
   });
   PROVIDER_STATE.set(provider, {
-    inventory,
-    inventoryFingerprint: fingerprintInventory(inventory),
-    ruleRegistry,
+    inventoryRef: inventory,
+    inventorySnapshot: deepFreeze(copyStaticValue(inventory)),
+    inventoryDigest: digestCanonical(inventory),
+    ruleRegistryRef: ruleRegistry,
     ruleSnapshot: snapshotRuleRegistry(ruleRegistry),
-    sourcePreparers: new Map(sourcePreparers),
   });
   return provider;
 }
@@ -55,25 +50,21 @@ export async function buildMapping({
   sourceDir,
   capabilities,
 }) {
-  validateBuildInputs({
-    inventory,
-    evidenceRegistry,
-    ruleRegistry,
-    prismaCatalog,
-    sourceDir,
-  });
+  validateBuildInputs({ inventory, evidenceRegistry, ruleRegistry, prismaCatalog, sourceDir });
   const providerState = validateContextProvider(capabilities, inventory, ruleRegistry);
-  validateRegistries(inventory, evidenceRegistry, ruleRegistry, prismaCatalog);
-  providerState.ruleSnapshot = snapshotRuleRegistry(ruleRegistry);
+  const sealedInventory = providerState.inventorySnapshot;
+  validateRegistries(sealedInventory, evidenceRegistry, ruleRegistry, prismaCatalog);
 
   const tableMappings = [];
   const destinationMappings = [];
   const columnMappings = [];
   const pendingTables = [];
   const quarantineReasonCounts = new Map();
+  const preflightBlockCounts = new Map();
   const emissionCounts = {};
 
-  for (const sourceInspection of sorted(inventory.tables, ({ sourceTable }) => sourceTable)) {
+  for (const sourceInspection of sorted(sealedInventory.tables, ({ sourceTable }) => sourceTable)) {
+    validateContextProvider(capabilities, inventory, ruleRegistry);
     const evidence = evidenceRegistry.get(sourceInspection.sourceTable);
     if (evidence.finalStatus === "pending") {
       pendingTables.push({
@@ -83,41 +74,29 @@ export async function buildMapping({
       continue;
     }
 
-    validateContextProvider(capabilities, inventory, ruleRegistry);
     const rule = ruleRegistry.get(sourceInspection.sourceTable);
-    const stepContracts = new Map(
-      rule.destinations.map((destination) => [
-        destination.stepId,
-        buildDestinationContract(rule, destination),
-      ]),
+    const audit = buildRuntimeClassifierAudit(rule);
+    const staticDestinations = rule.destinations.map((step) =>
+      deriveDestinationStatic(rule, step, audit),
     );
     const counts = createStepCounts(rule);
-    const execution = await prepareSourceExecution({
-      providerState,
-      inventory,
-      ruleRegistry,
-      sourceInspection,
-      rule,
-      stepContracts,
-    });
-    validateContextProvider(capabilities, inventory, ruleRegistry);
+    const executable = isExplicitContextFreeRule(rule);
     const dumpPath = resolveDumpPath(sourceDir, sourceInspection);
     let readRows = 0;
 
-    if (!execution.executable) {
+    if (!executable) {
       for await (const _row of iterateSqlRows(dumpPath)) readRows += 1;
       for (const destination of rule.destinations) {
         const count = counts.get(destination.stepId);
         count.readRows = readRows;
-        count.quarantine = readRows;
-        recordQuarantineReason(
-          quarantineReasonCounts,
+        count.blockedRows = readRows;
+        recordPreflightBlock(
+          preflightBlockCounts,
           {
             sourceTable: rule.sourceTable,
             stepId: destination.stepId,
             destinationTable: destination.destinationTable,
-            field: null,
-            reasonCode: execution.reasonCode,
+            reasonCode: "RUNTIME_CLASSIFIER_PREFLIGHT_REQUIRED",
           },
           readRows,
         );
@@ -125,8 +104,8 @@ export async function buildMapping({
     } else {
       for await (const row of iterateSqlRows(dumpPath)) {
         readRows += 1;
-        const context = await issueRowContext(execution, row, readRows);
-        const emissions = requireExplicitRowEmissions(rule, rule.emitRows(row, context));
+        const decisions = validateMappingEmissions(rule, rule.emitRows(row));
+        const emissions = requireExplicitRowEmissions(rule, decisions);
         for (const decision of emissions) {
           const count = counts.get(decision.stepId);
           count.readRows += 1;
@@ -141,6 +120,7 @@ export async function buildMapping({
             });
           }
         }
+        validateContextProvider(capabilities, inventory, ruleRegistry);
       }
     }
 
@@ -150,234 +130,88 @@ export async function buildMapping({
 
     const countRows = [...counts.values()];
     const totals = sumCounts(countRows);
+    const tableStatic = deriveTableStatic(rule, evidence, staticDestinations);
     tableMappings.push({
-      sourceTable: rule.sourceTable,
+      ...tableStatic,
       sourceRowCount: sourceInspection.rowCount,
       readRows,
-      status: "confirmed",
-      reasonCode: evidence.reasonCode,
-      reason: evidence.reason,
-      domain: rule.domain,
-      ruleOrigin: rule.ruleOrigin,
-      cardinality: rule.cardinality,
-      destinationStepCount: rule.destinations.length,
-      dependencies: [...rule.dependencies],
-      evidence: copyRuleEvidence(rule.evidence),
-      contextProviderMode: capabilities.mode,
+      contextProviderMode: PROVIDER_MODE,
+      preflightState: executable ? "context_free_executed" : "preflight_blocked",
       preflightComplete: false,
       prepared: totals.prepared,
       quarantine: totals.quarantine,
       notEmitted: totals.notEmitted,
+      blockedRows: totals.blockedRows,
     });
 
-    for (const destination of rule.destinations) {
-      const count = counts.get(destination.stepId);
-      const contract = stepContracts.get(destination.stepId);
+    for (const staticMapping of staticDestinations) {
+      const count = counts.get(staticMapping.stepId);
       const mapping = {
-        sourceTable: rule.sourceTable,
-        stepId: destination.stepId,
-        destinationTable: destination.destinationTable,
-        mode: destination.mode,
-        identityKind: destination.identity.kind,
-        identity: copyStaticValue(destination.identity),
-        cardinality: rule.cardinality,
-        ruleOrigin: rule.ruleOrigin,
-        dependencies: [...destination.dependencies],
-        precedence: [...destination.precedence],
-        columns: destination.columns.map(copyColumn),
-        constants: copyStaticValue(destination.constants),
-        defaults: copyStaticValue(destination.defaults),
-        contextRequirements: contract.contextRequirements,
-        emissionContract: contract.emissionContract,
+        ...staticMapping,
         readRows: count.readRows,
         prepared: count.prepared,
         quarantine: count.quarantine,
         notEmitted: count.notEmitted,
+        blockedRows: count.blockedRows,
+        preflightState: executable ? "context_free_executed" : "preflight_blocked",
         preflightComplete: false,
       };
       destinationMappings.push(mapping);
       setEmissionCount(emissionCounts, mapping);
-
-      for (const column of destination.columns) {
-        columnMappings.push({
-          sourceTable: rule.sourceTable,
-          stepId: destination.stepId,
-          destinationTable: destination.destinationTable,
-          mode: destination.mode,
-          ...copyColumn(column),
-          ruleOrigin: rule.ruleOrigin,
-        });
-      }
+      columnMappings.push(...deriveColumnMappings(rule, staticMapping));
     }
   }
 
   const quarantineReasons = sortQuarantineReasons([...quarantineReasonCounts.values()]);
+  const preflightBlocks = sortPreflightBlocks([...preflightBlockCounts.values()]);
   const result = {
     tableMappings: sortTableMappings(tableMappings),
     destinationMappings: sortDestinationMappings(destinationMappings),
     columnMappings: sortColumnMappings(columnMappings),
     pendingTables: sortTableMappings(pendingTables),
     quarantineReasons,
-    emissionCounts,
     quarantineSummary: buildQuarantineSummary(quarantineReasons),
-    contextProviderMode: capabilities.mode,
+    preflightBlocks,
+    preflightSummary: buildPreflightSummary(preflightBlocks),
+    emissionCounts,
+    contextProviderMode: PROVIDER_MODE,
     preflightComplete: false,
     readyForMigration: false,
   };
   assertNoSensitiveValues({ ...result, emissionCounts: undefined });
-  validateMappingCompleteness(result, inventory);
-  return result;
+  const provenance = createResultProvenance({
+    provider: capabilities,
+    providerState,
+    inventory,
+    evidenceRegistry,
+    ruleRegistry,
+    prismaCatalog,
+  });
+  RESULT_PROVENANCE.set(result, provenance);
+  validateMappingCompleteness(result, {
+    inventory,
+    evidenceRegistry,
+    ruleRegistry,
+    prismaCatalog,
+  });
+  return deepFreeze(result);
 }
 
-export function validateMappingCompleteness(result, inventory) {
-  if (!isObject(result) || !Array.isArray(inventory?.tables)) {
-    throw new TypeError("Resultado e inventário são obrigatórios");
+export function validateMappingCompleteness(result, context) {
+  const provenance = RESULT_PROVENANCE.get(result);
+  if (provenance === undefined) {
+    throw new Error("Resultado autenticado com provenance é obrigatório");
   }
-  if (result.preflightComplete !== false || result.readyForMigration !== false) {
-    throw new Error("Estado de preflight inválido ou incompleto");
-  }
-  const confirmed = requireArray(result.tableMappings, "tableMappings");
-  const pending = requireArray(result.pendingTables, "pendingTables");
-  const destinations = requireArray(result.destinationMappings, "destinationMappings");
-  const columns = requireArray(result.columnMappings, "columnMappings");
-  const reasons = requireArray(result.quarantineReasons, "quarantineReasons");
-  const inventoryBySource = new Map(inventory.tables.map((table) => [table.sourceTable, table]));
-  const inventorySources = [...inventoryBySource.keys()].sort(compareText);
-  assertSameUniqueSources(
-    [...confirmed, ...pending].map(({ sourceTable }) => sourceTable).sort(compareText),
-    inventorySources,
+  validateResultProvenance(provenance, context);
+  const inventory = provenance.providerState.inventorySnapshot;
+  validateRegistries(
+    inventory,
+    context.evidenceRegistry,
+    context.ruleRegistry,
+    context.prismaCatalog,
   );
-
-  const pendingSources = new Set();
-  for (const mapping of pending) {
-    const source = inventoryBySource.get(mapping.sourceTable);
-    if (
-      source === undefined ||
-      mapping.status !== "pending" ||
-      mapping.sourceRowCount !== source.rowCount ||
-      mapping.preflightComplete !== false
-    ) {
-      throw new Error(`Pending mapping inválido: ${String(mapping.sourceTable)}`);
-    }
-    pendingSources.add(mapping.sourceTable);
-  }
-
-  const destinationsBySource = groupBy(destinations, "sourceTable");
-  const destinationKeys = new Set();
-  const expectedEmissionCounts = {};
-  const expectedColumns = [];
-  for (const destination of destinations) {
-    const key = destinationKey(destination);
-    if (destinationKeys.has(key)) throw new Error(`Destination mapping duplicado: ${key}`);
-    destinationKeys.add(key);
-    const source = inventoryBySource.get(destination.sourceTable);
-    if (
-      source === undefined ||
-      pendingSources.has(destination.sourceTable) ||
-      destination.readRows !== source.rowCount ||
-      destination.preflightComplete !== false ||
-      !validCounts(destination) ||
-      destination.prepared + destination.quarantine + destination.notEmitted !== source.rowCount
-    ) {
-      throw new Error(`Destination mapping incompleto: ${key}`);
-    }
-    if (
-      !isObject(destination.identity) ||
-      destination.identity.kind !== destination.identityKind ||
-      !Array.isArray(destination.dependencies) ||
-      !Array.isArray(destination.precedence) ||
-      !Array.isArray(destination.columns) ||
-      destination.columns.length === 0 ||
-      !isObject(destination.constants) ||
-      !isObject(destination.defaults) ||
-      !Array.isArray(destination.contextRequirements) ||
-      !isObject(destination.emissionContract) ||
-      destination.emissionContract.decisionRequiredPerSourceRow !== true ||
-      destination.emissionContract.omissionPolicy !== "error"
-    ) {
-      throw new Error(`Contrato estático do destino inválido: ${key}`);
-    }
-    for (const column of destination.columns) {
-      if (canonicalJson(column) !== canonicalJson(copyColumn(column))) {
-        throw new Error(`Column contract inválido: ${key}`);
-      }
-      expectedColumns.push({
-        sourceTable: destination.sourceTable,
-        stepId: destination.stepId,
-        destinationTable: destination.destinationTable,
-        mode: destination.mode,
-        ...copyColumn(column),
-        ruleOrigin: destination.ruleOrigin,
-      });
-    }
-    setEmissionCount(expectedEmissionCounts, destination);
-  }
-  if (canonicalJson(expectedEmissionCounts) !== canonicalJson(result.emissionCounts)) {
-    throw new Error("EmissionCounts diverge de destinationMappings");
-  }
-  if (
-    canonicalJson(sortColumnMappings(expectedColumns)) !==
-    canonicalJson(sortColumnMappings(columns))
-  ) {
-    throw new Error("ColumnMappings diverge de destinationMappings");
-  }
-
-  for (const mapping of confirmed) {
-    const source = inventoryBySource.get(mapping.sourceTable);
-    const sourceDestinations = destinationsBySource.get(mapping.sourceTable) ?? [];
-    const totals = sumCounts(sourceDestinations);
-    if (
-      source === undefined ||
-      mapping.status !== "confirmed" ||
-      mapping.sourceRowCount !== source.rowCount ||
-      mapping.readRows !== source.rowCount ||
-      mapping.destinationStepCount !== sourceDestinations.length ||
-      mapping.preflightComplete !== false ||
-      sourceDestinations.length === 0 ||
-      mapping.prepared !== totals.prepared ||
-      mapping.quarantine !== totals.quarantine ||
-      mapping.notEmitted !== totals.notEmitted
-    ) {
-      throw new Error(`Totais da tabela divergem: ${mapping.sourceTable}`);
-    }
-  }
-
-  const reasonKeys = new Set();
-  const quarantineByDestination = new Map();
-  const reasonRowsByDestination = new Map();
-  for (const reason of reasons) {
-    const key = quarantineReasonKey(reason);
-    if (reasonKeys.has(key)) throw new Error(`Quarantine reason duplicada: ${key}`);
-    reasonKeys.add(key);
-    if (!Number.isSafeInteger(reason.count) || reason.count <= 0) {
-      throw new Error(`Contagem de quarantine inválida: ${key}`);
-    }
-    const destination = destinations.find(
-      (candidate) => destinationKey(candidate) === destinationKey(reason),
-    );
-    if (destination === undefined) throw new Error(`Quarantine sem destination: ${key}`);
-    const destinationId = destinationKey(reason);
-    const reasonRows = (reasonRowsByDestination.get(destinationId) ?? 0) + 1;
-    if (reasonRows > MAX_REASONS_PER_STEP) {
-      throw new Error(`Quarantine excede limite bounded: ${destinationId}`);
-    }
-    reasonRowsByDestination.set(destinationId, reasonRows);
-    quarantineByDestination.set(
-      destinationId,
-      (quarantineByDestination.get(destinationId) ?? 0) + reason.count,
-    );
-  }
-  for (const destination of destinations) {
-    if (
-      (quarantineByDestination.get(destinationKey(destination)) ?? 0) !== destination.quarantine
-    ) {
-      throw new Error(`Quarantine diverge do destino: ${destinationKey(destination)}`);
-    }
-  }
-  const expectedSummary = buildQuarantineSummary(reasons);
-  if (canonicalJson(expectedSummary) !== canonicalJson(result.quarantineSummary)) {
-    throw new Error("Resumo de quarantine diverge das razões");
-  }
+  validateStaticContracts(result, inventory, context.evidenceRegistry, context.ruleRegistry);
+  validateMetricReconciliation(result, inventory);
   return true;
 }
 
@@ -399,6 +233,11 @@ export async function assertSafePackagePath({ packageDir, protectedPaths }) {
 }
 
 export async function writeMappingPackage(packageDir, result, { protectedPaths, fileSystem } = {}) {
+  const provenance = RESULT_PROVENANCE.get(result);
+  if (provenance === undefined) {
+    throw new Error("Resultado autenticado com provenance é obrigatório");
+  }
+  validateMappingCompleteness(result, provenance.bindings);
   await assertSafePackagePath({ packageDir, protectedPaths });
   const artifacts = buildArtifacts(result);
   for (const [relativePath, content] of artifacts) {
@@ -413,7 +252,7 @@ export async function writeMappingPackage(packageDir, result, { protectedPaths, 
     }
   }
   return writeFileSetAtomically(packageDir, artifacts, {
-    replaceDirectories: ["mapping", "pending-mapping", "quarantine"],
+    replaceDirectories: ["mapping", "pending-mapping", "preflight", "quarantine"],
     fileSystem,
   });
 }
@@ -447,98 +286,103 @@ function validateBuildInputs({
 
 function validateContextProvider(provider, inventory, ruleRegistry) {
   const state = isObject(provider) ? PROVIDER_STATE.get(provider) : undefined;
-  if (state === undefined) throw new Error("Provider de contexto autenticado é obrigatório");
+  if (state === undefined) throw new Error("Provider conservador autenticado é obrigatório");
   if (
-    state.inventory !== inventory ||
-    state.ruleRegistry !== ruleRegistry ||
-    state.inventoryFingerprint !== fingerprintInventory(inventory)
+    state.inventoryRef !== inventory ||
+    state.ruleRegistryRef !== ruleRegistry ||
+    state.inventoryDigest !== digestCanonical(inventory)
   ) {
-    throw new Error("Provider diverge do inventário ou registry vinculado");
+    throw new Error("Provider diverge do inventário ou registry snapshot");
   }
-  for (const [sourceTable, snapshot] of state.ruleSnapshot) {
-    const rule = ruleRegistry.get(sourceTable);
-    if (
-      rule !== snapshot.rule ||
-      rule.ruleOrigin !== snapshot.ruleOrigin ||
-      rule.emitRows !== snapshot.emitRows
-    ) {
-      throw new Error("Provider diverge do RuleRegistry vinculado");
-    }
-  }
+  validateRuleSnapshot(state.ruleSnapshot, ruleRegistry);
   return state;
 }
 
+function createResultProvenance({
+  provider,
+  providerState,
+  inventory,
+  evidenceRegistry,
+  ruleRegistry,
+  prismaCatalog,
+}) {
+  return {
+    provider,
+    providerState,
+    bindings: { inventory, evidenceRegistry, ruleRegistry, prismaCatalog },
+    evidenceDigest: digestCanonical(snapshotMap(evidenceRegistry)),
+    prismaDigest: digestCanonical(prismaCatalog),
+  };
+}
+
+function validateResultProvenance(provenance, context) {
+  if (
+    !isObject(context) ||
+    context.inventory !== provenance.bindings.inventory ||
+    context.evidenceRegistry !== provenance.bindings.evidenceRegistry ||
+    context.ruleRegistry !== provenance.bindings.ruleRegistry ||
+    context.prismaCatalog !== provenance.bindings.prismaCatalog
+  ) {
+    throw new Error("Proveniência diverge dos registries autenticados");
+  }
+  validateContextProvider(provenance.provider, context.inventory, context.ruleRegistry);
+  if (
+    provenance.evidenceDigest !== digestCanonical(snapshotMap(context.evidenceRegistry)) ||
+    provenance.prismaDigest !== digestCanonical(context.prismaCatalog)
+  ) {
+    throw new Error("Proveniência diverge do snapshot de evidência ou Prisma");
+  }
+}
+
 function snapshotRuleRegistry(ruleRegistry) {
-  return new Map(
-    [...ruleRegistry].map(([sourceTable, rule]) => [
+  const entries = [...ruleRegistry]
+    .sort(([left], [right]) => compareText(left, right))
+    .map(([sourceTable, rule]) => ({
       sourceTable,
-      { rule, ruleOrigin: rule.ruleOrigin, emitRows: rule.emitRows },
+      ruleRef: rule,
+      classifyRef: rule.classifySourceRow,
+      emitRef: rule.emitRows,
+      digest: digestCanonical(snapshotRule(rule)),
+    }));
+  return Object.freeze(entries);
+}
+
+function validateRuleSnapshot(snapshot, ruleRegistry) {
+  if (snapshot.length !== ruleRegistry.size) {
+    throw new Error("Provider diverge do RuleRegistry snapshot");
+  }
+  for (const entry of snapshot) {
+    const rule = ruleRegistry.get(entry.sourceTable);
+    if (
+      rule !== entry.ruleRef ||
+      rule?.classifySourceRow !== entry.classifyRef ||
+      rule?.emitRows !== entry.emitRef ||
+      entry.digest !== digestCanonical(snapshotRule(rule))
+    ) {
+      throw new Error("Provider diverge da regra ou callback no registry snapshot");
+    }
+  }
+}
+
+function snapshotRule(rule) {
+  if (!isObject(rule)) return rule;
+  return Object.fromEntries(
+    Object.entries(rule).map(([key, value]) => [
+      key,
+      typeof value === "function" ? functionDescriptor(key, value) : copyStaticValue(value),
     ]),
   );
 }
 
-async function prepareSourceExecution({ providerState, sourceInspection, rule, stepContracts }) {
-  const requirements = stableUnique(
-    [...stepContracts.values()].flatMap(({ contextRequirements }) => contextRequirements),
-  );
-  const prepare = providerState.sourcePreparers.get(rule.sourceTable);
-  if (prepare === undefined) {
-    return {
-      executable: false,
-      reasonCode:
-        requirements.length > 0
-          ? "SEMANTIC_CONTEXT_PREFLIGHT_REQUIRED"
-          : "RULE_CONTEXT_PREFLIGHT_REQUIRED",
-    };
-  }
-  const prepared = await prepare({
-    source: Object.freeze({
-      sourceTable: sourceInspection.sourceTable,
-      sha256: sourceInspection.sha256,
-      rowCount: sourceInspection.rowCount,
-    }),
-    rule: Object.freeze({
-      sourceTable: rule.sourceTable,
-      ruleOrigin: rule.ruleOrigin,
-      steps: Object.freeze([...stepContracts.keys()]),
-    }),
-  });
-  if (
-    !isObject(prepared) ||
-    prepared.preflightComplete !== true ||
-    typeof prepared.contextForRow !== "function"
-  ) {
-    throw new Error(`Source preparer incompleto para ${rule.sourceTable}`);
-  }
-  return {
-    executable: true,
-    contextForRow: prepared.contextForRow,
-    sourceTable: rule.sourceTable,
-    sourceDigest: sourceInspection.sha256,
-  };
+function functionDescriptor(name, callback) {
+  return { name, digest: digestFunction(callback) };
 }
 
-async function issueRowContext(execution, row, rowNumber) {
-  const supplied = await execution.contextForRow(row, rowNumber);
-  if (!isObject(supplied)) throw new Error("Resolver deve retornar contexto por linha");
-  for (const [key, value] of Object.entries(supplied)) {
-    if (SENSITIVE_CAPABILITY.test(key) && value === true) {
-      throw new Error("Capability sensível exige preflight externo autenticado");
-    }
-  }
-  const disabledCapabilities = Object.freeze({
-    encryption: false,
-    credentialEncryptionVerified: false,
-    certificateStorageEncryptionVerified: false,
-  });
-  return Object.freeze({
-    ...supplied,
-    ...disabledCapabilities,
-    capabilities: disabledCapabilities,
-    sourceTable: execution.sourceTable,
-    sourceDigest: execution.sourceDigest,
-    rowNumber,
-  });
+function digestFunction(callback) {
+  return crypto
+    .createHash("sha256")
+    .update(Function.prototype.toString.call(callback), "utf8")
+    .digest("hex");
 }
 
 function validateRegistries(inventory, evidenceRegistry, ruleRegistry, prismaCatalog) {
@@ -564,7 +408,7 @@ function validateRegistries(inventory, evidenceRegistry, ruleRegistry, prismaCat
     if (rule === undefined || rule.ruleOrigin !== evidence.ruleId) {
       throw new Error(`Regra confirmada ausente ou divergente para ${sourceTable}`);
     }
-    validateMappingRule(rule, prismaCatalog);
+    validateMappingRuleStructure(rule, prismaCatalog);
     assertCasteloTenant(rule, prismaCatalog);
     confirmedSources.push(sourceTable);
   }
@@ -603,52 +447,111 @@ function assertCasteloTenant(rule, prismaCatalog) {
   }
 }
 
-function buildDestinationContract(rule, step) {
-  const contextRequirements = detectContextRequirements(rule, step);
+function isExplicitContextFreeRule(rule) {
+  return (
+    rule.executionContract?.contextMode === "context_free" &&
+    rule.executionContract.emissionConditions?.kind === "declarative"
+  );
+}
+
+function buildRuntimeClassifierAudit(rule) {
   return {
-    contextRequirements,
-    emissionContract: {
-      decisionRequiredPerSourceRow: true,
-      omissionPolicy: "error",
-      preflightReasonCode:
-        contextRequirements.length === 0 ? null : "SEMANTIC_CONTEXT_PREFLIGHT_REQUIRED",
-    },
+    classifyRef: `${rule.ruleOrigin}#classifySourceRow`,
+    classifyDigest: digestFunction(rule.classifySourceRow),
+    emitRef: `${rule.ruleOrigin}#emitRows`,
+    emitDigest: digestFunction(rule.emitRows),
   };
 }
 
-function detectContextRequirements(rule, step) {
-  const requirements = new Set();
-  if (["resolve", "lookup", "aggregate"].includes(step.identity.kind)) {
-    requirements.add(`identity:${step.identity.kind}`);
-  }
-  if (["merge", "lookup", "aggregate"].includes(step.mode)) {
-    requirements.add(`mode:${step.mode}`);
-  }
-  if (rule.dependencies.length > 0 || step.dependencies.length > 0) {
-    requirements.add("dependency_resolution");
-  }
-  if (
-    step.columns.some(({ transformation }) =>
-      /resolve|lookup|dedup|unique|encrypt|aggregate|parent|existing/i.test(transformation),
-    )
-  ) {
-    requirements.add("transformation_resolution");
-  }
-  if (step.columns.some(({ sensitivity }) => ["credential", "secret"].includes(sensitivity))) {
-    requirements.add("encryption_preflight");
-  }
-  if (
-    step.precedence.some((entry) =>
-      /resolve|lookup|dedup|unique|current|existing|canonical|parent/i.test(entry),
-    )
-  ) {
-    requirements.add("precedence_resolution");
-  }
-  return [...requirements].sort(compareText);
+function deriveDestinationStatic(rule, step, audit) {
+  const declared = isExplicitContextFreeRule(rule);
+  const contextContract = declared
+    ? {
+        declared: true,
+        mode: rule.executionContract.contextMode,
+        requirements: [...rule.executionContract.contextRequirements],
+      }
+    : { declared: false, mode: "unknown", requirements: [] };
+  const emissionContract = declared
+    ? {
+        kind: "declarative",
+        conditions: copyStaticValue(rule.executionContract.emissionConditions),
+        decisionRequiredPerSourceRow: true,
+        omissionPolicy: "error",
+        runtimeClassifierRequired: false,
+      }
+    : {
+        kind: "runtime_classifier",
+        conditions: null,
+        decisionRequiredPerSourceRow: true,
+        omissionPolicy: "error",
+        runtimeClassifierRequired: true,
+      };
+  const contractOrigin = {
+    ruleOrigin: rule.ruleOrigin,
+    stepId: step.stepId,
+    classifyRef: audit.classifyRef,
+    emitRef: audit.emitRef,
+  };
+  const runtimeClassifier = {
+    required: !declared,
+    classifyDigest: audit.classifyDigest,
+    emitDigest: audit.emitDigest,
+  };
+  const contractBody = {
+    sourceTable: rule.sourceTable,
+    stepId: step.stepId,
+    destinationTable: step.destinationTable,
+    mode: step.mode,
+    identity: copyStaticValue(step.identity),
+    cardinality: rule.cardinality,
+    ruleOrigin: rule.ruleOrigin,
+    dependencies: [...step.dependencies],
+    precedence: [...step.precedence],
+    columns: step.columns.map(copyColumn),
+    constants: copyStaticValue(step.constants),
+    defaults: copyStaticValue(step.defaults),
+    contextContract,
+    emissionContract,
+    contractOrigin,
+    runtimeClassifier,
+  };
+  return {
+    ...contractBody,
+    identityKind: step.identity.kind,
+    contractDigest: digestCanonical(contractBody),
+  };
+}
+
+function deriveTableStatic(rule, evidence, destinations) {
+  const contractBody = {
+    sourceTable: rule.sourceTable,
+    reasonCode: evidence.reasonCode,
+    reason: evidence.reason,
+    domain: rule.domain,
+    ruleOrigin: rule.ruleOrigin,
+    cardinality: rule.cardinality,
+    destinationStepCount: rule.destinations.length,
+    dependencies: [...rule.dependencies],
+    evidence: copyRuleEvidence(rule.evidence),
+    destinationContractDigests: destinations.map(({ contractDigest }) => contractDigest),
+  };
+  return { ...contractBody, contractDigest: digestCanonical(contractBody), status: "confirmed" };
+}
+
+function deriveColumnMappings(rule, destination) {
+  return destination.columns.map((column) => ({
+    sourceTable: rule.sourceTable,
+    stepId: destination.stepId,
+    destinationTable: destination.destinationTable,
+    mode: destination.mode,
+    ...copyColumn(column),
+    ruleOrigin: rule.ruleOrigin,
+    contractDigest: destination.contractDigest,
+  }));
 }
 
 function requireExplicitRowEmissions(rule, emissions) {
-  if (!Array.isArray(emissions)) throw new TypeError("emitRows deve retornar um array");
   const expected = new Set(rule.destinations.map(({ stepId }) => stepId));
   const actual = new Set();
   for (const { stepId } of emissions) {
@@ -675,28 +578,200 @@ function createStepCounts(rule) {
         prepared: 0,
         quarantine: 0,
         notEmitted: 0,
+        blockedRows: 0,
       },
     ]),
   );
 }
 
 function recordQuarantineReason(registry, reason, increment = 1) {
+  recordBounded(registry, quarantineReasonKey(reason), reason, increment, "quarantine");
+}
+
+function recordPreflightBlock(registry, block, increment) {
+  recordBounded(registry, preflightBlockKey(block), block, increment, "preflight");
+}
+
+function recordBounded(registry, key, item, increment, label) {
   if (increment === 0) return;
-  const key = quarantineReasonKey(reason);
   const existing = registry.get(key);
   if (existing !== undefined) {
     existing.count += increment;
     return;
   }
   const perStep = [...registry.values()].filter(
-    (item) => destinationKey(item) === destinationKey(reason),
+    (candidate) => destinationKey(candidate) === destinationKey(item),
   ).length;
   if (perStep >= MAX_REASONS_PER_STEP) {
     throw new Error(
-      `Quantidade de razões excedeu o limite para ${reason.sourceTable}.${reason.stepId}`,
+      `Quantidade de ${label} excedeu o limite para ${item.sourceTable}.${item.stepId}`,
     );
   }
-  registry.set(key, { ...reason, count: increment });
+  registry.set(key, { ...item, count: increment });
+}
+
+function validateStaticContracts(result, inventory, evidenceRegistry, ruleRegistry) {
+  const expectedTables = [];
+  const expectedDestinations = [];
+  const expectedColumns = [];
+  const expectedPending = [];
+  for (const source of sorted(inventory.tables, ({ sourceTable }) => sourceTable)) {
+    const evidence = evidenceRegistry.get(source.sourceTable);
+    if (evidence.finalStatus === "pending") {
+      expectedPending.push({
+        ...createPendingMapping(source, evidence),
+        preflightComplete: false,
+      });
+      continue;
+    }
+    const rule = ruleRegistry.get(source.sourceTable);
+    const audit = buildRuntimeClassifierAudit(rule);
+    const destinations = rule.destinations.map((step) =>
+      deriveDestinationStatic(rule, step, audit),
+    );
+    expectedTables.push(deriveTableStatic(rule, evidence, destinations));
+    expectedDestinations.push(...destinations);
+    for (const destination of destinations) {
+      expectedColumns.push(...deriveColumnMappings(rule, destination));
+    }
+  }
+  compareStaticRows(
+    result.tableMappings,
+    expectedTables,
+    TABLE_STATIC_FIELDS,
+    sortTableMappings,
+    "tableMappings",
+  );
+  compareStaticRows(
+    result.destinationMappings,
+    expectedDestinations,
+    DESTINATION_STATIC_FIELDS,
+    sortDestinationMappings,
+    "destinationMappings",
+  );
+  compareStaticRows(
+    result.columnMappings,
+    expectedColumns,
+    COLUMN_COLUMNS,
+    sortColumnMappings,
+    "columnMappings",
+  );
+  if (
+    canonicalJson(sortTableMappings(result.pendingTables.map(pickPendingMapping))) !==
+    canonicalJson(sortTableMappings(expectedPending.map(pickPendingMapping)))
+  ) {
+    throw new Error("pendingMappings diverge dos registries");
+  }
+}
+
+function compareStaticRows(actual, expected, fields, sorter, label) {
+  const selectedActual = sorter(actual.map((row) => pickFields(row, fields)));
+  const selectedExpected = sorter(expected.map((row) => pickFields(row, fields)));
+  if (canonicalJson(selectedActual) !== canonicalJson(selectedExpected)) {
+    throw new Error(`${label} diverge dos registries autenticados`);
+  }
+}
+
+function validateMetricReconciliation(result, inventory) {
+  if (result.preflightComplete !== false || result.readyForMigration !== false) {
+    throw new Error("Estado de preflight inválido ou incompleto");
+  }
+  const confirmed = requireArray(result.tableMappings, "tableMappings");
+  const pending = requireArray(result.pendingTables, "pendingTables");
+  const destinations = requireArray(result.destinationMappings, "destinationMappings");
+  const reasons = requireArray(result.quarantineReasons, "quarantineReasons");
+  const blocks = requireArray(result.preflightBlocks, "preflightBlocks");
+  requireArray(result.columnMappings, "columnMappings");
+  const inventoryBySource = new Map(inventory.tables.map((table) => [table.sourceTable, table]));
+  assertSameUniqueSources(
+    [...confirmed, ...pending].map(({ sourceTable }) => sourceTable).sort(compareText),
+    [...inventoryBySource.keys()].sort(compareText),
+  );
+  const pendingSources = new Set(pending.map(({ sourceTable }) => sourceTable));
+  const destinationsBySource = groupBy(destinations, "sourceTable");
+  const destinationKeys = new Set();
+  const expectedEmissionCounts = {};
+  for (const destination of destinations) {
+    const key = destinationKey(destination);
+    if (destinationKeys.has(key)) throw new Error(`Destination mapping duplicado: ${key}`);
+    destinationKeys.add(key);
+    const source = inventoryBySource.get(destination.sourceTable);
+    if (
+      source === undefined ||
+      pendingSources.has(destination.sourceTable) ||
+      destination.readRows !== source.rowCount ||
+      destination.preflightComplete !== false ||
+      !validCounts(destination) ||
+      destination.prepared +
+        destination.quarantine +
+        destination.notEmitted +
+        destination.blockedRows !==
+        source.rowCount ||
+      destination.blockedRows > 0 !== (destination.preflightState === "preflight_blocked")
+    ) {
+      throw new Error(`Destination mapping incompleto: ${key}`);
+    }
+    setEmissionCount(expectedEmissionCounts, destination);
+  }
+  if (canonicalJson(expectedEmissionCounts) !== canonicalJson(result.emissionCounts)) {
+    throw new Error("EmissionCounts diverge de destinationMappings");
+  }
+
+  for (const mapping of confirmed) {
+    const source = inventoryBySource.get(mapping.sourceTable);
+    const sourceDestinations = destinationsBySource.get(mapping.sourceTable) ?? [];
+    const totals = sumCounts(sourceDestinations);
+    if (
+      source === undefined ||
+      mapping.sourceRowCount !== source.rowCount ||
+      mapping.readRows !== source.rowCount ||
+      mapping.destinationStepCount !== sourceDestinations.length ||
+      mapping.preflightComplete !== false ||
+      mapping.prepared !== totals.prepared ||
+      mapping.quarantine !== totals.quarantine ||
+      mapping.notEmitted !== totals.notEmitted ||
+      mapping.blockedRows !== totals.blockedRows
+    ) {
+      throw new Error(`Totais da tabela divergem: ${mapping.sourceTable}`);
+    }
+  }
+  validateAggregateRows(reasons, destinations, "quarantine", quarantineReasonKey);
+  validateAggregateRows(blocks, destinations, "blockedRows", preflightBlockKey);
+  if (canonicalJson(buildQuarantineSummary(reasons)) !== canonicalJson(result.quarantineSummary)) {
+    throw new Error("Resumo de quarantine diverge das razões");
+  }
+  if (canonicalJson(buildPreflightSummary(blocks)) !== canonicalJson(result.preflightSummary)) {
+    throw new Error("Resumo de preflight diverge dos bloqueios");
+  }
+}
+
+function validateAggregateRows(rows, destinations, countField, keyBuilder) {
+  const keys = new Set();
+  const totals = new Map();
+  const rowCounts = new Map();
+  for (const row of rows) {
+    const key = keyBuilder(row);
+    if (keys.has(key)) throw new Error(`Linha agregada duplicada: ${key}`);
+    keys.add(key);
+    if (!Number.isSafeInteger(row.count) || row.count <= 0) {
+      throw new Error(`Contagem agregada inválida: ${key}`);
+    }
+    const destinationId = destinationKey(row);
+    const destination = destinations.find(
+      (candidate) => destinationKey(candidate) === destinationId,
+    );
+    if (destination === undefined) throw new Error(`Agregado sem destination: ${key}`);
+    totals.set(destinationId, (totals.get(destinationId) ?? 0) + row.count);
+    rowCounts.set(destinationId, (rowCounts.get(destinationId) ?? 0) + 1);
+    if (rowCounts.get(destinationId) > MAX_REASONS_PER_STEP) {
+      throw new Error(`Agregado excede limite bounded: ${destinationId}`);
+    }
+  }
+  for (const destination of destinations) {
+    if ((totals.get(destinationKey(destination)) ?? 0) !== destination[countField]) {
+      throw new Error(`Agregado diverge do destino: ${destinationKey(destination)}`);
+    }
+  }
 }
 
 function resolveDumpPath(sourceDir, inspection) {
@@ -716,15 +791,19 @@ function setEmissionCount(registry, count) {
     prepared: count.prepared,
     quarantine: count.quarantine,
     notEmitted: count.notEmitted,
+    blockedRows: count.blockedRows,
   };
 }
 
 function buildArtifacts(result) {
-  const tables = sortTableMappings(result.tableMappings ?? []);
-  const destinations = sortDestinationMappings(result.destinationMappings ?? []);
-  const columns = sortColumnMappings(result.columnMappings ?? []);
-  const pending = sortTableMappings(result.pendingTables ?? []);
-  const reasons = sortQuarantineReasons(result.quarantineReasons ?? []);
+  const tables = sortTableMappings(result.tableMappings.map(pickTableMapping));
+  const destinations = sortDestinationMappings(
+    result.destinationMappings.map(pickDestinationMapping),
+  );
+  const columns = sortColumnMappings(result.columnMappings.map(pickColumnMapping));
+  const pending = sortTableMappings(result.pendingTables.map(pickPendingMapping));
+  const reasons = sortQuarantineReasons(result.quarantineReasons.map(pickQuarantineReason));
+  const blocks = sortPreflightBlocks(result.preflightBlocks.map(pickPreflightBlock));
   const files = new Map();
   addJsonCsv(files, "mapping/tables", TABLE_COLUMNS, tables, flattenTableMapping);
   addJsonCsv(
@@ -736,7 +815,15 @@ function buildArtifacts(result) {
   );
   addJsonCsv(files, "mapping/columns", COLUMN_COLUMNS, columns, (row) => row);
   addJsonCsv(files, "pending-mapping/tables", PENDING_COLUMNS, pending, flattenPendingMapping);
-  files.set("quarantine/summary.json", serializeStableJson(result.quarantineSummary));
+  files.set(
+    "preflight/summary.json",
+    serializeStableJson(pickPreflightSummary(result.preflightSummary)),
+  );
+  files.set("preflight/blocked.csv", serializeCsv(PREFLIGHT_COLUMNS, blocks));
+  files.set(
+    "quarantine/summary.json",
+    serializeStableJson(pickQuarantineSummary(result.quarantineSummary)),
+  );
   files.set("quarantine/reasons.csv", serializeCsv(QUARANTINE_COLUMNS, reasons));
   return files;
 }
@@ -751,6 +838,7 @@ function flattenTableMapping(row) {
     ...row,
     dependencies: row.dependencies.join("|"),
     evidence: JSON.stringify(row.evidence),
+    destinationContractDigests: row.destinationContractDigests.join("|"),
   };
 }
 
@@ -763,8 +851,10 @@ function flattenDestinationMapping(row) {
     columns: JSON.stringify(row.columns),
     constants: JSON.stringify(row.constants),
     defaults: JSON.stringify(row.defaults),
-    contextRequirements: row.contextRequirements.join("|"),
+    contextContract: JSON.stringify(row.contextContract),
     emissionContract: JSON.stringify(row.emissionContract),
+    contractOrigin: JSON.stringify(row.contractOrigin),
+    runtimeClassifier: JSON.stringify(row.runtimeClassifier),
   };
 }
 
@@ -793,6 +883,16 @@ function buildQuarantineSummary(reasons) {
   };
 }
 
+function buildPreflightSummary(blocks) {
+  return {
+    totalBlockedRows: blocks.reduce((sum, block) => sum + block.count, 0),
+    blockedSources: new Set(blocks.map(({ sourceTable }) => sourceTable)).size,
+    blockedSteps: blocks.length,
+    byReason: countWeightedGroups(blocks, "reasonCode"),
+    bySourceTable: countWeightedGroups(blocks, "sourceTable"),
+  };
+}
+
 function countWeightedGroups(items, field) {
   const counts = new Map();
   for (const item of items) counts.set(item[field], (counts.get(item[field]) ?? 0) + item.count);
@@ -807,15 +907,20 @@ function sumCounts(counts) {
       prepared: total.prepared + count.prepared,
       quarantine: total.quarantine + count.quarantine,
       notEmitted: total.notEmitted + count.notEmitted,
+      blockedRows: total.blockedRows + count.blockedRows,
     }),
-    { prepared: 0, quarantine: 0, notEmitted: 0 },
+    { prepared: 0, quarantine: 0, notEmitted: 0, blockedRows: 0 },
   );
 }
 
 function validCounts(mapping) {
-  return [mapping.readRows, mapping.prepared, mapping.quarantine, mapping.notEmitted].every(
-    (value) => Number.isSafeInteger(value) && value >= 0,
-  );
+  return [
+    mapping.readRows,
+    mapping.prepared,
+    mapping.quarantine,
+    mapping.notEmitted,
+    mapping.blockedRows,
+  ].every((value) => Number.isSafeInteger(value) && value >= 0);
 }
 
 function copyRuleEvidence(evidence) {
@@ -823,16 +928,7 @@ function copyRuleEvidence(evidence) {
 }
 
 function copyColumn(column) {
-  return {
-    sourceColumn: column.sourceColumn,
-    destinationColumn: column.destinationColumn,
-    status: column.status,
-    transformation: column.transformation,
-    nullHandling: column.nullHandling,
-    referenceRole: column.referenceRole,
-    sensitivity: column.sensitivity,
-    reason: column.reason,
-  };
+  return pickFields(column, COLUMN_CONTRACT_FIELDS);
 }
 
 function copyStaticValue(value) {
@@ -845,22 +941,21 @@ function copyStaticValue(value) {
   return value;
 }
 
-function fingerprintInventory(inventory) {
-  return crypto
-    .createHash("sha256")
-    .update(
-      canonicalJson({
-        actualTableCount: inventory.actualTableCount,
-        expectedTableCount: inventory.expectedTableCount,
-        sourceDigest: inventory.sourceDigest,
-        tables: inventory.tables.map(({ sourceTable, sha256, rowCount }) => ({
-          sourceTable,
-          sha256,
-          rowCount,
-        })),
-      }),
-    )
-    .digest("hex");
+function deepFreeze(value, seen = new WeakSet()) {
+  if (value === null || typeof value !== "object" || seen.has(value)) return value;
+  seen.add(value);
+  for (const entry of Object.values(value)) deepFreeze(entry, seen);
+  return Object.freeze(value);
+}
+
+function snapshotMap(registry) {
+  return [...registry]
+    .sort(([left], [right]) => compareText(left, right))
+    .map(([key, value]) => [key, copyStaticValue(value)]);
+}
+
+function digestCanonical(value) {
+  return crypto.createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
 }
 
 async function canonicalPackageCandidate(packageDir) {
@@ -908,6 +1003,10 @@ function quarantineReasonKey({ sourceTable, stepId, destinationTable, field, rea
   return [sourceTable, stepId, destinationTable, field ?? "", reasonCode].join("\0");
 }
 
+function preflightBlockKey({ sourceTable, stepId, destinationTable, reasonCode }) {
+  return [sourceTable, stepId, destinationTable, reasonCode].join("\0");
+}
+
 function sortTableMappings(rows) {
   return sorted(rows, ({ sourceTable }) => sourceTable);
 }
@@ -928,6 +1027,10 @@ function sortColumnMappings(rows) {
 
 function sortQuarantineReasons(rows) {
   return sorted(rows, quarantineReasonKey);
+}
+
+function sortPreflightBlocks(rows) {
+  return sorted(rows, preflightBlockKey);
 }
 
 function sorted(rows, key) {
@@ -954,18 +1057,60 @@ function sameArray(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function stableUnique(values) {
-  return [...new Set(values)].sort(compareText);
-}
-
 function requireArray(value, field) {
   if (!Array.isArray(value)) throw new TypeError(`${field} deve ser array`);
   return value;
 }
 
 function toCountField(status) {
-  if (!EMISSION_STATUSES.includes(status)) throw new Error(`Status de emissão inválido: ${status}`);
+  if (!["prepared", "quarantine", "not_emitted"].includes(status)) {
+    throw new Error(`Status de emissão inválido: ${status}`);
+  }
   return status === "not_emitted" ? "notEmitted" : status;
+}
+
+function pickFields(value, fields) {
+  return Object.fromEntries(fields.map((field) => [field, copyStaticValue(value[field])]));
+}
+
+function pickTableMapping(row) {
+  return pickFields(row, TABLE_COLUMNS);
+}
+
+function pickDestinationMapping(row) {
+  return pickFields(row, DESTINATION_COLUMNS);
+}
+
+function pickColumnMapping(row) {
+  return pickFields(row, COLUMN_COLUMNS);
+}
+
+function pickPendingMapping(row) {
+  return {
+    sourceTable: row.sourceTable,
+    sourceRowCount: row.sourceRowCount,
+    status: row.status,
+    reasonCode: row.reasonCode,
+    reason: row.reason,
+    evidence: pickFields(row.evidence, PENDING_EVIDENCE_FIELDS),
+    preflightComplete: row.preflightComplete,
+  };
+}
+
+function pickQuarantineReason(row) {
+  return pickFields(row, QUARANTINE_COLUMNS);
+}
+
+function pickPreflightBlock(row) {
+  return pickFields(row, PREFLIGHT_COLUMNS);
+}
+
+function pickQuarantineSummary(summary) {
+  return pickFields(summary, QUARANTINE_SUMMARY_FIELDS);
+}
+
+function pickPreflightSummary(summary) {
+  return pickFields(summary, PREFLIGHT_SUMMARY_FIELDS);
 }
 
 function isObject(value) {
@@ -976,6 +1121,30 @@ function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+const COLUMN_CONTRACT_FIELDS = [
+  "sourceColumn",
+  "destinationColumn",
+  "status",
+  "transformation",
+  "nullHandling",
+  "referenceRole",
+  "sensitivity",
+  "reason",
+];
+const TABLE_STATIC_FIELDS = [
+  "sourceTable",
+  "status",
+  "reasonCode",
+  "reason",
+  "domain",
+  "ruleOrigin",
+  "cardinality",
+  "destinationStepCount",
+  "dependencies",
+  "evidence",
+  "destinationContractDigests",
+  "contractDigest",
+];
 const TABLE_COLUMNS = [
   "sourceTable",
   "sourceRowCount",
@@ -989,13 +1158,17 @@ const TABLE_COLUMNS = [
   "destinationStepCount",
   "dependencies",
   "evidence",
+  "destinationContractDigests",
+  "contractDigest",
   "contextProviderMode",
+  "preflightState",
   "preflightComplete",
   "prepared",
   "quarantine",
   "notEmitted",
+  "blockedRows",
 ];
-const DESTINATION_COLUMNS = [
+const DESTINATION_STATIC_FIELDS = [
   "sourceTable",
   "stepId",
   "destinationTable",
@@ -1009,12 +1182,20 @@ const DESTINATION_COLUMNS = [
   "columns",
   "constants",
   "defaults",
-  "contextRequirements",
+  "contextContract",
   "emissionContract",
+  "contractOrigin",
+  "runtimeClassifier",
+  "contractDigest",
+];
+const DESTINATION_COLUMNS = [
+  ...DESTINATION_STATIC_FIELDS,
   "readRows",
   "prepared",
   "quarantine",
   "notEmitted",
+  "blockedRows",
+  "preflightState",
   "preflightComplete",
 ];
 const COLUMN_COLUMNS = [
@@ -1022,15 +1203,9 @@ const COLUMN_COLUMNS = [
   "stepId",
   "destinationTable",
   "mode",
-  "sourceColumn",
-  "destinationColumn",
-  "status",
-  "transformation",
-  "nullHandling",
-  "referenceRole",
-  "sensitivity",
+  ...COLUMN_CONTRACT_FIELDS,
   "ruleOrigin",
-  "reason",
+  "contractDigest",
 ];
 const PENDING_COLUMNS = [
   "sourceTable",
@@ -1043,6 +1218,19 @@ const PENDING_COLUMNS = [
   "confidence",
   "preflightComplete",
 ];
+const PENDING_EVIDENCE_FIELDS = [
+  "sourceTable",
+  "legacyModule",
+  "legacyReferences",
+  "operations",
+  "legacyRelationships",
+  "currentContractEvidence",
+  "finalStatus",
+  "reasonCode",
+  "reason",
+  "confidence",
+  "ruleId",
+];
 const QUARANTINE_COLUMNS = [
   "sourceTable",
   "stepId",
@@ -1050,4 +1238,19 @@ const QUARANTINE_COLUMNS = [
   "field",
   "reasonCode",
   "count",
+];
+const PREFLIGHT_COLUMNS = ["sourceTable", "stepId", "destinationTable", "reasonCode", "count"];
+const QUARANTINE_SUMMARY_FIELDS = [
+  "total",
+  "unresolved",
+  "boundedReasonRows",
+  "byReason",
+  "bySourceTable",
+];
+const PREFLIGHT_SUMMARY_FIELDS = [
+  "totalBlockedRows",
+  "blockedSources",
+  "blockedSteps",
+  "byReason",
+  "bySourceTable",
 ];

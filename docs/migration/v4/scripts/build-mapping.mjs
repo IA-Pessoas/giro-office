@@ -7,7 +7,7 @@ import { EVIDENCE_REGISTRY } from "./evidence/index.mjs";
 import {
   assertSafePackagePath,
   buildMapping,
-  createMappingContextProvider,
+  createConservativeMappingContextProvider,
   writeMappingPackage,
 } from "./lib/mapping-engine.mjs";
 import { loadPrismaCatalog } from "./lib/prisma-catalog.mjs";
@@ -63,7 +63,7 @@ async function main() {
     INTEGRACAO_REGULARIZE_RULES,
     REMAINING_RULES,
   );
-  const contextProvider = createMappingContextProvider({ inventory, ruleRegistry });
+  const contextProvider = createConservativeMappingContextProvider({ inventory, ruleRegistry });
   const result = await buildMapping({
     inventory,
     evidenceRegistry: EVIDENCE_REGISTRY,

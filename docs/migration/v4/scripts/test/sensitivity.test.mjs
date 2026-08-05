@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  assertNoSensitiveSerializedContent,
   assertNoSensitiveValues,
   classifySensitivity,
   isSensitiveColumn,
@@ -32,16 +33,45 @@ test("isSensitiveColumn reconhece nomes sensiveis em portugues e ingles", () => 
   assert.equal(classifySensitivity("nome_exibicao"), "none");
 });
 
-test("toLegacyIdRef preserva IDs seguros e resume IDs livres com sha256", () => {
-  assert.equal(toLegacyIdRef(42), "42");
-  assert.equal(
-    toLegacyIdRef("c2c0a7d6-1e99-43c7-a922-23b4f7183ec5"),
+test("toLegacyIdRef nunca preserva identificador legado bruto", () => {
+  for (const value of [
+    42,
     "c2c0a7d6-1e99-43c7-a922-23b4f7183ec5",
-  );
-  assert.equal(toLegacyIdRef("legacyID_7-A"), "legacyID_7-A");
+    "legacyID_7-A",
+    "123.456.789-09",
+    "12.345.678/0001-90",
+    "+55 (71) 99999-1234",
+  ]) {
+    assert.match(toLegacyIdRef(value), /^sha256:[a-f0-9]{64}$/);
+    assert.equal(toLegacyIdRef(value).includes(String(value)), false);
+  }
   assert.equal(
     toLegacyIdRef("legacy id: 7"),
     "sha256:79b7d14aab00ee260f810373f46b5ea75d5a53dd37c79b5799297c6f377a58d2",
+  );
+});
+
+test("barreira serializada cobre CNPJ, RG, telefone, endereço e PFX/DER em variações", () => {
+  const unsafe = [
+    ["12", ".345.678/", "0001-90"].join(""),
+    ['{"rg":"', "12.345.678-9", '"}'].join(""),
+    ["rg=", "MG-12.345.678"].join(""),
+    ["+55 ", "(71) 99999-1234"].join(""),
+    ['{"endereco":"', "Rua Exemplo, 10", '"}'].join(""),
+    ["address=", "Avenida Exemplo 20"].join(""),
+    ["pfx=", "3082", "A1".repeat(96)].join(""),
+    ["pkcs12:", Buffer.from("material-criptografico".repeat(12)).toString("base64")].join(""),
+    ['{"pfx_hex":"3082', "B2".repeat(96), '"}'].join(""),
+    ["der_base64=", Buffer.from("der-material".repeat(20)).toString("base64")].join(""),
+  ];
+
+  for (const value of unsafe) {
+    assert.throws(() => assertNoSensitiveSerializedContent(value), /sensivel/i);
+  }
+  assert.doesNotThrow(() =>
+    assertNoSensitiveSerializedContent(
+      '{"destinationColumn":"address","sourceColumn":"rg","sensitivity":"personal"}',
+    ),
   );
 });
 
