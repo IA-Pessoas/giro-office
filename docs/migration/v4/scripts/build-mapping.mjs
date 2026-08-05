@@ -15,9 +15,7 @@ import {
   loadPreviousMappingArtifacts,
 } from "./lib/previous-comparison.mjs";
 import { loadPrismaCatalog } from "./lib/prisma-catalog.mjs";
-import { assertNoSensitiveSerializedContent } from "./lib/sensitivity.mjs";
 import { buildSourceInventory } from "./lib/source-inventory.mjs";
-import { serializeStableJson, writeStableJson } from "./lib/stable-output.mjs";
 import {
   ADMIN_BUSINESS_RULES,
   buildRuleRegistry,
@@ -86,19 +84,18 @@ async function main() {
     sourceDir: options.source,
     capabilities: contextProvider,
   });
-  await writeMappingPackage(options.package, result, { protectedPaths });
   const comparisonReport = buildComparisonReport({
     currentInventory: inventory,
     evidenceRegistry: EVIDENCE_REGISTRY,
     historicalInputs,
     ruleRegistry,
   });
-  const serializedComparison = serializeStableJson(comparisonReport);
-  assertNoSensitiveSerializedContent(serializedComparison);
-  await writeStableJson(
-    path.join(options.package, "reports", "previous-mapping-comparison.json"),
-    comparisonReport,
-  );
+  await writeMappingPackage(options.package, result, {
+    protectedPaths,
+    extraArtifacts: {
+      "reports/previous-mapping-comparison.json": comparisonReport,
+    },
+  });
 }
 
 function parseCommandLine() {
@@ -149,6 +146,7 @@ async function loadHistoricalInputs(options) {
   for (const [index, sourceDir] of options.previousSources.entries()) {
     try {
       const canonicalSource = await assertRealDirectory(sourceDir);
+      protectedPaths.push(canonicalSource);
       const expectedTables = await countSqlFiles(canonicalSource);
       if (expectedTables === 0) throw new Error("Backup histórico sem dumps SQL");
       const inventory = await buildSourceInventory({
@@ -165,7 +163,6 @@ async function loadHistoricalInputs(options) {
         digest: inventory.sourceDigest,
         inventory,
       });
-      protectedPaths.push(canonicalSource);
     } catch {
       issues.push({
         scope: `previous-source-${index + 1}`,
@@ -180,7 +177,7 @@ async function loadHistoricalInputs(options) {
       const loaded = await loadPreviousMappingArtifacts({ previousDocsDir: canonicalDocs });
       previousArtifacts.push(...loaded.artifacts);
       issues.push(...loaded.issues);
-      protectedPaths.push(canonicalDocs);
+      protectedPaths.push(...loaded.protectedPaths);
     } catch {
       issues.push({
         scope: "previous-docs",
@@ -206,27 +203,14 @@ function buildComparisonReport({
   historicalInputs,
   ruleRegistry,
 }) {
-  let comparison;
-  let issues = [...historicalInputs.issues];
-  try {
-    comparison = comparePreviousMappings({
-      currentInventory,
-      historicalInventories: historicalInputs.historicalInventories,
-      evidenceRegistry,
-      ruleRegistry,
-      previousArtifacts: historicalInputs.previousArtifacts,
-    });
-  } catch {
-    issues = [...issues, { scope: "comparison", reasonCode: "HISTORICAL_COMPARISON_REJECTED" }];
-    comparison = comparePreviousMappings({
-      currentInventory,
-      historicalInventories: [],
-      evidenceRegistry,
-      ruleRegistry,
-      previousArtifacts: [],
-    });
-  }
-  issues.sort((left, right) => compareText(left.scope, right.scope));
+  const comparison = comparePreviousMappings({
+    currentInventory,
+    historicalInventories: historicalInputs.historicalInventories,
+    evidenceRegistry,
+    ruleRegistry,
+    previousArtifacts: historicalInputs.previousArtifacts,
+  });
+  const issues = deduplicateIssues([...historicalInputs.issues, ...comparison.issues]);
   const hasHistoricalData =
     comparison.historicalSources.length > 0 || comparison.artifactSources.length > 0;
   const availability = !historicalInputs.requested
@@ -236,7 +220,18 @@ function buildComparisonReport({
       : hasHistoricalData
         ? "partial"
         : "unavailable";
-  return { availability, issues, ...comparison };
+  return { ...comparison, availability, issues };
+}
+
+function deduplicateIssues(issues) {
+  const bySignature = new Map();
+  for (const issue of issues) {
+    const signature = `${issue.scope}\0${issue.reasonCode}\0${issue.version ?? ""}`;
+    bySignature.set(signature, issue);
+  }
+  return [...bySignature]
+    .sort(([left], [right]) => compareText(left, right))
+    .map(([, issue]) => issue);
 }
 
 async function assertRealDirectory(directory) {

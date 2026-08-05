@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import { ALL_EVIDENCE, EVIDENCE_REGISTRY } from "../evidence/index.mjs";
+import { assertSafePackagePath } from "../lib/mapping-engine.mjs";
 import {
   comparePreviousMappings,
   loadPreviousMappingArtifacts,
@@ -26,19 +28,55 @@ const SHA_B = "b".repeat(64);
 const SHA_C = "c".repeat(64);
 const CLI = path.resolve("docs/migration/v4/scripts/build-mapping.mjs");
 const PRISMA = path.resolve("infra/prisma/schema.prisma");
+const VALID_V2_SOURCE_ROWS = Object.freeze({
+  adminUsers: 10,
+  integracaoClients: 11,
+  projectPlans: 12,
+  projectPlanTasks: 13,
+  projects: 14,
+  regularizeClients: 15,
+  rhCollaborators: 16,
+  taskModels: 17,
+  tasks: 18,
+});
+const VALID_V3_MARKDOWN = `# Migração RH e Departamento Pessoal - Dry-run v3
+
+## Resultado do dry-run
+
+Registros lidos no legado:
+
+| Origem | Registros |
+| --- | ---: |
+| \`tb_rh.solicitacoes\` | 9 |
+
+## Regra corrigida para solicitacoes RH
+
+O texto editorial cita tb_rh.colaboradores.id\`, nao \`tb_admin.usuarios.id e
+rh.requests.requester_user_id, mas não é um registro estrutural de decisão.
+`;
 
 function table(sourceTable, columns, rowCount, sha256 = SHA_A) {
   return { sourceTable, columns, rowCount, sha256 };
 }
 
-function inventory(version, tables, digest = SHA_A) {
+function inventory(version, tables) {
+  const sourceDigest = crypto
+    .createHash("sha256")
+    .update(
+      [...tables]
+        .sort((left, right) => left.sourceTable.localeCompare(right.sourceTable))
+        .map(({ rowCount, sha256, sourceTable }) => `${sourceTable}\t${sha256}\t${rowCount}`)
+        .join("\n"),
+      "utf8",
+    )
+    .digest("hex");
   return {
     version,
     origin: `backup/${version}`,
-    digest,
+    digest: sourceDigest,
     inventory: {
       sourceDirectoryLabel: version,
-      sourceDigest: digest,
+      sourceDigest,
       tables,
     },
   };
@@ -81,7 +119,9 @@ function previousArtifact(decisions) {
     version: "v2",
     origin: "v2/confirmed-table-destinations.csv",
     digest: SHA_C,
+    sizeBytes: 123,
     format: "csv",
+    semanticAvailability: "available",
     decisions,
     inventoryCounts: [],
   };
@@ -126,6 +166,26 @@ async function createCompleteSource(directory) {
   return { legacyDir, sourceDir };
 }
 
+async function createPreviousDocsFixture(directory) {
+  const docsDir = path.join(directory, "migration");
+  await mkdir(path.join(docsDir, "v2", "pending-mapping"), { recursive: true });
+  await mkdir(path.join(docsDir, "v3"), { recursive: true });
+  await writeFile(
+    path.join(docsDir, "v2", "confirmed-table-destinations.csv"),
+    '"legacy_table","target_table"\n"legacy.one","current.one"\n',
+  );
+  await writeFile(
+    path.join(docsDir, "v2", "manifest.json"),
+    `${JSON.stringify({ sourceRows: VALID_V2_SOURCE_ROWS })}\n`,
+  );
+  await writeFile(
+    path.join(docsDir, "v2", "pending-mapping", "tables-without-confirmed-destination.json"),
+    "[]\n",
+  );
+  await writeFile(path.join(docsDir, "v3", "rh-pessoal-dry-run.md"), VALID_V3_MARKDOWN);
+  return docsDir;
+}
+
 test("compara regra reutilizada, corrigida, invalidada e nova sem promover delta físico a mudança semântica", () => {
   const currentInventory = {
     sourceDirectoryLabel: "03.08.2026",
@@ -138,15 +198,12 @@ test("compara regra reutilizada, corrigida, invalidada e nova sem promover delta
     ],
   };
   const historicalInventories = [
-    inventory(
-      "06.07.2026",
-      [
-        table("legacy.corrected", ["id"], 3),
-        table("legacy.invalidated", ["id"], 4),
-        table("legacy.reused", ["descrição", "id", "removed_column"], 10, SHA_A),
-      ],
-      SHA_C,
-    ),
+    inventory("06.07.2026", [
+      table("legacy.corrected", ["id"], 3),
+      table("legacy.invalidated", ["id"], 4),
+      table("legacy.removed", ["id"], 9),
+      table("legacy.reused", ["descrição", "id", "removed_column"], 10, SHA_A),
+    ]),
   ];
   const evidenceRegistry = new Map([
     ["legacy.corrected", decision("legacy.corrected", "confirmed", "v4:legacy.corrected")],
@@ -189,19 +246,28 @@ test("compara regra reutilizada, corrigida, invalidada e nova sem promover delta
 
   assert.deepEqual(
     comparison.tables.map(({ sourceTable }) => sourceTable),
-    ["legacy.corrected", "legacy.invalidated", "legacy.new", "legacy.reused"],
+    ["legacy.corrected", "legacy.invalidated", "legacy.new", "legacy.removed", "legacy.reused"],
   );
   assert.deepEqual(comparison.summary.byDecisionStatus, {
+    conflict: 0,
     corrected: 1,
     invalidated: 1,
+    missing: 1,
     new: 1,
     reused: 1,
   });
+  assert.equal(comparison.summary.totalTables, 5);
+  assert.equal(
+    Object.values(comparison.summary.byDecisionStatus).reduce((sum, count) => sum + count, 0),
+    comparison.summary.totalTables,
+  );
 
   const bySource = new Map(comparison.tables.map((entry) => [entry.sourceTable, entry]));
   assert.equal(bySource.get("legacy.corrected").decision.status, "corrected");
   assert.equal(bySource.get("legacy.invalidated").decision.status, "invalidated");
   assert.equal(bySource.get("legacy.new").decision.status, "new");
+  assert.equal(bySource.get("legacy.removed").decision.status, "missing");
+  assert.equal(bySource.get("legacy.removed").currentDecision, null);
   assert.equal(bySource.get("legacy.reused").decision.status, "reused");
 
   const physical = bySource.get("legacy.reused").inventoryComparisons[0];
@@ -217,7 +283,7 @@ test("compara regra reutilizada, corrigida, invalidada e nova sem promover delta
   ]);
   assert.equal(bySource.get("legacy.reused").decision.reasonCode, "PREVIOUS_RULE_REVALIDATED");
 
-  for (const entry of comparison.tables) {
+  for (const entry of comparison.tables.filter(({ currentDecision }) => currentDecision !== null)) {
     assert.ok(entry.decision.reasonCode.length > 0);
     assert.ok(entry.decision.evidenceRefs.length > 0);
     assert.equal(entry.decision.provenance.length > 0, true);
@@ -238,7 +304,7 @@ test("compara regra reutilizada, corrigida, invalidada e nova sem promover delta
   }
 });
 
-test("resultado é determinístico, reconcilia duplicatas idênticas e rejeita decisões conflitantes", () => {
+test("resultado é determinístico, reconcilia duplicatas idênticas e materializa conflito histórico", () => {
   const currentInventory = {
     sourceDirectoryLabel: "03.08.2026",
     sourceDigest: SHA_A,
@@ -255,8 +321,8 @@ test("resultado é determinístico, reconcilia duplicatas idênticas e rejeita d
   const input = {
     currentInventory,
     historicalInventories: [
-      inventory("10.07.2026", [table("legacy.one", ["id"], 1)], SHA_B),
-      inventory("06.07.2026", [table("legacy.one", ["id"], 1)], SHA_C),
+      inventory("10.07.2026", [table("legacy.one", ["id"], 1)]),
+      inventory("06.07.2026", [table("legacy.one", ["id"], 1)]),
     ],
     evidenceRegistry: new Map([["legacy.one", currentEvidence]]),
     ruleRegistry: new Map([["legacy.one", currentRule]]),
@@ -277,22 +343,80 @@ test("resultado é determinístico, reconcilia duplicatas idênticas e rejeita d
     ["06.07.2026", "10.07.2026"],
   );
 
-  assert.throws(
-    () =>
-      comparePreviousMappings({
-        ...input,
-        previousArtifacts: [
-          previousArtifact([
-            repeatedDecision,
-            {
-              ...repeatedDecision,
-              destinations: [{ destinationTable: "other.destination" }],
-            },
-          ]),
-        ],
-      }),
-    /conflitante/i,
+  const conflict = comparePreviousMappings({
+    ...input,
+    previousArtifacts: [
+      previousArtifact([
+        repeatedDecision,
+        {
+          ...repeatedDecision,
+          destinations: [{ destinationTable: "other.destination" }],
+        },
+      ]),
+    ],
+  });
+  assert.equal(conflict.tables[0].currentDecision.destinationTables[0], "current.one");
+  assert.equal(conflict.tables[0].decision.status, "conflict");
+  assert.equal(conflict.tables[0].decision.reasonCode, "HISTORICAL_DECISION_CONFLICT");
+  assert.equal(conflict.tables[0].previousDecisions.length, 2);
+  assert.deepEqual(conflict.summary.byDecisionStatus, {
+    conflict: 1,
+    corrected: 0,
+    invalidated: 0,
+    missing: 0,
+    new: 0,
+    reused: 0,
+  });
+  assert.deepEqual(
+    conflict.issues.map(({ reasonCode }) => reasonCode),
+    ["HISTORICAL_DECISION_CONFLICT"],
   );
+});
+
+test("provenance histórica incoerente vira issue sanitizada sem descartar inventário válido", () => {
+  const currentInventory = {
+    sourceDirectoryLabel: "03.08.2026",
+    sourceDigest: SHA_A,
+    tables: [table("legacy.one", ["id"], 2)],
+  };
+  const valid = inventory("06.07.2026", [table("legacy.one", ["id"], 1)]);
+  const invalid = {
+    ...inventory("10.07.2026", [table("legacy.one", ["id"], 3)]),
+    origin: "backup/versao-errada",
+  };
+
+  const comparison = comparePreviousMappings({
+    currentInventory,
+    historicalInventories: [invalid, valid],
+    evidenceRegistry: new Map([
+      ["legacy.one", decision("legacy.one", "confirmed", "v4:legacy.one")],
+    ]),
+    ruleRegistry: new Map([["legacy.one", rule("legacy.one", "current.one")]]),
+    previousArtifacts: [
+      previousArtifact([]),
+      {
+        ...previousArtifact([]),
+        origin: "v3/arquivo-forjado.csv",
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    comparison.historicalSources.map(({ version }) => version),
+    ["06.07.2026"],
+  );
+  assert.deepEqual(comparison.issues, [
+    {
+      reasonCode: "HISTORICAL_ARTIFACT_PROVENANCE_CONFLICT",
+      scope: "historical-artifact-2",
+    },
+    {
+      reasonCode: "HISTORICAL_INVENTORY_PROVENANCE_CONFLICT",
+      scope: "historical-inventory-1",
+    },
+  ]);
+  assert.equal(comparison.artifactSources.length, 1);
+  assert.doesNotMatch(JSON.stringify(comparison.issues), /versao-errada|arquivo-forjado|\/home\//i);
 });
 
 test("invalida as três decisões históricas comprovadamente incompatíveis com a semântica V4", async () => {
@@ -453,6 +577,10 @@ test("loader lê somente artefatos V2/V3 estáticos allow-listed e retorna prove
     true,
   );
   assert.equal(
+    loaded.artifacts.every(({ sizeBytes }) => Number.isSafeInteger(sizeBytes) && sizeBytes > 0),
+    true,
+  );
+  assert.equal(
     loaded.artifacts.every(({ format }) => ["csv", "json", "md"].includes(format)),
     true,
   );
@@ -471,44 +599,180 @@ test("loader lê somente artefatos V2/V3 estáticos allow-listed e retorna prove
     { rowCount: 905, sourceTable: "tb_rh.solicitacoes" },
   );
 
-  const serialized = JSON.stringify(loaded);
+  const serialized = JSON.stringify({ artifacts: loaded.artifacts, issues: loaded.issues });
   assert.doesNotMatch(
     serialized,
     /transformations\.json|legacy_id|target_id|INSERT INTO|\/home\//i,
   );
   assert.equal(loaded.issues.length, 0);
+  assert.deepEqual(
+    loaded.protectedPaths.map((filePath) =>
+      path.relative(path.resolve("docs/migration"), filePath),
+    ),
+    [
+      "v2/confirmed-table-destinations.csv",
+      "v2/manifest.json",
+      "v2/pending-mapping/tables-without-confirmed-destination.json",
+      "v3/rh-pessoal-dry-run.md",
+    ],
+  );
 });
 
-test("loader rejeita symlink e shape histórico inválido sem ler scripts ou SQL", async () => {
+test("layout oficial protege arquivos históricos exatos sem bloquear package v4", async () => {
+  const migrationRoot = path.resolve("docs/migration");
+  const loaded = await loadPreviousMappingArtifacts({ previousDocsDir: migrationRoot });
+
+  await assert.doesNotReject(() =>
+    assertSafePackagePath({
+      packageDir: path.join(migrationRoot, "v4"),
+      protectedPaths: loaded.protectedPaths,
+    }),
+  );
+  for (const unsafePackage of [
+    migrationRoot,
+    path.join(migrationRoot, "v2"),
+    path.join(migrationRoot, "v3"),
+    loaded.protectedPaths[0],
+  ]) {
+    await assert.rejects(
+      () =>
+        assertSafePackagePath({
+          packageDir: unsafePackage,
+          protectedPaths: loaded.protectedPaths,
+        }),
+      /package.*origens|coincidir|conter/i,
+    );
+  }
+});
+
+test("loader mantém artefatos válidos diante de UTF-8 fatal, JSON profundo e V3 editorial", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "migration-v4-previous-"));
   try {
-    const realDocs = path.join(directory, "real-docs");
-    const docsAlias = path.join(directory, "docs-alias");
-    await mkdir(path.join(realDocs, "v2", "pending-mapping"), { recursive: true });
-    await mkdir(path.join(realDocs, "v3"), { recursive: true });
+    const docsDir = await createPreviousDocsFixture(directory);
     await writeFile(
-      path.join(realDocs, "v2", "confirmed-table-destinations.csv"),
-      '"legacy_table","target_table"\n"legacy.one","current.one"\n',
+      path.join(docsDir, "v2", "confirmed-table-destinations.csv"),
+      Buffer.from([0xc3, 0x28]),
     );
-    await writeFile(path.join(realDocs, "v2", "manifest.json"), '{"sourceRows":[]}\n');
-    await writeFile(
-      path.join(realDocs, "v2", "pending-mapping", "tables-without-confirmed-destination.json"),
-      "[]\n",
-    );
-    await writeFile(path.join(realDocs, "v3", "rh-pessoal-dry-run.md"), "# inválido\n");
-    await writeFile(path.join(realDocs, "v2", "apply.mjs"), "throw new Error('não executar');\n");
-    await writeFile(path.join(realDocs, "v2", "dump.sql"), "INSERT INTO secrets VALUES ('x');\n");
-    await symlink(realDocs, docsAlias);
+    let nested = { sourceRows: VALID_V2_SOURCE_ROWS };
+    for (let depth = 0; depth < 40; depth += 1) nested = { nested };
+    await writeFile(path.join(docsDir, "v2", "manifest.json"), JSON.stringify(nested));
+    await writeFile(path.join(docsDir, "v2", "apply.mjs"), "throw new Error('não executar');\n");
+    await writeFile(path.join(docsDir, "v2", "dump.sql"), "INSERT INTO secrets VALUES ('x');\n");
 
+    const loaded = await loadPreviousMappingArtifacts({ previousDocsDir: docsDir });
+
+    assert.deepEqual(
+      loaded.artifacts.map(({ origin }) => origin),
+      ["v2/pending-mapping/tables-without-confirmed-destination.json", "v3/rh-pessoal-dry-run.md"],
+    );
+    assert.deepEqual(loaded.issues.map(({ reasonCode }) => reasonCode).sort(), [
+      "ARTIFACT_INVALID_UTF8",
+      "ARTIFACT_JSON_LIMIT_EXCEEDED",
+      "ARTIFACT_SEMANTIC_METRICS_ONLY",
+    ]);
+    const v3 = loaded.artifacts.find(({ version }) => version === "v3");
+    assert.deepEqual(v3.decisions, []);
+    assert.equal(v3.semanticAvailability, "metrics_only");
+    assert.match(await readFile(path.join(docsDir, "v2", "apply.mjs"), "utf8"), /não executar/);
+    assert.doesNotMatch(JSON.stringify(loaded), /INSERT INTO|apply\.mjs|dump\.sql|\/home\//i);
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
+test("loader limita bytes, nós, chaves, strings, linhas e células por artefato", async () => {
+  const oversizedKeys = Object.fromEntries(
+    Array.from({ length: 10_001 }, (_, index) => [`key${index}`, index]),
+  );
+  const cases = [
+    {
+      origin: "v2/confirmed-table-destinations.csv",
+      content: `legacy_table,target_table\n${"x".repeat(513)},current.one\n`,
+      reasonCode: "ARTIFACT_CSV_LIMIT_EXCEEDED",
+    },
+    {
+      origin: "v2/manifest.json",
+      content: `${JSON.stringify({ sourceRows: VALID_V2_SOURCE_ROWS })}${" ".repeat(300_000)}`,
+      reasonCode: "ARTIFACT_MAX_BYTES_EXCEEDED",
+    },
+    {
+      origin: "v2/manifest.json",
+      content: JSON.stringify({ sourceRows: VALID_V2_SOURCE_ROWS, value: "x".repeat(4_097) }),
+      reasonCode: "ARTIFACT_JSON_LIMIT_EXCEEDED",
+    },
+    {
+      origin: "v2/manifest.json",
+      content: JSON.stringify({ extra: oversizedKeys, sourceRows: VALID_V2_SOURCE_ROWS }),
+      reasonCode: "ARTIFACT_JSON_LIMIT_EXCEEDED",
+    },
+    {
+      origin: "v2/pending-mapping/tables-without-confirmed-destination.json",
+      content: JSON.stringify(Array.from({ length: 20_001 }, () => null)),
+      reasonCode: "ARTIFACT_JSON_LIMIT_EXCEEDED",
+    },
+    {
+      origin: "v3/rh-pessoal-dry-run.md",
+      content: `${VALID_V3_MARKDOWN}\n${"x".repeat(2_049)}\n`,
+      reasonCode: "ARTIFACT_MARKDOWN_LIMIT_EXCEEDED",
+    },
+    {
+      origin: "v3/rh-pessoal-dry-run.md",
+      content: `${VALID_V3_MARKDOWN}${"\n".repeat(5_001)}`,
+      reasonCode: "ARTIFACT_MARKDOWN_LIMIT_EXCEEDED",
+    },
+  ];
+
+  for (const [index, fixture] of cases.entries()) {
+    const directory = await mkdtemp(
+      path.join(os.tmpdir(), `migration-v4-previous-limit-${index}-`),
+    );
+    try {
+      const docsDir = await createPreviousDocsFixture(directory);
+      await writeFile(path.join(docsDir, ...fixture.origin.split("/")), fixture.content);
+      const loaded = await loadPreviousMappingArtifacts({ previousDocsDir: docsDir });
+      assert.equal(
+        loaded.issues.some(
+          ({ reasonCode, scope }) => reasonCode === fixture.reasonCode && scope === fixture.origin,
+        ),
+        true,
+        fixture.origin,
+      );
+      assert.equal(loaded.artifacts.length, 3, fixture.origin);
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  }
+});
+
+test("loader rejeita symlink intermediário por artefato e symlink da raiz integralmente", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "migration-v4-previous-link-"));
+  try {
+    const docsDir = await createPreviousDocsFixture(directory);
+    const external = path.join(directory, "external-pending");
+    await mkdir(external);
+    await writeFile(path.join(external, "tables-without-confirmed-destination.json"), "[]\n");
+    await rm(path.join(docsDir, "v2", "pending-mapping"), { recursive: true });
+    await symlink(external, path.join(docsDir, "v2", "pending-mapping"));
+
+    const loaded = await loadPreviousMappingArtifacts({ previousDocsDir: docsDir });
+    assert.equal(
+      loaded.artifacts.some(({ origin }) => origin.includes("pending-mapping")),
+      false,
+    );
+    assert.equal(
+      loaded.issues.some(
+        ({ reasonCode, scope }) =>
+          reasonCode === "ARTIFACT_PATH_SYMLINK" && scope.includes("pending-mapping"),
+      ),
+      true,
+    );
+
+    const alias = path.join(directory, "migration-alias");
+    await symlink(docsDir, alias);
     await assert.rejects(
-      () => loadPreviousMappingArtifacts({ previousDocsDir: docsAlias }),
+      () => loadPreviousMappingArtifacts({ previousDocsDir: alias }),
       /diretório real|symlink|confinado/i,
     );
-    await assert.rejects(
-      () => loadPreviousMappingArtifacts({ previousDocsDir: realDocs }),
-      /shape|sourceRows|markdown/i,
-    );
-    assert.match(await readFile(path.join(realDocs, "v2", "apply.mjs"), "utf8"), /não executar/);
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
@@ -551,7 +815,14 @@ test("CLI gera comparação metadata-only e não bloqueia o pacote quando histó
     const validReport = JSON.parse(
       await readFile(path.join(packageDir, "reports/previous-mapping-comparison.json"), "utf8"),
     );
-    assert.equal(validReport.availability, "available");
+    assert.equal(validReport.availability, "partial");
+    assert.equal(
+      validReport.issues.some(
+        ({ reasonCode, scope }) =>
+          reasonCode === "HISTORICAL_DECISION_CONFLICT" && scope === "tb_rh.solicitacoes",
+      ),
+      true,
+    );
     assert.equal(validReport.tables.length, 312);
     assert.deepEqual(
       validReport.historicalSources.map(({ version }) => version),

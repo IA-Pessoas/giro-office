@@ -49,7 +49,7 @@ export function serializeCsv(columns, rows) {
 export async function writeFileSetAtomically(
   directoryPath,
   files,
-  { replaceDirectories = [], fileSystem = DEFAULT_FILE_SYSTEM } = {},
+  { replaceDirectories = [], replaceFiles = [], fileSystem = DEFAULT_FILE_SYSTEM } = {},
 ) {
   validateFileSystemAdapter(fileSystem);
   const resolvedDirectory = path.resolve(directoryPath);
@@ -61,6 +61,7 @@ export async function writeFileSetAtomically(
   validateOperationPath(temporaryPath, parentDirectory, baseName, operationId, "tmp");
   validateOperationPath(backupPath, parentDirectory, baseName, operationId, "previous");
   validateRelativeDirectories(replaceDirectories);
+  validateRelativeFiles(replaceFiles);
   const entries = normalizeFileEntries(files);
   let previousMoved = false;
   let installed = false;
@@ -85,6 +86,12 @@ export async function writeFileSetAtomically(
       await fileSystem.rm(path.join(temporaryPath, relativeDirectory), {
         force: true,
         recursive: true,
+      });
+    }
+    for (const relativeFile of replaceFiles) {
+      await fileSystem.rm(path.join(temporaryPath, relativeFile), {
+        force: true,
+        recursive: false,
       });
     }
     for (const [relativePath, content] of entries) {
@@ -276,6 +283,11 @@ function normalizeFileEntries(files) {
 function validateRelativeDirectories(directories) {
   if (!Array.isArray(directories)) throw new TypeError("replaceDirectories deve ser array");
   for (const directory of directories) validateRelativePath(directory);
+}
+
+function validateRelativeFiles(files) {
+  if (!Array.isArray(files)) throw new TypeError("replaceFiles deve ser array");
+  for (const file of files) validateRelativePath(file);
 }
 
 function validateRelativePath(relativePath) {

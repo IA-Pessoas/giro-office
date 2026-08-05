@@ -17,6 +17,7 @@ const CASTELO_ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const PROVIDER_MODE = "conservative-read-only";
 const MAX_REASONS_PER_STEP = 64;
 const DUMP_INTEGRITY_CHUNK_SIZE = 64 * 1024;
+const PREVIOUS_COMPARISON_REPORT_PATH = "reports/previous-mapping-comparison.json";
 const PROVIDER_STATE = new WeakMap();
 const RESULT_PROVENANCE = new WeakMap();
 
@@ -273,7 +274,11 @@ export async function assertSafePackagePath({ packageDir, protectedPaths }) {
   return true;
 }
 
-export async function writeMappingPackage(packageDir, result, { protectedPaths, fileSystem } = {}) {
+export async function writeMappingPackage(
+  packageDir,
+  result,
+  { protectedPaths, fileSystem, extraArtifacts } = {},
+) {
   const provenance = RESULT_PROVENANCE.get(result);
   if (provenance === undefined) {
     throw new Error("Resultado autenticado com provenance é obrigatório");
@@ -281,6 +286,7 @@ export async function writeMappingPackage(packageDir, result, { protectedPaths, 
   validateMappingCompleteness(result, provenance.bindings);
   await assertSafePackagePath({ packageDir, protectedPaths });
   const artifacts = buildArtifacts(result);
+  addExtraArtifacts(artifacts, extraArtifacts);
   for (const [relativePath, content] of artifacts) {
     try {
       assertNoSensitiveSerializedContent(content);
@@ -294,8 +300,23 @@ export async function writeMappingPackage(packageDir, result, { protectedPaths, 
   }
   return writeFileSetAtomically(packageDir, artifacts, {
     replaceDirectories: ["mapping", "pending-mapping", "preflight", "quarantine"],
+    replaceFiles: [PREVIOUS_COMPARISON_REPORT_PATH],
     fileSystem,
   });
+}
+
+function addExtraArtifacts(artifacts, extraArtifacts) {
+  if (extraArtifacts === undefined) return;
+  if (!isObject(extraArtifacts)) throw new TypeError("Artefatos extras devem ser um objeto");
+  const entries = Object.entries(extraArtifacts);
+  if (
+    entries.length !== 1 ||
+    entries[0][0] !== PREVIOUS_COMPARISON_REPORT_PATH ||
+    !isObject(entries[0][1])
+  ) {
+    throw new Error("Artefato extra fora da allow-list do pacote V4");
+  }
+  artifacts.set(PREVIOUS_COMPARISON_REPORT_PATH, serializeStableJson(entries[0][1]));
 }
 
 function validateBuildInputs({

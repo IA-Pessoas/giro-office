@@ -8,6 +8,23 @@ const VERSION_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const DIGEST = /^[a-f0-9]{64}$/;
 const SAFE_REFERENCE = /^[A-Za-z0-9_./:# -]+$/;
 const DECISION_STATUSES = new Set(["confirmed", "pending"]);
+const DECISION_COMPARISON_STATUSES = Object.freeze([
+  "reused",
+  "corrected",
+  "invalidated",
+  "new",
+  "missing",
+  "conflict",
+]);
+const MAX_JSON_DEPTH = 16;
+const MAX_JSON_NODES = 20_000;
+const MAX_JSON_KEYS = 10_000;
+const MAX_JSON_STRING_LENGTH = 4_096;
+const MAX_TEXT_LINES = 5_000;
+const MAX_TEXT_LINE_LENGTH = 2_048;
+const MAX_CSV_ROWS = 1_024;
+const MAX_CSV_CELL_LENGTH = 512;
+const V3_SEMANTIC_FINGERPRINT = "320c209f4a99c670285526b7a8f795f85484542edd7a91f378ec44c6a81582d1";
 const ALLOWED_ARTIFACTS = Object.freeze([
   {
     format: "csv",
@@ -59,14 +76,50 @@ export function comparePreviousMappings({
   previousArtifacts,
 }) {
   const current = normalizeCurrentInventory(currentInventory);
-  const histories = normalizeHistoricalInventories(historicalInventories);
+  const historicalNormalization = normalizeHistoricalInventories(historicalInventories);
+  const histories = historicalNormalization.values;
   const evidence = normalizeRegistry(evidenceRegistry, "EvidenceRegistry");
   const rules = normalizeRegistry(ruleRegistry, "RuleRegistry");
-  const previous = normalizePreviousArtifacts(previousArtifacts);
-  const previousBySource = indexPreviousDecisions(previous);
-  const artifactCountsBySource = indexArtifactCounts(previous);
+  const previousNormalization = normalizePreviousArtifacts(previousArtifacts);
+  const previous = previousNormalization.values;
+  const previousIndex = indexPreviousDecisions(previous);
+  const previousBySource = previousIndex.bySource;
+  const artifactCountIndex = indexArtifactCounts(previous);
+  const artifactCountsBySource = artifactCountIndex.bySource;
 
-  const tables = current.tables.map((currentTable) => {
+  const issues = [
+    ...historicalNormalization.issues,
+    ...previousNormalization.issues,
+    ...previousIndex.issues,
+    ...artifactCountIndex.issues,
+  ];
+  issues.sort(compareIssues);
+
+  const currentBySource = new Map(
+    current.tables.map((currentTable) => [currentTable.sourceTable, currentTable]),
+  );
+  const allSources = new Set(currentBySource.keys());
+  for (const history of histories) {
+    for (const table of history.tables) allSources.add(table.sourceTable);
+  }
+  for (const sourceTable of previousBySource.keys()) allSources.add(sourceTable);
+  for (const sourceTable of artifactCountsBySource.keys()) allSources.add(sourceTable);
+
+  const tables = [...allSources].sort(compareText).map((sourceTable) => {
+    const currentTable = currentBySource.get(sourceTable);
+    const previousDecisions = previousBySource.get(sourceTable) ?? [];
+    const historicalConflict =
+      previousIndex.conflictSources.has(sourceTable) ||
+      artifactCountIndex.conflictSources.has(sourceTable);
+    if (currentTable === undefined) {
+      return buildMissingCurrentTable({
+        sourceTable,
+        histories,
+        previousDecisions,
+        historicalCounts: artifactCountsBySource.get(sourceTable) ?? [],
+        historicalConflict,
+      });
+    }
     const currentEvidence = evidence.get(currentTable.sourceTable);
     if (currentEvidence === undefined) {
       throw new Error(`EvidenceDecision atual ausente: ${currentTable.sourceTable}`);
@@ -79,7 +132,6 @@ export function comparePreviousMappings({
       currentRule,
     );
     guardedSemanticReason(currentTable.sourceTable, currentDecision);
-    const previousDecisions = previousBySource.get(currentTable.sourceTable) ?? [];
     const artifactCountComparisons = (
       artifactCountsBySource.get(currentTable.sourceTable) ?? []
     ).map((historicalCount) => compareArtifactCount(currentTable, historicalCount));
@@ -101,6 +153,7 @@ export function comparePreviousMappings({
         sourceTable: currentTable.sourceTable,
         currentDecision,
         previousDecisions,
+        historicalConflict,
       }),
     };
   });
@@ -116,13 +169,18 @@ export function comparePreviousMappings({
       origin,
       version,
     })),
-    artifactSources: previous.map(({ digest, format, origin, version }) => ({
-      digest,
-      format,
-      origin,
-      version,
-    })),
+    artifactSources: previous.map(
+      ({ digest, format, origin, semanticAvailability, sizeBytes, version }) => ({
+        digest,
+        format,
+        origin,
+        version,
+        sizeBytes,
+        semanticAvailability,
+      }),
+    ),
     summary: buildSummary(tables, histories),
+    issues,
     tables,
   };
 }
@@ -130,21 +188,46 @@ export function comparePreviousMappings({
 export async function loadPreviousMappingArtifacts({ previousDocsDir }) {
   const root = await assertRealConfinedRoot(previousDocsDir);
   const artifacts = [];
+  const issues = [];
+  const protectedPaths = [];
   for (const descriptor of ALLOWED_ARTIFACTS) {
     const absolutePath = path.join(root, ...descriptor.origin.split("/"));
-    const content = await readAllowListedArtifact(absolutePath, root, descriptor);
-    const parsed = descriptor.parser(content);
-    artifacts.push({
-      version: descriptor.version,
-      origin: descriptor.origin,
-      digest: sha256(content),
-      format: descriptor.format,
-      decisions: parsed.decisions,
-      inventoryCounts: parsed.inventoryCounts,
-    });
+    try {
+      const loaded = await readAllowListedArtifact(absolutePath, root, descriptor);
+      protectedPaths.push(loaded.canonicalPath);
+      const parsed = descriptor.parser(loaded.content, { digest: loaded.digest });
+      artifacts.push({
+        version: descriptor.version,
+        origin: descriptor.origin,
+        digest: loaded.digest,
+        sizeBytes: loaded.sizeBytes,
+        format: descriptor.format,
+        semanticAvailability: parsed.semanticAvailability ?? "available",
+        decisions: parsed.decisions,
+        inventoryCounts: parsed.inventoryCounts,
+      });
+      for (const reasonCode of parsed.issueReasonCodes ?? []) {
+        issues.push(artifactIssue(descriptor, reasonCode));
+      }
+    } catch (error) {
+      if (typeof error?.protectedPath === "string") protectedPaths.push(error.protectedPath);
+      issues.push(
+        artifactIssue(descriptor, error?.reasonCode ?? "ARTIFACT_INVALID_OR_UNAVAILABLE"),
+      );
+    }
   }
   artifacts.sort((left, right) => compareText(left.origin, right.origin));
-  return { artifacts, issues: [] };
+  issues.sort(compareIssues);
+  protectedPaths.sort(compareText);
+  return { artifacts, issues, protectedPaths: [...new Set(protectedPaths)] };
+}
+
+function artifactIssue(descriptor, reasonCode) {
+  return {
+    scope: descriptor.origin,
+    version: descriptor.version,
+    reasonCode,
+  };
 }
 
 function normalizeCurrentInventory(inventory) {
@@ -164,30 +247,52 @@ function normalizeHistoricalInventories(inventories) {
   if (!Array.isArray(inventories)) {
     throw new TypeError("historicalInventories deve ser array");
   }
-  const normalized = inventories.map((entry) => {
-    if (!isRecord(entry) || !isRecord(entry.inventory)) {
-      throw new TypeError("Inventário histórico exige version, origin, digest e inventory");
+  const values = [];
+  const issues = [];
+  for (const [index, entry] of inventories.entries()) {
+    try {
+      if (!isRecord(entry) || !isRecord(entry.inventory)) {
+        throw new TypeError("Inventário histórico exige version, origin, digest e inventory");
+      }
+      const version = normalizeVersion(entry.version, "historical version");
+      const origin = normalizeOrigin(entry.origin);
+      const digest = normalizeDigest(entry.digest, "historical digest");
+      const inventoryLabel = normalizeVersion(
+        entry.inventory.sourceDirectoryLabel,
+        "historical inventory.sourceDirectoryLabel",
+      );
+      const inventoryDigest = normalizeDigest(
+        entry.inventory.sourceDigest,
+        "historical inventory.sourceDigest",
+      );
+      const tables = normalizeInventoryTables(entry.inventory.tables, `inventário ${version}`);
+      if (
+        version !== inventoryLabel ||
+        origin !== `backup/${version}` ||
+        digest !== inventoryDigest ||
+        digest !== createInventoryDigest(tables) ||
+        values.some((known) => known.version === version)
+      ) {
+        throw new Error("Provenance histórica divergente");
+      }
+      values.push({ version, origin, digest, tables });
+    } catch {
+      issues.push({
+        scope: `historical-inventory-${index + 1}`,
+        reasonCode: "HISTORICAL_INVENTORY_PROVENANCE_CONFLICT",
+      });
     }
-    const version = normalizeVersion(entry.version, "historical version");
-    const origin = normalizeOrigin(entry.origin);
-    const digest = normalizeDigest(entry.digest, "historical digest");
-    const inventoryDigest = normalizeDigest(
-      entry.inventory.sourceDigest,
-      "historical inventory.sourceDigest",
-    );
-    if (digest !== inventoryDigest) {
-      throw new Error(`Digest histórico divergente: ${version}`);
-    }
-    return {
-      version,
-      origin,
-      digest,
-      tables: normalizeInventoryTables(entry.inventory.tables, `inventário ${version}`),
-    };
-  });
-  normalized.sort((left, right) => compareText(left.version, right.version));
-  assertUnique(normalized, ({ version }) => version, "Versão histórica duplicada");
-  return normalized;
+  }
+  values.sort((left, right) => compareText(left.version, right.version));
+  issues.sort(compareIssues);
+  return { values, issues };
+}
+
+function createInventoryDigest(tables) {
+  const canonicalContent = tables
+    .map((table) => `${table.sourceTable}\t${table.sha256}\t${table.rowCount}`)
+    .join("\n");
+  return sha256(canonicalContent);
 }
 
 function normalizeInventoryTables(tables, label) {
@@ -222,30 +327,51 @@ function normalizeInventoryTables(tables, label) {
 
 function normalizePreviousArtifacts(artifacts) {
   if (!Array.isArray(artifacts)) throw new TypeError("previousArtifacts deve ser array");
-  return artifacts
-    .map((artifact) => {
+  const values = [];
+  const issues = [];
+  for (const [index, artifact] of artifacts.entries()) {
+    try {
       if (!isRecord(artifact)) throw new TypeError("Artefato histórico inválido");
       const version = normalizeVersion(artifact.version, "artifact.version");
       const origin = normalizeOrigin(artifact.origin);
       const digest = normalizeDigest(artifact.digest, "artifact.digest");
+      if (!origin.startsWith(`${version}/`)) {
+        throw new TypeError("Versão e origem histórica divergentes");
+      }
       if (!["csv", "json", "md"].includes(artifact.format)) {
         throw new TypeError("Formato histórico não allow-listed");
+      }
+      if (!Number.isSafeInteger(artifact.sizeBytes) || artifact.sizeBytes <= 0) {
+        throw new TypeError("Tamanho histórico inválido");
+      }
+      if (!["available", "metrics_only"].includes(artifact.semanticAvailability)) {
+        throw new TypeError("Disponibilidade semântica histórica inválida");
       }
       if (!Array.isArray(artifact.decisions) || !Array.isArray(artifact.inventoryCounts)) {
         throw new TypeError("Shape histórico inválido");
       }
-      return {
+      values.push({
         version,
         origin,
         digest,
+        sizeBytes: artifact.sizeBytes,
         format: artifact.format,
+        semanticAvailability: artifact.semanticAvailability,
         decisions: artifact.decisions.map((decision) =>
           normalizePreviousDecision(decision, { digest, origin, version }),
         ),
         inventoryCounts: artifact.inventoryCounts.map(normalizeInventoryCount),
-      };
-    })
-    .sort((left, right) => compareText(left.origin, right.origin));
+      });
+    } catch {
+      issues.push({
+        scope: `historical-artifact-${index + 1}`,
+        reasonCode: "HISTORICAL_ARTIFACT_PROVENANCE_CONFLICT",
+      });
+    }
+  }
+  values.sort((left, right) => compareText(left.origin, right.origin));
+  issues.sort(compareIssues);
+  return { values, issues };
 }
 
 function normalizePreviousDecision(decision, provenance) {
@@ -297,22 +423,19 @@ function normalizeInventoryCount(count) {
 
 function indexPreviousDecisions(artifacts) {
   const bySource = new Map();
-  const byVersionAndSource = new Map();
+  const signaturesBySource = new Map();
   for (const artifact of artifacts) {
     for (const decision of artifact.decisions) {
-      const key = `${decision.provenance.version}\0${decision.sourceTable}`;
-      const comparable = {
-        sourceTable: decision.sourceTable,
+      const signature = canonicalJson({
         status: decision.status,
         destinations: decision.destinations,
-      };
-      const known = byVersionAndSource.get(key);
-      if (known !== undefined) {
-        if (canonicalJson(known.comparable) !== canonicalJson(comparable)) {
-          throw new Error(`Decisão histórica conflitante: ${decision.sourceTable}`);
-        }
-        continue;
+      });
+      if (!signaturesBySource.has(decision.sourceTable)) {
+        signaturesBySource.set(decision.sourceTable, new Set());
       }
+      const signatures = signaturesBySource.get(decision.sourceTable);
+      if (signatures.has(signature)) continue;
+      signatures.add(signature);
       const normalized = {
         version: decision.provenance.version,
         origin: decision.provenance.origin,
@@ -320,7 +443,6 @@ function indexPreviousDecisions(artifacts) {
         status: decision.status,
         destinationTables: decision.destinations.map(({ destinationTable }) => destinationTable),
       };
-      byVersionAndSource.set(key, { comparable, normalized });
       if (!bySource.has(decision.sourceTable)) bySource.set(decision.sourceTable, []);
       bySource.get(decision.sourceTable).push(normalized);
     }
@@ -333,22 +455,32 @@ function indexPreviousDecisions(artifacts) {
       ),
     );
   }
-  return bySource;
+  const conflictSources = new Set(
+    [...signaturesBySource]
+      .filter(([, signatures]) => signatures.size > 1)
+      .map(([sourceTable]) => sourceTable),
+  );
+  const issues = [...conflictSources]
+    .map((sourceTable) => ({
+      scope: sourceTable,
+      reasonCode: "HISTORICAL_DECISION_CONFLICT",
+    }))
+    .sort(compareIssues);
+  return { bySource, conflictSources, issues };
 }
 
 function indexArtifactCounts(artifacts) {
   const bySource = new Map();
-  const byVersionAndSource = new Map();
+  const signaturesByVersionAndSource = new Map();
   for (const artifact of artifacts) {
     for (const count of artifact.inventoryCounts) {
       const key = `${artifact.version}\0${count.sourceTable}`;
-      const known = byVersionAndSource.get(key);
-      if (known !== undefined) {
-        if (known.rowCount !== count.rowCount) {
-          throw new Error(`Contagem histórica conflitante: ${count.sourceTable}`);
-        }
-        continue;
+      if (!signaturesByVersionAndSource.has(key)) {
+        signaturesByVersionAndSource.set(key, new Set());
       }
+      const signatures = signaturesByVersionAndSource.get(key);
+      if (signatures.has(count.rowCount)) continue;
+      signatures.add(count.rowCount);
       const normalized = {
         version: artifact.version,
         origin: artifact.origin,
@@ -356,17 +488,30 @@ function indexArtifactCounts(artifacts) {
         sourceTable: count.sourceTable,
         rowCount: count.rowCount,
       };
-      byVersionAndSource.set(key, normalized);
       if (!bySource.has(count.sourceTable)) bySource.set(count.sourceTable, []);
       bySource.get(count.sourceTable).push(normalized);
     }
   }
   for (const counts of bySource.values()) {
     counts.sort((left, right) =>
-      compareText(`${left.version}\0${left.origin}`, `${right.version}\0${right.origin}`),
+      compareText(
+        `${left.version}\0${left.origin}\0${left.digest}\0${left.rowCount}`,
+        `${right.version}\0${right.origin}\0${right.digest}\0${right.rowCount}`,
+      ),
     );
   }
-  return bySource;
+  const conflictSources = new Set(
+    [...signaturesByVersionAndSource]
+      .filter(([, signatures]) => signatures.size > 1)
+      .map(([key]) => key.split("\0")[1]),
+  );
+  const issues = [...conflictSources]
+    .map((sourceTable) => ({
+      scope: sourceTable,
+      reasonCode: "HISTORICAL_COUNT_CONFLICT",
+    }))
+    .sort(compareIssues);
+  return { bySource, conflictSources, issues };
 }
 
 function normalizeRegistry(registry, label) {
@@ -536,6 +681,88 @@ function extractSecurityDecisions(rule) {
     .sort((left, right) => compareText(left.destinationColumn, right.destinationColumn));
 }
 
+function buildMissingCurrentTable({
+  sourceTable,
+  histories,
+  previousDecisions,
+  historicalCounts,
+  historicalConflict,
+}) {
+  const inventoryComparisons = histories.map((history) =>
+    compareMissingInventoryTable(sourceTable, history),
+  );
+  const artifactCountComparisons = historicalCounts.map((historicalCount) => ({
+    currentRowCount: null,
+    delta: null,
+    digest: historicalCount.digest,
+    evidenceRefs: [`${historicalCount.origin}#${sourceTable}`],
+    historicalRowCount: historicalCount.rowCount,
+    origin: historicalCount.origin,
+    reasonCode: "CURRENT_TABLE_NOT_PRESENT",
+    version: historicalCount.version,
+  }));
+  const evidenceRefs = [
+    ...inventoryComparisons
+      .filter(({ present }) => present)
+      .flatMap(({ evidenceRefs: references }) => references),
+    ...artifactCountComparisons.flatMap(({ evidenceRefs: references }) => references),
+    ...previousDecisions.map(({ digest, origin }) => `${origin}#${sourceTable}@${digest}`),
+  ];
+  const provenance = [
+    ...histories
+      .filter((history) => history.tables.some((table) => table.sourceTable === sourceTable))
+      .map(({ digest, origin, version }) => ({ digest, origin, version })),
+    ...previousDecisions.map(({ digest, origin, version }) => ({ digest, origin, version })),
+  ];
+  const reasonCode = historicalConflict
+    ? "HISTORICAL_ARTIFACT_CONFLICT_CURRENT_TABLE_MISSING"
+    : "CURRENT_TABLE_MISSING_FROM_INVENTORY";
+  return {
+    sourceTable,
+    currentInventory: null,
+    inventoryComparisons,
+    artifactCountComparisons,
+    previousDecisions,
+    currentDecision: null,
+    decision: decisionResult(
+      historicalConflict ? "conflict" : "missing",
+      reasonCode,
+      evidenceRefs,
+      deduplicateProvenance(provenance),
+    ),
+  };
+}
+
+function compareMissingInventoryTable(sourceTable, history) {
+  const historicalTable = history.tables.find((table) => table.sourceTable === sourceTable);
+  if (historicalTable === undefined) {
+    return {
+      version: history.version,
+      origin: history.origin,
+      digest: history.digest,
+      present: false,
+      addedColumns: [],
+      removedColumns: [],
+      rowCount: { current: null, delta: null, historical: null },
+      hashChanged: null,
+      reasonCodes: ["BACKUP_TABLE_NOT_PRESENT"],
+      evidenceRefs: [],
+    };
+  }
+  return {
+    version: history.version,
+    origin: history.origin,
+    digest: history.digest,
+    present: true,
+    addedColumns: [],
+    removedColumns: historicalTable.columns,
+    rowCount: { current: null, delta: null, historical: historicalTable.rowCount },
+    hashChanged: null,
+    reasonCodes: ["CURRENT_TABLE_NOT_PRESENT"],
+    evidenceRefs: [`${history.origin}#${sourceTable}`],
+  };
+}
+
 function compareInventoryTable(currentTable, history) {
   const historicalTable = history.tables.find(
     ({ sourceTable }) => sourceTable === currentTable.sourceTable,
@@ -608,7 +835,12 @@ function compareArtifactCount(currentTable, historicalCount) {
   };
 }
 
-function compareSemanticDecision({ sourceTable, currentDecision, previousDecisions }) {
+function compareSemanticDecision({
+  sourceTable,
+  currentDecision,
+  previousDecisions,
+  historicalConflict,
+}) {
   const previous =
     [...previousDecisions].reverse().find(({ status }) => status === "confirmed") ??
     previousDecisions.at(-1) ??
@@ -625,6 +857,18 @@ function compareSemanticDecision({ sourceTable, currentDecision, previousDecisio
     },
     ...previousDecisions.map(({ digest, origin, version }) => ({ digest, origin, version })),
   ];
+
+  if (historicalConflict) {
+    return decisionResult(
+      "conflict",
+      "HISTORICAL_DECISION_CONFLICT",
+      [
+        ...currentDecision.evidenceRefs,
+        ...previousDecisions.map(({ digest, origin }) => `${origin}#${sourceTable}@${digest}`),
+      ],
+      deduplicateProvenance(provenance),
+    );
+  }
 
   if (previous?.status === "confirmed" && currentDecision.status === "pending") {
     return decisionResult(
@@ -697,14 +941,31 @@ function decisionResult(status, reasonCode, evidenceRefs, provenance) {
     reasonCode,
     reason: semanticReason(reasonCode),
     evidenceRefs: [...new Set(evidenceRefs.map(normalizeReference))].sort(compareText),
-    provenance,
+    provenance: deduplicateProvenance(provenance),
   };
+}
+
+function deduplicateProvenance(provenance) {
+  const bySignature = new Map();
+  for (const entry of provenance) {
+    const signature = `${entry.version}\0${entry.origin}\0${entry.digest}`;
+    bySignature.set(signature, entry);
+  }
+  return [...bySignature]
+    .sort(([left], [right]) => compareText(left, right))
+    .map(([, value]) => value);
 }
 
 function semanticReason(reasonCode) {
   return {
     LEGACY_PASSWORD_REQUIRES_CURRENT_BCRYPT_STRATEGY:
       "A decisão histórica não comprova transformação segura; a regra atual seleciona bcrypt válido ou aplica hash bcrypt ao texto legado.",
+    CURRENT_TABLE_MISSING_FROM_INVENTORY:
+      "A origem existe apenas nas fontes históricas e não está presente no inventário atual.",
+    HISTORICAL_DECISION_CONFLICT:
+      "Artefatos históricos divergem; a decisão atual permanece registrada como autoridade sem resolver silenciosamente o conflito.",
+    HISTORICAL_ARTIFACT_CONFLICT_CURRENT_TABLE_MISSING:
+      "Artefatos históricos divergem para uma origem ausente do inventário atual.",
     NO_PREVIOUS_RULE_FOUND:
       "Nenhuma decisão histórica confirmada foi encontrada; a classificação vem exclusivamente da evidência atual.",
     ORIENTATION_PARTNERS_MUST_BE_AGGREGATED:
@@ -725,7 +986,10 @@ function semanticReason(reasonCode) {
 }
 
 function buildSummary(tables, histories) {
-  const byDecisionStatus = countBy(tables, ({ decision }) => decision.status);
+  const countedStatuses = countBy(tables, ({ decision }) => decision.status);
+  const byDecisionStatus = Object.fromEntries(
+    DECISION_COMPARISON_STATUSES.map((status) => [status, countedStatuses[status] ?? 0]),
+  );
   const byDecisionReasonCode = countBy(tables, ({ decision }) => decision.reasonCode);
   const byHistoricalVersion = histories.map((history) => {
     const comparisons = tables.map(({ inventoryComparisons }) =>
@@ -806,25 +1070,67 @@ async function readAllowListedArtifact(filePath, root, descriptor) {
   }
   const resolved = path.resolve(filePath);
   if (!resolved.startsWith(`${root}${path.sep}`)) {
-    throw new Error("Artefato histórico fora do diretório confinado");
+    throw artifactLoadError("ARTIFACT_PATH_OUTSIDE_ROOT");
   }
-  let inspection;
-  try {
-    inspection = await lstat(resolved);
-  } catch {
-    throw new Error(`Artefato histórico ausente: ${descriptor.origin}`);
-  }
-  if (!inspection.isFile() || inspection.isSymbolicLink()) {
-    throw new Error(`Artefato histórico deve ser arquivo real: ${descriptor.origin}`);
-  }
+  const inspection = await inspectArtifactPathComponents(root, descriptor.origin);
   if (inspection.size > descriptor.maximumBytes) {
-    throw new Error(`Artefato histórico excede limite: ${descriptor.origin}`);
+    throw artifactLoadError("ARTIFACT_MAX_BYTES_EXCEEDED", resolved);
   }
   const canonical = await realpath(resolved);
   if (!canonical.startsWith(`${root}${path.sep}`)) {
-    throw new Error("Artefato histórico fora do diretório confinado");
+    throw artifactLoadError("ARTIFACT_PATH_OUTSIDE_ROOT");
   }
-  return readFile(canonical, "utf8");
+  let bytes;
+  try {
+    bytes = await readFile(canonical);
+  } catch {
+    throw artifactLoadError("ARTIFACT_READ_FAILED", canonical);
+  }
+  if (bytes.byteLength !== inspection.size) {
+    throw artifactLoadError("ARTIFACT_SIZE_CHANGED", canonical);
+  }
+  let content;
+  try {
+    content = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw artifactLoadError("ARTIFACT_INVALID_UTF8", canonical);
+  }
+  return {
+    canonicalPath: canonical,
+    content,
+    digest: crypto.createHash("sha256").update(bytes).digest("hex"),
+    sizeBytes: bytes.byteLength,
+  };
+}
+
+async function inspectArtifactPathComponents(root, origin) {
+  let current = root;
+  const segments = origin.split("/");
+  for (const [index, segment] of segments.entries()) {
+    current = path.join(current, segment);
+    let inspection;
+    try {
+      inspection = await lstat(current);
+    } catch {
+      throw artifactLoadError("ARTIFACT_MISSING");
+    }
+    if (inspection.isSymbolicLink()) {
+      throw artifactLoadError("ARTIFACT_PATH_SYMLINK");
+    }
+    const final = index === segments.length - 1;
+    if ((!final && !inspection.isDirectory()) || (final && !inspection.isFile())) {
+      throw artifactLoadError("ARTIFACT_PATH_KIND_INVALID");
+    }
+    if (final) return inspection;
+  }
+  throw artifactLoadError("ARTIFACT_PATH_KIND_INVALID");
+}
+
+function artifactLoadError(reasonCode, protectedPath) {
+  const error = new Error(reasonCode);
+  error.reasonCode = reasonCode;
+  if (protectedPath !== undefined) error.protectedPath = protectedPath;
+  return error;
 }
 
 function parseV2ConfirmedDestinations(content) {
@@ -834,7 +1140,7 @@ function parseV2ConfirmedDestinations(content) {
     !sameArray(rows[0], ["legacy_table", "target_table"]) ||
     rows.some((row) => row.length !== 2)
   ) {
-    throw new Error("Shape CSV V2 inválido");
+    throw artifactLoadError("ARTIFACT_CSV_SHAPE_INVALID");
   }
   return {
     decisions: rows.slice(1).map(([sourceTable, destinationTable]) => ({
@@ -849,12 +1155,14 @@ function parseV2ConfirmedDestinations(content) {
 }
 
 function parseV2Manifest(content) {
-  const parsed = parseJsonObject(content, "manifest V2");
-  if (!isRecord(parsed.sourceRows)) throw new Error("Shape sourceRows do manifest V2 inválido");
+  const parsed = parseJsonObject(content);
+  if (!isRecord(parsed.sourceRows)) {
+    throw artifactLoadError("ARTIFACT_JSON_SHAPE_INVALID");
+  }
   const inventoryCounts = Object.entries(V2_SOURCE_ROW_TABLES).map(([field, sourceTable]) => {
     const rowCount = parsed.sourceRows[field];
     if (!Number.isSafeInteger(rowCount) || rowCount < 0) {
-      throw new Error(`Shape sourceRows do manifest V2 inválido: ${field}`);
+      throw artifactLoadError("ARTIFACT_JSON_SHAPE_INVALID");
     }
     return { sourceTable, rowCount };
   });
@@ -867,13 +1175,14 @@ function parseV2Pending(content) {
   try {
     parsed = JSON.parse(content);
   } catch {
-    throw new Error("JSON pending V2 inválido");
+    throw artifactLoadError("ARTIFACT_JSON_INVALID");
   }
-  if (!Array.isArray(parsed)) throw new Error("Shape pending V2 inválido");
+  assertJsonLimits(parsed);
+  if (!Array.isArray(parsed)) throw artifactLoadError("ARTIFACT_JSON_SHAPE_INVALID");
   return {
     decisions: parsed.map((entry) => {
       if (!isRecord(entry) || typeof entry.legacy_table !== "string") {
-        throw new Error("Shape pending V2 inválido");
+        throw artifactLoadError("ARTIFACT_JSON_SHAPE_INVALID");
       }
       return {
         sourceTable: normalizeSourceName(entry.legacy_table, "pending legacy_table"),
@@ -885,37 +1194,63 @@ function parseV2Pending(content) {
   };
 }
 
-function parseV3DryRun(content) {
-  if (!/^# Migração RH e Departamento Pessoal - Dry-run v3$/m.test(content)) {
-    throw new Error("Markdown V3 sem shape esperado");
+function parseV3DryRun(content, { digest }) {
+  const lines = validateTextLines(content, "ARTIFACT_MARKDOWN_LIMIT_EXCEEDED");
+  if (lines[0] !== "# Migração RH e Departamento Pessoal - Dry-run v3") {
+    throw artifactLoadError("ARTIFACT_MARKDOWN_SHAPE_INVALID");
   }
-  const section = content.match(
-    /## Resultado do dry-run[\s\S]*?Registros lidos no legado:\s*\n([\s\S]*?)(?=\n\n[^|])/,
-  );
-  if (section === null) throw new Error("Markdown V3 sem tabela de inventário");
-  const inventoryCounts = [];
-  for (const line of section[1].split(/\r?\n/)) {
-    const match = line.match(/^\| `([A-Za-z0-9_.-]+)` \| ([0-9]+) \|$/);
-    if (match === null) continue;
-    inventoryCounts.push({ sourceTable: match[1], rowCount: Number(match[2]) });
+  const headingIndexes = lines
+    .map((line, index) => (line === "## Resultado do dry-run" ? index : -1))
+    .filter((index) => index !== -1);
+  if (headingIndexes.length !== 1) {
+    throw artifactLoadError("ARTIFACT_MARKDOWN_SHAPE_INVALID");
   }
-  if (inventoryCounts.length === 0) throw new Error("Markdown V3 sem contagens válidas");
-  inventoryCounts.sort((left, right) => compareText(left.sourceTable, right.sourceTable));
-  const decisions = [];
+  const markerIndex = lines.indexOf("Registros lidos no legado:", headingIndexes[0] + 1);
+  const headerIndex = markerIndex + 2;
   if (
-    content.includes("tb_rh.colaboradores.id`, nao `tb_admin.usuarios.id") &&
-    content.includes("rh.requests.requester_user_id")
+    markerIndex === -1 ||
+    lines[headerIndex] !== "| Origem | Registros |" ||
+    lines[headerIndex + 1] !== "| --- | ---: |"
   ) {
-    decisions.push({
-      sourceTable: "tb_rh.solicitacoes",
-      status: "confirmed",
-      destinations: [{ destinationTable: "rh.requests" }],
-    });
+    throw artifactLoadError("ARTIFACT_MARKDOWN_SHAPE_INVALID");
   }
-  return { decisions, inventoryCounts };
+  const inventoryCounts = [];
+  for (let index = headerIndex + 2; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line === "") break;
+    const match = line.match(/^\| `([A-Za-z0-9_.-]+)` \| ([0-9]+) \|$/);
+    if (match === null) throw artifactLoadError("ARTIFACT_MARKDOWN_ROW_INVALID");
+    inventoryCounts.push({ sourceTable: match[1], rowCount: Number(match[2]) });
+    if (inventoryCounts.length > MAX_CSV_ROWS) {
+      throw artifactLoadError("ARTIFACT_MARKDOWN_LIMIT_EXCEEDED");
+    }
+  }
+  if (inventoryCounts.length === 0) {
+    throw artifactLoadError("ARTIFACT_MARKDOWN_SHAPE_INVALID");
+  }
+  inventoryCounts.sort((left, right) => compareText(left.sourceTable, right.sourceTable));
+  const fingerprintKnown = digest === V3_SEMANTIC_FINGERPRINT;
+  return {
+    decisions: fingerprintKnown
+      ? [
+          {
+            sourceTable: "tb_rh.solicitacoes",
+            status: "confirmed",
+            destinations: [{ destinationTable: "rh.requests" }],
+          },
+        ]
+      : [],
+    inventoryCounts,
+    semanticAvailability: fingerprintKnown ? "available" : "metrics_only",
+    issueReasonCodes: fingerprintKnown ? [] : ["ARTIFACT_SEMANTIC_METRICS_ONLY"],
+  };
 }
 
 function parseCsv(content) {
+  const lines = validateTextLines(content, "ARTIFACT_CSV_LIMIT_EXCEEDED");
+  if (lines.length > MAX_CSV_ROWS + 1) {
+    throw artifactLoadError("ARTIFACT_CSV_LIMIT_EXCEEDED");
+  }
   const rows = [];
   let row = [];
   let field = "";
@@ -930,6 +1265,9 @@ function parseCsv(content) {
         quoted = false;
       } else {
         field += character;
+        if (field.length > MAX_CSV_CELL_LENGTH) {
+          throw artifactLoadError("ARTIFACT_CSV_LIMIT_EXCEEDED");
+        }
       }
       continue;
     }
@@ -946,9 +1284,12 @@ function parseCsv(content) {
       field = "";
     } else {
       field += character;
+      if (field.length > MAX_CSV_CELL_LENGTH) {
+        throw artifactLoadError("ARTIFACT_CSV_LIMIT_EXCEEDED");
+      }
     }
   }
-  if (quoted) throw new Error("CSV histórico inválido");
+  if (quoted) throw artifactLoadError("ARTIFACT_CSV_SHAPE_INVALID");
   if (field.length > 0 || row.length > 0) {
     row.push(field);
     rows.push(row);
@@ -956,15 +1297,57 @@ function parseCsv(content) {
   return rows.filter((entry) => entry.some((value) => value.length > 0));
 }
 
-function parseJsonObject(content, label) {
+function parseJsonObject(content) {
   let parsed;
   try {
     parsed = JSON.parse(content);
   } catch {
-    throw new Error(`JSON ${label} inválido`);
+    throw artifactLoadError("ARTIFACT_JSON_INVALID");
   }
-  if (!isRecord(parsed)) throw new Error(`Shape ${label} inválido`);
+  assertJsonLimits(parsed);
+  if (!isRecord(parsed)) throw artifactLoadError("ARTIFACT_JSON_SHAPE_INVALID");
   return parsed;
+}
+
+function validateTextLines(content, reasonCode) {
+  const lines = content.split(/\r?\n/);
+  if (lines.length > MAX_TEXT_LINES || lines.some((line) => line.length > MAX_TEXT_LINE_LENGTH)) {
+    throw artifactLoadError(reasonCode);
+  }
+  return lines;
+}
+
+function assertJsonLimits(value) {
+  const stack = [{ depth: 0, value }];
+  let nodes = 0;
+  let keys = 0;
+  while (stack.length > 0) {
+    const current = stack.pop();
+    nodes += 1;
+    if (nodes > MAX_JSON_NODES || current.depth > MAX_JSON_DEPTH) {
+      throw artifactLoadError("ARTIFACT_JSON_LIMIT_EXCEEDED");
+    }
+    if (typeof current.value === "string") {
+      if (current.value.length > MAX_JSON_STRING_LENGTH) {
+        throw artifactLoadError("ARTIFACT_JSON_LIMIT_EXCEEDED");
+      }
+      continue;
+    }
+    if (Array.isArray(current.value)) {
+      for (const entry of current.value) stack.push({ depth: current.depth + 1, value: entry });
+      continue;
+    }
+    if (isRecord(current.value)) {
+      const entries = Object.entries(current.value);
+      keys += entries.length;
+      if (keys > MAX_JSON_KEYS || entries.some(([key]) => key.length > MAX_JSON_STRING_LENGTH)) {
+        throw artifactLoadError("ARTIFACT_JSON_LIMIT_EXCEEDED");
+      }
+      for (const [, entry] of entries) {
+        stack.push({ depth: current.depth + 1, value: entry });
+      }
+    }
+  }
 }
 
 function normalizeEvidenceReferences(references, label) {
@@ -1075,4 +1458,11 @@ function sameArray(left, right) {
 
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function compareIssues(left, right) {
+  return compareText(
+    `${left.scope}\0${left.reasonCode}\0${left.version ?? ""}`,
+    `${right.scope}\0${right.reasonCode}\0${right.version ?? ""}`,
+  );
 }

@@ -813,6 +813,83 @@ test("writeMappingPackage gera artefatos determinísticos e sem linha ou payload
   });
 });
 
+test("relatório histórico participa do mesmo commit atômico e extra files são allow-listed", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const result = await buildFixtureMapping(fixture);
+    const packageDir = path.join(directory, "package");
+    const reportPath = "reports/previous-mapping-comparison.json";
+    const report = {
+      availability: "available",
+      issues: [],
+      schemaVersion: 1,
+      summary: {
+        byDecisionStatus: {
+          conflict: 0,
+          corrected: 0,
+          invalidated: 0,
+          missing: 0,
+          new: 0,
+          reused: 1,
+        },
+        totalTables: 1,
+      },
+      tables: [],
+    };
+
+    await writeMappingPackage(packageDir, result, {
+      protectedPaths: [fixture.sourceDir],
+      extraArtifacts: { [reportPath]: report },
+    });
+    assert.deepEqual(JSON.parse(await readFile(path.join(packageDir, reportPath), "utf8")), report);
+
+    const beforeUnsafe = await readPackageFiles(packageDir);
+    await assert.rejects(
+      () =>
+        writeMappingPackage(packageDir, result, {
+          protectedPaths: [fixture.sourceDir],
+          extraArtifacts: {
+            [reportPath]: { ...report, payload: "fixture@example.test" },
+          },
+        }),
+      /sensivel/i,
+    );
+    assert.deepEqual(await readPackageFiles(packageDir), beforeUnsafe);
+
+    await assert.rejects(
+      () =>
+        writeMappingPackage(packageDir, result, {
+          protectedPaths: [fixture.sourceDir],
+          extraArtifacts: { "reports/outro.json": report },
+        }),
+      /allow-list|artefato extra/i,
+    );
+    assert.deepEqual(await readPackageFiles(packageDir), beforeUnsafe);
+
+    const baseAdapter = createNodeFileSystemAdapter();
+    const reportWriteFailure = {
+      ...baseAdapter,
+      async writeFile(target, content, encoding) {
+        if (target.endsWith(reportPath)) throw new Error("injected-report-write-failure");
+        return baseAdapter.writeFile(target, content, encoding);
+      },
+    };
+    await assert.rejects(
+      () =>
+        writeMappingPackage(packageDir, result, {
+          protectedPaths: [fixture.sourceDir],
+          extraArtifacts: { [reportPath]: { ...report, availability: "partial" } },
+          fileSystem: reportWriteFailure,
+        }),
+      /pacote anterior preservado|commit atômico/i,
+    );
+    assert.deepEqual(await readPackageFiles(packageDir), beforeUnsafe);
+
+    await writeMappingPackage(packageDir, result, { protectedPaths: [fixture.sourceDir] });
+    await assert.rejects(() => readFile(path.join(packageDir, reportPath), "utf8"), /ENOENT/);
+  });
+});
+
 test("writeMappingPackage rejeita resultado forjado antes de escrever e preserva pacote anterior", async () => {
   await withSandbox(async (directory) => {
     const fixture = await createFixture(directory);
