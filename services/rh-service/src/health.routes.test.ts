@@ -16,6 +16,7 @@ describe("rh-service", () => {
     const env = {
       port: 3034,
       databaseUrl: "postgresql://localhost/rh_test",
+      databasePoolMax: 5,
       jwtSecret: "test-jwt-secret",
       nodeEnv: "test",
       logLevel: "silent",
