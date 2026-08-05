@@ -462,6 +462,21 @@ await runTest("regularize process selection follows the visible page and gives e
   assert.match(pageSource, /processSelectionOrigin === "manual"/);
 });
 
+await runTest("regularize process eye opens a centered detail dialog", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog";/);
+  assert.match(pageSource, /const \[isProcessDetailDialogOpen, setIsProcessDetailDialogOpen\] = useState\(false\);/);
+  assert.match(pageSource, /function openProcessDetail\(processId: RegularizeId\)/);
+  assert.match(pageSource, /setIsProcessDetailDialogOpen\(true\)/);
+  assert.match(pageSource, /title="Ver detalhe"[\s\S]{0,180}openProcessDetail\(item\.id\)/);
+  assert.match(pageSource, /<Dialog[\s\S]{0,220}open=\{isProcessDetailDialogOpen\}/);
+  assert.match(pageSource, /title="Detalhes do processo"/);
+  assert.match(pageSource, /onOpenChange=\{setIsProcessDetailDialogOpen\}/);
+  assert.match(pageSource, /label="Tipo"/);
+  assert.match(pageSource, /label="Urgência"/);
+});
+
 await runTest("regularize manually selected process detail is safely focused on narrow viewports", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
 
