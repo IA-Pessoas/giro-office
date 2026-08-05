@@ -35,8 +35,7 @@ router.post(
       }
 
       const body = parseWithZod(createMessageBodySchema, req.body);
-      const canUseWorkflowMessages = canUseRhWorkflowMessages(req);
-      if (!canUseWorkflowMessages && body.type !== "Message") {
+      if (!canUseRhWorkflowMessages(req) && body.type !== "Message") {
         throw new ServiceError(403, "RH Visualizador pode enviar somente mensagens.");
       }
 
@@ -48,7 +47,6 @@ router.post(
         type: body.type,
         ...(body.attachment !== undefined ? { attachment: body.attachment } : {}),
         can_manage_rh: canManageRh(req),
-        can_use_workflow_messages: canUseWorkflowMessages,
       });
 
       res.status(200).json(createSuccessResponse(result));

@@ -95,26 +95,4 @@ describe("MessageService", () => {
 
     expect(result).toBe(created);
   });
-
-  it("create rejeita workflow para RH Visualizador", async () => {
-    prismaMock.rhRequest.findFirst.mockResolvedValue({
-      id: "req-1",
-      title: "Pedido",
-      requester_user_id: "user-1",
-      assigned_to_user_id: "user-2",
-    });
-
-    const service = new MessageService();
-    await expect(
-      service.create({
-        organization_id: "org-1",
-        sender_user_id: "user-1",
-        request_id: "req-1",
-        message: "SoluÃ§Ã£o",
-        type: "Solution",
-        can_use_workflow_messages: false,
-      }),
-    ).rejects.toMatchObject({ statusCode: 403 });
-    expect(prismaMock.rhMessage.create).not.toHaveBeenCalled();
-  });
 });

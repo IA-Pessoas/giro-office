@@ -47,7 +47,7 @@ describe("message routes", () => {
 
     expect(res.status).toBe(200);
     expect(messageServiceMock.create).toHaveBeenCalledWith(
-      expect.objectContaining({ can_use_workflow_messages: true }),
+      expect.objectContaining({ type: "Solution" }),
     );
   });
 
