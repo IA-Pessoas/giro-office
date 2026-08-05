@@ -777,11 +777,18 @@ test("writeMappingPackage gera artefatos determinísticos e sem linha ou payload
         "preflight/summary.json",
         "quarantine/reasons.csv",
         "quarantine/summary.json",
+        "reports/semantic-decisions.json",
       ],
     );
     const serialized = [...firstFiles.values()].join("\n");
     assert.doesNotMatch(serialized, /SENTINEL_RAW_SECRET|rawValue|payload|INSERT INTO/i);
     assert.match(firstFiles.get("quarantine/reasons.csv"), /legacy\.multi,derived/);
+    assert.deepEqual(
+      JSON.parse(firstFiles.get("reports/semantic-decisions.json")),
+      [...fixture.evidenceRegistry.values()].sort((left, right) =>
+        left.sourceTable.localeCompare(right.sourceTable),
+      ),
+    );
     const destinations = JSON.parse(firstFiles.get("mapping/destinations.json"));
     const merge = destinations.find(({ stepId }) => stepId === "merge");
     assert.deepEqual(merge.identity, {

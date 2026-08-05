@@ -1,0 +1,2 @@
+# Os CSVs auditaveis usam CRLF conforme RFC 4180; preserve os bytes hasheados no manifest.
+*.csv -text -eol whitespace=cr-at-eol

@@ -289,7 +289,7 @@ export async function writeMappingPackage(
   }
   await assertSafePackagePath({ packageDir, protectedPaths });
   validateMappingCompleteness(result, provenance.bindings);
-  const artifacts = buildArtifacts(result);
+  const artifacts = buildArtifacts(result, provenance.bindings);
   addExtraArtifacts(artifacts, extraArtifacts, provenance.bindings);
   for (const [relativePath, content] of artifacts) {
     try {
@@ -1070,7 +1070,7 @@ function setEmissionCount(registry, count) {
   };
 }
 
-function buildArtifacts(result) {
+function buildArtifacts(result, { evidenceRegistry }) {
   const tables = sortTableMappings(result.tableMappings.map(pickTableMapping));
   const destinations = sortDestinationMappings(
     result.destinationMappings.map(pickDestinationMapping),
@@ -1100,6 +1100,14 @@ function buildArtifacts(result) {
     serializeStableJson(pickQuarantineSummary(result.quarantineSummary)),
   );
   files.set("quarantine/reasons.csv", serializeCsv(QUARANTINE_COLUMNS, reasons));
+  files.set(
+    "reports/semantic-decisions.json",
+    serializeStableJson(
+      [...evidenceRegistry.values()].sort((left, right) =>
+        compareText(left.sourceTable, right.sourceTable),
+      ),
+    ),
+  );
   return files;
 }
 

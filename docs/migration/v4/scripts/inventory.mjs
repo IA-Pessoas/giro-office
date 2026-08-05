@@ -1,3 +1,4 @@
+import { writeSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { buildSourceInventory } from "./lib/source-inventory.mjs";
 import { writeStableJson } from "./lib/stable-output.mjs";
@@ -67,8 +68,6 @@ function formatError(error) {
 try {
   await main();
 } catch (error) {
-  await new Promise((resolve) => {
-    process.stderr.write(`${formatError(error)}\n`, resolve);
-  });
+  writeSync(process.stderr.fd, `${formatError(error)}\n`);
   process.exitCode = 1;
 }

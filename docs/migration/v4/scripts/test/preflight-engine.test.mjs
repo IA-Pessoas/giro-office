@@ -58,6 +58,61 @@ test("runPreflight valida cenário limpo por destination step em transação REA
     assert.match(text, /^(?:SELECT|WITH)\b/);
     assert.equal(query?.name, undefined);
   }
+  const uniqueIndexesQuery = client.history.find((query) =>
+    (typeof query === "string" ? query : query.text).includes("pg_catalog.pg_index"),
+  );
+  assert.ok(uniqueIndexesQuery);
+  assert.match(
+    typeof uniqueIndexesQuery === "string" ? uniqueIndexesQuery : uniqueIndexesQuery.text,
+    /pg_catalog\.generate_series\(0, index_metadata\.indnkeyatts - 1\) AS key_position/,
+  );
+  assert.doesNotMatch(
+    typeof uniqueIndexesQuery === "string" ? uniqueIndexesQuery : uniqueIndexesQuery.text,
+    /key_column\.unnest|key_position\.generate_series/,
+  );
+});
+
+test("runPreflight aceita QueryResult real com rows próprio e prototype do pg", async () => {
+  const client = createCatalogClient();
+  const query = client.query.bind(client);
+  client.query = async (...args) => {
+    const result = await query(...args);
+    return new PgResultFixture(result);
+  };
+
+  const report = await runPreflight({
+    client,
+    mappingPackage: createMappingPackage(),
+    prismaCatalog: createPrismaCatalog(),
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+
+  assert.equal(report.transactionMode, "READ ONLY");
+  assert.equal(report.writesPerformed, false);
+});
+
+class PgResultFixture {
+  constructor(result) {
+    Object.assign(this, result);
+  }
+}
+
+test("runPreflight aceita pontuação segura em nomes de constraint que não entram em SQL", async () => {
+  const constraintRows = createConstraintRows().map((row) => ({
+    ...row,
+    constraint_name: row.constraint_name.replaceAll("_", "-"),
+  }));
+  const report = await runPreflight({
+    client: createCatalogClient({ constraintRows }),
+    mappingPackage: createMappingPackage(),
+    prismaCatalog: createPrismaCatalog(),
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+
+  assert.equal(report.transactionMode, "READ ONLY");
+  assert.equal(report.writesPerformed, false);
 });
 
 test("runPreflight bloqueia divergências de tabela, coluna, tipo, nulo, unique, FK e Prisma", async () => {
@@ -388,7 +443,11 @@ test("runPreflight reconhece CREATE UNIQUE INDEX simples e composto sem INCLUDE 
   assert.match(indexQuery.text, /indisvalid/);
   assert.match(indexQuery.text, /indisready/);
   assert.match(indexQuery.text, /indnullsnotdistinct/);
-  assert.match(indexQuery.text, /ordinality <= .*indnkeyatts/);
+  assert.match(
+    indexQuery.text,
+    /pg_catalog\.generate_series\(0, index_metadata\.indnkeyatts - 1\)/,
+  );
+  assert.match(indexQuery.text, /key_position\.key_position/);
   const conflictQueries = client.history.filter(
     (query) =>
       typeof query !== "string" && query.text.includes("intra_batch_unique_conflict_count"),

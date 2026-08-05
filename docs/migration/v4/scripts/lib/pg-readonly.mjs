@@ -52,7 +52,7 @@ const FORBIDDEN_FUNCTIONS = new Set([
   "PG_TRY_ADVISORY_LOCK",
   "SETVAL",
 ]);
-const ALLOWED_READ_ONLY_FUNCTIONS = new Set(["ANY", "COUNT", "UNNEST"]);
+const ALLOWED_READ_ONLY_FUNCTIONS = new Set(["ANY", "COUNT", "GENERATE_SERIES", "UNNEST"]);
 const PARENTHESIZED_SQL_KEYWORDS = new Set(["AS", "EXISTS", "FILTER", "FROM", "IN"]);
 
 export async function loadPg() {

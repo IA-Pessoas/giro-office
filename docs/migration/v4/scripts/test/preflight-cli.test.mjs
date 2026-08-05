@@ -100,6 +100,30 @@ test("CLI usa DATABASE_URL, grava somente o relatório e mantém exit 0 com pend
   ]);
 });
 
+test("CLI aceita coluna derivada sem sourceColumn no pacote canônico", async (t) => {
+  const directory = await createPackage(t, { pending: true });
+  await mutateJson(directory, "mapping/destinations.json", (destinations) => {
+    destinations[0].columns[0].sourceColumn = null;
+  });
+  await mutateJson(directory, "mapping/columns.json", (columns) => {
+    columns[0].sourceColumn = null;
+  });
+  const io = createIo();
+  const exitCode = await runCli({
+    args: validArguments(directory),
+    env: { DATABASE_URL: createDatabaseUrl("derived-column-fixture-password") },
+    expectedPrismaPath: PRISMA_FIXTURE,
+    ...io,
+    createClient: async () => createReadOnlyFakeClient(),
+  });
+
+  assert.equal(exitCode, 0);
+  assert.doesNotMatch(
+    `${io.stdout.text}${io.stderr.text}`,
+    /derived-column-fixture-password|postgresql:\/\//i,
+  );
+});
+
 test("CLI usa DIRECT_URL como fallback e falha tecnicamente sem revelar conexão", async (t) => {
   const directory = await createPackage(t);
   const directUrl = createDatabaseUrl("direct-fixture-password");

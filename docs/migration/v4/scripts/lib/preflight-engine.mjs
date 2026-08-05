@@ -211,7 +211,7 @@ async function loadDatabaseCatalog(transaction) {
       "SELECT namespace.nspname AS table_schema, table_class.relname AS table_name,",
       "index_class.relname AS index_name, attribute.attname AS column_name,",
       "index_metadata.indnullsnotdistinct AS nulls_not_distinct,",
-      "key_column.ordinality AS ordinal_position",
+      "key_position.key_position + 1 AS ordinal_position",
       "FROM pg_catalog.pg_index index_metadata",
       "JOIN pg_catalog.pg_class table_class",
       "ON table_class.oid = index_metadata.indrelid",
@@ -219,20 +219,18 @@ async function loadDatabaseCatalog(transaction) {
       "ON index_class.oid = index_metadata.indexrelid",
       "JOIN pg_catalog.pg_namespace namespace",
       "ON namespace.oid = table_class.relnamespace",
-      "CROSS JOIN LATERAL unnest(index_metadata.indkey)",
-      "WITH ORDINALITY AS key_column",
+      "CROSS JOIN LATERAL pg_catalog.generate_series(0, index_metadata.indnkeyatts - 1) AS key_position",
       "JOIN pg_catalog.pg_attribute attribute",
       "ON attribute.attrelid = index_metadata.indrelid",
-      "AND attribute.attnum = key_column.unnest",
+      "AND attribute.attnum = index_metadata.indkey[key_position.key_position]",
       "WHERE namespace.nspname = $1",
       "AND index_metadata.indisunique",
       "AND index_metadata.indisvalid",
       "AND index_metadata.indisready",
       "AND index_metadata.indpred IS NULL",
       "AND index_metadata.indexprs IS NULL",
-      "AND key_column.unnest > 0",
-      "AND key_column.ordinality <= index_metadata.indnkeyatts",
-      "ORDER BY table_class.relname, index_class.relname, key_column.ordinality",
+      "AND index_metadata.indkey[key_position.key_position] > 0",
+      "ORDER BY table_class.relname, index_class.relname, key_position.key_position",
     ].join(" "),
     values: [DATABASE_SCHEMA],
   });
@@ -267,7 +265,7 @@ async function loadDatabaseCatalog(transaction) {
       throw new Error("Catálogo PostgreSQL retornou constraint de schema inesperado.");
     }
     const tableName = requireDatabaseName(row.table_name, "table_name");
-    const constraintName = requireDatabaseName(row.constraint_name, "constraint_name");
+    const constraintName = requireCatalogObjectName(row.constraint_name, "constraint_name");
     const key = `${tableName}\0${constraintName}`;
     const entry = constraints.get(key) ?? {
       columns: [],
@@ -314,7 +312,7 @@ async function loadDatabaseCatalog(transaction) {
       throw new Error("Catálogo PostgreSQL retornou índice unique de schema inesperado.");
     }
     const tableName = requireDatabaseName(row.table_name, "table_name");
-    const indexName = requireDatabaseName(row.index_name, "index_name");
+    const indexName = requireCatalogObjectName(row.index_name, "index_name");
     const key = `${tableName}\0${indexName}`;
     const nullsNotDistinct = parseBoolean(row.nulls_not_distinct, "nulls_not_distinct");
     const index = uniqueIndexes.get(key) ?? { columns: [], nullsNotDistinct, tableName };
@@ -1052,7 +1050,10 @@ function normalizeColumnMapping(column) {
       column.destinationTable,
       "columnMappings.destinationTable",
     ),
-    sourceColumn: requireIdentifier(column.sourceColumn, "columnMappings.sourceColumn"),
+    sourceColumn:
+      column.sourceColumn === null
+        ? null
+        : requireIdentifier(column.sourceColumn, "columnMappings.sourceColumn"),
     sourceTable: requireTechnicalName(column.sourceTable, "columnMappings.sourceTable"),
     stepId: requireTechnicalName(column.stepId, "columnMappings.stepId"),
   };
@@ -1307,10 +1308,20 @@ function orderedNames(entries) {
 }
 
 function requireRows(result, label) {
-  if (!isPlainObject(result) || !Array.isArray(result.rows)) {
+  const rowsDescriptor =
+    result !== null && typeof result === "object"
+      ? Object.getOwnPropertyDescriptor(result, "rows")
+      : undefined;
+  if (
+    rowsDescriptor === undefined ||
+    rowsDescriptor.get !== undefined ||
+    rowsDescriptor.set !== undefined ||
+    !Array.isArray(rowsDescriptor.value) ||
+    Object.getPrototypeOf(rowsDescriptor.value) !== Array.prototype
+  ) {
     throw new Error(`Resposta PostgreSQL inválida para ${label}.`);
   }
-  return result.rows;
+  return rowsDescriptor.value;
 }
 
 function requireArray(value, label) {
@@ -1342,6 +1353,18 @@ function requireIdentifier(value, label) {
 
 function requireDatabaseName(value, label) {
   if (typeof value !== "string" || !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(value)) {
+    throw new TypeError(`${label} inválido.`);
+  }
+  return value;
+}
+
+function requireCatalogObjectName(value, label) {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 256 ||
+    /[\0-\x1f\x7f]/.test(value)
+  ) {
     throw new TypeError(`${label} inválido.`);
   }
   return value;
