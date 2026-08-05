@@ -67,6 +67,41 @@ function preparedEmission(overrides = {}) {
   };
 }
 
+function executionContractFor(...stepIds) {
+  return typedExecutionContractFor(...stepIds);
+}
+
+function typedCondition(stepId, outcome) {
+  return {
+    stepId,
+    outcome,
+    conditionId: `${stepId}:${outcome}`,
+    predicate: {
+      kind: "decision_outcome_equals",
+      source: "emit_rows",
+      value: outcome,
+    },
+  };
+}
+
+function typedExecutionContractFor(...stepIds) {
+  return {
+    contextMode: "context_free",
+    steps: Object.fromEntries(
+      stepIds.map((stepId) => [
+        stepId,
+        {
+          contextRequirements: [],
+          decisionSource: "emit_rows",
+          preparedWhen: typedCondition(stepId, "prepared"),
+          quarantineWhen: typedCondition(stepId, "quarantine"),
+          notEmittedWhen: typedCondition(stepId, "not_emitted"),
+        },
+      ]),
+    ),
+  };
+}
+
 function validRule(overrides = {}) {
   return {
     sourceTable: "tb_legacy.workspaces",
@@ -126,6 +161,120 @@ test("validateMappingRuleStructure valida contrato sem executar ou substituir ca
   assert.equal(calls, 0);
   assert.equal(rule.classifySourceRow, classifySourceRow);
   assert.equal(rule.emitRows, emitRows);
+});
+
+test("ExecutionContract exige contrato declarativo exato e estruturado para cada stepId", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+  const contract = executionContractFor("workspace-insert");
+
+  assert.equal(
+    validateMappingRuleStructure(validRule({ executionContract: contract }), catalog),
+    true,
+  );
+  assert.throws(
+    () =>
+      validateMappingRuleStructure(
+        validRule({ executionContract: executionContractFor() }),
+        catalog,
+      ),
+    /executioncontract.*(?:ausente|cobertura).*workspace-insert/i,
+  );
+  assert.throws(
+    () =>
+      validateMappingRuleStructure(
+        validRule({ executionContract: executionContractFor("workspace-insert", "extra") }),
+        catalog,
+      ),
+    /executioncontract.*(?:extra|desconhecido)/i,
+  );
+
+  const freeForm = structuredClone(contract);
+  freeForm.steps["workspace-insert"].preparedWhen = "source row satisfies mapping";
+  assert.throws(
+    () => validateMappingRuleStructure(validRule({ executionContract: freeForm }), catalog),
+    /preparedWhen.*objeto/i,
+  );
+});
+
+test("ExecutionContract aceita predicados tipados vinculados a stepId e outcome", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+  const memberStep = destinationStep({
+    stepId: "member-insert",
+    destinationTable: "members_table",
+    columns: [mappedColumn({ destinationColumn: "workspace_id" })],
+  });
+  const rule = validRule({
+    cardinality: "1:N",
+    destinations: [destinationStep(), memberStep],
+    executionContract: typedExecutionContractFor("workspace-insert", "member-insert"),
+  });
+
+  assert.equal(validateMappingRuleStructure(rule, catalog), true);
+  assert.deepEqual(rule.executionContract.steps["workspace-insert"].preparedWhen.predicate, {
+    kind: "decision_outcome_equals",
+    source: "emit_rows",
+    value: "prepared",
+  });
+});
+
+test("ExecutionContract rejeita condição copiada entre steps ou outcomes", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+  const memberStep = destinationStep({
+    stepId: "member-insert",
+    destinationTable: "members_table",
+    columns: [mappedColumn({ destinationColumn: "workspace_id" })],
+  });
+  const destinations = [destinationStep(), memberStep];
+
+  const copiedStep = typedExecutionContractFor("workspace-insert", "member-insert");
+  copiedStep.steps["member-insert"].preparedWhen = structuredClone(
+    copiedStep.steps["workspace-insert"].preparedWhen,
+  );
+  assert.throws(
+    () =>
+      validateMappingRuleStructure(
+        validRule({ cardinality: "1:N", destinations, executionContract: copiedStep }),
+        catalog,
+      ),
+    /preparedWhen.*stepId.*member-insert/i,
+  );
+
+  const copiedOutcome = typedExecutionContractFor("workspace-insert");
+  copiedOutcome.steps["workspace-insert"].quarantineWhen = structuredClone(
+    copiedOutcome.steps["workspace-insert"].preparedWhen,
+  );
+  assert.throws(
+    () => validateMappingRuleStructure(validRule({ executionContract: copiedOutcome }), catalog),
+    /quarantineWhen.*outcome.*quarantine/i,
+  );
+});
+
+test("ExecutionContract exige conditionId único e predicate completo não ambíguo", async () => {
+  const catalog = await loadPrismaCatalog(fixturePath);
+  const memberStep = destinationStep({
+    stepId: "member-insert",
+    destinationTable: "members_table",
+    columns: [mappedColumn({ destinationColumn: "workspace_id" })],
+  });
+  const destinations = [destinationStep(), memberStep];
+  const duplicate = typedExecutionContractFor("workspace-insert", "member-insert");
+  duplicate.steps["member-insert"].preparedWhen.conditionId =
+    duplicate.steps["workspace-insert"].preparedWhen.conditionId;
+  assert.throws(
+    () =>
+      validateMappingRuleStructure(
+        validRule({ cardinality: "1:N", destinations, executionContract: duplicate }),
+        catalog,
+      ),
+    /conditionId.*duplicado/i,
+  );
+
+  const ambiguous = typedExecutionContractFor("workspace-insert");
+  delete ambiguous.steps["workspace-insert"].notEmittedWhen.predicate.value;
+  assert.throws(
+    () => validateMappingRuleStructure(validRule({ executionContract: ambiguous }), catalog),
+    /predicate.*value/i,
+  );
 });
 
 test("merge N:1 prioriza vínculo legado explícito antes de lookup natural", async () => {

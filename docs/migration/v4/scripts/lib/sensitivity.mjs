@@ -7,8 +7,19 @@ const CREDENTIAL_URL_PATTERN = /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/i;
 const EMAIL_PATTERN = /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/i;
 const CPF_PATTERN = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/;
 const CNPJ_PATTERN = /\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/;
-const PHONE_PATTERN =
-  /(?:\+?55[\s.-]+\(?\d{2}\)?[\s.-]*9?\d{4}[\s.-]+\d{4}|\(\d{2}\)[\s.-]*9?\d{4}[\s.-]+\d{4}|\b\d{2}[\s.-]+9?\d{4}[\s.-]+\d{4}\b)/;
+const BRAZIL_DDD_PATTERN =
+  "(?:1[1-9]|2[12478]|3[1-578]|4[1-9]|5[13-5]|6[1-9]|7[134579]|8[1-9]|9[1-9])";
+const BRAZIL_LOCAL_CONTIGUOUS_PATTERN = "(?:[2-9]\\d{7}|9\\d{8})";
+const BRAZIL_LOCAL_FORMATTED_PATTERN = "(?:[2-9]\\d{3}[\\s.-]+\\d{4}|9\\d{4}[\\s.-]+\\d{4})";
+const PHONE_PATTERN = new RegExp(
+  [
+    `(?<![A-Za-z0-9])\\+55${BRAZIL_DDD_PATTERN}${BRAZIL_LOCAL_CONTIGUOUS_PATTERN}(?![A-Za-z0-9])`,
+    `(?<![A-Za-z0-9])${BRAZIL_DDD_PATTERN}${BRAZIL_LOCAL_CONTIGUOUS_PATTERN}(?![A-Za-z0-9])`,
+    `(?<![A-Za-z0-9])\\+?55[\\s.-]+\\(?${BRAZIL_DDD_PATTERN}\\)?[\\s.-]*${BRAZIL_LOCAL_FORMATTED_PATTERN}(?![A-Za-z0-9])`,
+    `(?<![A-Za-z0-9])\\(${BRAZIL_DDD_PATTERN}\\)[\\s.-]*${BRAZIL_LOCAL_FORMATTED_PATTERN}(?![A-Za-z0-9])`,
+    `(?<![A-Za-z0-9])${BRAZIL_DDD_PATTERN}[\\s.-]+${BRAZIL_LOCAL_FORMATTED_PATTERN}(?![A-Za-z0-9])`,
+  ].join("|"),
+);
 const JWT_CANDIDATE_PATTERN = /([a-z0-9_-]+)\.([a-z0-9_-]+)\.([a-z0-9_-]+)/gi;
 const PEM_OR_PFX_PATTERN = /-----BEGIN [A-Z0-9 #_-]+-----/i;
 const ENCODED_KEY_MATERIAL_PATTERN =
@@ -84,9 +95,9 @@ export function assertNoSensitiveSerializedContent(content) {
 function serializedSensitivityReason(content) {
   if (CREDENTIAL_URL_PATTERN.test(content)) return "CREDENTIAL_URL";
   if (EMAIL_PATTERN.test(content)) return "EMAIL";
+  if (PHONE_PATTERN.test(content)) return "PHONE";
   if (CPF_PATTERN.test(content)) return "CPF";
   if (CNPJ_PATTERN.test(content)) return "CNPJ";
-  if (PHONE_PATTERN.test(content)) return "PHONE";
   if (KEYED_PERSONAL_VALUE_PATTERN.test(content)) return "KEYED_PERSONAL_VALUE";
   if (hasPlausibleJwt(content)) return "JWT";
   if (PEM_OR_PFX_PATTERN.test(content)) return "PEM";

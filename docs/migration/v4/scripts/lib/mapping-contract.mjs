@@ -79,7 +79,6 @@ export function validateMappingRuleStructure(rule, prismaCatalog) {
     throw new Error(`Cardinality inválida: ${String(rule?.cardinality)}`);
   }
   validateDependencies(rule?.dependencies);
-  validateExecutionContract(rule?.executionContract);
   if (!Array.isArray(rule?.destinations) || rule.destinations.length === 0) {
     throw new Error("destinations deve ser um array não vazio");
   }
@@ -99,6 +98,7 @@ export function validateMappingRuleStructure(rule, prismaCatalog) {
     validateDestinationStep(step, prismaCatalog);
     stepsById.set(step.stepId, step);
   }
+  validateExecutionContract(rule.executionContract, stepsById);
 
   return true;
 }
@@ -108,30 +108,80 @@ export function validateMappingEmissions(rule, emissions) {
   return validateEmissionDecisions(emissions, stepsById);
 }
 
-function validateExecutionContract(contract) {
+function validateExecutionContract(contract, stepsById) {
   if (contract === undefined) return;
-  assertExactFields(
-    contract,
-    ["contextMode", "contextRequirements", "emissionConditions"],
-    "ExecutionContract",
-  );
+  assertExactFields(contract, ["contextMode", "steps"], "ExecutionContract");
   if (contract.contextMode !== "context_free") {
     throw new Error("ExecutionContract desta fase aceita somente context_free explícito");
   }
-  validateStringArray(contract.contextRequirements, "contextRequirements", { allowEmpty: true });
-  if (contract.contextRequirements.length !== 0) {
-    throw new Error("ExecutionContract context_free não aceita contextRequirements");
+  if (!isPlainObject(contract.steps)) {
+    throw new TypeError("ExecutionContract.steps deve ser um objeto por stepId");
   }
+
+  for (const stepId of stepsById.keys()) {
+    if (!Object.hasOwn(contract.steps, stepId)) {
+      throw new Error(`ExecutionContract possui cobertura ausente para ${stepId}`);
+    }
+  }
+  const conditionIds = new Set();
+  for (const stepId of Object.keys(contract.steps)) {
+    if (!stepsById.has(stepId)) {
+      throw new Error(`ExecutionContract possui stepId extra ou desconhecido: ${stepId}`);
+    }
+    validateStepExecutionContract(contract.steps[stepId], stepId, conditionIds);
+  }
+}
+
+function validateStepExecutionContract(contract, stepId, conditionIds) {
+  const label = `ExecutionContract.steps.${stepId}`;
   assertExactFields(
-    contract.emissionConditions,
-    ["kind", "prepared", "quarantine", "notEmitted"],
-    "EmissionConditions",
+    contract,
+    ["contextRequirements", "decisionSource", "preparedWhen", "quarantineWhen", "notEmittedWhen"],
+    label,
   );
-  if (contract.emissionConditions.kind !== "declarative") {
-    throw new Error("ExecutionContract exige EmissionConditions declarativa");
+  validateStringArray(contract.contextRequirements, `${label}.contextRequirements`, {
+    allowEmpty: true,
+  });
+  if (contract.contextRequirements.length !== 0) {
+    throw new Error(`${label} context_free não aceita contextRequirements`);
   }
-  for (const field of ["prepared", "quarantine", "notEmitted"]) {
-    assertNonEmptyString(contract.emissionConditions[field], `EmissionConditions.${field}`);
+  if (contract.decisionSource !== "emit_rows") {
+    throw new Error(`${label}.decisionSource deve ser emit_rows`);
+  }
+  for (const [field, outcome] of [
+    ["preparedWhen", "prepared"],
+    ["quarantineWhen", "quarantine"],
+    ["notEmittedWhen", "not_emitted"],
+  ]) {
+    validateExecutionCondition(contract[field], {
+      conditionIds,
+      field: `${label}.${field}`,
+      outcome,
+      stepId,
+    });
+  }
+}
+
+function validateExecutionCondition(condition, { conditionIds, field, outcome, stepId }) {
+  assertExactFields(condition, ["stepId", "outcome", "conditionId", "predicate"], field);
+  if (condition.stepId !== stepId) {
+    throw new Error(`${field}.stepId deve coincidir com ${stepId}`);
+  }
+  if (condition.outcome !== outcome) {
+    throw new Error(`${field}.outcome deve coincidir com ${outcome}`);
+  }
+  assertSafeReference(condition.conditionId, `${field}.conditionId`);
+  if (conditionIds.has(condition.conditionId)) {
+    throw new Error(`${field}.conditionId duplicado`);
+  }
+  conditionIds.add(condition.conditionId);
+  assertExactFields(condition.predicate, ["kind", "source", "value"], `${field}.predicate`);
+  if (
+    condition.predicate.kind !== "decision_outcome_equals" ||
+    condition.predicate.source !== "emit_rows" ||
+    condition.predicate.value !== outcome
+  ) {
+    throw new Error(`${field}.predicate deve vincular emit_rows ao outcome ${outcome}`);
   }
 }
 

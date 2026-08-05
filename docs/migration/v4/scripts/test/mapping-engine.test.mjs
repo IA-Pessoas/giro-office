@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import { mkdirSync, renameSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -97,16 +98,33 @@ function emission(stepId, destinationTable, status, identityRef, reasonCode = nu
   };
 }
 
-function explicitContextFreeContract() {
+function explicitCondition(stepId, outcome) {
+  return {
+    stepId,
+    outcome,
+    conditionId: `${stepId}:${outcome}`,
+    predicate: {
+      kind: "decision_outcome_equals",
+      source: "emit_rows",
+      value: outcome,
+    },
+  };
+}
+
+function explicitStepContract(stepId) {
+  return {
+    contextRequirements: [],
+    decisionSource: "emit_rows",
+    preparedWhen: explicitCondition(stepId, "prepared"),
+    quarantineWhen: explicitCondition(stepId, "quarantine"),
+    notEmittedWhen: explicitCondition(stepId, "not_emitted"),
+  };
+}
+
+function explicitContextFreeContract(stepIds = ["insert", "merge", "derived", "aggregate"]) {
   return {
     contextMode: "context_free",
-    contextRequirements: [],
-    emissionConditions: {
-      kind: "declarative",
-      prepared: "source row satisfies the step mapping",
-      quarantine: "declared field or reference validation fails",
-      notEmitted: "declared destination condition does not apply",
-    },
+    steps: Object.fromEntries(stepIds.map((stepId) => [stepId, explicitStepContract(stepId)])),
   };
 }
 
@@ -145,14 +163,11 @@ function pendingEvidence(sourceTable) {
 async function createFixture(directory) {
   const sourceDir = path.join(directory, "source");
   await mkdir(sourceDir, { recursive: true });
-  await writeFile(
-    path.join(sourceDir, "legacy.multi.sql"),
-    "INSERT INTO `legacy.multi` (`id`, `password`) VALUES (1, 'SENTINEL_RAW_SECRET'), (2, 'SENTINEL_RAW_SECRET_2');\n",
-  );
-  await writeFile(
-    path.join(sourceDir, "legacy.pending.sql"),
-    "CONTEUDO INVALIDO QUE NAO DEVE SER LIDO;\n",
-  );
+  const confirmedDump =
+    "INSERT INTO `legacy.multi` (`id`, `password`) VALUES (1, 'SENTINEL_RAW_SECRET'), (2, 'SENTINEL_RAW_SECRET_2');\n";
+  const pendingDump = "CONTEUDO INVALIDO QUE NAO DEVE SER LIDO;\n";
+  await writeFile(path.join(sourceDir, "legacy.multi.sql"), confirmedDump);
+  await writeFile(path.join(sourceDir, "legacy.pending.sql"), pendingDump);
 
   const destinations = [
     step({
@@ -230,8 +245,8 @@ async function createFixture(directory) {
         sourceTable: "legacy.multi",
         fileName: "legacy.multi.sql",
         relativePath: "legacy.multi.sql",
-        fileSizeBytes: 120,
-        sha256: "a".repeat(64),
+        fileSizeBytes: Buffer.byteLength(confirmedDump),
+        sha256: crypto.createHash("sha256").update(confirmedDump).digest("hex"),
         columns: ["id", "password"],
         rowCount: 2,
         insertStatementCount: 1,
@@ -242,8 +257,8 @@ async function createFixture(directory) {
         sourceTable: "legacy.pending",
         fileName: "legacy.pending.sql",
         relativePath: "legacy.pending.sql",
-        fileSizeBytes: 40,
-        sha256: "b".repeat(64),
+        fileSizeBytes: Buffer.byteLength(pendingDump),
+        sha256: crypto.createHash("sha256").update(pendingDump).digest("hex"),
         columns: [],
         rowCount: 7,
         insertStatementCount: 0,
@@ -274,6 +289,14 @@ function contextProviderFor(fixture) {
 
 function buildFixtureMapping(fixture) {
   return buildMapping({ ...fixture, capabilities: contextProviderFor(fixture) });
+}
+
+async function replaceDumpAndInventory(fixture, sourceTable, content, rowCount) {
+  const inspection = fixture.inventory.tables.find((table) => table.sourceTable === sourceTable);
+  await writeFile(path.join(fixture.sourceDir, inspection.relativePath), content);
+  inspection.fileSizeBytes = Buffer.byteLength(content);
+  inspection.sha256 = crypto.createHash("sha256").update(content).digest("hex");
+  inspection.rowCount = rowCount;
 }
 
 async function readPackageFiles(packageDir) {
@@ -335,6 +358,156 @@ test("buildMapping fecha insert, merge, derived e aggregate por linha sem reter 
     assert.equal(result.preflightComplete, false);
     assert.equal(result.readyForMigration, false);
     assert.doesNotMatch(JSON.stringify(result), /SENTINEL_RAW_SECRET|password/i);
+  });
+});
+
+test("buildMapping valida hash e tamanho de todas as origens, inclusive pending", async () => {
+  await withSandbox(async (directory) => {
+    for (const sourceTable of ["legacy.multi", "legacy.pending"]) {
+      const fixture = await createFixture(path.join(directory, sourceTable.replace(".", "-")));
+      const inspection = fixture.inventory.tables.find(
+        (table) => table.sourceTable === sourceTable,
+      );
+      const dumpPath = path.join(fixture.sourceDir, inspection.relativePath);
+      const original = await readFile(dumpPath, "utf8");
+      const altered =
+        sourceTable === "legacy.multi"
+          ? original.replaceAll("SENTINEL", "REPLACED")
+          : `${original}ALTERACAO_SIGILOSA_QUE_NAO_PODE_APARECER_NO_ERRO\n`;
+      if (sourceTable === "legacy.multi") {
+        assert.equal(Buffer.byteLength(altered), Buffer.byteLength(original));
+      }
+      await writeFile(dumpPath, altered);
+      const sensitiveMarker =
+        sourceTable === "legacy.multi" ? "REPLACED_RAW_SECRET" : "ALTERACAO_SIGILOSA";
+
+      await assert.rejects(
+        () => buildFixtureMapping(fixture),
+        (error) => {
+          assert.equal(error.code, "DUMP_INTEGRITY_MISMATCH");
+          assert.equal(error.sourceTable, sourceTable);
+          assert.equal(error.message.includes(sensitiveMarker), false);
+          assert.equal(error.message.includes(fixture.sourceDir), false);
+          assert.equal(JSON.stringify(error).includes(sensitiveMarker), false);
+          return true;
+        },
+      );
+    }
+  });
+});
+
+test("buildMapping aborta troca TOCTOU com mesmo número de linhas sem vazar SQL", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const dumpPath = path.join(fixture.sourceDir, "legacy.multi.sql");
+    const original = await readFile(dumpPath, "utf8");
+    const replacement = original.replaceAll("SENTINEL", "REPLACED");
+    assert.equal(Buffer.byteLength(replacement), Buffer.byteLength(original));
+    let hookCalls = 0;
+
+    await assert.rejects(
+      () =>
+        buildMapping({
+          ...fixture,
+          capabilities: contextProviderFor(fixture),
+          integrityHooks: {
+            async afterInitialValidation({ sourceTable }) {
+              if (sourceTable !== "legacy.multi") return;
+              hookCalls += 1;
+              await writeFile(dumpPath, replacement);
+            },
+          },
+        }),
+      (error) => {
+        assert.equal(error.code, "DUMP_INTEGRITY_CHANGED");
+        assert.equal(error.sourceTable, "legacy.multi");
+        assert.equal(error.message.includes("REPLACED_RAW_SECRET"), false);
+        assert.equal(error.message.includes(fixture.sourceDir), false);
+        assert.equal(JSON.stringify(error).includes("REPLACED_RAW_SECRET"), false);
+        return true;
+      },
+    );
+    assert.equal(hookCalls, 1);
+  });
+});
+
+test("buildMapping não reabre substituto após rename do diretório pai", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const sourceDir = fixture.sourceDir;
+    const displacedDir = path.join(directory, "source-original");
+    const replacementDir = path.join(directory, "source-replacement");
+    const dumpPath = path.join(sourceDir, "legacy.multi.sql");
+    const original = await readFile(dumpPath, "utf8");
+    const replacement = original.replace("(1,", "(7,").replace("(2,", "(8,");
+    assert.equal(Buffer.byteLength(replacement), Buffer.byteLength(original));
+    const observedIds = [];
+    let restored = false;
+    const rule = fixture.ruleRegistry.get("legacy.multi");
+    const originalEmitRows = rule.emitRows;
+    rule.emitRows = (row) => {
+      observedIds.push(row.id);
+      if (!restored) {
+        renameSync(sourceDir, replacementDir);
+        renameSync(displacedDir, sourceDir);
+        restored = true;
+      }
+      return originalEmitRows(row);
+    };
+
+    const result = await buildMapping({
+      ...fixture,
+      capabilities: contextProviderFor(fixture),
+      integrityHooks: {
+        async afterInitialValidation({ sourceTable }) {
+          if (sourceTable !== "legacy.multi") return;
+          renameSync(sourceDir, displacedDir);
+          mkdirSync(sourceDir);
+          await writeFile(path.join(sourceDir, "legacy.multi.sql"), replacement);
+        },
+      },
+    });
+
+    assert.equal(result.tableMappings[0].readRows, 2);
+    assert.deepEqual(observedIds, ["1", "2"]);
+  });
+});
+
+test("buildMapping detecta modificação tardia de origem confirmed e pending", async () => {
+  await withSandbox(async (directory) => {
+    for (const sourceTable of ["legacy.multi", "legacy.pending"]) {
+      const fixture = await createFixture(path.join(directory, sourceTable.replace(".", "-")));
+      const inspection = fixture.inventory.tables.find(
+        (table) => table.sourceTable === sourceTable,
+      );
+      const dumpPath = path.join(fixture.sourceDir, inspection.relativePath);
+      const original = await readFile(dumpPath, "utf8");
+      const altered =
+        sourceTable === "legacy.multi"
+          ? original.replaceAll("SENTINEL", "REPLACED")
+          : original.replace("INVALIDO", "ALTERADO");
+      assert.equal(Buffer.byteLength(altered), Buffer.byteLength(original));
+
+      await assert.rejects(
+        () =>
+          buildMapping({
+            ...fixture,
+            capabilities: contextProviderFor(fixture),
+            integrityHooks: {
+              async beforeFinalValidation() {
+                await writeFile(dumpPath, altered);
+              },
+            },
+          }),
+        (error) => {
+          assert.equal(error.code, "DUMP_INTEGRITY_CHANGED");
+          assert.equal(error.sourceTable, sourceTable);
+          assert.equal(error.message.includes(fixture.sourceDir), false);
+          assert.equal(error.message.includes("REPLACED_RAW_SECRET"), false);
+          return true;
+        },
+      );
+    }
   });
 });
 
@@ -455,6 +628,42 @@ test("regra sem contrato explícito fica preflight_blocked sem chamar callbacks 
   });
 });
 
+test("origem confirmed vazia preserva bloqueio por step com contagem zero no pacote", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    await replaceDumpAndInventory(fixture, "legacy.multi", "-- origem confirmada vazia\n", 0);
+    delete fixture.ruleRegistry.get("legacy.multi").executionContract;
+
+    const result = await buildFixtureMapping(fixture);
+    const packageDir = path.join(directory, "package");
+    await writeMappingPackage(packageDir, result, { protectedPaths: [fixture.sourceDir] });
+
+    assert.equal(result.tableMappings[0].preflightState, "preflight_blocked");
+    assert.equal(result.tableMappings[0].readRows, 0);
+    assert.equal(result.preflightSummary.totalBlockedRows, 0);
+    assert.equal(result.preflightSummary.blockedSources, 1);
+    assert.equal(result.preflightSummary.blockedSteps, 4);
+    assert.equal(result.preflightBlocks.length, 4);
+    assert.equal(
+      result.preflightBlocks.every(({ count }) => count === 0),
+      true,
+    );
+    assert.equal(
+      result.destinationMappings.every(
+        ({ readRows, prepared, quarantine, notEmitted, blockedRows, preflightState }) =>
+          readRows === 0 &&
+          prepared === 0 &&
+          quarantine === 0 &&
+          notEmitted === 0 &&
+          blockedRows === 0 &&
+          preflightState === "preflight_blocked",
+      ),
+      true,
+    );
+    assert.match(await readFile(path.join(packageDir, "preflight/blocked.csv"), "utf8"), /,0\r?$/m);
+  });
+});
+
 test("buildMapping rejeita EvidenceDecision confirmed incompleta antes de ler o dump", async () => {
   await withSandbox(async (directory) => {
     const fixture = await createFixture(directory);
@@ -551,13 +760,20 @@ test("writeMappingPackage gera artefatos determinísticos e sem linha ou payload
     assert.deepEqual(merge.constants, {});
     assert.deepEqual(merge.defaults, {});
     assert.deepEqual(merge.columns, [columnRule()]);
-    assert.deepEqual(merge.emissionContract, {
-      kind: "declarative",
-      conditions: explicitContextFreeContract().emissionConditions,
-      decisionRequiredPerSourceRow: true,
-      omissionPolicy: "error",
-      runtimeClassifierRequired: false,
-    });
+    assert.equal(merge.emissionContract.kind, "declarative");
+    assert.equal(merge.emissionContract.decisionSource, "emit_rows");
+    assert.equal(merge.emissionContract.decisionRequiredPerSourceRow, true);
+    assert.equal(merge.emissionContract.omissionPolicy, "error");
+    assert.equal(merge.emissionContract.runtimeClassifierRequired, false);
+    for (const [field, outcome] of [
+      ["preparedWhen", "prepared"],
+      ["quarantineWhen", "quarantine"],
+      ["notEmittedWhen", "not_emitted"],
+    ]) {
+      const { conditionDigest, ...condition } = merge.emissionContract.conditions[field];
+      assert.deepEqual(condition, explicitCondition("merge", outcome));
+      assert.match(conditionDigest, /^[a-f0-9]{64}$/);
+    }
     assert.deepEqual(merge.contextContract, {
       declared: true,
       mode: "context_free",
@@ -572,6 +788,27 @@ test("writeMappingPackage gera artefatos determinísticos e sem linha ou payload
     assert.match(merge.contractDigest, /^[a-f0-9]{64}$/);
     assert.match(merge.runtimeClassifier.classifyDigest, /^[a-f0-9]{64}$/);
     assert.match(merge.runtimeClassifier.emitDigest, /^[a-f0-9]{64}$/);
+    const insert = destinations.find(({ stepId }) => stepId === "insert");
+    assert.deepEqual(
+      insert.emissionContract.conditions.preparedWhen.predicate,
+      merge.emissionContract.conditions.preparedWhen.predicate,
+    );
+    assert.notEqual(
+      insert.emissionContract.conditions.preparedWhen.conditionDigest,
+      merge.emissionContract.conditions.preparedWhen.conditionDigest,
+    );
+    assert.equal(
+      new Set(
+        destinations.flatMap(({ emissionContract }) =>
+          Object.values(emissionContract.conditions).map(({ conditionDigest }) => conditionDigest),
+        ),
+      ).size,
+      12,
+    );
+    assert.equal(
+      new Set(destinations.map(({ emissionContract }) => JSON.stringify(emissionContract))).size,
+      4,
+    );
     assert.doesNotMatch(serialized, /classifySourceRow\s*\(|emitRows\s*\(|=>/);
   });
 });
@@ -586,6 +823,7 @@ test("writeMappingPackage rejeita resultado forjado antes de escrever e preserva
     const forged = structuredClone(result);
     forged.destinationMappings[0].identity.scope = "forged";
     forged.destinationMappings[0].columns[0].transformation = "forged";
+    forged.destinationMappings[0].emissionContract.conditions.preparedWhen.stepId = "forged";
     forged.columnMappings[0].transformation = "forged";
 
     await assert.rejects(
@@ -619,7 +857,9 @@ test("resultado é opaco e completeness exige provenance e registries íntegros"
       /resultado.*(?:autenticado|provenance)|proveniência/i,
     );
 
-    fixture.ruleRegistry.get("legacy.multi").destinations[0].constants.injected = true;
+    fixture.ruleRegistry.get(
+      "legacy.multi",
+    ).executionContract.steps.insert.preparedWhen.conditionId = "forged:prepared";
     assert.throws(
       () => validateMappingCompleteness(result, fixture),
       /proveniência|registry|snapshot|diverge/i,
@@ -633,11 +873,12 @@ test("quarentena permanece bounded e não retém um objeto por linha", async () 
     const rows = Array.from({ length: 400 }, (_, index) => `(${index + 1}, 'S${index + 1}')`).join(
       ",",
     );
-    await writeFile(
-      path.join(fixture.sourceDir, "legacy.multi.sql"),
+    await replaceDumpAndInventory(
+      fixture,
+      "legacy.multi",
       `INSERT INTO \`legacy.multi\` (\`id\`, \`password\`) VALUES ${rows};\n`,
+      400,
     );
-    fixture.inventory.tables[0].rowCount = 400;
     const result = await buildFixtureMapping(fixture);
 
     assert.equal(result.quarantineSummary.total, 200);

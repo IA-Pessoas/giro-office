@@ -4,6 +4,7 @@ import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 
 const INSERT_PREFIX = "INSERT INTO";
+const FILE_HANDLE_CHUNK_SIZE = 64 * 1024;
 const SENSITIVE_COLUMN_PATTERN =
   /(?:senha|password|token|secret|chave|key|cpf|cnpj|rg|email|telefone|phone)/i;
 
@@ -18,10 +19,10 @@ export function parseSourceTableFileName(fileName) {
   return sourceTable;
 }
 
-export async function* createSqlTokenizer(filePath, { onChunk } = {}) {
-  const parser = new SqlInsertStreamParser(filePath);
+export async function* createSqlTokenizer(source, { onChunk, fileName } = {}) {
+  const parser = new SqlInsertStreamParser(resolveSourceFileName(source, fileName));
   const decoder = new StringDecoder("utf8");
-  const stream = createReadStream(filePath);
+  const stream = createSourceStream(source);
 
   for await (const chunk of stream) {
     onChunk?.(chunk);
@@ -36,8 +37,8 @@ export async function* createSqlTokenizer(filePath, { onChunk } = {}) {
   parser.finish();
 }
 
-export async function* iterateSqlRows(filePath) {
-  for await (const event of createSqlTokenizer(filePath)) {
+export async function* iterateSqlRows(source, options = {}) {
+  for await (const event of createSqlTokenizer(source, options)) {
     if (event.type === "row") {
       yield event.row;
     }
@@ -90,8 +91,8 @@ export async function inspectSqlDump(filePath, options = {}) {
 }
 
 class SqlInsertStreamParser {
-  constructor(filePath) {
-    this.fileName = path.basename(filePath);
+  constructor(fileName) {
+    this.fileName = fileName;
     this.position = 0;
     this.mode = "leading";
     this.header = "";
@@ -342,6 +343,43 @@ class SqlInsertStreamParser {
     throw new Error(
       `Erro no parser SQL em ${this.fileName} na posicao ${this.position}: ${reason}`,
     );
+  }
+}
+
+function createSourceStream(source) {
+  if (typeof source === "string") return createReadStream(source);
+  if (isFileHandle(source)) {
+    return iterateFileHandleChunks(source);
+  }
+  throw new TypeError("Origem SQL deve ser path ou FileHandle");
+}
+
+function resolveSourceFileName(source, fileName) {
+  if (typeof source === "string") return path.basename(source);
+  if (!isFileHandle(source) || typeof fileName !== "string" || fileName.length === 0) {
+    throw new TypeError("FileHandle exige fileName de metadado");
+  }
+  return path.basename(fileName);
+}
+
+function isFileHandle(source) {
+  return (
+    typeof source === "object" &&
+    source !== null &&
+    typeof source.createReadStream === "function" &&
+    typeof source.read === "function" &&
+    typeof source.stat === "function"
+  );
+}
+
+async function* iterateFileHandleChunks(fileHandle) {
+  const buffer = Buffer.allocUnsafe(FILE_HANDLE_CHUNK_SIZE);
+  let position = 0;
+  while (true) {
+    const { bytesRead } = await fileHandle.read(buffer, 0, buffer.length, position);
+    if (bytesRead === 0) return;
+    position += bytesRead;
+    yield buffer.subarray(0, bytesRead);
   }
 }
 

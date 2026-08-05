@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { lstat, realpath } from "node:fs/promises";
+import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -16,6 +16,7 @@ import { serializeCsv, serializeStableJson, writeFileSetAtomically } from "./sta
 const CASTELO_ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const PROVIDER_MODE = "conservative-read-only";
 const MAX_REASONS_PER_STEP = 64;
+const DUMP_INTEGRITY_CHUNK_SIZE = 64 * 1024;
 const PROVIDER_STATE = new WeakMap();
 const RESULT_PROVENANCE = new WeakMap();
 
@@ -49,152 +50,192 @@ export async function buildMapping({
   prismaCatalog,
   sourceDir,
   capabilities,
+  integrityHooks,
 }) {
-  validateBuildInputs({ inventory, evidenceRegistry, ruleRegistry, prismaCatalog, sourceDir });
+  validateBuildInputs({
+    inventory,
+    evidenceRegistry,
+    ruleRegistry,
+    prismaCatalog,
+    sourceDir,
+    integrityHooks,
+  });
   const providerState = validateContextProvider(capabilities, inventory, ruleRegistry);
   const sealedInventory = providerState.inventorySnapshot;
   validateRegistries(sealedInventory, evidenceRegistry, ruleRegistry, prismaCatalog);
+  const dumpSessions = [];
 
-  const tableMappings = [];
-  const destinationMappings = [];
-  const columnMappings = [];
-  const pendingTables = [];
-  const quarantineReasonCounts = new Map();
-  const preflightBlockCounts = new Map();
-  const emissionCounts = {};
+  try {
+    const tableMappings = [];
+    const destinationMappings = [];
+    const columnMappings = [];
+    const pendingTables = [];
+    const quarantineReasonCounts = new Map();
+    const preflightBlockCounts = new Map();
+    const emissionCounts = {};
 
-  for (const sourceInspection of sorted(sealedInventory.tables, ({ sourceTable }) => sourceTable)) {
-    validateContextProvider(capabilities, inventory, ruleRegistry);
-    const evidence = evidenceRegistry.get(sourceInspection.sourceTable);
-    if (evidence.finalStatus === "pending") {
-      pendingTables.push({
-        ...createPendingMapping(sourceInspection, evidence),
-        preflightComplete: false,
-      });
-      continue;
-    }
-
-    const rule = ruleRegistry.get(sourceInspection.sourceTable);
-    const audit = buildRuntimeClassifierAudit(rule);
-    const staticDestinations = rule.destinations.map((step) =>
-      deriveDestinationStatic(rule, step, audit),
-    );
-    const counts = createStepCounts(rule);
-    const executable = isExplicitContextFreeRule(rule);
-    const dumpPath = resolveDumpPath(sourceDir, sourceInspection);
-    let readRows = 0;
-
-    if (!executable) {
-      for await (const _row of iterateSqlRows(dumpPath)) readRows += 1;
-      for (const destination of rule.destinations) {
-        const count = counts.get(destination.stepId);
-        count.readRows = readRows;
-        count.blockedRows = readRows;
-        recordPreflightBlock(
-          preflightBlockCounts,
-          {
-            sourceTable: rule.sourceTable,
-            stepId: destination.stepId,
-            destinationTable: destination.destinationTable,
-            reasonCode: "RUNTIME_CLASSIFIER_PREFLIGHT_REQUIRED",
-          },
-          readRows,
-        );
+    for (const sourceInspection of sorted(
+      sealedInventory.tables,
+      ({ sourceTable }) => sourceTable,
+    )) {
+      validateContextProvider(capabilities, inventory, ruleRegistry);
+      const dumpPath = resolveDumpPath(sourceDir, sourceInspection);
+      const dumpSession = await openValidatedDumpSession(dumpPath, sourceInspection);
+      dumpSessions.push(dumpSession);
+      await integrityHooks?.afterInitialValidation?.(
+        Object.freeze({ sourceTable: sourceInspection.sourceTable }),
+      );
+      const evidence = evidenceRegistry.get(sourceInspection.sourceTable);
+      if (evidence.finalStatus === "pending") {
+        pendingTables.push({
+          ...createPendingMapping(sourceInspection, evidence),
+          preflightComplete: false,
+        });
+        continue;
       }
-    } else {
-      for await (const row of iterateSqlRows(dumpPath)) {
-        readRows += 1;
-        const decisions = validateMappingEmissions(rule, rule.emitRows(row));
-        const emissions = requireExplicitRowEmissions(rule, decisions);
-        for (const decision of emissions) {
-          const count = counts.get(decision.stepId);
-          count.readRows += 1;
-          count[toCountField(decision.status)] += 1;
-          if (decision.status === "quarantine") {
-            recordQuarantineReason(quarantineReasonCounts, {
-              sourceTable: rule.sourceTable,
-              stepId: decision.stepId,
-              destinationTable: decision.destinationTable,
-              field: decision.field,
-              reasonCode: decision.reasonCode,
-            });
+
+      const rule = ruleRegistry.get(sourceInspection.sourceTable);
+      const audit = buildRuntimeClassifierAudit(rule);
+      const staticDestinations = rule.destinations.map((step) =>
+        deriveDestinationStatic(rule, step, audit),
+      );
+      const counts = createStepCounts(rule);
+      const executable = isExplicitContextFreeRule(rule);
+      let readRows = 0;
+      let parseFailure;
+
+      try {
+        if (!executable) {
+          for await (const _row of iterateSqlRows(dumpSession.fileHandle, {
+            fileName: sourceInspection.fileName,
+          })) {
+            readRows += 1;
+          }
+          for (const destination of rule.destinations) {
+            const count = counts.get(destination.stepId);
+            count.readRows = readRows;
+            count.blockedRows = readRows;
+            recordPreflightBlock(
+              preflightBlockCounts,
+              {
+                sourceTable: rule.sourceTable,
+                stepId: destination.stepId,
+                destinationTable: destination.destinationTable,
+                reasonCode: "RUNTIME_CLASSIFIER_PREFLIGHT_REQUIRED",
+              },
+              readRows,
+            );
+          }
+        } else {
+          for await (const row of iterateSqlRows(dumpSession.fileHandle, {
+            fileName: sourceInspection.fileName,
+          })) {
+            readRows += 1;
+            const decisions = validateMappingEmissions(rule, rule.emitRows(row));
+            const emissions = requireExplicitRowEmissions(rule, decisions);
+            for (const decision of emissions) {
+              const count = counts.get(decision.stepId);
+              count.readRows += 1;
+              count[toCountField(decision.status)] += 1;
+              if (decision.status === "quarantine") {
+                recordQuarantineReason(quarantineReasonCounts, {
+                  sourceTable: rule.sourceTable,
+                  stepId: decision.stepId,
+                  destinationTable: decision.destinationTable,
+                  field: decision.field,
+                  reasonCode: decision.reasonCode,
+                });
+              }
+            }
+            validateContextProvider(capabilities, inventory, ruleRegistry);
           }
         }
-        validateContextProvider(capabilities, inventory, ruleRegistry);
+      } catch (cause) {
+        parseFailure = cause;
+      }
+      if (parseFailure !== undefined) {
+        await validateFinalDumpSession(dumpSession);
+        throw parseFailure;
+      }
+
+      if (readRows !== sourceInspection.rowCount) {
+        await validateFinalDumpSession(dumpSession);
+        throw new Error(`Contagem lida diverge do inventário para ${sourceInspection.sourceTable}`);
+      }
+
+      const countRows = [...counts.values()];
+      const totals = sumCounts(countRows);
+      const tableStatic = deriveTableStatic(rule, evidence, staticDestinations);
+      tableMappings.push({
+        ...tableStatic,
+        sourceRowCount: sourceInspection.rowCount,
+        readRows,
+        contextProviderMode: PROVIDER_MODE,
+        preflightState: executable ? "context_free_executed" : "preflight_blocked",
+        preflightComplete: false,
+        prepared: totals.prepared,
+        quarantine: totals.quarantine,
+        notEmitted: totals.notEmitted,
+        blockedRows: totals.blockedRows,
+      });
+
+      for (const staticMapping of staticDestinations) {
+        const count = counts.get(staticMapping.stepId);
+        const mapping = {
+          ...staticMapping,
+          readRows: count.readRows,
+          prepared: count.prepared,
+          quarantine: count.quarantine,
+          notEmitted: count.notEmitted,
+          blockedRows: count.blockedRows,
+          preflightState: executable ? "context_free_executed" : "preflight_blocked",
+          preflightComplete: false,
+        };
+        destinationMappings.push(mapping);
+        setEmissionCount(emissionCounts, mapping);
+        columnMappings.push(...deriveColumnMappings(rule, staticMapping));
       }
     }
 
-    if (readRows !== sourceInspection.rowCount) {
-      throw new Error(`Contagem lida diverge do inventário para ${sourceInspection.sourceTable}`);
-    }
-
-    const countRows = [...counts.values()];
-    const totals = sumCounts(countRows);
-    const tableStatic = deriveTableStatic(rule, evidence, staticDestinations);
-    tableMappings.push({
-      ...tableStatic,
-      sourceRowCount: sourceInspection.rowCount,
-      readRows,
+    const quarantineReasons = sortQuarantineReasons([...quarantineReasonCounts.values()]);
+    const preflightBlocks = sortPreflightBlocks([...preflightBlockCounts.values()]);
+    const result = {
+      tableMappings: sortTableMappings(tableMappings),
+      destinationMappings: sortDestinationMappings(destinationMappings),
+      columnMappings: sortColumnMappings(columnMappings),
+      pendingTables: sortTableMappings(pendingTables),
+      quarantineReasons,
+      quarantineSummary: buildQuarantineSummary(quarantineReasons),
+      preflightBlocks,
+      preflightSummary: buildPreflightSummary(preflightBlocks),
+      emissionCounts,
       contextProviderMode: PROVIDER_MODE,
-      preflightState: executable ? "context_free_executed" : "preflight_blocked",
       preflightComplete: false,
-      prepared: totals.prepared,
-      quarantine: totals.quarantine,
-      notEmitted: totals.notEmitted,
-      blockedRows: totals.blockedRows,
+      readyForMigration: false,
+    };
+    assertNoSensitiveValues({ ...result, emissionCounts: undefined });
+    validateContextProvider(capabilities, inventory, ruleRegistry);
+    await integrityHooks?.beforeFinalValidation?.();
+    await validateAllDumpSessions(dumpSessions);
+    const provenance = createResultProvenance({
+      provider: capabilities,
+      providerState,
+      inventory,
+      evidenceRegistry,
+      ruleRegistry,
+      prismaCatalog,
     });
-
-    for (const staticMapping of staticDestinations) {
-      const count = counts.get(staticMapping.stepId);
-      const mapping = {
-        ...staticMapping,
-        readRows: count.readRows,
-        prepared: count.prepared,
-        quarantine: count.quarantine,
-        notEmitted: count.notEmitted,
-        blockedRows: count.blockedRows,
-        preflightState: executable ? "context_free_executed" : "preflight_blocked",
-        preflightComplete: false,
-      };
-      destinationMappings.push(mapping);
-      setEmissionCount(emissionCounts, mapping);
-      columnMappings.push(...deriveColumnMappings(rule, staticMapping));
-    }
+    RESULT_PROVENANCE.set(result, provenance);
+    validateMappingCompleteness(result, {
+      inventory,
+      evidenceRegistry,
+      ruleRegistry,
+      prismaCatalog,
+    });
+    return deepFreeze(result);
+  } finally {
+    await closeDumpSessions(dumpSessions);
   }
-
-  const quarantineReasons = sortQuarantineReasons([...quarantineReasonCounts.values()]);
-  const preflightBlocks = sortPreflightBlocks([...preflightBlockCounts.values()]);
-  const result = {
-    tableMappings: sortTableMappings(tableMappings),
-    destinationMappings: sortDestinationMappings(destinationMappings),
-    columnMappings: sortColumnMappings(columnMappings),
-    pendingTables: sortTableMappings(pendingTables),
-    quarantineReasons,
-    quarantineSummary: buildQuarantineSummary(quarantineReasons),
-    preflightBlocks,
-    preflightSummary: buildPreflightSummary(preflightBlocks),
-    emissionCounts,
-    contextProviderMode: PROVIDER_MODE,
-    preflightComplete: false,
-    readyForMigration: false,
-  };
-  assertNoSensitiveValues({ ...result, emissionCounts: undefined });
-  const provenance = createResultProvenance({
-    provider: capabilities,
-    providerState,
-    inventory,
-    evidenceRegistry,
-    ruleRegistry,
-    prismaCatalog,
-  });
-  RESULT_PROVENANCE.set(result, provenance);
-  validateMappingCompleteness(result, {
-    inventory,
-    evidenceRegistry,
-    ruleRegistry,
-    prismaCatalog,
-  });
-  return deepFreeze(result);
 }
 
 export function validateMappingCompleteness(result, context) {
@@ -263,6 +304,7 @@ function validateBuildInputs({
   ruleRegistry,
   prismaCatalog,
   sourceDir,
+  integrityHooks,
 }) {
   if (!isObject(inventory) || !Array.isArray(inventory.tables)) {
     throw new TypeError("SourceInventory inválido");
@@ -275,6 +317,19 @@ function validateBuildInputs({
   }
   if (typeof sourceDir !== "string" || sourceDir.length === 0) {
     throw new TypeError("sourceDir inválido");
+  }
+  if (
+    integrityHooks !== undefined &&
+    (!isObject(integrityHooks) ||
+      Object.keys(integrityHooks).some(
+        (field) => !["afterInitialValidation", "beforeFinalValidation"].includes(field),
+      ) ||
+      (integrityHooks.afterInitialValidation !== undefined &&
+        typeof integrityHooks.afterInitialValidation !== "function") ||
+      (integrityHooks.beforeFinalValidation !== undefined &&
+        typeof integrityHooks.beforeFinalValidation !== "function"))
+  ) {
+    throw new TypeError("integrityHooks inválido");
   }
   if (
     inventory.actualTableCount !== inventory.tables.length ||
@@ -450,7 +505,7 @@ function assertCasteloTenant(rule, prismaCatalog) {
 function isExplicitContextFreeRule(rule) {
   return (
     rule.executionContract?.contextMode === "context_free" &&
-    rule.executionContract.emissionConditions?.kind === "declarative"
+    rule.destinations.every(({ stepId }) => rule.executionContract.steps?.[stepId] !== undefined)
   );
 }
 
@@ -465,23 +520,30 @@ function buildRuntimeClassifierAudit(rule) {
 
 function deriveDestinationStatic(rule, step, audit) {
   const declared = isExplicitContextFreeRule(rule);
+  const stepContract = declared ? rule.executionContract.steps[step.stepId] : null;
   const contextContract = declared
     ? {
         declared: true,
         mode: rule.executionContract.contextMode,
-        requirements: [...rule.executionContract.contextRequirements],
+        requirements: [...stepContract.contextRequirements],
       }
     : { declared: false, mode: "unknown", requirements: [] };
   const emissionContract = declared
     ? {
         kind: "declarative",
-        conditions: copyStaticValue(rule.executionContract.emissionConditions),
+        decisionSource: stepContract.decisionSource,
+        conditions: {
+          preparedWhen: deriveConditionArtifact(stepContract.preparedWhen),
+          quarantineWhen: deriveConditionArtifact(stepContract.quarantineWhen),
+          notEmittedWhen: deriveConditionArtifact(stepContract.notEmittedWhen),
+        },
         decisionRequiredPerSourceRow: true,
         omissionPolicy: "error",
         runtimeClassifierRequired: false,
       }
     : {
         kind: "runtime_classifier",
+        decisionSource: "runtime_classifier",
         conditions: null,
         decisionRequiredPerSourceRow: true,
         omissionPolicy: "error",
@@ -521,6 +583,11 @@ function deriveDestinationStatic(rule, step, audit) {
     identityKind: step.identity.kind,
     contractDigest: digestCanonical(contractBody),
   };
+}
+
+function deriveConditionArtifact(condition) {
+  const artifact = copyStaticValue(condition);
+  return { ...artifact, conditionDigest: digestCanonical(artifact) };
 }
 
 function deriveTableStatic(rule, evidence, destinations) {
@@ -589,11 +656,13 @@ function recordQuarantineReason(registry, reason, increment = 1) {
 }
 
 function recordPreflightBlock(registry, block, increment) {
-  recordBounded(registry, preflightBlockKey(block), block, increment, "preflight");
+  recordBounded(registry, preflightBlockKey(block), block, increment, "preflight", {
+    preserveZero: true,
+  });
 }
 
-function recordBounded(registry, key, item, increment, label) {
-  if (increment === 0) return;
+function recordBounded(registry, key, item, increment, label, { preserveZero = false } = {}) {
+  if (increment === 0 && !preserveZero) return;
   const existing = registry.get(key);
   if (existing !== undefined) {
     existing.count += increment;
@@ -689,6 +758,7 @@ function validateMetricReconciliation(result, inventory) {
   );
   const pendingSources = new Set(pending.map(({ sourceTable }) => sourceTable));
   const destinationsBySource = groupBy(destinations, "sourceTable");
+  const blockedDestinationKeys = new Set(blocks.map(destinationKey));
   const destinationKeys = new Set();
   const expectedEmissionCounts = {};
   for (const destination of destinations) {
@@ -707,7 +777,7 @@ function validateMetricReconciliation(result, inventory) {
         destination.notEmitted +
         destination.blockedRows !==
         source.rowCount ||
-      destination.blockedRows > 0 !== (destination.preflightState === "preflight_blocked")
+      blockedDestinationKeys.has(key) !== (destination.preflightState === "preflight_blocked")
     ) {
       throw new Error(`Destination mapping incompleto: ${key}`);
     }
@@ -721,6 +791,9 @@ function validateMetricReconciliation(result, inventory) {
     const source = inventoryBySource.get(mapping.sourceTable);
     const sourceDestinations = destinationsBySource.get(mapping.sourceTable) ?? [];
     const totals = sumCounts(sourceDestinations);
+    const sourceBlocked = sourceDestinations.some(
+      ({ preflightState }) => preflightState === "preflight_blocked",
+    );
     if (
       source === undefined ||
       mapping.sourceRowCount !== source.rowCount ||
@@ -730,13 +803,16 @@ function validateMetricReconciliation(result, inventory) {
       mapping.prepared !== totals.prepared ||
       mapping.quarantine !== totals.quarantine ||
       mapping.notEmitted !== totals.notEmitted ||
-      mapping.blockedRows !== totals.blockedRows
+      mapping.blockedRows !== totals.blockedRows ||
+      sourceBlocked !== (mapping.preflightState === "preflight_blocked")
     ) {
       throw new Error(`Totais da tabela divergem: ${mapping.sourceTable}`);
     }
   }
   validateAggregateRows(reasons, destinations, "quarantine", quarantineReasonKey);
-  validateAggregateRows(blocks, destinations, "blockedRows", preflightBlockKey);
+  validateAggregateRows(blocks, destinations, "blockedRows", preflightBlockKey, {
+    allowZero: true,
+  });
   if (canonicalJson(buildQuarantineSummary(reasons)) !== canonicalJson(result.quarantineSummary)) {
     throw new Error("Resumo de quarantine diverge das razões");
   }
@@ -745,7 +821,13 @@ function validateMetricReconciliation(result, inventory) {
   }
 }
 
-function validateAggregateRows(rows, destinations, countField, keyBuilder) {
+function validateAggregateRows(
+  rows,
+  destinations,
+  countField,
+  keyBuilder,
+  { allowZero = false } = {},
+) {
   const keys = new Set();
   const totals = new Map();
   const rowCounts = new Map();
@@ -753,7 +835,7 @@ function validateAggregateRows(rows, destinations, countField, keyBuilder) {
     const key = keyBuilder(row);
     if (keys.has(key)) throw new Error(`Linha agregada duplicada: ${key}`);
     keys.add(key);
-    if (!Number.isSafeInteger(row.count) || row.count <= 0) {
+    if (!Number.isSafeInteger(row.count) || row.count < (allowZero ? 0 : 1)) {
       throw new Error(`Contagem agregada inválida: ${key}`);
     }
     const destinationId = destinationKey(row);
@@ -781,6 +863,178 @@ function resolveDumpPath(sourceDir, inspection) {
     throw new Error("Caminho de dump fora do diretório de origem");
   }
   return dumpPath;
+}
+
+async function openValidatedDumpSession(dumpPath, inspection) {
+  validateInventoryIntegrityFields(inspection);
+  let fileHandle;
+  try {
+    const initialPathIdentity = await captureDumpPathIdentity(dumpPath, inspection.sourceTable);
+    fileHandle = await open(dumpPath, "r");
+    const handleIdentity = await fileHandle.stat({ bigint: true });
+    if (
+      !handleIdentity.isFile() ||
+      handleIdentity.dev !== initialPathIdentity.device ||
+      handleIdentity.ino !== initialPathIdentity.inode
+    ) {
+      throw dumpIntegrityError("DUMP_INTEGRITY_CHANGED", inspection.sourceTable);
+    }
+    const session = {
+      dumpPath,
+      sourceTable: inspection.sourceTable,
+      expectedSize: BigInt(inspection.fileSizeBytes),
+      expectedSha256: inspection.sha256,
+      fileHandle,
+      initialPathIdentity,
+      initialSnapshot: null,
+    };
+    session.initialSnapshot = await captureOpenDumpIntegrity(session);
+    if (
+      session.initialSnapshot.size !== session.expectedSize ||
+      session.initialSnapshot.sha256 !== session.expectedSha256
+    ) {
+      throw dumpIntegrityError("DUMP_INTEGRITY_MISMATCH", inspection.sourceTable);
+    }
+    return session;
+  } catch (cause) {
+    if (fileHandle !== undefined) await fileHandle.close().catch(() => {});
+    if (cause?.code?.startsWith("DUMP_INTEGRITY_")) throw cause;
+    throw dumpIntegrityError("DUMP_INTEGRITY_UNAVAILABLE", inspection.sourceTable);
+  }
+}
+
+async function validateAllDumpSessions(sessions) {
+  for (const session of sessions) await validateFinalDumpSession(session);
+}
+
+async function validateFinalDumpSession(session) {
+  try {
+    const snapshot = await captureOpenDumpIntegrity(session);
+    const pathIdentity = await captureDumpPathIdentity(session.dumpPath, session.sourceTable);
+    if (
+      snapshot.size !== session.expectedSize ||
+      snapshot.sha256 !== session.expectedSha256 ||
+      !sameDumpSnapshot(snapshot, session.initialSnapshot) ||
+      !samePathIdentity(pathIdentity, session.initialPathIdentity) ||
+      pathIdentity.device !== snapshot.device ||
+      pathIdentity.inode !== snapshot.inode
+    ) {
+      throw dumpIntegrityError("DUMP_INTEGRITY_CHANGED", session.sourceTable);
+    }
+  } catch (cause) {
+    if (cause?.code?.startsWith("DUMP_INTEGRITY_")) throw cause;
+    throw dumpIntegrityError("DUMP_INTEGRITY_UNAVAILABLE", session.sourceTable);
+  }
+}
+
+async function captureOpenDumpIntegrity(session) {
+  try {
+    const before = await session.fileHandle.stat({ bigint: true });
+    if (!before.isFile()) {
+      throw dumpIntegrityError("DUMP_INTEGRITY_UNAVAILABLE", session.sourceTable);
+    }
+    const hash = crypto.createHash("sha256");
+    let streamedSize = 0n;
+    const buffer = Buffer.allocUnsafe(DUMP_INTEGRITY_CHUNK_SIZE);
+    let position = 0;
+    while (true) {
+      const { bytesRead } = await session.fileHandle.read(buffer, 0, buffer.length, position);
+      if (bytesRead === 0) break;
+      position += bytesRead;
+      streamedSize += BigInt(bytesRead);
+      hash.update(buffer.subarray(0, bytesRead));
+    }
+    const after = await session.fileHandle.stat({ bigint: true });
+    if (!sameFileMetadata(before, after) || streamedSize !== after.size) {
+      throw dumpIntegrityError("DUMP_INTEGRITY_CHANGED", session.sourceTable);
+    }
+    return {
+      sha256: hash.digest("hex"),
+      size: streamedSize,
+      device: after.dev,
+      inode: after.ino,
+      modifiedAt: after.mtimeNs,
+      changedAt: after.ctimeNs,
+    };
+  } catch (cause) {
+    if (cause?.code?.startsWith("DUMP_INTEGRITY_")) throw cause;
+    throw dumpIntegrityError("DUMP_INTEGRITY_UNAVAILABLE", session.sourceTable);
+  }
+}
+
+async function captureDumpPathIdentity(dumpPath, sourceTable) {
+  try {
+    const inspection = await lstat(dumpPath, { bigint: true });
+    if (!inspection.isFile() || inspection.isSymbolicLink()) {
+      throw dumpIntegrityError("DUMP_INTEGRITY_UNAVAILABLE", sourceTable);
+    }
+    return {
+      canonicalPath: await realpath(dumpPath),
+      device: inspection.dev,
+      inode: inspection.ino,
+    };
+  } catch (cause) {
+    if (cause?.code?.startsWith("DUMP_INTEGRITY_")) throw cause;
+    throw dumpIntegrityError("DUMP_INTEGRITY_UNAVAILABLE", sourceTable);
+  }
+}
+
+async function closeDumpSessions(sessions) {
+  const settlements = await Promise.allSettled(
+    sessions.map(({ fileHandle }) => fileHandle.close()),
+  );
+  const failedIndex = settlements.findIndex(({ status }) => status === "rejected");
+  if (failedIndex !== -1) {
+    throw dumpIntegrityError("DUMP_INTEGRITY_CLOSE_FAILED", sessions[failedIndex].sourceTable);
+  }
+}
+
+function validateInventoryIntegrityFields(inspection) {
+  if (
+    !Number.isSafeInteger(inspection.fileSizeBytes) ||
+    inspection.fileSizeBytes < 0 ||
+    typeof inspection.sha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(inspection.sha256)
+  ) {
+    throw dumpIntegrityError("DUMP_INTEGRITY_METADATA_INVALID", inspection.sourceTable);
+  }
+}
+
+function sameFileMetadata(left, right) {
+  return (
+    left.isFile() === right.isFile() &&
+    left.dev === right.dev &&
+    left.ino === right.ino &&
+    left.size === right.size &&
+    left.mtimeNs === right.mtimeNs &&
+    left.ctimeNs === right.ctimeNs
+  );
+}
+
+function sameDumpSnapshot(left, right) {
+  return (
+    left.sha256 === right.sha256 &&
+    left.size === right.size &&
+    left.device === right.device &&
+    left.inode === right.inode &&
+    left.modifiedAt === right.modifiedAt &&
+    left.changedAt === right.changedAt
+  );
+}
+
+function samePathIdentity(left, right) {
+  return (
+    left.canonicalPath === right.canonicalPath &&
+    left.device === right.device &&
+    left.inode === right.inode
+  );
+}
+
+function dumpIntegrityError(code, sourceTable) {
+  const error = new Error(`Integridade do dump rejeitada para ${sourceTable}`);
+  error.code = code;
+  error.sourceTable = sourceTable;
+  return error;
 }
 
 function setEmissionCount(registry, count) {

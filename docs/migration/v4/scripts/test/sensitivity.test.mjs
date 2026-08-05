@@ -75,6 +75,41 @@ test("barreira serializada cobre CNPJ, RG, telefone, endereço e PFX/DER em vari
   );
 });
 
+test("barreira reconhece telefones BR contíguos com DDD e limites sem expor o valor", () => {
+  const phones = [
+    "+5571999991234",
+    "+557188881234",
+    "+55 (71) 99999-1234",
+    "+55 (71) 8888-1234",
+    "7133331234",
+    "7166661234",
+    "7188881234",
+    "71999991234",
+    "(71) 8888-1234",
+    "71 8888-1234",
+  ];
+  for (const phone of phones) {
+    assert.throws(
+      () => assertNoSensitiveSerializedContent(`contato=${phone}`),
+      (error) => {
+        assert.equal(error.reasonCode, "PHONE");
+        assert.equal(error.message.includes(phone), false);
+        return true;
+      },
+    );
+  }
+
+  for (const benign of [
+    "ref=abc7133331234def",
+    "digest=171333312345",
+    "ref=7118881234",
+    "ref=7108881234",
+    `sha256:${"7".repeat(64)}`,
+  ]) {
+    assert.doesNotThrow(() => assertNoSensitiveSerializedContent(benign));
+  }
+});
+
 test("sanitizeQuarantineItem remove valores e preserva somente os metadados permitidos", () => {
   const item = sanitizeQuarantineItem({
     sourceTable: "usuarios_legado",

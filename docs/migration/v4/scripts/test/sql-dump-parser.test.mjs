@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -44,6 +44,25 @@ test("iterateSqlRows preserva valores como string ou null em multiplos INSERT", 
       apagado: null,
     },
   ]);
+});
+
+test("iterateSqlRows lê o dump pelo FileHandle fornecido sem reabrir o path", async () => {
+  const filePath = path.join(fixturesDirectory, "parser-basic.sql");
+  const fileHandle = await open(filePath, "r");
+  try {
+    const rows = [];
+    for await (const row of iterateSqlRows(fileHandle, { fileName: "parser-basic.sql" })) {
+      rows.push(row);
+    }
+
+    assert.equal(rows.length, 3);
+    assert.deepEqual(
+      rows.map(({ id }) => id),
+      ["9007199254740993", "2", "3"],
+    );
+  } finally {
+    await fileHandle.close();
+  }
 });
 
 test("iterateSqlRows decodifica escapes, UTF-8, quebras de linha e ponto e virgula em strings", async () => {
