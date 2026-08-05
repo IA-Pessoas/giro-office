@@ -31012,12 +31012,14 @@
         ],
         "evidenceRefs": [
           "classes/Solicitacao.php:161",
+          "classes/Solicitacao.php:162",
+          "classes/Solicitacao.php:243",
           "classes/Solicitacao.php:244",
           "classes/Solicitacao.php:246",
           "rh/pages/solicitacoes/solicitacao.php:4",
-          "infra/prisma/schema.prisma:1839",
-          "services/rh-service/src/services/requestService.ts:129",
-          "services/rh-service/src/services/requestService.ts:86"
+          "infra/prisma/schema.prisma:1845",
+          "services/rh-service/src/services/requestService.ts:101",
+          "services/rh-service/src/services/requestService.ts:117"
         ],
         "identityDecisions": [
           {
@@ -31028,7 +31030,7 @@
           }
         ],
         "reasonCode": "LEGACY_BEHAVIOR_CONFIRMED",
-        "ruleDigest": "65c4744fea13a9c689ec045ce6c48f93fb01d7e3aeb90f165bfb460d5f3ed5a2",
+        "ruleDigest": "1b2915a2cd5790850f624fc5808d94e6a532013ad852ee238b976fa49874efce",
         "ruleId": "rh-pessoal:tb_rh.solicitacoes",
         "securityDecisions": [],
         "status": "confirmed",
@@ -31053,12 +31055,14 @@
       "decision": {
         "evidenceRefs": [
           "classes/Solicitacao.php:161",
+          "classes/Solicitacao.php:162",
+          "classes/Solicitacao.php:243",
           "classes/Solicitacao.php:244",
           "classes/Solicitacao.php:246",
-          "infra/prisma/schema.prisma:1839",
+          "infra/prisma/schema.prisma:1845",
           "rh/pages/solicitacoes/solicitacao.php:4",
-          "services/rh-service/src/services/requestService.ts:129",
-          "services/rh-service/src/services/requestService.ts:86",
+          "services/rh-service/src/services/requestService.ts:101",
+          "services/rh-service/src/services/requestService.ts:117",
           "sha256:8dc2f6aad0e33851ec1cb50d3a010cf9fcd3123c29a90dc008d6761e42936499"
         ],
         "provenance": [
@@ -31073,7 +31077,7 @@
             "version": "v3"
           },
           {
-            "digest": "669c2d2f9ae39b2b4e1ac47cc2c4fdca582f93166b3816a6e641ca9199436288",
+            "digest": "ca931189b8a35bcb5a0e0cc26152d132ef4fb3492465cc134a688c8f31f86523",
             "origin": "current-evidence-rule-registry",
             "version": "v4"
           }

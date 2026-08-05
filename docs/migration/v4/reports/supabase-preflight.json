@@ -1,14 +1,6 @@
 {
   "blockers": [
     {
-      "destinationTable": "rh.requests",
-      "field": "assigned_to_user_id",
-      "reasonCode": "DESTINATION_NULLABILITY_MISMATCH",
-      "scope": "step",
-      "sourceTable": "tb_rh.solicitacoes",
-      "stepId": "rh-request-insert"
-    },
-    {
       "destinationTable": "permissions",
       "field": null,
       "reasonCode": "MERGE_IDENTITY_CONFLICT",
@@ -1233,14 +1225,6 @@
       "reasonCode": "PENDING_MAPPING_EXISTS",
       "scope": "source",
       "sourceTable": "tb_workspace.natal"
-    },
-    {
-      "destinationTable": "rh.requests",
-      "field": "assigned_to_user_id",
-      "reasonCode": "PRISMA_DATABASE_DRIFT",
-      "scope": "step",
-      "sourceTable": "tb_rh.solicitacoes",
-      "stepId": "rh-request-insert"
     },
     {
       "reasonCode": "SEMANTIC_EVIDENCE_MISSING",
@@ -5368,8 +5352,6 @@
     },
     {
       "blockerCodes": [
-        "DESTINATION_NULLABILITY_MISMATCH",
-        "PRISMA_DATABASE_DRIFT",
         "SEMANTIC_EVIDENCE_MISSING"
       ],
       "conflictChecks": {
@@ -5803,7 +5785,7 @@
   ],
   "summary": {
     "blockedStepCount": 132,
-    "blockerCount": 384,
+    "blockerCount": 382,
     "pendingTableCount": 210,
     "stepCount": 132,
     "unresolvedQuarantineCount": 0

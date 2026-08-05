@@ -16318,13 +16318,13 @@
       },
       {
         "destinationColumn": "assigned_to_user_id",
-        "nullHandling": "required_lookup_never_null",
-        "reason": "Assignee explícito referencia tb_rh.colaboradores.id e resolve seu User no tenant; ausência exige exatamente um User ativo no tenant, diferente do requester e com permissions.rh >= 1.",
+        "nullHandling": "zero_empty_or_missing_to_null",
+        "reason": "atribuido referencia tb_rh.colaboradores quando não zero; 0, vazio ou ausência representam solicitação ainda sem responsável e mapeiam para NULL.",
         "referenceRole": "foreign_key",
         "sensitivity": "none",
         "sourceColumn": "atribuido",
         "status": "mapped",
-        "transformation": "resolve_required_collaborator_rh_assignee"
+        "transformation": "resolve_optional_collaborator_rh_assignee"
       },
       {
         "destinationColumn": "category_id",
@@ -16375,7 +16375,7 @@
       "mode": "unknown",
       "requirements": []
     },
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "contractOrigin": {
       "classifyRef": "rh-pessoal:tb_rh.solicitacoes#classifySourceRow",
       "emitRef": "rh-pessoal:tb_rh.solicitacoes#emitRows",
@@ -16412,7 +16412,7 @@
     "precedence": [
       "legacy_identity",
       "explicit_assignee_user",
-      "single_eligible_rh_assignee"
+      "unassigned_null"
     ],
     "preflightComplete": false,
     "preflightState": "preflight_blocked",
@@ -16421,7 +16421,7 @@
     "readRows": 915,
     "ruleOrigin": "rh-pessoal:tb_rh.solicitacoes",
     "runtimeClassifier": {
-      "classifyDigest": "f7ef5c353fbc2b45051eed302718eccddd9fa782aa5784f07036ade8a583fb78",
+      "classifyDigest": "48731fd94ddda0234fb75dadc6068eda658c7c0895b8c8520c0204101c54f805",
       "emitDigest": "84718a557db3083559525af8f2a2c358229960cf52007be18a455a73ba33fca6",
       "required": true
     },

@@ -35,12 +35,12 @@
   "hashes": {
     ".gitattributes": "49db1badf4a820b264f5edafe1bcc54f191d99a6e05f842632c884b855849b79",
     "README.md": "2243b38a9408aed61627d611b5e78755930a685e32d33654e62bb975a2f350dd",
-    "mapping/columns.csv": "41513789c5f4e1fb0a12db436126a9daba5b15daaba51e1d2f83d2f0556865fd",
-    "mapping/columns.json": "02eccb97a7d0bf317f449cdb71dd9c4e925d39e8b4ef8c753cf1197e528403e1",
-    "mapping/destinations.csv": "5271c5977b516b29560adb443aa946291e95a225bb503e30fef28144cc18fd67",
-    "mapping/destinations.json": "c819c1b8f7ab942ca9194c3ea7a3598c0a4d24cfd57004a558474639fe6e536d",
-    "mapping/tables.csv": "4ee946599744c54a5ecf13a97aa810c74acaf993aa0fc9891a9b71b03fd28da2",
-    "mapping/tables.json": "78a37d79d2fa96224b1809f65dbfd58d746118ef65d9f2aed4f4db01fe7b9263",
+    "mapping/columns.csv": "0aa287581af67ae01fbc8a371a89ad11da95f42740225c07b9ee0097b00ab517",
+    "mapping/columns.json": "042ddf61c80d9628d5d7ac17a64943d9cdd9c4b41f43793d07bbb9d5d96cfe12",
+    "mapping/destinations.csv": "97503be84bb599f0366edc50db80160b40c5c1d9104163d9a2682c5987fdb348",
+    "mapping/destinations.json": "b6329bd0afbf813f3b21655525319079740e98ccbbcddc64282255699a886f7e",
+    "mapping/tables.csv": "c54d40112d35cdee94b3d29398cdb9178a1348da33aea40fb31c8ebb92ffcffc",
+    "mapping/tables.json": "e87070cb16a476f54b63038b622545bca3f3f8d55660ebf653d9346eb29e27bf",
     "pending-mapping/tables.csv": "00ba7364af6f7a7a2e6294955f2e7e71aeb404f8d131bf0929d435bc13d05a69",
     "pending-mapping/tables.json": "ee07c2ab7d3790e435143408b54bd204689c8c6079e971fcedd714a655a1d77e",
     "preflight/blocked.csv": "23f9cbaa6826392cd969dd7644320e1396cdb1553d2cbe7e271f92352422473c",
@@ -49,9 +49,9 @@
     "quarantine/summary.json": "0c52d58138b62e413718b20c0d1b3c1e9a36b828bea9ef8ce38191fc006879d6",
     "reports/legacy-behavior-analysis.json": "816cd61b4c538d949bc904eae67737446c08d594f9416273bbb143fcad1a0f82",
     "reports/legacy-behavior-analysis.md": "6e6825e380dd7cca92453d26c24f25fdc6bc3763f3f51c786e2a295e8eefbe59",
-    "reports/previous-mapping-comparison.json": "ad36667cb7165119b8dcc75df156026ecad8345afe85b2e9f02a97a60d97c654",
-    "reports/semantic-decisions.json": "1a42019483d381790f6e816d3021fb3e36726d4bb1d0d3c47bceda7e67652bc5",
+    "reports/previous-mapping-comparison.json": "4c7427f422ce1dc972bf36bd77a36e85c0032829576028071c4dad06a82667b0",
+    "reports/semantic-decisions.json": "1abdc59bfebd0203dd301ce1cf873d7086c9d75b3144c60ac8347304048eb84c",
     "reports/source-inventory.json": "d0b8d765f9a7cd591f47599b732fd0dc74ebcc576b925e589243a34779d0da1a",
-    "reports/supabase-preflight.json": "95b7617cac9e27ab499d169d4b750d58487deb6d82029ec39bd869083f0a265e"
+    "reports/supabase-preflight.json": "96195c1643c26747790b56f233b55d1361aa75e962cfc514093a0a6848524658"
   }
 }

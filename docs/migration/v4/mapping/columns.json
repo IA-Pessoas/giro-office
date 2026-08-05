@@ -14672,12 +14672,12 @@
     "transformation": "normalize_boolean"
   },
   {
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "destinationColumn": "assigned_to_user_id",
     "destinationTable": "rh.requests",
     "mode": "insert",
-    "nullHandling": "required_lookup_never_null",
-    "reason": "Assignee explícito referencia tb_rh.colaboradores.id e resolve seu User no tenant; ausência exige exatamente um User ativo no tenant, diferente do requester e com permissions.rh >= 1.",
+    "nullHandling": "zero_empty_or_missing_to_null",
+    "reason": "atribuido referencia tb_rh.colaboradores quando não zero; 0, vazio ou ausência representam solicitação ainda sem responsável e mapeiam para NULL.",
     "referenceRole": "foreign_key",
     "ruleOrigin": "rh-pessoal:tb_rh.solicitacoes",
     "sensitivity": "none",
@@ -14685,10 +14685,10 @@
     "sourceTable": "tb_rh.solicitacoes",
     "status": "mapped",
     "stepId": "rh-request-insert",
-    "transformation": "resolve_required_collaborator_rh_assignee"
+    "transformation": "resolve_optional_collaborator_rh_assignee"
   },
   {
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "destinationColumn": "category_id",
     "destinationTable": "rh.requests",
     "mode": "insert",
@@ -14704,7 +14704,7 @@
     "transformation": "resolve_request_category_reference"
   },
   {
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "destinationColumn": "updated_at",
     "destinationTable": "rh.requests",
     "mode": "insert",
@@ -14720,7 +14720,7 @@
     "transformation": "normalize_required_date_with_created_fallback"
   },
   {
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "destinationColumn": "created_at",
     "destinationTable": "rh.requests",
     "mode": "insert",
@@ -14736,7 +14736,7 @@
     "transformation": "normalize_required_date"
   },
   {
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "destinationColumn": "description",
     "destinationTable": "rh.requests",
     "mode": "insert",
@@ -14752,7 +14752,7 @@
     "transformation": "normalize_required_text"
   },
   {
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "destinationColumn": "id",
     "destinationTable": "rh.requests",
     "mode": "insert",
@@ -14768,7 +14768,7 @@
     "transformation": "uuid_v5_from_full_source_table_and_legacy_id"
   },
   {
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "destinationColumn": "requester_user_id",
     "destinationTable": "rh.requests",
     "mode": "insert",
@@ -14784,7 +14784,7 @@
     "transformation": "resolve_collaborator_user_reference"
   },
   {
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "destinationColumn": "status",
     "destinationTable": "rh.requests",
     "mode": "insert",
@@ -14800,7 +14800,7 @@
     "transformation": "normalize_rh_request_status"
   },
   {
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "destinationColumn": "title",
     "destinationTable": "rh.requests",
     "mode": "insert",
@@ -14816,7 +14816,7 @@
     "transformation": "normalize_required_text"
   },
   {
-    "contractDigest": "3ad5231c25355505c04699d0d8df568c84552a89051d02bb6375fde08d6c6df1",
+    "contractDigest": "eabe828efcfe047d8f9c891fabe6bda2f01baedcb64d823e3b794fe5c032271a",
     "destinationColumn": "urgency",
     "destinationTable": "rh.requests",
     "mode": "insert",
