@@ -131,6 +131,14 @@ export function canViewTasksOnlyIntegrationRoute(
   return isWithinRoute(normalizeRoutePath(routePath), "/tasks");
 }
 
+export function isIntegrationTasksOnlyRouteBlocked(
+  routeModule: ModuleKey | null,
+  routePath: string,
+  subject: ModulePermissionSubject,
+): boolean {
+  return routeModule === "integracao" && !canViewTasksOnlyIntegrationRoute(routePath, subject);
+}
+
 const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
   certificado: "certificado",
   comercial: "comercial",
