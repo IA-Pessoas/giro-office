@@ -165,6 +165,35 @@ runTest("certificate workspace requests table record deletion through the shared
   assert.match(workspaceSource, /Esta ação remove o cadastro e o arquivo associado, quando existir\./);
 });
 
+runTest("certificate workspace shows PF and PJ details in a shared dialog", () => {
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    workspaceSource,
+    /const shouldShowDetailDialog = Boolean\(selected\) && !isFormMode;/,
+  );
+  assert.match(workspaceSource, /function handleCloseDetailDialog\(\) \{/);
+  assert.match(workspaceSource, /open=\{shouldShowDetailDialog\}/);
+  assert.match(workspaceSource, /onOpenChange=\{handleDetailDialogOpenChange\}/);
+  assert.match(workspaceSource, /title=\{detailDialogTitle\}/);
+  assert.match(
+    workspaceSource,
+    /const detailDialogTitle = selected\?\.type === "pj"[\s\S]*?"Detalhe do certificado PJ"[\s\S]*?"Detalhe do certificado PF";/,
+  );
+  assert.match(
+    workspaceSource,
+    /function handleCloseDetailDialog\(\) \{[\s\S]*?setSelected\(null\);[\s\S]*?setWorkspaceMode\("view"\);[\s\S]*?setShowDetailPassword\(false\);[\s\S]*?\}/,
+  );
+  assert.doesNotMatch(workspaceSource, /const shouldShowDetailPanel = Boolean\(selected\);/);
+  assert.doesNotMatch(
+    workspaceSource,
+    /\{shouldShowDetailPanel \? \(\s*<section className=\{`\$\{CERTIFICATE_PANEL_CLASSNAME\} space-y-4`\}>/,
+  );
+});
+
 runTest("certificate record deletion uses the shared confirmation dialog", () => {
   const clientSource = readFileSync(new URL("./services/certificateService.ts", import.meta.url), "utf8");
   const actionsSource = readFileSync(
