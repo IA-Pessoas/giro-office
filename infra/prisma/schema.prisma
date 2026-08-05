@@ -1842,7 +1842,7 @@ model RhRequest {
   description         String
   requester_user_id   String
   category_id         String
-  assigned_to_user_id String
+  assigned_to_user_id String?
   urgency             RhRequestUrgency
   status              RhRequestStatus
   created_at          DateTime         @default(now())

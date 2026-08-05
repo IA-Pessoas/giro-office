@@ -12,6 +12,15 @@ import {
 } from "../lib/prisma-catalog.mjs";
 
 const fixturePath = new URL("./fixtures/schema-catalog.prisma", import.meta.url);
+const repositorySchemaPath = new URL("../../../../../infra/prisma/schema.prisma", import.meta.url);
+
+test("loadPrismaCatalog expõe responsável de solicitação RH como anulável", async () => {
+  const catalog = await loadPrismaCatalog(repositorySchemaPath);
+  const rhRequests = getModelByDatabaseName(catalog, "rh.requests");
+  const assignee = getFieldByDatabaseName(rhRequests, "assigned_to_user_id");
+
+  assert.equal(assignee?.nullable, true);
+});
 
 test("loadPrismaCatalog preserva contratos e nomes físicos de modelos, campos e índices", async () => {
   const catalog = await loadPrismaCatalog(fixturePath);
