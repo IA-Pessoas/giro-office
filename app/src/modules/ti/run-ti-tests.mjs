@@ -180,7 +180,7 @@ await runTest("ti request detail card keeps assignee actions from overflowing", 
   );
   assert.match(
     responsibleBlock,
-    /canTransferRequest\(activeRequest\) \?[\s\S]*className={cn\(\s*tiSecondaryButtonClassName,\s*"h-auto min-h-8 min-w-\[104px\] max-w-full justify-center px-3 py-1\.5 text-xs",\s*\)}[\s\S]*<span className="min-w-0 whitespace-normal break-words text-center">\s*Transferir responsabilidade\s*<\/span>/,
+    /canTransferRequest\(activeRequest\) \?[\s\S]*aria-label="Transferir responsabilidade"[\s\S]*title="Transferir responsabilidade"[\s\S]*className={cn\(\s*tiSecondaryButtonClassName,\s*"h-auto min-h-8 min-w-\[104px\] max-w-full justify-center px-3 py-1\.5 text-xs",\s*\)}[\s\S]*<span className="min-w-0 whitespace-normal break-words text-center">\s*Transferir\s*<\/span>/,
   );
 });
 

@@ -1149,6 +1149,8 @@ export function TiRequestsTab() {
                         {canTransferRequest(activeRequest) ? (
                           <button
                             type="button"
+                            aria-label="Transferir responsabilidade"
+                            title="Transferir responsabilidade"
                             className={cn(
                               tiSecondaryButtonClassName,
                               "h-auto min-h-8 min-w-[104px] max-w-full justify-center px-3 py-1.5 text-xs",
@@ -1158,7 +1160,7 @@ export function TiRequestsTab() {
                           >
                             <UserCheck className="h-3.5 w-3.5" />
                             <span className="min-w-0 whitespace-normal break-words text-center">
-                              Transferir responsabilidade
+                              Transferir
                             </span>
                           </button>
                         ) : null}
