@@ -189,7 +189,7 @@ runTest("RH point adjustments expose guarded approve and reject decisions", () =
   assert.match(rhSources.pointAdjustmentHook, /useRejectRhPointAdjustmentMutation/);
   assert.match(
     rhSources.pointAdjustmentHook,
-    /invalidateQueries\(\{ queryKey: RH_QUERY_KEY \}\)/,
+    /invalidateQueries\(\{ queryKey: RH_POINT_QUERY_KEY \}\)/,
   );
   assert.match(
     rhSources.pointAdjustmentPanel,
@@ -264,4 +264,17 @@ runTest("RH request timeline uses distinct semantic message type badges", () => 
   assert.match(getRhMessageTypeClassName("Rejection"), /red|rose/);
   assert.match(getRhMessageTypeClassName("Acceptance"), /green|emerald/);
   assert.match(timelineSource, /getRhMessageTypeClassName\(item\.type\)/);
+});
+
+runTest("RH ponto nao invalida queries fora do dominio", () => {
+  const pointSource = readFileSync("src/modules/rh/hooks/useRhPoint.ts", "utf8");
+
+  assert.match(pointSource, /RH_POINT_QUERY_KEY/);
+  assert.doesNotMatch(pointSource, /invalidateQueries\(\{ queryKey: RH_QUERY_KEY \}\)/);
+});
+
+runTest("contador de solicitacoes so fica ativo na aba de solicitacoes", () => {
+  const shellSource = readFileSync("src/shared/components/newLayout/RH.tsx", "utf8");
+
+  assert.match(shellSource, /enabled: canManageRhRequests && activeTab === "requests"/);
 });
