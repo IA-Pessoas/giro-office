@@ -499,6 +499,104 @@ test("conflito de contagem física gera issue sem promover conflito semântico",
   );
 });
 
+test("versões semânticas não canônicas viram issues sanitizadas por artefato", () => {
+  const sourceTable = "legacy.version";
+  const currentDecision = {
+    sourceTable,
+    status: "confirmed",
+    destinations: [{ destinationTable: "current.version" }],
+  };
+  const comparison = comparePreviousMappings({
+    currentInventory: {
+      sourceDirectoryLabel: "03.08.2026",
+      sourceDigest: SHA_A,
+      tables: [table(sourceTable, ["id"], 1)],
+    },
+    historicalInventories: [],
+    evidenceRegistry: new Map([
+      [sourceTable, decision(sourceTable, "confirmed", `v4:${sourceTable}`)],
+    ]),
+    ruleRegistry: new Map([[sourceTable, rule(sourceTable, "current.version")]]),
+    previousArtifacts: [
+      previousArtifact([currentDecision], {
+        origin: "v02/confirmed-table-destinations.csv",
+        version: "v02",
+      }),
+      previousArtifact([currentDecision], {
+        origin: "release-z/confirmed-table-destinations.csv",
+        version: "release-z",
+      }),
+      previousArtifact([currentDecision], {
+        origin: "v3/rh-pessoal-dry-run.md",
+        version: "v3",
+      }),
+    ],
+  });
+
+  assert.deepEqual(
+    comparison.artifactSources.map(({ version }) => version),
+    ["v3"],
+  );
+  assert.deepEqual(
+    comparison.issues.map(({ reasonCode, scope }) => ({ reasonCode, scope })),
+    [
+      {
+        reasonCode: "HISTORICAL_ARTIFACT_PROVENANCE_CONFLICT",
+        scope: "historical-artifact-1",
+      },
+      {
+        reasonCode: "HISTORICAL_ARTIFACT_PROVENANCE_CONFLICT",
+        scope: "historical-artifact-2",
+      },
+    ],
+  );
+  assert.doesNotMatch(JSON.stringify(comparison.issues), /v02|release-z/i);
+});
+
+test("precedência vN usa inteiro exato para versões canônicas grandes", () => {
+  const sourceTable = "legacy.big-version";
+  const almostLatest = "v99999999999999999999";
+  const latest = "v100000000000000000000";
+  const historicalDecision = (destinationTable) => ({
+    sourceTable,
+    status: "confirmed",
+    destinations: [{ destinationTable }],
+  });
+  const comparison = comparePreviousMappings({
+    currentInventory: {
+      sourceDirectoryLabel: "03.08.2026",
+      sourceDigest: SHA_A,
+      tables: [table(sourceTable, ["id"], 1)],
+    },
+    historicalInventories: [],
+    evidenceRegistry: new Map([
+      [sourceTable, decision(sourceTable, "confirmed", `v4:${sourceTable}`)],
+    ]),
+    ruleRegistry: new Map([[sourceTable, rule(sourceTable, "current.big-version")]]),
+    previousArtifacts: [
+      previousArtifact([historicalDecision("old.v3")], {
+        origin: "v3/rh-pessoal-dry-run.md",
+        version: "v3",
+      }),
+      previousArtifact([historicalDecision("old.almost")], {
+        origin: `${almostLatest}/confirmed-table-destinations.csv`,
+        version: almostLatest,
+      }),
+      previousArtifact([historicalDecision("current.big-version")], {
+        origin: `${latest}/confirmed-table-destinations.csv`,
+        version: latest,
+      }),
+    ],
+  });
+
+  assert.deepEqual(
+    comparison.tables[0].previousDecisions.map(({ version }) => version),
+    ["v3", almostLatest, latest],
+  );
+  assert.equal(comparison.tables[0].decision.status, "reused");
+  assert.equal(comparison.tables[0].decision.reasonCode, "PREVIOUS_RULE_REVALIDATED");
+});
+
 test("provenance histórica incoerente vira issue sanitizada sem descartar inventário válido", () => {
   const currentInventory = {
     sourceDirectoryLabel: "03.08.2026",

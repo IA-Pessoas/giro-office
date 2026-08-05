@@ -89,6 +89,7 @@ async function main() {
     currentInventory: inventory,
     evidenceRegistry: EVIDENCE_REGISTRY,
     historicalInputs,
+    prismaCatalog,
     ruleRegistry,
   });
   await writeMappingPackage(options.package, result, {
@@ -202,6 +203,7 @@ function buildComparisonReport({
   currentInventory,
   evidenceRegistry,
   historicalInputs,
+  prismaCatalog,
   ruleRegistry,
 }) {
   const comparison = comparePreviousMappings({
@@ -209,6 +211,7 @@ function buildComparisonReport({
     historicalInventories: historicalInputs.historicalInventories,
     evidenceRegistry,
     ruleRegistry,
+    prismaCatalog,
     previousArtifacts: historicalInputs.previousArtifacts,
   });
   const issues = deduplicateIssues([...historicalInputs.issues, ...comparison.issues]);

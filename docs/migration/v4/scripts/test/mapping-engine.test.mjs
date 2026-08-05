@@ -15,6 +15,7 @@ import {
 import {
   comparePreviousMappings,
   createAuthenticatedPreviousMappingReport,
+  validateAuthenticatedPreviousMappingReport,
 } from "../lib/previous-comparison.mjs";
 import { assertNoSensitiveSerializedContent, toLegacyIdRef } from "../lib/sensitivity.mjs";
 import {
@@ -304,6 +305,7 @@ function authenticatedReportFor(fixture, overrides = {}) {
     historicalInventories: overrides.historicalInventories ?? [],
     evidenceRegistry,
     ruleRegistry,
+    prismaCatalog: overrides.prismaCatalog ?? fixture.prismaCatalog,
     previousArtifacts: overrides.previousArtifacts ?? [],
   });
   return createAuthenticatedPreviousMappingReport({
@@ -985,6 +987,72 @@ test("relatório histórico participa do mesmo commit atômico e extra files sã
 
     await writeMappingPackage(packageDir, result, { protectedPaths: [fixture.sourceDir] });
     await assert.rejects(() => readFile(path.join(packageDir, reportPath), "utf8"), /ENOENT/);
+  });
+});
+
+test("relatório autenticado exige as mesmas bindings de evidence, rules e Prisma", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const result = await buildFixtureMapping(fixture);
+    const packageDir = path.join(directory, "package");
+    const reportPath = "reports/previous-mapping-comparison.json";
+    const officialReport = authenticatedReportFor(fixture);
+    await writeMappingPackage(packageDir, result, {
+      protectedPaths: [fixture.sourceDir],
+      extraArtifacts: { [reportPath]: officialReport },
+    });
+    const beforeRejected = await readPackageFiles(packageDir);
+
+    const alternativeEvidenceRegistry = new Map(fixture.evidenceRegistry);
+    alternativeEvidenceRegistry.set("legacy.multi", {
+      ...fixture.evidenceRegistry.get("legacy.multi"),
+      currentContractEvidence: ["fixture.prisma:2"],
+    });
+    const alternativeRuleRegistry = new Map(fixture.ruleRegistry);
+    const registryReport = authenticatedReportFor(fixture, {
+      evidenceRegistry: alternativeEvidenceRegistry,
+      ruleRegistry: alternativeRuleRegistry,
+    });
+    await assert.rejects(
+      () =>
+        writeMappingPackage(packageDir, result, {
+          protectedPaths: [fixture.sourceDir],
+          extraArtifacts: { [reportPath]: registryReport },
+        }),
+      /evidence|rule|registry|bindings|proveniência.*relatório/i,
+    );
+    assert.deepEqual(await readPackageFiles(packageDir), beforeRejected);
+
+    const prismaReport = authenticatedReportFor(fixture, {
+      prismaCatalog: structuredClone(fixture.prismaCatalog),
+    });
+    await assert.rejects(
+      () =>
+        writeMappingPackage(packageDir, result, {
+          protectedPaths: [fixture.sourceDir],
+          extraArtifacts: { [reportPath]: prismaReport },
+        }),
+      /prisma|bindings|proveniência.*relatório/i,
+    );
+    assert.deepEqual(await readPackageFiles(packageDir), beforeRejected);
+
+    const originalEmitRows = fixture.ruleRegistry.get("legacy.multi").emitRows;
+    fixture.ruleRegistry.get("legacy.multi").emitRows = () => [];
+    try {
+      assert.throws(
+        () =>
+          validateAuthenticatedPreviousMappingReport(officialReport, {
+            inventory: fixture.inventory,
+            evidenceRegistry: fixture.evidenceRegistry,
+            ruleRegistry: fixture.ruleRegistry,
+            prismaCatalog: fixture.prismaCatalog,
+          }),
+        /integridade.*(?:rule|registry)|snapshot.*(?:rule|registry)/i,
+      );
+    } finally {
+      fixture.ruleRegistry.get("legacy.multi").emitRows = originalEmitRows;
+    }
+    assert.doesNotMatch(JSON.stringify(officialReport), /function\s*\(|=>|SENTINEL_RAW_SECRET/);
   });
 });
 

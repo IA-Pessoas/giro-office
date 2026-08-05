@@ -287,7 +287,7 @@ export async function writeMappingPackage(
   validateMappingCompleteness(result, provenance.bindings);
   await assertSafePackagePath({ packageDir, protectedPaths });
   const artifacts = buildArtifacts(result);
-  addExtraArtifacts(artifacts, extraArtifacts, provenance.bindings.inventory);
+  addExtraArtifacts(artifacts, extraArtifacts, provenance.bindings);
   for (const [relativePath, content] of artifacts) {
     try {
       assertNoSensitiveSerializedContent(content);
@@ -306,7 +306,7 @@ export async function writeMappingPackage(
   });
 }
 
-function addExtraArtifacts(artifacts, extraArtifacts, inventory) {
+function addExtraArtifacts(artifacts, extraArtifacts, bindings) {
   if (extraArtifacts === undefined) return;
   if (!isObject(extraArtifacts)) throw new TypeError("Artefatos extras devem ser um objeto");
   const entries = Object.entries(extraArtifacts);
@@ -317,7 +317,7 @@ function addExtraArtifacts(artifacts, extraArtifacts, inventory) {
   ) {
     throw new Error("Artefato extra fora da allow-list do pacote V4");
   }
-  validateAuthenticatedPreviousMappingReport(entries[0][1], inventory);
+  validateAuthenticatedPreviousMappingReport(entries[0][1], bindings);
   artifacts.set(PREVIOUS_COMPARISON_REPORT_PATH, serializeStableJson(entries[0][1]));
 }
 

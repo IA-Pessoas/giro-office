@@ -7,6 +7,7 @@ import { assertNoSensitiveSerializedContent } from "./sensitivity.mjs";
 const SOURCE_NAME = /^[A-Za-z0-9_.-]+$/;
 const COLUMN_NAME = /^[\p{L}\p{N}_.-]+$/u;
 const VERSION_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const ARTIFACT_VERSION = /^v(?:0|[1-9][0-9]*)$/;
 const DIGEST = /^[a-f0-9]{64}$/;
 const SAFE_REFERENCE = /^[A-Za-z0-9_./:# -]+$/;
 const DECISION_STATUSES = new Set(["confirmed", "pending"]);
@@ -77,6 +78,7 @@ export function comparePreviousMappings({
   historicalInventories,
   evidenceRegistry,
   ruleRegistry,
+  prismaCatalog = null,
   previousArtifacts,
 }) {
   const current = normalizeCurrentInventory(currentInventory);
@@ -186,10 +188,15 @@ export function comparePreviousMappings({
     tables,
   };
   const frozen = deepFreeze(comparison);
-  COMPARISON_PROVENANCE.set(frozen, {
-    inventoryRef: currentInventory,
-    inventoryDigest: sha256(canonicalJson(currentInventory)),
-  });
+  COMPARISON_PROVENANCE.set(
+    frozen,
+    createComparisonProvenance({
+      currentInventory,
+      evidenceRegistry,
+      ruleRegistry,
+      prismaCatalog,
+    }),
+  );
   return frozen;
 }
 
@@ -198,6 +205,10 @@ export function createAuthenticatedPreviousMappingReport({ comparison, availabil
   if (provenance === undefined) {
     throw new Error("Comparação autenticada é obrigatória para finalizar o relatório");
   }
+  if (provenance.bindings.prismaCatalog === null) {
+    throw new Error("PrismaCatalog é obrigatório para finalizar relatório autenticado");
+  }
+  validateComparisonBindingIntegrity(provenance);
   if (!Object.isFrozen(comparison)) {
     throw new Error("Comparação autenticada foi adulterada");
   }
@@ -232,22 +243,102 @@ export function createAuthenticatedPreviousMappingReport({ comparison, availabil
   return frozen;
 }
 
-export function validateAuthenticatedPreviousMappingReport(report, inventory) {
+export function validateAuthenticatedPreviousMappingReport(report, bindings) {
   const provenance = isRecord(report) ? REPORT_PROVENANCE.get(report) : undefined;
   if (provenance === undefined) {
     throw new Error("Relatório histórico autenticado com proveniência é obrigatório");
   }
-  if (
-    provenance.inventoryRef !== inventory ||
-    provenance.inventoryDigest !== sha256(canonicalJson(inventory))
-  ) {
-    throw new Error("Inventário do relatório diverge do MappingResult autenticado");
+  if (!isRecord(bindings)) {
+    throw new TypeError("Bindings autenticadas são obrigatórias para validar o relatório");
   }
+  for (const field of ["inventory", "evidenceRegistry", "ruleRegistry", "prismaCatalog"]) {
+    if (provenance.bindings[field] !== bindings[field]) {
+      throw new Error(`Binding ${field} diverge da proveniência do relatório`);
+    }
+  }
+  validateComparisonBindingIntegrity(provenance);
   if (!Object.isFrozen(report) || provenance.reportDigest !== sha256(canonicalJson(report))) {
     throw new Error("Relatório histórico autenticado foi adulterado");
   }
-  validateReportCoverage(report, normalizeCurrentInventory(inventory));
+  validateReportCoverage(report, normalizeCurrentInventory(bindings.inventory));
   return true;
+}
+
+function createComparisonProvenance({
+  currentInventory,
+  evidenceRegistry,
+  ruleRegistry,
+  prismaCatalog,
+}) {
+  if (
+    prismaCatalog !== null &&
+    (!isRecord(prismaCatalog) || !Array.isArray(prismaCatalog.models))
+  ) {
+    throw new TypeError("PrismaCatalog inválido para comparação histórica");
+  }
+  const bindings = {
+    inventory: currentInventory,
+    evidenceRegistry,
+    ruleRegistry,
+    prismaCatalog,
+  };
+  return {
+    bindings,
+    digests: createBindingDigests(bindings),
+  };
+}
+
+function createBindingDigests(bindings) {
+  return {
+    inventory: digestBinding(bindings.inventory),
+    evidenceRegistry: digestBinding(bindings.evidenceRegistry),
+    ruleRegistry: digestBinding(bindings.ruleRegistry),
+    prismaCatalog: bindings.prismaCatalog === null ? null : digestBinding(bindings.prismaCatalog),
+  };
+}
+
+function validateComparisonBindingIntegrity(provenance) {
+  const currentDigests = createBindingDigests(provenance.bindings);
+  for (const field of ["inventory", "evidenceRegistry", "ruleRegistry", "prismaCatalog"]) {
+    if (currentDigests[field] !== provenance.digests[field]) {
+      throw new Error(`Integridade do snapshot ${field} do relatório foi violada`);
+    }
+  }
+}
+
+function digestBinding(value) {
+  return sha256(canonicalJson(snapshotBindingValue(value)));
+}
+
+function snapshotBindingValue(value, active = new WeakSet()) {
+  if (typeof value === "function") {
+    return {
+      kind: "function",
+      name: value.name,
+      digest: sha256(Function.prototype.toString.call(value)),
+    };
+  }
+  if (value === null || typeof value !== "object") return value;
+  if (active.has(value)) throw new TypeError("Binding cíclica não é permitida");
+  active.add(value);
+  let snapshot;
+  if (value instanceof Map) {
+    snapshot = [...value]
+      .map(([key, entry]) => [key, snapshotBindingValue(entry, active)])
+      .sort(([left], [right]) => compareText(String(left), String(right)));
+  } else if (Array.isArray(value)) {
+    snapshot = value.map((entry) => snapshotBindingValue(entry, active));
+  } else if (isRecord(value)) {
+    snapshot = Object.fromEntries(
+      Object.keys(value)
+        .sort(compareText)
+        .map((key) => [key, snapshotBindingValue(value[key], active)]),
+    );
+  } else {
+    throw new TypeError("Tipo de binding não suportado");
+  }
+  active.delete(value);
+  return snapshot;
 }
 
 export async function loadPreviousMappingArtifacts({ previousDocsDir }) {
@@ -397,7 +488,7 @@ function normalizePreviousArtifacts(artifacts) {
   for (const [index, artifact] of artifacts.entries()) {
     try {
       if (!isRecord(artifact)) throw new TypeError("Artefato histórico inválido");
-      const version = normalizeVersion(artifact.version, "artifact.version");
+      const version = normalizeArtifactVersion(artifact.version);
       const origin = normalizeOrigin(artifact.origin);
       const digest = normalizeDigest(artifact.digest, "artifact.digest");
       if (!origin.startsWith(`${version}/`)) {
@@ -553,12 +644,9 @@ function compareHistoricalDecisions(left, right) {
 }
 
 function compareHistoricalVersions(left, right) {
-  const leftMatch = left.match(/^v([0-9]+)$/);
-  const rightMatch = right.match(/^v([0-9]+)$/);
-  if (leftMatch !== null && rightMatch !== null) {
-    return Number(leftMatch[1]) - Number(rightMatch[1]);
-  }
-  return compareText(left, right);
+  const leftNumber = BigInt(left.slice(1));
+  const rightNumber = BigInt(right.slice(1));
+  return leftNumber < rightNumber ? -1 : leftNumber > rightNumber ? 1 : 0;
 }
 
 function indexArtifactCounts(artifacts) {
@@ -1575,6 +1663,13 @@ function normalizeColumnName(value, label) {
 function normalizeVersion(value, label) {
   if (typeof value !== "string" || !VERSION_NAME.test(value)) {
     throw new TypeError(`${label} inválida`);
+  }
+  return value;
+}
+
+function normalizeArtifactVersion(value) {
+  if (typeof value !== "string" || !VERSION_NAME.test(value) || !ARTIFACT_VERSION.test(value)) {
+    throw new TypeError("artifact.version deve usar vN canônico");
   }
   return value;
 }
