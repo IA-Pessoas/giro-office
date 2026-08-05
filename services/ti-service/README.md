@@ -37,8 +37,10 @@ O arquivo e validado antes do armazenamento. Entrada ou assinatura de arquivo in
 arquivo acima do limite retorna `413`; uma falha ao armazenar a imagem retorna `500`, sem expor a
 configuracao ou as credenciais do Supabase. O upload guarda apenas a chave privada no banco e devolve
 uma URL assinada de cinco minutos depois de validar o acesso ao chamado. Configure
-`TI_REQUEST_IMAGE_BUCKET` como um bucket privado dedicado; `SUPABASE_URL` e
-`SUPABASE_SERVICE_ROLE_KEY` devem permanecer apenas no ambiente do servico.
+`TI_REQUEST_IMAGE_BUCKET` com o valor recomendado `ti-request-attachments-private`, em um
+bucket privado dedicado. Crie/configure esse bucket como privado no Supabase Storage (o servico nao le
+`BUCKET_VISIBILITY`). `SUPABASE_SERVICE_ROLE_KEY` deve permanecer apenas no ambiente do
+servico/VPS, junto com `SUPABASE_URL`.
 
 ## Gateway
 

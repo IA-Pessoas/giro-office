@@ -628,3 +628,46 @@ test("VPS env materialization includes parcelamento-service in manifest", async 
     }
   }
 });
+
+test("TI request image storage contract is explicit in docs and deploy manifests", async () => {
+  const manifest = await readFile(vpsSecretsManifest, "utf8");
+  assert.match(manifest, /^ENV_VPS_TI_SERVICE\|\.env\.vps\.ti-service$/m);
+  assert.match(manifest, /^# TI_REQUEST_IMAGE_BUCKET=ti-request-attachments-private$/m);
+  assert.match(
+    manifest,
+    /^# crie\/configure esse bucket como privado no Supabase Storage \(nao existe BUCKET_VISIBILITY no env do servico\)\.$/m,
+  );
+  assert.doesNotMatch(manifest, /^# BUCKET_VISIBILITY=/m);
+  assert.match(
+    manifest,
+    /^# SUPABASE_SERVICE_ROLE_KEY=<service role key somente no VPS\/servico>$/m,
+  );
+
+  const envExample = await readFile(path.join(repoRoot, ".env.example"), "utf8");
+  assert.match(envExample, /^TI_REQUEST_IMAGE_BUCKET=ti-request-attachments-private$/m);
+  assert.match(
+    envExample,
+    /^# bucket do Supabase Storage para anexos de TI; crie-o como privado no painel do Supabase\.$/m,
+  );
+  assert.match(
+    envExample,
+    /^# uso exclusivo do backend\/servico; nunca exponha a service role em cliente ou codigo frontend\.$/m,
+  );
+
+  const tiServiceReadme = await readFile(
+    path.join(repoRoot, "services", "ti-service", "README.md"),
+    "utf8",
+  );
+  assert.match(
+    tiServiceReadme,
+    /`TI_REQUEST_IMAGE_BUCKET` com o valor recomendado `ti-request-attachments-private`/,
+  );
+  assert.match(
+    tiServiceReadme,
+    /Crie\/configure esse bucket como privado no Supabase Storage[\s\S]*`BUCKET_VISIBILITY`\)\./i,
+  );
+  assert.match(
+    tiServiceReadme,
+    /`SUPABASE_SERVICE_ROLE_KEY` deve permanecer apenas no ambiente do[\s\S]*servico\/VPS/i,
+  );
+});
