@@ -10,6 +10,41 @@ type CertificateWorkspaceAccess = {
   isAdmin: boolean;
 };
 
+export type CertificateSortDirection = "asc" | "desc";
+
+type CertificateSortValue = string | number | boolean | null | undefined;
+
+export function sortCertificateRows<T>(
+  rows: T[],
+  getValue: (row: T) => CertificateSortValue,
+  direction: CertificateSortDirection,
+): T[] {
+  return [...rows].sort((left, right) => {
+    const leftValue = getValue(left);
+    const rightValue = getValue(right);
+
+    if (leftValue == null && rightValue == null) {
+      return 0;
+    }
+    if (leftValue == null) {
+      return 1;
+    }
+    if (rightValue == null) {
+      return -1;
+    }
+
+    const comparison = typeof leftValue === "number" && typeof rightValue === "number"
+      ? leftValue - rightValue
+      : typeof leftValue === "boolean" && typeof rightValue === "boolean"
+        ? Number(leftValue) - Number(rightValue)
+        : String(leftValue).localeCompare(String(rightValue), "pt-BR", {
+            sensitivity: "base",
+          });
+
+    return direction === "asc" ? comparison : -comparison;
+  });
+}
+
 export type CertificateWorkspaceCapabilities = {
   canReadRecords: boolean;
   canManageRecords: boolean;

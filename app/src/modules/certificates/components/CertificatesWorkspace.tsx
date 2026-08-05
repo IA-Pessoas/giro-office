@@ -4,6 +4,9 @@ import { toast } from "react-toastify";
 import {
   Bell,
   CalendarClock,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
   Copy,
   Eye,
   EyeOff,
@@ -84,13 +87,22 @@ import {
   CERTIFICATE_TABLE_SCROLL_AREA_CLASSNAME,
   CERTIFICATE_SUMMARY_BAR_CLASSNAME,
   CERTIFICATE_SUMMARY_ITEM_CLASSNAME,
+  type CertificateSortDirection,
   formatDateBR,
   getExpirationTone,
   resolveCertificateWorkspaceCapabilities,
+  sortCertificateRows,
 } from "./certificateWorkspaceUi";
 
 type CertificateTab = "pj" | "pf" | "notifications";
 type WorkspaceMode = "view" | "createPj" | "createPf" | "editPj" | "editPf";
+type SortState<Key extends string> = {
+  key: Key;
+  direction: CertificateSortDirection;
+} | null;
+type PjSortKey = "name" | "responsible" | "model" | "expiration_date" | "has_certificate";
+type PfSortKey = "name" | "enterprise" | "model" | "expiration_date" | "has_certificate";
+type NotificationSortKey = "client_name" | "type" | "date";
 
 type PjFilters = {
   name: string;
@@ -173,6 +185,14 @@ function trimValue(value: string): string {
   return value.trim();
 }
 
+function mergeListById<T extends { id: string }>(current: T[], next: T[]): T[] {
+  const itemsById = new Map(current.map((item) => [item.id, item]));
+
+  next.forEach((item) => itemsById.set(item.id, item));
+
+  return [...itemsById.values()];
+}
+
 function buildStats(total: number, expiringInDays: number, expired: number, withCertificate: number) {
   return [
     { label: "Total", value: total },
@@ -233,6 +253,63 @@ function getCertificateErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function nextSortState<Key extends string>(
+  current: SortState<Key>,
+  key: Key,
+): SortState<Key> {
+  if (current?.key !== key) {
+    return { key, direction: "asc" };
+  }
+
+  if (current.direction === "asc") {
+    return { key, direction: "desc" };
+  }
+
+  return null;
+}
+
+type SortableTableHeaderProps<Key extends string> = {
+  className: string;
+  label: string;
+  sortKey: Key;
+  sortState: SortState<Key>;
+  onSort: (key: Key) => void;
+};
+
+function SortableTableHeader<Key extends string>({
+  className,
+  label,
+  sortKey,
+  sortState,
+  onSort,
+}: SortableTableHeaderProps<Key>) {
+  const isActive = sortState?.key === sortKey;
+  const directionLabel = sortState?.direction === "asc" ? "crescente" : "decrescente";
+  const SortIcon = !isActive
+    ? ChevronsUpDown
+    : sortState.direction === "asc"
+      ? ChevronUp
+      : ChevronDown;
+
+  return (
+    <th
+      className={className}
+      aria-sort={!isActive ? "none" : sortState.direction === "asc" ? "ascending" : "descending"}
+    >
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 text-left transition-colors hover:text-blue-600 dark:hover:text-blue-400"
+        onClick={() => onSort(sortKey)}
+        aria-label={`Ordenar por ${label}`}
+        title={isActive ? `Ordenação ${directionLabel}` : `Ordenar por ${label}`}
+      >
+        <span>{label}</span>
+        <SortIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      </button>
+    </th>
+  );
+}
+
 function AccessDeniedCard() {
   return (
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20">
@@ -263,6 +340,12 @@ export function CertificatesWorkspace() {
   const [pjPage, setPjPage] = useState(FIRST_PAGE);
   const [pfPage, setPfPage] = useState(FIRST_PAGE);
   const [notificationPage, setNotificationPage] = useState(FIRST_PAGE);
+  const [visiblePjItems, setVisiblePjItems] = useState<CertificatePj[]>([]);
+  const [visiblePfItems, setVisiblePfItems] = useState<CertificatePf[]>([]);
+  const [visibleNotificationItems, setVisibleNotificationItems] = useState<CertificateNotification[]>([]);
+  const [pjSort, setPjSort] = useState<SortState<PjSortKey>>(null);
+  const [pfSort, setPfSort] = useState<SortState<PfSortKey>>(null);
+  const [notificationSort, setNotificationSort] = useState<SortState<NotificationSortKey>>(null);
   const [pendingDeletion, setPendingDeletion] = useState<PendingCertificateDeletion | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
 
@@ -362,6 +445,125 @@ export function CertificatesWorkspace() {
   const deletePfMutation = useDeleteCertificatePfMutation();
   const updatePjMutation = useUpdateCertificatePjMutation(selected?.type === "pj" ? selected.id : "");
   const updatePfMutation = useUpdateCertificatePfMutation(selected?.type === "pf" ? selected.id : "");
+
+  useEffect(() => {
+    if (
+      !pjListQuery.data ||
+      pjListQuery.isPlaceholderData ||
+      pjListQuery.data.page !== pjPage
+    ) {
+      return;
+    }
+
+    const nextItems = pjListQuery.data.data;
+
+    setVisiblePjItems((current) =>
+      pjPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
+    );
+  }, [pjListQuery.data, pjListQuery.isPlaceholderData, pjPage]);
+
+  useEffect(() => {
+    if (
+      !pfListQuery.data ||
+      pfListQuery.isPlaceholderData ||
+      pfListQuery.data.page !== pfPage
+    ) {
+      return;
+    }
+
+    const nextItems = pfListQuery.data.data;
+
+    setVisiblePfItems((current) =>
+      pfPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
+    );
+  }, [pfListQuery.data, pfListQuery.isPlaceholderData, pfPage]);
+
+  useEffect(() => {
+    if (
+      !notificationsQuery.data ||
+      notificationsQuery.isPlaceholderData ||
+      notificationsQuery.data.page !== notificationPage
+    ) {
+      return;
+    }
+
+    const nextItems = notificationsQuery.data.data;
+
+    setVisibleNotificationItems((current) =>
+      notificationPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
+    );
+  }, [notificationPage, notificationsQuery.data, notificationsQuery.isPlaceholderData]);
+
+  const sortedPjItems = useMemo(() => {
+    if (!pjSort) {
+      return visiblePjItems;
+    }
+
+    return sortCertificateRows(
+      visiblePjItems,
+      (item) => {
+        switch (pjSort.key) {
+          case "name":
+            return item.name;
+          case "responsible":
+            return item.responsible;
+          case "model":
+            return item.model;
+          case "expiration_date":
+            return Date.parse(item.expiration_date);
+          case "has_certificate":
+            return item.has_certificate;
+        }
+      },
+      pjSort.direction,
+    );
+  }, [pjSort, visiblePjItems]);
+
+  const sortedPfItems = useMemo(() => {
+    if (!pfSort) {
+      return visiblePfItems;
+    }
+
+    return sortCertificateRows(
+      visiblePfItems,
+      (item) => {
+        switch (pfSort.key) {
+          case "name":
+            return item.name;
+          case "enterprise":
+            return item.enterprise;
+          case "model":
+            return item.model;
+          case "expiration_date":
+            return Date.parse(item.expiration_date);
+          case "has_certificate":
+            return item.has_certificate;
+        }
+      },
+      pfSort.direction,
+    );
+  }, [pfSort, visiblePfItems]);
+
+  const sortedNotificationItems = useMemo(() => {
+    if (!notificationSort) {
+      return visibleNotificationItems;
+    }
+
+    return sortCertificateRows(
+      visibleNotificationItems,
+      (item) => {
+        switch (notificationSort.key) {
+          case "client_name":
+            return item.client_name;
+          case "type":
+            return item.type;
+          case "date":
+            return Date.parse(item.date);
+        }
+      },
+      notificationSort.direction,
+    );
+  }, [notificationSort, visibleNotificationItems]);
 
   useEffect(() => {
     setPjPage(FIRST_PAGE);
@@ -566,6 +768,18 @@ export function CertificatesWorkspace() {
     setSelected(null);
     setWorkspaceMode("view");
     setShowDetailPassword(false);
+  }
+
+  function handlePjSort(key: PjSortKey) {
+    setPjSort((current) => nextSortState(current, key));
+  }
+
+  function handlePfSort(key: PfSortKey) {
+    setPfSort((current) => nextSortState(current, key));
+  }
+
+  function handleNotificationSort(key: NotificationSortKey) {
+    setNotificationSort((current) => nextSortState(current, key));
   }
 
   function handleSelectPj(pj: CertificatePj) {
@@ -1308,11 +1522,41 @@ export function CertificatesWorkspace() {
             <table className={CERTIFICATE_TABLE_CLASSNAME}>
               <thead className="border-b border-gray-200 bg-gray-50 dark:border-slate-800 dark:bg-slate-800/60">
                 <tr>
-                  <th className={CERTIFICATE_TABLE_NAME_HEAD_CELL_CLASSNAME}>Cliente</th>
-                  <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Responsável</th>
-                  <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Modelo</th>
-                  <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Vencimento</th>
-                  <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Arquivo</th>
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_NAME_HEAD_CELL_CLASSNAME}
+                    label="Cliente"
+                    sortKey="name"
+                    sortState={pjSort}
+                    onSort={handlePjSort}
+                  />
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}
+                    label="Responsável"
+                    sortKey="responsible"
+                    sortState={pjSort}
+                    onSort={handlePjSort}
+                  />
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}
+                    label="Modelo"
+                    sortKey="model"
+                    sortState={pjSort}
+                    onSort={handlePjSort}
+                  />
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}
+                    label="Vencimento"
+                    sortKey="expiration_date"
+                    sortState={pjSort}
+                    onSort={handlePjSort}
+                  />
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}
+                    label="Arquivo"
+                    sortKey="has_certificate"
+                    sortState={pjSort}
+                    onSort={handlePjSort}
+                  />
                   <th className={CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME}>Ações</th>
                 </tr>
               </thead>
@@ -1333,7 +1577,7 @@ export function CertificatesWorkspace() {
                     </td>
                   </tr>
                 ) : (
-                  pjItems.map((item) => {
+                  sortedPjItems.map((item) => {
                     const expirationTone = getExpirationTone(item.expiration_date);
                     const withCertificateClassName = item.has_certificate
                       ? `${CERTIFICATE_BADGE_CLASSNAME} bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300`
@@ -1413,11 +1657,41 @@ export function CertificatesWorkspace() {
             <table className={CERTIFICATE_TABLE_CLASSNAME}>
               <thead className="border-b border-gray-200 bg-gray-50 dark:border-slate-800 dark:bg-slate-800/60">
                 <tr>
-                  <th className={CERTIFICATE_TABLE_NAME_HEAD_CELL_CLASSNAME}>Titular</th>
-                  <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Empresa</th>
-                  <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Modelo</th>
-                  <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Vencimento</th>
-                  <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Arquivo</th>
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_NAME_HEAD_CELL_CLASSNAME}
+                    label="Titular"
+                    sortKey="name"
+                    sortState={pfSort}
+                    onSort={handlePfSort}
+                  />
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}
+                    label="Empresa"
+                    sortKey="enterprise"
+                    sortState={pfSort}
+                    onSort={handlePfSort}
+                  />
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}
+                    label="Modelo"
+                    sortKey="model"
+                    sortState={pfSort}
+                    onSort={handlePfSort}
+                  />
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}
+                    label="Vencimento"
+                    sortKey="expiration_date"
+                    sortState={pfSort}
+                    onSort={handlePfSort}
+                  />
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}
+                    label="Arquivo"
+                    sortKey="has_certificate"
+                    sortState={pfSort}
+                    onSort={handlePfSort}
+                  />
                   <th className={CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME}>Ações</th>
                 </tr>
               </thead>
@@ -1438,7 +1712,7 @@ export function CertificatesWorkspace() {
                     </td>
                   </tr>
                 ) : (
-                  pfItems.map((item) => {
+                  sortedPfItems.map((item) => {
                     const expirationTone = getExpirationTone(item.expiration_date);
 
                     return (
@@ -1518,9 +1792,27 @@ export function CertificatesWorkspace() {
             <table className={CERTIFICATE_TABLE_CLASSNAME}>
               <thead className="border-b border-gray-200 bg-gray-50 dark:border-slate-800 dark:bg-slate-800/60">
                 <tr>
-                  <th className={CERTIFICATE_TABLE_NAME_HEAD_CELL_CLASSNAME}>Cliente</th>
-                  <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Tipo</th>
-                  <th className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}>Data</th>
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_NAME_HEAD_CELL_CLASSNAME}
+                    label="Cliente"
+                    sortKey="client_name"
+                    sortState={notificationSort}
+                    onSort={handleNotificationSort}
+                  />
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}
+                    label="Tipo"
+                    sortKey="type"
+                    sortState={notificationSort}
+                    onSort={handleNotificationSort}
+                  />
+                  <SortableTableHeader
+                    className={CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME}
+                    label="Data"
+                    sortKey="date"
+                    sortState={notificationSort}
+                    onSort={handleNotificationSort}
+                  />
                   <th className={CERTIFICATE_TABLE_ACTION_HEAD_CELL_CLASSNAME}>Abrir</th>
                 </tr>
               </thead>
@@ -1541,7 +1833,7 @@ export function CertificatesWorkspace() {
                     </td>
                   </tr>
                 ) : (
-                  notificationItems.map((notification) => (
+                  sortedNotificationItems.map((notification) => (
                     <tr
                       key={notification.id}
                       className="border-b border-slate-200/80 align-top last:border-b-0 dark:border-slate-800"
