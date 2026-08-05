@@ -147,7 +147,7 @@ test("credenciais exigem criptografia e nenhuma decisão expõe login, senha, em
   }
 });
 
-test("solicitação resolve requester pelo colaborador e exige assignee explícito ou elegível único", () => {
+test("solicitação converte responsável legado ausente em null e quarentena referências inválidas", () => {
   const mappingRule = rule("tb_rh.solicitacoes");
   const destination = step(mappingRule, "rh-request-insert");
   const requester = destination.columns.find(({ sourceColumn }) => sourceColumn === "requerente");
@@ -157,10 +157,8 @@ test("solicitação resolve requester pelo colaborador e exige assignee explíci
   assert.equal(requester.transformation, "resolve_collaborator_user_reference");
   assert.match(requester.reason, /tb_rh\.colaboradores/i);
   assert.equal(assignee.destinationColumn, "assigned_to_user_id");
-  assert.equal(assignee.transformation, "resolve_required_collaborator_rh_assignee");
-  assert.match(assignee.reason, /tb_rh\.colaboradores/i);
-  assert.match(assignee.reason, /permissions\.rh/i);
-  assert.equal(assignee.nullHandling, "required_lookup_never_null");
+  assert.equal(assignee.transformation, "resolve_optional_collaborator_rh_assignee");
+  assert.equal(assignee.nullHandling, "zero_empty_or_missing_to_null");
   assert.ok(destination.dependencies.includes("tb_rh.colaboradores"));
   assert.ok(destination.dependencies.includes("tb_admin.usuarios"));
 
@@ -176,6 +174,11 @@ test("solicitação resolve requester pelo colaborador e exige assignee explíci
     requesterUserId: "user-requester",
     categoryResolution: "one",
   };
+
+  for (const atribuido of [0, "0", "", null, undefined]) {
+    assert.equal(mappingRule.emitRows({ ...base, atribuido }, required)[0].status, "prepared");
+  }
+
   assert.equal(
     mappingRule.emitRows(
       { ...base, atribuido: 44 },
@@ -184,11 +187,13 @@ test("solicitação resolve requester pelo colaborador e exige assignee explíci
     "prepared",
   );
 
+  const [sameRequesterAssignee] = mappingRule.emitRows(
+    { ...base, atribuido: 44 },
+    { ...required, assigneeResolution: "one", assigneeUserId: "user-requester" },
+  );
+  assert.equal(sameRequesterAssignee.status, "quarantine");
   assert.equal(
-    mappingRule.emitRows(
-      { ...base, atribuido: 44 },
-      { ...required, assigneeResolution: "one", assigneeUserId: "user-requester" },
-    )[0].reasonCode,
+    sameRequesterAssignee.reasonCode,
     "ASSIGNEE_EQUALS_REQUESTER",
   );
 
@@ -206,66 +211,6 @@ test("solicitação resolve requester pelo colaborador e exige assignee explíci
       { ...required, assigneeResolution: "one", assigneeUserId: "user-assignee" },
     )[0].reasonCode,
     "ASSIGNEE_REFERENCE_INVALID",
-  );
-
-  const organizationId = "e8048d1c-0830-45d7-84de-68e20abd685b";
-  const eligible = {
-    id: "user-assignee",
-    status: "active",
-    organizationId,
-    departmentOrganizationId: null,
-    permissions: [{ organizationId, rh: 1 }],
-  };
-  assert.equal(
-    mappingRule.emitRows(
-      { ...base, atribuido: 0 },
-      { ...required, eligibleAssigneeCandidates: [eligible] },
-    )[0].status,
-    "prepared",
-  );
-
-  const invalidCandidateCases = [
-    { ...eligible, id: "user-requester" },
-    { ...eligible, status: "inactive" },
-    { ...eligible, organizationId: "other-organization" },
-    { ...eligible, permissions: [{ organizationId, rh: 0 }] },
-  ];
-  for (const candidate of invalidCandidateCases) {
-    const [emission] = mappingRule.emitRows(
-      { ...base, atribuido: 0 },
-      { ...required, eligibleAssigneeCandidates: [candidate] },
-    );
-    assert.equal(emission.status, "quarantine");
-    assert.equal(emission.reasonCode, "ELIGIBLE_RH_ASSIGNEE_INELIGIBLE");
-  }
-
-  assert.equal(
-    mappingRule.emitRows({ ...base, atribuido: 0 }, required)[0].reasonCode,
-    "ELIGIBLE_RH_ASSIGNEE_LOOKUP_NOT_EXECUTED",
-  );
-  assert.equal(
-    mappingRule.emitRows(
-      { ...base, atribuido: 0 },
-      { ...required, eligibleAssigneeResolution: "one" },
-    )[0].reasonCode,
-    "ELIGIBLE_RH_ASSIGNEE_LOOKUP_NOT_EXECUTED",
-  );
-  assert.equal(
-    mappingRule.emitRows(
-      { ...base, atribuido: 0 },
-      { ...required, eligibleAssigneeCandidates: [] },
-    )[0].reasonCode,
-    "ELIGIBLE_RH_ASSIGNEE_NOT_FOUND",
-  );
-  assert.equal(
-    mappingRule.emitRows(
-      { ...base, atribuido: 0 },
-      {
-        ...required,
-        eligibleAssigneeCandidates: [eligible, { ...eligible, id: "user-assignee-2" }],
-      },
-    )[0].reasonCode,
-    "ELIGIBLE_RH_ASSIGNEE_AMBIGUOUS",
   );
 });
 

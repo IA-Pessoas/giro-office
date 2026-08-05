@@ -578,6 +578,8 @@ export const RH_PESSOAL_EVIDENCE = Object.freeze(
       legacyModule: "recursos humanos",
       legacyReferences: [
         "classes/Solicitacao.php:161",
+        "classes/Solicitacao.php:162",
+        "classes/Solicitacao.php:243",
         "classes/Solicitacao.php:244",
         "classes/Solicitacao.php:246",
         "rh/pages/solicitacoes/solicitacao.php:4",
@@ -587,12 +589,12 @@ export const RH_PESSOAL_EVIDENCE = Object.freeze(
         "requerente e atribuido recebem IDs de tb_rh.colaboradores; categoria referencia tb_rh.solicitacoes_categorias.id.",
       ],
       currentContractEvidence: [
-        "infra/prisma/schema.prisma:1839",
-        "services/rh-service/src/services/requestService.ts:86",
-        "services/rh-service/src/services/requestService.ts:129",
+        "infra/prisma/schema.prisma:1845",
+        "services/rh-service/src/services/requestService.ts:101",
+        "services/rh-service/src/services/requestService.ts:117",
       ],
       reason:
-        "Solicitações possuem contrato atual; requester usa o vínculo de colaborador e assignee obrigatório exige resolução única explícita.",
+        "Solicitações possuem contrato atual; atribuido = 0 representa ausência de responsável na criação legada e assumirRH registra a atribuição posterior. Valores não zero resolvem o User pelo vínculo de colaborador.",
     }),
     confirmed({
       sourceTable: "tb_rh.solicitacoes_categorias",

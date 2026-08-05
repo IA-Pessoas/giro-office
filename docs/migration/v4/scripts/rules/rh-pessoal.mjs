@@ -666,10 +666,7 @@ function createRhRequestRule() {
     }
 
     if (isMissingLegacyReference(row?.atribuido)) {
-      return classifyEligibleRhAssigneeCandidates(
-        context?.eligibleAssigneeCandidates,
-        context.requesterUserId,
-      );
+      return prepared();
     }
     if (!isValidLegacyIdentity(row?.atribuido)) {
       return quarantine("atribuido", "ASSIGNEE_REFERENCE_INVALID");
@@ -713,11 +710,11 @@ function createRhRequestRule() {
             reason:
               "requerente referencia tb_rh.colaboradores.id e deve resolver o User ligado, nunca o mesmo id em tb_admin.usuarios.",
           }),
-          mapped("atribuido", "assigned_to_user_id", "resolve_required_collaborator_rh_assignee", {
+          mapped("atribuido", "assigned_to_user_id", "resolve_optional_collaborator_rh_assignee", {
             ...referenceOptions(),
-            nullHandling: "required_lookup_never_null",
+            nullHandling: "zero_empty_or_missing_to_null",
             reason:
-              "Assignee explícito referencia tb_rh.colaboradores.id e resolve seu User no tenant; ausência exige exatamente um User ativo no tenant, diferente do requester e com permissions.rh >= 1.",
+              "atribuido referencia tb_rh.colaboradores quando não zero; 0, vazio ou ausência representam solicitação ainda sem responsável e mapeiam para NULL.",
           }),
           mapped(
             "categoria",
@@ -731,7 +728,7 @@ function createRhRequestRule() {
         ],
         constants: { organization_id: ORGANIZATION_ID },
         defaults: { urgency: "Low", status: "New" },
-        precedence: ["legacy_identity", "explicit_assignee_user", "single_eligible_rh_assignee"],
+        precedence: ["legacy_identity", "explicit_assignee_user", "unassigned_null"],
         dependencies: ["tb_rh.colaboradores", "tb_admin.usuarios", "tb_rh.solicitacoes_categorias"],
       },
     ],
@@ -1009,45 +1006,6 @@ function classifyResolution(state, field, reasonPrefix) {
   if (state === "zero") return quarantine(field, `${reasonPrefix}_NOT_FOUND`);
   if (state === "many") return quarantine(field, `${reasonPrefix}_AMBIGUOUS`);
   return quarantine(field, `${reasonPrefix}_LOOKUP_NOT_EXECUTED`);
-}
-
-function classifyEligibleRhAssigneeCandidates(candidates, requesterUserId) {
-  if (!Array.isArray(candidates)) {
-    return quarantine("atribuido", "ELIGIBLE_RH_ASSIGNEE_LOOKUP_NOT_EXECUTED");
-  }
-  if (candidates.length === 0) {
-    return quarantine("atribuido", "ELIGIBLE_RH_ASSIGNEE_NOT_FOUND");
-  }
-  const eligible = candidates.filter((candidate) =>
-    isEligibleRhAssigneeCandidate(candidate, requesterUserId),
-  );
-  if (eligible.length === 0) {
-    return quarantine("atribuido", "ELIGIBLE_RH_ASSIGNEE_INELIGIBLE");
-  }
-  if (eligible.length > 1) {
-    return quarantine("atribuido", "ELIGIBLE_RH_ASSIGNEE_AMBIGUOUS");
-  }
-  return prepared();
-}
-
-function isEligibleRhAssigneeCandidate(candidate, requesterUserId) {
-  if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)) {
-    return false;
-  }
-  if (!isResolvedUserId(candidate.id) || candidate.id === requesterUserId) return false;
-  if (candidate.status !== "active") return false;
-
-  const belongsToOrganization =
-    candidate.organizationId === ORGANIZATION_ID ||
-    (candidate.organizationId === null && candidate.departmentOrganizationId === ORGANIZATION_ID);
-  if (!belongsToOrganization || !Array.isArray(candidate.permissions)) return false;
-
-  return candidate.permissions.some(
-    (permission) =>
-      permission?.organizationId === ORGANIZATION_ID &&
-      typeof permission.rh === "number" &&
-      permission.rh >= 1,
-  );
 }
 
 function isResolvedUserId(value) {
