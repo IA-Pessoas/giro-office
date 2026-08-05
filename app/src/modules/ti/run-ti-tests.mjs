@@ -141,6 +141,49 @@ await runTest("ti request transfer UI uses request-scoped candidates and preserv
   );
 });
 
+await runTest("ti request detail card keeps assignee actions from overflowing", async () => {
+  const tiRequestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const responsibleLabel = '<dt className={tiLabelClassName}>Responsável</dt>';
+  const responsibleLabelIndex = tiRequestsTabSource.indexOf(responsibleLabel);
+  const responsibleBlockStart = tiRequestsTabSource.lastIndexOf(
+    '<div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">',
+    responsibleLabelIndex,
+  );
+  const responsibleBlockEnd = tiRequestsTabSource.indexOf("</div>", responsibleLabelIndex);
+
+  assert.ok(responsibleLabelIndex >= 0);
+  assert.ok(responsibleBlockStart >= 0);
+  assert.ok(responsibleBlockEnd > responsibleBlockStart);
+
+  const responsibleBlock = tiRequestsTabSource.slice(
+    responsibleBlockStart,
+    responsibleBlockEnd + "</div>".length,
+  );
+
+  assert.match(
+    responsibleBlock,
+    /<dd className="mt-1 min-w-0 flex flex-col items-start gap-2 text-slate-700 dark:text-slate-200">/,
+  );
+  assert.match(responsibleBlock, /canManageRequests && !hasAssignee\(activeRequest\) \?/);
+  assert.match(responsibleBlock, /canTransferRequest\(activeRequest\) \?/);
+  assert.match(
+    responsibleBlock,
+    /className={cn\(\s*tiSecondaryButtonClassName,\s*"h-auto min-h-8 min-w-\[104px\] max-w-full justify-center px-3 py-1\.5 text-xs",\s*\)}/,
+  );
+  assert.doesNotMatch(
+    responsibleBlock,
+    /className={cn\(\s*tiSecondaryButtonClassName,\s*"h-8 min-w-\[104px\] max-w-full justify-center px-3 text-xs",\s*\)}/,
+  );
+  assert.match(
+    responsibleBlock,
+    /canManageRequests && !hasAssignee\(activeRequest\) \?[\s\S]*className={cn\(\s*tiSecondaryButtonClassName,\s*"h-auto min-h-8 min-w-\[104px\] max-w-full justify-center px-3 py-1\.5 text-xs",\s*\)}[\s\S]*<span className="min-w-0 whitespace-normal break-words text-center">\s*\{assignRequestMutation\.isPending \? "Assumindo\.\.\." : "Assumir"\}\s*<\/span>/,
+  );
+  assert.match(
+    responsibleBlock,
+    /canTransferRequest\(activeRequest\) \?[\s\S]*aria-label="Transferir responsabilidade"[\s\S]*title="Transferir responsabilidade"[\s\S]*className={cn\(\s*tiSecondaryButtonClassName,\s*"h-auto min-h-8 min-w-\[104px\] max-w-full justify-center px-3 py-1\.5 text-xs",\s*\)}[\s\S]*<span className="min-w-0 whitespace-normal break-words text-center">\s*Transferir\s*<\/span>/,
+  );
+});
+
 async function readModuleSource(relativePath) {
   return readFile(join(moduleRoot, relativePath), "utf8");
 }

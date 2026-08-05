@@ -1128,20 +1128,20 @@ export function TiRequestsTab() {
                     </div>
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
                       <dt className={tiLabelClassName}>Responsável</dt>
-                      <dd className="mt-1 flex flex-col items-start gap-2 text-slate-700 dark:text-slate-200">
+                      <dd className="mt-1 min-w-0 flex flex-col items-start gap-2 text-slate-700 dark:text-slate-200">
                         <span>{getAssigneeLabel(activeRequest)}</span>
                         {canManageRequests && !hasAssignee(activeRequest) ? (
                           <button
                             type="button"
                             className={cn(
                               tiSecondaryButtonClassName,
-                              "h-8 min-w-[104px] justify-center px-3 text-xs whitespace-nowrap",
+                              "h-auto min-h-8 min-w-[104px] max-w-full justify-center px-3 py-1.5 text-xs",
                             )}
                             disabled={assignRequestMutation.isPending || !currentUser?.id}
                             onClick={handleAssignToMe}
                           >
                             <UserCheck className="h-3.5 w-3.5" />
-                            <span>
+                            <span className="min-w-0 whitespace-normal break-words text-center">
                               {assignRequestMutation.isPending ? "Assumindo..." : "Assumir"}
                             </span>
                           </button>
@@ -1149,15 +1149,19 @@ export function TiRequestsTab() {
                         {canTransferRequest(activeRequest) ? (
                           <button
                             type="button"
+                            aria-label="Transferir responsabilidade"
+                            title="Transferir responsabilidade"
                             className={cn(
                               tiSecondaryButtonClassName,
-                              "h-8 min-w-[104px] justify-center px-3 text-xs whitespace-nowrap",
+                              "h-auto min-h-8 min-w-[104px] max-w-full justify-center px-3 py-1.5 text-xs",
                             )}
                             disabled={assignRequestMutation.isPending}
                             onClick={handleOpenTransferDialog}
                           >
                             <UserCheck className="h-3.5 w-3.5" />
-                            <span>Transferir responsabilidade</span>
+                            <span className="min-w-0 whitespace-normal break-words text-center">
+                              Transferir
+                            </span>
                           </button>
                         ) : null}
                       </dd>
