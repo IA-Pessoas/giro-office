@@ -284,8 +284,8 @@ export async function writeMappingPackage(
   if (provenance === undefined) {
     throw new Error("Resultado autenticado com provenance é obrigatório");
   }
-  validateMappingCompleteness(result, provenance.bindings);
   await assertSafePackagePath({ packageDir, protectedPaths });
+  validateMappingCompleteness(result, provenance.bindings);
   const artifacts = buildArtifacts(result);
   addExtraArtifacts(artifacts, extraArtifacts, provenance.bindings);
   for (const [relativePath, content] of artifacts) {

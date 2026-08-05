@@ -315,6 +315,15 @@ function authenticatedReportFor(fixture, overrides = {}) {
   });
 }
 
+function authenticatedBindingsFor(fixture) {
+  return {
+    inventory: fixture.inventory,
+    evidenceRegistry: fixture.evidenceRegistry,
+    ruleRegistry: fixture.ruleRegistry,
+    prismaCatalog: fixture.prismaCatalog,
+  };
+}
+
 async function replaceDumpAndInventory(fixture, sourceTable, content, rowCount) {
   const inspection = fixture.inventory.tables.find((table) => table.sourceTable === sourceTable);
   await writeFile(path.join(fixture.sourceDir, inspection.relativePath), content);
@@ -1053,6 +1062,236 @@ test("relatório autenticado exige as mesmas bindings de evidence, rules e Prism
       fixture.ruleRegistry.get("legacy.multi").emitRows = originalEmitRows;
     }
     assert.doesNotMatch(JSON.stringify(officialReport), /function\s*\(|=>|SENTINEL_RAW_SECRET/);
+  });
+});
+
+test("snapshot tipado distingue callback de objeto descritor equivalente", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const rule = fixture.ruleRegistry.get("legacy.multi");
+    const originalEmitRows = rule.emitRows;
+    const report = authenticatedReportFor(fixture);
+    rule.emitRows = {
+      kind: "function",
+      name: originalEmitRows.name,
+      digest: crypto
+        .createHash("sha256")
+        .update(Function.prototype.toString.call(originalEmitRows), "utf8")
+        .digest("hex"),
+    };
+    try {
+      assert.throws(
+        () => validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+        /integridade|snapshot|tipo|função/i,
+      );
+    } finally {
+      rule.emitRows = originalEmitRows;
+    }
+    assert.equal(
+      validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+      true,
+    );
+  });
+});
+
+test("snapshot tipado distingue Map de array estruturalmente equivalente", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const rule = fixture.ruleRegistry.get("legacy.multi");
+    const originalProbe = new Map([["probe", "value"]]);
+    rule.provenanceProbe = originalProbe;
+    const report = authenticatedReportFor(fixture);
+    rule.provenanceProbe = [["probe", "value"]];
+    try {
+      assert.throws(
+        () => validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+        /integridade|snapshot|tipo|map|array/i,
+      );
+    } finally {
+      rule.provenanceProbe = originalProbe;
+    }
+    assert.equal(
+      validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+      true,
+    );
+    delete rule.provenanceProbe;
+  });
+});
+
+test("proveniência exige a referência exata de callback mesmo com source idêntico", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const rule = fixture.ruleRegistry.get("legacy.multi");
+    const originalEmitRows = rule.emitRows;
+    const createCallback = () => function sameSourceCallback() {};
+    const authenticatedCallback = createCallback();
+    const clonedCallback = createCallback();
+    assert.notEqual(authenticatedCallback, clonedCallback);
+    assert.equal(
+      Function.prototype.toString.call(authenticatedCallback),
+      Function.prototype.toString.call(clonedCallback),
+    );
+    rule.emitRows = authenticatedCallback;
+    const report = authenticatedReportFor(fixture);
+    rule.emitRows = clonedCallback;
+    try {
+      assert.throws(
+        () => validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+        /integridade|snapshot|referência|função/i,
+      );
+    } finally {
+      rule.emitRows = authenticatedCallback;
+    }
+    assert.equal(
+      validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+      true,
+    );
+    rule.emitRows = originalEmitRows;
+  });
+});
+
+test("snapshot rejeita valores sem representação canônica", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const rule = fixture.ruleRegistry.get("legacy.multi");
+    class CustomValue {
+      constructor() {
+        this.value = "custom";
+      }
+    }
+    const cases = [
+      ["undefined", undefined],
+      ["NaN", Number.NaN],
+      ["Infinity", Number.POSITIVE_INFINITY],
+      ["Symbol", Symbol("probe")],
+      ["Date", new Date(0)],
+      ["Set", new Set(["probe"])],
+      ["RegExp", /probe/u],
+      ["Buffer", Buffer.from("probe")],
+      ["custom prototype", new CustomValue()],
+    ];
+    for (const [label, value] of cases) {
+      rule.provenanceProbe = value;
+      assert.throws(
+        () => authenticatedReportFor(fixture),
+        /binding|snapshot|canônic|suportado|tipo|finito|symbol|prototype/i,
+        label,
+      );
+      delete rule.provenanceProbe;
+    }
+  });
+});
+
+test("snapshot rejeita accessors e propriedades inesperadas sem invocar getter", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const rule = fixture.ruleRegistry.get("legacy.multi");
+    let getterCalls = 0;
+    Object.defineProperty(rule, "provenanceProbe", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return "probe";
+      },
+    });
+    try {
+      assert.throws(
+        () => authenticatedReportFor(fixture),
+        /accessor|binding|snapshot|propriedade/i,
+      );
+    } finally {
+      delete rule.provenanceProbe;
+    }
+    assert.equal(getterCalls, 0);
+
+    const symbolKey = Symbol("probe");
+    rule[symbolKey] = "value";
+    try {
+      assert.throws(() => authenticatedReportFor(fixture), /symbol|binding|snapshot|propriedade/i);
+    } finally {
+      delete rule[symbolKey];
+    }
+
+    Object.defineProperty(rule, "provenanceProbe", {
+      configurable: true,
+      enumerable: false,
+      value: "probe",
+    });
+    try {
+      assert.throws(() => authenticatedReportFor(fixture), /enumer|binding|snapshot|propriedade/i);
+    } finally {
+      delete rule.provenanceProbe;
+    }
+  });
+});
+
+test("snapshot rejeita propriedades custom e chaves Map canonicamente duplicadas", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const rule = fixture.ruleRegistry.get("legacy.multi");
+    const customArray = ["probe"];
+    customArray.extra = "value";
+    rule.provenanceProbe = customArray;
+    assert.throws(() => authenticatedReportFor(fixture), /array|binding|snapshot|propriedade/i);
+
+    const customMap = new Map([["probe", "value"]]);
+    customMap.extra = "value";
+    rule.provenanceProbe = customMap;
+    assert.throws(() => authenticatedReportFor(fixture), /map|binding|snapshot|propriedade/i);
+
+    rule.provenanceProbe = new Map([
+      [{ id: 1 }, "first"],
+      [{ id: 1 }, "second"],
+    ]);
+    assert.throws(() => authenticatedReportFor(fixture), /map|chave|duplicad|ambígu/i);
+    delete rule.provenanceProbe;
+  });
+});
+
+test("writer revalida MappingResult depois do último await antes de materializar", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const result = await buildFixtureMapping(fixture);
+    const packageDir = path.join(directory, "package");
+    const reportPath = "reports/previous-mapping-comparison.json";
+    const officialReport = authenticatedReportFor(fixture);
+    await writeMappingPackage(packageDir, result, {
+      protectedPaths: [fixture.sourceDir],
+      extraArtifacts: { [reportPath]: officialReport },
+    });
+    const beforeRejected = await readPackageFiles(packageDir);
+
+    const originalEvidence = fixture.evidenceRegistry.get("legacy.multi");
+    const alternativeEvidence = {
+      ...originalEvidence,
+      currentContractEvidence: ["fixture.prisma:2"],
+    };
+    fixture.evidenceRegistry.set("legacy.multi", alternativeEvidence);
+    const alternativeReport = authenticatedReportFor(fixture);
+    fixture.evidenceRegistry.set("legacy.multi", originalEvidence);
+
+    let rejection;
+    const write = writeMappingPackage(packageDir, result, {
+      protectedPaths: [fixture.sourceDir],
+      extraArtifacts: { [reportPath]: alternativeReport },
+    });
+    fixture.evidenceRegistry.set("legacy.multi", alternativeEvidence);
+    try {
+      await write;
+    } catch (error) {
+      rejection = error;
+    } finally {
+      fixture.evidenceRegistry.set("legacy.multi", originalEvidence);
+    }
+
+    assert.match(rejection?.message ?? "", /proveniência|snapshot|evidência|registry|binding/i);
+    assert.deepEqual(await readPackageFiles(packageDir), beforeRejected);
+    await writeMappingPackage(packageDir, result, {
+      protectedPaths: [fixture.sourceDir],
+      extraArtifacts: { [reportPath]: officialReport },
+    });
+    assert.deepEqual(await readPackageFiles(packageDir), beforeRejected);
   });
 });
 

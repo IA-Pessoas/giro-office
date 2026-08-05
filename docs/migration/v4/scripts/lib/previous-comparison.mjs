@@ -284,61 +284,240 @@ function createComparisonProvenance({
   };
   return {
     bindings,
-    digests: createBindingDigests(bindings),
+    snapshots: createBindingSnapshots(bindings),
   };
 }
 
-function createBindingDigests(bindings) {
+function createBindingSnapshots(bindings) {
   return {
-    inventory: digestBinding(bindings.inventory),
-    evidenceRegistry: digestBinding(bindings.evidenceRegistry),
-    ruleRegistry: digestBinding(bindings.ruleRegistry),
-    prismaCatalog: bindings.prismaCatalog === null ? null : digestBinding(bindings.prismaCatalog),
+    inventory: snapshotBinding(bindings.inventory),
+    evidenceRegistry: snapshotBinding(bindings.evidenceRegistry),
+    ruleRegistry: snapshotBinding(bindings.ruleRegistry),
+    prismaCatalog: bindings.prismaCatalog === null ? null : snapshotBinding(bindings.prismaCatalog),
   };
 }
 
 function validateComparisonBindingIntegrity(provenance) {
-  const currentDigests = createBindingDigests(provenance.bindings);
+  const currentSnapshots = createBindingSnapshots(provenance.bindings);
   for (const field of ["inventory", "evidenceRegistry", "ruleRegistry", "prismaCatalog"]) {
-    if (currentDigests[field] !== provenance.digests[field]) {
+    const expected = provenance.snapshots[field];
+    const current = currentSnapshots[field];
+    if (current?.digest !== expected?.digest) {
       throw new Error(`Integridade do snapshot ${field} do relatório foi violada`);
+    }
+    validateFunctionReferences(field, expected?.functionReferences, current?.functionReferences);
+  }
+}
+
+function snapshotBinding(value) {
+  const snapshot = snapshotBindingValue(value, new WeakSet());
+  const functionReferences = snapshot.functionReferences
+    .map(({ path, reference }) => ({ path: JSON.stringify(path), reference }))
+    .sort((left, right) => compareText(left.path, right.path));
+  for (let index = 1; index < functionReferences.length; index += 1) {
+    if (functionReferences[index - 1].path === functionReferences[index].path) {
+      throw new TypeError("Caminho de função duplicado na binding");
+    }
+  }
+  return {
+    digest: sha256(JSON.stringify(snapshot.encoding)),
+    functionReferences,
+  };
+}
+
+function validateFunctionReferences(field, expected, current) {
+  if (!Array.isArray(expected) || !Array.isArray(current) || expected.length !== current.length) {
+    throw new Error(`Integridade das referências de função ${field} foi violada`);
+  }
+  for (let index = 0; index < expected.length; index += 1) {
+    if (
+      expected[index].path !== current[index].path ||
+      expected[index].reference !== current[index].reference
+    ) {
+      throw new Error(`Integridade das referências de função ${field} foi violada`);
     }
   }
 }
 
-function digestBinding(value) {
-  return sha256(canonicalJson(snapshotBindingValue(value)));
-}
-
-function snapshotBindingValue(value, active = new WeakSet()) {
+function snapshotBindingValue(value, active) {
+  if (value === null) return bindingLeaf(["null"]);
+  if (typeof value === "boolean") return bindingLeaf(["boolean", value]);
+  if (typeof value === "string") return bindingLeaf(["string", value]);
+  if (typeof value === "number") {
+    if (!Number.isFinite(value))
+      throw new TypeError("Number não finito não é permitido em binding");
+    return bindingLeaf(["number", Object.is(value, -0) ? "-0" : String(value)]);
+  }
+  if (typeof value === "bigint") throw new TypeError("BigInt não é suportado em binding");
+  if (typeof value === "undefined") {
+    throw new TypeError("undefined não é permitido em binding");
+  }
+  if (typeof value === "symbol") throw new TypeError("Symbol não é permitido em binding");
   if (typeof value === "function") {
+    assertSupportedFunction(value);
+    const name = Object.getOwnPropertyDescriptor(value, "name")?.value;
     return {
-      kind: "function",
-      name: value.name,
-      digest: sha256(Function.prototype.toString.call(value)),
+      encoding: [
+        "function",
+        typeof name === "string" ? name : "",
+        sha256(Function.prototype.toString.call(value)),
+      ],
+      functionReferences: [{ path: [], reference: value }],
     };
   }
-  if (value === null || typeof value !== "object") return value;
+  if (typeof value !== "object") throw new TypeError("Tipo de binding não suportado");
   if (active.has(value)) throw new TypeError("Binding cíclica não é permitida");
   active.add(value);
-  let snapshot;
-  if (value instanceof Map) {
-    snapshot = [...value]
-      .map(([key, entry]) => [key, snapshotBindingValue(entry, active)])
-      .sort(([left], [right]) => compareText(String(left), String(right)));
-  } else if (Array.isArray(value)) {
-    snapshot = value.map((entry) => snapshotBindingValue(entry, active));
-  } else if (isRecord(value)) {
-    snapshot = Object.fromEntries(
-      Object.keys(value)
-        .sort(compareText)
-        .map((key) => [key, snapshotBindingValue(value[key], active)]),
-    );
-  } else {
-    throw new TypeError("Tipo de binding não suportado");
+  try {
+    if (value instanceof Map) return snapshotBindingMap(value, active);
+    if (Array.isArray(value)) return snapshotBindingArray(value, active);
+    if (Object.getPrototypeOf(value) === Object.prototype) {
+      return snapshotBindingObject(value, active);
+    }
+    throw new TypeError("Protótipo especial não é permitido em binding");
+  } finally {
+    active.delete(value);
   }
-  active.delete(value);
-  return snapshot;
+}
+
+function snapshotBindingObject(value, active) {
+  const keys = assertPlainDataProperties(value, "object").sort(compareText);
+  const entries = [];
+  const functionReferences = [];
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const child = snapshotBindingValue(descriptor.value, active);
+    entries.push([key, child.encoding]);
+    functionReferences.push(
+      ...prefixFunctionReferences(child.functionReferences, ["object-property", key]),
+    );
+  }
+  return { encoding: ["object", entries], functionReferences };
+}
+
+function snapshotBindingArray(value, active) {
+  if (Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new TypeError("Protótipo de array não suportado em binding");
+  }
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.some((key) => typeof key === "symbol")) {
+    throw new TypeError("Array com Symbol não é permitido em binding");
+  }
+  if (
+    ownKeys.length !== value.length + 1 ||
+    ownKeys.some(
+      (key) =>
+        key !== "length" &&
+        (!/^(?:0|[1-9][0-9]*)$/.test(key) ||
+          !Number.isSafeInteger(Number(key)) ||
+          Number(key) >= value.length),
+    )
+  ) {
+    throw new TypeError(
+      "Array com propriedade custom ou posição ausente não é permitido em binding",
+    );
+  }
+  const entries = [];
+  const functionReferences = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (descriptor === undefined || !("value" in descriptor) || descriptor.enumerable !== true) {
+      throw new TypeError("Array com accessor ou posição não enumerável não é permitido");
+    }
+    const child = snapshotBindingValue(descriptor.value, active);
+    entries.push(child.encoding);
+    functionReferences.push(
+      ...prefixFunctionReferences(child.functionReferences, ["array-index", String(index)]),
+    );
+  }
+  return { encoding: ["array", entries], functionReferences };
+}
+
+function snapshotBindingMap(value, active) {
+  if (Object.getPrototypeOf(value) !== Map.prototype || Reflect.ownKeys(value).length !== 0) {
+    throw new TypeError("Map com protótipo ou propriedade custom não é permitido em binding");
+  }
+  const entries = [];
+  for (const [key, entryValue] of Map.prototype.entries.call(value)) {
+    const keySnapshot = snapshotBindingValue(key, active);
+    const keyCanonical = JSON.stringify(keySnapshot.encoding);
+    const valueSnapshot = snapshotBindingValue(entryValue, active);
+    entries.push({ keyCanonical, keySnapshot, valueSnapshot });
+  }
+  entries.sort((left, right) => compareText(left.keyCanonical, right.keyCanonical));
+  for (let index = 1; index < entries.length; index += 1) {
+    if (entries[index - 1].keyCanonical === entries[index].keyCanonical) {
+      throw new TypeError("Map possui chave canônica duplicada ou ambígua");
+    }
+  }
+  const functionReferences = [];
+  for (const entry of entries) {
+    functionReferences.push(
+      ...prefixFunctionReferences(entry.keySnapshot.functionReferences, [
+        "map-key",
+        entry.keyCanonical,
+      ]),
+      ...prefixFunctionReferences(entry.valueSnapshot.functionReferences, [
+        "map-value",
+        entry.keyCanonical,
+      ]),
+    );
+  }
+  return {
+    encoding: [
+      "map",
+      entries.map(({ keySnapshot, valueSnapshot }) => [
+        keySnapshot.encoding,
+        valueSnapshot.encoding,
+      ]),
+    ],
+    functionReferences,
+  };
+}
+
+function bindingLeaf(encoding) {
+  return { encoding, functionReferences: [] };
+}
+
+function prefixFunctionReferences(references, segment) {
+  return references.map(({ path, reference }) => ({ path: [segment, ...path], reference }));
+}
+
+function assertPlainDataProperties(value, label) {
+  const keys = Reflect.ownKeys(value);
+  if (keys.some((key) => typeof key === "symbol")) {
+    throw new TypeError(`${label} com Symbol não é permitido em binding`);
+  }
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor === undefined || !("value" in descriptor) || descriptor.enumerable !== true) {
+      throw new TypeError(`${label} com accessor ou propriedade não enumerável não é permitido`);
+    }
+  }
+  return keys;
+}
+
+function assertSupportedFunction(value) {
+  const allowedKeys = new Set(["length", "name", "arguments", "caller", "prototype"]);
+  const keys = Reflect.ownKeys(value);
+  if (
+    keys.some((key) => typeof key === "symbol" || typeof key !== "string" || !allowedKeys.has(key))
+  ) {
+    throw new TypeError("Função com propriedade custom ou Symbol não é permitida em binding");
+  }
+  const name = Object.getOwnPropertyDescriptor(value, "name");
+  const length = Object.getOwnPropertyDescriptor(value, "length");
+  if (
+    name === undefined ||
+    !("value" in name) ||
+    typeof name.value !== "string" ||
+    length === undefined ||
+    !("value" in length) ||
+    !Number.isSafeInteger(length.value) ||
+    length.value < 0
+  ) {
+    throw new TypeError("Descritores de função inválidos em binding");
+  }
 }
 
 export async function loadPreviousMappingArtifacts({ previousDocsDir }) {
