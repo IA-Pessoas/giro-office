@@ -270,6 +270,18 @@ runTest("union cnpj payload normalization strips formatting before submit", () =
   );
 });
 
+runTest("union form component keeps the extracted helper identifiers", () => {
+  const section = readFileSync(
+    "src/modules/pessoal/components/PessoalUnionsSection.tsx",
+    "utf8",
+  );
+
+  assert.match(section, /buildPessoalUnionFormValues\(union\)/);
+  assert.match(section, /buildPessoalUnionFormPayload\(formValues\)/);
+  assert.match(section, /buildPessoalUnionFormValues\(savedUnion\)/);
+  assert.doesNotMatch(section, /buildUnionFormValues|buildUnionFormPayload/);
+});
+
 runTest("union management sends remote search and pagination", () => {
   assert.deepEqual(
     buildPessoalUnionListParams({ search: " Metal ", page: 2, limit: 20 }),

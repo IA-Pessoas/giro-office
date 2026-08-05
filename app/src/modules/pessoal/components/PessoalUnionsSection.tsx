@@ -121,7 +121,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
 
   function handleStartEdit(union: PessoalUnion) {
     setSelectedUnion(union);
-    setFormValues(buildUnionFormValues(union));
+    setFormValues(buildPessoalUnionFormValues(union));
     setFormError(null);
     setIsFormOpen(true);
   }
@@ -181,7 +181,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
       return;
     }
 
-    const payload = buildUnionFormPayload(formValues);
+    const payload = buildPessoalUnionFormPayload(formValues);
 
     if (!payload.name || !payload.cnpj) {
       setFormError("Informe nome e CNPJ.");
@@ -196,7 +196,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
         : await createMutation.mutateAsync(payload);
 
       setSelectedUnion(savedUnion);
-      setFormValues(buildUnionFormValues(savedUnion));
+      setFormValues(buildPessoalUnionFormValues(savedUnion));
       setIsFormOpen(false);
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível salvar o sindicato."));
