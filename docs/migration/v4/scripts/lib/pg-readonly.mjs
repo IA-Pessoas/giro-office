@@ -52,8 +52,8 @@ const FORBIDDEN_FUNCTIONS = new Set([
   "PG_TRY_ADVISORY_LOCK",
   "SETVAL",
 ]);
-const ALLOWED_READ_ONLY_FUNCTIONS = new Set(["ANY", "COUNT"]);
-const PARENTHESIZED_SQL_KEYWORDS = new Set(["AS", "EXISTS", "FROM", "IN"]);
+const ALLOWED_READ_ONLY_FUNCTIONS = new Set(["ANY", "COUNT", "UNNEST"]);
+const PARENTHESIZED_SQL_KEYWORDS = new Set(["AS", "EXISTS", "FILTER", "FROM", "IN"]);
 
 export async function loadPg() {
   const require = createRequire(import.meta.url);
@@ -96,7 +96,12 @@ export async function createReadOnlyClient({ databaseUrl, loadPgModule = loadPg 
 }
 
 export function assertReadOnlyQuery(query) {
-  const text = extractQueryText(query);
+  const { text } = snapshotQuery(query);
+  assertReadOnlySql(text);
+  return true;
+}
+
+function assertReadOnlySql(text) {
   const tokens = tokenizeConservativeSql(text);
   if (tokens.length === 0) throw readOnlyError();
 
@@ -123,7 +128,6 @@ export function assertReadOnlyQuery(query) {
     throw readOnlyError();
   }
   if (hasLockingSelect(tokens)) throw readOnlyError();
-  return true;
 }
 
 export async function withReadOnlyTransaction(client, callback) {
@@ -143,15 +147,13 @@ export async function withReadOnlyTransaction(client, callback) {
       query: async (query, values) => {
         if (!transactionActive)
           throw new Error("Transação encerrada; query somente leitura rejeitada.");
-        if (values === undefined) {
-          assertReadOnlyQuery(query);
-          return client.query(query);
+        const snapshot = snapshotQuery(query, values);
+        assertReadOnlySql(snapshot.text);
+        if (snapshot.callStyle === "text") return client.query(snapshot.text);
+        if (snapshot.callStyle === "arguments") {
+          return client.query(snapshot.text, snapshot.values);
         }
-        if (typeof query !== "string" || !Array.isArray(values)) {
-          throw new TypeError("Query PostgreSQL inválida.");
-        }
-        assertReadOnlyQuery({ text: query, values });
-        return client.query(query, values);
+        return client.query(snapshot.config);
       },
     });
     const result = await callback(transaction);
@@ -175,25 +177,96 @@ export async function withReadOnlyTransaction(client, callback) {
   }
 }
 
-function extractQueryText(query) {
-  if (typeof query === "string") return query;
+function snapshotQuery(query, separateValues) {
+  if (typeof query === "string") {
+    if (separateValues === undefined) return { callStyle: "text", text: query };
+    return {
+      callStyle: "arguments",
+      text: query,
+      values: snapshotValues(separateValues),
+    };
+  }
+  if (separateValues !== undefined) throw new TypeError("Query PostgreSQL inválida.");
   if (query === null || typeof query !== "object" || Array.isArray(query)) {
     throw new TypeError("Query PostgreSQL inválida.");
   }
-  const keys = Object.keys(query);
+  if (Object.getPrototypeOf(query) !== Object.prototype) {
+    throw new TypeError("Configuração de query PostgreSQL possui prototype não permitido.");
+  }
+  const keys = Reflect.ownKeys(query);
+  if (keys.some((key) => typeof key === "symbol")) {
+    throw new TypeError("Configuração de query PostgreSQL possui symbol não permitido.");
+  }
   if (keys.includes("name")) {
     throw new Error("Query preparada nomeada não é permitida no transaction pooler.");
   }
   if (keys.some((key) => key !== "text" && key !== "values")) {
     throw new TypeError("Configuração de query PostgreSQL não permitida.");
   }
-  if (
-    typeof query.text !== "string" ||
-    (query.values !== undefined && !Array.isArray(query.values))
-  ) {
+  const descriptors = Object.getOwnPropertyDescriptors(query);
+  if (Object.values(descriptors).some(isAccessorDescriptor)) {
+    throw new TypeError("Configuração de query PostgreSQL com accessor não permitida.");
+  }
+  if (typeof descriptors.text?.value !== "string") {
     throw new TypeError("Query PostgreSQL inválida.");
   }
-  return query.text;
+  const text = descriptors.text.value;
+  if (descriptors.values === undefined || descriptors.values.value === undefined) {
+    return {
+      callStyle: "config",
+      config: Object.freeze({ text }),
+      text,
+    };
+  }
+  const values = snapshotValues(descriptors.values.value);
+  return {
+    callStyle: "config",
+    config: Object.freeze({ text, values }),
+    text,
+    values,
+  };
+}
+
+function snapshotValues(values, depth = 0) {
+  if (!Array.isArray(values) || Object.getPrototypeOf(values) !== Array.prototype || depth > 8) {
+    throw new TypeError("Values PostgreSQL inválidos.");
+  }
+  const keys = Reflect.ownKeys(values);
+  if (keys.some((key) => typeof key === "symbol")) {
+    throw new TypeError("Values PostgreSQL possuem symbol não permitido.");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(values);
+  if (Object.values(descriptors).some(isAccessorDescriptor)) {
+    throw new TypeError("Values PostgreSQL com accessor não são permitidos.");
+  }
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || keys.length !== length + 1) {
+    throw new TypeError("Values PostgreSQL possuem propriedades extras ou lacunas.");
+  }
+  const snapshot = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (descriptor === undefined) throw new TypeError("Values PostgreSQL possuem lacunas.");
+    const value = descriptor.value;
+    if (Array.isArray(value)) snapshot.push(snapshotValues(value, depth + 1));
+    else if (isQueryScalar(value)) snapshot.push(value);
+    else throw new TypeError("Value PostgreSQL não suportado pelo preflight.");
+  }
+  return Object.freeze(snapshot);
+}
+
+function isAccessorDescriptor(descriptor) {
+  return descriptor.get !== undefined || descriptor.set !== undefined;
+}
+
+function isQueryScalar(value) {
+  return (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "bigint" ||
+    (typeof value === "number" && Number.isFinite(value)) ||
+    typeof value === "string"
+  );
 }
 
 function tokenizeConservativeSql(sql) {

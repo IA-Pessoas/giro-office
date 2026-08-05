@@ -33,6 +33,14 @@ test("runPreflight valida cenário limpo por destination step em transação REA
     scopeProven: true,
   });
   assert.equal(report.steps[0].status, "ready");
+  assert.deepEqual(report.steps[0].conflictChecks, {
+    complete: true,
+    deterministicIdCandidateCount: 1,
+    mergeCandidateCount: 0,
+    preparedRowCount: 1,
+    uniqueCandidateCount: 1,
+    uniqueConstraintCount: 1,
+  });
   assert.deepEqual(
     client.history.map((query) => (typeof query === "string" ? query : query.text)),
     [
@@ -137,6 +145,8 @@ test("runPreflight detecta escopo, ID determinístico, unique e identidade merge
     createEvidence("legacy.project_details", "details-rule"),
   );
   mappingPackage.preflightInputs["legacy.project_details\0project-merge"] = {
+    preparedRowCount: 1,
+    uniqueCandidates: [{ columns: ["slug"], values: ["alpha"] }],
     mergeCandidates: [{ columns: ["slug"], values: ["alpha"] }],
   };
 
@@ -339,6 +349,184 @@ test("runPreflight mantém runtime classifier não executado como blocker do pas
   assert.equal(report.steps[0].blockerCodes.includes("SEMANTIC_EVIDENCE_MISSING"), true);
 });
 
+test("runPreflight reconhece CREATE UNIQUE INDEX simples e composto sem INCLUDE ou índice parcial", async () => {
+  const mappingPackage = createMappingPackage();
+  const prismaCatalog = createPrismaCatalog();
+  prismaCatalog.models[0].compoundUnique.push(["organization_id", "slug"]);
+  const constraintRows = createConstraintRows().filter(
+    ({ constraint_name }) => constraint_name !== "projects_slug_key",
+  );
+  const uniqueIndexRows = [
+    uniqueIndex("projects", "projects_org_slug_idx", "slug", 2),
+    uniqueIndex("projects", "projects_slug_idx", "slug", 1),
+    uniqueIndex("projects", "projects_org_slug_idx", "organization_id", 1),
+  ];
+  mappingPackage.preflightInputs["legacy.projects\0project-insert"].uniqueCandidates.push({
+    columns: ["organization_id", "slug"],
+    values: [ORGANIZATION_ID, "alpha"],
+  });
+
+  const client = createCatalogClient({ constraintRows, uniqueIndexRows });
+  const report = await runPreflight({
+    client,
+    mappingPackage,
+    prismaCatalog,
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+
+  assert.equal(report.readyForMigration, true);
+  const indexQuery = client.history.find(
+    (query) => typeof query !== "string" && query.text.includes("pg_index"),
+  );
+  assert.ok(indexQuery);
+  assert.match(indexQuery.text, /indisunique/);
+  assert.match(indexQuery.text, /indpred IS NULL/);
+  assert.match(indexQuery.text, /indexprs IS NULL/);
+  assert.match(indexQuery.text, /indisvalid/);
+  assert.match(indexQuery.text, /indisready/);
+  assert.match(indexQuery.text, /ordinality <= .*indnkeyatts/);
+});
+
+test("runPreflight bloqueia cobertura ausente ou incompleta para todo passo preparado", async () => {
+  const absent = createMappingPackage();
+  absent.destinationMappings[0].identity = { kind: "resolve" };
+  absent.destinationMappings[0].identityKind = "resolve";
+  absent.preflightInputs = {};
+  const absentReport = await runPreflight({
+    client: createCatalogClient(),
+    mappingPackage: absent,
+    prismaCatalog: createPrismaCatalog(),
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+  assert.equal(absentReport.readyForMigration, false);
+  assert.equal(absentReport.steps[0].blockerCodes.includes("SEMANTIC_EVIDENCE_MISSING"), true);
+
+  const incomplete = createMappingPackage();
+  incomplete.destinationMappings[0].prepared = 2;
+  incomplete.preflightInputs["legacy.projects\0project-insert"].preparedRowCount = 2;
+  const incompleteReport = await runPreflight({
+    client: createCatalogClient(),
+    mappingPackage: incomplete,
+    prismaCatalog: createPrismaCatalog(),
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+  assert.equal(incompleteReport.readyForMigration, false);
+  assert.equal(incompleteReport.steps[0].conflictChecks.complete, false);
+  assert.equal(incompleteReport.steps[0].conflictChecks.preparedRowCount, 2);
+  assert.doesNotMatch(JSON.stringify(incompleteReport), /alpha|4e6ae95e/i);
+
+  const merge = createMappingPackage();
+  merge.destinationMappings[0].mode = "merge";
+  merge.destinationMappings[0].identity = { kind: "resolve" };
+  merge.destinationMappings[0].identityKind = "resolve";
+  merge.destinationMappings[0].prepared = 2;
+  merge.preflightInputs["legacy.projects\0project-insert"] = {
+    preparedRowCount: 2,
+    uniqueCandidates: [
+      { columns: ["slug"], values: ["first"] },
+      { columns: ["slug"], values: ["second"] },
+    ],
+    mergeCandidates: [{ columns: ["slug"], values: ["first"] }],
+  };
+  const mergeReport = await runPreflight({
+    client: createCatalogClient(),
+    mappingPackage: merge,
+    prismaCatalog: createPrismaCatalog(),
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+  assert.equal(mergeReport.readyForMigration, false);
+  assert.equal(mergeReport.steps[0].conflictChecks.complete, false);
+});
+
+test("runPreflight minimiza tenant e conflito determinístico para contagens agregadas", async () => {
+  const client = createCatalogClient();
+  await runPreflight({
+    client,
+    mappingPackage: createMappingPackage(),
+    prismaCatalog: createPrismaCatalog(),
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+  const tenantQuery = client.history.find(
+    (query) => typeof query !== "string" && query.text.includes("castelo_row_count"),
+  );
+  assert.ok(tenantQuery);
+  assert.deepEqual(tenantQuery.values, [ORGANIZATION_ID]);
+  assert.doesNotMatch(tenantQuery.text, /GROUP BY/);
+  assert.equal(JSON.stringify(client.history).includes(OTHER_ORGANIZATION_ID), false);
+
+  const idQuery = client.history.find(
+    (query) => typeof query !== "string" && query.text.includes("deterministic_id_conflict_count"),
+  );
+  assert.ok(idQuery);
+  assert.match(idQuery.text, /^SELECT COUNT\(\*\)/);
+  assert.doesNotMatch(idQuery.text, /^SELECT\s+"id"/);
+
+  await assert.rejects(
+    runPreflight({
+      client: createCatalogClient({ rawTenantRows: true }),
+      mappingPackage: createMappingPackage(),
+      prismaCatalog: createPrismaCatalog(),
+      organizationId: ORGANIZATION_ID,
+      requiredSecretNames: [],
+    }),
+    /contagem|cardinalidade/i,
+  );
+  await assert.rejects(
+    runPreflight({
+      client: createCatalogClient({ rawDeterministicRows: true }),
+      mappingPackage: createMappingPackage(),
+      prismaCatalog: createPrismaCatalog(),
+      organizationId: ORGANIZATION_ID,
+      requiredSecretNames: [],
+    }),
+    /contagem|cardinalidade/i,
+  );
+});
+
+test("runPreflight não impõe teto de mapeamento e pagina IDs somente em memória", async () => {
+  const prepared = 1_001;
+  const mappingPackage = createMappingPackage();
+  mappingPackage.destinationMappings[0].prepared = prepared;
+  mappingPackage.preflightInputs["legacy.projects\0project-insert"] = {
+    preparedRowCount: prepared,
+    deterministicIds: Array.from(
+      { length: prepared },
+      (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    ),
+    uniqueCandidates: [],
+    mergeCandidates: [],
+  };
+  const prismaCatalog = createPrismaCatalog();
+  prismaCatalog.models[0].fields.find(({ databaseName }) => databaseName === "slug").unique = false;
+  const constraintRows = createConstraintRows().filter(
+    ({ constraint_name }) => constraint_name !== "projects_slug_key",
+  );
+  const client = createCatalogClient({ constraintRows });
+
+  const report = await runPreflight({
+    client,
+    mappingPackage,
+    prismaCatalog,
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+
+  assert.equal(report.readyForMigration, true);
+  assert.equal(report.steps[0].conflictChecks.deterministicIdCandidateCount, prepared);
+  assert.equal(
+    client.history.filter(
+      (query) =>
+        typeof query !== "string" && query.text.includes("deterministic_id_conflict_count"),
+    ).length,
+    2,
+  );
+});
+
 function createMappingPackage() {
   const destinationMappings = [createDestination()];
   return {
@@ -359,8 +547,10 @@ function createMappingPackage() {
     ]),
     preflightInputs: {
       "legacy.projects\0project-insert": {
+        preparedRowCount: 1,
         deterministicIds: [PLANNED_ID],
         uniqueCandidates: [{ columns: ["slug"], values: ["alpha"] }],
+        mergeCandidates: [],
       },
     },
   };
@@ -405,6 +595,11 @@ function createDestination({
     ],
     constants: { organization_id: ORGANIZATION_ID },
     defaults: {},
+    readRows: 1,
+    prepared: 1,
+    quarantine: 0,
+    notEmitted: 0,
+    blockedRows: 0,
   };
 }
 
@@ -530,13 +725,26 @@ function constraint(table, name, type, columnName, options = {}) {
   };
 }
 
+function uniqueIndex(table, name, columnName, ordinalPosition) {
+  return {
+    table_schema: "public",
+    table_name: table,
+    index_name: name,
+    column_name: columnName,
+    ordinal_position: ordinalPosition,
+  };
+}
+
 function createCatalogClient({
   catalogRows = createCatalogRows(),
   constraintRows = createConstraintRows(),
+  uniqueIndexRows = [],
   deterministicMatches = 0,
   uniqueMatches = 0,
   mergeMatchCount = 1,
   failCatalog = false,
+  rawTenantRows = false,
+  rawDeterministicRows = false,
 } = {}) {
   return {
     history: [],
@@ -554,6 +762,27 @@ function createCatalogClient({
       if (text.includes("information_schema.table_constraints")) {
         return { rows: structuredClone(constraintRows), rowCount: constraintRows.length };
       }
+      if (text.includes("pg_index")) {
+        return { rows: structuredClone(uniqueIndexRows), rowCount: uniqueIndexRows.length };
+      }
+      if (text.includes("castelo_row_count")) {
+        if (rawTenantRows) {
+          return {
+            rows: [{ organization_id: OTHER_ORGANIZATION_ID, row_count: "2" }],
+            rowCount: 1,
+          };
+        }
+        return {
+          rows: [
+            {
+              castelo_row_count: "3",
+              distinct_organization_count: "2",
+              other_tenant_row_count: "2",
+            },
+          ],
+          rowCount: 1,
+        };
+      }
       if (text.includes('GROUP BY "organization_id"')) {
         return {
           rows: [
@@ -564,6 +793,15 @@ function createCatalogClient({
         };
       }
       if (text.includes("= ANY($1)")) {
+        if (text.includes("deterministic_id_conflict_count")) {
+          if (rawDeterministicRows) {
+            return { rows: [{ id: PLANNED_ID }], rowCount: 1 };
+          }
+          return {
+            rows: [{ deterministic_id_conflict_count: String(deterministicMatches) }],
+            rowCount: 1,
+          };
+        }
         return {
           rows: Array.from({ length: deterministicMatches }, () => ({ id: PLANNED_ID })),
           rowCount: deterministicMatches,

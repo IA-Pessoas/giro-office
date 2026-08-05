@@ -85,6 +85,56 @@ test("withReadOnlyTransaction conecta, inicia READ ONLY e confirma somente queri
   assert.equal(client.endCount, 0);
 });
 
+test("withReadOnlyTransaction rejeita accessors e entrega ao cliente somente snapshot imutável", async () => {
+  const accessorClient = createFakeClient();
+  let getterReads = 0;
+  const alternatingQuery = {};
+  Object.defineProperty(alternatingQuery, "text", {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return getterReads <= 2 ? "SELECT id FROM users" : "DELETE FROM users";
+    },
+  });
+
+  await assert.rejects(
+    withReadOnlyTransaction(accessorClient, ({ query }) => query(alternatingQuery)),
+    /accessor|configura[cç][aã]o|query/i,
+  );
+  assert.equal(getterReads, 0);
+  assert.deepEqual(accessorClient.history, ["BEGIN TRANSACTION READ ONLY", "ROLLBACK"]);
+
+  const snapshotClient = createFakeClient();
+  const originalValues = ["id-1"];
+  const originalConfig = { text: "SELECT id FROM users WHERE id = $1", values: originalValues };
+  await withReadOnlyTransaction(snapshotClient, async ({ query }) => {
+    await query(originalConfig);
+    originalConfig.text = "DELETE FROM users";
+    originalValues[0] = "id-mutated";
+  });
+  const delivered = snapshotClient.history[1];
+  assert.notEqual(delivered, originalConfig);
+  assert.equal(Object.isFrozen(delivered), true);
+  assert.equal(Object.isFrozen(delivered.values), true);
+  assert.deepEqual(delivered, {
+    text: "SELECT id FROM users WHERE id = $1",
+    values: ["id-1"],
+  });
+
+  for (const invalid of [
+    Object.assign(Object.create({}), { text: "SELECT id FROM users" }),
+    Object.assign({ text: "SELECT id FROM users" }, { extra: true }),
+    Object.assign({ text: "SELECT id FROM users" }, { [Symbol("unsafe")]: true }),
+  ]) {
+    const client = createFakeClient();
+    await assert.rejects(
+      withReadOnlyTransaction(client, ({ query }) => query(invalid)),
+      /query/i,
+    );
+    assert.deepEqual(client.history, ["BEGIN TRANSACTION READ ONLY", "ROLLBACK"]);
+  }
+});
+
 test("withReadOnlyTransaction faz ROLLBACK e encerra Client quando o callback falha", async () => {
   const client = createFakeClient({ useRelease: false });
 

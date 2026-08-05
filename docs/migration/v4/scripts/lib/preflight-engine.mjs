@@ -6,7 +6,7 @@ import { serializeStableJson } from "./stable-output.mjs";
 const CASTELO_ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const DATABASE_SCHEMA = "public";
 const MAX_CATALOG_ROWS = 100_000;
-const MAX_PREFLIGHT_CANDIDATES = 1_000;
+const ID_QUERY_BATCH_SIZE = 1_000;
 const BLOCKER_CODES = new Set([
   "DEPENDENCY_CYCLE",
   "DESTINATION_COLUMN_MISSING",
@@ -203,9 +203,39 @@ async function loadDatabaseCatalog(transaction) {
     ].join(" "),
     values: [DATABASE_SCHEMA],
   });
+  const uniqueIndexesResult = await transaction.query({
+    text: [
+      "SELECT namespace.nspname AS table_schema, table_class.relname AS table_name,",
+      "index_class.relname AS index_name, attribute.attname AS column_name,",
+      "key_column.ordinality AS ordinal_position",
+      "FROM pg_catalog.pg_index index_metadata",
+      "JOIN pg_catalog.pg_class table_class",
+      "ON table_class.oid = index_metadata.indrelid",
+      "JOIN pg_catalog.pg_class index_class",
+      "ON index_class.oid = index_metadata.indexrelid",
+      "JOIN pg_catalog.pg_namespace namespace",
+      "ON namespace.oid = table_class.relnamespace",
+      "CROSS JOIN LATERAL unnest(index_metadata.indkey)",
+      "WITH ORDINALITY AS key_column",
+      "JOIN pg_catalog.pg_attribute attribute",
+      "ON attribute.attrelid = index_metadata.indrelid",
+      "AND attribute.attnum = key_column.unnest",
+      "WHERE namespace.nspname = $1",
+      "AND index_metadata.indisunique",
+      "AND index_metadata.indisvalid",
+      "AND index_metadata.indisready",
+      "AND index_metadata.indpred IS NULL",
+      "AND index_metadata.indexprs IS NULL",
+      "AND key_column.unnest > 0",
+      "AND key_column.ordinality <= index_metadata.indnkeyatts",
+      "ORDER BY table_class.relname, index_class.relname, key_column.ordinality",
+    ].join(" "),
+    values: [DATABASE_SCHEMA],
+  });
   const columnRows = requireRows(columnsResult, "catálogo de colunas");
   const constraintRows = requireRows(constraintsResult, "catálogo de constraints");
-  if (columnRows.length + constraintRows.length > MAX_CATALOG_ROWS) {
+  const uniqueIndexRows = requireRows(uniqueIndexesResult, "catálogo de índices unique");
+  if (columnRows.length + constraintRows.length + uniqueIndexRows.length > MAX_CATALOG_ROWS) {
     throw new Error("Catálogo PostgreSQL excede o limite seguro do preflight.");
   }
 
@@ -274,8 +304,28 @@ async function loadDatabaseCatalog(transaction) {
       });
     }
   }
+  const uniqueIndexes = new Map();
+  for (const row of uniqueIndexRows) {
+    if (row.table_schema !== DATABASE_SCHEMA) {
+      throw new Error("Catálogo PostgreSQL retornou índice unique de schema inesperado.");
+    }
+    const tableName = requireDatabaseName(row.table_name, "table_name");
+    const indexName = requireDatabaseName(row.index_name, "index_name");
+    const key = `${tableName}\0${indexName}`;
+    const index = uniqueIndexes.get(key) ?? { columns: [], tableName };
+    index.columns.push({
+      name: requireIdentifier(row.column_name, "column_name"),
+      ordinal: parseOrdinal(row.ordinal_position),
+    });
+    uniqueIndexes.set(key, index);
+  }
+  for (const index of uniqueIndexes.values()) {
+    getOrCreateTable(tables, index.tableName).uniqueSets.push(orderedNames(index.columns));
+  }
   for (const table of tables.values()) {
-    table.uniqueSets.sort(compareArrays);
+    table.uniqueSets = [
+      ...new Map(table.uniqueSets.map((columns) => [columns.join("\0"), columns])).values(),
+    ].sort(compareArrays);
     table.foreignKeys.sort((left, right) => compareArrays(left.columns, right.columns));
   }
   return { tables };
@@ -307,7 +357,14 @@ async function validateStep({
   if (databaseTable === undefined) {
     addBlocker({ ...base, reasonCode: "DESTINATION_TABLE_MISSING", field: null });
     addBlocker({ ...base, reasonCode: "PRISMA_DATABASE_DRIFT", field: null });
-    return emptyStepResult(step);
+    const conflictInput = validateConflictInputCoverage({
+      addBlocker,
+      databaseTable: { uniqueSets: [] },
+      mappingPackage,
+      prismaModel,
+      step,
+    });
+    return emptyStepResult(step, conflictInput.summary);
   }
   if (prismaModel !== null) {
     validatePhysicalContract({ addBlocker, databaseTable, prismaCatalog, prismaModel, step });
@@ -335,7 +392,14 @@ async function validateStep({
     addBlocker({ ...base, reasonCode: "TENANT_SCOPE_UNPROVEN", field: "organization_id" });
   }
 
-  const inputs = mappingPackage.preflightInputs[stepKey(step)] ?? {};
+  const conflictInput = validateConflictInputCoverage({
+    addBlocker,
+    databaseTable,
+    mappingPackage,
+    prismaModel,
+    step,
+  });
+  const { inputs } = conflictInput;
   await validateDeterministicIds({
     addBlocker,
     databaseTable,
@@ -346,22 +410,120 @@ async function validateStep({
   });
   await validateUniqueCandidates({ addBlocker, databaseTable, inputs, step, transaction });
   await validateMergeCandidates({ addBlocker, databaseTable, inputs, step, transaction });
-  if (
-    step.identity?.kind === "generate" &&
-    Number.isSafeInteger(step.prepared) &&
-    step.prepared > 0 &&
-    !Array.isArray(inputs.deterministicIds)
-  ) {
-    addBlocker({ ...base, reasonCode: "SEMANTIC_EVIDENCE_MISSING", field: "id" });
-  }
   return {
     blockerCodes: [],
+    conflictChecks: conflictInput.summary,
     destinationTable: step.destinationTable,
     sourceTable: step.sourceTable,
     status: "ready",
     stepId: step.stepId,
     tenant,
   };
+}
+
+function validateConflictInputCoverage({
+  addBlocker,
+  databaseTable,
+  mappingPackage,
+  prismaModel,
+  step,
+}) {
+  const key = stepKey(step);
+  const provided = Object.hasOwn(mappingPackage.preflightInputs, key);
+  const inputs =
+    provided && isPlainObject(mappingPackage.preflightInputs[key])
+      ? mappingPackage.preflightInputs[key]
+      : {};
+  const preparedRowCount = step.prepared;
+  const deterministicRequired = step.identity?.kind === "generate";
+  const mergeRequired = step.mode === "merge";
+  const applicableUniqueSets = getApplicableUniqueSets(databaseTable, prismaModel, step);
+  const deterministicCount = Array.isArray(inputs.deterministicIds)
+    ? inputs.deterministicIds.length
+    : 0;
+  const uniqueCount = Array.isArray(inputs.uniqueCandidates) ? inputs.uniqueCandidates.length : 0;
+  const mergeCount = Array.isArray(inputs.mergeCandidates) ? inputs.mergeCandidates.length : 0;
+  let complete = true;
+  const markIncomplete = (field) => {
+    complete = false;
+    addBlocker({
+      ...stepBlockerBase(step),
+      reasonCode: "SEMANTIC_EVIDENCE_MISSING",
+      field,
+    });
+  };
+
+  if (preparedRowCount > 0 && !provided) markIncomplete("preflight_inputs");
+  if (preparedRowCount > 0 && inputs.preparedRowCount !== preparedRowCount) {
+    markIncomplete("preflight_inputs.prepared_row_count");
+  }
+  if (
+    preparedRowCount > 0 &&
+    deterministicRequired &&
+    (!Array.isArray(inputs.deterministicIds) ||
+      deterministicCount !== preparedRowCount ||
+      new Set(inputs.deterministicIds).size !== preparedRowCount)
+  ) {
+    markIncomplete("preflight_inputs.deterministic_ids");
+  }
+  if (preparedRowCount > 0 && applicableUniqueSets.length > 0) {
+    if (!Array.isArray(inputs.uniqueCandidates)) {
+      markIncomplete("preflight_inputs.unique_candidates");
+    } else {
+      const counts = new Map();
+      for (const candidate of inputs.uniqueCandidates) {
+        if (!isPlainObject(candidate) || !Array.isArray(candidate.columns)) {
+          markIncomplete("preflight_inputs.unique_candidates");
+          continue;
+        }
+        const signature = candidate.columns.join("\0");
+        counts.set(signature, (counts.get(signature) ?? 0) + 1);
+      }
+      const expected = new Set(applicableUniqueSets.map((columns) => columns.join("\0")));
+      if (
+        counts.size !== expected.size ||
+        [...expected].some((signature) => counts.get(signature) !== preparedRowCount) ||
+        [...counts].some(([signature]) => !expected.has(signature))
+      ) {
+        markIncomplete("preflight_inputs.unique_candidates");
+      }
+    }
+  }
+  if (
+    preparedRowCount > 0 &&
+    mergeRequired &&
+    (!Array.isArray(inputs.mergeCandidates) || mergeCount !== preparedRowCount)
+  ) {
+    markIncomplete("preflight_inputs.merge_candidates");
+  }
+
+  return {
+    inputs,
+    summary: {
+      complete,
+      deterministicIdCandidateCount: deterministicCount,
+      mergeCandidateCount: mergeCount,
+      preparedRowCount,
+      uniqueCandidateCount: uniqueCount,
+      uniqueConstraintCount: applicableUniqueSets.length,
+    },
+  };
+}
+
+function getApplicableUniqueSets(databaseTable, prismaModel, step) {
+  const emittedColumns = new Set([
+    ...step.columns
+      .filter(({ status }) => status === "mapped")
+      .map(({ destinationColumn }) => destinationColumn),
+    ...Object.keys(step.constants),
+    ...Object.keys(step.defaults),
+  ]);
+  const idColumn = prismaModel?.fields.find(({ id }) => id)?.databaseName ?? null;
+  return databaseTable.uniqueSets.filter(
+    (columns) =>
+      columns.every((column) => emittedColumns.has(column)) &&
+      !(columns.length === 1 && columns[0] === idColumn),
+  );
 }
 
 function validatePhysicalContract({ addBlocker, databaseTable, prismaCatalog, prismaModel, step }) {
@@ -472,22 +634,20 @@ async function getTenantDistribution({
   const key = `${table}\0${column}`;
   if (distributionCache.has(key)) return { ...distributionCache.get(key) };
   const quotedColumn = quoteIdentifier(column);
-  const result = await transaction.query(
-    `SELECT ${quotedColumn}, COUNT(*)::bigint AS row_count FROM ${quoteQualified(table)} ` +
-      `GROUP BY ${quotedColumn} ORDER BY ${quotedColumn}`,
-  );
-  const rows = requireRows(result, "distribuição por tenant");
-  let casteloRowCount = 0;
-  let otherTenantRowCount = 0;
-  for (const row of rows) {
-    const count = parseCount(row.row_count, "row_count");
-    if (row[column] === organizationId) casteloRowCount += count;
-    else otherTenantRowCount += count;
-  }
+  const result = await transaction.query({
+    text: [
+      `SELECT COUNT(*) FILTER (WHERE ${quotedColumn} = $1)::bigint AS castelo_row_count,`,
+      `COUNT(*) FILTER (WHERE ${quotedColumn} IS DISTINCT FROM $1)::bigint`,
+      "AS other_tenant_row_count,",
+      `COUNT(DISTINCT ${quotedColumn})::bigint AS distinct_organization_count`,
+      `FROM ${quoteQualified(table)}`,
+    ].join(" "),
+    values: [organizationId],
+  });
   const distribution = {
-    casteloRowCount,
-    distinctOrganizationCount: rows.length,
-    otherTenantRowCount,
+    casteloRowCount: singleCount(result, "castelo_row_count"),
+    distinctOrganizationCount: singleCount(result, "distinct_organization_count"),
+    otherTenantRowCount: singleCount(result, "other_tenant_row_count"),
     scopeProven: false,
   };
   distributionCache.set(key, distribution);
@@ -503,31 +663,30 @@ async function validateDeterministicIds({
   transaction,
 }) {
   if (!Array.isArray(inputs.deterministicIds) || inputs.deterministicIds.length === 0) return;
-  if (inputs.deterministicIds.length > MAX_PREFLIGHT_CANDIDATES) {
-    throw new Error("Quantidade de IDs determinísticos excede o limite seguro.");
-  }
   const ids = [...new Set(inputs.deterministicIds)].sort(compareText);
   if (!ids.every(isUuid)) throw new Error("ID determinístico inválido no preflight.");
   const idField = prismaModel?.fields.find(({ id }) => id) ?? null;
   if (idField === null || !databaseTable.columns.has(idField.databaseName)) return;
-  const result = await transaction.query({
-    text: `SELECT ${quoteIdentifier(idField.databaseName)} FROM ${quoteQualified(
-      step.destinationTable,
-    )} WHERE ${quoteIdentifier(idField.databaseName)} = ANY($1)`,
-    values: [ids],
-  });
-  if (requireRows(result, "IDs determinísticos").length > 0) {
-    addBlocker({
-      ...stepBlockerBase(step),
-      reasonCode: "DETERMINISTIC_ID_CONFLICT",
-      field: idField.databaseName,
+  for (let offset = 0; offset < ids.length; offset += ID_QUERY_BATCH_SIZE) {
+    const result = await transaction.query({
+      text: `SELECT COUNT(*)::bigint AS deterministic_id_conflict_count FROM ${quoteQualified(
+        step.destinationTable,
+      )} WHERE ${quoteIdentifier(idField.databaseName)} = ANY($1)`,
+      values: [ids.slice(offset, offset + ID_QUERY_BATCH_SIZE)],
     });
+    if (singleCount(result, "deterministic_id_conflict_count") > 0) {
+      addBlocker({
+        ...stepBlockerBase(step),
+        reasonCode: "DETERMINISTIC_ID_CONFLICT",
+        field: idField.databaseName,
+      });
+      break;
+    }
   }
 }
 
 async function validateUniqueCandidates({ addBlocker, databaseTable, inputs, step, transaction }) {
   if (!Array.isArray(inputs.uniqueCandidates)) return;
-  validateCandidateLimit(inputs.uniqueCandidates, "unique");
   for (const candidate of inputs.uniqueCandidates) {
     const normalized = normalizeCandidate(candidate, databaseTable);
     if (!databaseTable.uniqueSets.some((columns) => sameArray(columns, normalized.columns))) {
@@ -561,7 +720,6 @@ async function validateMergeCandidates({ addBlocker, databaseTable, inputs, step
     });
     return;
   }
-  validateCandidateLimit(inputs.mergeCandidates, "merge");
   for (const candidate of inputs.mergeCandidates) {
     const normalized = normalizeCandidate(candidate, databaseTable);
     const result = await transaction.query({
@@ -827,6 +985,9 @@ function normalizeStep(step) {
   ) {
     throw new TypeError("Destination step possui blockedRows inválido.");
   }
+  if (step.prepared !== undefined && (!Number.isSafeInteger(step.prepared) || step.prepared < 0)) {
+    throw new TypeError("Destination step possui prepared inválido.");
+  }
   const columns = requireArray(step.columns, "step.columns").map((column) => {
     if (!isPlainObject(column) || !new Set(["mapped", "not_preserved"]).has(column.status)) {
       throw new TypeError("Column mapping inválido.");
@@ -850,6 +1011,7 @@ function normalizeStep(step) {
     destinationTable: requireDatabaseName(step.destinationTable, "step.destinationTable"),
     sourceTable: requireTechnicalName(step.sourceTable, "step.sourceTable"),
     stepId: requireTechnicalName(step.stepId, "step.stepId"),
+    prepared: step.prepared ?? 0,
   };
 }
 
@@ -902,9 +1064,17 @@ function stepBlockerBase(step) {
   };
 }
 
-function emptyStepResult(step) {
+function emptyStepResult(step, conflictChecks) {
   return {
     blockerCodes: [],
+    conflictChecks: conflictChecks ?? {
+      complete: step.prepared === 0,
+      deterministicIdCandidateCount: 0,
+      mergeCandidateCount: 0,
+      preparedRowCount: step.prepared,
+      uniqueCandidateCount: 0,
+      uniqueConstraintCount: 0,
+    },
     destinationTable: step.destinationTable,
     sourceTable: step.sourceTable,
     status: "blocked",
@@ -1082,12 +1252,6 @@ function validatePrismaCatalog(value) {
 function assertCasteloOrganization(value) {
   if (value !== CASTELO_ORGANIZATION_ID) {
     throw new Error("organization-id deve identificar a Castelo Contabilidade nesta V4.");
-  }
-}
-
-function validateCandidateLimit(candidates, label) {
-  if (candidates.length > MAX_PREFLIGHT_CANDIDATES) {
-    throw new Error(`Quantidade de candidatos ${label} excede o limite seguro.`);
   }
 }
 
