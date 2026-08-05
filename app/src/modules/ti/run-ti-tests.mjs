@@ -141,6 +141,23 @@ await runTest("ti request transfer UI uses request-scoped candidates and preserv
   );
 });
 
+await runTest("ti request detail card keeps assignee actions from overflowing", async () => {
+  const tiRequestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(
+    tiRequestsTabSource,
+    /<dd className="mt-1 min-w-0 flex flex-col items-start gap-2 text-slate-700 dark:text-slate-200">/,
+  );
+  assert.match(
+    tiRequestsTabSource,
+    /className={cn\(\s*tiSecondaryButtonClassName,\s*"h-8 min-w-\[104px\] max-w-full justify-center px-3 text-xs",\s*\)}/,
+  );
+  assert.match(
+    tiRequestsTabSource,
+    /<span className="min-w-0 whitespace-normal break-words text-center">\s*Transferir responsabilidade\s*<\/span>/,
+  );
+});
+
 async function readModuleSource(relativePath) {
   return readFile(join(moduleRoot, relativePath), "utf8");
 }
