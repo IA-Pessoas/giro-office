@@ -170,23 +170,49 @@ runTest("certificate workspace shows PF and PJ details in a shared dialog", () =
     new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
     "utf8",
   );
+  const detailDialogBlock =
+    workspaceSource.match(/<Dialog[\s\S]*?open=\{shouldShowDetailDialog\}[\s\S]*?<\/Dialog>/)?.[0] ?? "";
+  const startEditSelectedBlock =
+    workspaceSource.match(/function handleStartEditSelected\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
 
   assert.match(
     workspaceSource,
     /const shouldShowDetailDialog = Boolean\(selected\) && !isFormMode;/,
   );
   assert.match(workspaceSource, /function handleCloseDetailDialog\(\) \{/);
-  assert.match(workspaceSource, /open=\{shouldShowDetailDialog\}/);
-  assert.match(workspaceSource, /onOpenChange=\{handleDetailDialogOpenChange\}/);
-  assert.match(workspaceSource, /title=\{detailDialogTitle\}/);
   assert.match(
     workspaceSource,
     /const detailDialogTitle = selected\?\.type === "pj"[\s\S]*?"Detalhe do certificado PJ"[\s\S]*?"Detalhe do certificado PF";/,
   );
   assert.match(
     workspaceSource,
+    /const detailDialogDescription = selected\?\.type === "pj"[\s\S]*?"Dados completos do certificado PJ selecionado\."[\s\S]*?"Dados completos do certificado PF selecionado\.";/,
+  );
+  assert.match(
+    workspaceSource,
     /function handleCloseDetailDialog\(\) \{[\s\S]*?setSelected\(null\);[\s\S]*?setWorkspaceMode\("view"\);[\s\S]*?setShowDetailPassword\(false\);[\s\S]*?\}/,
   );
+  assert.match(
+    workspaceSource,
+    /function handleDetailDialogOpenChange\(open: boolean\) \{[\s\S]*?if \(open\) \{[\s\S]*?return;[\s\S]*?\}[\s\S]*?handleCloseDetailDialog\(\);[\s\S]*?\}/,
+  );
+  assert.ok(detailDialogBlock, "bloco do Dialog de detalhe não encontrado");
+  assert.match(detailDialogBlock, /open=\{shouldShowDetailDialog\}/);
+  assert.match(detailDialogBlock, /onOpenChange=\{handleDetailDialogOpenChange\}/);
+  assert.match(detailDialogBlock, /title=\{detailDialogTitle\}/);
+  assert.match(detailDialogBlock, /description=\{detailDialogDescription\}/);
+  assert.match(
+    detailDialogBlock,
+    /\{activeDetailIsLoading \? \([\s\S]*?\{activeDetailErrorMessage \? \([\s\S]*?selected\?\.type === "pj"[\s\S]*?selected\?\.type === "pf"/,
+  );
+  assert.match(detailDialogBlock, /renderPasswordBlock\(pjDetail\?\.password\)/);
+  assert.match(detailDialogBlock, /renderPasswordBlock\(pfDetail\?\.password\)/);
+  assert.match(detailDialogBlock, /<CertificateFileActions[\s\S]*?kind="pj"/);
+  assert.match(detailDialogBlock, /<CertificateFileActions[\s\S]*?kind="pf"/);
+  assert.ok(startEditSelectedBlock, "handler de edição não encontrado");
+  assert.match(startEditSelectedBlock, /setWorkspaceMode\("editPj"\)/);
+  assert.match(startEditSelectedBlock, /setWorkspaceMode\("editPf"\)/);
+  assert.doesNotMatch(startEditSelectedBlock, /setSelected\(null\)/);
   assert.doesNotMatch(workspaceSource, /const shouldShowDetailPanel = Boolean\(selected\);/);
   assert.doesNotMatch(
     workspaceSource,

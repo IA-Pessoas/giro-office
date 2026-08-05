@@ -758,6 +758,9 @@ export function CertificatesWorkspace() {
   const detailDialogTitle = selected?.type === "pj"
     ? "Detalhe do certificado PJ"
     : "Detalhe do certificado PF";
+  const detailDialogDescription = selected?.type === "pj"
+    ? "Dados completos do certificado PJ selecionado."
+    : "Dados completos do certificado PF selecionado.";
   const formSubmitLabel = isCreating ? "Criar certificado" : "Salvar alterações";
   const shouldDisableFormSubmit =
     formSubmitting ||
@@ -2029,6 +2032,7 @@ export function CertificatesWorkspace() {
         open={shouldShowDetailDialog}
         onOpenChange={handleDetailDialogOpenChange}
         title={detailDialogTitle}
+        description={detailDialogDescription}
       >
         <section className={`${CERTIFICATE_PANEL_CLASSNAME} space-y-4`}>
           {canManageCertificateModule ? (
