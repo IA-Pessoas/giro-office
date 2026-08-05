@@ -39,7 +39,7 @@ export interface MessageListByRequestInput {
 }
 
 function assertUserCanAccessRequest(
-  request: { requester_user_id: string; assigned_to_user_id: string },
+  request: { requester_user_id: string; assigned_to_user_id: string | null },
   userId: string,
   canManageRh = false,
 ): void {

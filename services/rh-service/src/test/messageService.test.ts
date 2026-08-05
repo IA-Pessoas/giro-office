@@ -52,6 +52,34 @@ describe("MessageService", () => {
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
+  it("listByRequest permite ao solicitante acessar chamado sem responsável", async () => {
+    const messages = [{ id: "msg-1" }];
+    prismaMock.rhRequest.findFirst.mockResolvedValue({
+      id: "req-1",
+      requester_user_id: "user-1",
+      assigned_to_user_id: null,
+    });
+    prismaMock.rhMessage.findMany.mockResolvedValue(messages);
+    const service = new MessageService();
+
+    await expect(
+      service.listByRequest({ organization_id: "org-1", user_id: "user-1", request_id: "req-1" }),
+    ).resolves.toBe(messages);
+  });
+
+  it("listByRequest nega terceiro em chamado sem responsável", async () => {
+    prismaMock.rhRequest.findFirst.mockResolvedValue({
+      id: "req-1",
+      requester_user_id: "user-2",
+      assigned_to_user_id: null,
+    });
+    const service = new MessageService();
+
+    await expect(
+      service.listByRequest({ organization_id: "org-1", user_id: "user-1", request_id: "req-1" }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
   it("listByRequest permite gestor RH listar mensagens de chamado de terceiro", async () => {
     const messages = [{ id: "msg-1" }];
     prismaMock.rhRequest.findFirst.mockResolvedValue({
