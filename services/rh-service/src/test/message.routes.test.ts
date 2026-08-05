@@ -25,6 +25,32 @@ describe("message routes", () => {
     );
   });
 
+  it("POST /rh/messages rejeita workflow para RH Visualizador", async () => {
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).post("/rh/messages").send({
+      request_id: itemId,
+      message: "SoluÃ§Ã£o",
+      type: "Solution",
+    });
+
+    expect(res.status).toBe(403);
+    expect(messageServiceMock.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /rh/messages preserva workflow para RH Usuario", async () => {
+    const app = createTestApp({ rhPermission: 2 });
+    const res = await request(app).post("/rh/messages").send({
+      request_id: itemId,
+      message: "SoluÃ§Ã£o",
+      type: "Solution",
+    });
+
+    expect(res.status).toBe(200);
+    expect(messageServiceMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({ can_use_workflow_messages: true }),
+    );
+  });
+
   it("GET /rh/messages lista mensagens", async () => {
     const app = createTestApp();
     const res = await request(app).get("/rh/messages").query({ requestId: itemId });

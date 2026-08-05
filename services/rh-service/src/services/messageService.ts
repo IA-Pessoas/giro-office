@@ -29,6 +29,7 @@ export interface MessageCreateInput {
   type: RhMessageTypeInput;
   attachment?: string;
   can_manage_rh?: boolean;
+  can_use_workflow_messages?: boolean;
 }
 
 export interface MessageListByRequestInput {
@@ -67,6 +68,10 @@ class MessageService {
       const message = assertNonEmptyString(input.message, "message");
       const type = input.type;
       const attachment = input.attachment?.trim() ? input.attachment : undefined;
+
+      if (input.can_use_workflow_messages === false && type !== "Message") {
+        throw new ServiceError(403, "RH Visualizador pode enviar somente mensagens.");
+      }
 
       return await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
         const request = await tx.rhRequest.findFirst({

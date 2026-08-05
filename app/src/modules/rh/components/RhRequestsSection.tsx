@@ -40,7 +40,7 @@ export function RhRequestsSection() {
   const [editingRequest, setEditingRequest] = useState<RhRequest | null>(null);
   const [requestIdPendingDelete, setRequestIdPendingDelete] = useState<string | null>(null);
 
-  const { user, canManageRhRequests } = useRhPermissions("requests");
+  const { user, canManageRhRequests, canUseRhWorkflowMessages } = useRhPermissions("requests");
   const categoriesQuery = useRhCategories({ activeOnly: true });
   const assignableUsersQuery = useAssignableUsers({ enabled: canManageRhRequests, module: "rh" });
   const deleteRequestMutation = useDeleteRhRequestMutation();
@@ -299,6 +299,7 @@ export function RhRequestsSection() {
         getAssignedUserLabel={getAssignedUserLabel}
         getRequesterLabel={getRequesterLabel}
         canManageRequest={canManageRhRequests}
+        canUseRhWorkflowMessages={canUseRhWorkflowMessages}
         isDeleting={deleteRequestMutation.isPending}
         onClose={handleCloseDetail}
         onEdit={handleEditFromDetail}

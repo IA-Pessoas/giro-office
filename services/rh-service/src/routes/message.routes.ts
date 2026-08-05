@@ -9,6 +9,7 @@ import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   canManageRh,
+  canUseRhWorkflowMessages,
   RH_SELF_SERVICE_PERMISSION,
   requireRhPermission,
 } from "../middlewares/requireRhPermission.js";
@@ -34,6 +35,10 @@ router.post(
       }
 
       const body = parseWithZod(createMessageBodySchema, req.body);
+      const canUseWorkflowMessages = canUseRhWorkflowMessages(req);
+      if (!canUseWorkflowMessages && body.type !== "Message") {
+        throw new ServiceError(403, "RH Visualizador pode enviar somente mensagens.");
+      }
 
       const result = await messageService.create({
         organization_id: organizationId,
@@ -43,6 +48,7 @@ router.post(
         type: body.type,
         ...(body.attachment !== undefined ? { attachment: body.attachment } : {}),
         can_manage_rh: canManageRh(req),
+        can_use_workflow_messages: canUseWorkflowMessages,
       });
 
       res.status(200).json(createSuccessResponse(result));
