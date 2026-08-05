@@ -223,6 +223,7 @@ export function createTestApp(options: { rhPermission?: number } = {}) {
   const env = {
     port: 3034,
     databaseUrl: "postgresql://localhost/rh_test",
+    databasePoolMax: 5,
     jwtSecret: "test-secret",
     nodeEnv: "test",
     logLevel: "silent",
