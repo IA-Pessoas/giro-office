@@ -72,6 +72,35 @@ test("runPreflight valida cenário limpo por destination step em transação REA
   );
 });
 
+test("runPreflight aceita coluna usada anulável quando Prisma e banco concordam", async () => {
+  const prismaCatalog = createPrismaCatalog();
+  const ownerField = prismaCatalog.models[0].fields.find(
+    ({ databaseName }) => databaseName === "owner_id",
+  );
+  ownerField.nullable = true;
+
+  const catalogRows = createCatalogRows();
+  const ownerColumn = catalogRows.find(
+    ({ table_name, column_name }) => table_name === "projects" && column_name === "owner_id",
+  );
+  ownerColumn.is_nullable = "YES";
+
+  const report = await runPreflight({
+    client: createCatalogClient({ catalogRows }),
+    mappingPackage: createMappingPackage(),
+    prismaCatalog,
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+  const codes = new Set(report.blockers.map(({ reasonCode }) => reasonCode));
+
+  assert.equal(codes.has("DESTINATION_NULLABILITY_MISMATCH"), false);
+  assert.equal(codes.has("PRISMA_DATABASE_DRIFT"), false);
+  assert.equal(report.readyForMigration, true);
+  assert.equal(report.transactionMode, "READ ONLY");
+  assert.equal(report.writesPerformed, false);
+});
+
 test("runPreflight aceita QueryResult real com rows próprio e prototype do pg", async () => {
   const client = createCatalogClient();
   const query = client.query.bind(client);
