@@ -368,36 +368,61 @@ runTest("payroll responsible field uses a user selector instead of raw IDs", () 
   assert.doesNotMatch(payroll, /label: "Responsável ID"/);
 });
 
-runTest("payroll section exposes the clarified payroll labels", () => {
+runTest("payroll section binds the clarified labels to rendered payroll controls", () => {
   const payroll = readFileSync(
     "src/modules/pessoal/components/PessoalPayrollSection.tsx",
     "utf8",
   );
+  const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-  for (const label of [
-    "Informações da folha",
-    "Grupo da folha",
-    "Tipo de adiantamento",
-    "Tipo de vale-transporte",
-    "Contato da folha",
-    "Responsável pela folha",
-    "Quantidade de funcionários",
-    "Valor do adiantamento",
-    "Valor do vale-transporte",
-    "Sindicato",
-    "Adiantamento salarial",
-    "Usar folha anterior",
-    "Integração com Onvio",
-    "Vale-transporte",
-    "Vale-alimentação",
-    "Contribuição assistencial",
-    "Bem Mais",
-    "BSF",
-    "Reinf",
+  for (const [name, label] of [
+    ["info", "Informações da folha"],
+    ["group", "Grupo da folha"],
+    ["advance_type", "Tipo de adiantamento"],
+    ["vt_type", "Tipo de vale-transporte"],
+    ["contact", "Contato da folha"],
+    ["employees", "Quantidade de funcionários"],
+    ["advance_amount", "Valor do adiantamento"],
+    ["vt_value", "Valor do vale-transporte"],
+    ["advance", "Adiantamento salarial"],
+    ["previous", "Usar folha anterior"],
+    ["onvio", "Integração com Onvio"],
+    ["vt", "Vale-transporte"],
+    ["va", "Vale-alimentação"],
+    ["assistance_fee", "Contribuição assistencial"],
+    ["bem_mais", "Bem Mais"],
+    ["bsf", "BSF"],
+    ["reinf", "Reinf"],
   ]) {
-    assert.match(payroll, new RegExp(label));
+    assert.match(
+      payroll,
+      new RegExp(`name: "${name}"[\\s\\S]*?label: "${escapeRegex(label)}"`),
+    );
   }
 
+  assert.match(
+    payroll,
+    /\{textFields\.map\(\(field\) => \{[\s\S]*?htmlFor=\{`payroll-\$\{field\.name\}`\}[\s\S]*?<input[\s\S]*?id=\{`payroll-\$\{field\.name\}`\}/,
+  );
+  assert.match(
+    payroll,
+    /\{numberFields\.map\(\(field\) => \([\s\S]*?htmlFor=\{`payroll-\$\{field\.name\}`\}[\s\S]*?<input[\s\S]*?id=\{`payroll-\$\{field\.name\}`\}/,
+  );
+  assert.match(
+    payroll,
+    /<label[\s\S]*?htmlFor="payroll-responsible_id"[\s\S]*?Responsável pela folha[\s\S]*?<select[\s\S]*?id="payroll-responsible_id"/,
+  );
+  assert.match(
+    payroll,
+    /<label[\s\S]*?htmlFor="payroll-union_id"[\s\S]*?Sindicato[\s\S]*?<select[\s\S]*?id="payroll-union_id"/,
+  );
+  assert.match(
+    payroll,
+    /\{checkboxFields\.map\(\(field\) => \{[\s\S]*?<label[\s\S]*?htmlFor=\{`payroll-\$\{field\.name\}`\}[\s\S]*?<input[\s\S]*?id=\{`payroll-\$\{field\.name\}`\}/,
+  );
+
+  assert.match(payroll, /Responsável pela folha/);
+  assert.match(payroll, /Sindicato/);
   assert.doesNotMatch(payroll, /Tipo de VT/);
   assert.doesNotMatch(payroll, /Valor do VT/);
 });
