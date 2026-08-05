@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { REMAINING_EVIDENCE } from "../evidence/index.mjs";
-import { validateMappingRule } from "../lib/mapping-contract.mjs";
+import { REQUIRED_IDENTITY_NAMESPACE, validateMappingRule } from "../lib/mapping-contract.mjs";
 import { loadPrismaCatalog } from "../lib/prisma-catalog.mjs";
 import { iterateSqlRows } from "../lib/sql-dump-parser.mjs";
+import { uuidV5 } from "../lib/uuid-v5.mjs";
 import * as ruleExports from "../rules/index.mjs";
 import {
   ADMIN_BUSINESS_RULES,
@@ -36,6 +38,91 @@ import {
 
 const DUMP_ROOT = "/home/bruno/Documents/03.08.2026";
 const LEGACY_ROOT = "/home/bruno/Documents/workspace2";
+const THIS_TEST_FILE = fileURLToPath(import.meta.url);
+const SENSITIVE_DUMP_FIELDS = Object.freeze([
+  ["tb_admin.departamentos", ["id", "nome"]],
+  ["tb_admin.usuarios", ["id"]],
+  ["tb_cbc.emails", ["id", "email", "responsavel"]],
+  ["tb_cbs.estoque", ["id", "quantidade"]],
+  ["tb_cbs.estoque_andares", ["id", "nome"]],
+  ["tb_cbs.estoque_categorias", ["id", "nome"]],
+  ["tb_cbs.estoque_entradas", ["id", "quantidade", "data_entrada"]],
+  ["tb_cbs.estoque_inventario", ["id", "tipo_item", "tag", "status"]],
+  ["tb_cbs.estoque_itens", ["id", "nome", "descricao", "status"]],
+  ["tb_cbs.estoque_localizacoes", ["id", "nome"]],
+  ["tb_cbs.estoque_saidas", ["id", "quantidade", "data_saida", "destino", "obs"]],
+  ["tb_mkt.redes_sociais", ["id", "instagram"]],
+  ["tb_mkt.senhas", ["id", "local", "user", "password", "obs"]],
+  [
+    "tb_pec.notas",
+    [
+      "id",
+      "tarefa",
+      "cadastro",
+      "previsao",
+      "conclusao",
+      "inicio_semana",
+      "fim_semana",
+      "cadastro_original",
+    ],
+  ],
+  ["tb_triagem.campos", ["id", "cliente_id"]],
+  ["tb_workspace.solicitacoes", ["id", "titulo", "descricao", "data_cadastro", "data_atualizacao"]],
+  ["tb_workspace.solicitacoes_categorias", ["id", "nome"]],
+  ["tb_workspace.solicitacoes_mensagens", ["id", "mensagem", "data_envio"]],
+]);
+const EMBEDDED_SENSITIVE_DUMP_FIELDS = new Map([
+  [
+    "tb_cbc.emails",
+    [
+      ["email", 4],
+      ["responsavel", 4],
+    ],
+  ],
+  ["tb_cbs.estoque_categorias", [["nome", 8]]],
+  [
+    "tb_cbs.estoque_inventario",
+    [
+      ["tipo_item", 8],
+      ["tag", 8],
+    ],
+  ],
+  [
+    "tb_cbs.estoque_itens",
+    [
+      ["nome", 8],
+      ["descricao", 8],
+    ],
+  ],
+  ["tb_cbs.estoque_localizacoes", [["nome", 8]]],
+  [
+    "tb_cbs.estoque_saidas",
+    [
+      ["destino", 8],
+      ["obs", 8],
+    ],
+  ],
+  ["tb_mkt.redes_sociais", [["instagram", 4]]],
+  [
+    "tb_mkt.senhas",
+    [
+      ["local", 4],
+      ["user", 4],
+      ["password", 4],
+      ["obs", 4],
+    ],
+  ],
+  ["tb_pec.notas", [["tarefa", 8]]],
+  [
+    "tb_workspace.solicitacoes",
+    [
+      ["titulo", 8],
+      ["descricao", 8],
+    ],
+  ],
+  ["tb_workspace.solicitacoes_categorias", [["nome", 8]]],
+  ["tb_workspace.solicitacoes_mensagens", [["mensagem", 8]]],
+]);
 const rowsCache = new Map();
 let clientResolverPromise;
 
@@ -84,6 +171,109 @@ function summary(emissions) {
 function reasonCount(emissions, reasonCode) {
   return emissions.filter((emission) => emission.reasonCode === reasonCode).length;
 }
+
+function assertBoolean(value) {
+  assert.equal(value, true);
+}
+
+function normalizedText(value) {
+  const text = String(value ?? "").trim();
+  return text.length === 0 ? null : text;
+}
+
+function normalizedZeroDate(value) {
+  const text = String(value ?? "").trim();
+  return text.length === 0 || text.startsWith("0000-00-00") ? null : text;
+}
+
+function generatedIdentity(sourceTable, sourceKey) {
+  return uuidV5(REQUIRED_IDENTITY_NAMESPACE, `${sourceTable}:${String(sourceKey).trim()}`);
+}
+
+function resolvedIdentity(context, name) {
+  return uuidV5(REQUIRED_IDENTITY_NAMESPACE, context.resolutions[name].identityRef);
+}
+
+function assertPayloadKeys(payload, keys) {
+  assertBoolean(Object.keys(payload).sort().join("\n") === [...keys].sort().join("\n"));
+}
+
+function assertOrganization(payload, sourceTable) {
+  assertBoolean(
+    payload.organization_id === rule(sourceTable).destinations[0].constants.organization_id,
+  );
+}
+
+function projectPreparedSample(sourceTable, rows, contexts, predicate = () => true) {
+  const mappingRule = rule(sourceTable);
+  const index = rows.findIndex(
+    (row, candidateIndex) =>
+      mappingRule.emitRows(row, contexts[candidateIndex])[0].status === "prepared" &&
+      predicate(row, contexts[candidateIndex]),
+  );
+  assertBoolean(index >= 0);
+  const audit = ruleExports.projectRemainingRow({
+    sourceTable,
+    row: rows[index],
+    context: contexts[index],
+  });
+  assertBoolean(audit.decision.status === "prepared");
+  assertBoolean(audit.payload !== null);
+  return { row: rows[index], context: contexts[index], payload: audit.payload };
+}
+
+test("fonte do teste não versiona valores sensíveis derivados dos dumps", async () => {
+  const source = await readFile(THIS_TEST_FILE, "utf8");
+  const rowsByTable = await Promise.all(
+    SENSITIVE_DUMP_FIELDS.map(async ([sourceTable, fields]) => ({
+      fields,
+      rows: await loadRows(sourceTable),
+      sourceTable,
+    })),
+  );
+  const structuralLiterals = new Set(
+    SENSITIVE_DUMP_FIELDS.flatMap(([sourceTable, fields]) => [sourceTable, ...fields]),
+  );
+  const sensitiveLiterals = rowsByTable.flatMap(({ fields, rows }) =>
+    rows.flatMap((row) =>
+      fields.flatMap((field) => {
+        const value = String(row[field] ?? "").trim();
+        return value.length >= 4 && !structuralLiterals.has(value) ? [JSON.stringify(value)] : [];
+      }),
+    ),
+  );
+  const shortIdentityLiterals = rowsByTable.flatMap(({ fields, rows }) =>
+    fields.includes("id")
+      ? rows.flatMap((row) => {
+          const value = String(row.id ?? "").trim();
+          return /^\d{2,3}$/.test(value) ? [JSON.stringify(value)] : [];
+        })
+      : [],
+  );
+  const lowerSource = source.toLocaleLowerCase("pt-BR");
+  const embeddedSensitiveValues = rowsByTable.flatMap(({ rows, sourceTable }) => {
+    const fields = EMBEDDED_SENSITIVE_DUMP_FIELDS.get(sourceTable) ?? [];
+    return rows.flatMap((row) =>
+      fields.flatMap(([field, minimumLength]) => {
+        const value = String(row[field] ?? "").trim();
+        const lowerValue = value.toLocaleLowerCase("pt-BR");
+        const collidesWithStructuralSymbol =
+          lowerSource.includes(`${lowerValue}_rules`) || lowerSource.includes(`build${lowerValue}`);
+        return value.length >= minimumLength &&
+          !structuralLiterals.has(value) &&
+          !collidesWithStructuralSymbol
+          ? [value]
+          : [];
+      }),
+    );
+  });
+  assert.equal(
+    sensitiveLiterals.every((literal) => !source.includes(literal)) &&
+      shortIdentityLiterals.every((literal) => !source.includes(literal)) &&
+      embeddedSensitiveValues.every((value) => !source.includes(value)),
+    true,
+  );
+});
 
 async function stockContexts() {
   const [rows, departmentRows, itemRows, categoryRows, categoryItemRows, locationRows, floorRows] =
@@ -236,7 +426,7 @@ test("proveniência opaca rejeita fabricação, spread, clone, mistura, mutaçã
   assert.equal(Object.isFrozen(context), true);
   assert.equal(Object.isFrozen(context.resolutions.item), true);
   assert.throws(() => {
-    context.resolutions.item.sourceKey = "430";
+    context.resolutions.item.sourceKey = "__synthetic_reference__";
   }, TypeError);
 
   const args = await Promise.all(
@@ -265,18 +455,16 @@ test("proveniência opaca rejeita fabricação, spread, clone, mistura, mutaçã
   assert.equal(mappingRule.emitRows(row, context)[0].status, "prepared");
 });
 
-test("estoque CBS preserva descrição/status do item e aplica escopo Tecnologia e joins reais", async () => {
+test("estoque CBS preserva campos do item e aplica escopo e joins reais", async () => {
   const mappingRule = rule("tb_cbs.estoque");
   const { rows, contexts } = await stockContexts();
   const emissions = rows.map((row, index) => mappingRule.emitRows(row, contexts[index])[0]);
   const step = mappingRule.destinations[0];
   const itemRows = await loadRows("tb_cbs.estoque_itens");
-  const item430 = itemRows.find(({ id }) => id === "430");
-  const item433 = itemRows.find(({ id }) => id === "433");
+  const itemById = new Map(itemRows.map((row) => [row.id, row]));
 
   assert.deepEqual(summary(emissions), { prepared: 21, quarantine: 412 });
   assert.equal(reasonCount(emissions, "CBS_STOCK_NOT_TECHNOLOGY"), 228);
-  assert.deepEqual([item430?.status, item433?.status], ["0", "0"]);
   assert.equal("description" in step.defaults, false);
   assert.equal("status" in step.defaults, false);
   assert.equal(
@@ -288,13 +476,20 @@ test("estoque CBS preserva descrição/status do item e aplica escopo Tecnologia
     step.columns.find(({ destinationColumn }) => destinationColumn === "status")?.transformation,
     "map_legacy_stock_item_zero_active_status",
   );
-  for (const productId of ["430", "433"]) {
-    const index = rows.findIndex(({ produto_id }) => produto_id === productId);
-    assert.notEqual(index, -1);
-    assert.equal(contexts[index].resolutions.item.itemActive, true);
-    assert.equal(contexts[index].resolutions.item.itemDescription, null);
-    assert.equal(emissions[index].reasonCode, "CBS_STOCK_CATEGORY_NOT_FOUND");
-  }
+  const activeWithoutDescriptionIndexes = rows.flatMap((_row, index) =>
+    contexts[index].resolutions.item.itemActive === true &&
+    contexts[index].resolutions.item.itemDescription === null &&
+    emissions[index].reasonCode === "CBS_STOCK_NOT_TECHNOLOGY"
+      ? [index]
+      : [],
+  );
+  assertBoolean(activeWithoutDescriptionIndexes.length > 0);
+  assertBoolean(
+    activeWithoutDescriptionIndexes.every(
+      (index) =>
+        String(itemById.get(contexts[index].resolutions.item.sourceKey)?.status).trim() === "0",
+    ),
+  );
 });
 
 test("pais transversais de estoque exigem decisões opacas prepared de categoria e localização", async () => {
@@ -372,11 +567,19 @@ test("entrada e saída só preparam quando estoque e usuários-pai também prepa
   );
   const userRows = await loadRows("tb_admin.usuarios");
   const userRule = V2_RULES.find(({ sourceTable }) => sourceTable === "tb_admin.usuarios");
+  assertBoolean(userRule !== undefined);
+  const userEmissions = userRows.map((row) => userRule.emitRows(row)[0]);
   const preparedUserIds = new Set(
-    userRows.flatMap((row) => (userRule.emitRows(row)[0].status === "prepared" ? [row.id] : [])),
+    userRows.flatMap((row, index) => (userEmissions[index].status === "prepared" ? [row.id] : [])),
+  );
+  const quarantinedUserIds = new Set(
+    userRows.flatMap((row, index) =>
+      userEmissions[index].status === "quarantine" ? [row.id] : [],
+    ),
   );
   assert.equal(preparedUserIds.size, 305);
-  assert.equal(preparedUserIds.has("102"), false);
+  assert.equal(quarantinedUserIds.size, 1);
+
   const entryRows = await loadRows("tb_cbs.estoque_entradas");
   const entryContexts = buildCbsStockEntryContexts({
     rows: entryRows,
@@ -400,48 +603,37 @@ test("entrada e saída só preparam quando estoque e usuários-pai também prepa
       rule("tb_cbs.estoque_saidas").emitRows(row, exitContexts[index])[0].status === "prepared",
   );
 
-  assert.equal(
-    preparedEntries.every(({ produto_id }) => preparedStockIds.has(produto_id)),
-    true,
-  );
-  assert.equal(
-    preparedExits.every(({ produto_id }) => preparedStockIds.has(produto_id)),
-    true,
-  );
-  assert.equal(
-    preparedEntries.every(({ repositor }) => preparedUserIds.has(repositor)),
-    true,
-  );
-  assert.equal(
+  assertBoolean(preparedEntries.every(({ produto_id }) => preparedStockIds.has(produto_id)));
+  assertBoolean(preparedExits.every(({ produto_id }) => preparedStockIds.has(produto_id)));
+  assertBoolean(preparedEntries.every(({ repositor }) => preparedUserIds.has(repositor)));
+  assertBoolean(
     preparedExits.every((row) =>
       [row.solicitante, row.autorizador, row.operador]
         .filter((sourceKey) => !["", "0"].includes(String(sourceKey).trim()))
         .every((sourceKey) => preparedUserIds.has(sourceKey)),
     ),
-    true,
   );
 
-  const entryWithQuarantinedUser = entryRows.findIndex(({ repositor }) => repositor === "102");
-  assert.notEqual(entryWithQuarantinedUser, -1);
-  assert.equal(
-    entryContexts[entryWithQuarantinedUser].resolutions.user.migrationState,
-    "quarantine",
+  const entryWithQuarantinedUser = entryRows.findIndex(({ repositor }) =>
+    quarantinedUserIds.has(repositor),
   );
-  const exitWithQuarantinedUser = exitRows.findIndex(
-    ({ solicitante, autorizador, operador }) =>
-      solicitante === "102" || autorizador === "102" || operador === "102",
+  assertBoolean(entryWithQuarantinedUser >= 0);
+  assertBoolean(
+    entryContexts[entryWithQuarantinedUser].resolutions.user.migrationState === "quarantine",
   );
-  assert.notEqual(exitWithQuarantinedUser, -1);
-  assert.equal(
+  const exitWithQuarantinedUser = exitRows.findIndex(({ solicitante, autorizador, operador }) =>
+    [solicitante, autorizador, operador].some((sourceKey) => quarantinedUserIds.has(sourceKey)),
+  );
+  assertBoolean(exitWithQuarantinedUser >= 0);
+  assertBoolean(
     ["requester", "approver", "operator"]
       .map((name) => exitContexts[exitWithQuarantinedUser].resolutions[name])
-      .filter((resolution) => resolution?.sourceKey === "102")
+      .filter((resolution) => quarantinedUserIds.has(resolution?.sourceKey))
       .every(({ migrationState }) => migrationState === "quarantine"),
-    true,
   );
 });
 
-test("localização CBS resolve o rótulo real do andar e não converte ID externo em floor", async () => {
+test("localização CBS resolve o rótulo real do andar sem converter ID externo", async () => {
   const [rows, floorRows, departmentRows] = await Promise.all(
     ["tb_cbs.estoque_localizacoes", "tb_cbs.estoque_andares", "tb_admin.departamentos"].map(
       loadRows,
@@ -452,13 +644,30 @@ test("localização CBS resolve o rótulo real do andar e não converte ID exter
     (row, index) => rule("tb_cbs.estoque_localizacoes").emitRows(row, contexts[index])[0],
   );
   assert.deepEqual(summary(emissions), { quarantine: 25, prepared: 2 });
-  const serverIndex = rows.findIndex(({ id }) => id === "20");
-  const depositIndex = rows.findIndex(({ id }) => id === "22");
-  assert.equal(contexts[serverIndex].resolutions.floor.floorLabel, "Térreo");
-  assert.equal(contexts[serverIndex].resolutions.floor.floor, 0);
-  assert.equal(emissions[serverIndex].status, "prepared");
-  assert.equal(contexts[depositIndex].resolutions.floor.floorLabel, "Capuchino");
-  assert.equal(emissions[depositIndex].reasonCode, "CBS_STOCK_FLOOR_LABEL_UNMAPPABLE");
+  const zeroFloorIndex = contexts.findIndex(
+    (context, index) =>
+      context.resolutions.floor.floor === 0 && emissions[index].status === "prepared",
+  );
+  assertBoolean(zeroFloorIndex >= 0);
+  const zeroFloorSource = floorRows.find(
+    (row) => row.id === contexts[zeroFloorIndex].resolutions.floor.sourceKey,
+  );
+  assertBoolean(
+    contexts[zeroFloorIndex].resolutions.floor.floorLabel === normalizedText(zeroFloorSource?.nome),
+  );
+
+  const unmappableFloorIndex = emissions.findIndex(
+    ({ reasonCode }) => reasonCode === "CBS_STOCK_FLOOR_LABEL_UNMAPPABLE",
+  );
+  assertBoolean(unmappableFloorIndex >= 0);
+  const unmappableFloorSource = floorRows.find(
+    (row) => row.id === contexts[unmappableFloorIndex].resolutions.floor.sourceKey,
+  );
+  assertBoolean(
+    contexts[unmappableFloorIndex].resolutions.floor.floorLabel ===
+      normalizedText(unmappableFloorSource?.nome),
+  );
+  assertBoolean(emissions[unmappableFloorIndex].status === "quarantine");
 });
 
 test("saídas com observação funcional nunca são emitidas parcialmente", async () => {
@@ -491,7 +700,7 @@ test("saídas com observação funcional nunca são emitidas parcialmente", asyn
   );
 });
 
-test("Triagem usa NFSE e quarentena faturamento/envio antes da consolidação", async () => {
+test("configuração fiscal usa NFSE e quarentena faturamento/envio antes da consolidação", async () => {
   const rows = await loadRows("tb_triagem.campos");
   const contexts = buildTriageClientSlotContexts({
     rows,
@@ -532,9 +741,9 @@ test("Triagem usa NFSE e quarentena faturamento/envio antes da consolidação", 
   assert.equal(multiCauseIndexes.length, 5);
   for (const index of multiCauseIndexes) {
     const reverseIndex = reversedRows.findIndex(({ id }) => id === rows[index].id);
-    assert.deepEqual(
-      contexts[index].resolutions.clientSlot,
-      reversedContexts[reverseIndex].resolutions.clientSlot,
+    assertBoolean(
+      JSON.stringify(contexts[index].resolutions.clientSlot) ===
+        JSON.stringify(reversedContexts[reverseIndex].resolutions.clientSlot),
     );
     const audit = ruleExports.projectRemainingRow({
       sourceTable: "tb_triagem.campos",
@@ -571,19 +780,27 @@ test("rede social consolida N:1 de modo determinístico no Client canônico", as
 
   assert.equal(mappingRule.cardinality, "N:1");
   assert.deepEqual(summary(emissions), { prepared: 203, not_emitted: 1, quarantine: 1 });
-  for (const id of ["3121", "3122"]) {
-    const index = rows.findIndex((row) => row.id === id);
-    const reverseIndex = reversedRows.findIndex((row) => row.id === id);
-    assert.deepEqual(
-      contexts[index].resolutions.clientSlot,
-      reversedContexts[reverseIndex].resolutions.clientSlot,
+  const duplicateIndex = emissions.findIndex(
+    ({ reasonCode }) => reasonCode === "MKT_SOCIAL_CANONICAL_CLIENT_DUPLICATE",
+  );
+  assertBoolean(duplicateIndex >= 0);
+  const ownerIndex = rows.findIndex(
+    (_row, index) =>
+      emissions[index].status === "prepared" &&
+      contexts[index].resolutions.clientSlot.groupFingerprint ===
+        contexts[duplicateIndex].resolutions.clientSlot.groupFingerprint,
+  );
+  assertBoolean(ownerIndex >= 0);
+  for (const index of [ownerIndex, duplicateIndex]) {
+    const reverseIndex = reversedRows.findIndex((row) => row.id === rows[index].id);
+    assertBoolean(reverseIndex >= 0);
+    assertBoolean(
+      JSON.stringify(contexts[index].resolutions.clientSlot) ===
+        JSON.stringify(reversedContexts[reverseIndex].resolutions.clientSlot),
     );
   }
-  assert.equal(emissions[rows.findIndex(({ id }) => id === "3121")].status, "prepared");
-  assert.equal(
-    emissions[rows.findIndex(({ id }) => id === "3122")].reasonCode,
-    "MKT_SOCIAL_CANONICAL_CLIENT_DUPLICATE",
-  );
+  assertBoolean(emissions[ownerIndex].status === "prepared");
+  assertBoolean(emissions[duplicateIndex].reasonCode === "MKT_SOCIAL_CANONICAL_CLIENT_DUPLICATE");
   assert.throws(
     () => buildMarketingSocialContexts({ rows: rows.slice(1), clientResolver }),
     /corpus completo auditado.*tb_mkt\.redes_sociais/i,
@@ -641,7 +858,7 @@ test("mensagens Workspace usam tipo executável e cadeia parental opaca", async 
     field: "tipo",
     reasonCode: "WORKSPACE_MESSAGE_TYPE_INVALID",
   });
-  assert.equal(rows[attachmentIndex].mensagem, "");
+  assertBoolean(rows[attachmentIndex].mensagem === "");
   assert.equal(emissions[normalIndex].reasonCode, "WORKSPACE_MESSAGE_READ_STATE_UNMAPPABLE");
   assert.equal(
     emissions[attachmentIndex].reasonCode,
@@ -768,8 +985,7 @@ test("senha Marketing exige builder opaco com criptografia e nunca vaza o segred
   );
 });
 
-test("payloads reais das 14 regras materializam valores significativos sem ampliar emissão", async () => {
-  const organizationId = "e8048d1c-0830-45d7-84de-68e20abd685b";
+test("projeções das 14 regras preservam valores runtime sem versionar conteúdo real", async () => {
   const stockBundle = await stockContexts();
   const workspaceBundle = await workspaceContexts();
   const [users, entries, inventory, exits, emails, socialRows, passwordRows, pecRows, triageRows] =
@@ -806,201 +1022,400 @@ test("payloads reais das 14 regras materializam valores significativos sem ampli
   });
   const pecContexts = buildPecNoteContexts({ rows: pecRows, userRows: users, clientResolver });
   const triageContexts = buildTriageClientSlotContexts({ rows: triageRows, clientResolver });
-  const projectById = (sourceTable, rows, contexts, id) => {
-    const index = rows.findIndex((row) => row.id === id);
-    assert.notEqual(index, -1, `${sourceTable}:${id}`);
-    return ruleExports.projectRemainingRow({
-      sourceTable,
-      row: rows[index],
-      context: contexts[index],
-    });
-  };
 
-  assert.deepEqual(
-    projectById(
-      "tb_cbc.emails",
-      emails,
-      emails.map(() => ({})),
-      "3",
-    ).payload,
-    {
-      id: "7a9ed02f-ecba-5def-9339-da1535648910",
-      email: "castelo.infoproduto@gmail.com",
-      responsible: "Alef",
-      new_client_sending: true,
-      task_stalled_sending: true,
-      organization_id: organizationId,
-    },
+  const email = projectPreparedSample(
+    "tb_cbc.emails",
+    emails,
+    emails.map(() => ({})),
+    (row) => normalizedText(row.email) !== null && normalizedText(row.responsavel) !== null,
   );
-  assert.deepEqual(
-    projectById(
-      "tb_cbs.estoque_categorias",
-      stockBundle.categoryRows,
-      stockBundle.categoryContexts,
-      "11",
-    ).payload,
-    {
-      id: "ee027dc5-f6d8-55dc-b75f-18d5d91a9923",
-      name: "CABOS",
-      department_id: "b439168d-8152-5b57-bd9c-440773d07d5b",
-      status: true,
-      organization_id: organizationId,
-    },
+  assertPayloadKeys(email.payload, [
+    "id",
+    "email",
+    "responsible",
+    "new_client_sending",
+    "task_stalled_sending",
+    "organization_id",
+  ]);
+  assertBoolean(email.payload.id === generatedIdentity("tb_cbc.emails", email.row.id));
+  assertBoolean(email.payload.email === normalizedText(email.row.email));
+  assertBoolean(email.payload.responsible === normalizedText(email.row.responsavel));
+  assertBoolean(
+    email.payload.new_client_sending === (String(email.row.cliente_novo_integracao).trim() === "1"),
   );
-  assert.deepEqual(
-    projectById("tb_cbs.estoque", stockBundle.rows, stockBundle.contexts, "413").payload,
-    {
-      id: "18c1460c-ce60-53d0-8939-a6a3d98c29c7",
-      department_id: "b439168d-8152-5b57-bd9c-440773d07d5b",
-      name: "Fonte para Notebook N11CASTELO",
-      description: "Defeituosa",
-      status: false,
-      category_id: "f1a7aae0-9d8d-5c75-a2e3-bb30a4de6f8e",
-      quantity: 1,
-      location_id: "31f592ca-e7f3-5840-950d-c449f2860d26",
-      organization_id: organizationId,
-    },
+  assertBoolean(
+    email.payload.task_stalled_sending ===
+      (String(email.row.tarefa_paralisada_integracao).trim() === "1"),
   );
-  assert.deepEqual(projectById("tb_cbs.estoque_entradas", entries, entryContexts, "315").payload, {
-    id: "d3e53e20-0ab9-5ce3-9616-a7aca8ecf212",
-    stock_id: "18c1460c-ce60-53d0-8939-a6a3d98c29c7",
-    quantity: 11,
-    entry_date: "2023-08-31 14:55:00",
-    entry_by_user_id: "65c120df-02f4-51ac-8541-0e69e3ce5214",
-    organization_id: organizationId,
+  assertOrganization(email.payload, "tb_cbc.emails");
+
+  const category = projectPreparedSample(
+    "tb_cbs.estoque_categorias",
+    stockBundle.categoryRows,
+    stockBundle.categoryContexts,
+  );
+  assertPayloadKeys(category.payload, ["id", "name", "department_id", "status", "organization_id"]);
+  assertBoolean(
+    category.payload.id === generatedIdentity("tb_cbs.estoque_categorias", category.row.id),
+  );
+  assertBoolean(category.payload.name === normalizedText(category.row.nome));
+  assertBoolean(
+    category.payload.department_id === resolvedIdentity(category.context, "department"),
+  );
+  assertBoolean(category.payload.status === true);
+  assertOrganization(category.payload, "tb_cbs.estoque_categorias");
+
+  const stock = projectPreparedSample(
+    "tb_cbs.estoque",
+    stockBundle.rows,
+    stockBundle.contexts,
+    (_row, context) =>
+      context.resolutions.item.itemDescription !== null &&
+      context.resolutions.item.itemActive === false,
+  );
+  assertPayloadKeys(stock.payload, [
+    "id",
+    "department_id",
+    "name",
+    "description",
+    "status",
+    "category_id",
+    "quantity",
+    "location_id",
+    "organization_id",
+  ]);
+  assertBoolean(stock.payload.id === generatedIdentity("tb_cbs.estoque", stock.row.id));
+  assertBoolean(stock.payload.department_id === resolvedIdentity(stock.context, "department"));
+  assertBoolean(stock.payload.name === stock.context.resolutions.item.itemName);
+  assertBoolean(stock.payload.description === stock.context.resolutions.item.itemDescription);
+  assertBoolean(stock.payload.status === stock.context.resolutions.item.itemActive);
+  assertBoolean(stock.payload.category_id === resolvedIdentity(stock.context, "category"));
+  assertBoolean(stock.payload.quantity === Number(stock.row.quantidade));
+  assertBoolean(stock.payload.location_id === resolvedIdentity(stock.context, "location"));
+  assertOrganization(stock.payload, "tb_cbs.estoque");
+
+  const entry = projectPreparedSample(
+    "tb_cbs.estoque_entradas",
+    entries,
+    entryContexts,
+    (row) => Number(row.quantidade) > 0,
+  );
+  assertPayloadKeys(entry.payload, [
+    "id",
+    "stock_id",
+    "quantity",
+    "entry_date",
+    "entry_by_user_id",
+    "organization_id",
+  ]);
+  assertBoolean(entry.payload.id === generatedIdentity("tb_cbs.estoque_entradas", entry.row.id));
+  assertBoolean(entry.payload.stock_id === resolvedIdentity(entry.context, "stock"));
+  assertBoolean(entry.payload.quantity === Number(entry.row.quantidade));
+  assertBoolean(entry.payload.entry_date === normalizedText(entry.row.data_entrada));
+  assertBoolean(entry.payload.entry_by_user_id === resolvedIdentity(entry.context, "user"));
+  assertOrganization(entry.payload, "tb_cbs.estoque_entradas");
+
+  const inventorySample = projectPreparedSample(
+    "tb_cbs.estoque_inventario",
+    inventory,
+    inventory.map(() => ({})),
+  );
+  assertPayloadKeys(inventorySample.payload, ["id", "name", "tag", "active", "organization_id"]);
+  assertBoolean(
+    inventorySample.payload.id ===
+      generatedIdentity("tb_cbs.estoque_inventario", inventorySample.row.id),
+  );
+  assertBoolean(inventorySample.payload.name === normalizedText(inventorySample.row.tipo_item));
+  assertBoolean(inventorySample.payload.tag === normalizedText(inventorySample.row.tag));
+  assertBoolean(
+    inventorySample.payload.active ===
+      (String(inventorySample.row.status).trim().toLocaleLowerCase("pt-BR") === "ativo"),
+  );
+  assertOrganization(inventorySample.payload, "tb_cbs.estoque_inventario");
+
+  const location = projectPreparedSample(
+    "tb_cbs.estoque_localizacoes",
+    stockBundle.locationRows,
+    stockBundle.locationContexts,
+  );
+  assertPayloadKeys(location.payload, [
+    "id",
+    "name",
+    "floor",
+    "department_id",
+    "status",
+    "organization_id",
+  ]);
+  assertBoolean(
+    location.payload.id === generatedIdentity("tb_cbs.estoque_localizacoes", location.row.id),
+  );
+  assertBoolean(location.payload.name === normalizedText(location.row.nome));
+  assertBoolean(location.payload.floor === location.context.resolutions.floor.floor);
+  assertBoolean(
+    location.payload.department_id === resolvedIdentity(location.context, "department"),
+  );
+  assertBoolean(location.payload.status === true);
+  assertOrganization(location.payload, "tb_cbs.estoque_localizacoes");
+
+  const exitSample = projectPreparedSample(
+    "tb_cbs.estoque_saidas",
+    exits,
+    exitContexts,
+    (row, context) =>
+      normalizedText(row.destino) !== null &&
+      context.resolutions.approver !== null &&
+      context.resolutions.operator !== null,
+  );
+  assertPayloadKeys(exitSample.payload, [
+    "id",
+    "stock_id",
+    "quantity",
+    "exit_date",
+    "destination",
+    "requester_id",
+    "approver_id",
+    "operator_id",
+    "location_destination_id",
+    "organization_id",
+  ]);
+  assertBoolean(
+    exitSample.payload.id === generatedIdentity("tb_cbs.estoque_saidas", exitSample.row.id),
+  );
+  assertBoolean(exitSample.payload.stock_id === resolvedIdentity(exitSample.context, "stock"));
+  assertBoolean(exitSample.payload.quantity === Number(exitSample.row.quantidade));
+  assertBoolean(exitSample.payload.exit_date === normalizedText(exitSample.row.data_saida));
+  assertBoolean(exitSample.payload.destination === normalizedText(exitSample.row.destino));
+  assertBoolean(
+    exitSample.payload.requester_id === resolvedIdentity(exitSample.context, "requester"),
+  );
+  assertBoolean(
+    exitSample.payload.approver_id === resolvedIdentity(exitSample.context, "approver"),
+  );
+  assertBoolean(
+    exitSample.payload.operator_id === resolvedIdentity(exitSample.context, "operator"),
+  );
+  assertBoolean(exitSample.payload.location_destination_id === null);
+  assertOrganization(exitSample.payload, "tb_cbs.estoque_saidas");
+
+  const social = projectPreparedSample(
+    "tb_mkt.redes_sociais",
+    socialRows,
+    socialContexts,
+    (row) => normalizedText(row.instagram) !== null,
+  );
+  assertPayloadKeys(social.payload, ["id", "instagram"]);
+  assertBoolean(social.payload.id === resolvedIdentity(social.context, "client"));
+  assertBoolean(social.payload.instagram === normalizedText(social.row.instagram));
+
+  const password = projectPreparedSample("tb_mkt.senhas", passwordRows, passwordContexts);
+  assertPayloadKeys(password.payload, [
+    "id",
+    "local",
+    "userPresent",
+    "notes",
+    "organization_id",
+    "credential",
+  ]);
+  assertPayloadKeys(password.payload.credential, [
+    "sourcePresent",
+    "encryptionRequired",
+    "plaintextIncluded",
+  ]);
+  assertBoolean(password.payload.id === generatedIdentity("tb_mkt.senhas", password.row.id));
+  assertBoolean(password.payload.local === normalizedText(password.row.local));
+  assertBoolean(password.payload.userPresent === (normalizedText(password.row.user) !== null));
+  assertBoolean(password.payload.notes === normalizedText(password.row.obs));
+  assertBoolean(password.payload.credential.sourcePresent === true);
+  assertBoolean(password.payload.credential.encryptionRequired === true);
+  assertBoolean(password.payload.credential.plaintextIncluded === false);
+  assertOrganization(password.payload, "tb_mkt.senhas");
+
+  const pec = projectPreparedSample(
+    "tb_pec.notas",
+    pecRows,
+    pecContexts,
+    (row) => normalizedZeroDate(row.conclusao) !== null,
+  );
+  assertPayloadKeys(pec.payload, [
+    "id",
+    "user_id",
+    "number",
+    "note",
+    "created_at",
+    "due_date",
+    "completion_date",
+    "status",
+    "week_start_date",
+    "week_end_date",
+    "original_creation_date",
+    "has_penalty",
+    "is_urgent",
+    "is_internal",
+    "client_id",
+    "organization_id",
+  ]);
+  assertBoolean(pec.payload.id === generatedIdentity("tb_pec.notas", pec.row.id));
+  assertBoolean(pec.payload.user_id === resolvedIdentity(pec.context, "user"));
+  assertBoolean(pec.payload.number === Number(pec.row.numero));
+  assertBoolean(pec.payload.note === normalizedText(pec.row.tarefa));
+  assertBoolean(pec.payload.created_at === normalizedText(pec.row.cadastro));
+  assertBoolean(pec.payload.due_date === normalizedZeroDate(pec.row.previsao));
+  assertBoolean(pec.payload.completion_date === normalizedZeroDate(pec.row.conclusao));
+  assertBoolean(pec.payload.status === (String(pec.row.status).trim() !== "0"));
+  assertBoolean(pec.payload.week_start_date === normalizedText(pec.row.inicio_semana));
+  assertBoolean(pec.payload.week_end_date === normalizedText(pec.row.fim_semana));
+  assertBoolean(pec.payload.original_creation_date === normalizedText(pec.row.cadastro_original));
+  assertBoolean(pec.payload.has_penalty === (String(pec.row.multa).trim() === "1"));
+  assertBoolean(pec.payload.is_urgent === (String(pec.row.urgente).trim() === "1"));
+  const pecClientKey = String(pec.row.cliente_id ?? "").trim();
+  const pecIsInternal = pecClientKey.length === 0 || pecClientKey === "0";
+  assertBoolean(pec.payload.is_internal === pecIsInternal);
+  assertBoolean(
+    pec.payload.client_id === (pecIsInternal ? null : resolvedIdentity(pec.context, "client")),
+  );
+  assertOrganization(pec.payload, "tb_pec.notas");
+
+  const triageFields = [
+    ["nfce", "nfce_documents"],
+    ["sped", "sped_fiscal"],
+    ["spedContribuicoes", "sped_contributions"],
+    ["nfce_tomados", "nfse_received"],
+    ["modelo_21", "model_21_invoice"],
+    ["cte_emitente", "cte_as_issuer"],
+    ["prestadas_mei", "services_provided_as_mei"],
+  ];
+  const expectedTriageItems = (row) =>
+    triageFields.flatMap(([field, item]) =>
+      String(row[field] ?? "").trim() === "1" ? [item] : [],
+    );
+  const triage = projectPreparedSample(
+    "tb_triagem.campos",
+    triageRows,
+    triageContexts,
+    (row) => expectedTriageItems(row).length > 0,
+  );
+  assertPayloadKeys(triage.payload, ["id", "client_id", "type", "active_items", "organization_id"]);
+  assertBoolean(triage.payload.id === generatedIdentity("tb_triagem.campos", triage.row.id));
+  assertBoolean(triage.payload.client_id === resolvedIdentity(triage.context, "client"));
+  assertBoolean(triage.payload.type === "FISCAL");
+  assertBoolean(
+    JSON.stringify(triage.payload.active_items) === JSON.stringify(expectedTriageItems(triage.row)),
+  );
+  assertOrganization(triage.payload, "tb_triagem.campos");
+
+  const workspaceCategory = projectPreparedSample(
+    "tb_workspace.solicitacoes_categorias",
+    workspaceBundle.categoryRows,
+    workspaceBundle.categoryContexts,
+  );
+  assertPayloadKeys(workspaceCategory.payload, ["id", "name", "active", "organization_id"]);
+  assertBoolean(
+    workspaceCategory.payload.id ===
+      generatedIdentity("tb_workspace.solicitacoes_categorias", workspaceCategory.row.id),
+  );
+  assertBoolean(workspaceCategory.payload.name === normalizedText(workspaceCategory.row.nome));
+  assertBoolean(
+    workspaceCategory.payload.active === (String(workspaceCategory.row.status).trim() === "1"),
+  );
+  assertOrganization(workspaceCategory.payload, "tb_workspace.solicitacoes_categorias");
+
+  const workspaceRequest = projectPreparedSample(
+    "tb_workspace.solicitacoes",
+    workspaceBundle.requestRows,
+    workspaceBundle.requestContexts,
+    (row) => normalizedText(row.descricao) !== null,
+  );
+  assertPayloadKeys(workspaceRequest.payload, [
+    "id",
+    "title",
+    "description",
+    "status",
+    "requester_id",
+    "assigned_to_id",
+    "category_id",
+    "urgency",
+    "attachment",
+    "created_at",
+    "updated_at",
+    "organization_id",
+  ]);
+  assertBoolean(
+    workspaceRequest.payload.id ===
+      generatedIdentity("tb_workspace.solicitacoes", workspaceRequest.row.id),
+  );
+  assertBoolean(workspaceRequest.payload.title === normalizedText(workspaceRequest.row.titulo));
+  assertBoolean(
+    workspaceRequest.payload.description === normalizedText(workspaceRequest.row.descricao),
+  );
+  const requestStatuses = new Map([
+    ["0", "New"],
+    ["1", "In_Progress"],
+    ["2", "Resolved"],
+    ["3", "Closed"],
+  ]);
+  const requestUrgencies = new Map([
+    ["1", "Low"],
+    ["2", "Medium"],
+    ["3", "High"],
+  ]);
+  assertBoolean(
+    workspaceRequest.payload.status ===
+      requestStatuses.get(String(workspaceRequest.row.status).trim()),
+  );
+  assertBoolean(
+    workspaceRequest.payload.requester_id ===
+      resolvedIdentity(workspaceRequest.context, "requester"),
+  );
+  assertBoolean(
+    workspaceRequest.payload.assigned_to_id ===
+      (workspaceRequest.context.resolutions.assignee === null
+        ? null
+        : resolvedIdentity(workspaceRequest.context, "assignee")),
+  );
+  assertBoolean(
+    workspaceRequest.payload.category_id === resolvedIdentity(workspaceRequest.context, "category"),
+  );
+  assertBoolean(
+    workspaceRequest.payload.urgency ===
+      requestUrgencies.get(String(workspaceRequest.row.urgencia).trim()),
+  );
+  assertBoolean(workspaceRequest.payload.attachment === null);
+  assertBoolean(
+    workspaceRequest.payload.created_at === normalizedText(workspaceRequest.row.data_cadastro),
+  );
+  assertBoolean(
+    workspaceRequest.payload.updated_at === normalizedText(workspaceRequest.row.data_atualizacao),
+  );
+  assertOrganization(workspaceRequest.payload, "tb_workspace.solicitacoes");
+
+  const messageIndex = workspaceBundle.messageRows.findIndex(
+    (row) => normalizedText(row.mensagem) !== null,
+  );
+  assertBoolean(messageIndex >= 0);
+  const messageRow = workspaceBundle.messageRows[messageIndex];
+  const messageAudit = ruleExports.projectRemainingRow({
+    sourceTable: "tb_workspace.solicitacoes_mensagens",
+    row: messageRow,
+    context: workspaceBundle.messageContexts[messageIndex],
   });
-  assert.deepEqual(
-    projectById(
-      "tb_cbs.estoque_inventario",
-      inventory,
-      inventory.map(() => ({})),
-      "1",
-    ).payload,
-    {
-      id: "7ed37dc7-498c-5cbd-9c46-47aab2f53d75",
-      name: "Carrinho",
-      tag: null,
-      active: true,
-      organization_id: organizationId,
-    },
+  assertBoolean(messageAudit.decision.status === "quarantine");
+  assertBoolean(messageAudit.payload === null);
+  assertBoolean(messageAudit.candidate !== null);
+  assertPayloadKeys(messageAudit.candidate, ["type", "content", "attachment"]);
+  assertPayloadKeys(messageAudit.candidate.content, ["present", "length"]);
+  const mappedMessageType = ruleExports.mapWorkspaceMessageType(messageRow.tipo);
+  const messageText = normalizedText(messageRow.mensagem);
+  assertBoolean(
+    messageAudit.candidate.type ===
+      (mappedMessageType.status === "mapped" ? mappedMessageType.value : null),
   );
-  assert.deepEqual(
-    projectById(
-      "tb_cbs.estoque_localizacoes",
-      stockBundle.locationRows,
-      stockBundle.locationContexts,
-      "21",
-    ).payload,
-    {
-      id: "31f592ca-e7f3-5840-950d-c449f2860d26",
-      name: "Armários",
-      floor: 2,
-      department_id: "b439168d-8152-5b57-bd9c-440773d07d5b",
-      status: true,
-      organization_id: organizationId,
-    },
+  assertBoolean(messageAudit.candidate.content.present === (messageText !== null));
+  assertBoolean(messageAudit.candidate.content.length === (messageText?.length ?? 0));
+  assertBoolean(
+    messageAudit.candidate.attachment ===
+      (mappedMessageType.status === "mapped" && mappedMessageType.attachment),
   );
-  assert.deepEqual(projectById("tb_cbs.estoque_saidas", exits, exitContexts, "1185").payload, {
-    id: "9067f7f9-4b29-5ca8-8fed-1903f8ca40b2",
-    stock_id: "e079d279-1d93-5eb5-8db0-011167300e67",
-    quantity: 1,
-    exit_date: "2023-11-16 11:31:00",
-    destination: "11",
-    requester_id: "7b41c726-8f87-581e-a0f8-18adb1fccfaf",
-    approver_id: "43b3a318-4ed8-58f1-ac3b-9cd44d0fb9d2",
-    operator_id: "126778dc-0e9e-52b8-b541-8d9cb0a29874",
-    location_destination_id: null,
-    organization_id: organizationId,
-  });
-  assert.deepEqual(
-    projectById("tb_mkt.redes_sociais", socialRows, socialContexts, "3121").payload,
-    { id: "c54d2373-4929-5377-92b2-078ec84a584d", instagram: "cantor.roby" },
-  );
-  assert.deepEqual(projectById("tb_mkt.senhas", passwordRows, passwordContexts, "23").payload, {
-    id: "fbfb5fee-356b-599f-9dc4-7b1178b7d3be",
-    local: "CANVA",
-    userPresent: true,
-    notes: null,
-    organization_id: organizationId,
-    credential: {
-      sourcePresent: true,
-      encryptionRequired: true,
-      plaintextIncluded: false,
-    },
-  });
-  assert.deepEqual(projectById("tb_pec.notas", pecRows, pecContexts, "2").payload, {
-    id: "4536afc7-eddd-50bb-9705-d47538636135",
-    user_id: "48ca6e10-17c0-56aa-bcf5-e27013261b71",
-    number: 1,
-    note: "Verificar proposta assinada do projeto Matheus - Alice Embalagens, mudar de MEI para ME e enviar mudança para o financeiro;",
-    created_at: "2024-03-04 08:45:58",
-    due_date: null,
-    completion_date: "2024-03-05 18:04:52",
-    status: true,
-    week_start_date: "2024-03-04",
-    week_end_date: "2024-03-08",
-    original_creation_date: "2024-03-04 08:45:58",
-    has_penalty: false,
-    is_urgent: false,
-    is_internal: true,
-    client_id: null,
-    organization_id: organizationId,
-  });
-  assert.deepEqual(projectById("tb_triagem.campos", triageRows, triageContexts, "4").payload, {
-    id: "417c8249-e23f-567a-8740-582af574c40e",
-    client_id: "a8203615-6f07-526c-ba24-5a158ed0b53f",
-    type: "FISCAL",
-    active_items: ["nfce_documents"],
-    organization_id: organizationId,
-  });
-  assert.deepEqual(
-    projectById(
-      "tb_workspace.solicitacoes_categorias",
-      workspaceBundle.categoryRows,
-      workspaceBundle.categoryContexts,
-      "1",
-    ).payload,
-    {
-      id: "eb70dfea-f4fc-5b97-a19e-f976b45e8e95",
-      name: "Troca de Equipamento",
-      active: true,
-      organization_id: organizationId,
-    },
-  );
-  assert.deepEqual(
-    projectById(
-      "tb_workspace.solicitacoes",
-      workspaceBundle.requestRows,
-      workspaceBundle.requestContexts,
-      "26",
-    ).payload,
-    {
-      id: "fb7a6a07-92ee-57b1-a024-88813734f32e",
-      title: "TESTE",
-      description: "MEU PC PEGOU FOGO",
-      status: "In_Progress",
-      requester_id: "34f9ea61-838f-5d32-9004-6b1c6ecf7b21",
-      assigned_to_id: "126778dc-0e9e-52b8-b541-8d9cb0a29874",
-      category_id: "eb70dfea-f4fc-5b97-a19e-f976b45e8e95",
-      urgency: "High",
-      attachment: null,
-      created_at: "2025-03-31 16:41:51",
-      updated_at: "2025-09-01 13:21:31",
-      organization_id: organizationId,
-    },
-  );
-  const quarantinedMessage = projectById(
-    "tb_workspace.solicitacoes_mensagens",
-    workspaceBundle.messageRows,
-    workspaceBundle.messageContexts,
-    "1",
-  );
-  assert.equal(quarantinedMessage.payload, null);
-  assert.deepEqual(quarantinedMessage.candidate, {
-    type: "Message",
-    content: { present: true, length: 39 },
-    attachment: false,
-  });
+  assertBoolean(!JSON.stringify(messageAudit.candidate).includes(messageText));
 });
 
 test("comportamento real cobre as 15 origens originalmente confirmadas após downgrade", async () => {
