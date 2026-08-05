@@ -1,8 +1,15 @@
-import { stat } from "node:fs/promises";
+import { writeSync } from "node:fs";
+import { lstat } from "node:fs/promises";
+import path from "node:path";
 import { parseArgs } from "node:util";
 
 import { EVIDENCE_REGISTRY } from "./evidence/index.mjs";
-import { buildMapping, writeMappingPackage } from "./lib/mapping-engine.mjs";
+import {
+  assertSafePackagePath,
+  buildMapping,
+  createMappingContextProvider,
+  writeMappingPackage,
+} from "./lib/mapping-engine.mjs";
 import { loadPrismaCatalog } from "./lib/prisma-catalog.mjs";
 import { buildSourceInventory } from "./lib/source-inventory.mjs";
 import {
@@ -16,9 +23,30 @@ import {
   TECHNOLOGY_RULES,
 } from "./rules/index.mjs";
 
+const USAGE = `Uso:
+  node docs/migration/v4/scripts/build-mapping.mjs \\
+    --source <diretorio-dos-dumps> \\
+    --legacy-source <workspace-legado> \\
+    --package <diretorio-de-saida> \\
+    --prisma <schema.prisma> \\
+    --expected-tables <quantidade>
+`;
+
 async function main() {
+  if (process.argv.slice(2).length === 1 && process.argv[2] === "--help") {
+    writeSync(process.stdout.fd, USAGE);
+    return;
+  }
   const options = parseCommandLine();
-  await assertDirectory(options.legacySource);
+  await assertLegacyWorkspace(options.legacySource);
+  const protectedPaths = [options.source, options.legacySource, options.prisma];
+  try {
+    await assertSafePackagePath({ packageDir: options.package, protectedPaths });
+  } catch {
+    throw new CliError(
+      "Package inválido: deve ficar fora das origens e não pode usar symlink/alias.",
+    );
+  }
   const [inventory, prismaCatalog] = await Promise.all([
     buildSourceInventory({
       sourceDir: options.source,
@@ -35,19 +63,16 @@ async function main() {
     INTEGRACAO_REGULARIZE_RULES,
     REMAINING_RULES,
   );
+  const contextProvider = createMappingContextProvider({ inventory, ruleRegistry });
   const result = await buildMapping({
     inventory,
     evidenceRegistry: EVIDENCE_REGISTRY,
     ruleRegistry,
     prismaCatalog,
     sourceDir: options.source,
-    capabilities: {
-      encryption: false,
-      credentialEncryptionVerified: false,
-      certificateStorageEncryptionVerified: false,
-    },
+    capabilities: contextProvider,
   });
-  await writeMappingPackage(options.package, result);
+  await writeMappingPackage(options.package, result, { protectedPaths });
 }
 
 function parseCommandLine() {
@@ -65,7 +90,7 @@ function parseCommandLine() {
       strict: true,
     }));
   } catch {
-    throw new Error("Argumentos inválidos");
+    throw new CliError("Argumentos inválidos.");
   }
   if (
     !values.source ||
@@ -74,7 +99,7 @@ function parseCommandLine() {
     !values.prisma ||
     !values["expected-tables"]
   ) {
-    throw new Error("Argumentos obrigatórios ausentes");
+    throw new CliError("Argumentos obrigatórios ausentes.");
   }
   return {
     source: values.source,
@@ -86,29 +111,44 @@ function parseCommandLine() {
 }
 
 function parsePositiveInteger(value) {
-  if (!/^\d+$/.test(value)) throw new Error("Inteiro positivo obrigatório");
+  if (!/^\d+$/.test(value)) throw new CliError("Argumentos inválidos.");
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    throw new Error("Inteiro positivo obrigatório");
+    throw new CliError("Argumentos inválidos.");
   }
   return parsed;
 }
 
-async function assertDirectory(directory) {
-  let inspection;
-  try {
-    inspection = await stat(directory);
-  } catch {
-    throw new Error("Diretório legado inválido");
+async function assertLegacyWorkspace(directory) {
+  if (!(await isRealEntry(directory, "directory"))) {
+    throw new CliError("Workspace legado inválido: marcadores do sistema legado ausentes.");
   }
-  if (!inspection.isDirectory()) throw new Error("Diretório legado inválido");
+  for (const marker of ["composer.json", "login.php", "classes/Painel.php"]) {
+    if (!(await isRealEntry(path.join(directory, marker), "file"))) {
+      throw new CliError("Workspace legado inválido: marcadores do sistema legado ausentes.");
+    }
+  }
 }
+
+async function isRealEntry(target, expectedKind) {
+  try {
+    const inspection = await lstat(target);
+    return (
+      !inspection.isSymbolicLink() &&
+      (expectedKind === "directory" ? inspection.isDirectory() : inspection.isFile())
+    );
+  } catch {
+    return false;
+  }
+}
+
+class CliError extends Error {}
 
 try {
   await main();
-} catch {
-  await new Promise((resolve) => {
-    process.stderr.write("Falha ao gerar pacote de mapeamento V4.\n", resolve);
-  });
+} catch (error) {
+  const message =
+    error instanceof CliError ? error.message : "Falha ao gerar pacote de mapeamento V4.";
+  writeSync(process.stderr.fd, `${message}\n`);
   process.exitCode = 1;
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -44,7 +44,10 @@ async function createCompleteSource(directory) {
   const sourceDir = path.join(directory, "source");
   const legacyDir = path.join(directory, "legacy");
   await mkdir(sourceDir);
-  await mkdir(legacyDir);
+  await mkdir(path.join(legacyDir, "classes"), { recursive: true });
+  await writeFile(path.join(legacyDir, "composer.json"), '{"name":"fixture/legacy"}\n');
+  await writeFile(path.join(legacyDir, "login.php"), "<?php // marcador legado\n");
+  await writeFile(path.join(legacyDir, "classes", "Painel.php"), "<?php class Painel {}\n");
   for (const evidence of ALL_EVIDENCE) {
     const content =
       evidence.finalStatus === "confirmed"
@@ -55,25 +58,29 @@ async function createCompleteSource(directory) {
   return { sourceDir, legacyDir };
 }
 
+function validArguments({ sourceDir, legacyDir, packageDir }) {
+  return [
+    "--source",
+    sourceDir,
+    "--legacy-source",
+    legacyDir,
+    "--package",
+    packageDir,
+    "--prisma",
+    PRISMA,
+    "--expected-tables",
+    "312",
+  ];
+}
+
 test("CLI aceita somente as cinco origens declaradas e gera pacote dry-run completo", async () => {
   await withSandbox(async (directory) => {
     const { sourceDir, legacyDir } = await createCompleteSource(directory);
     const packageDir = path.join(directory, "package");
 
-    const execution = await runCli([
-      "--source",
-      sourceDir,
-      "--legacy-source",
-      legacyDir,
-      "--package",
-      packageDir,
-      "--prisma",
-      PRISMA,
-      "--expected-tables",
-      "312",
-    ]);
+    const execution = await runCli(validArguments({ sourceDir, legacyDir, packageDir }));
 
-    assert.equal(execution.code, 0);
+    assert.equal(execution.code, 0, execution.stderr);
     assert.equal(execution.signal, null);
     assert.equal(execution.stderr, "");
     assert.equal(execution.stdout, "");
@@ -82,17 +89,29 @@ test("CLI aceita somente as cinco origens declaradas e gera pacote dry-run compl
       await readFile(path.join(packageDir, "pending-mapping/tables.json")),
     );
     assert.equal(mappings.length + pending.length, 312);
+    assert.equal(
+      mappings.every(({ preflightComplete }) => preflightComplete === false),
+      true,
+    );
+    assert.equal(
+      mappings.every(({ prepared }) => prepared === 0),
+      true,
+    );
   });
 });
 
 test("CLI rejeita flags de escrita e preserva o pacote sem efeitos colaterais", async () => {
   await withSandbox(async (directory) => {
+    const { sourceDir, legacyDir } = await createCompleteSource(directory);
     const packageDir = path.join(directory, "package");
     await mkdir(packageDir);
     await writeFile(path.join(packageDir, "sentinel.txt"), "NAO_ALTERAR\n");
 
     for (const forbidden of ["--apply", "--write-db", "--delete"]) {
-      const execution = await runCli([forbidden]);
+      const execution = await runCli([
+        ...validArguments({ sourceDir, legacyDir, packageDir }),
+        forbidden,
+      ]);
       assert.notEqual(execution.code, 0, forbidden);
       assert.equal(execution.stdout, "", forbidden);
       assert.doesNotMatch(execution.stderr, /postgres|database_url|senha|token/i, forbidden);
@@ -102,5 +121,49 @@ test("CLI rejeita flags de escrita e preserva o pacote sem efeitos colaterais", 
         forbidden,
       );
     }
+  });
+});
+
+test("CLI oferece help e diferencia argumentos, workspace legado e package inseguro", async () => {
+  await withSandbox(async (directory) => {
+    const help = await runCli(["--help"]);
+    assert.equal(help.code, 0);
+    assert.match(help.stdout, /--source.*--legacy-source.*--package/s);
+    assert.equal(help.stderr, "");
+
+    const missing = await runCli([]);
+    assert.notEqual(missing.code, 0);
+    assert.match(missing.stderr, /obrigatórios/i);
+
+    const unknown = await runCli(["--unknown"]);
+    assert.notEqual(unknown.code, 0);
+    assert.match(unknown.stderr, /inválidos/i);
+
+    const { sourceDir, legacyDir } = await createCompleteSource(directory);
+    const invalidLegacy = path.join(directory, "not-legacy");
+    await mkdir(invalidLegacy);
+    const invalidWorkspace = await runCli(
+      validArguments({
+        sourceDir,
+        legacyDir: invalidLegacy,
+        packageDir: path.join(directory, "package-invalid-legacy"),
+      }),
+    );
+    assert.notEqual(invalidWorkspace.code, 0);
+    assert.match(invalidWorkspace.stderr, /marcadores.*legado/i);
+
+    const unsafePackage = await runCli(
+      validArguments({ sourceDir, legacyDir, packageDir: sourceDir }),
+    );
+    assert.notEqual(unsafePackage.code, 0);
+    assert.match(unsafePackage.stderr, /package.*origens/i);
+
+    const sourceAlias = path.join(directory, "source-alias");
+    await symlink(sourceDir, sourceAlias);
+    const aliasPackage = await runCli(
+      validArguments({ sourceDir, legacyDir, packageDir: sourceAlias }),
+    );
+    assert.notEqual(aliasPackage.code, 0);
+    assert.match(aliasPackage.stderr, /symlink|alias|origens/i);
   });
 });
