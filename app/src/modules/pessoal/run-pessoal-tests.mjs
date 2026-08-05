@@ -16,6 +16,12 @@ import {
   buildPessoalUnionListParams,
   hasPessoalPasswordSecretFields,
 } from "./services/pessoalService.ts";
+import {
+  buildPessoalUnionFormPayload,
+  buildPessoalUnionFormValues,
+  formatPessoalUnionCnpjInput,
+  normalizePessoalUnionCnpjValue,
+} from "./components/pessoalFormValueHelpers.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 import { formatPessoalObligationGenerationSummary } from "./utils/obligationGenerationSummary.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
@@ -213,6 +219,53 @@ runTest("union payload builder keeps backend field names", () => {
       name: "Sindicato A",
       cnpj: "12.345.678/0001-90",
       base_date: null,
+    },
+  );
+});
+
+runTest("union cnpj helper formats progressively and keeps the 14-digit cap", () => {
+  assert.equal(formatPessoalUnionCnpjInput("1"), "1");
+  assert.equal(formatPessoalUnionCnpjInput("12"), "12");
+  assert.equal(formatPessoalUnionCnpjInput("123"), "12.3");
+  assert.equal(formatPessoalUnionCnpjInput("1234"), "12.34");
+  assert.equal(formatPessoalUnionCnpjInput("12345"), "12.345");
+  assert.equal(formatPessoalUnionCnpjInput("123456"), "12.345.6");
+  assert.equal(formatPessoalUnionCnpjInput("1234567"), "12.345.67");
+  assert.equal(formatPessoalUnionCnpjInput("12345678"), "12.345.678");
+  assert.equal(formatPessoalUnionCnpjInput("123456789"), "12.345.678/9");
+  assert.equal(formatPessoalUnionCnpjInput("123456789012"), "12.345.678/9012");
+  assert.equal(formatPessoalUnionCnpjInput("1234567890123"), "12.345.678/9012-3");
+  assert.equal(formatPessoalUnionCnpjInput("12345678901234"), "12.345.678/9012-34");
+  assert.equal(formatPessoalUnionCnpjInput("12a3456b7890c1234"), "12.345.678/9012-34");
+  assert.equal(formatPessoalUnionCnpjInput("12345678901234567890"), "12.345.678/9012-34");
+});
+
+runTest("union cnpj payload normalization strips formatting before submit", () => {
+  assert.equal(normalizePessoalUnionCnpjValue("12.345.678/0001-90"), "12345678000190");
+  assert.equal(normalizePessoalUnionCnpjValue("12a3456b7890c1d2e3"), "1234567890123");
+  assert.deepEqual(
+    buildPessoalUnionFormValues({
+      id: "union-1",
+      name: "Metal",
+      cnpj: "12345678000190",
+      base_date: null,
+    }),
+    {
+      name: "Metal",
+      cnpj: "12.345.678/0001-90",
+      base_date: "",
+    },
+  );
+  assert.deepEqual(
+    buildPessoalUnionFormPayload({
+      name: " Metal ",
+      cnpj: "12.345.678/0001-90",
+      base_date: "2026-08-05",
+    }),
+    {
+      name: "Metal",
+      cnpj: "12345678000190",
+      base_date: "2026-08-05",
     },
   );
 });

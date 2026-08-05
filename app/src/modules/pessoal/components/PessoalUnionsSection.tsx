@@ -24,7 +24,7 @@ import {
   usePaginatedPessoalUnions,
   useUpdatePessoalUnionMutation,
 } from "../hooks/usePessoalUnions";
-import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
+import type { PessoalUnion } from "../types/unions";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
   cancelUnionDeletion,
@@ -40,6 +40,11 @@ import {
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
+import {
+  buildPessoalUnionFormPayload,
+  buildPessoalUnionFormValues,
+  formatPessoalUnionCnpjInput,
+} from "./pessoalFormValueHelpers";
 
 const UNIONS_PAGE_SIZE = 20;
 
@@ -64,26 +69,6 @@ const unionFields = [
   { name: "cnpj", label: "CNPJ", type: "text" },
   { name: "base_date", label: "Data-base", type: "date" },
 ] as const;
-
-function buildUnionFormValues(union: PessoalUnion | null): UnionFormValues {
-  if (!union) {
-    return emptyUnionFormValues;
-  }
-
-  return {
-    name: union.name,
-    cnpj: union.cnpj,
-    base_date: union.base_date ? union.base_date.slice(0, 10) : "",
-  };
-}
-
-function buildUnionFormPayload(values: UnionFormValues): PessoalUnionPayload {
-  return {
-    name: values.name.trim(),
-    cnpj: values.cnpj.trim(),
-    base_date: values.base_date || null,
-  };
-}
 
 function formatUnionDate(value: string | null): string {
   if (!value) {
@@ -185,7 +170,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
   function handleFieldChange(field: keyof UnionFormValues, value: string) {
     setFormValues((current) => ({
       ...current,
-      [field]: value,
+      [field]: field === "cnpj" ? formatPessoalUnionCnpjInput(value) : value,
     }));
   }
 
