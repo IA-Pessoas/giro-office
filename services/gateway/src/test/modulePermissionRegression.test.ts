@@ -177,6 +177,32 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(level >= 1);
   });
 
+  it("permite Viewer consultar Parcelamento sem liberar mutações", () => {
+    const viewer = authContext({ modules: { parcelamento: 1 } });
+    const readRoutes = [
+      ["GET", "/parcelamento/installments"],
+      ["GET", "/parcelamento/installments/installment-1/competencies"],
+      ["GET", "/parcelamento/panoramas"],
+    ] as const;
+    const mutationRoutes = [
+      ["POST", "/parcelamento/installments"],
+      ["PATCH", "/parcelamento/installments/installment-1"],
+      ["POST", "/parcelamento/installments/installment-1/competencies"],
+      ["PATCH", "/parcelamento/installment-competencies/competency-1"],
+      ["POST", "/parcelamento/panoramas"],
+      ["PATCH", "/parcelamento/panoramas/panorama-1"],
+      ["POST", "/parcelamento/panoramas/competences/2026-07/generate"],
+    ] as const;
+
+    for (const [method, path] of readRoutes) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(true);
+    }
+
+    for (const [method, path] of mutationRoutes) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(false);
+    }
+  });
+
   it.each([1, 2, 3])("respeita o limiar modular %i em toda a matriz 0-3", (minPermission) => {
     const observed = [0, 1, 2, 3].map((level) =>
       canAccessRoute(authContext({ modules: { integracao: level } }), {
