@@ -4,7 +4,7 @@ import { AlertCircle, ChevronDown, Loader2, RefreshCw, Save, WalletCards } from 
 import { useAssignableUsers } from "@modules/rh";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
-import { formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
+import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCreatePessoalPayrollMutation,
@@ -403,10 +403,22 @@ export function PessoalPayrollSection({
                   min={isMoney ? undefined : 0}
                   step={isMoney ? undefined : 1}
                   value={String(formValues[field.name])}
+                  onKeyDown={(event) => {
+                    if (
+                      isMoney &&
+                      (event.key === "Backspace" || event.key === "Delete") &&
+                      parseBrlInput(event.currentTarget.value) === 0
+                    ) {
+                      event.preventDefault();
+                      handleFieldChange(field.name, "");
+                    }
+                  }}
                   onChange={(event) =>
                     handleFieldChange(
                       field.name,
-                      isMoney ? formatBrlInput(event.target.value) : event.target.value,
+                      isMoney
+                        ? formatBrlInput(normalizeDigits(event.target.value))
+                        : event.target.value,
                     )
                   }
                   disabled={isFormDisabled}

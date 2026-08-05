@@ -17,7 +17,7 @@ import {
 import { Dialog } from "@shared/components";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
-import { formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
+import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCreatePessoalLddMutation,
@@ -827,14 +827,25 @@ export function PessoalTrackingSection({
                         <input
                           type={isMoney ? "text" : "type" in field ? field.type : "text"}
                           inputMode={isMoney ? "decimal" : undefined}
-                          step={field.name === "balance_amount" ? "0.01" : undefined}
-                          min={field.name === "balance_amount" ? 0 : undefined}
                           value={fieldValue}
+                          onKeyDown={(event) => {
+                            if (
+                              isMoney &&
+                              (event.key === "Backspace" || event.key === "Delete") &&
+                              parseBrlInput(event.currentTarget.value) === 0
+                            ) {
+                              event.preventDefault();
+                              setLddFormValues((current) => ({
+                                ...current,
+                                [field.name]: "",
+                              }));
+                            }
+                          }}
                           onChange={(event) =>
                             setLddFormValues((current) => ({
                               ...current,
                               [field.name]: isMoney
-                                ? formatBrlInput(event.target.value)
+                                ? formatBrlInput(normalizeDigits(event.target.value))
                                 : event.target.value,
                             }))
                           }
