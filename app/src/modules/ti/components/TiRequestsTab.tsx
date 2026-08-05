@@ -1135,7 +1135,7 @@ export function TiRequestsTab() {
                             type="button"
                             className={cn(
                               tiSecondaryButtonClassName,
-                              "h-8 min-w-[104px] max-w-full justify-center px-3 text-xs",
+                              "h-auto min-h-8 min-w-[104px] max-w-full justify-center px-3 py-1.5 text-xs",
                             )}
                             disabled={assignRequestMutation.isPending || !currentUser?.id}
                             onClick={handleAssignToMe}
@@ -1151,7 +1151,7 @@ export function TiRequestsTab() {
                             type="button"
                             className={cn(
                               tiSecondaryButtonClassName,
-                              "h-8 min-w-[104px] max-w-full justify-center px-3 text-xs",
+                              "h-auto min-h-8 min-w-[104px] max-w-full justify-center px-3 py-1.5 text-xs",
                             )}
                             disabled={assignRequestMutation.isPending}
                             onClick={handleOpenTransferDialog}

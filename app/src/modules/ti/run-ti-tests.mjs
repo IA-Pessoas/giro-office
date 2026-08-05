@@ -168,15 +168,19 @@ await runTest("ti request detail card keeps assignee actions from overflowing", 
   assert.match(responsibleBlock, /canTransferRequest\(activeRequest\) \?/);
   assert.match(
     responsibleBlock,
+    /className={cn\(\s*tiSecondaryButtonClassName,\s*"h-auto min-h-8 min-w-\[104px\] max-w-full justify-center px-3 py-1\.5 text-xs",\s*\)}/,
+  );
+  assert.doesNotMatch(
+    responsibleBlock,
     /className={cn\(\s*tiSecondaryButtonClassName,\s*"h-8 min-w-\[104px\] max-w-full justify-center px-3 text-xs",\s*\)}/,
   );
   assert.match(
     responsibleBlock,
-    /<span className="min-w-0 whitespace-normal break-words text-center">\s*Transferir responsabilidade\s*<\/span>/,
+    /canManageRequests && !hasAssignee\(activeRequest\) \?[\s\S]*className={cn\(\s*tiSecondaryButtonClassName,\s*"h-auto min-h-8 min-w-\[104px\] max-w-full justify-center px-3 py-1\.5 text-xs",\s*\)}[\s\S]*<span className="min-w-0 whitespace-normal break-words text-center">\s*\{assignRequestMutation\.isPending \? "Assumindo\.\.\." : "Assumir"\}\s*<\/span>/,
   );
   assert.match(
     responsibleBlock,
-    /<span className="min-w-0 whitespace-normal break-words text-center">\s*\{assignRequestMutation\.isPending \? "Assumindo\.\.\." : "Assumir"\}\s*<\/span>/,
+    /canTransferRequest\(activeRequest\) \?[\s\S]*className={cn\(\s*tiSecondaryButtonClassName,\s*"h-auto min-h-8 min-w-\[104px\] max-w-full justify-center px-3 py-1\.5 text-xs",\s*\)}[\s\S]*<span className="min-w-0 whitespace-normal break-words text-center">\s*Transferir responsabilidade\s*<\/span>/,
   );
 });
 
