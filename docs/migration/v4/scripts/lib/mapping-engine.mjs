@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 
+import { createBindingSnapshot, validateBindingSnapshot } from "./binding-provenance.mjs";
 import {
   createPendingMapping,
   validateMappingEmissions,
@@ -39,8 +40,10 @@ export function createConservativeMappingContextProvider({ inventory, ruleRegist
     inventoryRef: inventory,
     inventorySnapshot: deepFreeze(copyStaticValue(inventory)),
     inventoryDigest: digestCanonical(inventory),
+    inventoryBindingSnapshot: createBindingSnapshot(inventory),
     ruleRegistryRef: ruleRegistry,
-    ruleSnapshot: snapshotRuleRegistry(ruleRegistry),
+    ruleBindingSnapshot: createBindingSnapshot(ruleRegistry),
+    ruleReferences: snapshotRuleReferences(ruleRegistry),
   });
   return provider;
 }
@@ -372,7 +375,9 @@ function validateContextProvider(provider, inventory, ruleRegistry) {
   ) {
     throw new Error("Provider diverge do inventário ou registry snapshot");
   }
-  validateRuleSnapshot(state.ruleSnapshot, ruleRegistry);
+  validateBindingSnapshot("provider inventory", state.inventoryBindingSnapshot, inventory);
+  validateBindingSnapshot("provider RuleRegistry", state.ruleBindingSnapshot, ruleRegistry);
+  validateRuleReferences(state.ruleReferences, ruleRegistry);
   return state;
 }
 
@@ -384,10 +389,12 @@ function createResultProvenance({
   ruleRegistry,
   prismaCatalog,
 }) {
+  const bindings = { inventory, evidenceRegistry, ruleRegistry, prismaCatalog };
   return {
     provider,
     providerState,
-    bindings: { inventory, evidenceRegistry, ruleRegistry, prismaCatalog },
+    bindings,
+    bindingSnapshots: createResultBindingSnapshots(bindings),
     evidenceDigest: digestCanonical(snapshotMap(evidenceRegistry)),
     prismaDigest: digestCanonical(prismaCatalog),
   };
@@ -404,6 +411,13 @@ function validateResultProvenance(provenance, context) {
     throw new Error("Proveniência diverge dos registries autenticados");
   }
   validateContextProvider(provenance.provider, context.inventory, context.ruleRegistry);
+  for (const field of ["inventory", "evidenceRegistry", "ruleRegistry", "prismaCatalog"]) {
+    validateBindingSnapshot(
+      `${field} do MappingResult`,
+      provenance.bindingSnapshots[field],
+      context[field],
+    );
+  }
   if (
     provenance.evidenceDigest !== digestCanonical(snapshotMap(context.evidenceRegistry)) ||
     provenance.prismaDigest !== digestCanonical(context.prismaCatalog)
@@ -412,55 +426,32 @@ function validateResultProvenance(provenance, context) {
   }
 }
 
-function snapshotRuleRegistry(ruleRegistry) {
-  const entries = [...ruleRegistry]
-    .sort(([left], [right]) => compareText(left, right))
-    .map(([sourceTable, rule]) => ({
-      sourceTable,
-      ruleRef: rule,
-      classifyRef: rule.classifySourceRow,
-      emitRef: rule.emitRows,
-      digest: digestCanonical(snapshotRule(rule)),
-    }));
-  return Object.freeze(entries);
-}
-
-function validateRuleSnapshot(snapshot, ruleRegistry) {
-  if (snapshot.length !== ruleRegistry.size) {
-    throw new Error("Provider diverge do RuleRegistry snapshot");
-  }
-  for (const entry of snapshot) {
-    const rule = ruleRegistry.get(entry.sourceTable);
-    if (
-      rule !== entry.ruleRef ||
-      rule?.classifySourceRow !== entry.classifyRef ||
-      rule?.emitRows !== entry.emitRef ||
-      entry.digest !== digestCanonical(snapshotRule(rule))
-    ) {
-      throw new Error("Provider diverge da regra ou callback no registry snapshot");
-    }
-  }
-}
-
-function snapshotRule(rule) {
-  if (!isObject(rule)) return rule;
+function createResultBindingSnapshots(bindings) {
   return Object.fromEntries(
-    Object.entries(rule).map(([key, value]) => [
-      key,
-      typeof value === "function" ? functionDescriptor(key, value) : copyStaticValue(value),
+    ["inventory", "evidenceRegistry", "ruleRegistry", "prismaCatalog"].map((field) => [
+      field,
+      createBindingSnapshot(bindings[field]),
     ]),
   );
 }
 
-function functionDescriptor(name, callback) {
-  return { name, digest: digestFunction(callback) };
+function snapshotRuleReferences(ruleRegistry) {
+  return Object.freeze(
+    [...ruleRegistry]
+      .sort(([left], [right]) => compareText(left, right))
+      .map(([sourceTable, rule]) => Object.freeze({ sourceTable, ruleRef: rule })),
+  );
 }
 
-function digestFunction(callback) {
-  return crypto
-    .createHash("sha256")
-    .update(Function.prototype.toString.call(callback), "utf8")
-    .digest("hex");
+function validateRuleReferences(snapshot, ruleRegistry) {
+  if (!Array.isArray(snapshot) || snapshot.length !== ruleRegistry.size) {
+    throw new Error("Provider diverge das referências do RuleRegistry");
+  }
+  for (const entry of snapshot) {
+    if (ruleRegistry.get(entry.sourceTable) !== entry.ruleRef) {
+      throw new Error("Provider diverge da referência de regra no RuleRegistry");
+    }
+  }
 }
 
 function validateRegistries(inventory, evidenceRegistry, ruleRegistry, prismaCatalog) {
@@ -539,6 +530,13 @@ function buildRuntimeClassifierAudit(rule) {
     emitRef: `${rule.ruleOrigin}#emitRows`,
     emitDigest: digestFunction(rule.emitRows),
   };
+}
+
+function digestFunction(callback) {
+  return crypto
+    .createHash("sha256")
+    .update(Function.prototype.toString.call(callback), "utf8")
+    .digest("hex");
 }
 
 function deriveDestinationStatic(rule, step, audit) {

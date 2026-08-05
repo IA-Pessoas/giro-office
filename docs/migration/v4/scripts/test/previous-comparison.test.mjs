@@ -10,6 +10,7 @@ import { ALL_EVIDENCE, EVIDENCE_REGISTRY } from "../evidence/index.mjs";
 import { assertSafePackagePath } from "../lib/mapping-engine.mjs";
 import {
   comparePreviousMappings,
+  createAuthenticatedPreviousMappingReport,
   loadPreviousMappingArtifacts,
 } from "../lib/previous-comparison.mjs";
 import {
@@ -780,6 +781,60 @@ test("ausência histórica não autoriza hash ou plaintext legado na senha atual
       }),
     /bcrypt segura/i,
   );
+});
+
+test("snapshot compartilhado aceita os 204 callbacks e 19 prototypes oficiais", () => {
+  const ruleRegistry = buildRuleRegistry(
+    RH_PESSOAL_RULES,
+    TECHNOLOGY_RULES,
+    CERTIFICATE_RULES,
+    PARCELAMENTO_RULES,
+    ADMIN_BUSINESS_RULES,
+    INTEGRACAO_REGULARIZE_RULES,
+    REMAINING_RULES,
+  );
+  const counts = { callbacks: 0, prototypes: 0 };
+  const seen = new WeakSet();
+  const visit = (value) => {
+    if (typeof value === "function") {
+      counts.callbacks += 1;
+      if (Object.hasOwn(value, "prototype")) counts.prototypes += 1;
+      return;
+    }
+    if (value === null || typeof value !== "object" || seen.has(value)) return;
+    seen.add(value);
+    if (value instanceof Map) {
+      for (const [key, entry] of value) {
+        visit(key);
+        visit(entry);
+      }
+      return;
+    }
+    for (const entry of Object.values(value)) visit(entry);
+  };
+  visit(ruleRegistry);
+  assert.deepEqual(counts, { callbacks: 204, prototypes: 19 });
+
+  const sourceTable = ruleRegistry.keys().next().value;
+  const comparison = comparePreviousMappings({
+    currentInventory: {
+      sourceDirectoryLabel: "03.08.2026",
+      sourceDigest: SHA_A,
+      tables: [table(sourceTable, ["id"], 0)],
+    },
+    historicalInventories: [],
+    evidenceRegistry: EVIDENCE_REGISTRY,
+    ruleRegistry,
+    prismaCatalog: { models: [] },
+    previousArtifacts: [],
+  });
+  const report = createAuthenticatedPreviousMappingReport({
+    comparison,
+    availability: "not_requested",
+    issues: [],
+  });
+  assert.equal(report.summary.totalTables, 1);
+  assert.equal(Object.isFrozen(report), true);
 });
 
 test("loader lê somente artefatos V2/V3 estáticos allow-listed e retorna provenance sem payload", async () => {

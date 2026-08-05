@@ -1150,6 +1150,325 @@ test("proveniência exige a referência exata de callback mesmo com source idên
   });
 });
 
+test("snapshot detecta alteração do length do callback e aceita estado restaurado", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const callback = fixture.ruleRegistry.get("legacy.multi").emitRows;
+    const originalDescriptor = Object.getOwnPropertyDescriptor(callback, "length");
+    const report = authenticatedReportFor(fixture);
+    Object.defineProperty(callback, "length", { ...originalDescriptor, value: 2 });
+    try {
+      assert.throws(
+        () => validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+        /integridade|snapshot|descriptor|length|função/i,
+      );
+    } finally {
+      Object.defineProperty(callback, "length", originalDescriptor);
+    }
+    assert.equal(
+      validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+      true,
+    );
+  });
+});
+
+test("snapshot rejeita propriedade extra no prototype padrão do callback", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const rule = fixture.ruleRegistry.get("legacy.multi");
+    const originalEmitRows = rule.emitRows;
+    function callbackWithPrototype(row) {
+      return originalEmitRows.call(this, row);
+    }
+    rule.emitRows = callbackWithPrototype;
+    const report = authenticatedReportFor(fixture);
+    callbackWithPrototype.prototype.probe = true;
+    try {
+      assert.throws(
+        () => validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+        /integridade|snapshot|prototype|propriedade/i,
+      );
+    } finally {
+      delete callbackWithPrototype.prototype.probe;
+    }
+    assert.equal(
+      validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+      true,
+    );
+    rule.emitRows = originalEmitRows;
+  });
+});
+
+test("snapshot exige a referência exata do prototype padrão do callback", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const rule = fixture.ruleRegistry.get("legacy.multi");
+    const originalEmitRows = rule.emitRows;
+    function callbackWithPrototype(row) {
+      return originalEmitRows.call(this, row);
+    }
+    rule.emitRows = callbackWithPrototype;
+    const originalPrototype = callbackWithPrototype.prototype;
+    const report = authenticatedReportFor(fixture);
+    const clonedPrototype = {};
+    Object.defineProperty(
+      clonedPrototype,
+      "constructor",
+      Object.getOwnPropertyDescriptor(originalPrototype, "constructor"),
+    );
+    callbackWithPrototype.prototype = clonedPrototype;
+    try {
+      assert.throws(
+        () => validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+        /integridade|snapshot|prototype|referência/i,
+      );
+    } finally {
+      callbackWithPrototype.prototype = originalPrototype;
+    }
+    assert.equal(
+      validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+      true,
+    );
+    rule.emitRows = originalEmitRows;
+  });
+});
+
+test("snapshot detecta flags completas dos descritores de função", async (context) => {
+  await context.test("writable de length", async () => {
+    await withSandbox(async (directory) => {
+      const fixture = await createFixture(directory);
+      const callback = fixture.ruleRegistry.get("legacy.multi").emitRows;
+      const descriptor = Object.getOwnPropertyDescriptor(callback, "length");
+      const report = authenticatedReportFor(fixture);
+      Object.defineProperty(callback, "length", { ...descriptor, writable: true });
+      try {
+        assert.throws(
+          () =>
+            validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+          /integridade|snapshot|descriptor|writable|função/i,
+        );
+      } finally {
+        Object.defineProperty(callback, "length", descriptor);
+      }
+      assert.equal(
+        validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+        true,
+      );
+    });
+  });
+
+  await context.test("configurable de name", async () => {
+    await withSandbox(async (directory) => {
+      const fixture = await createFixture(directory);
+      const rule = fixture.ruleRegistry.get("legacy.multi");
+      const originalEmitRows = rule.emitRows;
+      const officialReport = authenticatedReportFor(fixture);
+      function descriptorCallback(row) {
+        return originalEmitRows.call(this, row);
+      }
+      rule.emitRows = descriptorCallback;
+      const report = authenticatedReportFor(fixture);
+      const descriptor = Object.getOwnPropertyDescriptor(descriptorCallback, "name");
+      Object.defineProperty(descriptorCallback, "name", { ...descriptor, configurable: false });
+      try {
+        assert.throws(
+          () =>
+            validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+          /integridade|snapshot|descriptor|configurable|função/i,
+        );
+      } finally {
+        rule.emitRows = originalEmitRows;
+      }
+      assert.equal(
+        validateAuthenticatedPreviousMappingReport(
+          officialReport,
+          authenticatedBindingsFor(fixture),
+        ),
+        true,
+      );
+    });
+  });
+
+  await context.test("writable do descriptor prototype", async () => {
+    await withSandbox(async (directory) => {
+      const fixture = await createFixture(directory);
+      const rule = fixture.ruleRegistry.get("legacy.multi");
+      const originalEmitRows = rule.emitRows;
+      const officialReport = authenticatedReportFor(fixture);
+      function descriptorCallback(row) {
+        return originalEmitRows.call(this, row);
+      }
+      rule.emitRows = descriptorCallback;
+      const report = authenticatedReportFor(fixture);
+      const descriptor = Object.getOwnPropertyDescriptor(descriptorCallback, "prototype");
+      Object.defineProperty(descriptorCallback, "prototype", { ...descriptor, writable: false });
+      try {
+        assert.throws(
+          () =>
+            validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+          /integridade|snapshot|descriptor|prototype|writable/i,
+        );
+      } finally {
+        rule.emitRows = originalEmitRows;
+      }
+      assert.equal(
+        validateAuthenticatedPreviousMappingReport(
+          officialReport,
+          authenticatedBindingsFor(fixture),
+        ),
+        true,
+      );
+    });
+  });
+
+  await context.test("writable do constructor do prototype", async () => {
+    await withSandbox(async (directory) => {
+      const fixture = await createFixture(directory);
+      const rule = fixture.ruleRegistry.get("legacy.multi");
+      const originalEmitRows = rule.emitRows;
+      function descriptorCallback(row) {
+        return originalEmitRows.call(this, row);
+      }
+      rule.emitRows = descriptorCallback;
+      const report = authenticatedReportFor(fixture);
+      const descriptor = Object.getOwnPropertyDescriptor(
+        descriptorCallback.prototype,
+        "constructor",
+      );
+      Object.defineProperty(descriptorCallback.prototype, "constructor", {
+        ...descriptor,
+        writable: false,
+      });
+      try {
+        assert.throws(
+          () =>
+            validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+          /integridade|snapshot|constructor|descriptor|writable/i,
+        );
+      } finally {
+        Object.defineProperty(descriptorCallback.prototype, "constructor", descriptor);
+      }
+      assert.equal(
+        validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+        true,
+      );
+      rule.emitRows = originalEmitRows;
+    });
+  });
+});
+
+test("snapshot detecta preventExtensions em função, prototype e containers", async (context) => {
+  for (const target of ["function", "prototype", "plain object", "array", "Map"]) {
+    await context.test(target, async () => {
+      await withSandbox(async (directory) => {
+        const fixture = await createFixture(directory);
+        const rule = fixture.ruleRegistry.get("legacy.multi");
+        const originalEmitRows = rule.emitRows;
+        const officialReport = authenticatedReportFor(fixture);
+        let report;
+        let restore;
+
+        if (target === "function" || target === "prototype") {
+          function extensibilityCallback(row) {
+            return originalEmitRows.call(this, row);
+          }
+          rule.emitRows = extensibilityCallback;
+          report = authenticatedReportFor(fixture);
+          Object.preventExtensions(
+            target === "function" ? extensibilityCallback : extensibilityCallback.prototype,
+          );
+          restore = () => {
+            rule.emitRows = originalEmitRows;
+          };
+        } else {
+          const value =
+            target === "plain object"
+              ? { nested: { value: "probe" } }
+              : target === "array"
+                ? ["probe"]
+                : new Map([["probe", "value"]]);
+          rule.provenanceProbe = value;
+          report = authenticatedReportFor(fixture);
+          const mutated = target === "plain object" ? value.nested : value;
+          Object.preventExtensions(mutated);
+          restore = () => {
+            rule.provenanceProbe =
+              target === "plain object"
+                ? { nested: { value: "probe" } }
+                : target === "array"
+                  ? ["probe"]
+                  : new Map([["probe", "value"]]);
+          };
+        }
+
+        try {
+          assert.throws(
+            () =>
+              validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+            /integridade|snapshot|extens|prototype|função|binding/i,
+          );
+        } finally {
+          restore();
+        }
+        if (target === "function" || target === "prototype") {
+          assert.equal(
+            validateAuthenticatedPreviousMappingReport(
+              officialReport,
+              authenticatedBindingsFor(fixture),
+            ),
+            true,
+          );
+        } else {
+          assert.equal(
+            validateAuthenticatedPreviousMappingReport(report, authenticatedBindingsFor(fixture)),
+            true,
+          );
+          delete rule.provenanceProbe;
+        }
+      });
+    });
+  }
+});
+
+test("MappingResult rejeita mutação de callback anterior à criação do relatório", async () => {
+  await withSandbox(async (directory) => {
+    const fixture = await createFixture(directory);
+    const result = await buildFixtureMapping(fixture);
+    const packageDir = path.join(directory, "package");
+    const reportPath = "reports/previous-mapping-comparison.json";
+    const officialReport = authenticatedReportFor(fixture);
+    await writeMappingPackage(packageDir, result, {
+      protectedPaths: [fixture.sourceDir],
+      extraArtifacts: { [reportPath]: officialReport },
+    });
+    const previousPackage = await readPackageFiles(packageDir);
+
+    const callback = fixture.ruleRegistry.get("legacy.multi").emitRows;
+    const descriptor = Object.getOwnPropertyDescriptor(callback, "length");
+    Object.defineProperty(callback, "length", { ...descriptor, value: 2 });
+    const mutatedReport = authenticatedReportFor(fixture);
+    try {
+      await assert.rejects(
+        () =>
+          writeMappingPackage(packageDir, result, {
+            protectedPaths: [fixture.sourceDir],
+            extraArtifacts: { [reportPath]: mutatedReport },
+          }),
+        /proveniência|provider|snapshot|binding|callback|registry/i,
+      );
+    } finally {
+      Object.defineProperty(callback, "length", descriptor);
+    }
+
+    assert.deepEqual(await readPackageFiles(packageDir), previousPackage);
+    await writeMappingPackage(packageDir, result, {
+      protectedPaths: [fixture.sourceDir],
+      extraArtifacts: { [reportPath]: officialReport },
+    });
+    assert.deepEqual(await readPackageFiles(packageDir), previousPackage);
+  });
+});
+
 test("snapshot rejeita valores sem representação canônica", async () => {
   await withSandbox(async (directory) => {
     const fixture = await createFixture(directory);
