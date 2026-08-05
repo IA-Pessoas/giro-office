@@ -25,22 +25,23 @@ import type {
 } from "../types";
 import { RH_QUERY_KEY } from "./useRhRequests";
 
+export const RH_POINT_QUERY_KEY = [...RH_QUERY_KEY, "point"] as const;
+
 interface RhPointReadQueryOptions {
   enabled?: boolean;
 }
 
 export function rhPointConfigQueryKey(userId?: string) {
-  return [...RH_QUERY_KEY, "point", "config", userId ?? "me"] as const;
+  return [...RH_POINT_QUERY_KEY, "config", userId ?? "me"] as const;
 }
 
 export function rhPointCalculationQueryKey(pointId: string) {
-  return [...RH_QUERY_KEY, "point", "calculation", pointId] as const;
+  return [...RH_POINT_QUERY_KEY, "calculation", pointId] as const;
 }
 
 export function rhPointListQueryKey(filters: RhPointListFilters = {}) {
   return [
-    ...RH_QUERY_KEY,
-    "point",
+    ...RH_POINT_QUERY_KEY,
     "list",
     filters.user_id ?? "me",
     filters.date_from ?? "",
@@ -49,13 +50,12 @@ export function rhPointListQueryKey(filters: RhPointListFilters = {}) {
 }
 
 export function rhTodayPointQueryKey() {
-  return [...RH_QUERY_KEY, "point", "today", "me"] as const;
+  return [...RH_POINT_QUERY_KEY, "today", "me"] as const;
 }
 
 export function rhPointSummaryQueryKey(filters: { month: string; user_id?: string }) {
   return [
-    ...RH_QUERY_KEY,
-    "point",
+    ...RH_POINT_QUERY_KEY,
     "summary",
     filters.user_id ?? "me",
     filters.month,
@@ -66,8 +66,7 @@ export function rhPointAdjustmentRequestsQueryKey(
   filters: RhPointAdjustmentListFilters = {},
 ) {
   return [
-    ...RH_QUERY_KEY,
-    "point",
+    ...RH_POINT_QUERY_KEY,
     "adjustments",
     filters.user_id ?? "me",
     filters.status ?? "all",
@@ -141,7 +140,7 @@ export function useCreateOrUpdateRhPointConfigMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => rhPointService.upsertPointConfig(payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
     },
   });
 }
@@ -156,7 +155,7 @@ export function useRegisterRhPointMutation(): UseMutationResult<
   return useMutation({
     mutationFn: () => rhPointService.registerPoint(),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
     },
   });
 }
@@ -171,7 +170,7 @@ export function useCalculateRhPointMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (pointId) => rhPointService.calculatePoint(pointId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
     },
   });
 }
@@ -186,7 +185,7 @@ export function useRequestRhPointAdjustmentMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => rhPointService.requestAdjustment(payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
     },
   });
 }
@@ -201,7 +200,7 @@ export function useApproveRhPointAdjustmentMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => rhPointService.approveAdjustment(payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
     },
   });
 }
@@ -216,7 +215,7 @@ export function useRejectRhPointAdjustmentMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => rhPointService.rejectAdjustment(payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
     },
   });
 }
