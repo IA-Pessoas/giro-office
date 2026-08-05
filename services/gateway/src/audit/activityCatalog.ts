@@ -252,6 +252,26 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/parcelamento\/installments\/[^/]+\/competencies$/,
+    description: { action: "consultou", item: "as competências de um parcelamento" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/parcelamento\/installments\/[^/]+\/competencies$/,
+    description: { action: "cadastrou", item: "uma nova competência de um parcelamento" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/parcelamento\/installment-competencies\/[^/]+$/,
+    description: { action: "atualizou", item: "uma competência de parcelamento" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/parcelamento\/panoramas\/competences\/[^/]+\/generate$/,
+    description: { action: "gerou", item: "panoramas de parcelamento" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/user\/[^/]+\/photo$/,
     description: { action: "consultou", item: "a foto de um usuário" },
   },
@@ -359,6 +379,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["PUT"],
     pattern: /^\/rh\/point\/adjustment\/approve$/,
     description: { action: "aprovou", item: "um ajuste de ponto" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/point\/adjustment\/reject$/,
+    description: { action: "rejeitou", item: "um ajuste de ponto" },
   },
   {
     methods: ["GET"],
@@ -783,6 +808,18 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "uma obrigação trabalhista",
     newSingular: "uma nova obrigação trabalhista",
     plural: "obrigações trabalhistas",
+  },
+  {
+    pattern: /^\/parcelamento\/installments(?:\/|$)/,
+    singular: "um parcelamento",
+    newSingular: "um novo parcelamento",
+    plural: "parcelamentos",
+  },
+  {
+    pattern: /^\/parcelamento\/panoramas(?:\/|$)/,
+    singular: "um panorama de parcelamento",
+    newSingular: "um novo panorama de parcelamento",
+    plural: "panoramas de parcelamento",
   },
   {
     pattern: /^\/pessoal\/passwords(?:\/|$)/,

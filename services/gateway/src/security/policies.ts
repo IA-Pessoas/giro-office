@@ -32,6 +32,13 @@ const pessoalEditPolicy: AuthPolicy = {
   },
 };
 
+const parcelamentoModulePolicy: AuthPolicy = {
+  modulePermission: {
+    module: "parcelamento",
+    minPermission: moduleAccessPermission,
+  },
+};
+
 const clientRelatedModules = [
   "comercial",
   "contabil",
@@ -102,6 +109,7 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientEditPolicy },
   { method: "ANY", path: /^\/project(?:\/|$)/, policy: integracaoProjectPolicy },
+  { method: "ANY", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoModulePolicy },
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
