@@ -61,15 +61,17 @@ export function buildCertificateListParams<
 export function buildCertificateListPage<T>(
   data: T[],
   params: CertificatePaginationParams = {},
+  metadata: { total?: number; has_more?: boolean } = {},
 ): CertificateListPage<T> {
   const page = params.page ?? DEFAULT_CERTIFICATE_PAGE;
   const pageSize = params.page_size ?? DEFAULT_CERTIFICATE_PAGE_SIZE;
 
   return {
     data,
+    total: metadata.total ?? data.length,
     page,
     page_size: pageSize,
-    hasMore: data.length === pageSize,
+    hasMore: metadata.has_more ?? data.length === pageSize,
   };
 }
 
@@ -136,14 +138,37 @@ export function unwrapCertificateList<T>(
   body: unknown,
   params: CertificatePaginationParams,
 ): CertificateListPage<T> {
-  return buildCertificateListPage(unwrapCertificateEnvelope<T[]>(body), params);
+  const payload = unwrapCertificateEnvelope<unknown>(body);
+
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "items" in payload &&
+    Array.isArray(payload.items)
+  ) {
+    const page = payload as {
+      items: T[];
+      total?: number;
+      page?: number;
+      page_size?: number;
+      has_more?: boolean;
+    };
+
+    return buildCertificateListPage(
+      page.items,
+      { page: page.page, page_size: page.page_size },
+      { total: page.total, has_more: page.has_more },
+    );
+  }
+
+  return buildCertificateListPage(unwrapCertificateEnvelope<T[]>(payload), params);
 }
 
 export function unwrapCertificateNotifications(
   body: unknown,
   params: CertificateNotificationListParams,
 ): CertificateListPage<CertificateNotification> {
-  return buildCertificateListPage(unwrapCertificateEnvelope<CertificateNotification[]>(body), params);
+  return unwrapCertificateList<CertificateNotification>(body, params);
 }
 
 export function unwrapCertificateUploadResult(

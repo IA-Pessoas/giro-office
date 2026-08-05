@@ -7,6 +7,7 @@ export interface CertificatePaginationParams {
 
 export interface CertificateListPage<T> {
   data: T[];
+  total: number;
   page: number;
   page_size: number;
   hasMore: boolean;

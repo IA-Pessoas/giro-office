@@ -186,22 +186,43 @@ describe("certificate-service OpenAPI", () => {
     expect(certificateFileMetadata?.properties).not.toHaveProperty("file_storage_bucket");
 
     expect(getSuccessDataSchemaRef(spec, "/certificate/pj/list", "get")).toMatchObject({
-      type: "array",
-      items: { $ref: "#/components/schemas/CertificatePj" },
+      type: "object",
+      properties: {
+        items: { type: "array", items: { $ref: "#/components/schemas/CertificatePj" } },
+        total: { type: "integer" },
+        page: { type: "integer" },
+        page_size: { type: "integer" },
+        has_more: { type: "boolean" },
+      },
     });
     expect(getSuccessDataSchemaRef(spec, "/certificate/pj/{id}", "get")).toEqual({
       $ref: "#/components/schemas/CertificatePj",
     });
     expect(getSuccessDataSchemaRef(spec, "/certificate/pf/list", "get")).toMatchObject({
-      type: "array",
-      items: { $ref: "#/components/schemas/CertificatePf" },
+      type: "object",
+      properties: {
+        items: { type: "array", items: { $ref: "#/components/schemas/CertificatePf" } },
+        total: { type: "integer" },
+        page: { type: "integer" },
+        page_size: { type: "integer" },
+        has_more: { type: "boolean" },
+      },
     });
     expect(getSuccessDataSchemaRef(spec, "/certificate/pf/{id}", "get")).toEqual({
       $ref: "#/components/schemas/CertificatePf",
     });
     expect(getSuccessDataSchemaRef(spec, "/certificate/notifications", "get")).toMatchObject({
-      type: "array",
-      items: { $ref: "#/components/schemas/CertificateNotification" },
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: { $ref: "#/components/schemas/CertificateNotification" },
+        },
+        total: { type: "integer" },
+        page: { type: "integer" },
+        page_size: { type: "integer" },
+        has_more: { type: "boolean" },
+      },
     });
     expect(getSuccessDataSchemaRef(spec, "/internal/notifications/run", "post")).toEqual({
       $ref: "#/components/schemas/CertificateNotificationRunResult",

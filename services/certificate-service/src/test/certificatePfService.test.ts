@@ -93,6 +93,7 @@ describe("CertificatePfService", () => {
   it("listCertificatePf filters by organization_id and never selects password", async () => {
     const prisma = {
       certificatePF: {
+        count: vi.fn(async () => 21),
         findMany: vi.fn(async () => [createCertificatePfRecord()]),
       },
     };
@@ -119,8 +120,15 @@ describe("CertificatePfService", () => {
       take: 10,
       select: expect.not.objectContaining({ password: true }),
     });
-    expect(result[0]).not.toHaveProperty("password");
-    expect(result[0]).not.toHaveProperty("file_path");
+    expect(result).toEqual({
+      items: [expect.objectContaining({ id: certificateId })],
+      total: 21,
+      page: 3,
+      page_size: 10,
+      has_more: false,
+    });
+    expect(result.items[0]).not.toHaveProperty("password");
+    expect(result.items[0]).not.toHaveProperty("file_path");
   });
 
   it("getCertificatePf returns password when canViewPassword is true", async () => {

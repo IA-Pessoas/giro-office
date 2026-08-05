@@ -65,10 +65,10 @@ describe("certificate PF routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
-    expect(response.body.data[0]).not.toHaveProperty("password");
-    expect(response.body.data[0]).not.toHaveProperty("file_path");
-    expect(response.body.data[0]).not.toHaveProperty("file_encryption_iv");
-    expect(response.body.data[0]).not.toHaveProperty("file_encryption_tag");
+    expect(response.body.data.items[0]).not.toHaveProperty("password");
+    expect(response.body.data.items[0]).not.toHaveProperty("file_path");
+    expect(response.body.data.items[0]).not.toHaveProperty("file_encryption_iv");
+    expect(response.body.data.items[0]).not.toHaveProperty("file_encryption_tag");
   });
 
   it("GET /certificate/pf/:id returns password for permission certificado 2", async () => {

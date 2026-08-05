@@ -19,12 +19,12 @@ import type {
 } from "../types";
 import {
   buildCertificateFileFormData,
-  buildCertificateListPage,
   buildCertificateListParams,
   CERTIFICATE_ENDPOINTS,
   unwrapCertificateDownload,
   unwrapCertificateEnvelope,
   unwrapCertificateList,
+  unwrapCertificateNotifications,
 } from "./certificateService.contract";
 
 function getHeaderValue(
@@ -206,7 +206,6 @@ export const certificateService = {
       params: buildCertificateListParams(params),
     });
 
-    const items = unwrapCertificateEnvelope<CertificateNotification[]>(response.data);
-    return buildCertificateListPage(items, params);
+    return unwrapCertificateNotifications(response.data, params);
   },
 };

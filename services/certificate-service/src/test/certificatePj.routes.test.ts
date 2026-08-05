@@ -65,8 +65,8 @@ describe("certificate PJ routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
-    expect(response.body.data[0]).not.toHaveProperty("password");
-    expect(response.body.data[0]).not.toHaveProperty("file_path");
+    expect(response.body.data.items[0]).not.toHaveProperty("password");
+    expect(response.body.data.items[0]).not.toHaveProperty("file_path");
   });
 
   it("GET /certificate/pj/:id returns password for permission certificado 2", async () => {
