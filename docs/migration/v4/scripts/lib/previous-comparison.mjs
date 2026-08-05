@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 
+import { assertNoSensitiveSerializedContent } from "./sensitivity.mjs";
+
 const SOURCE_NAME = /^[A-Za-z0-9_.-]+$/;
 const COLUMN_NAME = /^[\p{L}\p{N}_.-]+$/u;
 const VERSION_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
@@ -25,6 +27,8 @@ const MAX_TEXT_LINE_LENGTH = 2_048;
 const MAX_CSV_ROWS = 1_024;
 const MAX_CSV_CELL_LENGTH = 512;
 const V3_SEMANTIC_FINGERPRINT = "320c209f4a99c670285526b7a8f795f85484542edd7a91f378ec44c6a81582d1";
+const COMPARISON_PROVENANCE = new WeakMap();
+const REPORT_PROVENANCE = new WeakMap();
 const ALLOWED_ARTIFACTS = Object.freeze([
   {
     format: "csv",
@@ -108,9 +112,7 @@ export function comparePreviousMappings({
   const tables = [...allSources].sort(compareText).map((sourceTable) => {
     const currentTable = currentBySource.get(sourceTable);
     const previousDecisions = previousBySource.get(sourceTable) ?? [];
-    const historicalConflict =
-      previousIndex.conflictSources.has(sourceTable) ||
-      artifactCountIndex.conflictSources.has(sourceTable);
+    const historicalConflict = previousIndex.conflictSources.has(sourceTable);
     if (currentTable === undefined) {
       return buildMissingCurrentTable({
         sourceTable,
@@ -158,7 +160,7 @@ export function comparePreviousMappings({
     };
   });
 
-  return {
+  const comparison = {
     schemaVersion: 1,
     currentInventory: {
       digest: current.digest,
@@ -183,6 +185,69 @@ export function comparePreviousMappings({
     issues,
     tables,
   };
+  const frozen = deepFreeze(comparison);
+  COMPARISON_PROVENANCE.set(frozen, {
+    inventoryRef: currentInventory,
+    inventoryDigest: sha256(canonicalJson(currentInventory)),
+  });
+  return frozen;
+}
+
+export function createAuthenticatedPreviousMappingReport({ comparison, availability, issues }) {
+  const provenance = isRecord(comparison) ? COMPARISON_PROVENANCE.get(comparison) : undefined;
+  if (provenance === undefined) {
+    throw new Error("Comparação autenticada é obrigatória para finalizar o relatório");
+  }
+  if (!Object.isFrozen(comparison)) {
+    throw new Error("Comparação autenticada foi adulterada");
+  }
+  if (!["not_requested", "available", "partial", "unavailable"].includes(availability)) {
+    throw new TypeError("Disponibilidade histórica inválida");
+  }
+  assertNoSensitiveSerializedContent(JSON.stringify({ availability, comparison, issues }));
+  const normalizedIssues = normalizeReportIssues(issues);
+  const knownIssueSignatures = new Set(normalizedIssues.map(issueSignature));
+  if (comparison.issues.some((issue) => !knownIssueSignatures.has(issueSignature(issue)))) {
+    throw new Error("Relatório não pode omitir issues produzidas pela comparação");
+  }
+  const hasHistoricalData =
+    comparison.historicalSources.length > 0 || comparison.artifactSources.length > 0;
+  const expectedAvailability =
+    normalizedIssues.length === 0
+      ? hasHistoricalData
+        ? "available"
+        : "not_requested"
+      : hasHistoricalData
+        ? "partial"
+        : "unavailable";
+  if (availability !== expectedAvailability) {
+    throw new Error("Disponibilidade diverge das fontes e issues históricas");
+  }
+  const report = { ...comparison, availability, issues: normalizedIssues };
+  const frozen = deepFreeze(report);
+  REPORT_PROVENANCE.set(frozen, {
+    ...provenance,
+    reportDigest: sha256(canonicalJson(frozen)),
+  });
+  return frozen;
+}
+
+export function validateAuthenticatedPreviousMappingReport(report, inventory) {
+  const provenance = isRecord(report) ? REPORT_PROVENANCE.get(report) : undefined;
+  if (provenance === undefined) {
+    throw new Error("Relatório histórico autenticado com proveniência é obrigatório");
+  }
+  if (
+    provenance.inventoryRef !== inventory ||
+    provenance.inventoryDigest !== sha256(canonicalJson(inventory))
+  ) {
+    throw new Error("Inventário do relatório diverge do MappingResult autenticado");
+  }
+  if (!Object.isFrozen(report) || provenance.reportDigest !== sha256(canonicalJson(report))) {
+    throw new Error("Relatório histórico autenticado foi adulterado");
+  }
+  validateReportCoverage(report, normalizeCurrentInventory(inventory));
+  return true;
 }
 
 export async function loadPreviousMappingArtifacts({ previousDocsDir }) {
@@ -423,19 +488,23 @@ function normalizeInventoryCount(count) {
 
 function indexPreviousDecisions(artifacts) {
   const bySource = new Map();
-  const signaturesBySource = new Map();
+  const signaturesByVersionAndSource = new Map();
+  const seenDecisions = new Set();
   for (const artifact of artifacts) {
     for (const decision of artifact.decisions) {
       const signature = canonicalJson({
         status: decision.status,
         destinations: decision.destinations,
       });
-      if (!signaturesBySource.has(decision.sourceTable)) {
-        signaturesBySource.set(decision.sourceTable, new Set());
+      const versionAndSource = `${decision.provenance.version}\0${decision.sourceTable}`;
+      if (!signaturesByVersionAndSource.has(versionAndSource)) {
+        signaturesByVersionAndSource.set(versionAndSource, new Set());
       }
-      const signatures = signaturesBySource.get(decision.sourceTable);
-      if (signatures.has(signature)) continue;
+      const signatures = signaturesByVersionAndSource.get(versionAndSource);
       signatures.add(signature);
+      const decisionKey = `${versionAndSource}\0${signature}`;
+      if (seenDecisions.has(decisionKey)) continue;
+      seenDecisions.add(decisionKey);
       const normalized = {
         version: decision.provenance.version,
         origin: decision.provenance.origin,
@@ -448,25 +517,48 @@ function indexPreviousDecisions(artifacts) {
     }
   }
   for (const decisions of bySource.values()) {
-    decisions.sort((left, right) =>
-      compareText(
-        `${left.version}\0${left.origin}\0${left.digest}`,
-        `${right.version}\0${right.origin}\0${right.digest}`,
-      ),
-    );
+    decisions.sort(compareHistoricalDecisions);
   }
+  const conflictEntries = [...signaturesByVersionAndSource]
+    .filter(([, signatures]) => signatures.size > 1)
+    .map(([versionAndSource]) => {
+      const [version, sourceTable] = versionAndSource.split("\0");
+      return { sourceTable, version };
+    });
+  const issueSources = new Set(conflictEntries.map(({ sourceTable }) => sourceTable));
   const conflictSources = new Set(
-    [...signaturesBySource]
-      .filter(([, signatures]) => signatures.size > 1)
-      .map(([sourceTable]) => sourceTable),
+    conflictEntries
+      .filter(({ sourceTable, version }) => {
+        const latest = bySource.get(sourceTable)?.at(-1);
+        return latest?.version === version;
+      })
+      .map(({ sourceTable }) => sourceTable),
   );
-  const issues = [...conflictSources]
+  const issues = [...issueSources]
     .map((sourceTable) => ({
       scope: sourceTable,
       reasonCode: "HISTORICAL_DECISION_CONFLICT",
     }))
     .sort(compareIssues);
   return { bySource, conflictSources, issues };
+}
+
+function compareHistoricalDecisions(left, right) {
+  const versionOrder = compareHistoricalVersions(left.version, right.version);
+  if (versionOrder !== 0) return versionOrder;
+  return compareText(
+    `${left.origin}\0${left.digest}\0${left.status}\0${left.destinationTables.join("\0")}`,
+    `${right.origin}\0${right.digest}\0${right.status}\0${right.destinationTables.join("\0")}`,
+  );
+}
+
+function compareHistoricalVersions(left, right) {
+  const leftMatch = left.match(/^v([0-9]+)$/);
+  const rightMatch = right.match(/^v([0-9]+)$/);
+  if (leftMatch !== null && rightMatch !== null) {
+    return Number(leftMatch[1]) - Number(rightMatch[1]);
+  }
+  return compareText(left, right);
 }
 
 function indexArtifactCounts(artifacts) {
@@ -841,10 +933,7 @@ function compareSemanticDecision({
   previousDecisions,
   historicalConflict,
 }) {
-  const previous =
-    [...previousDecisions].reverse().find(({ status }) => status === "confirmed") ??
-    previousDecisions.at(-1) ??
-    null;
+  const previous = previousDecisions.at(-1) ?? null;
   const evidenceRefs = [
     ...currentDecision.evidenceRefs,
     ...(previous === null ? [] : [`${previous.origin}#${sourceTable}@${previous.digest}`]),
@@ -1033,6 +1122,99 @@ function buildSummary(tables, histories) {
     byHistoricalVersion,
     byArtifactVersion,
   };
+}
+
+function normalizeReportIssues(issues) {
+  if (!Array.isArray(issues)) throw new TypeError("Issues históricas devem ser array");
+  const normalized = issues.map((issue) => {
+    if (!isRecord(issue)) throw new TypeError("Issue histórica inválida");
+    const allowedFields = new Set(["scope", "reasonCode", "version"]);
+    if (Object.keys(issue).some((field) => !allowedFields.has(field))) {
+      throw new TypeError("Issue histórica contém campo não permitido");
+    }
+    if (
+      typeof issue.scope !== "string" ||
+      issue.scope.length === 0 ||
+      issue.scope.length > 240 ||
+      !SAFE_REFERENCE.test(issue.scope) ||
+      issue.scope.includes("..") ||
+      issue.scope.includes("//")
+    ) {
+      throw new TypeError("Escopo de issue histórica inválido");
+    }
+    return {
+      scope: issue.scope,
+      reasonCode: normalizeReasonCode(issue.reasonCode),
+      ...(issue.version === undefined
+        ? {}
+        : { version: normalizeVersion(issue.version, "issue.version") }),
+    };
+  });
+  normalized.sort(compareIssues);
+  assertUnique(normalized, issueSignature, "Issue histórica duplicada");
+  return normalized;
+}
+
+function issueSignature(issue) {
+  return `${issue.scope}\0${issue.reasonCode}\0${issue.version ?? ""}`;
+}
+
+function validateReportCoverage(report, current) {
+  if (
+    report.schemaVersion !== 1 ||
+    !isRecord(report.currentInventory) ||
+    report.currentInventory.version !== current.version ||
+    report.currentInventory.digest !== current.digest ||
+    !Array.isArray(report.tables) ||
+    !isRecord(report.summary)
+  ) {
+    throw new Error("Versão ou digest atual diverge no relatório histórico");
+  }
+  const expectedBySource = new Map(current.tables.map((table) => [table.sourceTable, table]));
+  const seen = new Set();
+  const countedStatuses = Object.fromEntries(
+    DECISION_COMPARISON_STATUSES.map((status) => [status, 0]),
+  );
+  for (const table of report.tables) {
+    if (!isRecord(table)) throw new Error("Tabela inválida no relatório histórico");
+    const sourceTable = normalizeSourceName(table.sourceTable, "report.sourceTable");
+    if (seen.has(sourceTable)) throw new Error("Cobertura duplicada no relatório histórico");
+    seen.add(sourceTable);
+    const expected = expectedBySource.get(sourceTable);
+    if (expected === undefined) {
+      if (table.currentInventory !== null || table.currentDecision !== null) {
+        throw new Error("Tabela histórica extra não pode declarar inventário atual");
+      }
+    } else {
+      const expectedCurrent = {
+        columns: expected.columns,
+        digest: expected.sha256,
+        rowCount: expected.rowCount,
+      };
+      if (canonicalJson(table.currentInventory) !== canonicalJson(expectedCurrent)) {
+        throw new Error("Inventário por tabela diverge no relatório histórico");
+      }
+    }
+    const status = table.decision?.status;
+    if (!DECISION_COMPARISON_STATUSES.includes(status)) {
+      throw new Error("Status inválido no relatório histórico");
+    }
+    countedStatuses[status] += 1;
+  }
+  for (const sourceTable of expectedBySource.keys()) {
+    if (!seen.has(sourceTable)) throw new Error("Cobertura incompleta no relatório histórico");
+  }
+  const summaryStatuses = report.summary.byDecisionStatus;
+  if (
+    report.summary.totalTables !== report.tables.length ||
+    !isRecord(summaryStatuses) ||
+    Object.keys(summaryStatuses).length !== DECISION_COMPARISON_STATUSES.length ||
+    DECISION_COMPARISON_STATUSES.some(
+      (status) => summaryStatuses[status] !== countedStatuses[status],
+    )
+  ) {
+    throw new Error("Summary/status não reconciliado no relatório histórico");
+  }
 }
 
 function countBy(values, select) {
@@ -1446,6 +1628,13 @@ function stableSortObject(value) {
     );
   }
   return value;
+}
+
+function deepFreeze(value, seen = new WeakSet()) {
+  if (value === null || typeof value !== "object" || seen.has(value)) return value;
+  seen.add(value);
+  for (const entry of Object.values(value)) deepFreeze(entry, seen);
+  return Object.freeze(value);
 }
 
 function isRecord(value) {

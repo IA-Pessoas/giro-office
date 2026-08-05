@@ -12,6 +12,10 @@ import {
   validateMappingCompleteness,
   writeMappingPackage,
 } from "../lib/mapping-engine.mjs";
+import {
+  comparePreviousMappings,
+  createAuthenticatedPreviousMappingReport,
+} from "../lib/previous-comparison.mjs";
 import { assertNoSensitiveSerializedContent, toLegacyIdRef } from "../lib/sensitivity.mjs";
 import {
   createNodeFileSystemAdapter,
@@ -239,7 +243,7 @@ async function createFixture(directory) {
     sourceDirectoryLabel: "source",
     expectedTableCount: 2,
     actualTableCount: 2,
-    sourceDigest: "fixture-digest",
+    sourceDigest: "a".repeat(64),
     tables: [
       {
         sourceTable: "legacy.multi",
@@ -289,6 +293,24 @@ function contextProviderFor(fixture) {
 
 function buildFixtureMapping(fixture) {
   return buildMapping({ ...fixture, capabilities: contextProviderFor(fixture) });
+}
+
+function authenticatedReportFor(fixture, overrides = {}) {
+  const currentInventory = overrides.currentInventory ?? fixture.inventory;
+  const evidenceRegistry = overrides.evidenceRegistry ?? fixture.evidenceRegistry;
+  const ruleRegistry = overrides.ruleRegistry ?? fixture.ruleRegistry;
+  const comparison = comparePreviousMappings({
+    currentInventory,
+    historicalInventories: overrides.historicalInventories ?? [],
+    evidenceRegistry,
+    ruleRegistry,
+    previousArtifacts: overrides.previousArtifacts ?? [],
+  });
+  return createAuthenticatedPreviousMappingReport({
+    comparison,
+    availability: overrides.availability ?? "not_requested",
+    issues: overrides.issues ?? [],
+  });
 }
 
 async function replaceDumpAndInventory(fixture, sourceTable, content, rowCount) {
@@ -819,7 +841,7 @@ test("relatório histórico participa do mesmo commit atômico e extra files sã
     const result = await buildFixtureMapping(fixture);
     const packageDir = path.join(directory, "package");
     const reportPath = "reports/previous-mapping-comparison.json";
-    const report = {
+    const manualReport = {
       availability: "available",
       issues: [],
       schemaVersion: 1,
@@ -836,23 +858,95 @@ test("relatório histórico participa do mesmo commit atômico e extra files sã
       },
       tables: [],
     };
+    const report = authenticatedReportFor(fixture, {
+      availability: "available",
+      previousArtifacts: [
+        {
+          version: "v2",
+          origin: "v2/pending-mapping/tables-without-confirmed-destination.json",
+          digest: "c".repeat(64),
+          sizeBytes: 2,
+          format: "json",
+          semanticAvailability: "available",
+          decisions: [
+            {
+              sourceTable: "legacy.removed",
+              status: "pending",
+              destinations: [],
+            },
+          ],
+          inventoryCounts: [],
+        },
+      ],
+    });
 
     await writeMappingPackage(packageDir, result, {
       protectedPaths: [fixture.sourceDir],
       extraArtifacts: { [reportPath]: report },
     });
     assert.deepEqual(JSON.parse(await readFile(path.join(packageDir, reportPath), "utf8")), report);
+    assert.equal(
+      report.tables.some(
+        ({ currentInventory, decision, sourceTable }) =>
+          sourceTable === "legacy.removed" &&
+          currentInventory === null &&
+          decision.status === "missing",
+      ),
+      true,
+    );
 
     const beforeUnsafe = await readPackageFiles(packageDir);
     await assert.rejects(
       () =>
         writeMappingPackage(packageDir, result, {
           protectedPaths: [fixture.sourceDir],
-          extraArtifacts: {
-            [reportPath]: { ...report, payload: "fixture@example.test" },
-          },
+          extraArtifacts: { [reportPath]: manualReport },
+        }),
+      /relatório.*autenticado|proveniência.*relatório/i,
+    );
+    assert.deepEqual(await readPackageFiles(packageDir), beforeUnsafe);
+
+    await assert.rejects(
+      () =>
+        writeMappingPackage(packageDir, result, {
+          protectedPaths: [fixture.sourceDir],
+          extraArtifacts: { [reportPath]: structuredClone(report) },
+        }),
+      /relatório.*autenticado|proveniência.*relatório/i,
+    );
+    assert.deepEqual(await readPackageFiles(packageDir), beforeUnsafe);
+
+    assert.throws(() => {
+      report.summary.totalTables = 1;
+    }, TypeError);
+    assert.throws(
+      () =>
+        authenticatedReportFor(fixture, {
+          availability: "partial",
+          issues: [{ scope: "fixture@example.test", reasonCode: "PREVIOUS_ARTIFACTS_UNAVAILABLE" }],
         }),
       /sensivel/i,
+    );
+
+    const singleInventory = {
+      ...fixture.inventory,
+      expectedTableCount: 1,
+      actualTableCount: 1,
+      sourceDigest: "b".repeat(64),
+      tables: [fixture.inventory.tables[0]],
+    };
+    const singleReport = authenticatedReportFor(fixture, {
+      currentInventory: singleInventory,
+      evidenceRegistry: new Map([["legacy.multi", fixture.evidenceRegistry.get("legacy.multi")]]),
+      ruleRegistry: new Map([["legacy.multi", fixture.ruleRegistry.get("legacy.multi")]]),
+    });
+    await assert.rejects(
+      () =>
+        writeMappingPackage(packageDir, result, {
+          protectedPaths: [fixture.sourceDir],
+          extraArtifacts: { [reportPath]: singleReport },
+        }),
+      /inventário.*relatório|cobertura.*relatório|proveniência.*relatório/i,
     );
     assert.deepEqual(await readPackageFiles(packageDir), beforeUnsafe);
 
@@ -874,11 +968,15 @@ test("relatório histórico participa do mesmo commit atômico e extra files sã
         return baseAdapter.writeFile(target, content, encoding);
       },
     };
+    const partialReport = authenticatedReportFor(fixture, {
+      availability: "unavailable",
+      issues: [{ scope: "previous-docs", reasonCode: "PREVIOUS_ARTIFACTS_UNAVAILABLE" }],
+    });
     await assert.rejects(
       () =>
         writeMappingPackage(packageDir, result, {
           protectedPaths: [fixture.sourceDir],
-          extraArtifacts: { [reportPath]: { ...report, availability: "partial" } },
+          extraArtifacts: { [reportPath]: partialReport },
           fileSystem: reportWriteFailure,
         }),
       /pacote anterior preservado|commit atômico/i,

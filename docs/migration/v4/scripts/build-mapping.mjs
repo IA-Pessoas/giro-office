@@ -12,6 +12,7 @@ import {
 } from "./lib/mapping-engine.mjs";
 import {
   comparePreviousMappings,
+  createAuthenticatedPreviousMappingReport,
   loadPreviousMappingArtifacts,
 } from "./lib/previous-comparison.mjs";
 import { loadPrismaCatalog } from "./lib/prisma-catalog.mjs";
@@ -220,7 +221,7 @@ function buildComparisonReport({
       : hasHistoricalData
         ? "partial"
         : "unavailable";
-  return { ...comparison, availability, issues };
+  return createAuthenticatedPreviousMappingReport({ comparison, availability, issues });
 }
 
 function deduplicateIssues(issues) {

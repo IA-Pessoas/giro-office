@@ -7,6 +7,7 @@ import {
   validateMappingEmissions,
   validateMappingRuleStructure,
 } from "./mapping-contract.mjs";
+import { validateAuthenticatedPreviousMappingReport } from "./previous-comparison.mjs";
 import { getModelByDatabaseName } from "./prisma-catalog.mjs";
 import { validateEvidenceCoverage } from "./semantic-evidence.mjs";
 import { assertNoSensitiveSerializedContent, assertNoSensitiveValues } from "./sensitivity.mjs";
@@ -286,7 +287,7 @@ export async function writeMappingPackage(
   validateMappingCompleteness(result, provenance.bindings);
   await assertSafePackagePath({ packageDir, protectedPaths });
   const artifacts = buildArtifacts(result);
-  addExtraArtifacts(artifacts, extraArtifacts);
+  addExtraArtifacts(artifacts, extraArtifacts, provenance.bindings.inventory);
   for (const [relativePath, content] of artifacts) {
     try {
       assertNoSensitiveSerializedContent(content);
@@ -305,7 +306,7 @@ export async function writeMappingPackage(
   });
 }
 
-function addExtraArtifacts(artifacts, extraArtifacts) {
+function addExtraArtifacts(artifacts, extraArtifacts, inventory) {
   if (extraArtifacts === undefined) return;
   if (!isObject(extraArtifacts)) throw new TypeError("Artefatos extras devem ser um objeto");
   const entries = Object.entries(extraArtifacts);
@@ -316,6 +317,7 @@ function addExtraArtifacts(artifacts, extraArtifacts) {
   ) {
     throw new Error("Artefato extra fora da allow-list do pacote V4");
   }
+  validateAuthenticatedPreviousMappingReport(entries[0][1], inventory);
   artifacts.set(PREVIOUS_COMPARISON_REPORT_PATH, serializeStableJson(entries[0][1]));
 }
 

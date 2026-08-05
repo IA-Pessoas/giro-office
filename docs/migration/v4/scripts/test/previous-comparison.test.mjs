@@ -114,16 +114,25 @@ function rule(sourceTable, destinationTable, { mode = "insert", columns = [] } =
   };
 }
 
-function previousArtifact(decisions) {
+function previousArtifact(
+  decisions,
+  {
+    version = "v2",
+    origin = `${version}/confirmed-table-destinations.csv`,
+    format = origin.endsWith(".md") ? "md" : origin.endsWith(".json") ? "json" : "csv",
+    inventoryCounts = [],
+    digest = SHA_C,
+  } = {},
+) {
   return {
-    version: "v2",
-    origin: "v2/confirmed-table-destinations.csv",
-    digest: SHA_C,
+    version,
+    origin,
+    digest,
     sizeBytes: 123,
-    format: "csv",
+    format,
     semanticAvailability: "available",
     decisions,
-    inventoryCounts: [],
+    inventoryCounts,
   };
 }
 
@@ -370,6 +379,123 @@ test("resultado é determinístico, reconcilia duplicatas idênticas e materiali
   assert.deepEqual(
     conflict.issues.map(({ reasonCode }) => reasonCode),
     ["HISTORICAL_DECISION_CONFLICT"],
+  );
+});
+
+test("progressão v2 pending para v3 confirmed igual à V4 é reused sem conflito", () => {
+  const sourceTable = "legacy.temporal";
+  const input = {
+    currentInventory: {
+      sourceDirectoryLabel: "03.08.2026",
+      sourceDigest: SHA_A,
+      tables: [table(sourceTable, ["id"], 1)],
+    },
+    historicalInventories: [],
+    evidenceRegistry: new Map([
+      [sourceTable, decision(sourceTable, "confirmed", `v4:${sourceTable}`)],
+    ]),
+    ruleRegistry: new Map([[sourceTable, rule(sourceTable, "current.temporal")]]),
+    previousArtifacts: [
+      previousArtifact([{ sourceTable, status: "pending", destinations: [] }], {
+        origin: "v2/pending-mapping/tables-without-confirmed-destination.json",
+      }),
+      previousArtifact(
+        [
+          {
+            sourceTable,
+            status: "confirmed",
+            destinations: [{ destinationTable: "current.temporal" }],
+          },
+        ],
+        { origin: "v3/rh-pessoal-dry-run.md", version: "v3" },
+      ),
+    ],
+  };
+
+  const comparison = comparePreviousMappings(input);
+
+  assert.equal(comparison.tables[0].decision.status, "reused");
+  assert.equal(comparison.tables[0].previousDecisions.length, 2);
+  assert.equal(comparison.summary.byDecisionStatus.conflict, 0);
+  assert.equal(
+    comparison.issues.some(({ reasonCode }) => reasonCode === "HISTORICAL_DECISION_CONFLICT"),
+    false,
+  );
+});
+
+test("decisão equivalente em versões distintas preserva as duas provenances", () => {
+  const sourceTable = "legacy.provenance";
+  const historicalDecision = {
+    sourceTable,
+    status: "confirmed",
+    destinations: [{ destinationTable: "current.provenance" }],
+  };
+  const comparison = comparePreviousMappings({
+    currentInventory: {
+      sourceDirectoryLabel: "03.08.2026",
+      sourceDigest: SHA_A,
+      tables: [table(sourceTable, ["id"], 1)],
+    },
+    historicalInventories: [],
+    evidenceRegistry: new Map([
+      [sourceTable, decision(sourceTable, "confirmed", `v4:${sourceTable}`)],
+    ]),
+    ruleRegistry: new Map([[sourceTable, rule(sourceTable, "current.provenance")]]),
+    previousArtifacts: [
+      previousArtifact([historicalDecision]),
+      previousArtifact([historicalDecision], {
+        origin: "v3/rh-pessoal-dry-run.md",
+        version: "v3",
+      }),
+    ],
+  });
+
+  assert.deepEqual(
+    comparison.tables[0].previousDecisions.map(({ version }) => version),
+    ["v2", "v3"],
+  );
+  assert.deepEqual(
+    comparison.tables[0].decision.provenance
+      .filter(({ version }) => version !== "v4")
+      .map(({ version }) => version),
+    ["v2", "v3"],
+  );
+});
+
+test("conflito de contagem física gera issue sem promover conflito semântico", () => {
+  const sourceTable = "legacy.count";
+  const historicalDecision = {
+    sourceTable,
+    status: "confirmed",
+    destinations: [{ destinationTable: "current.count" }],
+  };
+  const comparison = comparePreviousMappings({
+    currentInventory: {
+      sourceDirectoryLabel: "03.08.2026",
+      sourceDigest: SHA_A,
+      tables: [table(sourceTable, ["id"], 1)],
+    },
+    historicalInventories: [],
+    evidenceRegistry: new Map([
+      [sourceTable, decision(sourceTable, "confirmed", `v4:${sourceTable}`)],
+    ]),
+    ruleRegistry: new Map([[sourceTable, rule(sourceTable, "current.count")]]),
+    previousArtifacts: [
+      previousArtifact([historicalDecision], {
+        inventoryCounts: [{ sourceTable, rowCount: 1 }],
+      }),
+      previousArtifact([], {
+        origin: "v2/manifest.json",
+        inventoryCounts: [{ sourceTable, rowCount: 2 }],
+      }),
+    ],
+  });
+
+  assert.equal(comparison.tables[0].decision.status, "reused");
+  assert.equal(comparison.summary.byDecisionStatus.conflict, 0);
+  assert.equal(
+    comparison.issues.some(({ reasonCode }) => reasonCode === "HISTORICAL_COUNT_CONFLICT"),
+    true,
   );
 });
 
@@ -815,14 +941,8 @@ test("CLI gera comparação metadata-only e não bloqueia o pacote quando histó
     const validReport = JSON.parse(
       await readFile(path.join(packageDir, "reports/previous-mapping-comparison.json"), "utf8"),
     );
-    assert.equal(validReport.availability, "partial");
-    assert.equal(
-      validReport.issues.some(
-        ({ reasonCode, scope }) =>
-          reasonCode === "HISTORICAL_DECISION_CONFLICT" && scope === "tb_rh.solicitacoes",
-      ),
-      true,
-    );
+    assert.equal(validReport.availability, "available");
+    assert.deepEqual(validReport.issues, []);
     assert.equal(validReport.tables.length, 312);
     assert.deepEqual(
       validReport.historicalSources.map(({ version }) => version),
