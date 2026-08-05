@@ -19,6 +19,7 @@ import {
 import {
   APP_ROUTE_MODULE_MAP,
   canViewIntegrationRoute,
+  isIntegrationTasksOnlyRouteBlocked,
   canViewTasksOnlyIntegrationRoute,
   getModulePermissionLevel,
   hasAnyModuleAccess,
@@ -124,6 +125,47 @@ await runTest("level 0 is restricted to the tasks surface", () => {
   assert.equal(canViewTasksOnlyIntegrationRoute("/dashboard", level1), true);
   assert.equal(canViewTasksOnlyIntegrationRoute("/configuracoes", owner), true);
 });
+
+await runTest(
+  "integration task-only restriction stays scoped to integracao routes and preserves own tasks",
+  () => {
+    const integrationRestrictedProfiles = [
+      { type: "user", modules: { integracao: 0, contabil: 1 } },
+      { type: "user", modules: { integracao: 0, contabil: 2 } },
+      { type: "user", modules: { integracao: 0, contabil: 3 } },
+    ];
+    const owner = { type: "owner", modules: { integracao: 0, contabil: 3 } };
+
+    for (const subject of integrationRestrictedProfiles) {
+      assert.equal(
+        isIntegrationTasksOnlyRouteBlocked("integracao", "/tasks", subject),
+        false,
+        "Minhas tarefas deve permanecer acessível para integração=0.",
+      );
+      assert.equal(
+        isIntegrationTasksOnlyRouteBlocked("integracao", "/clients/123", subject),
+        true,
+        "Clientes deve permanecer bloqueado para integração=0.",
+      );
+      assert.equal(
+        isIntegrationTasksOnlyRouteBlocked("integracao", "/projects/123", subject),
+        true,
+        "Projetos deve permanecer bloqueado para integração=0.",
+      );
+      assert.equal(
+        isIntegrationTasksOnlyRouteBlocked("contabil", "/contabil", subject),
+        false,
+        "Contábil não pode herdar o bloqueio de integração=0.",
+      );
+    }
+
+    assert.equal(
+      isIntegrationTasksOnlyRouteBlocked("integracao", "/clients/123", owner),
+      false,
+      "Owner não pode ser restrito pelo guard de integração=0.",
+    );
+  },
+);
 
 async function runTest(name, fn) {
   try {
