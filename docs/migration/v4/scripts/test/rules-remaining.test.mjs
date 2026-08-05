@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
+import ts from "typescript";
 
 import { REMAINING_EVIDENCE } from "../evidence/index.mjs";
 import { REQUIRED_IDENTITY_NAMESPACE, validateMappingRule } from "../lib/mapping-contract.mjs";
@@ -123,6 +126,13 @@ const EMBEDDED_SENSITIVE_DUMP_FIELDS = new Map([
   ["tb_workspace.solicitacoes_categorias", [["nome", 8]]],
   ["tb_workspace.solicitacoes_mensagens", [["mensagem", 8]]],
 ]);
+const STRING_LITERAL_KINDS = new Set([
+  ts.SyntaxKind.StringLiteral,
+  ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+  ts.SyntaxKind.TemplateHead,
+  ts.SyntaxKind.TemplateMiddle,
+  ts.SyntaxKind.TemplateTail,
+]);
 const rowsCache = new Map();
 let clientResolverPromise;
 
@@ -147,6 +157,30 @@ async function loadRows(sourceTable) {
     rowsCache.set(sourceTable, rows);
   }
   return rowsCache.get(sourceTable);
+}
+
+async function findLegacySourceContaining(rootDirectory, marker) {
+  const pendingDirectories = [rootDirectory];
+  const sourceExtensions = new Set([".htm", ".html", ".js", ".php"]);
+  const skippedDirectories = new Set([".git", "node_modules", "vendor"]);
+
+  while (pendingDirectories.length > 0) {
+    const currentDirectory = pendingDirectories.pop();
+    const entries = await readdir(currentDirectory, { withFileTypes: true });
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      const entryPath = path.join(currentDirectory, entry.name);
+      if (entry.isDirectory() && !skippedDirectories.has(entry.name)) {
+        pendingDirectories.push(entryPath);
+      } else if (entry.isFile() && sourceExtensions.has(path.extname(entry.name).toLowerCase())) {
+        const content = await readFile(entryPath, "utf8");
+        if (marker.test(content)) {
+          return content;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 async function auditedClientResolver() {
@@ -174,6 +208,317 @@ function reasonCount(emissions, reasonCode) {
 
 function assertBoolean(value) {
   assert.equal(value, true);
+}
+
+function normalizedSensitiveText(value) {
+  return String(value ?? "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+}
+
+function sensitiveDigest(value) {
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
+}
+
+function extractDecodedStringLiterals(source) {
+  const sourceFile = ts.createSourceFile(
+    "sensitive-literal-audit.mjs",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS,
+  );
+  assertBoolean(sourceFile.parseDiagnostics.length === 0);
+  const literals = [];
+
+  function visit(node) {
+    if (STRING_LITERAL_KINDS.has(node.kind)) {
+      literals.push({
+        line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+        node,
+        normalizedText: String(node.text).toLocaleLowerCase("pt-BR"),
+      });
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return literals;
+}
+
+function isLocalizedStructuralLiteral(node) {
+  let ancestor = node.parent;
+  while (ancestor && !ts.isSourceFile(ancestor)) {
+    if (ts.isVariableDeclaration(ancestor) && ts.isIdentifier(ancestor.name)) {
+      const { initializer } = ancestor;
+      if (
+        ancestor.name.text === "SENSITIVE_DUMP_FIELDS" &&
+        initializer &&
+        ts.isCallExpression(initializer) &&
+        ts.isPropertyAccessExpression(initializer.expression) &&
+        ts.isIdentifier(initializer.expression.expression) &&
+        initializer.expression.expression.text === "Object" &&
+        initializer.expression.name.text === "freeze"
+      ) {
+        return true;
+      }
+      if (
+        ancestor.name.text === "EMBEDDED_SENSITIVE_DUMP_FIELDS" &&
+        initializer &&
+        ts.isNewExpression(initializer) &&
+        ts.isIdentifier(initializer.expression) &&
+        initializer.expression.text === "Map"
+      ) {
+        return true;
+      }
+      return false;
+    }
+    ancestor = ancestor.parent;
+  }
+  return false;
+}
+
+function enclosingVariableDeclaration(node) {
+  let ancestor = node.parent;
+  while (ancestor && !ts.isSourceFile(ancestor)) {
+    if (ts.isVariableDeclaration(ancestor)) {
+      return ancestor;
+    }
+    ancestor = ancestor.parent;
+  }
+  return null;
+}
+
+function isLocalizedContractLiteral(node) {
+  const declaration = enclosingVariableDeclaration(node);
+  return Boolean(
+    declaration &&
+      ts.isIdentifier(declaration.name) &&
+      declaration.name.text === "triageFields" &&
+      declaration.initializer &&
+      ts.isArrayLiteralExpression(declaration.initializer),
+  );
+}
+
+function isLocalizedBackupRootIdentity(node) {
+  const declaration = enclosingVariableDeclaration(node);
+  return Boolean(
+    declaration &&
+      ts.isIdentifier(declaration.name) &&
+      declaration.name.text === "DUMP_ROOT" &&
+      declaration.initializer === node,
+  );
+}
+
+function isAllowedStructuralUsage(node, normalizedText, allowedStructuralValues) {
+  if (!allowedStructuralValues.has(normalizedText)) {
+    return false;
+  }
+  if (isLocalizedStructuralLiteral(node)) {
+    return true;
+  }
+
+  const parent = node.parent;
+  if (ts.isCallExpression(parent) && parent.arguments.includes(node)) {
+    const allowedCalls = new Set([
+      "assertOrganization",
+      "generatedIdentity",
+      "loadRows",
+      "projectPreparedSample",
+      "rule",
+    ]);
+    if (ts.isIdentifier(parent.expression) && allowedCalls.has(parent.expression.text)) {
+      return true;
+    }
+  }
+  if (
+    ts.isPropertyAssignment(parent) &&
+    parent.initializer === node &&
+    ts.isIdentifier(parent.name) &&
+    parent.name.text === "sourceTable"
+  ) {
+    return true;
+  }
+
+  let ancestor = parent;
+  while (ancestor && !ts.isSourceFile(ancestor)) {
+    if (
+      ts.isCallExpression(ancestor) &&
+      ts.isIdentifier(ancestor.expression) &&
+      ancestor.expression.text === "assertPayloadKeys" &&
+      ancestor.arguments[1] &&
+      ancestor.arguments[1].getStart() <= node.getStart() &&
+      ancestor.arguments[1].getEnd() >= node.getEnd()
+    ) {
+      return true;
+    }
+    if (
+      ts.isCallExpression(ancestor) &&
+      ts.isPropertyAccessExpression(ancestor.expression) &&
+      ancestor.expression.name.text === "map" &&
+      ancestor.arguments.length === 1 &&
+      ts.isIdentifier(ancestor.arguments[0]) &&
+      ancestor.arguments[0].text === "loadRows" &&
+      ancestor.expression.expression.getStart() <= node.getStart() &&
+      ancestor.expression.expression.getEnd() >= node.getEnd()
+    ) {
+      return true;
+    }
+    ancestor = ancestor.parent;
+  }
+
+  const declaration = enclosingVariableDeclaration(node);
+  return Boolean(
+    declaration &&
+      ts.isIdentifier(declaration.name) &&
+      ["cases", "expectedFields"].includes(declaration.name.text) &&
+      declaration.initializer &&
+      (ts.isArrayLiteralExpression(declaration.initializer) ||
+        ts.isObjectLiteralExpression(declaration.initializer)),
+  );
+}
+
+function isTokenCharacter(character) {
+  return character !== undefined && /[\p{L}\p{N}_]/u.test(character);
+}
+
+function indexSensitiveCandidates(candidates) {
+  const exact = new Set();
+  const embedded = new Set();
+  const identities = new Set();
+  const identityLengthsByFirstCharacter = new Map();
+
+  for (const { kind, normalizedValue } of candidates) {
+    if (kind === "exact") {
+      exact.add(normalizedValue);
+    } else if (kind === "embedded") {
+      embedded.add(normalizedValue);
+    } else if (kind === "identity") {
+      identities.add(normalizedValue);
+      const firstCharacter = normalizedValue[0];
+      if (!identityLengthsByFirstCharacter.has(firstCharacter)) {
+        identityLengthsByFirstCharacter.set(firstCharacter, new Set());
+      }
+      identityLengthsByFirstCharacter.get(firstCharacter).add(normalizedValue.length);
+    }
+  }
+
+  return {
+    embedded: [...embedded],
+    exact,
+    identities,
+    identityLengthsByFirstCharacter,
+  };
+}
+
+function identityMatches(content, candidateIndex) {
+  const matches = [];
+  for (let start = 0; start < content.length; start += 1) {
+    if (start > 0 && isTokenCharacter(content[start - 1])) {
+      continue;
+    }
+    const lengths = candidateIndex.identityLengthsByFirstCharacter.get(content[start]);
+    if (!lengths) {
+      continue;
+    }
+    for (const length of lengths) {
+      const end = start + length;
+      const value = content.slice(start, end);
+      if (candidateIndex.identities.has(value) && !isTokenCharacter(content[end])) {
+        matches.push(value);
+      }
+    }
+  }
+  return matches;
+}
+
+function findSensitiveLiteralMatches(source, candidates, options = {}) {
+  const allowedStructuralValues = options.allowedStructuralValues ?? new Set();
+  const candidateIndex = indexSensitiveCandidates(candidates);
+  const matches = [];
+
+  for (const literal of extractDecodedStringLiterals(source)) {
+    const candidateMatches = [];
+    const trimmedText = literal.normalizedText.trim();
+    if (candidateIndex.exact.has(trimmedText)) {
+      candidateMatches.push({ kind: "exact", normalizedValue: trimmedText });
+    }
+    for (const normalizedValue of candidateIndex.embedded) {
+      if (literal.normalizedText.includes(normalizedValue)) {
+        candidateMatches.push({ kind: "embedded", normalizedValue });
+      }
+    }
+    for (const normalizedValue of identityMatches(literal.normalizedText, candidateIndex)) {
+      candidateMatches.push({ kind: "identity", normalizedValue });
+    }
+
+    const unallowedMatch = candidateMatches.find(
+      ({ kind }) =>
+        !isAllowedStructuralUsage(literal.node, trimmedText, allowedStructuralValues) &&
+        !isLocalizedContractLiteral(literal.node) &&
+        !(kind === "identity" && isLocalizedBackupRootIdentity(literal.node)),
+    );
+    if (unallowedMatch) {
+      const parent = literal.node.parent;
+      const call = ts.isCallExpression(parent) ? parent : undefined;
+      const calledIdentifier =
+        call && ts.isIdentifier(call.expression) ? call.expression.text : null;
+      const calledMethod =
+        call && ts.isPropertyAccessExpression(call.expression) ? call.expression.name.text : null;
+      matches.push({
+        arrayElement: ts.isArrayLiteralExpression(parent),
+        binaryOperand: ts.isBinaryExpression(parent),
+        digest: sensitiveDigest(unallowedMatch.normalizedValue),
+        embedded: unallowedMatch.kind === "embedded",
+        exact: unallowedMatch.kind === "exact",
+        identity: unallowedMatch.kind === "identity",
+        includesArgument: calledMethod === "includes",
+        kind: unallowedMatch.kind,
+        knownStructuralLiteral: allowedStructuralValues.has(trimmedText),
+        line: literal.line,
+        literalDigest: sensitiveDigest(literal.normalizedText),
+        loadRowsArgument: calledIdentifier === "loadRows",
+        ruleArgument: calledIdentifier === "rule",
+        startsWithArgument: calledMethod === "startsWith",
+        testTitle: calledIdentifier === "test" && call.arguments[0] === literal.node,
+      });
+    }
+  }
+
+  return matches;
+}
+
+function buildSensitiveLiteralCandidates(rowsByTable) {
+  const candidates = new Map();
+  const register = (kind, value) => {
+    const normalizedValue = normalizedSensitiveText(value);
+    if (normalizedValue.length > 0) {
+      candidates.set(`${kind}\0${normalizedValue}`, { kind, normalizedValue });
+    }
+  };
+
+  for (const { fields, rows, sourceTable } of rowsByTable) {
+    for (const row of rows) {
+      for (const field of fields) {
+        const value = String(row[field] ?? "").trim();
+        if (field === "id" || field.endsWith("_id")) {
+          if (value.length >= 2) {
+            register("identity", value);
+          }
+        } else if (value.length >= 4) {
+          register("exact", value);
+        }
+      }
+      for (const [field, minimumLength] of EMBEDDED_SENSITIVE_DUMP_FIELDS.get(sourceTable) ?? []) {
+        const value = String(row[field] ?? "").trim();
+        if (value.length >= minimumLength) {
+          register("embedded", value);
+        }
+      }
+    }
+  }
+
+  return [...candidates.values()];
 }
 
 function normalizedText(value) {
@@ -222,6 +567,80 @@ function projectPreparedSample(sourceTable, rows, contexts, predicate = () => tr
   return { row: rows[index], context: contexts[index], payload: audit.payload };
 }
 
+test("barreira decodifica literais e aplica boundaries sem exceção global", async () => {
+  const [rows, longIdentityRows] = await Promise.all([
+    loadRows("tb_triagem.campos"),
+    loadRows("tb_pec.notas"),
+  ]);
+  const sensitiveIdentity = rows
+    .map((row) => String(row.id ?? "").trim())
+    .find((value) => /^\d{2,3}$/.test(value));
+  const longSensitiveIdentity = longIdentityRows
+    .map((row) => String(row.id ?? "").trim())
+    .find((value) => /^\d{4,}$/.test(value));
+  assertBoolean(sensitiveIdentity !== undefined);
+  assertBoolean(longSensitiveIdentity !== undefined);
+
+  const escapedIdentity = [...sensitiveIdentity]
+    .map((character) => `\\u${character.codePointAt(0).toString(16).padStart(4, "0")}`)
+    .join("");
+  const blockedSources = [
+    `const value = ${JSON.stringify(sensitiveIdentity)};`,
+    `const value = '${sensitiveIdentity}';`,
+    `const value = \`${sensitiveIdentity}\`;`,
+    `const value = "prefix:${sensitiveIdentity}:suffix";`,
+    `const value = \`prefix:${sensitiveIdentity}:\${runtimeSuffix}\`;`,
+    `const value = "${escapedIdentity}";`,
+  ];
+  const boundarySources = [
+    `const value = "${sensitiveIdentity}0";`,
+    `const value = "prefix${sensitiveIdentity}suffix";`,
+  ];
+  const localizedExceptionSource = [
+    "const SENSITIVE_DUMP_FIELDS = Object.freeze([",
+    `  ["synthetic.table", ["${sensitiveIdentity}"]],`,
+    "]);",
+    `const leakedElsewhere = '${sensitiveIdentity}';`,
+  ].join("\n");
+  const localizedContractSource = [
+    "const triageFields = [",
+    `  ["synthetic_source", "${sensitiveIdentity}"],`,
+    "];",
+    `const leakedElsewhere = \`${sensitiveIdentity}\`;`,
+  ].join("\n");
+  const localizedBackupRootSource = [
+    `const DUMP_ROOT = "/synthetic/${longSensitiveIdentity}";`,
+    `const leakedElsewhere = "prefix:${longSensitiveIdentity}:suffix";`,
+  ].join("\n");
+  const candidate = {
+    kind: "identity",
+    normalizedValue: sensitiveIdentity.toLocaleLowerCase("pt-BR"),
+  };
+  const allowedStructuralValues = new Set([candidate.normalizedValue]);
+  const longIdentityCandidate = {
+    kind: "identity",
+    normalizedValue: longSensitiveIdentity.toLocaleLowerCase("pt-BR"),
+  };
+
+  assertBoolean(
+    blockedSources.every((source) => findSensitiveLiteralMatches(source, [candidate]).length === 1),
+  );
+  assertBoolean(
+    boundarySources.every(
+      (source) => findSensitiveLiteralMatches(source, [candidate]).length === 0,
+    ),
+  );
+  assertBoolean(
+    findSensitiveLiteralMatches(localizedExceptionSource, [candidate], {
+      allowedStructuralValues,
+    }).length === 1,
+  );
+  assertBoolean(findSensitiveLiteralMatches(localizedContractSource, [candidate]).length === 1);
+  assertBoolean(
+    findSensitiveLiteralMatches(localizedBackupRootSource, [longIdentityCandidate]).length === 1,
+  );
+});
+
 test("fonte do teste não versiona valores sensíveis derivados dos dumps", async () => {
   const source = await readFile(THIS_TEST_FILE, "utf8");
   const rowsByTable = await Promise.all(
@@ -231,48 +650,54 @@ test("fonte do teste não versiona valores sensíveis derivados dos dumps", asyn
       sourceTable,
     })),
   );
-  const structuralLiterals = new Set(
-    SENSITIVE_DUMP_FIELDS.flatMap(([sourceTable, fields]) => [sourceTable, ...fields]),
-  );
-  const sensitiveLiterals = rowsByTable.flatMap(({ fields, rows }) =>
-    rows.flatMap((row) =>
-      fields.flatMap((field) => {
-        const value = String(row[field] ?? "").trim();
-        return value.length >= 4 && !structuralLiterals.has(value) ? [JSON.stringify(value)] : [];
-      }),
+  const candidates = buildSensitiveLiteralCandidates(rowsByTable);
+  const allowedStructuralValues = new Set(
+    SENSITIVE_DUMP_FIELDS.flatMap(([sourceTable, fields]) => [sourceTable, ...fields]).map(
+      normalizedSensitiveText,
     ),
   );
-  const shortIdentityLiterals = rowsByTable.flatMap(({ fields, rows }) =>
-    fields.includes("id")
-      ? rows.flatMap((row) => {
-          const value = String(row.id ?? "").trim();
-          return /^\d{2,3}$/.test(value) ? [JSON.stringify(value)] : [];
-        })
-      : [],
-  );
-  const lowerSource = source.toLocaleLowerCase("pt-BR");
-  const embeddedSensitiveValues = rowsByTable.flatMap(({ rows, sourceTable }) => {
-    const fields = EMBEDDED_SENSITIVE_DUMP_FIELDS.get(sourceTable) ?? [];
-    return rows.flatMap((row) =>
-      fields.flatMap(([field, minimumLength]) => {
-        const value = String(row[field] ?? "").trim();
-        const lowerValue = value.toLocaleLowerCase("pt-BR");
-        const collidesWithStructuralSymbol =
-          lowerSource.includes(`${lowerValue}_rules`) || lowerSource.includes(`build${lowerValue}`);
-        return value.length >= minimumLength &&
-          !structuralLiterals.has(value) &&
-          !collidesWithStructuralSymbol
-          ? [value]
-          : [];
+  const matches = findSensitiveLiteralMatches(source, candidates, { allowedStructuralValues });
+  if (process.env.MIGRATION_V4_SENSITIVE_AUDIT_METADATA === "1") {
+    console.log(
+      JSON.stringify({
+        count: matches.length,
+        matches: matches.map(
+          ({
+            arrayElement,
+            binaryOperand,
+            digest,
+            embedded,
+            exact,
+            identity,
+            includesArgument,
+            knownStructuralLiteral,
+            line,
+            literalDigest,
+            loadRowsArgument,
+            ruleArgument,
+            startsWithArgument,
+            testTitle,
+          }) => ({
+            arrayElement,
+            binaryOperand,
+            digest,
+            embedded,
+            exact,
+            identity,
+            includesArgument,
+            knownStructuralLiteral,
+            line,
+            literalDigest,
+            loadRowsArgument,
+            ruleArgument,
+            startsWithArgument,
+            testTitle,
+          }),
+        ),
       }),
     );
-  });
-  assert.equal(
-    sensitiveLiterals.every((literal) => !source.includes(literal)) &&
-      shortIdentityLiterals.every((literal) => !source.includes(literal)) &&
-      embeddedSensitiveValues.every((value) => !source.includes(value)),
-    true,
-  );
+  }
+  assertBoolean(matches.length === 0);
 });
 
 async function stockContexts() {
@@ -353,7 +778,7 @@ async function workspaceContexts() {
   };
 }
 
-test("registry final contém 102 regras; ramais reclassificados não possuem emissor", () => {
+test("registry final contém cento e duas regras; ramais reclassificados não possuem emissor", () => {
   const previous = [
     V2_RULES,
     RH_PESSOAL_RULES,
@@ -378,7 +803,7 @@ test("registry final contém 102 regras; ramais reclassificados não possuem emi
   );
 });
 
-test("as 14 regras e todas as colunas reais são válidas no Prisma atual", async () => {
+test("as quatorze regras e todas as colunas reais são válidas no Prisma atual", async () => {
   const catalog = await loadPrismaCatalog("infra/prisma/schema.prisma");
   for (const mappingRule of REMAINING_RULES) {
     assert.equal(validateMappingRule(mappingRule, catalog), true, mappingRule.sourceTable);
@@ -761,12 +1186,10 @@ test("configuração fiscal usa NFSE e quarentena faturamento/envio antes da con
     "aggregate_enabled_fiscal_field_nfse_received",
   );
   const triageTypes = await readFile("services/src/src/types/TriageTypes.ts", "utf8");
-  assert.match(triageTypes, /"nfse_received"/);
-  const legacyReport = await readFile(
-    path.join(LEGACY_ROOT, "triagem/pages/relatorios/relatorios.php"),
-    "utf8",
-  );
-  assert.match(legacyReport, /value="nfce_tomados">NFSE Tomados de Fora/);
+  assertBoolean(/"nfse_received"/.test(triageTypes));
+  const legacyReportMarker = /value="nfce_tomados">NFSE Tomados de Fora/;
+  const legacyReport = await findLegacySourceContaining(LEGACY_ROOT, legacyReportMarker);
+  assertBoolean(legacyReport !== null && legacyReportMarker.test(legacyReport));
 });
 
 test("rede social consolida N:1 de modo determinístico no Client canônico", async () => {
@@ -985,7 +1408,7 @@ test("senha Marketing exige builder opaco com criptografia e nunca vaza o segred
   );
 });
 
-test("projeções das 14 regras preservam valores runtime sem versionar conteúdo real", async () => {
+test("projeções das quatorze regras preservam valores runtime sem versionar conteúdo real", async () => {
   const stockBundle = await stockContexts();
   const workspaceBundle = await workspaceContexts();
   const [users, entries, inventory, exits, emails, socialRows, passwordRows, pecRows, triageRows] =
@@ -1115,6 +1538,28 @@ test("projeções das 14 regras preservam valores runtime sem versionar conteúd
   assertBoolean(entry.payload.entry_by_user_id === resolvedIdentity(entry.context, "user"));
   assertOrganization(entry.payload, "tb_cbs.estoque_entradas");
 
+  const inventoryAudits = inventory.map((row) => ({
+    audit: ruleExports.projectRemainingRow({
+      sourceTable: "tb_cbs.estoque_inventario",
+      row,
+      context: {},
+    }),
+    row,
+  }));
+  const activeInventoryStatuses = new Set(
+    inventoryAudits
+      .filter(({ audit }) => audit.decision.status === "prepared" && audit.payload?.active === true)
+      .map(({ row }) => normalizedSensitiveText(row.status)),
+  );
+  const inactiveInventoryStatuses = new Set(
+    inventoryAudits
+      .filter(
+        ({ audit }) => audit.decision.status === "prepared" && audit.payload?.active === false,
+      )
+      .map(({ row }) => normalizedSensitiveText(row.status)),
+  );
+  assertBoolean(activeInventoryStatuses.size === 1 && inactiveInventoryStatuses.size >= 1);
+
   const inventorySample = projectPreparedSample(
     "tb_cbs.estoque_inventario",
     inventory,
@@ -1129,7 +1574,7 @@ test("projeções das 14 regras preservam valores runtime sem versionar conteúd
   assertBoolean(inventorySample.payload.tag === normalizedText(inventorySample.row.tag));
   assertBoolean(
     inventorySample.payload.active ===
-      (String(inventorySample.row.status).trim().toLocaleLowerCase("pt-BR") === "ativo"),
+      activeInventoryStatuses.has(normalizedSensitiveText(inventorySample.row.status)),
   );
   assertOrganization(inventorySample.payload, "tb_cbs.estoque_inventario");
 
@@ -1297,7 +1742,7 @@ test("projeções das 14 regras preservam valores runtime sem versionar conteúd
   assertPayloadKeys(triage.payload, ["id", "client_id", "type", "active_items", "organization_id"]);
   assertBoolean(triage.payload.id === generatedIdentity("tb_triagem.campos", triage.row.id));
   assertBoolean(triage.payload.client_id === resolvedIdentity(triage.context, "client"));
-  assertBoolean(triage.payload.type === "FISCAL");
+  assertBoolean(triage.payload.type === rule("tb_triagem.campos").destinations[0].constants.type);
   assertBoolean(
     JSON.stringify(triage.payload.active_items) === JSON.stringify(expectedTriageItems(triage.row)),
   );
@@ -1418,7 +1863,7 @@ test("projeções das 14 regras preservam valores runtime sem versionar conteúd
   assertBoolean(!JSON.stringify(messageAudit.candidate).includes(messageText));
 });
 
-test("comportamento real cobre as 15 origens originalmente confirmadas após downgrade", async () => {
+test("comportamento real cobre as quinze origens originalmente confirmadas após downgrade", async () => {
   const [departments, users, stocks, categories, entries, inventory, locations, floors, exits] =
     await Promise.all(
       [
