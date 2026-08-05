@@ -36,6 +36,62 @@ function runTest(name, fn) {
   }
 }
 
+runTest("certificate row sorting orders dates without mutating the source", () => {
+  const rows = [
+    { id: "late", expiration_date: "2026-12-31" },
+    { id: "early", expiration_date: "2025-01-01" },
+    { id: "middle", expiration_date: "2026-01-01" },
+  ];
+
+  assert.deepEqual(
+    certificateWorkspaceUi
+      .sortCertificateRows(rows, (row) => Date.parse(row.expiration_date), "asc")
+      .map((row) => row.id),
+    ["early", "middle", "late"],
+  );
+  assert.deepEqual(
+    certificateWorkspaceUi
+      .sortCertificateRows(rows, (row) => Date.parse(row.expiration_date), "desc")
+      .map((row) => row.id),
+    ["late", "middle", "early"],
+  );
+  assert.deepEqual(rows.map((row) => row.id), ["late", "early", "middle"]);
+});
+
+runTest("certificate row sorting compares text and boolean values", () => {
+  const rows = [
+    { id: "without-file", name: "Zeta", has_certificate: false },
+    { id: "with-file", name: "Alpha", has_certificate: true },
+  ];
+
+  assert.deepEqual(
+    certificateWorkspaceUi
+      .sortCertificateRows(rows, (row) => row.name, "asc")
+      .map((row) => row.id),
+    ["with-file", "without-file"],
+  );
+  assert.deepEqual(
+    certificateWorkspaceUi
+      .sortCertificateRows(rows, (row) => row.has_certificate, "asc")
+      .map((row) => row.id),
+    ["without-file", "with-file"],
+  );
+});
+
+runTest("certificate tables expose sortable headers and active sort state", () => {
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workspaceSource, /function SortableTableHeader/);
+  assert.match(workspaceSource, /aria-sort=/);
+  assert.equal((workspaceSource.match(/sortKey="expiration_date"/g) ?? []).length, 2);
+  assert.match(workspaceSource, /sortedPjItems\.map/);
+  assert.match(workspaceSource, /sortedPfItems\.map/);
+  assert.match(workspaceSource, /sortedNotificationItems\.map/);
+});
+
 runTest("certificate endpoints match gateway public contract", () => {
   assert.equal(CERTIFICATE_ENDPOINTS.pjList, "/certificate/pj/list");
   assert.equal(CERTIFICATE_ENDPOINTS.pjCreate, "/certificate/pj");
