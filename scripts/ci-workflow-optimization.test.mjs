@@ -628,3 +628,28 @@ test("VPS env materialization includes parcelamento-service in manifest", async 
     }
   }
 });
+
+test("TI request image storage contract is explicit in docs and deploy manifests", async () => {
+  const manifest = await readFile(vpsSecretsManifest, "utf8");
+  assert.match(manifest, /^ENV_VPS_TI_SERVICE\|\.env\.vps\.ti-service$/m);
+  assert.match(manifest, /^# TI_REQUEST_IMAGE_BUCKET=ti-request-attachments-private$/m);
+  assert.match(manifest, /^# BUCKET_VISIBILITY=private$/m);
+  assert.match(manifest, /^# SUPABASE_SERVICE_ROLE_KEY=<service role key somente no VPS\/servico>$/m);
+
+  const envExample = await readFile(path.join(repoRoot, ".env.example"), "utf8");
+  assert.match(envExample, /^TI_REQUEST_IMAGE_BUCKET=ti-request-attachments-private$/m);
+
+  const tiServiceReadme = await readFile(
+    path.join(repoRoot, "services", "ti-service", "README.md"),
+    "utf8",
+  );
+  assert.match(
+    tiServiceReadme,
+    /`TI_REQUEST_IMAGE_BUCKET` com o valor recomendado `ti-request-attachments-private`/,
+  );
+  assert.match(tiServiceReadme, /bucket privado/i);
+  assert.match(
+    tiServiceReadme,
+    /`SUPABASE_SERVICE_ROLE_KEY` devem permanecer apenas no ambiente do servico/i,
+  );
+});
