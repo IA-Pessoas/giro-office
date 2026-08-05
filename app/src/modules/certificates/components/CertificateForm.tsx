@@ -44,12 +44,14 @@ type BaseCreateProps = {
   isSubmitting: boolean;
   initialData?: never;
   formId: string;
+  tooltipContainer?: HTMLElement | null;
 };
 
 type BaseEditProps = {
   mode: "edit";
   isSubmitting: boolean;
   formId: string;
+  tooltipContainer?: HTMLElement | null;
 };
 
 type PJCreateFormProps = BaseCreateProps & {
@@ -169,6 +171,7 @@ export function CertificateForm({
   onSubmit,
   initialData,
   formId,
+  tooltipContainer,
 }: CertificateFormProps) {
   const isCreate = mode === "create";
   const isPj = kind === "pj";
@@ -414,6 +417,7 @@ export function CertificateForm({
                 <FieldHelp
                   label="Natureza jurídica"
                   description="Classificação jurídica da empresa conforme o cadastro oficial."
+                  container={tooltipContainer}
                 />
               </span>
               <input
@@ -509,6 +513,7 @@ export function CertificateForm({
             <FieldHelp
               label="Situação Castelo"
               description="Indica se este certificado está regularizado no sistema Castelo."
+              container={tooltipContainer}
             />
           </span>
           <CertificateNativeSelect
@@ -530,6 +535,7 @@ export function CertificateForm({
             <FieldHelp
               label="Situação Focus"
               description="Indica se este certificado está regularizado no sistema Focus."
+              container={tooltipContainer}
             />
           </span>
           <CertificateNativeSelect
@@ -574,6 +580,7 @@ export function CertificateForm({
             <FieldHelp
               label="Valor pago"
               description="Informe o valor pago em reais, usando o formato R$ 0,00."
+              container={tooltipContainer}
             />
           </span>
           <input

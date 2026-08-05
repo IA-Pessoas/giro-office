@@ -1,11 +1,19 @@
 "use client";
 
-import { useId } from "react";
 import { Info } from "lucide-react";
+import { useId } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
-export function FieldHelp({ label, description }: { label: string; description: string }) {
+export function FieldHelp({
+  label,
+  description,
+  container,
+}: {
+  label: string;
+  description: string;
+  container?: HTMLElement | null;
+}) {
   const descriptionId = useId();
 
   return (
@@ -20,7 +28,15 @@ export function FieldHelp({ label, description }: { label: string; description: 
           <Info aria-hidden="true" className="h-3.5 w-3.5" />
         </button>
       </TooltipTrigger>
-      <TooltipContent id={descriptionId} side="top" align="start" className="max-w-xs leading-5">
+      <TooltipContent
+        id={descriptionId}
+        side="top"
+        align="start"
+        container={container}
+        collisionBoundary={container ?? undefined}
+        collisionPadding={container ? 8 : undefined}
+        className="max-w-xs leading-5"
+      >
         {description}
       </TooltipContent>
     </Tooltip>
