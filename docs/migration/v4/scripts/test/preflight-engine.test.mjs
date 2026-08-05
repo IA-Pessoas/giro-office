@@ -6,6 +6,7 @@ import { runPreflight } from "../lib/preflight-engine.mjs";
 const ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const OTHER_ORGANIZATION_ID = "45337d55-bb0c-48eb-8ee5-9657c4e5f7df";
 const PLANNED_ID = "4e6ae95e-4d73-4e6d-8954-10be339a7cc8";
+const SECOND_PLANNED_ID = "e614f8cf-2b4b-48ee-87df-302c25483956";
 
 test("runPreflight valida cenário limpo por destination step em transação READ ONLY", async () => {
   const client = createCatalogClient();
@@ -34,6 +35,7 @@ test("runPreflight valida cenário limpo por destination step em transação REA
   });
   assert.equal(report.steps[0].status, "ready");
   assert.deepEqual(report.steps[0].conflictChecks, {
+    candidateLimitExceeded: false,
     complete: true,
     deterministicIdCandidateCount: 1,
     mergeCandidateCount: 0,
@@ -385,7 +387,19 @@ test("runPreflight reconhece CREATE UNIQUE INDEX simples e composto sem INCLUDE 
   assert.match(indexQuery.text, /indexprs IS NULL/);
   assert.match(indexQuery.text, /indisvalid/);
   assert.match(indexQuery.text, /indisready/);
+  assert.match(indexQuery.text, /indnullsnotdistinct/);
   assert.match(indexQuery.text, /ordinality <= .*indnkeyatts/);
+  const conflictQueries = client.history.filter(
+    (query) =>
+      typeof query !== "string" && query.text.includes("intra_batch_unique_conflict_count"),
+  );
+  assert.equal(conflictQueries.length, 2);
+  const compoundQuery = conflictQueries.find((query) =>
+    query.text.includes('SELECT "organization_id", "slug" FROM "public"."projects" WHERE FALSE'),
+  );
+  assert.ok(compoundQuery);
+  assert.deepEqual(compoundQuery.values, [ORGANIZATION_ID, "alpha"]);
+  assert.match(compoundQuery.text, /FROM \(VALUES \(\$1, \$2\)\) AS candidate_values/);
 });
 
 test("runPreflight bloqueia cobertura ausente ou incompleta para todo passo preparado", async () => {
@@ -525,6 +539,183 @@ test("runPreflight não impõe teto de mapeamento e pagina IDs somente em memór
     ).length,
     2,
   );
+});
+
+test("runPreflight detecta unique duplicado no próprio lote com SELECT tipado agregado", async () => {
+  const mappingPackage = createMappingPackage();
+  const step = mappingPackage.destinationMappings[0];
+  Object.assign(step, { readRows: 2, prepared: 2 });
+  mappingPackage.preflightInputs["legacy.projects\0project-insert"] = {
+    preparedRowCount: 2,
+    deterministicIds: [PLANNED_ID, SECOND_PLANNED_ID],
+    uniqueCandidates: [
+      { columns: ["slug"], values: ["duplicado-no-lote"] },
+      { columns: ["slug"], values: ["duplicado-no-lote"] },
+    ],
+    mergeCandidates: [],
+  };
+  const client = createCatalogClient({ intraBatchUniqueConflicts: 1 });
+
+  const report = await runPreflight({
+    client,
+    mappingPackage,
+    prismaCatalog: createPrismaCatalog(),
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+
+  assert.equal(report.readyForMigration, false);
+  assert.equal(
+    report.blockers.some(
+      ({ field, reasonCode }) => reasonCode === "UNIQUE_VALUE_CONFLICT" && field === "slug",
+    ),
+    true,
+  );
+  const queries = client.history.filter(
+    (query) =>
+      typeof query !== "string" && query.text.includes("intra_batch_unique_conflict_count"),
+  );
+  assert.equal(queries.length, 1);
+  assert.deepEqual(queries[0].values, ["duplicado-no-lote", "duplicado-no-lote"]);
+  assert.match(queries[0].text, /SELECT "slug" FROM "public"\."projects" WHERE FALSE/);
+  assert.match(queries[0].text, /FROM \(VALUES \(\$1\), \(\$2\)\) AS candidate_values/);
+  assert.doesNotMatch(queries[0].text, /duplicado-no-lote/);
+  assert.doesNotMatch(JSON.stringify(report), /duplicado-no-lote/);
+});
+
+test("runPreflight respeita NULL distinto padrão e NULLS NOT DISTINCT do índice", async () => {
+  const createNullBatch = () => {
+    const mappingPackage = createMappingPackage();
+    Object.assign(mappingPackage.destinationMappings[0], { readRows: 2, prepared: 2 });
+    mappingPackage.preflightInputs["legacy.projects\0project-insert"] = {
+      preparedRowCount: 2,
+      deterministicIds: [PLANNED_ID, SECOND_PLANNED_ID],
+      uniqueCandidates: [
+        { columns: ["slug"], values: [null] },
+        { columns: ["slug"], values: [null] },
+      ],
+      mergeCandidates: [],
+    };
+    return mappingPackage;
+  };
+
+  const standardClient = createCatalogClient();
+  const standardReport = await runPreflight({
+    client: standardClient,
+    mappingPackage: createNullBatch(),
+    prismaCatalog: createPrismaCatalog(),
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+  assert.equal(standardReport.readyForMigration, true);
+  const standardQuery = standardClient.history.find(
+    (query) =>
+      typeof query !== "string" && query.text.includes("intra_batch_unique_conflict_count"),
+  );
+  assert.ok(standardQuery);
+  assert.match(standardQuery.text, /"slug" IS NOT NULL/);
+  assert.match(standardQuery.text, /destination\."slug" = candidates\."slug"/);
+
+  const notDistinctClient = createCatalogClient({
+    intraBatchUniqueConflicts: 1,
+    uniqueIndexRows: [
+      uniqueIndex("projects", "projects_slug_nulls_idx", "slug", 1, {
+        nullsNotDistinct: true,
+      }),
+    ],
+  });
+  const notDistinctReport = await runPreflight({
+    client: notDistinctClient,
+    mappingPackage: createNullBatch(),
+    prismaCatalog: createPrismaCatalog(),
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+  assert.equal(notDistinctReport.readyForMigration, false);
+  const notDistinctQuery = notDistinctClient.history.find(
+    (query) =>
+      typeof query !== "string" && query.text.includes("intra_batch_unique_conflict_count"),
+  );
+  assert.ok(notDistinctQuery);
+  assert.doesNotMatch(notDistinctQuery.text, /"slug" IS NOT NULL/);
+  assert.match(
+    notDistinctQuery.text,
+    /destination\."slug" IS NOT DISTINCT FROM candidates\."slug"/,
+  );
+});
+
+test("runPreflight bloqueia candidatos acima do limite sem consultar conflitos", async () => {
+  const prepared = 501;
+  const mappingPackage = createMappingPackage();
+  Object.assign(mappingPackage.destinationMappings[0], {
+    identity: { kind: "resolve" },
+    identityKind: "resolve",
+    mode: "merge",
+    readRows: prepared,
+    prepared,
+  });
+  mappingPackage.preflightInputs["legacy.projects\0project-insert"] = {
+    preparedRowCount: prepared,
+    uniqueCandidates: Array.from({ length: prepared }, (_, index) => ({
+      columns: ["slug"],
+      values: [`candidate-${index}`],
+    })),
+    mergeCandidates: Array.from({ length: prepared }, (_, index) => ({
+      columns: ["slug"],
+      values: [`candidate-${index}`],
+    })),
+  };
+  const client = createCatalogClient();
+
+  const report = await runPreflight({
+    client,
+    mappingPackage,
+    prismaCatalog: createPrismaCatalog(),
+    organizationId: ORGANIZATION_ID,
+    requiredSecretNames: [],
+  });
+
+  assert.equal(report.readyForMigration, false);
+  assert.equal(report.steps[0].conflictChecks.complete, false);
+  assert.equal(report.steps[0].conflictChecks.candidateLimitExceeded, true);
+  assert.equal(report.steps[0].blockerCodes.includes("SEMANTIC_EVIDENCE_MISSING"), true);
+  assert.equal(
+    client.history.some(
+      (query) =>
+        typeof query !== "string" &&
+        (query.text.includes("unique_match_count") ||
+          query.text.includes("intra_batch_unique_conflict_count") ||
+          query.text.includes("merge_match_count")),
+    ),
+    false,
+  );
+});
+
+test("runPreflight exige todas as contagens finais inteiras e não negativas", async () => {
+  for (const [field, invalid] of [
+    ["readRows", undefined],
+    ["prepared", -1],
+    ["quarantine", 0.5],
+    ["notEmitted", "0"],
+    ["blockedRows", undefined],
+  ]) {
+    const mappingPackage = createMappingPackage();
+    if (invalid === undefined) delete mappingPackage.destinationMappings[0][field];
+    else mappingPackage.destinationMappings[0][field] = invalid;
+    const client = createCatalogClient();
+    await assert.rejects(
+      runPreflight({
+        client,
+        mappingPackage,
+        prismaCatalog: createPrismaCatalog(),
+        organizationId: ORGANIZATION_ID,
+        requiredSecretNames: [],
+      }),
+      /destination step.*contagem|readRows|prepared|quarantine|notEmitted|blockedRows/i,
+      field,
+    );
+    assert.equal(client.history.at(-1), "ROLLBACK", field);
+  }
 });
 
 function createMappingPackage() {
@@ -725,13 +916,14 @@ function constraint(table, name, type, columnName, options = {}) {
   };
 }
 
-function uniqueIndex(table, name, columnName, ordinalPosition) {
+function uniqueIndex(table, name, columnName, ordinalPosition, { nullsNotDistinct = false } = {}) {
   return {
     table_schema: "public",
     table_name: table,
     index_name: name,
     column_name: columnName,
     ordinal_position: ordinalPosition,
+    nulls_not_distinct: nullsNotDistinct,
   };
 }
 
@@ -740,6 +932,7 @@ function createCatalogClient({
   constraintRows = createConstraintRows(),
   uniqueIndexRows = [],
   deterministicMatches = 0,
+  intraBatchUniqueConflicts = 0,
   uniqueMatches = 0,
   mergeMatchCount = 1,
   failCatalog = false,
@@ -764,6 +957,17 @@ function createCatalogClient({
       }
       if (text.includes("pg_index")) {
         return { rows: structuredClone(uniqueIndexRows), rowCount: uniqueIndexRows.length };
+      }
+      if (text.includes("intra_batch_unique_conflict_count")) {
+        return {
+          rows: [
+            {
+              intra_batch_unique_conflict_count: String(intraBatchUniqueConflicts),
+              unique_match_count: String(uniqueMatches),
+            },
+          ],
+          rowCount: 1,
+        };
       }
       if (text.includes("castelo_row_count")) {
         if (rawTenantRows) {

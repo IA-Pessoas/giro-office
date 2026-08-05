@@ -6,6 +6,7 @@ import { serializeStableJson } from "./stable-output.mjs";
 const CASTELO_ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 const DATABASE_SCHEMA = "public";
 const MAX_CATALOG_ROWS = 100_000;
+const MAX_CONFLICT_CANDIDATES_PER_STEP = 1_000;
 const ID_QUERY_BATCH_SIZE = 1_000;
 const BLOCKER_CODES = new Set([
   "DEPENDENCY_CYCLE",
@@ -207,6 +208,7 @@ async function loadDatabaseCatalog(transaction) {
     text: [
       "SELECT namespace.nspname AS table_schema, table_class.relname AS table_name,",
       "index_class.relname AS index_name, attribute.attname AS column_name,",
+      "index_metadata.indnullsnotdistinct AS nulls_not_distinct,",
       "key_column.ordinality AS ordinal_position",
       "FROM pg_catalog.pg_index index_metadata",
       "JOIN pg_catalog.pg_class table_class",
@@ -294,7 +296,7 @@ async function loadDatabaseCatalog(transaction) {
     const table = getOrCreateTable(tables, constraint.tableName);
     const columns = orderedNames(constraint.columns);
     if (constraint.type === "PRIMARY KEY" || constraint.type === "UNIQUE") {
-      table.uniqueSets.push(columns);
+      table.uniqueSets.push({ columns, nullsNotDistinct: false });
     }
     if (constraint.type === "FOREIGN KEY") {
       table.foreignKeys.push({
@@ -312,7 +314,11 @@ async function loadDatabaseCatalog(transaction) {
     const tableName = requireDatabaseName(row.table_name, "table_name");
     const indexName = requireDatabaseName(row.index_name, "index_name");
     const key = `${tableName}\0${indexName}`;
-    const index = uniqueIndexes.get(key) ?? { columns: [], tableName };
+    const nullsNotDistinct = parseBoolean(row.nulls_not_distinct, "nulls_not_distinct");
+    const index = uniqueIndexes.get(key) ?? { columns: [], nullsNotDistinct, tableName };
+    if (index.nullsNotDistinct !== nullsNotDistinct) {
+      throw new Error("Catálogo PostgreSQL retornou metadata unique inconsistente.");
+    }
     index.columns.push({
       name: requireIdentifier(row.column_name, "column_name"),
       ordinal: parseOrdinal(row.ordinal_position),
@@ -320,12 +326,24 @@ async function loadDatabaseCatalog(transaction) {
     uniqueIndexes.set(key, index);
   }
   for (const index of uniqueIndexes.values()) {
-    getOrCreateTable(tables, index.tableName).uniqueSets.push(orderedNames(index.columns));
+    getOrCreateTable(tables, index.tableName).uniqueSets.push({
+      columns: orderedNames(index.columns),
+      nullsNotDistinct: index.nullsNotDistinct,
+    });
   }
   for (const table of tables.values()) {
-    table.uniqueSets = [
-      ...new Map(table.uniqueSets.map((columns) => [columns.join("\0"), columns])).values(),
-    ].sort(compareArrays);
+    const uniqueSets = new Map();
+    for (const uniqueSet of table.uniqueSets) {
+      const signature = uniqueSet.columns.join("\0");
+      const previous = uniqueSets.get(signature);
+      uniqueSets.set(signature, {
+        columns: uniqueSet.columns,
+        nullsNotDistinct: uniqueSet.nullsNotDistinct || previous?.nullsNotDistinct === true,
+      });
+    }
+    table.uniqueSets = [...uniqueSets.values()].sort((left, right) =>
+      compareArrays(left.columns, right.columns),
+    );
     table.foreignKeys.sort((left, right) => compareArrays(left.columns, right.columns));
   }
   return { tables };
@@ -408,8 +426,12 @@ async function validateStep({
     step,
     transaction,
   });
-  await validateUniqueCandidates({ addBlocker, databaseTable, inputs, step, transaction });
-  await validateMergeCandidates({ addBlocker, databaseTable, inputs, step, transaction });
+  if (conflictInput.uniqueCheckAllowed) {
+    await validateUniqueCandidates({ addBlocker, databaseTable, inputs, step, transaction });
+  }
+  if (conflictInput.mergeCheckAllowed) {
+    await validateMergeCandidates({ addBlocker, databaseTable, inputs, step, transaction });
+  }
   return {
     blockerCodes: [],
     conflictChecks: conflictInput.summary,
@@ -443,6 +465,7 @@ function validateConflictInputCoverage({
     : 0;
   const uniqueCount = Array.isArray(inputs.uniqueCandidates) ? inputs.uniqueCandidates.length : 0;
   const mergeCount = Array.isArray(inputs.mergeCandidates) ? inputs.mergeCandidates.length : 0;
+  const candidateLimitExceeded = uniqueCount + mergeCount > MAX_CONFLICT_CANDIDATES_PER_STEP;
   let complete = true;
   const markIncomplete = (field) => {
     complete = false;
@@ -453,6 +476,7 @@ function validateConflictInputCoverage({
     });
   };
 
+  if (candidateLimitExceeded) markIncomplete("preflight_inputs.candidate_limit");
   if (preparedRowCount > 0 && !provided) markIncomplete("preflight_inputs");
   if (preparedRowCount > 0 && inputs.preparedRowCount !== preparedRowCount) {
     markIncomplete("preflight_inputs.prepared_row_count");
@@ -479,7 +503,7 @@ function validateConflictInputCoverage({
         const signature = candidate.columns.join("\0");
         counts.set(signature, (counts.get(signature) ?? 0) + 1);
       }
-      const expected = new Set(applicableUniqueSets.map((columns) => columns.join("\0")));
+      const expected = new Set(applicableUniqueSets.map(({ columns }) => columns.join("\0")));
       if (
         counts.size !== expected.size ||
         [...expected].some((signature) => counts.get(signature) !== preparedRowCount) ||
@@ -499,7 +523,9 @@ function validateConflictInputCoverage({
 
   return {
     inputs,
+    mergeCheckAllowed: !candidateLimitExceeded,
     summary: {
+      candidateLimitExceeded,
       complete,
       deterministicIdCandidateCount: deterministicCount,
       mergeCandidateCount: mergeCount,
@@ -507,6 +533,7 @@ function validateConflictInputCoverage({
       uniqueCandidateCount: uniqueCount,
       uniqueConstraintCount: applicableUniqueSets.length,
     },
+    uniqueCheckAllowed: !candidateLimitExceeded,
   };
 }
 
@@ -520,7 +547,7 @@ function getApplicableUniqueSets(databaseTable, prismaModel, step) {
   ]);
   const idColumn = prismaModel?.fields.find(({ id }) => id)?.databaseName ?? null;
   return databaseTable.uniqueSets.filter(
-    (columns) =>
+    ({ columns }) =>
       columns.every((column) => emittedColumns.has(column)) &&
       !(columns.length === 1 && columns[0] === idColumn),
   );
@@ -577,7 +604,7 @@ function validatePhysicalContract({ addBlocker, databaseTable, prismaCatalog, pr
     ...prismaModel.compoundUnique,
   ];
   for (const columns of expectedUniqueSets) {
-    if (!databaseTable.uniqueSets.some((actual) => sameArray(actual, columns))) {
+    if (!databaseTable.uniqueSets.some((actual) => sameArray(actual.columns, columns))) {
       addBlocker({
         ...base,
         reasonCode: "DESTINATION_UNIQUE_MISMATCH",
@@ -686,28 +713,79 @@ async function validateDeterministicIds({
 }
 
 async function validateUniqueCandidates({ addBlocker, databaseTable, inputs, step, transaction }) {
-  if (!Array.isArray(inputs.uniqueCandidates)) return;
+  if (!Array.isArray(inputs.uniqueCandidates) || inputs.uniqueCandidates.length === 0) return;
+  const candidatesByUniqueSet = new Map();
   for (const candidate of inputs.uniqueCandidates) {
     const normalized = normalizeCandidate(candidate, databaseTable);
-    if (!databaseTable.uniqueSets.some((columns) => sameArray(columns, normalized.columns))) {
-      continue;
-    }
+    const uniqueSet = databaseTable.uniqueSets.find(({ columns }) =>
+      sameArray(columns, normalized.columns),
+    );
+    if (uniqueSet === undefined) continue;
+    const signature = uniqueSet.columns.join("\0");
+    const group = candidatesByUniqueSet.get(signature) ?? { candidates: [], uniqueSet };
+    group.candidates.push(normalized);
+    candidatesByUniqueSet.set(signature, group);
+  }
+  for (const { candidates, uniqueSet } of [...candidatesByUniqueSet.values()].sort((left, right) =>
+    compareArrays(left.uniqueSet.columns, right.uniqueSet.columns),
+  )) {
     const result = await transaction.query({
-      text: buildCandidateCountQuery(
-        step.destinationTable,
-        normalized.columns,
-        "unique_match_count",
-      ),
-      values: normalized.values,
+      text: buildUniqueBatchConflictQuery(step.destinationTable, uniqueSet, candidates.length),
+      values: candidates.flatMap(({ values }) => values),
     });
-    if (singleCount(result, "unique_match_count") > 0) {
+    const hasIntraBatchConflict = singleCount(result, "intra_batch_unique_conflict_count") > 0;
+    const hasDestinationConflict = singleCount(result, "unique_match_count") > 0;
+    if (hasIntraBatchConflict || hasDestinationConflict) {
       addBlocker({
         ...stepBlockerBase(step),
         reasonCode: "UNIQUE_VALUE_CONFLICT",
-        field: normalized.columns.join(","),
+        field: uniqueSet.columns.join(","),
       });
     }
   }
+}
+
+function buildUniqueBatchConflictQuery(table, uniqueSet, candidateCount) {
+  const quotedColumns = uniqueSet.columns.map(quoteIdentifier);
+  const anchorProjection = quotedColumns.join(", ");
+  const candidateProjection = quotedColumns
+    .map((column, index) => `candidate_values.column${index + 1} AS ${column}`)
+    .join(", ");
+  const values = Array.from({ length: candidateCount }, (_, candidateIndex) => {
+    const placeholders = quotedColumns.map(
+      (_, columnIndex) => `$${candidateIndex * quotedColumns.length + columnIndex + 1}`,
+    );
+    return `(${placeholders.join(", ")})`;
+  }).join(", ");
+  const eligibleFilter = uniqueSet.nullsNotDistinct
+    ? ""
+    : ` WHERE ${quotedColumns.map((column) => `${column} IS NOT NULL`).join(" AND ")}`;
+  const destinationJoin = quotedColumns
+    .map((column) => {
+      const operator = uniqueSet.nullsNotDistinct ? "IS NOT DISTINCT FROM" : "=";
+      return `destination.${column} ${operator} candidates.${column}`;
+    })
+    .join(" AND ");
+  return [
+    "WITH typed_candidates AS (",
+    `SELECT ${anchorProjection} FROM ${quoteQualified(table)} WHERE FALSE`,
+    "UNION ALL",
+    `SELECT ${candidateProjection} FROM (VALUES ${values}) AS candidate_values`,
+    "), eligible_candidates AS (",
+    `SELECT ${anchorProjection} FROM typed_candidates${eligibleFilter}`,
+    "), intra_batch_conflicts AS (",
+    `SELECT 1 FROM eligible_candidates GROUP BY ${anchorProjection} HAVING COUNT(*) > 1`,
+    "), destination_conflicts AS (",
+    `SELECT 1 FROM eligible_candidates AS candidates JOIN ${quoteQualified(
+      table,
+    )} AS destination ON ${destinationJoin}`,
+    "), intra_batch_conflict_count AS (",
+    "SELECT COUNT(*)::bigint AS intra_batch_unique_conflict_count FROM intra_batch_conflicts",
+    "), destination_conflict_count AS (",
+    "SELECT COUNT(*)::bigint AS unique_match_count FROM destination_conflicts",
+    ") SELECT intra_batch_unique_conflict_count, unique_match_count",
+    "FROM intra_batch_conflict_count CROSS JOIN destination_conflict_count",
+  ].join(" ");
 }
 
 async function validateMergeCandidates({ addBlocker, databaseTable, inputs, step, transaction }) {
@@ -979,14 +1057,10 @@ function normalizePending(table) {
 
 function normalizeStep(step) {
   if (!isPlainObject(step)) throw new TypeError("Destination step inválido.");
-  if (
-    step.blockedRows !== undefined &&
-    (!Number.isSafeInteger(step.blockedRows) || step.blockedRows < 0)
-  ) {
-    throw new TypeError("Destination step possui blockedRows inválido.");
-  }
-  if (step.prepared !== undefined && (!Number.isSafeInteger(step.prepared) || step.prepared < 0)) {
-    throw new TypeError("Destination step possui prepared inválido.");
+  for (const field of ["readRows", "prepared", "quarantine", "notEmitted", "blockedRows"]) {
+    if (!Number.isSafeInteger(step[field]) || step[field] < 0) {
+      throw new TypeError(`Destination step possui contagem ${field} inválida.`);
+    }
   }
   const columns = requireArray(step.columns, "step.columns").map((column) => {
     if (!isPlainObject(column) || !new Set(["mapped", "not_preserved"]).has(column.status)) {
@@ -1011,7 +1085,6 @@ function normalizeStep(step) {
     destinationTable: requireDatabaseName(step.destinationTable, "step.destinationTable"),
     sourceTable: requireTechnicalName(step.sourceTable, "step.sourceTable"),
     stepId: requireTechnicalName(step.stepId, "step.stepId"),
-    prepared: step.prepared ?? 0,
   };
 }
 
@@ -1068,6 +1141,7 @@ function emptyStepResult(step, conflictChecks) {
   return {
     blockerCodes: [],
     conflictChecks: conflictChecks ?? {
+      candidateLimitExceeded: false,
       complete: step.prepared === 0,
       deterministicIdCandidateCount: 0,
       mergeCandidateCount: 0,
@@ -1170,6 +1244,11 @@ function parseNullable(value) {
   if (value === "YES") return true;
   if (value === "NO") return false;
   throw new Error("Nulabilidade PostgreSQL inválida.");
+}
+
+function parseBoolean(value, label) {
+  if (value === true || value === false) return value;
+  throw new Error(`Booleano PostgreSQL inválido em ${label}.`);
 }
 
 function getOrCreateTable(tables, name) {

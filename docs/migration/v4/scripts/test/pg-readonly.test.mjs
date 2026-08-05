@@ -15,6 +15,17 @@ test("assertReadOnlyQuery aceita somente SELECT e WITH finalizado por SELECT", (
       values: ["4e6ae95e-4d73-4e6d-8954-10be339a7cc8"],
     }),
   );
+  assert.doesNotThrow(() =>
+    assertReadOnlyQuery({
+      text: [
+        "WITH typed_candidates AS (",
+        "SELECT id FROM public.users WHERE FALSE UNION ALL",
+        "SELECT candidate_values.column1 FROM (VALUES ($1), ($2)) AS candidate_values",
+        ") SELECT COUNT(*) FROM typed_candidates",
+      ].join(" "),
+      values: ["id-1", "id-2"],
+    }),
+  );
 });
 
 test("assertReadOnlyQuery rejeita mutação, evasão, múltiplas instruções e lock", () => {
