@@ -10,7 +10,8 @@ import {
 import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
-import { useAssignableUsers } from "@modules/rh";
+import { listAdminUsers } from "@modules/users";
+import { useFetch } from "@shared/hooks";
 
 import {
   useCreateTiExtensionMutation,
@@ -112,7 +113,19 @@ export function TiExtensionsTab() {
   const selectedExtensionQuery = useTiExtension(selectedExtensionId, {
     enabled: Boolean(selectedExtensionId),
   });
-  const assignableUsersQuery = useAssignableUsers({ enabled: canManageExtensions, module: "ti" });
+  const assignableUsersQuery = useFetch(
+    ["ti", "extensions", "assignable-users", "active"] as const,
+    () => listAdminUsers("active"),
+    {
+      enabled: canManageExtensions,
+      select: (users) =>
+        users.map((user) => ({
+          id: user.id,
+          name: user.name,
+          departmentName: user.department?.name ?? null,
+        })),
+    },
+  );
   const createExtensionMutation = useCreateTiExtensionMutation();
   const updateExtensionMutation = useUpdateTiExtensionMutation();
   const isSubmitting = createExtensionMutation.isPending || updateExtensionMutation.isPending;

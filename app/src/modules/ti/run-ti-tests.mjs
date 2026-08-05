@@ -1155,7 +1155,7 @@ await runTest("ti password reveal clears sensitive detail cache when hidden", as
   assert.match(tabSource, /setRevealPasswordId\(null\)/);
 });
 
-await runTest("ti user selects reuse the operational users source", async () => {
+await runTest("ti user selects reuse the operational users source where still intended", async () => {
   const hookSource = await readAppSource("src/modules/rh/hooks/useAssignableUsers.ts");
   const rhTypesSource = await readAppSource("src/modules/rh/types.ts");
   const userTypesSource = await readAppSource("src/modules/users/types/index.ts");
@@ -1170,7 +1170,6 @@ await runTest("ti user selects reuse the operational users source", async () => 
   for (const componentPath of [
     "components/TiStockTab.tsx",
     "components/TiPasswordsTab.tsx",
-    "components/TiExtensionsTab.tsx",
   ]) {
     const source = await readModuleSource(componentPath);
 
@@ -1244,8 +1243,11 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   );
   assert.match(
     tabSource,
-    /assignableUsersQuery = useAssignableUsers\(\{ enabled: canManageExtensions, module: "ti" \}\)/,
+    /assignableUsersQuery = useFetch(?:<[\s\S]*?>)?\(/,
   );
+  assert.match(tabSource, /listAdminUsers\("active"\)/);
+  assert.match(tabSource, /enabled: canManageExtensions/);
+  assert.doesNotMatch(tabSource, /useAssignableUsers/);
   assert.match(tabSource, /\{!canManageExtensions \? \(/);
   assert.match(tabSource, /<TiEmptyState/);
   const sectionHeaderMatch = tabSource.match(/<TiSectionHeader[\s\S]*?\/>/);
@@ -1257,6 +1259,16 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(tabSource, /placeholder="Ex: 1001"/);
   assert.doesNotMatch(tabSource, /placeholder="1001"/);
   assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
+});
+
+await runTest("ti extensions load all eligible users via the admin collector", async () => {
+  const tabSource = await readModuleSource("components/TiExtensionsTab.tsx");
+
+  assert.match(tabSource, /import \{ listAdminUsers(?:, type UserItem)? \} from "@modules\/users"/);
+  assert.match(tabSource, /import \{ useFetch \} from "@shared\/hooks"/);
+  assert.match(tabSource, /listAdminUsers\("active"\)/);
+  assert.match(tabSource, /enabled: canManageExtensions/);
+  assert.doesNotMatch(tabSource, /useAssignableUsers/);
 });
 
 await runTest("ti extension controls stay hidden for technician level 2", async () => {
