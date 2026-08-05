@@ -368,6 +368,40 @@ runTest("payroll responsible field uses a user selector instead of raw IDs", () 
   assert.doesNotMatch(payroll, /label: "Responsável ID"/);
 });
 
+runTest("payroll section exposes the clarified payroll labels", () => {
+  const payroll = readFileSync(
+    "src/modules/pessoal/components/PessoalPayrollSection.tsx",
+    "utf8",
+  );
+
+  for (const label of [
+    "Informações da folha",
+    "Grupo da folha",
+    "Tipo de adiantamento",
+    "Tipo de vale-transporte",
+    "Contato da folha",
+    "Responsável pela folha",
+    "Quantidade de funcionários",
+    "Valor do adiantamento",
+    "Valor do vale-transporte",
+    "Sindicato",
+    "Adiantamento salarial",
+    "Usar folha anterior",
+    "Integração com Onvio",
+    "Vale-transporte",
+    "Vale-alimentação",
+    "Contribuição assistencial",
+    "Bem Mais",
+    "BSF",
+    "Reinf",
+  ]) {
+    assert.match(payroll, new RegExp(label));
+  }
+
+  assert.doesNotMatch(payroll, /Tipo de VT/);
+  assert.doesNotMatch(payroll, /Valor do VT/);
+});
+
 runTest("obligation params map client and competence", () => {
   assert.deepEqual(buildPessoalObligationParams("client-1", "2026-07"), {
     client_id: "client-1",

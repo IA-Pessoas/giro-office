@@ -72,8 +72,8 @@ const emptyPayrollFormValues: PayrollFormValues = {
 };
 
 const textFields = [
-  { name: "info", label: "Informações", type: "text", required: true },
-  { name: "group", label: "Grupo", type: "text", required: true },
+  { name: "info", label: "Informações da folha", type: "text", required: true },
+  { name: "group", label: "Grupo da folha", type: "text", required: true },
   {
     name: "advance_type",
     label: "Tipo de adiantamento",
@@ -83,26 +83,26 @@ const textFields = [
   },
   {
     name: "vt_type",
-    label: "Tipo de VT",
+    label: "Tipo de vale-transporte",
     type: "text",
     required: false,
     help: "Tipo de vale-transporte utilizado pelo cliente.",
   },
-  { name: "contact", label: "Contato", type: "text", required: false },
+  { name: "contact", label: "Contato da folha", type: "text", required: false },
 ] as const;
 
 const numberFields = [
-  { name: "employees", label: "Funcionários", required: true },
+  { name: "employees", label: "Quantidade de funcionários", required: true },
   { name: "advance_amount", label: "Valor do adiantamento", required: false },
-  { name: "vt_value", label: "Valor do VT", required: false },
+  { name: "vt_value", label: "Valor do vale-transporte", required: false },
 ] as const;
 
 const checkboxFields = [
-  { name: "advance", label: "Adiantamento" },
-  { name: "previous", label: "Folha anterior" },
+  { name: "advance", label: "Adiantamento salarial" },
+  { name: "previous", label: "Usar folha anterior" },
   {
     name: "onvio",
-    label: "Onvio",
+    label: "Integração com Onvio",
     help: "Indica se a rotina Onvio é usada para este cliente.",
   },
   { name: "vt", label: "Vale-transporte" },
@@ -351,7 +351,7 @@ export function PessoalPayrollSection({
           })}
 
           <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-            Responsável
+            Responsável pela folha
             <div className="relative">
               <select
                 value={formValues.responsible_id}
