@@ -152,7 +152,7 @@ await runTest("regularize PF forms search every paginated PF option and preserve
   const selectSource = await readModuleSource("components/RegularizeClientPfSelect.tsx");
   assert.match(selectSource, /usePaginatedRegularizeClientPfs/);
   assert.match(selectSource, /useRegularizeClientPfDetail/);
-  assert.match(selectSource, /placeholder="Buscar PF por nome, código ou CPF"/);
+  assert.match(selectSource, /placeholder="Nome, código ou CPF"/);
   assert.match(selectSource, /page: pfPage/);
   assert.match(selectSource, /onNext/);
   assert.match(selectSource, /selectedPfQuery\.data/);
@@ -163,6 +163,27 @@ await runTest("regularize PF forms search every paginated PF option and preserve
   assert.match(selectSource, /Tentar novamente/);
   assert.match(selectSource, /const error = listQuery\.error \?\? selectedPfQuery\.error/);
   assert.match(selectSource, /listQuery\.refetch/);
+});
+
+await runTest("regularize PF selector uses a clear modal list with keyboard-friendly states", async () => {
+  const selectSource = await readModuleSource("components/RegularizeClientPfSelect.tsx");
+  const partnerSource = await readModuleSource("components/RegularizePartnerForm.tsx");
+
+  assert.match(selectSource, /<Dialog\s+open=\{isOpen\}/);
+  assert.match(selectSource, /aria-haspopup="dialog"/);
+  assert.match(selectSource, /aria-expanded=\{isOpen\}/);
+  assert.match(selectSource, /title="Selecionar cliente PF"/);
+  assert.match(selectSource, /placeholder="Nome, código ou CPF"/);
+  assert.match(selectSource, /role="listbox"/);
+  assert.match(selectSource, /role="option"/);
+  assert.match(selectSource, /aria-selected=\{/);
+  assert.match(selectSource, /totalPages/);
+  assert.match(selectSource, /onPageChange/);
+  assert.match(selectSource, /Selecionar cliente PF/);
+  assert.doesNotMatch(selectSource, /<RegularizeNativeSelect/);
+  assert.match(partnerSource, /className="space-y-5"/);
+  assert.match(partnerSource, /className="grid gap-5 md:grid-cols-2"/);
+  assert.match(partnerSource, /fieldset className="flex min-w-0 flex-col/);
 });
 
 await runTest("regularize document inputs keep masks while payloads use canonical digits", async () => {
