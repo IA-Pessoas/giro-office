@@ -2,10 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   ClipboardList,
   Edit3,
   FileText,
@@ -13,7 +9,7 @@ import {
   Plus,
 } from "lucide-react";
 
-import { Dialog } from "@shared/components/ui/Dialog";
+import { Dialog, PaginationControls } from "@shared/components";
 
 import {
   useCreateParcelamentoCompetency,
@@ -40,8 +36,6 @@ import {
 
 const FIRST_PAGE = 1;
 const PAGE_SIZE = 50;
-const paginationButtonClassName =
-  "inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border border-gray-300 px-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700";
 const installmentMenuOptionClassName =
   "flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors";
 
@@ -130,7 +124,6 @@ export function ParcelamentoCompetenciesSection({
   const competencies = competenciesQuery.data?.items ?? [];
   const total = competenciesQuery.data?.total ?? 0;
   const totalPages = Math.max(FIRST_PAGE, Math.ceil(total / PAGE_SIZE));
-  const hasPreviousPage = page > FIRST_PAGE;
   const hasNextPage = Boolean(competenciesQuery.data?.has_more) || page < totalPages;
   const selectedInstallment = installments.find(
     (installment) => installment.id === selectedInstallmentId,
@@ -345,49 +338,20 @@ export function ParcelamentoCompetenciesSection({
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-          <button
-            type="button"
-            aria-label="Primeira página"
-            title="Primeira página"
-            onClick={() => setPage(FIRST_PAGE)}
-            disabled={!hasPreviousPage || competenciesQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            <ChevronsLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setSafePage(page - 1)}
-            disabled={!hasPreviousPage || competenciesQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Anterior
-          </button>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Página {page} de {totalPages}
-          </p>
-          <button
-            type="button"
-            onClick={() => setSafePage(page + 1)}
-            disabled={!hasNextPage || competenciesQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            Próxima
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Última página"
-            title="Última página"
-            onClick={() => setPage(totalPages)}
-            disabled={page >= totalPages || competenciesQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            <ChevronsRight className="h-4 w-4" />
-          </button>
-        </div>
+        <PaginationControls
+          page={page}
+          limit={PAGE_SIZE}
+          total={total}
+          count={competencies.length}
+          hasMore={hasNextPage}
+          isFetching={competenciesQuery.isFetching}
+          totalPages={totalPages}
+          onPrevious={() => setSafePage(page - 1)}
+          onNext={() => setSafePage(page + 1)}
+          onFirst={() => setPage(FIRST_PAGE)}
+          onLast={() => setPage(totalPages)}
+          onPageChange={setSafePage}
+        />
       </div>
 
       {installmentsQuery.isError ? (

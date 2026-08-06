@@ -1,4 +1,4 @@
-import type { ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from "lucide-react";
 
 interface PaginationControlsProps {
@@ -34,22 +34,46 @@ export function PaginationControls({
   onLast,
   onPageChange,
 }: PaginationControlsProps) {
+  const safePage = totalPages ? Math.min(totalPages, Math.max(1, page)) : page;
   const canSelectPage = Boolean(totalPages && onPageChange);
+  const [pageInputValue, setPageInputValue] = useState(String(safePage));
 
-  function handlePageChange(event: ChangeEvent<HTMLInputElement>) {
+  useEffect(() => {
+    setPageInputValue(String(safePage));
+    if (safePage !== page && onPageChange) {
+      onPageChange(safePage);
+    }
+  }, [onPageChange, page, safePage]);
+
+  function submitPage(rawPage: string) {
     if (!totalPages || !onPageChange) {
       return;
     }
 
-    const rawPage = event.currentTarget.value.trim();
+    const normalizedPage = rawPage.trim();
 
-    if (!/^\d+$/.test(rawPage)) {
+    if (!/^\d+$/.test(normalizedPage)) {
+      setPageInputValue(String(safePage));
       return;
     }
 
-    const nextPage = Number(rawPage);
+    const nextPage = Number(normalizedPage);
 
+    setPageInputValue(String(Math.min(totalPages, Math.max(1, Math.trunc(nextPage)))));
     onPageChange(Math.min(totalPages, Math.max(1, Math.trunc(nextPage))));
+  }
+
+  function handlePageChange(event: ChangeEvent<HTMLInputElement>) {
+    setPageInputValue(event.currentTarget.value.replace(/\D/g, ""));
+  }
+
+  function handlePageKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    submitPage(event.currentTarget.value);
   }
 
   return (
@@ -65,9 +89,11 @@ export function PaginationControls({
                 inputMode="numeric"
                 min={1}
                 max={totalPages}
-                value={page}
+                value={pageInputValue}
                 disabled={isFetching}
                 onChange={handlePageChange}
+                onBlur={(event) => submitPage(event.currentTarget.value)}
+                onKeyDown={handlePageKeyDown}
                 className={pageInputClassName}
               />
               de {totalPages}
@@ -84,7 +110,7 @@ export function PaginationControls({
             className={buttonClassName}
             aria-label="Primeira página"
             title="Primeira página"
-            disabled={page <= 1 || isFetching}
+            disabled={safePage <= 1 || isFetching}
             onClick={onFirst}
           >
             <ChevronsLeft className="h-4 w-4" />
@@ -102,7 +128,7 @@ export function PaginationControls({
         <button
           type="button"
           className={buttonClassName}
-          disabled={!hasMore || isFetching}
+          disabled={!hasMore || safePage >= (totalPages ?? Number.POSITIVE_INFINITY) || isFetching}
           onClick={onNext}
         >
           {isFetching ? (

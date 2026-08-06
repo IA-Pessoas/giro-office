@@ -690,6 +690,25 @@ runTest("client picker keeps paginated remote search and accessible feedback", (
   assert.match(picker, /handleSelect\(null\)/);
 });
 
+runTest("client pickers reuse shared pagination controls without inline pagination", () => {
+  const sources = [
+    readFileSync("src/modules/clients/components/ClientPickerModal.tsx", "utf8"),
+    readFileSync("src/modules/parcelamento/components/ParcelamentoClientSelector.tsx", "utf8"),
+  ];
+
+  for (const source of sources) {
+    assert.match(source, /import \{[^}]*PaginationControls[^}]*\} from "@shared\/components";/);
+    assert.match(source, /<PaginationControls[\s\S]*?page=\{page\}[\s\S]*?limit=\{pageSize\}[\s\S]*?total=\{total\}[\s\S]*?count=\{clients\.length\}/);
+    assert.match(source, /hasMore=\{Boolean\(clientsQuery\.data\?\.hasMore\) && page < totalPages\}/);
+    assert.match(source, /isFetching=\{clientsQuery\.isFetching\}/);
+    assert.match(source, /totalPages=\{totalPages\}/);
+    assert.match(source, /onFirst=\{\(\) => setPage\(FIRST_CLIENT_PAGE\)\}/);
+    assert.match(source, /onLast=\{\(\) => setPage\(totalPages\)\}/);
+    assert.match(source, /onPageChange=\{setPage\}/);
+    assert.doesNotMatch(source, /Chevron(Left|Right)|handlePageChange|hasPreviousPage|hasNextPage|type="number"/);
+  }
+});
+
 runTest("client create modal binds person type to document validation and payload", () => {
   const modal = readFileSync("src/modules/clients/components/ClientCreateModal.tsx", "utf8");
   const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
@@ -711,33 +730,17 @@ runTest("client create modal binds person type to document validation and payloa
   assert.doesNotMatch(form, /rounded-2xl border border-slate-200 bg-slate-50/);
 });
 
-runTest("clients list exposes compact page jump input", () => {
+runTest("clients list uses the shared page jump and navigation controls", () => {
   const clients = readFileSync("src/shared/components/newLayout/Clients.tsx", "utf8");
 
   assert.match(clients, /import \{ DEFAULT_PAGE_SIZE \} from "@shared\/pagination\/pagination";/);
+  assert.match(clients, /import \{ PaginationControls \} from "@shared\/components";/);
   assert.match(clients, /const limit = DEFAULT_PAGE_SIZE;/);
-  assert.match(clients, /useEffect/);
-  assert.match(clients, /const \[pageInputValue, setPageInputValue\] = useState\(String\(page\)\)/);
-  assert.match(clients, /setPageInputValue\(String\(currentPage\)\)/);
-  assert.match(clients, /const pageInputSize = Math\.max\(1, pageInputValue\.length\)/);
-  assert.match(clients, /const pageInputWidthClassName =/);
-  assert.match(clients, /"w-\[3ch\]"/);
-  assert.match(clients, /function goToPage\(value: string\)/);
-  assert.match(clients, /Math\.min\(pageCount, Math\.max\(1, nextPage\)\)/);
-  assert.match(clients, /setPageInputValue\(String\(clampedPage\)\)/);
-  assert.match(clients, /aria-label="Ir para página"/);
-  assert.match(clients, /type="text"/);
-  assert.match(clients, /inputMode="numeric"/);
-  assert.match(clients, /pattern="\[0-9\]\*"/);
-  assert.match(clients, /size=\{pageInputSize\}/);
-  assert.match(clients, /value=\{pageInputValue\}/);
-  assert.match(clients, /setPageInputValue\(event\.target\.value\.replace\(\/\\D\/g, ""\)\)/);
-  assert.match(clients, /pageInputWidthClassName/);
-  assert.doesNotMatch(clients, /style=\{\{ width:/);
-  assert.doesNotMatch(clients, /min-w-\[/);
-  assert.doesNotMatch(clients, /w-16/);
-  assert.match(clients, /onBlur=\{\(event\) => goToPage\(event\.target\.value\)\}/);
-  assert.match(clients, /onKeyDown=\{\(event\) =>/);
+  assert.match(clients, /<PaginationControls/);
+  assert.match(clients, /totalPages=\{pageCount\}/);
+  assert.match(clients, /onPageChange=\{setPage\}/);
+  assert.match(clients, /hasMore=\{Boolean\(clientsPage\?\.hasMore\)/);
+  assert.doesNotMatch(clients, /pageInputValue|function goToPage/);
 });
 
 runTest("clients list hides organization from the main table", () => {

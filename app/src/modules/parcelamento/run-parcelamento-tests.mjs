@@ -525,17 +525,78 @@ runTest("parcelamento shell mounts real installments section", () => {
   assert.doesNotMatch(form, /api\.(get|post|patch|put|delete)\(/);
 });
 
-runTest("parcelamento installments pagination exposes page jump and last page", () => {
+runTest("parcelamento installments use shared pagination controls", () => {
   const section = readWorkspaceFile(
     "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
   );
 
-  assert.match(section, /const totalPages = Math\.max\(FIRST_PAGE, Math\.ceil\(total \/ pageSize\)\)/);
-  assert.match(section, /function handlePageChange/);
-  assert.match(section, /aria-label="Página atual"/);
-  assert.match(section, /de \{totalPages\}/);
-  assert.match(section, /aria-label="Última página"/);
-  assert.match(section, /setPage\(totalPages\)/);
+  assert.match(section, /import \{ Dialog, PaginationControls \} from "@shared\/components";/);
+  assert.match(section, /<PaginationControls/);
+  assert.match(section, /page=\{page\}/);
+  assert.match(section, /limit=\{pageSize\}/);
+  assert.match(section, /total=\{total\}/);
+  assert.match(section, /count=\{installments\.length\}/);
+  assert.match(section, /hasMore=\{hasNextPage\}/);
+  assert.match(section, /isFetching=\{installmentsQuery\.isFetching\}/);
+  assert.match(section, /totalPages=\{totalPages\}/);
+  assert.match(section, /onPrevious=\{\(\) => setSafePage\(page - 1\)\}/);
+  assert.match(section, /onNext=\{\(\) => setSafePage\(page \+ 1\)\}/);
+  assert.match(section, /onFirst=\{\(\) => setPage\(FIRST_PAGE\)\}/);
+  assert.match(section, /onLast=\{\(\) => setPage\(totalPages\)\}/);
+  assert.match(section, /onPageChange=\{setSafePage\}/);
+  assert.doesNotMatch(section, /paginationButtonClassName/);
+  assert.doesNotMatch(section, /function handlePageChange/);
+  assert.doesNotMatch(section, /aria-label="Página atual"/);
+  assert.doesNotMatch(section, /aria-label="Última página"/);
+});
+
+runTest("parcelamento competencies use shared editable pagination controls", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoCompetenciesSection.tsx",
+  );
+
+  assert.match(section, /import \{ Dialog, PaginationControls \} from "@shared\/components";/);
+  assert.match(section, /<PaginationControls/);
+  assert.match(section, /page=\{page\}/);
+  assert.match(section, /limit=\{PAGE_SIZE\}/);
+  assert.match(section, /total=\{total\}/);
+  assert.match(section, /count=\{competencies\.length\}/);
+  assert.match(section, /hasMore=\{hasNextPage\}/);
+  assert.match(section, /isFetching=\{competenciesQuery\.isFetching\}/);
+  assert.match(section, /totalPages=\{totalPages\}/);
+  assert.match(section, /onPrevious=\{\(\) => setSafePage\(page - 1\)\}/);
+  assert.match(section, /onNext=\{\(\) => setSafePage\(page \+ 1\)\}/);
+  assert.match(section, /onFirst=\{\(\) => setPage\(FIRST_PAGE\)\}/);
+  assert.match(section, /onLast=\{\(\) => setPage\(totalPages\)\}/);
+  assert.match(section, /onPageChange=\{setSafePage\}/);
+  assert.doesNotMatch(section, /paginationButtonClassName/);
+  assert.doesNotMatch(section, /aria-label="Primeira página"/);
+  assert.doesNotMatch(section, /aria-label="Última página"/);
+});
+
+runTest("parcelamento panoramas use shared editable pagination controls", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoPanoramasSection.tsx",
+  );
+
+  assert.match(section, /import \{ Dialog, PaginationControls \} from "@shared\/components";/);
+  assert.match(section, /<PaginationControls/);
+  assert.match(section, /page=\{page\}/);
+  assert.match(section, /page_size: PAGE_SIZE/);
+  assert.match(section, /limit=\{PAGE_SIZE\}/);
+  assert.match(section, /total=\{total\}/);
+  assert.match(section, /count=\{panoramas\.length\}/);
+  assert.match(section, /hasMore=\{hasNextPage\}/);
+  assert.match(section, /isFetching=\{panoramasQuery\.isFetching\}/);
+  assert.match(section, /totalPages=\{totalPages\}/);
+  assert.match(section, /onPrevious=\{\(\) => setSafePage\(page - 1\)\}/);
+  assert.match(section, /onNext=\{\(\) => setSafePage\(page \+ 1\)\}/);
+  assert.match(section, /onFirst=\{\(\) => setPage\(FIRST_PAGE\)\}/);
+  assert.match(section, /onLast=\{\(\) => setPage\(totalPages\)\}/);
+  assert.match(section, /onPageChange=\{setSafePage\}/);
+  assert.doesNotMatch(section, /paginationButtonClassName/);
+  assert.doesNotMatch(section, /aria-label="Primeira página"/);
+  assert.doesNotMatch(section, /aria-label="Última página"/);
 });
 
 runTest("parcelamento installments supports general list and client selection on edit", () => {

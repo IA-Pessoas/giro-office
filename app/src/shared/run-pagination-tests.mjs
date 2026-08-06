@@ -39,6 +39,8 @@ assert.match(controlsSource, /type="text"/);
 assert.match(controlsSource, /inputMode="numeric"/);
 assert.match(controlsSource, /min=\{1\}/);
 assert.match(controlsSource, /max=\{totalPages\}/);
+assert.match(controlsSource, /safePage/);
+assert.match(controlsSource, /onPageChange\(safePage\)/);
 assert.match(controlsSource, /h-6 w-8/);
 assert.doesNotMatch(controlsSource, /type="number"/);
 assert.doesNotMatch(controlsSource, /getPaginationRange\(page, limit, count\)/);
