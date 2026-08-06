@@ -1,14 +1,11 @@
 import { useDeferredValue, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Loader2, Search, X } from "lucide-react";
+import { Check, Loader2, Search, X } from "lucide-react";
 
 import { useClients } from "@modules/clients";
-import { Dialog } from "@shared/components/ui/Dialog";
+import { Dialog, PaginationControls } from "@shared/components";
 
 import type { ParcelamentoClientOption } from "../types";
-import {
-  parcelamentoSecondaryButtonClassName,
-  parcelamentoTextFieldClassName,
-} from "./parcelamentoFormControls";
+import { parcelamentoTextFieldClassName } from "./parcelamentoFormControls";
 
 const CLIENT_PICKER_LIMIT = 50;
 const FIRST_CLIENT_PAGE = 1;
@@ -40,22 +37,10 @@ export function ParcelamentoClientSelector({
   const total = clientsQuery.data?.total ?? 0;
   const pageSize = clientsQuery.data?.pageSize ?? CLIENT_PICKER_LIMIT;
   const totalPages = Math.max(FIRST_CLIENT_PAGE, Math.ceil(total / pageSize));
-  const hasPreviousPage = page > FIRST_CLIENT_PAGE;
-  const hasNextPage = Boolean(clientsQuery.data?.hasMore) || page < totalPages;
 
   function handleSearchChange(value: string) {
     setSearch(value);
     setPage(FIRST_CLIENT_PAGE);
-  }
-
-  function handlePageChange(value: string) {
-    const nextPage = Math.trunc(Number(value));
-
-    if (!Number.isFinite(nextPage)) {
-      return;
-    }
-
-    setPage(Math.min(totalPages, Math.max(FIRST_CLIENT_PAGE, nextPage)));
   }
 
   function handleSelect(client: ParcelamentoClientOption | null) {
@@ -163,40 +148,20 @@ export function ParcelamentoClientSelector({
           )}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            Página
-            <input
-              type="number"
-              min={FIRST_CLIENT_PAGE}
-              max={totalPages}
-              value={page}
-              onChange={(event) => handlePageChange(event.target.value)}
-              className="h-8 w-14 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            />
-            de {totalPages}
-          </label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.max(FIRST_CLIENT_PAGE, current - 1))}
-              disabled={!hasPreviousPage || clientsQuery.isFetching}
-              className={parcelamentoSecondaryButtonClassName}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Anterior
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((current) => current + 1)}
-              disabled={!hasNextPage || clientsQuery.isFetching}
-              className={parcelamentoSecondaryButtonClassName}
-            >
-              Próxima
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+        <PaginationControls
+          page={page}
+          limit={pageSize}
+          total={total}
+          count={clients.length}
+          hasMore={Boolean(clientsQuery.data?.hasMore) && page < totalPages}
+          isFetching={clientsQuery.isFetching}
+          totalPages={totalPages}
+          onFirst={() => setPage(FIRST_CLIENT_PAGE)}
+          onPrevious={() => setPage((current) => Math.max(FIRST_CLIENT_PAGE, current - 1))}
+          onNext={() => setPage((current) => Math.min(totalPages, current + 1))}
+          onLast={() => setPage(totalPages)}
+          onPageChange={setPage}
+        />
       </Dialog>
     </div>
   );

@@ -690,6 +690,25 @@ runTest("client picker keeps paginated remote search and accessible feedback", (
   assert.match(picker, /handleSelect\(null\)/);
 });
 
+runTest("client pickers reuse shared pagination controls without inline pagination", () => {
+  const sources = [
+    readFileSync("src/modules/clients/components/ClientPickerModal.tsx", "utf8"),
+    readFileSync("src/modules/parcelamento/components/ParcelamentoClientSelector.tsx", "utf8"),
+  ];
+
+  for (const source of sources) {
+    assert.match(source, /import \{[^}]*PaginationControls[^}]*\} from "@shared\/components";/);
+    assert.match(source, /<PaginationControls[\s\S]*?page=\{page\}[\s\S]*?limit=\{pageSize\}[\s\S]*?total=\{total\}[\s\S]*?count=\{clients\.length\}/);
+    assert.match(source, /hasMore=\{Boolean\(clientsQuery\.data\?\.hasMore\) && page < totalPages\}/);
+    assert.match(source, /isFetching=\{clientsQuery\.isFetching\}/);
+    assert.match(source, /totalPages=\{totalPages\}/);
+    assert.match(source, /onFirst=\{\(\) => setPage\(FIRST_CLIENT_PAGE\)\}/);
+    assert.match(source, /onLast=\{\(\) => setPage\(totalPages\)\}/);
+    assert.match(source, /onPageChange=\{setPage\}/);
+    assert.doesNotMatch(source, /Chevron(Left|Right)|handlePageChange|hasPreviousPage|hasNextPage|type="number"/);
+  }
+});
+
 runTest("client create modal binds person type to document validation and payload", () => {
   const modal = readFileSync("src/modules/clients/components/ClientCreateModal.tsx", "utf8");
   const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");

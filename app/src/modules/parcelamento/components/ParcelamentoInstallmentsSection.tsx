@@ -2,10 +2,6 @@ import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "
 import {
   AlertCircle,
   BadgeDollarSign,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Edit3,
   Loader2,
   Plus,
@@ -13,7 +9,7 @@ import {
   Search,
 } from "lucide-react";
 
-import { Dialog } from "@shared/components/ui/Dialog";
+import { Dialog, PaginationControls } from "@shared/components";
 
 import {
   useCreateParcelamentoInstallmentMutation,
@@ -51,8 +47,6 @@ const FIRST_PAGE = 1;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const INSTALLMENT_TYPE_OPTIONS = ["Federal", "Estadual", "Municipal", "Simplificado", "SIMPLES"];
 const INSTALLMENT_JURISDICTION_OPTIONS = ["PGFN", "RFB", "Federal", "Estadual", "Municipal"];
-const paginationButtonClassName =
-  "inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border border-gray-300 px-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -130,7 +124,6 @@ export function ParcelamentoInstallmentsSection({
   const total = installmentsQuery.data?.total ?? installments.length;
   const totalPages = Math.max(FIRST_PAGE, Math.ceil(total / pageSize));
   const hasNextPage = Boolean(installmentsQuery.data?.has_more) || page < totalPages;
-  const hasPreviousPage = page > FIRST_PAGE;
   const statusOptions = getSelectOptions(
     INSTALLMENT_STATUS_OPTIONS,
     status,
@@ -157,16 +150,6 @@ export function ParcelamentoInstallmentsSection({
 
   function setSafePage(nextPage: number) {
     setPage(Math.min(totalPages, Math.max(FIRST_PAGE, nextPage)));
-  }
-
-  function handlePageChange(value: string) {
-    const nextPage = Math.trunc(Number(value));
-
-    if (!Number.isFinite(nextPage)) {
-      return;
-    }
-
-    setSafePage(nextPage);
   }
 
   function handleFiltersSubmit(event: FormEvent<HTMLFormElement>) {
@@ -329,59 +312,20 @@ export function ParcelamentoInstallmentsSection({
         </label>
       </form>
 
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            aria-label="Primeira página"
-            title="Primeira página"
-            onClick={() => setPage(FIRST_PAGE)}
-            disabled={!hasPreviousPage || installmentsQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            <ChevronsLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setSafePage(page - 1)}
-            disabled={!hasPreviousPage || installmentsQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Anterior
-          </button>
-          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            Página
-            <input
-              type="number"
-              min={FIRST_PAGE}
-              max={totalPages}
-              value={page}
-              onChange={(event) => handlePageChange(event.target.value)}
-              aria-label="Página atual"
-              className="h-8 w-9 [appearance:textfield] rounded-lg border border-gray-300 bg-white px-0.5 text-center text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            />
-            de {totalPages}
-          </label>
-          <button
-            type="button"
-            onClick={() => setSafePage(page + 1)}
-            disabled={!hasNextPage || installmentsQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            Próxima
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Última página"
-            title="Última página"
-            onClick={() => setPage(totalPages)}
-            disabled={page >= totalPages || installmentsQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            <ChevronsRight className="h-4 w-4" />
-          </button>
-      </div>
+      <PaginationControls
+        page={page}
+        limit={pageSize}
+        total={total}
+        count={installments.length}
+        hasMore={hasNextPage}
+        isFetching={installmentsQuery.isFetching}
+        totalPages={totalPages}
+        onPrevious={() => setSafePage(page - 1)}
+        onNext={() => setSafePage(page + 1)}
+        onFirst={() => setPage(FIRST_PAGE)}
+        onLast={() => setPage(totalPages)}
+        onPageChange={setSafePage}
+      />
 
       <Dialog
         open={formMode !== null}

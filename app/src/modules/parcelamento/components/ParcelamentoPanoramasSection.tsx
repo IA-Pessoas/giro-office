@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Edit3,
   FileText,
   Loader2,
@@ -13,7 +9,7 @@ import {
   WalletCards,
 } from "lucide-react";
 
-import { Dialog } from "@shared/components/ui/Dialog";
+import { Dialog, PaginationControls } from "@shared/components";
 
 import {
   useCreateParcelamentoPanoramaMutation,
@@ -42,8 +38,6 @@ import {
 
 const FIRST_PAGE = 1;
 const PAGE_SIZE = 50;
-const paginationButtonClassName =
-  "inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border border-gray-300 px-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700";
 
 const panoramaCheckFields = [
   { key: "cnd_municipal", label: "CND municipal" },
@@ -140,7 +134,6 @@ export function ParcelamentoPanoramasSection({
   );
   const total = panoramasQuery.data?.total ?? 0;
   const totalPages = Math.max(FIRST_PAGE, Math.ceil(total / PAGE_SIZE));
-  const hasPreviousPage = page > FIRST_PAGE;
   const hasNextPage = Boolean(panoramasQuery.data?.has_more) || page < totalPages;
   const generateErrorMessage = generateMutation.error
     ? getParcelamentoErrorMessage(
@@ -297,49 +290,20 @@ export function ParcelamentoPanoramasSection({
           />
         </label>
 
-        <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-          <button
-            type="button"
-            aria-label="Primeira página"
-            title="Primeira página"
-            onClick={() => setPage(FIRST_PAGE)}
-            disabled={!hasPreviousPage || panoramasQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            <ChevronsLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setSafePage(page - 1)}
-            disabled={!hasPreviousPage || panoramasQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Anterior
-          </button>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Página {page} de {totalPages}
-          </p>
-          <button
-            type="button"
-            onClick={() => setSafePage(page + 1)}
-            disabled={!hasNextPage || panoramasQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            Próxima
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Última página"
-            title="Última página"
-            onClick={() => setPage(totalPages)}
-            disabled={page >= totalPages || panoramasQuery.isFetching}
-            className={paginationButtonClassName}
-          >
-            <ChevronsRight className="h-4 w-4" />
-          </button>
-        </div>
+        <PaginationControls
+          page={page}
+          limit={PAGE_SIZE}
+          total={total}
+          count={panoramas.length}
+          hasMore={hasNextPage}
+          isFetching={panoramasQuery.isFetching}
+          totalPages={totalPages}
+          onPrevious={() => setSafePage(page - 1)}
+          onNext={() => setSafePage(page + 1)}
+          onFirst={() => setPage(FIRST_PAGE)}
+          onLast={() => setPage(totalPages)}
+          onPageChange={setSafePage}
+        />
       </div>
 
       {generateErrorMessage ? (
