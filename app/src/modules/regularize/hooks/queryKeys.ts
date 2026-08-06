@@ -86,6 +86,14 @@ export const regularizeQueryKeys = {
     [...regularizeQueryKeys.operations(), "guidance", "detail", id ?? ""] as const,
   licenses: (filters: RegularizeLicenseListFilters) =>
     [...regularizeQueryKeys.operations(), "licenses", filters.status] as const,
+  licensesPage: (filters: RegularizeLicenseListFilters) =>
+    [
+      ...regularizeQueryKeys.operations(),
+      "licenses-page",
+      filters.status,
+      filters.page ?? 1,
+      filters.limit ?? 20,
+    ] as const,
   licenseDetail: (id?: RegularizeId | null) =>
     [...regularizeQueryKeys.operations(), "licenses", "detail", id ?? ""] as const,
 };

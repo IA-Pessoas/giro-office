@@ -74,7 +74,12 @@ export function createLicenseRoutes(deps: RegularizeRouteDeps): Router {
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listLicensesQuerySchema, request.query);
-        const list = await licenseService.list(request.organization_id, query.status);
+        const list = await licenseService.list({
+          organizationId: request.organization_id,
+          paginationRequested:
+            request.query.page !== undefined || request.query.limit !== undefined,
+          ...query,
+        });
         response.json(createSuccessResponse(list));
       } catch (err) {
         logError("Erro ao listar licencas do regularize", { err });

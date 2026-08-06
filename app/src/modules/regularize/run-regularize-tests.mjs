@@ -4,6 +4,7 @@ import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildRegularizeClientPfListParams,
+  buildRegularizeLicenseListParams,
   buildRegularizeMunicipalTaxesListParams,
   buildRegularizeProcessListParams,
   buildRegularizeSitePasswordListParams,
@@ -78,13 +79,24 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   }
 });
 
-await runTest("regularize licenses list all statuses by default and keep mutation invalidation", async () => {
+await runTest("regularize licenses list uses paginated hook and keeps mutation invalidation", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
   const operationsSource = await readModuleSource("hooks/useRegularizeOperations.ts");
+  const contractSource = await readModuleSource("services/regularizeService.contract.ts");
 
   assert.match(
     pageSource,
-    /const licenseQuery = useRegularizeLicenses\(\s*\{ status: "Todos" \},\s*\{ enabled: queryPolicy\.licenses \},\s*\);/,
+    /const licensePageQuery = usePaginatedRegularizeLicenses\(\s*\{\s*status: "Todos",\s*page: licensePage,\s*limit: REGULARIZE_PAGE_SIZE,\s*\},\s*\{ enabled: activeTab === "licenses" \},\s*\);/,
+  );
+  assert.match(pageSource, /const \[licensePage, setLicensePage\] = useState\(1\)/);
+  assert.match(pageSource, /<PaginationControls[\s\S]{0,220}licensePageQuery\.data\?\.hasMore/);
+  assert.deepEqual(
+    buildRegularizeLicenseListParams({ status: "Ativo", page: 2, limit: 20 }),
+    { status: "Ativo", page: 2, limit: 20 },
+  );
+  assert.match(
+    operationsSource,
+    /export function usePaginatedRegularizeLicenses/,
   );
   assert.match(
     operationsSource,
@@ -374,7 +386,7 @@ await runTest("regularize page renders aggregate dashboard and lazy list options
   assert.match(pageSource, /enabled: queryPolicy\.sitePasswords/);
   assert.match(pageSource, /enabled: queryPolicy\.municipalTaxes/);
   assert.match(pageSource, /enabled: queryPolicy\.processes/);
-  assert.match(pageSource, /enabled: queryPolicy\.licenses/);
+  assert.match(pageSource, /enabled: activeTab === "licenses"/);
   assert.match(pageSource, /dashboardQuery\.data\.metrics/);
   assert.match(pageSource, /getRegularizeRequestId\(dashboardQuery\.error\)/);
   assert.doesNotMatch(pageSource, /const metricData = useMemo/);
@@ -465,6 +477,7 @@ await runTest("regularize management tables use debounced paginated hooks", asyn
 
   assert.match(pageSource, /usePaginatedRegularizeProcesses/);
   assert.match(pageSource, /usePaginatedRegularizeSitePasswords/);
+  assert.match(pageSource, /usePaginatedRegularizeLicenses/);
   assert.match(pageSource, /useDebouncedValue\(processSearch\.trim\(\), 300\)/);
   assert.match(pageSource, /useDebouncedValue\(siteSearch\.trim\(\), 300\)/);
   assert.match(pageSource, /<PaginationControls/);

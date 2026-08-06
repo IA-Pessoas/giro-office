@@ -80,7 +80,7 @@ import {
   useCreateRegularizeProcessMutation,
   useRegularizeGuidance,
   useRegularizeLicenseDetail,
-  useRegularizeLicenses,
+  usePaginatedRegularizeLicenses,
   useRegularizeMunicipalTaxDetail,
   useRegularizeMunicipalTaxes,
   useRegularizeProcessDetail,
@@ -927,6 +927,7 @@ export function RegularizePage() {
   const [taxType, setTaxType] = useState<"Todos" | "TFF" | "TLP" | "TLL">("Todos");
   const [taxYear, setTaxYear] = useState(() => new Date().getFullYear());
   const [taxPage, setTaxPage] = useState(1);
+  const [licensePage, setLicensePage] = useState(1);
   const debouncedProcessSearch = useDebouncedValue(processSearch.trim(), 300);
   const debouncedSiteSearch = useDebouncedValue(siteSearch.trim(), 300);
   const debouncedPfSearch = useDebouncedValue(pfSearch.trim(), 300);
@@ -979,9 +980,13 @@ export function RegularizePage() {
     { status: "Todos" },
     { enabled: queryPolicy.processes },
   );
-  const licenseQuery = useRegularizeLicenses(
-    { status: "Todos" },
-    { enabled: queryPolicy.licenses },
+  const licensePageQuery = usePaginatedRegularizeLicenses(
+    {
+      status: "Todos",
+      page: licensePage,
+      limit: REGULARIZE_PAGE_SIZE,
+    },
+    { enabled: activeTab === "licenses" },
   );
   const processPageQuery = usePaginatedRegularizeProcesses(
     {
@@ -1116,6 +1121,13 @@ export function RegularizePage() {
     }
   }, [taxPage, taxQuery.data]);
 
+  useEffect(() => {
+    const result = licensePageQuery.data;
+    if (result && result.data.length === 0 && result.total > 0 && licensePage > 1) {
+      setLicensePage(getLastPage(result.total, REGULARIZE_PAGE_SIZE));
+    }
+  }, [licensePage, licensePageQuery.data]);
+
   const processTableQuery: ListQuery<RegularizeProcessListItem> = {
     ...processPageQuery,
     data: isProcessSearchPending ? undefined : visibleProcessRows,
@@ -1135,6 +1147,10 @@ export function RegularizePage() {
     ...taxQuery,
     data: isTaxSearchPending ? undefined : taxQuery.data?.data,
     isLoading: isTaxSearchPending || taxQuery.isLoading,
+  };
+  const licenseTableQuery: ListQuery<RegularizeLicenseListItem> = {
+    ...licensePageQuery,
+    data: licensePageQuery.data?.data,
   };
 
   const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
@@ -1228,7 +1244,7 @@ export function RegularizePage() {
     if (queryPolicy.sitePasswords) refreshes.push(siteQuery.refetch());
     if (queryPolicy.municipalTaxes) refreshes.push(taxQuery.refetch());
     if (queryPolicy.processes) refreshes.push(processQuery.refetch());
-    if (queryPolicy.licenses) refreshes.push(licenseQuery.refetch());
+    if (activeTab === "licenses") refreshes.push(licensePageQuery.refetch());
     if (queryPolicy.partners) refreshes.push(partnerQuery.refetch());
     if (queryPolicy.passwords) refreshes.push(credentialQuery.refetch());
     if (queryPolicy.guidance) refreshes.push(guidanceQuery.refetch());
@@ -1873,34 +1889,46 @@ export function RegularizePage() {
             }
           />
 
-          <QueryStatePanel query={licenseQuery} emptyTitle="Nenhuma licença encontrada.">
+          <QueryStatePanel query={licenseTableQuery} emptyTitle="Nenhuma licença encontrada.">
             {(licenseRows) => (
-              <DataTable headers={["Licença", "Protocolo", "Contato", "Status", "Vencimento", ""]}>
-                {licenseRows.map((item: RegularizeLicenseListItem) => (
-                  <tr key={item.id} className="text-gray-700 dark:text-slate-200">
-                    <td className="px-4 py-3 font-medium">{formatText(item.type_license)}</td>
-                    <td className="px-4 py-3">{formatText(item.protocol)}</td>
-                    <td className="px-4 py-3">{formatText(item.contact)}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
-                    </td>
-                    <td className="px-4 py-3">{formatDate(item.due_date)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end">
-                        {canManageRegularizeCore ? (
-                          <TableActionButton
-                            icon={Pencil}
-                            title="Editar licença"
-                            onClick={() =>
-                              setActiveForm({ type: "license", mode: "edit", id: item.id })
-                            }
-                          />
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </DataTable>
+              <div>
+                <DataTable headers={["Licença", "Protocolo", "Contato", "Status", "Vencimento", ""]}>
+                  {licenseRows.map((item: RegularizeLicenseListItem) => (
+                    <tr key={item.id} className="text-gray-700 dark:text-slate-200">
+                      <td className="px-4 py-3 font-medium">{formatText(item.type_license)}</td>
+                      <td className="px-4 py-3">{formatText(item.protocol)}</td>
+                      <td className="px-4 py-3">{formatText(item.contact)}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
+                      </td>
+                      <td className="px-4 py-3">{formatDate(item.due_date)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end">
+                          {canManageRegularizeCore ? (
+                            <TableActionButton
+                              icon={Pencil}
+                              title="Editar licença"
+                              onClick={() =>
+                                setActiveForm({ type: "license", mode: "edit", id: item.id })
+                              }
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </DataTable>
+                <PaginationControls
+                  page={licensePage}
+                  limit={REGULARIZE_PAGE_SIZE}
+                  total={licensePageQuery.data?.total ?? 0}
+                  count={licenseRows.length}
+                  hasMore={licensePageQuery.data?.hasMore ?? false}
+                  isFetching={licensePageQuery.isFetching}
+                  onPrevious={() => setLicensePage((current) => Math.max(1, current - 1))}
+                  onNext={() => setLicensePage((current) => current + 1)}
+                />
+              </div>
             )}
           </QueryStatePanel>
         </section>

@@ -114,6 +114,8 @@ export function buildRegularizeGuidanceListParams(filters: RegularizeGuidanceLis
 export function buildRegularizeLicenseListParams(filters: RegularizeLicenseListFilters) {
   return {
     status: filters.status,
+    ...(filters.page !== undefined ? { page: filters.page } : {}),
+    ...(filters.limit !== undefined ? { limit: filters.limit } : {}),
   };
 }
 
