@@ -732,7 +732,7 @@ export function CertificatesWorkspace() {
       ? deletePfMutation.isPending
       : false;
 
-  const shouldShowDetailPanel = Boolean(selected);
+  const shouldShowDetailDialog = Boolean(selected) && !isFormMode;
   const pjDetail = pjDetailQuery.data;
   const pfDetail = pfDetailQuery.data;
   const activeDetailIsLoading = selected?.type === "pj"
@@ -755,6 +755,12 @@ export function CertificatesWorkspace() {
   const formDialogDescription = isCreating
     ? "Formulário de criação de certificado"
     : "Formulário de edição de certificado";
+  const detailDialogTitle = selected?.type === "pj"
+    ? "Detalhe do certificado PJ"
+    : "Detalhe do certificado PF";
+  const detailDialogDescription = selected?.type === "pj"
+    ? "Dados completos do certificado PJ selecionado."
+    : "Dados completos do certificado PF selecionado.";
   const formSubmitLabel = isCreating ? "Criar certificado" : "Salvar alterações";
   const shouldDisableFormSubmit =
     formSubmitting ||
@@ -965,12 +971,26 @@ export function CertificatesWorkspace() {
     setShowDetailPassword(false);
   }
 
+  function handleCloseDetailDialog() {
+    setSelected(null);
+    setWorkspaceMode("view");
+    setShowDetailPassword(false);
+  }
+
   function handleFormOpenChange(open: boolean) {
     if (open || formSubmitting) {
       return;
     }
 
     handleCancelForm();
+  }
+
+  function handleDetailDialogOpenChange(open: boolean) {
+    if (open) {
+      return;
+    }
+
+    handleCloseDetailDialog();
   }
 
   async function handleSubmitCreatePj(payload: CreateCertificatePjBody) {
@@ -2008,11 +2028,15 @@ export function CertificatesWorkspace() {
         variant="destructive"
       />
 
-      {shouldShowDetailPanel ? (
+      <Dialog
+        open={shouldShowDetailDialog}
+        onOpenChange={handleDetailDialogOpenChange}
+        title={detailDialogTitle}
+        description={detailDialogDescription}
+      >
         <section className={`${CERTIFICATE_PANEL_CLASSNAME} space-y-4`}>
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Detalhe</h2>
-            {canManageCertificateModule ? (
+          {canManageCertificateModule ? (
+            <div className="flex justify-end">
               <button
                 type="button"
                 onClick={handleStartEditSelected}
@@ -2021,8 +2045,8 @@ export function CertificatesWorkspace() {
               >
                 Editar
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           {activeDetailIsLoading ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-400">
@@ -2229,7 +2253,7 @@ export function CertificatesWorkspace() {
             </div>
           ) : null}
         </section>
-      ) : null}
+      </Dialog>
     </div>
   );
 }
