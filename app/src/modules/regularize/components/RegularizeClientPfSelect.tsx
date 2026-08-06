@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Dialog, PaginationControls } from "@shared/components";
 import { useDebouncedValue } from "@shared/hooks";
@@ -67,6 +67,12 @@ export function RegularizeClientPfSelect({
   function handleSearchChange(nextSearch: string) {
     setSearch(nextSearch);
     setPfPage(1);
+    setActiveOptionIndex(0);
+  }
+
+  function handlePageChange(nextPage: number) {
+    setPfPage(nextPage);
+    setActiveOptionIndex(0);
   }
 
   function handleSelect(option?: RegularizeClientPfSelectOption) {
@@ -95,6 +101,10 @@ export function RegularizeClientPfSelect({
       focusOption(options.length);
     }
   }
+
+  useEffect(() => {
+    setActiveOptionIndex((current) => Math.min(current, options.length));
+  }, [options.length]);
 
   return (
     <div className="space-y-2">
@@ -228,9 +238,9 @@ export function RegularizeClientPfSelect({
             count={listQuery.data?.data.length ?? 0}
             hasMore={listQuery.data?.hasMore ?? false}
             isFetching={listQuery.isFetching || isSearchPending}
-            onPrevious={() => setPfPage((current) => Math.max(1, current - 1))}
-            onNext={() => setPfPage((current) => current + 1)}
-            onPageChange={setPfPage}
+            onPrevious={() => handlePageChange(Math.max(1, pfPage - 1))}
+            onNext={() => handlePageChange(Math.min(totalPages, pfPage + 1))}
+            onPageChange={handlePageChange}
           />
         ) : null}
       </Dialog>

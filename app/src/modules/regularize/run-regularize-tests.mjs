@@ -183,6 +183,9 @@ await runTest("regularize PF selector uses a clear modal list with keyboard-frie
   assert.match(selectSource, /ArrowUp/);
   assert.match(selectSource, /Home/);
   assert.match(selectSource, /End/);
+  assert.match(selectSource, /useEffect/);
+  assert.match(selectSource, /setActiveOptionIndex\(\(current\) => Math\.min\(current, options\.length\)\)/);
+  assert.match(selectSource, /function handlePageChange/);
   assert.match(selectSource, /totalPages/);
   assert.match(selectSource, /onPageChange/);
   assert.match(selectSource, /total > 0 \?/);
