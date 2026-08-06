@@ -957,13 +957,38 @@ await runTest("regularize site credential detail states are explicit", async () 
   assert.doesNotMatch(sitesSource, /Acesso negado ou indispon[iÃ­]vel/);
 });
 
+await runTest("regularize site credential reveal opens a centered modal for the selected site", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const sitesStart = pageSource.indexOf('{activeTab === "sites"');
+  const taxesStart = pageSource.indexOf('{activeTab === "taxes"', sitesStart);
+  const sitesSource = pageSource.slice(sitesStart, taxesStart);
+
+  assert.match(
+    pageSource,
+    /const \[isSiteCredentialDialogOpen, setIsSiteCredentialDialogOpen\] = useState\(false\)/,
+  );
+  assert.match(
+    sitesSource,
+    /setActiveSitePasswordId\(item\.id\)[\s\S]{0,100}setIsSiteCredentialDialogOpen\(true\)/,
+  );
+  assert.match(sitesSource, /<Dialog\s+open=\{isSiteCredentialDialogOpen\}/);
+  assert.match(sitesSource, /sitePasswordDetailQuery\.data\.user/);
+  assert.match(sitesSource, /sitePasswordDetailQuery\.data\.password/);
+  assert.match(sitesSource, /sitePasswordDetailQuery\.data\.link/);
+  assert.match(sitesSource, /Carregando\.\.\./);
+  assert.match(sitesSource, /Acesso negado para revelar credenciais/);
+  assert.match(sitesSource, /getSiteCredentialDetailStatus\(sitePasswordDetailQuery\.error\)/);
+  assert.match(sitesSource, /Selecione um site para revelar credenciais/);
+  assert.doesNotMatch(sitesSource, /<DetailPanel title="Site selecionado">/);
+  assert.match(pageSource, /aria-label=\{title\}/);
+});
+
 await runTest("regularize credential empty layouts keep intentional detail behavior", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
   const passwordsStart = pageSource.indexOf('{activeTab === "passwords"');
   const sitesStart = pageSource.indexOf('{activeTab === "sites"', passwordsStart);
   const passwordsSource = pageSource.slice(passwordsStart, sitesStart);
 
-  assert.match(pageSource, /const hasSiteRows = \(siteQuery\.data\?\.length \?\? 0\) > 0;/);
   assert.notEqual(passwordsStart, -1);
   assert.notEqual(sitesStart, -1);
   assert.match(passwordsSource, /<div className="space-y-3">/);
@@ -976,7 +1001,7 @@ await runTest("regularize credential empty layouts keep intentional detail behav
   assert.match(passwordsSource, /<DetailPanel title="Senha selecionada">/);
   assert.doesNotMatch(passwordsSource, /hasCredentialRows \? \(/);
   assert.doesNotMatch(passwordsSource, /emptyClassName="[^"]*xl:col-span-2[^"]*"/);
-  assert.match(pageSource, /hasSiteRows \? \(\s*<DetailPanel title="Site selecionado">/);
+  assert.match(pageSource, /<Dialog\s+open=\{isSiteCredentialDialogOpen\}/);
   assert.match(pageSource, /<QueryStatePanel\s+query=\{siteTableQuery\}\s+emptyTitle="Nenhum site encontrado\."\s+emptyClassName="[^"]*xl:col-span-2[^"]*"/);
 });
 
