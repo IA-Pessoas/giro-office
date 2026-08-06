@@ -177,8 +177,15 @@ await runTest("regularize PF selector uses a clear modal list with keyboard-frie
   assert.match(selectSource, /role="listbox"/);
   assert.match(selectSource, /role="option"/);
   assert.match(selectSource, /aria-selected=\{/);
+  assert.match(selectSource, /useRef/);
+  assert.match(selectSource, /onKeyDown=\{\(event\) => handleOptionKeyDown/);
+  assert.match(selectSource, /ArrowDown/);
+  assert.match(selectSource, /ArrowUp/);
+  assert.match(selectSource, /Home/);
+  assert.match(selectSource, /End/);
   assert.match(selectSource, /totalPages/);
   assert.match(selectSource, /onPageChange/);
+  assert.match(selectSource, /total > 0 \?/);
   assert.match(selectSource, /Selecionar cliente PF/);
   assert.doesNotMatch(selectSource, /<RegularizeNativeSelect/);
   assert.match(partnerSource, /className="space-y-5"/);
