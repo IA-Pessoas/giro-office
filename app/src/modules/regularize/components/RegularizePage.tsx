@@ -302,6 +302,7 @@ function TableActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
+      aria-label={title}
       className={cn(
         "inline-flex h-8 w-8 items-center justify-center rounded-lg",
         "text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900",
@@ -910,6 +911,7 @@ export function RegularizePage() {
   const selectedProcessDetailRef = useRef<HTMLElement | null>(null);
   const [activePasswordId, setActivePasswordId] = useState<RegularizeId>();
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
+  const [isSiteCredentialDialogOpen, setIsSiteCredentialDialogOpen] = useState(false);
   const [activeForm, setActiveForm] = useState<RegularizeFormState | null>(null);
   const [processSearch, setProcessSearch] = useState("");
   const [processStatus, setProcessStatus] = useState("Todos");
@@ -1137,7 +1139,6 @@ export function RegularizePage() {
 
   const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
   const hasProcessRows = visibleProcessRows.length > 0;
-  const hasSiteRows = (siteQuery.data?.length ?? 0) > 0;
 
   const siteOptions = useMemo<RegularizeFormOption[]>(
     () =>
@@ -2255,14 +2256,16 @@ export function RegularizePage() {
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
                           <TableActionButton
-                            disabled={!canRevealCredentials}
                             icon={Eye}
                             title={
                               canRevealCredentials
                                 ? "Revelar credencial"
                                 : "Acesso negado para revelar credenciais"
                             }
-                            onClick={() => setActiveSitePasswordId(item.id)}
+                            onClick={() => {
+                              setActiveSitePasswordId(item.id);
+                              setIsSiteCredentialDialogOpen(true);
+                            }}
                           />
                           {canManageRegularizeCore ? (
                             <TableActionButton
@@ -2298,34 +2301,43 @@ export function RegularizePage() {
               )}
             </QueryStatePanel>
 
-            {hasSiteRows ? (
-              <DetailPanel title="Site selecionado">
-                {sitePasswordDetailQuery.isLoading ? (
-                  <FieldLine label="Status" value="Carregando..." />
-                ) : !canRevealCredentials ? (
-                  <DetailEmptyState message="Acesso negado para revelar credenciais." />
-                ) : sitePasswordDetailQuery.isError ? (
+            <Dialog
+              open={isSiteCredentialDialogOpen}
+              onOpenChange={(open) => {
+                setIsSiteCredentialDialogOpen(open);
+                if (!open) {
+                  setActiveSitePasswordId(undefined);
+                }
+              }}
+              title="Credenciais do site"
+              description="Credenciais do site selecionado."
+            >
+              {sitePasswordDetailQuery.isLoading ? (
+                <DetailEmptyState message="Carregando..." />
+              ) : !canRevealCredentials ? (
+                <DetailEmptyState message="Acesso negado para revelar credenciais." />
+              ) : sitePasswordDetailQuery.isError ? (
+                <FieldLine
+                  label="Status"
+                  value={getSiteCredentialDetailStatus(sitePasswordDetailQuery.error)}
+                />
+              ) : sitePasswordDetailQuery.data ? (
+                <div className="space-y-3">
+                  <FieldLine label="Site" value={formatText(sitePasswordDetailQuery.data.name)} />
                   <FieldLine
-                    label="Status"
-                    value={getSiteCredentialDetailStatus(sitePasswordDetailQuery.error)}
+                    label="Usuário"
+                    value={formatText(sitePasswordDetailQuery.data.user)}
                   />
-                ) : sitePasswordDetailQuery.data ? (
-                  <>
-                    <FieldLine
-                      label="Usuário"
-                      value={formatText(sitePasswordDetailQuery.data.user)}
-                    />
-                    <FieldLine
-                      label="Senha"
-                      value={formatText(sitePasswordDetailQuery.data.password)}
-                    />
-                    <FieldLine label="Link" value={formatText(sitePasswordDetailQuery.data.link)} />
-                  </>
-                ) : (
-                  <DetailEmptyState message="Selecione um site para revelar credenciais." />
-                )}
-              </DetailPanel>
-            ) : null}
+                  <FieldLine
+                    label="Senha"
+                    value={formatText(sitePasswordDetailQuery.data.password)}
+                  />
+                  <FieldLine label="Link" value={formatText(sitePasswordDetailQuery.data.link)} />
+                </div>
+              ) : (
+                <DetailEmptyState message="Selecione um site para revelar credenciais." />
+              )}
+            </Dialog>
           </div>
         </section>
       ) : null}
