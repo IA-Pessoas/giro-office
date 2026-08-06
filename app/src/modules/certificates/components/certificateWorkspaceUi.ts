@@ -60,7 +60,7 @@ export function resolveCertificateWorkspaceCapabilities(
     canReadRecords: access.canView,
     canManageRecords: access.canEdit,
     canManageFiles: access.canEdit,
-    canDeleteRecords: access.canEdit,
+    canDeleteRecords: access.isAdmin,
     canDeleteFiles: access.isAdmin,
   };
 }

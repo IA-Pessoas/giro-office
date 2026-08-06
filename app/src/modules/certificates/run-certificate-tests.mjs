@@ -574,7 +574,7 @@ runTest("Viewer de certificados pode consultar sem receber ações de escrita", 
       canReadRecords: true,
       canManageRecords: true,
       canManageFiles: true,
-      canDeleteRecords: true,
+      canDeleteRecords: false,
       canDeleteFiles: false,
     },
   );

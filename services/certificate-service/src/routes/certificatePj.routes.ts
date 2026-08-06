@@ -188,7 +188,7 @@ export function createCertificatePjRoutes(options: CreateCertificatePjRoutesOpti
     },
   );
 
-  router.delete("/:id", requireCertificatePermission, async (request, response, next) => {
+  router.delete("/:id", requireCertificateDeletePermission, async (request, response, next) => {
     try {
       const authContext = requireAuthenticatedRequestContext(request);
       const params = parseWithZod(certificatePjIdParamSchema, request.params);
@@ -238,7 +238,7 @@ export function createCertificatePjRoutes(options: CreateCertificatePjRoutesOpti
     }
   });
 
-  router.delete("/:id", requireCertificatePermission, async (request, response, next) => {
+  router.delete("/:id", requireCertificateDeletePermission, async (request, response, next) => {
     try {
       const authContext = requireAuthenticatedRequestContext(request);
       const params = parseWithZod(certificatePjIdParamSchema, request.params);

@@ -290,6 +290,20 @@ describe("certificate PJ routes", () => {
     });
   });
 
+  it("DELETE /certificate/pj/:id rejects certificate users", async () => {
+    const app = createCertificateTestApp();
+
+    const response = await request(app)
+      .delete(`/certificate/pj/${certificateId}`)
+      .set(certificateGatewayHeaders(2));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "FORBIDDEN",
+    });
+  });
+
   it("DELETE /certificate/pj/:id removes the file before the record", async () => {
     const prisma = createCertificatePrismaMock();
     const fileStorage = {
@@ -301,7 +315,7 @@ describe("certificate PJ routes", () => {
 
     const response = await request(app)
       .delete(`/certificate/pj/${certificateId}`)
-      .set(certificateGatewayHeaders(2));
+      .set(certificateGatewayHeaders(3));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -594,7 +608,7 @@ describe("certificate PJ routes", () => {
 
     const response = await request(app)
       .delete(`/certificate/pj/${certificateId}`)
-      .set(certificateGatewayHeaders(2));
+      .set(certificateGatewayHeaders(3));
 
     expect(response.status).toBe(500);
     expect(response.body).toMatchObject({
@@ -612,7 +626,7 @@ describe("certificate PJ routes", () => {
 
     const response = await request(app)
       .delete(`/certificate/pj/${certificateId}`)
-      .set(certificateGatewayHeaders(2));
+      .set(certificateGatewayHeaders(3));
 
     expect(response.status).toBe(404);
     expect(response.body).toMatchObject({ success: false, code: "NOT_FOUND" });
