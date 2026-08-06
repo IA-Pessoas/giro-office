@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { PaginationControls } from "@shared/components";
+import { Dialog, PaginationControls } from "@shared/components";
 import { useDebouncedValue } from "@shared/hooks";
 import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
@@ -8,7 +8,6 @@ import {
   usePaginatedRegularizeClientPfs,
   useRegularizeClientPfDetail,
 } from "../hooks/useRegularizePeople";
-import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 
 const PF_SELECT_PAGE_SIZE = 20;
 
@@ -18,10 +17,6 @@ export type RegularizeClientPfSelectOption = {
   cpf?: string | null;
 };
 
-function toOption(clientPf: RegularizeClientPfSelectOption): RegularizeClientPfSelectOption {
-  return clientPf;
-}
-
 export function RegularizeClientPfSelect({
   onChange,
   value,
@@ -29,8 +24,11 @@ export function RegularizeClientPfSelect({
   onChange: (id: string, option?: RegularizeClientPfSelectOption) => void;
   value: string;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [pfPage, setPfPage] = useState(1);
+  const [activeOptionIndex, setActiveOptionIndex] = useState(0);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const isSearchPending = search.trim() !== debouncedSearch;
   const listQuery = usePaginatedRegularizeClientPfs({
@@ -45,13 +43,11 @@ export function RegularizeClientPfSelect({
   const isLoading = listQuery.isLoading || selectedPfQuery.isLoading;
 
   const options = useMemo<RegularizeClientPfSelectOption[]>(() => {
-    const pageOptions = (listQuery.data?.data ?? []).map((clientPf) =>
-      toOption({
-        id: clientPf.id,
-        label: clientPf.name || clientPf.id,
-        cpf: clientPf.cpf,
-      }),
-    );
+    const pageOptions = (listQuery.data?.data ?? []).map((clientPf) => ({
+      id: clientPf.id,
+      label: clientPf.name || clientPf.id,
+      cpf: clientPf.cpf,
+    }));
     const selected = selectedPfQuery.data;
 
     if (!selected || pageOptions.some((option) => option.id === selected.id)) {
@@ -59,74 +55,195 @@ export function RegularizeClientPfSelect({
     }
 
     return [
-      toOption({ id: selected.id, label: selected.name || selected.id, cpf: selected.cpf }),
+      { id: selected.id, label: selected.name || selected.id, cpf: selected.cpf },
       ...pageOptions,
     ];
   }, [listQuery.data, selectedPfQuery.data]);
 
+  const total = listQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PF_SELECT_PAGE_SIZE));
+  const selectedOption = options.find((option) => option.id === value);
+
+  function handleSearchChange(nextSearch: string) {
+    setSearch(nextSearch);
+    setPfPage(1);
+    setActiveOptionIndex(0);
+  }
+
+  function handlePageChange(nextPage: number) {
+    setPfPage(nextPage);
+    setActiveOptionIndex(0);
+  }
+
+  function handleSelect(option?: RegularizeClientPfSelectOption) {
+    onChange(option?.id ?? "", option);
+    setIsOpen(false);
+  }
+
+  function focusOption(index: number) {
+    const nextIndex = Math.min(Math.max(index, 0), options.length);
+    setActiveOptionIndex(nextIndex);
+    optionRefs.current[nextIndex]?.focus();
+  }
+
+  function handleOptionKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusOption((index + 1) % (options.length + 1));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusOption((index - 1 + options.length + 1) % (options.length + 1));
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusOption(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusOption(options.length);
+    }
+  }
+
+  useEffect(() => {
+    setActiveOptionIndex((current) => Math.min(current, options.length));
+  }, [options.length]);
+
   return (
     <div className="space-y-2">
-      <input
-        value={search}
-        onChange={(event) => {
-          setSearch(event.target.value);
-          setPfPage(1);
-        }}
-        className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-        placeholder="Buscar PF por nome, código ou CPF"
-        aria-label="Buscar cliente PF"
-      />
-      {isLoading ? (
-        <p role="status" aria-live="polite" className="text-sm text-gray-500 dark:text-gray-400">
-          Carregando clientes PF...
-        </p>
-      ) : null}
-      {hasError ? (
-        <div role="alert" className="flex items-center justify-between gap-2 text-sm text-red-700 dark:text-red-300">
-          <span>Não foi possível carregar clientes PF.</span>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-label="Selecionar cliente PF"
+        onClick={() => setIsOpen(true)}
+        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm text-gray-900 outline-none transition-colors hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+      >
+        <span className="min-w-0">
+          <span className="block truncate font-medium">
+            {selectedOption?.label || selectedPfQuery.data?.name || "Selecionar cliente PF"}
+          </span>
+          {selectedOption?.cpf || selectedPfQuery.data?.cpf ? (
+            <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+              {formatCPF_CNPJ(selectedOption?.cpf || selectedPfQuery.data?.cpf || "")}
+            </span>
+          ) : null}
+        </span>
+        <span className="shrink-0 text-xs font-medium text-blue-600 dark:text-blue-300">
+          Alterar
+        </span>
+      </button>
+
+      <Dialog
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        title="Selecionar cliente PF"
+        description="Busque, selecione e navegue pelos clientes PF disponíveis."
+        contentClassName="w-[min(92vw,560px)]"
+        bodyClassName="max-h-[72vh] space-y-4 overflow-y-auto"
+      >
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => handleSearchChange(event.target.value)}
+          className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          placeholder="Nome, código ou CPF"
+          aria-label="Buscar cliente PF"
+        />
+        {isLoading ? (
+          <p role="status" aria-live="polite" className="text-sm text-gray-500 dark:text-gray-400">
+            Carregando clientes PF...
+          </p>
+        ) : null}
+        {hasError ? (
+          <div role="alert" className="flex items-center justify-between gap-2 text-sm text-red-700 dark:text-red-300">
+            <span>Não foi possível carregar clientes PF.</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (listQuery.isError) {
+                  void listQuery.refetch();
+                }
+
+                if (selectedPfQuery.isError) {
+                  void selectedPfQuery.refetch();
+                }
+              }}
+              className="font-medium underline underline-offset-2"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : null}
+        <div
+          role="listbox"
+          aria-label="Resultados de clientes PF"
+          className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
+        >
           <button
             type="button"
-            onClick={() => {
-              if (listQuery.isError) {
-                void listQuery.refetch();
-              }
-
-              if (selectedPfQuery.isError) {
-                void selectedPfQuery.refetch();
-              }
+            role="option"
+            aria-selected={!value}
+            ref={(element) => {
+              optionRefs.current[0] = element;
             }}
-            className="font-medium underline underline-offset-2"
+            tabIndex={activeOptionIndex === 0 ? 0 : -1}
+            onKeyDown={(event) => handleOptionKeyDown(event, 0)}
+            onClick={() => handleSelect()}
+            className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 text-left text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
           >
-            Tentar novamente
+            <span className="font-medium text-gray-900 dark:text-white">Nenhum cliente PF selecionado</span>
+            {!value ? <span aria-hidden="true">✓</span> : null}
           </button>
+          {options.map((option, index) => {
+            const optionIndex = index + 1;
+
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="option"
+                aria-selected={option.id === value}
+                ref={(element) => {
+                  optionRefs.current[optionIndex] = element;
+                }}
+                tabIndex={activeOptionIndex === optionIndex ? 0 : -1}
+                onKeyDown={(event) => handleOptionKeyDown(event, optionIndex)}
+                onClick={() => handleSelect(option)}
+                className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 text-left last:border-b-0 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-gray-900 dark:text-white">
+                    {option.label}
+                  </span>
+                  {option.cpf ? (
+                    <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+                      {formatCPF_CNPJ(option.cpf)}
+                    </span>
+                  ) : null}
+                </span>
+                {option.id === value ? <span aria-hidden="true">✓</span> : null}
+              </button>
+            );
+          })}
         </div>
-      ) : null}
-      <RegularizeNativeSelect
-        value={value}
-        onChange={(event) => {
-          const option = options.find((candidate) => candidate.id === event.target.value);
-          onChange(event.target.value, option);
-        }}
-        aria-label="Selecionar cliente PF"
-      >
-        <option value="">Selecione</option>
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-            {option.cpf ? `, ${formatCPF_CNPJ(option.cpf)}` : ""}
-          </option>
-        ))}
-      </RegularizeNativeSelect>
-      <PaginationControls
-        page={pfPage}
-        limit={PF_SELECT_PAGE_SIZE}
-        total={listQuery.data?.total ?? 0}
-        count={listQuery.data?.data.length ?? 0}
-        hasMore={listQuery.data?.hasMore ?? false}
-        isFetching={listQuery.isFetching || isSearchPending}
-        onPrevious={() => setPfPage((current) => Math.max(1, current - 1))}
-        onNext={() => setPfPage((current) => current + 1)}
-      />
+        {!isLoading && options.length === 0 ? (
+          <p role="status" className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+            Nenhum cliente PF encontrado.
+          </p>
+        ) : null}
+        {total > 0 ? (
+          <PaginationControls
+            page={pfPage}
+            limit={PF_SELECT_PAGE_SIZE}
+            total={total}
+            totalPages={totalPages}
+            count={listQuery.data?.data.length ?? 0}
+            hasMore={listQuery.data?.hasMore ?? false}
+            isFetching={listQuery.isFetching || isSearchPending}
+            onPrevious={() => handlePageChange(Math.max(1, pfPage - 1))}
+            onNext={() => handlePageChange(Math.min(totalPages, pfPage + 1))}
+            onPageChange={handlePageChange}
+          />
+        ) : null}
+      </Dialog>
     </div>
   );
 }

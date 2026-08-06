@@ -155,15 +155,15 @@ export function RegularizePartnerForm({
       contentClassName="w-[min(92vw,760px)]"
       bodyClassName="max-h-[72vh] overflow-y-auto"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <RegularizeFormError message={formError} />
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           <RegularizeFormField label="Cliente PJ" required>
             <ClientSelectionField clientId={formState.pj_id} />
           </RegularizeFormField>
 
-          <fieldset className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <fieldset className="flex min-w-0 flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
             <legend className="inline-flex items-center gap-1">
               <span>Cliente PF</span>
               <span className="text-red-500">*</span>
