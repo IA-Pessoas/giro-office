@@ -17,6 +17,7 @@ import {
 import { Dialog } from "@shared/components";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
+import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCreatePessoalLddMutation,
@@ -42,7 +43,7 @@ import {
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
 } from "./pessoalFormControls";
-import { finiteNumber, optional } from "./pessoalFormValueHelpers";
+import { optional } from "./pessoalFormValueHelpers";
 import { PessoalPlaceholderSection } from "./PessoalPlaceholderSection";
 
 interface PessoalTrackingSectionProps {
@@ -96,7 +97,8 @@ const lddFields = [
   {
     name: "balance_amount",
     label: "Saldo",
-    type: "number",
+    type: "text",
+    money: true,
     help: "Saldo atual do LDD para acompanhar o valor pendente ou devido.",
   },
   {
@@ -132,7 +134,10 @@ function buildLddFormValues(ldd: PessoalLdd | null): LddFormValues {
     type: ldd.type,
     period: ldd.period ?? "",
     due_date: ldd.due_date ? ldd.due_date.slice(0, 10) : "",
-    balance_amount: typeof ldd.balance_amount === "number" ? String(ldd.balance_amount) : "",
+    balance_amount:
+      typeof ldd.balance_amount === "number"
+        ? formatBrlInput(String(Math.round(ldd.balance_amount * 100)))
+        : "",
     registration_status: ldd.registration_status ?? "",
     status: ldd.status ?? "",
   };
@@ -248,7 +253,7 @@ export function PessoalTrackingSection({
       type: lddFormValues.type.trim(),
       period: optional(lddFormValues.period),
       due_date: optional(lddFormValues.due_date),
-      balance_amount: optional(lddFormValues.balance_amount, finiteNumber),
+      balance_amount: optional(lddFormValues.balance_amount, parseBrlInput),
       registration_status: optional(lddFormValues.registration_status),
       status: optional(lddFormValues.status),
     };
@@ -775,6 +780,7 @@ export function PessoalTrackingSection({
                 {lddFields.map((field) => {
                   const fieldValue = lddFormValues[field.name];
                   const fieldOptions = "options" in field ? field.options : null;
+                  const isMoney = "money" in field && field.money;
                   const helpText = "help" in field ? field.help : undefined;
                   const customOption =
                     fieldOptions &&
@@ -819,14 +825,28 @@ export function PessoalTrackingSection({
                         </div>
                       ) : (
                         <input
-                          type={"type" in field ? field.type : "text"}
-                          step={field.name === "balance_amount" ? "0.01" : undefined}
-                          min={field.name === "balance_amount" ? 0 : undefined}
+                          type={isMoney ? "text" : "type" in field ? field.type : "text"}
+                          inputMode={isMoney ? "decimal" : undefined}
                           value={fieldValue}
+                          onKeyDown={(event) => {
+                            if (
+                              isMoney &&
+                              (event.key === "Backspace" || event.key === "Delete") &&
+                              parseBrlInput(event.currentTarget.value) === 0
+                            ) {
+                              event.preventDefault();
+                              setLddFormValues((current) => ({
+                                ...current,
+                                [field.name]: "",
+                              }));
+                            }
+                          }}
                           onChange={(event) =>
                             setLddFormValues((current) => ({
                               ...current,
-                              [field.name]: event.target.value,
+                              [field.name]: isMoney
+                                ? formatBrlInput(normalizeDigits(event.target.value))
+                                : event.target.value,
                             }))
                           }
                           disabled={!canEdit || isLddSubmitting}

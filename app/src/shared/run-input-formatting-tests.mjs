@@ -30,6 +30,7 @@ assert.equal(formatBrazilianPhoneInput("11987"), "(11) 987");
 assert.equal(formatBrazilianPhoneInput("(11) 98765-432199"), "(11) 98765-4321");
 
 assert.equal(normalizeDigits("12.345.678/0001-90"), "12345678000190");
+assert.equal(normalizeDigits("R$ 12,34"), "1234");
 assert.equal(normalizeDigits(null), "");
 assert.equal(normalizeDigits(undefined), "");
 
