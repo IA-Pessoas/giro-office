@@ -981,6 +981,10 @@ await runTest("regularize site credential reveal opens a centered modal for the 
   assert.match(sitesSource, /Selecione um site para revelar credenciais/);
   assert.doesNotMatch(sitesSource, /<DetailPanel title="Site selecionado">/);
   assert.match(pageSource, /aria-label=\{title\}/);
+  const siteEyeStart = sitesSource.indexOf("<TableActionButton", sitesSource.indexOf("<DataTable"));
+  const siteEyeEnd = sitesSource.indexOf("/>", siteEyeStart);
+  const siteEyeSource = sitesSource.slice(siteEyeStart, siteEyeEnd);
+  assert.doesNotMatch(siteEyeSource, /disabled=\{!canRevealCredentials\}/);
 });
 
 await runTest("regularize credential empty layouts keep intentional detail behavior", async () => {

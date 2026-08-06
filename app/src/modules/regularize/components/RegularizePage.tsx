@@ -2256,7 +2256,6 @@ export function RegularizePage() {
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
                           <TableActionButton
-                            disabled={!canRevealCredentials}
                             icon={Eye}
                             title={
                               canRevealCredentials
