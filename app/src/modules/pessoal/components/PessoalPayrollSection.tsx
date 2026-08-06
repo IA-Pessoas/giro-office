@@ -72,8 +72,8 @@ const emptyPayrollFormValues: PayrollFormValues = {
 };
 
 const textFields = [
-  { name: "info", label: "Informações", type: "text", required: true },
-  { name: "group", label: "Grupo", type: "text", required: true },
+  { name: "info", label: "Informações da folha", type: "text", required: true },
+  { name: "group", label: "Grupo da folha", type: "text", required: true },
   {
     name: "advance_type",
     label: "Tipo de adiantamento",
@@ -83,26 +83,26 @@ const textFields = [
   },
   {
     name: "vt_type",
-    label: "Tipo de VT",
+    label: "Tipo de vale-transporte",
     type: "text",
     required: false,
     help: "Tipo de vale-transporte utilizado pelo cliente.",
   },
-  { name: "contact", label: "Contato", type: "text", required: false },
+  { name: "contact", label: "Contato da folha", type: "text", required: false },
 ] as const;
 
 const numberFields = [
-  { name: "employees", label: "Funcionários", required: true },
+  { name: "employees", label: "Quantidade de funcionários", required: true },
   { name: "advance_amount", label: "Valor do adiantamento", required: false },
-  { name: "vt_value", label: "Valor do VT", required: false },
+  { name: "vt_value", label: "Valor do vale-transporte", required: false },
 ] as const;
 
 const checkboxFields = [
-  { name: "advance", label: "Adiantamento" },
-  { name: "previous", label: "Folha anterior" },
+  { name: "advance", label: "Adiantamento salarial" },
+  { name: "previous", label: "Usar folha anterior" },
   {
     name: "onvio",
-    label: "Onvio",
+    label: "Integração com Onvio",
     help: "Indica se a rotina Onvio é usada para este cliente.",
   },
   { name: "vt", label: "Vale-transporte" },
@@ -332,6 +332,7 @@ export function PessoalPayrollSection({
             return (
               <label
                 key={field.name}
+                htmlFor={`payroll-${field.name}`}
                 className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
               >
                 <span className="inline-flex items-center gap-1">
@@ -339,6 +340,7 @@ export function PessoalPayrollSection({
                   {helpText ? <FieldHelp label={field.label} description={helpText} /> : null}
                 </span>
                 <input
+                  id={`payroll-${field.name}`}
                   type={field.type}
                   required={field.required}
                   value={String(formValues[field.name])}
@@ -350,10 +352,14 @@ export function PessoalPayrollSection({
             );
           })}
 
-          <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-            Responsável
+          <label
+            htmlFor="payroll-responsible_id"
+            className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
+          >
+            Responsável pela folha
             <div className="relative">
               <select
+                id="payroll-responsible_id"
                 value={formValues.responsible_id}
                 onChange={(event) => handleFieldChange("responsible_id", event.target.value)}
                 disabled={
@@ -384,10 +390,12 @@ export function PessoalPayrollSection({
           {numberFields.map((field) => (
             <label
               key={field.name}
+              htmlFor={`payroll-${field.name}`}
               className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
             >
               {field.label}
               <input
+                id={`payroll-${field.name}`}
                 type="number"
                 required={field.required}
                 min={0}
@@ -400,10 +408,14 @@ export function PessoalPayrollSection({
             </label>
           ))}
 
-          <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <label
+            htmlFor="payroll-union_id"
+            className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
+          >
             Sindicato
             <div className="relative">
               <select
+                id="payroll-union_id"
                 value={formValues.union_id}
                 onChange={(event) => handleFieldChange("union_id", event.target.value)}
                 disabled={isFormDisabled || unionsQuery.isLoading}
@@ -426,8 +438,13 @@ export function PessoalPayrollSection({
             const helpText = "help" in field ? field.help : undefined;
 
             return (
-              <label key={field.name} className={pessoalCheckboxCardClassName}>
+              <label
+                key={field.name}
+                htmlFor={`payroll-${field.name}`}
+                className={pessoalCheckboxCardClassName}
+              >
                 <input
+                  id={`payroll-${field.name}`}
                   type="checkbox"
                   checked={Boolean(formValues[field.name])}
                   onChange={(event) => handleFieldChange(field.name, event.target.checked)}
