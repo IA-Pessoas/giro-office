@@ -18,6 +18,7 @@ interface RhRequestDetailModalProps {
   getAssignedUserLabel: (userId: string) => string;
   getRequesterLabel: (request: RhRequest) => string;
   canManageRequest: boolean;
+  canUseRhWorkflowMessages: boolean;
   isDeleting: boolean;
   onClose: () => void;
   onEdit: (requestId: string) => void;
@@ -31,6 +32,7 @@ export function RhRequestDetailModal({
   getAssignedUserLabel,
   getRequesterLabel,
   canManageRequest,
+  canUseRhWorkflowMessages,
   isDeleting,
   onClose,
   onEdit,
@@ -188,7 +190,10 @@ export function RhRequestDetailModal({
             </div>
           </section>
 
-          <RhRequestMessagesTimeline requestId={request.id} />
+          <RhRequestMessagesTimeline
+            requestId={request.id}
+            canUseRhWorkflowMessages={canUseRhWorkflowMessages}
+          />
         </>
       ) : null}
     </Dialog>

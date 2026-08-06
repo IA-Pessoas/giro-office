@@ -11,6 +11,7 @@ interface UseRhPermissionsResult {
   user: ReturnType<typeof useAuth>["user"];
   permissionQuery: RhPermissionState;
   canAccessRhPortal: boolean;
+  canUseRhWorkflowMessages: boolean;
   canViewRhDashboard: boolean;
   isRhResponsible: boolean;
   isGlobalAdmin: boolean;
@@ -39,6 +40,7 @@ export function useRhPermissions(scope: string): UseRhPermissionsResult {
       error: permissionError,
     },
     canAccessRhPortal: Boolean(user) && capabilities.canAccessRhPortal,
+    canUseRhWorkflowMessages: capabilities.canUseRhWorkflowMessages,
     canViewRhDashboard: capabilities.canViewRhDashboard,
     isRhResponsible,
     isGlobalAdmin,

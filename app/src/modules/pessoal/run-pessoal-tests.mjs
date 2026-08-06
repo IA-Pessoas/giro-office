@@ -16,6 +16,12 @@ import {
   buildPessoalUnionListParams,
   hasPessoalPasswordSecretFields,
 } from "./services/pessoalService.ts";
+import {
+  buildPessoalUnionFormPayload,
+  buildPessoalUnionFormValues,
+  formatPessoalUnionCnpjInput,
+  normalizePessoalUnionCnpjValue,
+} from "./components/pessoalFormValueHelpers.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
 import { formatPessoalObligationGenerationSummary } from "./utils/obligationGenerationSummary.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
@@ -217,6 +223,65 @@ runTest("union payload builder keeps backend field names", () => {
   );
 });
 
+runTest("union cnpj helper formats progressively and keeps the 14-digit cap", () => {
+  assert.equal(formatPessoalUnionCnpjInput("1"), "1");
+  assert.equal(formatPessoalUnionCnpjInput("12"), "12");
+  assert.equal(formatPessoalUnionCnpjInput("123"), "12.3");
+  assert.equal(formatPessoalUnionCnpjInput("1234"), "12.34");
+  assert.equal(formatPessoalUnionCnpjInput("12345"), "12.345");
+  assert.equal(formatPessoalUnionCnpjInput("123456"), "12.345.6");
+  assert.equal(formatPessoalUnionCnpjInput("1234567"), "12.345.67");
+  assert.equal(formatPessoalUnionCnpjInput("12345678"), "12.345.678");
+  assert.equal(formatPessoalUnionCnpjInput("123456789"), "12.345.678/9");
+  assert.equal(formatPessoalUnionCnpjInput("123456789012"), "12.345.678/9012");
+  assert.equal(formatPessoalUnionCnpjInput("1234567890123"), "12.345.678/9012-3");
+  assert.equal(formatPessoalUnionCnpjInput("12345678901234"), "12.345.678/9012-34");
+  assert.equal(formatPessoalUnionCnpjInput("12a3456b7890c1234"), "12.345.678/9012-34");
+  assert.equal(formatPessoalUnionCnpjInput("12345678901234567890"), "12.345.678/9012-34");
+});
+
+runTest("union cnpj payload normalization strips formatting before submit", () => {
+  assert.equal(normalizePessoalUnionCnpjValue("12.345.678/0001-90"), "12345678000190");
+  assert.equal(normalizePessoalUnionCnpjValue("12a3456b7890c1d2e3"), "1234567890123");
+  assert.deepEqual(
+    buildPessoalUnionFormValues({
+      id: "union-1",
+      name: "Metal",
+      cnpj: "12345678000190",
+      base_date: null,
+    }),
+    {
+      name: "Metal",
+      cnpj: "12.345.678/0001-90",
+      base_date: "",
+    },
+  );
+  assert.deepEqual(
+    buildPessoalUnionFormPayload({
+      name: " Metal ",
+      cnpj: "12.345.678/0001-90",
+      base_date: "2026-08-05",
+    }),
+    {
+      name: "Metal",
+      cnpj: "12345678000190",
+      base_date: "2026-08-05",
+    },
+  );
+});
+
+runTest("union form component keeps the extracted helper identifiers", () => {
+  const section = readFileSync(
+    "src/modules/pessoal/components/PessoalUnionsSection.tsx",
+    "utf8",
+  );
+
+  assert.match(section, /buildPessoalUnionFormValues\(union\)/);
+  assert.match(section, /buildPessoalUnionFormPayload\(formValues\)/);
+  assert.match(section, /buildPessoalUnionFormValues\(savedUnion\)/);
+  assert.doesNotMatch(section, /buildUnionFormValues|buildUnionFormPayload/);
+});
+
 runTest("union management sends remote search and pagination", () => {
   assert.deepEqual(
     buildPessoalUnionListParams({ search: " Metal ", page: 2, limit: 20 }),
@@ -396,6 +461,65 @@ runTest("payroll responsible field uses a user selector instead of raw IDs", () 
   assert.doesNotMatch(payroll, /departmentService/);
   assert.match(payroll, /<select[\s\S]*value=\{formValues\.responsible_id\}/);
   assert.doesNotMatch(payroll, /label: "Responsável ID"/);
+});
+
+runTest("payroll section binds the clarified labels to rendered payroll controls", () => {
+  const payroll = readFileSync(
+    "src/modules/pessoal/components/PessoalPayrollSection.tsx",
+    "utf8",
+  );
+  const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  for (const [name, label] of [
+    ["info", "Informações da folha"],
+    ["group", "Grupo da folha"],
+    ["advance_type", "Tipo de adiantamento"],
+    ["vt_type", "Tipo de vale-transporte"],
+    ["contact", "Contato da folha"],
+    ["employees", "Quantidade de funcionários"],
+    ["advance_amount", "Valor do adiantamento"],
+    ["vt_value", "Valor do vale-transporte"],
+    ["advance", "Adiantamento salarial"],
+    ["previous", "Usar folha anterior"],
+    ["onvio", "Integração com Onvio"],
+    ["vt", "Vale-transporte"],
+    ["va", "Vale-alimentação"],
+    ["assistance_fee", "Contribuição assistencial"],
+    ["bem_mais", "Bem Mais"],
+    ["bsf", "BSF"],
+    ["reinf", "Reinf"],
+  ]) {
+    assert.match(
+      payroll,
+      new RegExp(`name: "${name}"[\\s\\S]*?label: "${escapeRegex(label)}"`),
+    );
+  }
+
+  assert.match(
+    payroll,
+    /\{textFields\.map\(\(field\) => \{[\s\S]*?htmlFor=\{`payroll-\$\{field\.name\}`\}[\s\S]*?<input[\s\S]*?id=\{`payroll-\$\{field\.name\}`\}/,
+  );
+  assert.match(
+    payroll,
+    /\{numberFields\.map\(\(field\) => \([\s\S]*?htmlFor=\{`payroll-\$\{field\.name\}`\}[\s\S]*?<input[\s\S]*?id=\{`payroll-\$\{field\.name\}`\}/,
+  );
+  assert.match(
+    payroll,
+    /<label[\s\S]*?htmlFor="payroll-responsible_id"[\s\S]*?Responsável pela folha[\s\S]*?<select[\s\S]*?id="payroll-responsible_id"/,
+  );
+  assert.match(
+    payroll,
+    /<label[\s\S]*?htmlFor="payroll-union_id"[\s\S]*?Sindicato[\s\S]*?<select[\s\S]*?id="payroll-union_id"/,
+  );
+  assert.match(
+    payroll,
+    /\{checkboxFields\.map\(\(field\) => \{[\s\S]*?<label[\s\S]*?htmlFor=\{`payroll-\$\{field\.name\}`\}[\s\S]*?<input[\s\S]*?id=\{`payroll-\$\{field\.name\}`\}/,
+  );
+
+  assert.match(payroll, /Responsável pela folha/);
+  assert.match(payroll, /Sindicato/);
+  assert.doesNotMatch(payroll, /Tipo de VT/);
+  assert.doesNotMatch(payroll, /Valor do VT/);
 });
 
 runTest("obligation params map client and competence", () => {

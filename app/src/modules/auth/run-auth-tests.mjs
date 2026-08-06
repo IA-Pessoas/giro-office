@@ -1079,6 +1079,7 @@ await (async () => {
 
     assert.deepEqual(userCapabilities, {
       canAccessRhPortal: true,
+      canUseRhWorkflowMessages: true,
       canViewRhDashboard: false,
       canManageRh: false,
       canManageRhRequests: false,

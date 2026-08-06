@@ -21,11 +21,11 @@ export function RH() {
     useRhPermissions("rh-shell");
   const newRequestsQuery = useRhRequests(
     { status: "New" },
-    { enabled: canManageRhRequests },
+    { enabled: canManageRhRequests && activeTab === "requests" },
   );
   const inProgressRequestsQuery = useRhRequests(
     { status: "In_Progress" },
-    { enabled: canManageRhRequests },
+    { enabled: canManageRhRequests && activeTab === "requests" },
   );
 
   const pendingRequestsCount = useMemo(() => {

@@ -36,6 +36,69 @@ function runTest(name, fn) {
   }
 }
 
+function normalizeSource(source) {
+  return source.replace(/\r\n/g, "\n");
+}
+
+function extractDialogBlockByOpenExpression(source, openExpression) {
+  const normalizedSource = normalizeSource(source);
+  const openMarker = `open={${openExpression}}`;
+  const openIndex = normalizedSource.indexOf(openMarker);
+
+  assert.notEqual(openIndex, -1, `Dialog com ${openMarker} não encontrado`);
+
+  const dialogStart = normalizedSource.lastIndexOf("<Dialog", openIndex);
+  assert.notEqual(dialogStart, -1, `Abertura do Dialog para ${openMarker} não encontrada`);
+
+  const dialogEnd = normalizedSource.indexOf("</Dialog>", openIndex);
+  assert.notEqual(dialogEnd, -1, `Fechamento do Dialog para ${openMarker} não encontrado`);
+
+  return normalizedSource.slice(dialogStart, dialogEnd + "</Dialog>".length);
+}
+
+function extractBlockWithBalancedBraces(source, anchor) {
+  const normalizedSource = normalizeSource(source);
+  const blockStart = normalizedSource.indexOf(anchor);
+
+  assert.notEqual(blockStart, -1, `Bloco não encontrado: ${anchor}`);
+
+  const braceStart = normalizedSource.indexOf("{", blockStart);
+  assert.notEqual(braceStart, -1, `Abertura do bloco não encontrada: ${anchor}`);
+
+  let depth = 0;
+
+  for (let index = braceStart; index < normalizedSource.length; index += 1) {
+    const char = normalizedSource[index];
+
+    if (char === "{") {
+      depth += 1;
+      continue;
+    }
+
+    if (char !== "}") {
+      continue;
+    }
+
+    depth -= 1;
+
+    if (depth === 0) {
+      return normalizedSource.slice(blockStart, index + 1);
+    }
+  }
+
+  assert.fail(`Fechamento do bloco não encontrado: ${anchor}`);
+}
+
+function assertContainsInOrder(source, snippets, label) {
+  let cursor = 0;
+
+  for (const snippet of snippets) {
+    const index = source.indexOf(snippet, cursor);
+    assert.notEqual(index, -1, `${label}: trecho ausente ou fora de ordem: ${snippet}`);
+    cursor = index + snippet.length;
+  }
+}
+
 runTest("certificate row sorting orders dates without mutating the source", () => {
   const rows = [
     { id: "late", expiration_date: "2026-12-31" },
@@ -163,6 +226,73 @@ runTest("certificate workspace requests table record deletion through the shared
   assert.match(workspaceSource, /cancelLabel="Cancelar"/);
   assert.match(workspaceSource, /confirmLabel="Excluir certificado"/);
   assert.match(workspaceSource, /Esta ação remove o cadastro e o arquivo associado, quando existir\./);
+});
+
+runTest("certificate workspace shows PF and PJ details in a shared dialog", () => {
+  const workspaceSource = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+  const detailDialogBlock = extractDialogBlockByOpenExpression(
+    workspaceSource,
+    "shouldShowDetailDialog",
+  );
+  const closeDetailDialogBlock = extractBlockWithBalancedBraces(
+    workspaceSource,
+    "function handleCloseDetailDialog()",
+  );
+  const detailDialogOpenChangeBlock = extractBlockWithBalancedBraces(
+    workspaceSource,
+    "function handleDetailDialogOpenChange(open: boolean)",
+  );
+  const startEditSelectedBlock = extractBlockWithBalancedBraces(
+    workspaceSource,
+    "function handleStartEditSelected()",
+  );
+
+  assert.match(
+    workspaceSource,
+    /const shouldShowDetailDialog = Boolean\(selected\) && !isFormMode;/,
+  );
+  assert.match(workspaceSource, /function handleCloseDetailDialog\(\) \{/);
+  assert.match(
+    workspaceSource,
+    /const detailDialogTitle = selected\?\.type === "pj"[\s\S]*?"Detalhe do certificado PJ"[\s\S]*?"Detalhe do certificado PF";/,
+  );
+  assert.match(
+    workspaceSource,
+    /const detailDialogDescription = selected\?\.type === "pj"[\s\S]*?"Dados completos do certificado PJ selecionado\."[\s\S]*?"Dados completos do certificado PF selecionado\.";/,
+  );
+  assert.match(closeDetailDialogBlock, /setSelected\(null\);/);
+  assert.match(closeDetailDialogBlock, /setWorkspaceMode\("view"\);/);
+  assert.match(closeDetailDialogBlock, /setShowDetailPassword\(false\);/);
+  assertContainsInOrder(
+    detailDialogOpenChangeBlock,
+    ["if (open) {", "return;", "handleCloseDetailDialog();"],
+    "handleDetailDialogOpenChange",
+  );
+  assert.ok(detailDialogBlock, "bloco do Dialog de detalhe não encontrado");
+  assert.match(detailDialogBlock, /open=\{shouldShowDetailDialog\}/);
+  assert.match(detailDialogBlock, /onOpenChange=\{handleDetailDialogOpenChange\}/);
+  assert.match(detailDialogBlock, /title=\{detailDialogTitle\}/);
+  assert.match(detailDialogBlock, /description=\{detailDialogDescription\}/);
+  assert.match(
+    detailDialogBlock,
+    /\{activeDetailIsLoading \? \([\s\S]*?\{activeDetailErrorMessage \? \([\s\S]*?selected\?\.type === "pj"[\s\S]*?selected\?\.type === "pf"/,
+  );
+  assert.match(detailDialogBlock, /renderPasswordBlock\(pjDetail\?\.password\)/);
+  assert.match(detailDialogBlock, /renderPasswordBlock\(pfDetail\?\.password\)/);
+  assert.match(detailDialogBlock, /<CertificateFileActions[\s\S]*?kind="pj"/);
+  assert.match(detailDialogBlock, /<CertificateFileActions[\s\S]*?kind="pf"/);
+  assert.ok(startEditSelectedBlock, "handler de edição não encontrado");
+  assert.match(startEditSelectedBlock, /setWorkspaceMode\("editPj"\)/);
+  assert.match(startEditSelectedBlock, /setWorkspaceMode\("editPf"\)/);
+  assert.doesNotMatch(startEditSelectedBlock, /setSelected\(null\)/);
+  assert.doesNotMatch(workspaceSource, /const shouldShowDetailPanel = Boolean\(selected\);/);
+  assert.doesNotMatch(
+    workspaceSource,
+    /\{shouldShowDetailPanel \? \(\s*<section className=\{`\$\{CERTIFICATE_PANEL_CLASSNAME\} space-y-4`\}>/,
+  );
 });
 
 runTest("certificate record deletion uses the shared confirmation dialog", () => {

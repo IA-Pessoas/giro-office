@@ -1759,6 +1759,62 @@ it("blocks a user without parcelamento permission before proxying", async () => 
   }
 });
 
+it("proxies Parcelamento read routes for Viewer without exposing mutations", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 0,
+    modules: { parcelamento: 1 },
+  });
+  const seenUrls: string[] = [];
+  const parcelamentoService = createServer((request, response) => {
+    seenUrls.push(request.url ?? "");
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const parcelamentoServiceUrl = await startServer(parcelamentoService);
+  const app = createApp(createEnv({ parcelamentoServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const headers = { Authorization: `Bearer ${token}` };
+  const readPaths = [
+    "/parcelamento/installments",
+    "/parcelamento/installments/installment-1/competencies",
+    "/parcelamento/panoramas",
+  ];
+  const mutationRequests = [
+    ["POST", "/parcelamento/installments"],
+    ["PATCH", "/parcelamento/installments/installment-1"],
+    ["POST", "/parcelamento/installments/installment-1/competencies"],
+    ["PATCH", "/parcelamento/installment-competencies/competency-1"],
+    ["POST", "/parcelamento/panoramas"],
+    ["PATCH", "/parcelamento/panoramas/panorama-1"],
+    ["POST", "/parcelamento/panoramas/competences/2026-07/generate"],
+  ] as const;
+
+  try {
+    for (const path of readPaths) {
+      const response = await fetch(`${gatewayUrl}${path}`, { headers });
+      expect(response.status).toBe(200);
+    }
+
+    for (const [method, path] of mutationRequests) {
+      const response = await fetch(`${gatewayUrl}${path}`, {
+        method,
+        headers: { ...headers, "content-type": "application/json" },
+        body: "{}",
+      });
+      expect(response.status).toBe(403);
+    }
+
+    expect(seenUrls).toEqual(readPaths);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(parcelamentoService);
+  }
+});
+
 it("forwards modular certificate permission and internal token to certificate-service", async () => {
   const token = createToken({
     user_id: "user-1",

@@ -26,6 +26,21 @@ const rhEnvSchema = z
         return Number.isNaN(parsed) ? 3034 : parsed;
       }),
     databaseUrl: z.string().min(1, "DATABASE_URL não definido para o rh-service."),
+    databasePoolMax: z
+      .string()
+      .optional()
+      .default("5")
+      .transform((value, ctx) => {
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed < 1) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "DATABASE_POOL_MAX deve ser um inteiro positivo.",
+          });
+          return z.NEVER;
+        }
+        return parsed;
+      }),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o rh-service."),
     nodeEnv: z.string().optional().default("development"),
     logLevel: loggerLevelSchema.optional().default("info"),
@@ -77,6 +92,7 @@ export function getRhEnv(): RhEnv {
   return rhEnvSchema.parse({
     port: process.env.PORT,
     databaseUrl: process.env.DATABASE_URL,
+    databasePoolMax: process.env.DATABASE_POOL_MAX,
     jwtSecret: process.env.JWT_SECRET,
     nodeEnv: process.env.NODE_ENV,
     logLevel: process.env.LOG_LEVEL,
