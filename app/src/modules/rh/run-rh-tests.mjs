@@ -7,6 +7,9 @@ const { resolveRhPermissionCapabilities } = await import("./utils/rhPermissions.
 const { getRhMessageTypeClassName } = await import("./utils/rhRequestUi.ts");
 
 const rhSources = {
+  messageTimeline: readFileSync("src/modules/rh/components/RhRequestMessagesTimeline.tsx", "utf8"),
+  requestDetailModal: readFileSync("src/modules/rh/components/RhRequestDetailModal.tsx", "utf8"),
+  requestsSection: readFileSync("src/modules/rh/components/RhRequestsSection.tsx", "utf8"),
   requestFormModal: readFileSync("src/modules/rh/components/RhRequestFormModal.tsx", "utf8"),
   pointConfigRoute: readFileSync(
     "../services/rh-service/src/routes/pointConfig.routes.ts",
@@ -208,6 +211,22 @@ runTest("RH Usuario mantem autosservico e nao recebe gestao", () => {
   assert.equal(capabilities.canManageRhTimeBank, false);
   assert.equal(capabilities.canManageRhTimesheets, false);
   assert.equal(capabilities.canManageRhWorkday, false);
+});
+
+runTest("RH Visualizador usa somente mensagem e preserva workflow para Usuario e Administrador", () => {
+  const viewerCapabilities = resolveRhPermissionCapabilities(1, false);
+  const userCapabilities = resolveRhPermissionCapabilities(2, false);
+  const adminCapabilities = resolveRhPermissionCapabilities(3, false);
+
+  assert.equal(viewerCapabilities.canUseRhWorkflowMessages, false);
+  assert.equal(userCapabilities.canUseRhWorkflowMessages, true);
+  assert.equal(adminCapabilities.canUseRhWorkflowMessages, true);
+  assert.match(rhSources.requestsSection, /canUseRhWorkflowMessages/);
+  assert.match(rhSources.requestDetailModal, /canUseRhWorkflowMessages/);
+  assert.match(
+    rhSources.messageTimeline,
+    /canUseRhWorkflowMessages \?[\s\S]*<option value="Solution">/,
+  );
 });
 
 runTest("RH sem acesso nao e tratado como usuario autorizado", () => {
