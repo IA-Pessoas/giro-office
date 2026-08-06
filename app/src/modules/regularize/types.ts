@@ -57,6 +57,8 @@ export type RegularizeGuidanceListFilters = {
 
 export type RegularizeLicenseListFilters = {
   status: string;
+  page?: number;
+  limit?: number;
 };
 
 export type RegularizePasswordSiteSummary = {

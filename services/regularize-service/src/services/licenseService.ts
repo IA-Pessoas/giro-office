@@ -142,18 +142,43 @@ export class LicenseService {
     return detail as unknown as Record<string, unknown>;
   }
 
-  async list(organizationId: string, status: string): Promise<Record<string, unknown>[]> {
-    const list = await this.prisma.license.findMany({
-      where: {
-        organization_id: organizationId,
-        ...(status === "Todos" ? {} : { status }),
-      },
+  async list(params: {
+    organizationId: string;
+    status: string;
+    page: number;
+    limit: number;
+    paginationRequested: boolean;
+  }): Promise<Record<string, unknown>[] | Record<string, unknown>> {
+    const where = {
+      organization_id: params.organizationId,
+      ...(params.status === "Todos" ? {} : { status: params.status }),
+    };
+    const findManyArgs = {
+      where,
       orderBy: {
         entry_date: "desc",
       },
-    });
+      ...(params.paginationRequested
+        ? { skip: (params.page - 1) * params.limit, take: params.limit }
+        : {}),
+    };
 
-    return list as unknown as Record<string, unknown>[];
+    if (!params.paginationRequested) {
+      return this.prisma.license.findMany(findManyArgs) as unknown as Record<string, unknown>[];
+    }
+
+    const [list, total] = await Promise.all([
+      this.prisma.license.findMany(findManyArgs),
+      this.prisma.license.count({ where }),
+    ]);
+
+    return {
+      data: list,
+      total,
+      page: params.page,
+      limit: params.limit,
+      hasMore: params.page * params.limit < total,
+    };
   }
 
   private async ensureClientExists(organizationId: string, clientId: string): Promise<void> {

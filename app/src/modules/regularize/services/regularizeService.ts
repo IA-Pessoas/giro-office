@@ -420,6 +420,17 @@ export const regularizeService = {
     return unwrapRegularizeEnvelope<RegularizeLicenseListItem[]>(response.data) ?? [];
   },
 
+  async listLicensesPage(
+    filters: RegularizeLicenseListFilters & { page: number; limit: number },
+  ): Promise<PaginatedResult<RegularizeLicenseListItem>> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.licenses, {
+      params: buildRegularizeLicenseListParams(filters),
+    });
+
+    return unwrapRegularizePage<RegularizeLicenseListItem>(response.data, filters);
+  },
+
   async getLicense(id: RegularizeId): Promise<RegularizeLicenseDetail> {
     const api = setupAPIClient();
     const response = await api.get(REGULARIZE_ENDPOINTS.license, {

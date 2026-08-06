@@ -624,19 +624,22 @@ export function buildRegularizeServiceOpenApiSpec(
               description: "Use Todos para listar todos os status.",
               schema: {
                 type: "string",
-                enum: [
-                  "Todos",
-                  "Ativo",
-                  "Pendente",
-                  "A vencer",
-                  "Vencido",
-                  "Inativo",
-                  "Cancelado",
-                ],
+                enum: ["Todos", "Ativo", "Pendente", "A vencer", "Vencido", "Inativo", "Cancelado"],
               },
             },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
           ],
-          responses: { "200": { description: "Lista de licencas", ...successEnvelopeContent() } },
+          responses: {
+            "200": {
+              description: "Lista completa ou pagina de licencas",
+              ...dualListSuccessEnvelopeContent(),
+            },
+          },
         },
       },
       "/internal/reconciliation/run": {

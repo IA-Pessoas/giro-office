@@ -290,6 +290,19 @@ export function useRegularizeLicenses(
   );
 }
 
+export function usePaginatedRegularizeLicenses(
+  filters: RegularizeLicenseListFilters & { page: number; limit: number },
+  options?: RegularizeReadQueryOptions,
+): UseQueryResult<PaginatedResult<RegularizeLicenseListItem>, Error> {
+  return useFetch(
+    regularizeQueryKeys.licensesPage(filters),
+    () => regularizeService.listLicensesPage(filters),
+    {
+      enabled: Boolean(filters.status) && (options?.enabled ?? true),
+    },
+  );
+}
+
 export function useCreateRegularizeLicenseMutation(): UseMutationResult<
   RegularizeLicenseDetail,
   Error,
