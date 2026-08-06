@@ -497,9 +497,7 @@ runTest("certificate pagination reads the active server page", () => {
   assert.match(workspaceSource, /const pjItems = pjListQuery\.data\?\.data \?\? \[\];/);
   assert.match(workspaceSource, /const pfItems = pfListQuery\.data\?\.data \?\? \[\];/);
   assert.match(workspaceSource, /const notificationItems = notificationsQuery\.data\?\.data \?\? \[\];/);
-  assert.match(workspaceSource, /pjListQuery\.isPlaceholderData/);
-  assert.match(workspaceSource, /pfListQuery\.isPlaceholderData/);
-  assert.match(workspaceSource, /notificationsQuery\.isPlaceholderData/);
+  assert.doesNotMatch(workspaceSource, /visiblePjItems|visiblePfItems|visibleNotificationItems|mergeListById/);
   assert.match(workspaceSource, /const activeListIsLoading = activeTab === "pf"\n    \? pfListQuery\.isFetching/);
   assert.match(workspaceSource, /onFirst=\{\(\) => setActivePage\(FIRST_PAGE\)\}/);
   assert.match(workspaceSource, /onLast=\{\(\) => setActivePage\(activeTotalPages\)\}/);

@@ -15,7 +15,7 @@ import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
-import { ConfirmationDialog } from "@shared/components";
+import { ConfirmationDialog, PaginationControls } from "@shared/components";
 import { useDebouncedValue } from "@shared/hooks";
 
 import { INTEGRACAO_TASK_STATUS_VALUES, type IntegracaoTaskListItem } from "../types";
@@ -45,7 +45,6 @@ import {
   TASK_TABLE_NAME_HEAD_CELL_CLASSNAME,
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
   canEditIntegracaoTask,
-  formatTasksFooterSummary,
 } from "./taskWorkspaceUi";
 
 const TASKS_PAGE_SIZE = 20;
@@ -76,26 +75,12 @@ function getBillingTone(value: string) {
     : "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
 }
 
-function mergeTaskPages(
-  currentTasks: IntegracaoTaskListItem[],
-  nextTasks: IntegracaoTaskListItem[],
-) {
-  const taskById = new Map(currentTasks.map((task) => [task.id, task]));
-
-  nextTasks.forEach((task) => {
-    taskById.set(task.id, task);
-  });
-
-  return Array.from(taskById.values());
-}
-
 export function TasksWorkspace() {
   const { access: integracaoAccess } = useModuleAccess("integracao");
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [refFilter, setRefFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
-  const [visibleTasks, setVisibleTasks] = useState<IntegracaoTaskListItem[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
@@ -120,21 +105,13 @@ export function TasksWorkspace() {
   const canDelete = integracaoAccess.isAdmin;
   const canCreate = integracaoAccess.canEdit;
   const canManageTaskModels = integracaoAccess.isAdmin;
+  const tasks = tasksQuery.data?.data ?? [];
+  const total = tasksQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / TASKS_PAGE_SIZE));
 
   useEffect(() => {
     setPage(1);
-    setVisibleTasks([]);
   }, [refFilter, searchTerm, statusFilter]);
-
-  useEffect(() => {
-    if (!tasksQuery.data || isSearchPending) {
-      return;
-    }
-
-    setVisibleTasks((currentTasks) =>
-      page === 1 ? tasksQuery.data.data : mergeTaskPages(currentTasks, tasksQuery.data.data),
-    );
-  }, [isSearchPending, page, tasksQuery.data]);
 
   const stats = useMemo(
     () => [
@@ -176,9 +153,7 @@ export function TasksWorkspace() {
 
     try {
       await deleteTaskMutation.mutateAsync({ taskId: task.id });
-      setVisibleTasks((currentTasks) =>
-        currentTasks.filter((currentTask) => currentTask.id !== task.id),
-      );
+      void tasksQuery.refetch();
       toast.success("Tarefa excluída com sucesso.");
       setPendingTaskDeletion(null);
       setTaskDeletionError(null);
@@ -211,12 +186,11 @@ export function TasksWorkspace() {
 
   function handleTaskSaved() {
     setPage(1);
-    setVisibleTasks([]);
     void tasksQuery.refetch();
   }
 
-  const isInitialLoading = tasksQuery.isLoading && visibleTasks.length === 0;
-  const hasMore = Boolean(tasksQuery.data?.hasMore);
+  const isInitialLoading = tasksQuery.isLoading && tasks.length === 0;
+  const hasMore = Boolean(tasksQuery.data?.hasMore) && page < totalPages;
 
   return (
     <div className="space-y-6">
@@ -423,14 +397,14 @@ export function TasksWorkspace() {
                     Não foi possível carregar as tarefas no momento.
                   </td>
                 </tr>
-              ) : visibleTasks.length === 0 ? (
+              ) : tasks.length === 0 ? (
                 <tr>
                   <td className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={9}>
                     Nenhuma tarefa encontrada com os filtros atuais.
                   </td>
                 </tr>
               ) : (
-                visibleTasks.map((task) => (
+                tasks.map((task) => (
                   <tr
                     key={task.id}
                     className="border-b border-slate-200/80 align-top last:border-b-0 dark:border-slate-800"
@@ -522,26 +496,20 @@ export function TasksWorkspace() {
           </table>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {formatTasksFooterSummary({ page, count: visibleTasks.length })}
-          </p>
-          {hasMore ? (
-            <button
-              type="button"
-              onClick={() => setPage((currentPage) => currentPage + 1)}
-              className={PROJECT_COMPACT_BUTTON_CLASSNAME}
-              disabled={tasksQuery.isFetching}
-            >
-              {tasksQuery.isFetching ? (
-                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Plus className="h-3.5 w-3.5" />
-              )}
-              Carregar mais
-            </button>
-          ) : null}
-        </div>
+        <PaginationControls
+          page={page}
+          limit={TASKS_PAGE_SIZE}
+          total={total}
+          count={tasks.length}
+          hasMore={hasMore}
+          isFetching={tasksQuery.isFetching || isSearchPending}
+          totalPages={totalPages}
+          onFirst={() => setPage(1)}
+          onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+          onPageChange={setPage}
+          onNext={() => setPage((currentPage) => Math.min(totalPages, currentPage + 1))}
+          onLast={() => setPage(totalPages)}
+        />
       </section>
     </div>
   );

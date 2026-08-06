@@ -171,10 +171,7 @@ runTest("integration destructive actions use the shared confirmation dialog", ()
     /const deleteTaskMutation = useDeleteIntegracaoTaskMutation\(\);/,
   );
   assert.match(sources.tasks, /await deleteTaskMutation\.mutateAsync\(\{\s*taskId:\s*task\.id,?\s*\}\);/);
-  assert.match(
-    sources.tasks,
-    /setVisibleTasks\(\(currentTasks\) =>\s*currentTasks\.filter\(\(currentTask\) => currentTask\.id !== task\.id\),\s*\);/,
-  );
+  assert.match(sources.tasks, /void tasksQuery\.refetch\(\);/);
   assert.match(sources.tasks, /toast\.success\("Tarefa excluída com sucesso\."\);/);
   assert.match(
     tasksHooksSource,

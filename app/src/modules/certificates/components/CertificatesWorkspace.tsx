@@ -185,14 +185,6 @@ function trimValue(value: string): string {
   return value.trim();
 }
 
-function mergeListById<T extends { id: string }>(current: T[], next: T[]): T[] {
-  const itemsById = new Map(current.map((item) => [item.id, item]));
-
-  next.forEach((item) => itemsById.set(item.id, item));
-
-  return [...itemsById.values()];
-}
-
 function buildStats(total: number, expiringInDays: number, expired: number, withCertificate: number) {
   return [
     { label: "Total", value: total },
@@ -340,9 +332,6 @@ export function CertificatesWorkspace() {
   const [pjPage, setPjPage] = useState(FIRST_PAGE);
   const [pfPage, setPfPage] = useState(FIRST_PAGE);
   const [notificationPage, setNotificationPage] = useState(FIRST_PAGE);
-  const [visiblePjItems, setVisiblePjItems] = useState<CertificatePj[]>([]);
-  const [visiblePfItems, setVisiblePfItems] = useState<CertificatePf[]>([]);
-  const [visibleNotificationItems, setVisibleNotificationItems] = useState<CertificateNotification[]>([]);
   const [pjSort, setPjSort] = useState<SortState<PjSortKey>>(null);
   const [pfSort, setPfSort] = useState<SortState<PfSortKey>>(null);
   const [notificationSort, setNotificationSort] = useState<SortState<NotificationSortKey>>(null);
@@ -445,62 +434,17 @@ export function CertificatesWorkspace() {
   const deletePfMutation = useDeleteCertificatePfMutation();
   const updatePjMutation = useUpdateCertificatePjMutation(selected?.type === "pj" ? selected.id : "");
   const updatePfMutation = useUpdateCertificatePfMutation(selected?.type === "pf" ? selected.id : "");
-
-  useEffect(() => {
-    if (
-      !pjListQuery.data ||
-      pjListQuery.isPlaceholderData ||
-      pjListQuery.data.page !== pjPage
-    ) {
-      return;
-    }
-
-    const nextItems = pjListQuery.data.data;
-
-    setVisiblePjItems((current) =>
-      pjPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
-    );
-  }, [pjListQuery.data, pjListQuery.isPlaceholderData, pjPage]);
-
-  useEffect(() => {
-    if (
-      !pfListQuery.data ||
-      pfListQuery.isPlaceholderData ||
-      pfListQuery.data.page !== pfPage
-    ) {
-      return;
-    }
-
-    const nextItems = pfListQuery.data.data;
-
-    setVisiblePfItems((current) =>
-      pfPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
-    );
-  }, [pfListQuery.data, pfListQuery.isPlaceholderData, pfPage]);
-
-  useEffect(() => {
-    if (
-      !notificationsQuery.data ||
-      notificationsQuery.isPlaceholderData ||
-      notificationsQuery.data.page !== notificationPage
-    ) {
-      return;
-    }
-
-    const nextItems = notificationsQuery.data.data;
-
-    setVisibleNotificationItems((current) =>
-      notificationPage === FIRST_PAGE ? nextItems : mergeListById(current, nextItems),
-    );
-  }, [notificationPage, notificationsQuery.data, notificationsQuery.isPlaceholderData]);
+  const pjItems = pjListQuery.data?.data ?? [];
+  const pfItems = pfListQuery.data?.data ?? [];
+  const notificationItems = notificationsQuery.data?.data ?? [];
 
   const sortedPjItems = useMemo(() => {
     if (!pjSort) {
-      return visiblePjItems;
+      return pjItems;
     }
 
     return sortCertificateRows(
-      visiblePjItems,
+      pjItems,
       (item) => {
         switch (pjSort.key) {
           case "name":
@@ -517,15 +461,15 @@ export function CertificatesWorkspace() {
       },
       pjSort.direction,
     );
-  }, [pjSort, visiblePjItems]);
+  }, [pjSort, pjItems]);
 
   const sortedPfItems = useMemo(() => {
     if (!pfSort) {
-      return visiblePfItems;
+      return pfItems;
     }
 
     return sortCertificateRows(
-      visiblePfItems,
+      pfItems,
       (item) => {
         switch (pfSort.key) {
           case "name":
@@ -542,15 +486,15 @@ export function CertificatesWorkspace() {
       },
       pfSort.direction,
     );
-  }, [pfSort, visiblePfItems]);
+  }, [pfSort, pfItems]);
 
   const sortedNotificationItems = useMemo(() => {
     if (!notificationSort) {
-      return visibleNotificationItems;
+      return notificationItems;
     }
 
     return sortCertificateRows(
-      visibleNotificationItems,
+      notificationItems,
       (item) => {
         switch (notificationSort.key) {
           case "client_name":
@@ -563,7 +507,7 @@ export function CertificatesWorkspace() {
       },
       notificationSort.direction,
     );
-  }, [notificationSort, visibleNotificationItems]);
+  }, [notificationSort, notificationItems]);
 
   useEffect(() => {
     setPjPage(FIRST_PAGE);
@@ -594,9 +538,6 @@ export function CertificatesWorkspace() {
     pfFilters.hasCertificate,
   ]);
 
-  const pjItems = pjListQuery.data?.data ?? [];
-  const pfItems = pfListQuery.data?.data ?? [];
-  const notificationItems = notificationsQuery.data?.data ?? [];
   const pjTotal = pjListQuery.data?.total ?? pjItems.length;
   const pfTotal = pfListQuery.data?.total ?? pfItems.length;
   const notificationTotal = notificationsQuery.data?.total ?? notificationItems.length;
@@ -634,7 +575,7 @@ export function CertificatesWorkspace() {
 
   const notificationsStats = useMemo(() => {
     const pjCount = notificationItems.filter((item) => item.type === "PJ").length;
-    const pfCount = notificationTotal - pjCount;
+    const pfCount = notificationItems.filter((item) => item.type === "PF").length;
 
     return [
       {
@@ -1881,7 +1822,7 @@ export function CertificatesWorkspace() {
           ) : null}
         </div>
 
-        {hasActiveRows ? (
+        {!activeListError ? (
           <PaginationControls
             page={activePage}
             limit={PAGE_SIZE}
