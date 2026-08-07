@@ -28,7 +28,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "../charts/LazyRecharts";
+} from "recharts";
 
 import { useActivityClock } from "../../../modules/dashboard/hooks/useActivityClock";
 import { useDashboard } from "../../../modules/dashboard/hooks/useDashboard";

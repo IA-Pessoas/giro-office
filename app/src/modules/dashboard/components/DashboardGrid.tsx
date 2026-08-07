@@ -1,15 +1,29 @@
 import React from "react";
+import dynamic from "next/dynamic";
 import { FiActivity, FiTrendingUp, FiUsers } from "react-icons/fi";
 import { LoadingSpinner } from "@shared/components/LoadingSpinner";
 
 import type { DashboardStats } from "../types";
-import { ClientTrendsChart } from "./ClientTrendsChart";
-import { FiscalObligationsChart } from "./FiscalObligationsChart";
+import { ChartSkeleton } from "../../../shared/components/charts/ChartSkeleton";
 import { InsightsPanel } from "./InsightsPanel";
 import { QuickActions } from "./QuickActions";
 import { RecentClientsTable } from "./RecentClientsTable";
-import { ServiceDistributionChart } from "./ServiceDistributionChart";
 import { StatCard } from "./StatCard";
+
+const FiscalObligationsChart = dynamic(
+  () => import("./FiscalObligationsChart").then((mod) => mod.FiscalObligationsChart),
+  { ssr: false, loading: () => <ChartSkeleton height={240} /> },
+);
+
+const ServiceDistributionChart = dynamic(
+  () => import("./ServiceDistributionChart").then((mod) => mod.ServiceDistributionChart),
+  { ssr: false, loading: () => <ChartSkeleton height={240} /> },
+);
+
+const ClientTrendsChart = dynamic(
+  () => import("./ClientTrendsChart").then((mod) => mod.ClientTrendsChart),
+  { ssr: false, loading: () => <ChartSkeleton height={240} /> },
+);
 
 interface DashboardGridProps {
   stats: DashboardStats | null;
