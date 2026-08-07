@@ -890,4 +890,24 @@ runTest("certificate Focus and Castelo statuses remain explicit and independent"
   );
 });
 
+runTest("issue 743 detail cards use asymmetric grid and break long values", () => {
+  const source = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /CERTIFICATE_DETAIL_SUMMARY_GRID_CLASSNAME/);
+  assert.match(source, /CERTIFICATE_DETAIL_VALUE_CLASSNAME/);
+  assert.match(source, /break-words/);
+
+  for (const label of ["Cliente", "Responsável", "Titular", "Empresa"]) {
+    const cardBlock = source.match(
+      new RegExp(
+        `<p className=\\{CERTIFICATE_DETAIL_LABEL_CLASSNAME\\}>${label}</p>[\\s\\S]{0,400}?CERTIFICATE_DETAIL_VALUE_CLASSNAME`,
+      ),
+    );
+    assert.ok(cardBlock, `expected ${label} card to use detail value class`);
+  }
+});
+
 console.log("certificates contract tests passed");
