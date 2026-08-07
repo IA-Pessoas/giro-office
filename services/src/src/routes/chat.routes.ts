@@ -4,6 +4,7 @@ import { ChatController } from "../controllers/chat/ChatController"
 import { MessageController } from "../controllers/chat/MessageController"
 import { isAuthenticated } from "../middlewares/isAuthenticated"
 import multer from "multer"
+import { uploadChatMedia } from "../middlewares/uploadChatMedia"
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -35,7 +36,7 @@ export const chatRoutes = (io: Server, onlineUsers: Map<string, string>) => {
     router.get('/chat/contacts', new ChatController(io, onlineUsers).listContacts);
     router.get('/messages/search', new MessageController().searchMessages);
     
-    router.post('/chat/media', isAuthenticated, upload.single('file'), new MessageController().uploadMedia.bind(messageController) as any)
+    router.post('/chat/media', isAuthenticated, uploadChatMedia, new MessageController().uploadMedia.bind(messageController) as any)
     router.get('/chat/media/link', isAuthenticated, new MessageController().getMedia.bind(messageController))
     
     return router;
