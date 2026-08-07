@@ -44,7 +44,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts";
+} from "../charts/LazyRecharts";
 
 interface Process {
   id: string;
