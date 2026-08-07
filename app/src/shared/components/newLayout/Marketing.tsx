@@ -46,7 +46,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts";
+} from "../charts/LazyRecharts";
 import { getSummaryItems } from "../../utils/summaryItems";
 
 interface Budget {

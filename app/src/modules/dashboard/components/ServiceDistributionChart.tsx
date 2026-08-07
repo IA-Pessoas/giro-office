@@ -11,7 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
   ComposedChart,
-} from 'recharts';
+} from '../../../shared/components/charts/LazyRecharts';
 import type { DashboardStats } from '../types';
 
 interface ServiceDistributionChartProps {
