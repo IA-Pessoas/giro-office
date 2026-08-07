@@ -1,0 +1,5 @@
+export const SYSTEM_SCROLLBAR_CLASSNAME = "u-scrollbar-system";
+
+export const SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME = `overflow-x-auto ${SYSTEM_SCROLLBAR_CLASSNAME}`;
+
+export const SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME = `overflow-y-auto ${SYSTEM_SCROLLBAR_CLASSNAME}`;

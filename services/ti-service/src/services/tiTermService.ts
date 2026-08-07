@@ -1,0 +1,194 @@
+import { error as logError, ServiceError } from "@workspace/shared";
+
+import type { PrismaClient } from "../generated/prisma/client.js";
+import { TiPermissionLevel } from "../middlewares/requireTiPermission.js";
+import { getPaginationParams } from "../schemas/pagination.schemas.js";
+import type {
+  CreateTiTermBody,
+  ListTiTermsQuery,
+  SignTiTermBody,
+  UpdateTiTermBody,
+} from "../schemas/tiTerm.schemas.js";
+import type { TiAuthContext } from "./tiRequestService.js";
+
+type TermRecord = Record<string, unknown>;
+type TiTermStatus = "pending" | "signed";
+
+const SAFE_USER_INCLUDE = {
+  user: {
+    select: {
+      id: true,
+      name: true,
+      full_name: true,
+      department_id: true,
+      organization_id: true,
+    },
+  },
+} as const;
+
+function withoutNestedUserPassword(record: unknown): unknown {
+  if (!record || typeof record !== "object" || Array.isArray(record)) {
+    return record;
+  }
+
+  const typedRecord = record as TermRecord;
+  const user = typedRecord.user;
+
+  if (!user || typeof user !== "object" || Array.isArray(user)) {
+    return record;
+  }
+
+  const { password: _password, ...safeUser } = user as Record<string, unknown>;
+
+  return {
+    ...typedRecord,
+    user: safeUser,
+  };
+}
+
+function toTermResponse(record: unknown): unknown {
+  const safeRecord = withoutNestedUserPassword(record);
+
+  if (!safeRecord || typeof safeRecord !== "object" || Array.isArray(safeRecord)) {
+    return safeRecord;
+  }
+
+  const typedRecord = safeRecord as TermRecord;
+  const status: TiTermStatus = typedRecord.signed_at == null ? "pending" : "signed";
+
+  return { ...typedRecord, status };
+}
+
+export class TiTermService {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async list(context: TiAuthContext, query: ListTiTermsQuery): Promise<unknown[]> {
+    const { skip, take } = getPaginationParams(query);
+    const userId = context.permission < TiPermissionLevel.Admin ? context.userId : query.user_id;
+    const terms = await this.prisma.termTecnologia.findMany({
+      where: {
+        organization_id: context.organizationId,
+        ...(userId ? { user_id: userId } : {}),
+        ...(query.status ? { signed_at: query.status === "signed" ? { not: null } : null } : {}),
+      },
+      include: SAFE_USER_INCLUDE,
+      orderBy: { date: "desc" },
+      skip,
+      take,
+    });
+
+    return terms.map((term) => toTermResponse(term));
+  }
+
+  async getById(context: TiAuthContext, id: string): Promise<unknown> {
+    const term = await this.prisma.termTecnologia.findFirst({
+      where: { id, organization_id: context.organizationId },
+      include: SAFE_USER_INCLUDE,
+    });
+
+    if (!term) {
+      throw new ServiceError(404, "Termo de TI nao encontrado.");
+    }
+
+    if (context.permission < TiPermissionLevel.Admin && term.user_id !== context.userId) {
+      throw new ServiceError(404, "Termo de TI nao encontrado.");
+    }
+
+    return toTermResponse(term);
+  }
+
+  async create(context: TiAuthContext, body: CreateTiTermBody): Promise<unknown> {
+    try {
+      const user = await this.ensureUser(context.organizationId, body.user_id);
+
+      if (body.department_id) {
+        await this.ensureDepartment(context.organizationId, body.department_id);
+      }
+
+      return this.prisma.termTecnologia
+        .create({
+          data: {
+            ...body,
+            signed_at: null,
+            organization_id: context.organizationId,
+            user_id: user.id,
+            user_name: user.full_name?.trim() || user.name,
+            user_cpf: user.cpf?.trim() ?? "",
+          },
+        })
+        .then((term) => toTermResponse(term));
+    } catch (err: unknown) {
+      logError("Erro ao criar termo de TI", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao criar termo de TI.", err);
+    }
+  }
+
+  async update(context: TiAuthContext, id: string, body: UpdateTiTermBody): Promise<unknown> {
+    try {
+      await this.getById(context, id);
+
+      if (body.department_id) {
+        await this.ensureDepartment(context.organizationId, body.department_id);
+      }
+
+      return this.prisma.termTecnologia
+        .update({
+          where: { id },
+          data: body,
+        })
+        .then((term) => toTermResponse(term));
+    } catch (err: unknown) {
+      logError("Erro ao atualizar termo de TI", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao atualizar termo de TI.", err);
+    }
+  }
+
+  async sign(context: TiAuthContext, id: string, body: SignTiTermBody): Promise<unknown> {
+    try {
+      const term = (await this.getById(context, id)) as TermRecord;
+
+      if (context.permission < TiPermissionLevel.Admin && term.user_id !== context.userId) {
+        throw new ServiceError(403, "Permissao insuficiente para assinar termo de outro usuario.");
+      }
+
+      return this.prisma.termTecnologia
+        .update({
+          where: { id },
+          data: {
+            reason: body.reason ?? "Termo assinado pelo usuario.",
+            signed_at: new Date(),
+          },
+        })
+        .then((term) => toTermResponse(term));
+    } catch (err: unknown) {
+      logError("Erro ao assinar termo de TI", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro ao assinar termo de TI.", err);
+    }
+  }
+
+  private async ensureUser(organizationId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organization_id: organizationId },
+      select: { id: true, name: true, full_name: true, cpf: true, organization_id: true },
+    });
+
+    if (!user) {
+      throw new ServiceError(404, "Usuario nao encontrado.");
+    }
+
+    return user;
+  }
+
+  private async ensureDepartment(organizationId: string, departmentId: string): Promise<void> {
+    const department = await this.prisma.department.findFirst({
+      where: { id: departmentId, organization_id: organizationId },
+    });
+
+    if (!department) {
+      throw new ServiceError(404, "Departamento nao encontrado.");
+    }
+  }
+}

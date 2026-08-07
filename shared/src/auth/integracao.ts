@@ -1,0 +1,515 @@
+import { ServiceError } from "../http/errors.js";
+
+export const INTEGRACAO_MODULE_KEY = "integracao" as const;
+
+export const INTEGRACAO_PERMISSION_LEVELS = [0, 1, 2, 3] as const;
+export type IntegracaoPermissionLevel = (typeof INTEGRACAO_PERMISSION_LEVELS)[number];
+export const INTEGRACAO_PERMISSION_LEVEL = {
+  BASIC: 0,
+  VIEWER: 1,
+  USER: 2,
+  ADMIN: 3,
+} as const satisfies Record<string, IntegracaoPermissionLevel>;
+
+export type IntegracaoResource = "client" | "project" | "task" | "taskModel";
+export type IntegracaoAction =
+  | "read"
+  | "create"
+  | "update"
+  | "activate"
+  | "deactivate"
+  | "delete"
+  | "requestCompletion"
+  | "approveCompletion"
+  | "manage"
+  | "manageDependencies";
+export type IntegracaoScope = "organization" | "responsible";
+export type IntegracaoHttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+export type IntegracaoMutableFields = readonly string[] | "all";
+
+export interface IntegracaoAccessRule {
+  levels: readonly IntegracaoPermissionLevel[];
+  scope: IntegracaoScope;
+  mutableFields: IntegracaoMutableFields;
+  requiresTaskCompletion?: boolean;
+}
+
+export interface IntegracaoRoutePolicy {
+  method: IntegracaoHttpMethod;
+  path: string;
+  resource: IntegracaoResource;
+  action: IntegracaoAction;
+  access: readonly IntegracaoAccessRule[];
+  organization: "active";
+  responses: {
+    forbidden: 403;
+    outOfScope: 404;
+    dependency: 409 | null;
+  };
+  audit: "required" | "none";
+  test: string;
+}
+
+export interface IntegracaoAuthorizationInput {
+  userId: string;
+  level: IntegracaoPermissionLevel;
+  organizationId: string;
+  resourceOrganizationId?: string;
+  responsibleId?: string | null;
+  responsible2Id?: string | null;
+  responsible3Id?: string | null;
+  isOwner: boolean;
+  hasTaskCompletionPermission?: boolean;
+  requestedFields?: readonly string[];
+}
+
+export interface IntegracaoServiceAuthorization {
+  level: IntegracaoPermissionLevel;
+  isOwner: boolean;
+}
+
+export type IntegracaoAuthorizationDecision = "allow" | "forbidden" | "not_found";
+
+const CLIENT_CREATE_FIELDS = [
+  "type",
+  "name",
+  "company_name",
+  "fantasy_name",
+  "cpf_cnpj",
+  "opening_date",
+  "responsible",
+  "cpf_responsible",
+  "number",
+  "email",
+  "agent",
+  "cpf_agent",
+  "instagram",
+  "indication",
+  "participants_meet",
+  "meet_type",
+  "type_registration",
+  "service_unique",
+  "status",
+  "prospecting_status",
+] as const;
+
+const CLIENT_UPDATE_FIELDS = [
+  "type",
+  "name",
+  "company_name",
+  "fantasy_name",
+  "cpf_cnpj",
+  "opening_date",
+  "responsible",
+  "cpf_responsible",
+  "number",
+  "email",
+  "agent",
+  "cpf_agent",
+  "instagram",
+  "indication",
+  "participants_meet",
+  "meet_type",
+  "type_registration",
+  "service_unique",
+  "prospecting_status",
+  "address",
+  "cep",
+  "neighborhood",
+  "state",
+  "city",
+] as const;
+
+const PROJECT_FIELDS = [
+  "name",
+  "client_id",
+  "start_date",
+  "end_date",
+  "objective",
+  "sponsor_id",
+] as const;
+const TASK_CREATE_FIELDS = [
+  "model_id",
+  "project_id",
+  "client_id",
+  "prospecting_status",
+  "observations",
+  "urgency",
+] as const;
+const TASK_UPDATE_FIELDS = [
+  ...TASK_CREATE_FIELDS,
+  "name",
+  "status",
+  "department_id",
+  "billing",
+  "responsible_id",
+  "responsible2_id",
+  "responsible3_id",
+  "prevision_date",
+] as const;
+const TASK_OWN_FIELDS = ["status", "observations"] as const;
+const TASK_MODEL_FIELDS = [
+  "name",
+  "department_id",
+  "responsible_id",
+  "responsible2_id",
+  "responsible3_id",
+  "observations",
+  "billing",
+  "prevision",
+  "type",
+] as const;
+const TASK_MODEL_DEPENDENCY_FIELDS = [
+  "task_model_id",
+  "dependent_id",
+  "wait",
+  "observation",
+] as const;
+
+function readRule(
+  levels: readonly IntegracaoPermissionLevel[],
+  scope: IntegracaoScope = "organization",
+): IntegracaoAccessRule {
+  return { levels, scope, mutableFields: [] as const };
+}
+
+function writeRule(
+  levels: readonly IntegracaoPermissionLevel[],
+  mutableFields: IntegracaoMutableFields,
+  scope: IntegracaoScope = "organization",
+): IntegracaoAccessRule {
+  return { levels, scope, mutableFields };
+}
+
+function completionApprovalRule(
+  levels: readonly IntegracaoPermissionLevel[],
+  requiresTaskCompletion = false,
+): IntegracaoAccessRule {
+  return {
+    levels,
+    scope: "organization" as const,
+    mutableFields: [] as const,
+    ...(requiresTaskCompletion ? { requiresTaskCompletion: true } : {}),
+  };
+}
+
+function routePolicy(
+  method: IntegracaoHttpMethod,
+  path: string,
+  resource: IntegracaoResource,
+  action: IntegracaoAction,
+  access: readonly IntegracaoAccessRule[],
+  options: { dependency?: 409; audit?: "required" | "none"; test: string },
+): IntegracaoRoutePolicy {
+  return {
+    method,
+    path,
+    resource,
+    action,
+    access,
+    organization: "active",
+    responses: {
+      forbidden: 403,
+      outOfScope: 404,
+      dependency: options.dependency ?? null,
+    },
+    audit: options.audit ?? "none",
+    test: options.test,
+  };
+}
+
+const readOrganization = [
+  INTEGRACAO_PERMISSION_LEVEL.VIEWER,
+  INTEGRACAO_PERMISSION_LEVEL.USER,
+  INTEGRACAO_PERMISSION_LEVEL.ADMIN,
+] as const;
+const writeUser = [INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN] as const;
+const admin = [INTEGRACAO_PERMISSION_LEVEL.ADMIN] as const;
+const taskModelRead = [
+  INTEGRACAO_PERMISSION_LEVEL.VIEWER,
+  INTEGRACAO_PERMISSION_LEVEL.USER,
+  INTEGRACAO_PERMISSION_LEVEL.ADMIN,
+] as const;
+
+export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
+  routePolicy("GET", "/client/list", "client", "read", [readRule(readOrganization)], {
+    test: "client.list",
+  }),
+  routePolicy("GET", "/client/:id", "client", "read", [readRule(readOrganization)], {
+    test: "client.detail",
+  }),
+  routePolicy("POST", "/client", "client", "create", [writeRule(writeUser, CLIENT_CREATE_FIELDS)], {
+    audit: "required",
+    test: "client.create",
+  }),
+  routePolicy(
+    "PATCH",
+    "/client/:id",
+    "client",
+    "update",
+    [writeRule(writeUser, CLIENT_UPDATE_FIELDS)],
+    {
+      audit: "required",
+      test: "client.update",
+    },
+  ),
+  routePolicy(
+    "POST",
+    "/client/integration",
+    "client",
+    "create",
+    [writeRule(writeUser, CLIENT_CREATE_FIELDS)],
+    { audit: "required", test: "client.integration.create" },
+  ),
+  routePolicy(
+    "PATCH",
+    "/client/:id/integration",
+    "client",
+    "update",
+    [writeRule(writeUser, CLIENT_UPDATE_FIELDS)],
+    { audit: "required", test: "client.integration.update" },
+  ),
+  routePolicy("DELETE", "/client/:id", "client", "deactivate", [writeRule(admin, [])], {
+    audit: "required",
+    test: "client.deactivate",
+  }),
+  routePolicy("POST", "/client/:id/activate", "client", "activate", [writeRule(admin, [])], {
+    audit: "required",
+    test: "client.activate",
+  }),
+  routePolicy("GET", "/project/list", "project", "read", [readRule(readOrganization)], {
+    test: "project.list",
+  }),
+  routePolicy("GET", "/project", "project", "read", [readRule(readOrganization)], {
+    test: "project.detail",
+  }),
+  routePolicy("GET", "/project/metrics", "project", "read", [readRule(readOrganization)], {
+    test: "project.metrics",
+  }),
+  routePolicy(
+    "POST",
+    "/project/progress",
+    "project",
+    "update",
+    [writeRule(writeUser, ["project_id"])],
+    {
+      audit: "required",
+      test: "project.progress",
+    },
+  ),
+  routePolicy("POST", "/project", "project", "create", [writeRule(writeUser, PROJECT_FIELDS)], {
+    audit: "required",
+    test: "project.create",
+  }),
+  routePolicy("PUT", "/project", "project", "update", [writeRule(writeUser, PROJECT_FIELDS)], {
+    audit: "required",
+    test: "project.update",
+  }),
+  routePolicy("DELETE", "/project", "project", "delete", [writeRule(admin, [])], {
+    audit: "required",
+    dependency: 409,
+    test: "project.delete",
+  }),
+  routePolicy(
+    "GET",
+    "/task/list",
+    "task",
+    "read",
+    [readRule([INTEGRACAO_PERMISSION_LEVEL.BASIC], "responsible"), readRule(readOrganization)],
+    { test: "task.list" },
+  ),
+  routePolicy(
+    "GET",
+    "/task",
+    "task",
+    "read",
+    [readRule([INTEGRACAO_PERMISSION_LEVEL.BASIC], "responsible"), readRule(readOrganization)],
+    { test: "task.detail" },
+  ),
+  routePolicy("POST", "/task", "task", "create", [writeRule(writeUser, TASK_CREATE_FIELDS)], {
+    audit: "required",
+    test: "task.create",
+  }),
+  routePolicy(
+    "PUT",
+    "/task",
+    "task",
+    "update",
+    [
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        TASK_OWN_FIELDS,
+        "responsible",
+      ),
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN],
+        TASK_UPDATE_FIELDS,
+        "organization",
+      ),
+    ],
+    { audit: "required", test: "task.update" },
+  ),
+  routePolicy("DELETE", "/task", "task", "delete", [writeRule(admin, [])], {
+    audit: "required",
+    dependency: 409,
+    test: "task.delete",
+  }),
+  routePolicy(
+    "PUT",
+    "/task/conclusion",
+    "task",
+    "requestCompletion",
+    [
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        ["status", "observations"],
+        "responsible",
+      ),
+    ],
+    { audit: "required", test: "task.requestCompletion" },
+  ),
+  routePolicy(
+    "PUT",
+    "/task/complete-request",
+    "task",
+    "approveCompletion",
+    [
+      completionApprovalRule([INTEGRACAO_PERMISSION_LEVEL.USER], true),
+      completionApprovalRule([INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
+    ],
+    { audit: "required", test: "task.approveCompletion" },
+  ),
+  routePolicy("GET", "/task/model/list", "taskModel", "read", [readRule(taskModelRead)], {
+    test: "taskModel.list",
+  }),
+  routePolicy("GET", "/task/deps/list", "taskModel", "read", [readRule(taskModelRead)], {
+    test: "taskModel.dependencies.list",
+  }),
+  routePolicy("GET", "/task/deps/options", "taskModel", "read", [readRule(taskModelRead)], {
+    test: "taskModel.options.list",
+  }),
+  routePolicy("GET", "/task/model", "taskModel", "read", [readRule(taskModelRead)], {
+    test: "taskModel.detail",
+  }),
+  routePolicy("POST", "/task/model", "taskModel", "manage", [writeRule(admin, TASK_MODEL_FIELDS)], {
+    audit: "required",
+    test: "taskModel.create",
+  }),
+  routePolicy("PUT", "/task/model", "taskModel", "manage", [writeRule(admin, TASK_MODEL_FIELDS)], {
+    audit: "required",
+    test: "taskModel.update",
+  }),
+  routePolicy("DELETE", "/task/model", "taskModel", "delete", [writeRule(admin, [])], {
+    audit: "required",
+    dependency: 409,
+    test: "taskModel.delete",
+  }),
+  routePolicy(
+    "GET",
+    "/task/model/dependent",
+    "taskModel",
+    "manageDependencies",
+    [readRule(taskModelRead)],
+    {
+      test: "taskModel.dependent.list",
+    },
+  ),
+  routePolicy(
+    "POST",
+    "/task/model/dependent",
+    "taskModel",
+    "manageDependencies",
+    [writeRule(admin, TASK_MODEL_DEPENDENCY_FIELDS)],
+    { audit: "required", test: "taskModel.dependent.create" },
+  ),
+  routePolicy("DELETE", "/task/model/dependent", "taskModel", "delete", [writeRule(admin, [])], {
+    audit: "required",
+    dependency: 409,
+    test: "taskModel.dependent.delete",
+  }),
+];
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function routePatternMatches(pattern: string, path: string): boolean {
+  const expression = escapeRegExp(pattern).replace(/:[^/\\]+/g, "[^/]+");
+  return new RegExp(`^${expression}$`).test(path);
+}
+
+function hasTaskOwnership(input: IntegracaoAuthorizationInput): boolean {
+  const responsibleIds = [input.responsibleId, input.responsible2Id, input.responsible3Id];
+  return responsibleIds.includes(input.userId);
+}
+
+export function findIntegracaoRoutePolicy(
+  method: string,
+  path: string,
+): IntegracaoRoutePolicy | undefined {
+  const normalizedMethod = method.toUpperCase();
+  return INTEGRACAO_ROUTE_POLICIES.find(
+    (policy) => policy.method === normalizedMethod && routePatternMatches(policy.path, path),
+  );
+}
+
+export function evaluateIntegracaoAction(
+  policy: IntegracaoRoutePolicy,
+  input: IntegracaoAuthorizationInput,
+): IntegracaoAuthorizationDecision {
+  if (input.isOwner) {
+    return "allow";
+  }
+
+  if (
+    input.resourceOrganizationId !== undefined &&
+    input.resourceOrganizationId !== input.organizationId
+  ) {
+    return "not_found";
+  }
+
+  const rule = policy.access.find((candidate) => candidate.levels.includes(input.level));
+  if (!rule) {
+    return "forbidden";
+  }
+
+  if (rule.scope === "responsible" && !hasTaskOwnership(input)) {
+    return "not_found";
+  }
+
+  if (rule.requiresTaskCompletion && input.hasTaskCompletionPermission !== true) {
+    return "forbidden";
+  }
+
+  if (
+    input.requestedFields &&
+    rule.mutableFields !== "all" &&
+    input.requestedFields.some((field) => !rule.mutableFields.includes(field))
+  ) {
+    return "forbidden";
+  }
+
+  return "allow";
+}
+
+export function requireIntegracaoRouteAccess(
+  method: string,
+  path: string,
+  input: IntegracaoAuthorizationInput,
+): void {
+  const policy = findIntegracaoRoutePolicy(method, path);
+  if (!policy) {
+    throw new ServiceError(500, `Política de autorização ausente para ${method} ${path}.`);
+  }
+
+  const decision = evaluateIntegracaoAction(policy, input);
+  if (decision === "allow") {
+    return;
+  }
+
+  if (decision === "not_found") {
+    throw new ServiceError(404, "Recurso não encontrado.");
+  }
+
+  throw new ServiceError(403, "Acesso negado para esta operação.");
+}
