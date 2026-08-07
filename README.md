@@ -46,6 +46,10 @@ Em desenvolvimento, a aplicação web usa `http://localhost:3000` e o gateway us
    done
    ```
 
+   `regularize-service`, `ti-service` e `parcelamento-service` não possuem `.env.example`.
+   Eles carregam as variáveis do `.env` da raiz; crie `services/<nome>/.env` somente quando
+   precisar sobrescrever valores para um serviço.
+
 3. Preencha os valores reais nos arquivos criados. Use a mesma `DATABASE_URL` e o mesmo
    `JWT_SECRET` nos componentes que compartilham banco e autenticação. Também configure
    `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` nos serviços que dependem do Supabase.
