@@ -82,6 +82,19 @@ describe("certificate PJ routes", () => {
     expect(response.body.data).not.toHaveProperty("file_path");
   });
 
+  it("GET /certificate/pj/:id returns password for permission certificado 3", async () => {
+    const app = createCertificateTestApp();
+
+    const response = await request(app)
+      .get(`/certificate/pj/${certificateId}`)
+      .set(certificateGatewayHeaders(3));
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.password).toBe("secret-password");
+    expect(response.body.data).not.toHaveProperty("file_path");
+  });
+
   it("GET /certificate/pj/:id allows Viewer without exposing private fields", async () => {
     const app = createCertificateTestApp();
 

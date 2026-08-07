@@ -112,7 +112,7 @@ export function createCertificatePjRoutes(options: CreateCertificatePjRoutesOpti
       const result = await service.getCertificatePj({
         id: params.id,
         organizationId: authContext.organization_id,
-        canViewPassword: request.permission?.certificado === CERTIFICATE_ELEVATED_PERMISSION,
+        canViewPassword: (request.permission?.certificado ?? 0) >= CERTIFICATE_ELEVATED_PERMISSION,
       });
 
       response.status(200).json(createSuccessResponse(result));
