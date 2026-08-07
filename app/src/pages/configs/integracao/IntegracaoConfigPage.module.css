@@ -1,0 +1,51 @@
+.page {
+  padding: 2rem;
+}
+
+.title {
+  margin: 0 0 1.5rem;
+  color: var(--colors-blue-500, #2f406a);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.card {
+  padding: 1.5rem;
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: var(--shadows-md);
+  cursor: pointer;
+  transition: 0.2s;
+  border: 1px solid transparent;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: #ef5a8b;
+}
+
+.icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #ef5a8b;
+  margin-bottom: 1rem;
+}
+
+.cardTitle {
+  margin: 0 0 0.5rem;
+}
+
+.cardText {
+  margin: 0;
+  color: #64748b;
+}
