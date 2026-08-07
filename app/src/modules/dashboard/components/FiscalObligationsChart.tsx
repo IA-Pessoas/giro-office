@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-} from 'recharts';
+} from "recharts";
 import type { DashboardStats, FiscalObligationStatus } from '../types';
 
 interface FiscalObligationsChartProps {

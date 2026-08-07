@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
-} from 'recharts';
+} from "recharts";
 import type { DashboardStats } from '../types';
 
 interface ClientTrendsChartProps {
