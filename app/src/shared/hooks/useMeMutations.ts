@@ -30,7 +30,7 @@ function getUploadPhotoErrorMessage(error: unknown): string {
     }
   }
 
-  return "Nao foi possivel atualizar a foto.";
+  return "Não foi possível atualizar a foto.";
 }
 
 function updateMeCache(queryClient: ReturnType<typeof useQueryClient>, me: MeSessionUser): void {
@@ -96,7 +96,7 @@ export function useDeleteMePhoto(): UseMutationResult<MeSessionUser, unknown, vo
         return;
       }
 
-      toast.error("Nao foi possivel remover a foto.");
+      toast.error("Não foi possível remover a foto.");
       console.log(error);
     },
   });

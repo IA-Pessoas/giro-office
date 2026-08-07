@@ -359,7 +359,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return (
             <SessionTransitionScreen
                 title="Preparando o Office"
-                description="Validando sua sessao e carregando os acessos necessarios para abrir o ambiente com seguranca."
+                description="Validando sua sessão e carregando os acessos necessários para abrir o ambiente com segurança."
             />
         );
     }

@@ -157,8 +157,8 @@ const moduleCategories: NavigationCategory[] = [
 ];
 
 const MODULE_ACCESS_DENIED_MESSAGE = "Você não tem acesso a este módulo no perfil atual.";
-const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao modulo.";
-const MODULE_NAV_LOADING_MESSAGE = "Carregando modulos";
+const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao módulo.";
+const MODULE_NAV_LOADING_MESSAGE = "Carregando módulos";
 const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
 const USER_MENU_PANEL_ID = "app-shell-user-menu";
 const AI_CHAT_DIALOG_DESCRIPTION_ID = "app-shell-ai-chat-description";

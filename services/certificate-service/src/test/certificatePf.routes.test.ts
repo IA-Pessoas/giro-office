@@ -119,6 +119,54 @@ describe("certificate PF routes", () => {
     expect(response.body.data).not.toHaveProperty("file_storage_bucket");
   });
 
+  it("GET /certificate/pf/:id returns password for permission certificado 3", async () => {
+    const prisma = createCertificatePrismaMock();
+    vi.mocked(prisma.certificatePF.findFirst).mockResolvedValueOnce({
+      id: certificateId,
+      name: "Joao Silva",
+      cpf: "12345678901",
+      model: "A1",
+      password: "secret-password",
+      expiration_date: new Date("2026-12-31T00:00:00.000Z"),
+      client_castelo_status: true,
+      client_focus_status: false,
+      notes: "Renovar com antecedencia",
+      enterprise: "Empresa Castelo",
+      cnpj: "11222333000144",
+      was_paid: true,
+      payment_date: new Date("2026-01-10T00:00:00.000Z"),
+      payment_amount: 250,
+      contact_info: "certificados@example.com",
+      file_path: "organizations/org/certificate-pf/cert/file.pfx.enc",
+      has_certificate: true,
+      organization_id: certificateOrganizationId,
+      file_original_name: "Joao Silva.pfx",
+      file_mime_type: "application/x-pkcs12",
+      file_size_bytes: 10,
+      file_sha256: "hash",
+      file_uploaded_at: new Date("2026-05-28T12:00:00.000Z"),
+      file_uploaded_by_user_id: certificateUserId,
+      file_storage_provider: "local",
+      file_storage_bucket: "Certificados",
+      file_encryption_iv: "iv",
+      file_encryption_tag: "tag",
+      file_encryption_key_version: "v1",
+    } as never);
+    const app = createCertificateTestApp(prisma);
+
+    const response = await request(app)
+      .get(`/certificate/pf/${certificateId}`)
+      .set(certificateGatewayHeaders(3));
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.password).toBe("secret-password");
+    expect(response.body.data).not.toHaveProperty("file_path");
+    expect(response.body.data).not.toHaveProperty("file_encryption_iv");
+    expect(response.body.data).not.toHaveProperty("file_encryption_tag");
+    expect(response.body.data).not.toHaveProperty("file_storage_bucket");
+  });
+
   it("GET /certificate/pf/:id allows Viewer without exposing private fields", async () => {
     const app = createCertificateTestApp();
 
