@@ -33,12 +33,12 @@ export default function Login() {
   const features = [
     {
       icon: Users,
-      title: "Gestao Integrada",
-      description: "Todos os departamentos em um so lugar",
+      title: "Gestão Integrada",
+      description: "Todos os departamentos em um só lugar",
     },
     {
       icon: Shield,
-      title: "Seguranca Total",
+      title: "Segurança Total",
       description: "Seus dados protegidos com criptografia",
     },
   ];
@@ -62,9 +62,9 @@ export default function Login() {
       }
     } catch (error: any) {
       if (error?.response?.status === 400 || error?.response?.status === 401) {
-        setError("Login ou senha invalidos");
+        setError("Login ou senha inválidos");
       } else {
-        setError("Nao foi possivel entrar agora. Tente novamente.");
+        setError("Não foi possível entrar agora. Tente novamente.");
       }
       setLogin("");
       setPassword("");
@@ -106,10 +106,10 @@ export default function Login() {
                   <h1 className="text-4xl font-bold leading-tight">
                     Gerencie tudo em
                     <br />
-                    <span className="text-blue-200">um so lugar</span>
+                    <span className="text-blue-200">um só lugar</span>
                   </h1>
                   <p className="text-base text-blue-100">
-                    Sistema completo de gestao empresarial modular e inteligente
+                    Sistema completo de gestão empresarial modular e inteligente
                   </p>
                 </div>
               </div>
@@ -138,7 +138,7 @@ export default function Login() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
                   <div className="mb-0.5 text-2xl font-bold">6</div>
-                  <div className="text-xs text-blue-100">Modulos</div>
+                  <div className="text-xs text-blue-100">Módulos</div>
                 </div>
                 <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
                   <div className="mb-0.5 text-2xl font-bold">99.9%</div>
@@ -303,7 +303,7 @@ export default function Login() {
                   </form>
 
                   <p className={`mt-4 text-center text-xs ${LOGIN_CARD_SECONDARY_TEXT_CLASSNAME}`}>
-                    Nao tem conta?{" "}
+                    Não tem conta?{" "}
                     <Link
                       href="/solicitar-acesso"
                       className="font-semibold text-blue-600 hover:text-blue-700 hover:underline"
