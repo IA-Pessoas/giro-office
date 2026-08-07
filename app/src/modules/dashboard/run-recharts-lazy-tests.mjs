@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,44 +20,49 @@ function runTest(name, fn) {
   }
 }
 
-const newLayoutTargets = [
-  "shared/components/newLayout/Dashboard.tsx",
-  "shared/components/newLayout/Parcelamento.tsx",
-  "shared/components/newLayout/Tecnologia.tsx",
-  "shared/components/newLayout/Regularize.tsx",
-  "shared/components/newLayout/Commercial.tsx",
-  "shared/components/newLayout/Marketing.tsx",
-  "shared/components/newLayout/Fiscal.tsx",
-  "shared/components/newLayout/DepartamentoPessoal.tsx",
-];
-
-const moduleChartTargets = [
-  "modules/dashboard/components/ServiceDistributionChart.tsx",
-  "modules/dashboard/components/FiscalObligationsChart.tsx",
-  "modules/dashboard/components/ClientTrendsChart.tsx",
-];
-
-const staticRecharts = /from\s+['"]recharts['"]/;
-
-runTest("LazyRecharts module exists", () => {
+runTest("LazyRecharts per-primitive wrapper must not exist", () => {
   assert.equal(
     existsSync(join(appSrc, "shared/components/charts/LazyRecharts.tsx")),
-    true,
+    false,
   );
 });
 
-runTest("LazyRecharts uses next/dynamic and does not statically re-export for consumers incorrectly", () => {
-  const src = read("shared/components/charts/LazyRecharts.tsx");
+runTest("dashboard page lazy-loads the full Dashboard component", () => {
+  const src = read("pages/dashboard/index.tsx");
   assert.match(src, /next\/dynamic/);
-  assert.match(src, /import\(["']recharts["']\)/);
   assert.match(src, /ssr:\s*false/);
+  assert.match(src, /newLayout\/Dashboard/);
+  assert.doesNotMatch(
+    src,
+    /import\s+\{\s*Dashboard\s+as\s+DashboardContent\s*\}\s+from/,
+  );
 });
 
-for (const rel of [...newLayoutTargets, ...moduleChartTargets]) {
-  runTest(`${rel} does not statically import recharts`, () => {
+runTest("DashboardGrid lazy-loads chart components as wholes", () => {
+  const src = read("modules/dashboard/components/DashboardGrid.tsx");
+  assert.match(src, /next\/dynamic/);
+  assert.match(src, /FiscalObligationsChart/);
+  assert.match(src, /ServiceDistributionChart/);
+  assert.match(src, /ClientTrendsChart/);
+  assert.match(src, /ssr:\s*false/);
+  assert.doesNotMatch(
+    src,
+    /import\s+\{\s*ClientTrendsChart\s*\}\s+from\s+["']\.\/ClientTrendsChart["']/,
+  );
+});
+
+const chartLeaves = [
+  "modules/dashboard/components/ServiceDistributionChart.tsx",
+  "modules/dashboard/components/FiscalObligationsChart.tsx",
+  "modules/dashboard/components/ClientTrendsChart.tsx",
+  "shared/components/newLayout/Dashboard.tsx",
+];
+
+for (const rel of chartLeaves) {
+  runTest(`${rel} keeps static recharts imports for composition`, () => {
     const src = read(rel);
-    assert.doesNotMatch(src, staticRecharts);
-    assert.match(src, /LazyRecharts|shared\/components\/charts\/LazyRecharts/);
+    assert.match(src, /from\s+["']recharts["']/);
+    assert.doesNotMatch(src, /LazyRecharts/);
   });
 }
 

@@ -42,7 +42,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "../charts/LazyRecharts";
+} from "recharts";
 
 import { useCommercialOverview } from "../../../modules/commercial/hooks/useCommercialOverview";
 import type { CommercialLead } from "../../../modules/commercial/types";
