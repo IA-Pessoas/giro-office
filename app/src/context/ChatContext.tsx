@@ -652,7 +652,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const supportedAudioTypes = ['audio/mpeg', 'audio/webm', 'audio/wav', 'audio/ogg'];
         
         if (![...supportedImageTypes, ...supportedAudioTypes].includes(file.type)) {
-            toast.error("Tipo de arquivo nao suportado.");
+            toast.error("Tipo de arquivo não suportado.");
             return;
         }
 
@@ -692,7 +692,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         } catch (error) {
             console.error("Erro no processo de upload:", error);
-            toast.error("Nao foi possivel enviar sua midia.");
+            toast.error("Não foi possível enviar sua mídia.");
         } finally {
             setIsUploading(false);
         }

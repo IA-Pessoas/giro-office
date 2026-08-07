@@ -4,7 +4,9 @@ export default class Mydocument extends Document {
     render(): JSX.Element {
         return(
             <Html lang="pt-BR">
-                <Head />
+                <Head>
+                  <meta charSet="utf-8" />
+                </Head>
                 <body>
                     <script
                       dangerouslySetInnerHTML={{
