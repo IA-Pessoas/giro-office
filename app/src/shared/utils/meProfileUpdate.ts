@@ -1,6 +1,6 @@
 import type { UpdateCurrentUserPayload } from "@workspace/api";
 
-export const PROFILE_UPDATE_ERROR_MESSAGE = "Nao foi possivel atualizar o perfil.";
+export const PROFILE_UPDATE_ERROR_MESSAGE = "Não foi possível atualizar o perfil.";
 
 interface BuildSelfProfileUpdatePayloadOptions {
   canManageUsers: boolean;
