@@ -96,9 +96,9 @@ await runTest("chat upload uses toast feedback instead of alert", () => {
   const uploadSource = getUploadFunctionSource();
 
   assert.equal(uploadSource.includes("alert("), false);
-  assert.match(uploadSource, /toast\.error\("Tipo de arquivo nao suportado\."\)/);
+  assert.match(uploadSource, /toast\.error\("Tipo de arquivo não suportado\."\)/);
   assert.match(uploadSource, /toast\.error\(CHAT_UPLOAD_SIZE_ERROR_MESSAGE\)/);
-  assert.match(uploadSource, /toast\.error\("Nao foi possivel enviar sua midia\."\)/);
+  assert.match(uploadSource, /toast\.error\("Não foi possível enviar sua mídia\."\)/);
 });
 
 await runTest("group detail update failure uses toast feedback instead of alert", () => {
