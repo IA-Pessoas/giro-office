@@ -19,3 +19,4 @@ packages:
   - "services/certificate-service"
   - "services/pessoal-service"
   - "services/parcelamento-service"
+  - "services/src"
