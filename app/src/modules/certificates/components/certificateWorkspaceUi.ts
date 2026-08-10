@@ -65,6 +65,18 @@ export function resolveCertificateWorkspaceCapabilities(
   };
 }
 
+export const CERTIFICATE_DETAIL_SUMMARY_GRID_CLASSNAME = "grid gap-4 sm:grid-cols-2";
+
+export const CERTIFICATE_DETAIL_CARD_CLASSNAME =
+  "min-w-0 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800";
+
+export const CERTIFICATE_DETAIL_CARD_WIDE_CLASSNAME = `${CERTIFICATE_DETAIL_CARD_CLASSNAME} sm:col-span-2`;
+
+export const CERTIFICATE_DETAIL_LABEL_CLASSNAME = "text-xs text-slate-500 dark:text-slate-400";
+
+export const CERTIFICATE_DETAIL_VALUE_CLASSNAME =
+  "mt-1 break-words font-semibold text-slate-900 dark:text-white";
+
 export const CERTIFICATE_PANEL_CLASSNAME =
   "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900";
 

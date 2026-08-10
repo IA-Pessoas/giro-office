@@ -58,6 +58,11 @@ import { CertificateForm } from "./CertificateForm";
 import { normalizeCertificateDocumentFilter } from "./certificateInputNormalization";
 import {
   CERTIFICATE_COMPACT_BUTTON_CLASSNAME,
+  CERTIFICATE_DETAIL_CARD_CLASSNAME,
+  CERTIFICATE_DETAIL_CARD_WIDE_CLASSNAME,
+  CERTIFICATE_DETAIL_LABEL_CLASSNAME,
+  CERTIFICATE_DETAIL_SUMMARY_GRID_CLASSNAME,
+  CERTIFICATE_DETAIL_VALUE_CLASSNAME,
   CERTIFICATE_DATE_STATUS_OK_CLASSNAME,
   CERTIFICATE_BADGE_CLASSNAME,
   CERTIFICATE_FORM_MODAL_BODY_CLASSNAME,
@@ -2006,26 +2011,26 @@ export function CertificatesWorkspace() {
 
           {!activeDetailIsLoading && !activeDetailErrorMessage && selected?.type === "pj" ? (
             <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Cliente</p>
-                  <p className="mt-1 font-semibold text-slate-900 dark:text-white">
+              <div className={CERTIFICATE_DETAIL_SUMMARY_GRID_CLASSNAME}>
+                <div className={CERTIFICATE_DETAIL_CARD_WIDE_CLASSNAME}>
+                  <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>Cliente</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>
                     {pjDetail?.name ?? "-"}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">CNPJ</p>
-                  <p className="mt-1 font-semibold text-slate-900 dark:text-white">{pjDetail?.cnpj ?? "-"}</p>
+                <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
+                  <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>CNPJ</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{pjDetail?.cnpj ?? "-"}</p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Responsável</p>
-                  <p className="mt-1 font-semibold text-slate-900 dark:text-white">
+                <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
+                  <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>Modelo</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{pjDetail?.model ?? "-"}</p>
+                </div>
+                <div className={CERTIFICATE_DETAIL_CARD_WIDE_CLASSNAME}>
+                  <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>Responsável</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>
                     {pjDetail?.responsible ?? "-"}
                   </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Modelo</p>
-                  <p className="mt-1 font-semibold text-slate-900 dark:text-white">{pjDetail?.model ?? "-"}</p>
                 </div>
               </div>
 
@@ -2102,24 +2107,24 @@ export function CertificatesWorkspace() {
 
           {!activeDetailIsLoading && !activeDetailErrorMessage && selected?.type === "pf" ? (
             <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Titular</p>
-                  <p className="mt-1 font-semibold text-slate-900 dark:text-white">
+              <div className={CERTIFICATE_DETAIL_SUMMARY_GRID_CLASSNAME}>
+                <div className={CERTIFICATE_DETAIL_CARD_WIDE_CLASSNAME}>
+                  <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>Titular</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>
                     {pfDetail?.name ?? "-"}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">CPF</p>
-                  <p className="mt-1 font-semibold text-slate-900 dark:text-white">{pfDetail?.cpf ?? "-"}</p>
+                <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
+                  <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>CPF</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{pfDetail?.cpf ?? "-"}</p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Empresa</p>
-                  <p className="mt-1 font-semibold text-slate-900 dark:text-white">{pfDetail?.enterprise ?? "-"}</p>
+                <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
+                  <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>Modelo</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{pfDetail?.model ?? "-"}</p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Modelo</p>
-                  <p className="mt-1 font-semibold text-slate-900 dark:text-white">{pfDetail?.model ?? "-"}</p>
+                <div className={CERTIFICATE_DETAIL_CARD_WIDE_CLASSNAME}>
+                  <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>Empresa</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{pfDetail?.enterprise ?? "-"}</p>
                 </div>
               </div>
 
