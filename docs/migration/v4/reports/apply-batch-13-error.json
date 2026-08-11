@@ -1,0 +1,27 @@
+{
+  "batchIndex": 13,
+  "failedAt": "2026-08-10T13:54:39.965Z",
+  "sources": [
+    "tb_rh.alergias",
+    "tb_rh.contatos_emergencia",
+    "tb_rh.pontos",
+    "tb_rh.pontos_adicionais_folhas",
+    "tb_rh.pontos_folhas",
+    "tb_rh.pontos_registros"
+  ],
+  "error": {
+    "name": "error",
+    "message": "invalid input syntax for type json",
+    "code": "22P02",
+    "details": null,
+    "stack": [
+      "error: invalid input syntax for type json",
+      "    at /home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js:631:17",
+      "    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+      "    at async Object.loadMappedData [as load] (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:282:27)",
+      "    at async runMigration (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:40:24)",
+      "    at async main (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:417:24)",
+      "    at async file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:475:3"
+    ]
+  }
+}

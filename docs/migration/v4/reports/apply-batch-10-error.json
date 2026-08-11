@@ -1,0 +1,27 @@
+{
+  "batchIndex": 10,
+  "failedAt": "2026-08-10T17:11:38.440Z",
+  "sources": [
+    "tb_regularize.pf_empresas",
+    "tb_regularize.processos",
+    "tb_regularize.taxas_municipais",
+    "tb_rh.colaboradores",
+    "tb_tecnologia.estoque",
+    "tb_tecnologia.inventario"
+  ],
+  "error": {
+    "name": "error",
+    "message": "update or delete on table \"regularize.process\" violates foreign key constraint \"regularize.proceduralGuidances_process_id_fkey\" on table \"regularize.proceduralGuidances\"",
+    "code": "23503",
+    "details": null,
+    "stack": [
+      "error: update or delete on table \"regularize.process\" violates foreign key constraint \"regularize.proceduralGuidances_process_id_fkey\" on table \"regularize.proceduralGuidances\"",
+      "    at /home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js:631:17",
+      "    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+      "    at async Object.cleanupMappedData [as cleanup] (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:115:29)",
+      "    at async runMigration (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:33:27)",
+      "    at async main (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:417:24)",
+      "    at async file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:475:3"
+    ]
+  }
+}

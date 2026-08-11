@@ -1,0 +1,27 @@
+{
+  "batchIndex": 0,
+  "failedAt": "2026-08-10T20:55:07.162Z",
+  "sources": [
+    "tb_admin.departamentos",
+    "tb_cbc.emails",
+    "tb_cbs.estoque_inventario",
+    "tb_certificados.pf",
+    "tb_certificados.pj",
+    "tb_fiscal.icms"
+  ],
+  "error": {
+    "name": "error",
+    "message": "update or delete on table \"departments\" violates foreign key constraint \"users_department_id_fkey\" on table \"users\"",
+    "code": "23503",
+    "details": null,
+    "stack": [
+      "error: update or delete on table \"departments\" violates foreign key constraint \"users_department_id_fkey\" on table \"users\"",
+      "    at /home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js:631:17",
+      "    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+      "    at async Object.cleanupMappedData [as cleanup] (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:115:29)",
+      "    at async runMigration (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:33:27)",
+      "    at async main (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:417:24)",
+      "    at async file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:475:3"
+    ]
+  }
+}

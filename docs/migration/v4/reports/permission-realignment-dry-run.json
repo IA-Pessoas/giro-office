@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "giro-office.permission-realignment/1",
+  "mode": "dry-run",
+  "writesPerformed": false,
+  "tenant": "e8048d1c-0830-45d7-84de-68e20abd685b",
+  "sourceDir": "/home/bruno/Documents/03.08.2026",
+  "sourceCounts": {
+    "users": 306,
+    "departments": 48,
+    "dynamicPermissionRows": 14,
+    "fixedPermissionRows": 1175
+  },
+  "destinationCounts": {
+    "usersInTenant": 305,
+    "matchedLegacyUsers": 305,
+    "unmatchedLegacyUsers": 1
+  },
+  "actions": 305,
+  "invalidStatuses": 0,
+  "conflicts": 12,
+  "moduleColumns": [
+    "certificado",
+    "comercial",
+    "contabil",
+    "financeiro",
+    "fiscal",
+    "integracao",
+    "marketing",
+    "parcelamento",
+    "pessoal",
+    "regularize",
+    "rh",
+    "ti",
+    "triagem"
+  ],
+  "globalUserProfile": {
+    "type": "user",
+    "permission": 1,
+    "first_owner_flag": false
+  },
+  "updatedAt": "2026-08-11T12:07:52.015Z"
+}
