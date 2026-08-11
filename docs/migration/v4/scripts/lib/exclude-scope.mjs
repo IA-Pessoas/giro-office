@@ -1,4 +1,4 @@
-const DEFAULT_EXCLUDED_DOMAINS = Object.freeze([]);
+const DEFAULT_EXCLUDED_DOMAINS = Object.freeze(["marketing", "triage"]);
 
 export function parseExcludedDomains(value) {
   if (typeof value !== "string" || value.trim().length === 0) {

@@ -11,6 +11,8 @@ abaixo e não está autorizado enquanto o dry-run conectado continuar incompleto
 - Namespace: `castelo-contabilidade`.
 - Origem: 312 dumps, 1.374.880 linhas inventariadas.
 - Estados finais: 103 origens `confirmed` e 209 `pending`.
+- Exclusões operacionais: os domínios `marketing` (`tb_mkt.*`) e `triage` (`tb_triagem.*`) ficam
+  como `notEmitted`/“não migrados”, sem entrar na carga.
 - Passos de destino: 133, sendo 90 `insert`, 21 `merge`, 14 `derived`, 4 `lookup` e 4
   `aggregate`.
 - Digest da origem: `e76a761406a4cc2e2aa2cae959c51be79c59a968f06a12f0702f3233876cb742`.
@@ -21,6 +23,10 @@ As 209 origens `pending` ficam deliberadamente fora da carga e entram em `quaran
 humana por caso. Nenhuma pendência é resolvida pela criação de tabela ou serviço: ela permanece
 registrada em `pending-mapping/`. Quarentenas das origens confirmadas ficam em `quarantine/` até
 serem corrigidas ou removidas antes da carga.
+
+A exclusão operacional atual adiciona 341 linhas de `tb_mkt.*` e 1.185 linhas de `tb_triagem.*` à
+lista de “não migrados”. Com essas exclusões, a quarentena funcional fica em 15.518 registros;
+o detalhamento está em `reports/operational-quarantine-summary.json`.
 
 ## Hierarquia de evidências
 
