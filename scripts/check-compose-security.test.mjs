@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { checkComposeSecurity } from "./check-compose-security.mjs";
+import {
+  checkComposeSecurity,
+  checkResolvedProductionSecurity,
+} from "./check-compose-security.mjs";
 
 async function writeFixture(contents) {
   const dir = await mkdtemp(path.join(tmpdir(), "compose-security-"));
@@ -78,4 +81,39 @@ networks:
   });
 
   assert.match(result.errors.join("\n"), /backend.*internal/);
+});
+
+test("production security accepts only web on public-edge without published ports", () => {
+  const result = checkResolvedProductionSecurity({
+    services: {
+      web: { networks: { edge: null, backend: null, "public-edge": null } },
+      gateway: { networks: { edge: null, backend: null } },
+      "user-service": { networks: { backend: null, egress: null } },
+    },
+    networks: {
+      backend: { internal: true },
+      "public-edge": { external: true, name: "public-edge" },
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+});
+
+test("production security rejects host ports and backend services on public-edge", () => {
+  const result = checkResolvedProductionSecurity({
+    services: {
+      web: {
+        networks: { edge: null, backend: null, "public-edge": null },
+        ports: [{ published: "3000", target: 3000 }],
+      },
+      gateway: { networks: { edge: null, backend: null, "public-edge": null } },
+    },
+    networks: {
+      backend: { internal: true },
+      "public-edge": { external: true, name: "public-edge" },
+    },
+  });
+
+  assert.match(result.errors.join("\n"), /web.*host ports/);
+  assert.match(result.errors.join("\n"), /gateway.*public-edge/);
 });

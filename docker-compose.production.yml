@@ -1,0 +1,20 @@
+# Produção single-slot atrás do Caddy compartilhado do host.
+services:
+  reverse-proxy:
+    profiles: ["internal-proxy"]
+    ports: !override []
+
+  web:
+    ports: !override []
+    networks:
+      - edge
+      - backend
+      - public-edge
+
+  gateway:
+    ports: !override []
+
+networks:
+  public-edge:
+    external: true
+    name: public-edge
