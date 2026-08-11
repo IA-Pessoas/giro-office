@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -10,6 +10,13 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const deployScript = path.join(repoRoot, "scripts", "ops", "deploy-production.sh");
 const webEnvLoader = path.join(repoRoot, "scripts", "ops", "load-production-web-env.sh");
 const endpointWaiter = path.join(repoRoot, "scripts", "ops", "wait-production-endpoints.sh");
+const turboConfig = path.join(repoRoot, "turbo.json");
+
+test("production build forwards the internal API URL through Turbo strict env", () => {
+  const config = JSON.parse(readFileSync(turboConfig, "utf8"));
+
+  assert.ok(config.tasks.build.env.includes("API_INTERNAL_URL"));
+});
 
 test("production endpoint waiter preserves external network names", () => {
   const external = spawnSync("bash", [endpointWaiter, "--resolve-network", "public-edge"], {
