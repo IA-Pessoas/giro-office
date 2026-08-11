@@ -9,6 +9,23 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const deployScript = path.join(repoRoot, "scripts", "ops", "deploy-production.sh");
 const webEnvLoader = path.join(repoRoot, "scripts", "ops", "load-production-web-env.sh");
+const endpointWaiter = path.join(repoRoot, "scripts", "ops", "wait-production-endpoints.sh");
+
+test("production endpoint waiter preserves external network names", () => {
+  const external = spawnSync("bash", [endpointWaiter, "--resolve-network", "public-edge"], {
+    encoding: "utf8",
+    env: { ...process.env, COMPOSE_PROJECT_NAME: "giro-office-production" },
+  });
+  const internal = spawnSync("bash", [endpointWaiter, "--resolve-network", "backend"], {
+    encoding: "utf8",
+    env: { ...process.env, COMPOSE_PROJECT_NAME: "giro-office-production" },
+  });
+
+  assert.equal(external.status, 0, external.stderr);
+  assert.equal(external.stdout.trim(), "public-edge");
+  assert.equal(internal.status, 0, internal.stderr);
+  assert.equal(internal.stdout.trim(), "giro-office-production_backend");
+});
 
 test("production web env is exported for Docker build arguments", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "production-web-env-"));

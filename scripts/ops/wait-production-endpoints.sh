@@ -7,6 +7,19 @@ TIMEOUT="${PRODUCTION_WAIT_TIMEOUT:-900}"
 INTERVAL="${PRODUCTION_WAIT_INTERVAL:-10}"
 CURL_IMAGE="${PRODUCTION_CURL_IMAGE:-curlimages/curl:8.12.0}"
 
+resolve_network_name() {
+  if [[ "$1" == "public-edge" ]]; then
+    printf '%s\n' "public-edge"
+  else
+    printf '%s_%s\n' "$PROJECT" "$1"
+  fi
+}
+
+if [[ "${1:-}" == "--resolve-network" ]]; then
+  resolve_network_name "${2:?network name is required}"
+  exit 0
+fi
+
 checks=(
   "backend|http://organization-service:3031/health"
   "backend|http://user-service:3030/health"
@@ -29,10 +42,11 @@ checks=(
 )
 
 run_checks() {
-  local failed=0 network url
+  local failed=0 network network_name url
   for item in "${checks[@]}"; do
     IFS='|' read -r network url <<<"$item"
-    if docker run --rm --network "${PROJECT}_${network}" "$CURL_IMAGE" \
+    network_name="$(resolve_network_name "$network")"
+    if docker run --rm --network "$network_name" "$CURL_IMAGE" \
       curl -fsS --max-time 8 "$url" >/dev/null; then
       printf 'OK %s\n' "$url"
     else
