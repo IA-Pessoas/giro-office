@@ -24,6 +24,7 @@ import { createCertificatePjRoutes } from "./routes/certificatePj.routes.js";
 import { createInternalNotificationRoutes } from "./routes/internalNotification.routes.js";
 import type { createCertificateFileCrypto } from "./services/certificateFileCrypto.js";
 import type { CertificateFileStorage } from "./services/certificateFileStorage.js";
+import { createCertificatePasswordCrypto } from "./services/certificatePasswordCrypto.js";
 
 function certificateServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const out: Record<string, unknown> = {};
@@ -47,6 +48,7 @@ export interface CreateCertificateApplicationOptions {
   prisma: PrismaClient;
   certificateFileStorage?: CertificateFileStorage;
   certificateFileCrypto?: ReturnType<typeof createCertificateFileCrypto>;
+  certificatePasswordCrypto?: ReturnType<typeof createCertificatePasswordCrypto>;
 }
 
 export function createCertificateApplication({
@@ -55,8 +57,15 @@ export function createCertificateApplication({
   prisma: _prisma,
   certificateFileStorage,
   certificateFileCrypto,
+  certificatePasswordCrypto: providedCertificatePasswordCrypto,
 }: CreateCertificateApplicationOptions): express.Express {
   const app = express();
+  const certificatePasswordCrypto =
+    providedCertificatePasswordCrypto ??
+    createCertificatePasswordCrypto({
+      keyBase64: env.certificatePasswordEncryptionKey,
+      keyVersion: env.certificatePasswordEncryptionKeyVersion,
+    });
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -94,6 +103,7 @@ export function createCertificateApplication({
       maxFileSizeBytes: env.certificateFileMaxSizeBytes,
       storageProvider: env.storageMode,
       storageBucket: env.storageBucket,
+      certificatePasswordCrypto,
       uploadRateLimit: createRateLimitMiddleware({
         key: "certificate-service:pj-file-upload",
         max: env.uploadRateLimitMax,
@@ -111,6 +121,7 @@ export function createCertificateApplication({
       maxFileSizeBytes: env.certificateFileMaxSizeBytes,
       storageProvider: env.storageMode,
       storageBucket: env.storageBucket,
+      certificatePasswordCrypto,
       uploadRateLimit: createRateLimitMiddleware({
         key: "certificate-service:pf-file-upload",
         max: env.uploadRateLimitMax,

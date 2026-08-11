@@ -17,6 +17,7 @@ import {
   type CertificateFileStorage,
 } from "./certificateFileStorage.js";
 import type { CertificateUploadFile } from "./certificateFileValidation.js";
+import type { CertificatePasswordCrypto } from "./certificatePasswordCrypto.js";
 import { isPrismaUniqueConstraintError } from "./prismaErrors.js";
 
 export interface CertificatePjContext {
@@ -193,7 +194,16 @@ export class CertificatePjService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly fileDeps?: CertificatePjFileDeps,
+    private readonly passwordCrypto?: CertificatePasswordCrypto,
   ) {}
+
+  private requirePasswordCrypto(): CertificatePasswordCrypto {
+    if (!this.passwordCrypto) {
+      throw new ServiceError(500, "Criptografia de senha de certificado nao configurada.");
+    }
+
+    return this.passwordCrypto;
+  }
 
   async listCertificatePj(input: CertificatePjListInput): Promise<CertificatePjListResult> {
     const pagination = getPaginationParams(input.query);
@@ -227,11 +237,29 @@ export class CertificatePjService {
       throw new ServiceError(404, "Certificado PJ nao encontrado.");
     }
 
+    const safeRecord = removeFilePrivateMetadata(record);
     if (!input.canViewPassword) {
-      return removePassword(removeFilePrivateMetadata(record));
+      return removePassword(safeRecord);
     }
 
-    return removeFilePrivateMetadata(record);
+    const password = safeRecord.password;
+    if (password === undefined) {
+      return safeRecord;
+    }
+
+    const passwordCrypto = this.requirePasswordCrypto();
+    if (!passwordCrypto.isEncrypted(password)) {
+      await this.prisma.certificatePJ.update({
+        where: { id: input.id, organization_id: input.organizationId },
+        data: { password: passwordCrypto.encrypt(password) as string },
+      });
+      return safeRecord;
+    }
+
+    return {
+      ...safeRecord,
+      password: passwordCrypto.decrypt(password) ?? undefined,
+    };
   }
 
   async createCertificatePj(input: CertificatePjCreateInput): Promise<CertificatePjDetailResult> {
@@ -249,15 +277,17 @@ export class CertificatePjService {
         throw new ServiceError(409, "Ja existe um certificado PJ com estes dados.");
       }
 
+      const passwordCrypto = this.requirePasswordCrypto();
       const record = await this.prisma.certificatePJ.create({
         data: {
           ...input.data,
+          password: passwordCrypto.encrypt(input.data.password) as string,
           organization_id: input.organizationId,
           has_certificate: false,
         },
       });
 
-      return removeFilePrivateMetadata(record);
+      return removePassword(removeFilePrivateMetadata(record));
     } catch (err: unknown) {
       logError("Erro ao criar certificado PJ", { err });
       if (err instanceof ServiceError) throw err;
@@ -302,12 +332,19 @@ export class CertificatePjService {
         }
       }
 
+      const data =
+        input.data.password === undefined
+          ? input.data
+          : {
+              ...input.data,
+              password: this.requirePasswordCrypto().encrypt(input.data.password) as string,
+            };
       const record = await this.prisma.certificatePJ.update({
         where: { id: input.id, organization_id: input.organizationId },
-        data: input.data,
+        data,
       });
 
-      return removeFilePrivateMetadata(record);
+      return removePassword(removeFilePrivateMetadata(record));
     } catch (err: unknown) {
       logError("Erro ao atualizar certificado PJ", { err });
       if (err instanceof ServiceError) throw err;

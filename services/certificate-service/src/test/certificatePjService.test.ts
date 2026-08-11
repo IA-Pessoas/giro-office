@@ -4,10 +4,18 @@ import type { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { createCertificateFileCrypto } from "../services/certificateFileCrypto.js";
-import { CertificatePjService } from "../services/certificatePjService.js";
+import { createCertificatePasswordCrypto } from "../services/certificatePasswordCrypto.js";
+import {
+  type CertificatePjFileDeps,
+  CertificatePjService,
+} from "../services/certificatePjService.js";
 import { certificateOrganizationId, certificateUserId } from "./testUtils.js";
 
 const certificateId = "20000000-0000-4000-8000-000000000001";
+const certificatePasswordCrypto = createCertificatePasswordCrypto({
+  keyBase64: Buffer.alloc(32, 7).toString("base64"),
+  keyVersion: "v1",
+});
 const privateFileMetadataFields = [
   "file_path",
   "file_original_name",
@@ -33,7 +41,7 @@ function createCertificatePjRecord(overrides: Record<string, unknown> = {}) {
     responsible: "Maria Silva",
     model: "A1",
     legal_nature: "LTDA",
-    password: "secret-password",
+    password: certificatePasswordCrypto.encrypt("secret-password") as string,
     expiration_date: new Date("2026-12-31T00:00:00.000Z"),
     notes: "Renovar com antecedencia",
     was_paid: true,
@@ -89,6 +97,10 @@ function expectNoPrivateFileMetadata(result: Record<string, unknown>) {
   }
 }
 
+function createPjService(prisma: never, fileDeps?: CertificatePjFileDeps) {
+  return new CertificatePjService(prisma, fileDeps, certificatePasswordCrypto);
+}
+
 describe("CertificatePjService", () => {
   it("listCertificatePj filters by organization_id and never selects password", async () => {
     const prisma = {
@@ -97,7 +109,7 @@ describe("CertificatePjService", () => {
         findMany: vi.fn(async () => [createCertificatePjRecord()]),
       },
     };
-    const service = new CertificatePjService(prisma as never);
+    const service = createPjService(prisma as never);
 
     const result = await service.listCertificatePj({
       organizationId: certificateOrganizationId,
@@ -131,7 +143,7 @@ describe("CertificatePjService", () => {
         findFirst: vi.fn(async () => createCertificatePjRecord()),
       },
     };
-    const service = new CertificatePjService(prisma as never);
+    const service = createPjService(prisma as never);
 
     const result = await service.getCertificatePj({
       id: certificateId,
@@ -149,7 +161,7 @@ describe("CertificatePjService", () => {
         findFirst: vi.fn(async () => createCertificatePjRecord()),
       },
     };
-    const service = new CertificatePjService(prisma as never);
+    const service = createPjService(prisma as never);
 
     const result = await service.getCertificatePj({
       id: certificateId,
@@ -160,6 +172,56 @@ describe("CertificatePjService", () => {
     expect(result).not.toHaveProperty("password");
   });
 
+  it("getCertificatePj re-encrypts legacy plaintext only for an authorized read", async () => {
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => createCertificatePjRecord({ password: "legacy-password" })),
+        update: vi.fn(async ({ data }) => createCertificatePjRecord(data)),
+      },
+    };
+    const service = createPjService(prisma as never);
+
+    const result = await service.getCertificatePj({
+      id: certificateId,
+      organizationId: certificateOrganizationId,
+      canViewPassword: true,
+    });
+
+    const storedPassword = prisma.certificatePJ.update.mock.calls[0]?.[0].data.password;
+    expect(result.password).toBe("legacy-password");
+    expect(prisma.certificatePJ.update).toHaveBeenCalledWith({
+      where: { id: certificateId, organization_id: certificateOrganizationId },
+      data: { password: expect.any(String) },
+    });
+    expect(typeof storedPassword).toBe("string");
+    expect(certificatePasswordCrypto.isEncrypted(storedPassword as string)).toBe(true);
+  });
+
+  it("getCertificatePj rejects an encrypted password that cannot be decrypted", async () => {
+    const otherCrypto = createCertificatePasswordCrypto({
+      keyBase64: Buffer.alloc(32, 8).toString("base64"),
+      keyVersion: "v1",
+    });
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () =>
+          createCertificatePjRecord({ password: otherCrypto.encrypt("secret-password") }),
+        ),
+        update: vi.fn(),
+      },
+    };
+    const service = createPjService(prisma as never);
+
+    await expect(
+      service.getCertificatePj({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+        canViewPassword: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 422 } satisfies Partial<ServiceError>);
+    expect(prisma.certificatePJ.update).not.toHaveBeenCalled();
+  });
+
   it("createCertificatePj blocks duplicates by organization_id, name, cnpj and model", async () => {
     const prisma = {
       certificatePJ: {
@@ -167,7 +229,7 @@ describe("CertificatePjService", () => {
         create: vi.fn(),
       },
     };
-    const service = new CertificatePjService(prisma as never);
+    const service = createPjService(prisma as never);
 
     await expect(
       service.createCertificatePj({
@@ -208,7 +270,7 @@ describe("CertificatePjService", () => {
         }),
       },
     };
-    const service = new CertificatePjService(prisma as never);
+    const service = createPjService(prisma as never);
 
     await expect(
       service.createCertificatePj({
@@ -255,7 +317,7 @@ describe("CertificatePjService", () => {
         ),
       },
     };
-    const service = new CertificatePjService(prisma as never);
+    const service = createPjService(prisma as never);
 
     const result = await service.createCertificatePj({
       organizationId: certificateOrganizationId,
@@ -275,6 +337,10 @@ describe("CertificatePjService", () => {
 
     expectNoPrivateFileMetadata(result as unknown as Record<string, unknown>);
     expect(result.has_certificate).toBe(false);
+    const storedPassword = prisma.certificatePJ.create.mock.calls[0]?.[0].data.password;
+    expect(certificatePasswordCrypto.isEncrypted(storedPassword as string)).toBe(true);
+    expect(certificatePasswordCrypto.decrypt(storedPassword as string)).toBe("secret-password");
+    expect(result).not.toHaveProperty("password");
   });
 
   it("updateCertificatePj returns 404 when record does not exist in organization", async () => {
@@ -284,7 +350,7 @@ describe("CertificatePjService", () => {
         update: vi.fn(),
       },
     };
-    const service = new CertificatePjService(prisma as never);
+    const service = createPjService(prisma as never);
 
     await expect(
       service.updateCertificatePj({
@@ -311,7 +377,7 @@ describe("CertificatePjService", () => {
         update: vi.fn(),
       },
     };
-    const service = new CertificatePjService(prisma as never);
+    const service = createPjService(prisma as never);
 
     await expect(
       service.updateCertificatePj({
@@ -358,15 +424,19 @@ describe("CertificatePjService", () => {
         ),
       },
     };
-    const service = new CertificatePjService(prisma as never);
+    const service = createPjService(prisma as never);
 
     const result = await service.updateCertificatePj({
       id: certificateId,
       organizationId: certificateOrganizationId,
-      data: { notes: "Atualizado" },
+      data: { notes: "Atualizado", password: "new-password" },
     });
 
     expectNoPrivateFileMetadata(result as unknown as Record<string, unknown>);
+    const storedPassword = prisma.certificatePJ.update.mock.calls[0]?.[0].data.password;
+    expect(certificatePasswordCrypto.isEncrypted(storedPassword as string)).toBe(true);
+    expect(certificatePasswordCrypto.decrypt(storedPassword as string)).toBe("new-password");
+    expect(result).not.toHaveProperty("password");
   });
 
   it("uploadCertificatePjFile stores encrypted bytes under organization-scoped path and updates metadata", async () => {
@@ -380,7 +450,7 @@ describe("CertificatePjService", () => {
         update: vi.fn(async ({ data }) => createCertificatePjRecord(data)),
       },
     };
-    const service = new CertificatePjService(prisma as never, {
+    const service = createPjService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -460,7 +530,7 @@ describe("CertificatePjService", () => {
         ),
       },
     };
-    const service = new CertificatePjService(prisma as never, {
+    const service = createPjService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -488,7 +558,7 @@ describe("CertificatePjService", () => {
         findFirst: vi.fn(async () => null),
       },
     };
-    const service = new CertificatePjService(prisma as never, {
+    const service = createPjService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -524,7 +594,7 @@ describe("CertificatePjService", () => {
         update: vi.fn(async ({ data }) => createCertificatePjRecord(data)),
       },
     };
-    const service = new CertificatePjService(prisma as never, {
+    const service = createPjService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -577,7 +647,7 @@ describe("CertificatePjService", () => {
         update: vi.fn(),
       },
     };
-    const service = new CertificatePjService(prisma as never, {
+    const service = createPjService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -622,7 +692,7 @@ describe("CertificatePjService", () => {
         deleteMany: deleteNotifications,
       },
     };
-    const service = new CertificatePjService(prisma as never, {
+    const service = createPjService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -661,7 +731,7 @@ describe("CertificatePjService", () => {
         delete: vi.fn(),
       },
     };
-    const service = new CertificatePjService(prisma as never, {
+    const service = createPjService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -691,7 +761,7 @@ describe("CertificatePjService", () => {
         delete: vi.fn(),
       },
     };
-    const service = new CertificatePjService(prisma as never, {
+    const service = createPjService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -715,7 +785,7 @@ describe("CertificatePjService", () => {
         delete: vi.fn(),
       },
     };
-    const service = new CertificatePjService(prisma as never);
+    const service = createPjService(prisma as never);
 
     await expect(
       service.deleteCertificatePj({

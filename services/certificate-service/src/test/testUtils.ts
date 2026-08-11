@@ -13,6 +13,10 @@ import type { CertificateServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { createCertificateFileCrypto } from "../services/certificateFileCrypto.js";
 import type { CertificateFileStorage } from "../services/certificateFileStorage.js";
+import {
+  type CertificatePasswordCrypto,
+  createCertificatePasswordCrypto,
+} from "../services/certificatePasswordCrypto.js";
 
 export const certificateOrganizationId = "10000000-0000-4000-8000-000000000001";
 export const certificateUserId = "00000000-0000-4000-8000-000000000001";
@@ -181,6 +185,7 @@ export interface CreateCertificateTestAppOptions {
   envOverrides?: Partial<CertificateServiceEnv>;
   fileStorage?: CertificateFileStorage;
   fileCrypto?: ReturnType<typeof createCertificateFileCrypto>;
+  passwordCrypto?: CertificatePasswordCrypto;
 }
 
 export function createMemoryCertificateFileStorage(): CertificateFileStorage & {
@@ -229,6 +234,8 @@ export function createCertificateTestApp(
     certificateFileMaxSizeBytes: 5 * 1024 * 1024,
     certificateFileEncryptionKey: Buffer.alloc(32, 7).toString("base64"),
     certificateFileEncryptionKeyVersion: "v1",
+    certificatePasswordEncryptionKey: Buffer.alloc(32, 7).toString("base64"),
+    certificatePasswordEncryptionKeyVersion: "v1",
     supabaseUrl: "https://example.supabase.co",
     supabaseServiceRoleKey: "test-service-role",
     uploadRateLimitMax: 30,
@@ -252,6 +259,12 @@ export function createCertificateTestApp(
       createCertificateFileCrypto({
         keyBase64: env.certificateFileEncryptionKey,
         keyVersion: env.certificateFileEncryptionKeyVersion,
+      }),
+    certificatePasswordCrypto:
+      options.passwordCrypto ??
+      createCertificatePasswordCrypto({
+        keyBase64: env.certificatePasswordEncryptionKey,
+        keyVersion: env.certificatePasswordEncryptionKeyVersion,
       }),
   });
 }

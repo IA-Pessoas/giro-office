@@ -62,6 +62,15 @@ const certificateServiceEnvSchema = z
       .string()
       .min(1, "CERTIFICATE_FILE_ENCRYPTION_KEY nao definida."),
     certificateFileEncryptionKeyVersion: z.string().optional().default("v1"),
+    certificatePasswordEncryptionKey: z
+      .string()
+      .min(1, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY nao definida."),
+    certificatePasswordEncryptionKeyVersion: z
+      .string()
+      .trim()
+      .min(1, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION invalida.")
+      .optional()
+      .default("v1"),
     supabaseUrl: z.string().trim().optional(),
     supabaseServiceRoleKey: z.string().trim().optional(),
     uploadRateLimitMax: z
@@ -80,6 +89,15 @@ const certificateServiceEnvSchema = z
         code: z.ZodIssueCode.custom,
         message: "CERTIFICATE_FILE_ENCRYPTION_KEY deve ser base64 com 32 bytes.",
         path: ["certificateFileEncryptionKey"],
+      });
+    }
+
+    const passwordKey = Buffer.from(env.certificatePasswordEncryptionKey, "base64");
+    if (passwordKey.length !== 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ser base64 com 32 bytes.",
+        path: ["certificatePasswordEncryptionKey"],
       });
     }
 
@@ -166,6 +184,9 @@ export function getCertificateServiceEnv(): CertificateServiceEnv {
     certificateFileMaxSizeBytes: process.env.CERTIFICATE_FILE_MAX_SIZE_BYTES,
     certificateFileEncryptionKey: process.env.CERTIFICATE_FILE_ENCRYPTION_KEY,
     certificateFileEncryptionKeyVersion: process.env.CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION,
+    certificatePasswordEncryptionKey: process.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
+    certificatePasswordEncryptionKeyVersion:
+      process.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION,
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     uploadRateLimitMax: process.env.UPLOAD_RATE_LIMIT_MAX,

@@ -16,6 +16,7 @@ function resetEnv(overrides: NodeJS.ProcessEnv = {}): void {
     AUDIT_SERVICE_TOKEN: "test-audit-token",
     CERTIFICATE_SERVICE_INTERNAL_TOKEN: "test-internal-token",
     CERTIFICATE_FILE_ENCRYPTION_KEY: validKey,
+    CERTIFICATE_PASSWORD_ENCRYPTION_KEY: validKey,
     ...overrides,
   };
 }
@@ -81,6 +82,28 @@ describe("certificate service env", () => {
 
     expect(() => getCertificateServiceEnv()).toThrow(
       /CERTIFICATE_FILE_ENCRYPTION_KEY deve ser base64 com 32 bytes/,
+    );
+  });
+
+  it("rejects certificate password encryption keys that are not 32 base64 bytes", () => {
+    resetEnv({
+      CERTIFICATE_STORAGE_MODE: "local",
+      CERTIFICATE_PASSWORD_ENCRYPTION_KEY: "invalid",
+    });
+
+    expect(() => getCertificateServiceEnv()).toThrow(
+      /CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ser base64 com 32 bytes/,
+    );
+  });
+
+  it("rejects an empty certificate password encryption key version", () => {
+    resetEnv({
+      CERTIFICATE_STORAGE_MODE: "local",
+      CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION: " ",
+    });
+
+    expect(() => getCertificateServiceEnv()).toThrow(
+      /CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION invalida/,
     );
   });
 });

@@ -32,6 +32,8 @@ versionado.
 - `CERTIFICATE_FILE_MAX_SIZE_BYTES`
 - `CERTIFICATE_FILE_ENCRYPTION_KEY`
 - `CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION`
+- `CERTIFICATE_PASSWORD_ENCRYPTION_KEY`
+- `CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `UPLOAD_RATE_LIMIT_MAX`
@@ -68,6 +70,19 @@ retorna resposta binaria com `Cache-Control: no-store`; ele nao usa o envelope J
 Supabase Storage e o provider padrao/recomendado para desenvolvimento integrado, staging, VPS e
 producao. `CERTIFICATE_STORAGE_MODE=local` existe apenas para testes unitarios ou execucao local
 offline, sem bucket real, service-role key ou rede externa.
+
+## Senhas dos certificados
+
+As senhas PJ/PF sao armazenadas no banco em envelope JSON AES-256-GCM com `v`, `iv`, `tag` e
+`data`; os campos binarios usam base64 e o IV tem 12 bytes. `CERTIFICATE_PASSWORD_ENCRYPTION_KEY`
+deve ser uma chave base64 de 32 bytes e precisa permanecer igual a chave usada para envelopes
+legados existentes. `CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION` identifica a versao da chave
+usada em novos writes. A aplicacao descriptografa apenas detalhes autorizados; o frontend nao
+descriptografa a senha.
+
+Esta correcao nao altera o schema nem cria migration/backfill em massa. Valores legados em texto
+simples sao recriptografados quando um detalhe autorizado e lido; envelopes invalidos sao
+rejeitados com erro controlado.
 
 ## Rotas internas
 

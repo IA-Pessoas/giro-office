@@ -4,10 +4,18 @@ import type { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { createCertificateFileCrypto } from "../services/certificateFileCrypto.js";
-import { CertificatePfService } from "../services/certificatePfService.js";
+import { createCertificatePasswordCrypto } from "../services/certificatePasswordCrypto.js";
+import {
+  type CertificatePfFileDeps,
+  CertificatePfService,
+} from "../services/certificatePfService.js";
 import { certificateOrganizationId, certificateUserId } from "./testUtils.js";
 
 const certificateId = "30000000-0000-4000-8000-000000000001";
+const certificatePasswordCrypto = createCertificatePasswordCrypto({
+  keyBase64: Buffer.alloc(32, 7).toString("base64"),
+  keyVersion: "v1",
+});
 const privateFileMetadataFields = [
   "file_path",
   "file_original_name",
@@ -31,7 +39,7 @@ function createCertificatePfRecord(overrides: Record<string, unknown> = {}) {
     name: "Joao Silva",
     cpf: "12345678901",
     model: "A1",
-    password: "secret-password",
+    password: certificatePasswordCrypto.encrypt("secret-password") as string,
     expiration_date: new Date("2026-12-31T00:00:00.000Z"),
     notes: "Renovar com antecedencia",
     enterprise: "Empresa Castelo",
@@ -89,6 +97,10 @@ function expectNoPrivateFileMetadata(result: Record<string, unknown>) {
   }
 }
 
+function createPfService(prisma: never, fileDeps?: CertificatePfFileDeps) {
+  return new CertificatePfService(prisma, fileDeps, certificatePasswordCrypto);
+}
+
 describe("CertificatePfService", () => {
   it("listCertificatePf filters by organization_id and never selects password", async () => {
     const prisma = {
@@ -97,7 +109,7 @@ describe("CertificatePfService", () => {
         findMany: vi.fn(async () => [createCertificatePfRecord()]),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     const result = await service.listCertificatePf({
       organizationId: certificateOrganizationId,
@@ -137,7 +149,7 @@ describe("CertificatePfService", () => {
         findFirst: vi.fn(async () => createCertificatePfRecord()),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     const result = await service.getCertificatePf({
       id: certificateId,
@@ -155,7 +167,7 @@ describe("CertificatePfService", () => {
         findFirst: vi.fn(async () => createCertificatePfRecord()),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     const result = await service.getCertificatePf({
       id: certificateId,
@@ -166,6 +178,56 @@ describe("CertificatePfService", () => {
     expect(result).not.toHaveProperty("password");
   });
 
+  it("getCertificatePf re-encrypts legacy plaintext only for an authorized read", async () => {
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () => createCertificatePfRecord({ password: "legacy-password" })),
+        update: vi.fn(async ({ data }) => createCertificatePfRecord(data)),
+      },
+    };
+    const service = createPfService(prisma as never);
+
+    const result = await service.getCertificatePf({
+      id: certificateId,
+      organizationId: certificateOrganizationId,
+      canViewPassword: true,
+    });
+
+    const storedPassword = prisma.certificatePF.update.mock.calls[0]?.[0].data.password;
+    expect(result.password).toBe("legacy-password");
+    expect(prisma.certificatePF.update).toHaveBeenCalledWith({
+      where: { id: certificateId, organization_id: certificateOrganizationId },
+      data: { password: expect.any(String) },
+    });
+    expect(typeof storedPassword).toBe("string");
+    expect(certificatePasswordCrypto.isEncrypted(storedPassword as string)).toBe(true);
+  });
+
+  it("getCertificatePf rejects an encrypted password that cannot be decrypted", async () => {
+    const otherCrypto = createCertificatePasswordCrypto({
+      keyBase64: Buffer.alloc(32, 8).toString("base64"),
+      keyVersion: "v1",
+    });
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () =>
+          createCertificatePfRecord({ password: otherCrypto.encrypt("secret-password") }),
+        ),
+        update: vi.fn(),
+      },
+    };
+    const service = createPfService(prisma as never);
+
+    await expect(
+      service.getCertificatePf({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+        canViewPassword: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 422 } satisfies Partial<ServiceError>);
+    expect(prisma.certificatePF.update).not.toHaveBeenCalled();
+  });
+
   it("createCertificatePf blocks duplicates by organization_id, name, cpf and model", async () => {
     const prisma = {
       certificatePF: {
@@ -173,7 +235,7 @@ describe("CertificatePfService", () => {
         create: vi.fn(),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     await expect(
       service.createCertificatePf({
@@ -212,7 +274,7 @@ describe("CertificatePfService", () => {
         }),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     await expect(
       service.createCertificatePf({
@@ -257,7 +319,7 @@ describe("CertificatePfService", () => {
         ),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     const result = await service.createCertificatePf({
       organizationId: certificateOrganizationId,
@@ -275,6 +337,10 @@ describe("CertificatePfService", () => {
 
     expectNoPrivateFileMetadata(result as unknown as Record<string, unknown>);
     expect(result.has_certificate).toBe(false);
+    const storedPassword = prisma.certificatePF.create.mock.calls[0]?.[0].data.password;
+    expect(certificatePasswordCrypto.isEncrypted(storedPassword as string)).toBe(true);
+    expect(certificatePasswordCrypto.decrypt(storedPassword as string)).toBe("secret-password");
+    expect(result).not.toHaveProperty("password");
   });
 
   it("updateCertificatePf returns 404 when record does not exist in organization", async () => {
@@ -284,7 +350,7 @@ describe("CertificatePfService", () => {
         update: vi.fn(),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     await expect(
       service.updateCertificatePf({
@@ -311,7 +377,7 @@ describe("CertificatePfService", () => {
         update: vi.fn(),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     await expect(
       service.updateCertificatePf({
@@ -358,15 +424,19 @@ describe("CertificatePfService", () => {
         ),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     const result = await service.updateCertificatePf({
       id: certificateId,
       organizationId: certificateOrganizationId,
-      data: { notes: "Atualizado" },
+      data: { notes: "Atualizado", password: "new-password" },
     });
 
     expectNoPrivateFileMetadata(result as unknown as Record<string, unknown>);
+    const storedPassword = prisma.certificatePF.update.mock.calls[0]?.[0].data.password;
+    expect(certificatePasswordCrypto.isEncrypted(storedPassword as string)).toBe(true);
+    expect(certificatePasswordCrypto.decrypt(storedPassword as string)).toBe("new-password");
+    expect(result).not.toHaveProperty("password");
   });
 
   it("uploadCertificatePfFile stores encrypted bytes under organization-scoped path and updates metadata", async () => {
@@ -380,7 +450,7 @@ describe("CertificatePfService", () => {
         update: vi.fn(async ({ data }) => createCertificatePfRecord(data)),
       },
     };
-    const service = new CertificatePfService(prisma as never, {
+    const service = createPfService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -460,7 +530,7 @@ describe("CertificatePfService", () => {
         ),
       },
     };
-    const service = new CertificatePfService(prisma as never, {
+    const service = createPfService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -488,7 +558,7 @@ describe("CertificatePfService", () => {
         findFirst: vi.fn(async () => null),
       },
     };
-    const service = new CertificatePfService(prisma as never, {
+    const service = createPfService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -524,7 +594,7 @@ describe("CertificatePfService", () => {
         update: vi.fn(async ({ data }) => createCertificatePfRecord(data)),
       },
     };
-    const service = new CertificatePfService(prisma as never, {
+    const service = createPfService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -577,7 +647,7 @@ describe("CertificatePfService", () => {
         update: vi.fn(),
       },
     };
-    const service = new CertificatePfService(prisma as never, {
+    const service = createPfService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -622,7 +692,7 @@ describe("CertificatePfService", () => {
         deleteMany: deleteNotifications,
       },
     };
-    const service = new CertificatePfService(prisma as never, {
+    const service = createPfService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -661,7 +731,7 @@ describe("CertificatePfService", () => {
         delete: vi.fn(),
       },
     };
-    const service = new CertificatePfService(prisma as never, {
+    const service = createPfService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -691,7 +761,7 @@ describe("CertificatePfService", () => {
         delete: vi.fn(),
       },
     };
-    const service = new CertificatePfService(prisma as never, {
+    const service = createPfService(prisma as never, {
       fileStorage: storage,
       fileCrypto: crypto,
       storageProvider: "local",
@@ -715,7 +785,7 @@ describe("CertificatePfService", () => {
         delete: vi.fn(),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     await expect(
       service.deleteCertificatePf({
@@ -736,7 +806,7 @@ describe("CertificatePfService", () => {
         deleteMany: vi.fn(async () => ({ count: 0 })),
       },
     };
-    const service = new CertificatePfService(prisma as never);
+    const service = createPfService(prisma as never);
 
     await expect(
       service.deleteCertificatePf({

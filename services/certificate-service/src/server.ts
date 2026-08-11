@@ -11,6 +11,7 @@ import {
   LocalCertificateFileStorage,
   SupabaseCertificateFileStorage,
 } from "./services/certificateFileStorage.js";
+import { createCertificatePasswordCrypto } from "./services/certificatePasswordCrypto.js";
 
 const env = getCertificateServiceEnv();
 const logger = createLogger({
@@ -23,6 +24,10 @@ const prisma = createCertificatePrismaClient(env.databaseUrl);
 const certificateFileCrypto = createCertificateFileCrypto({
   keyBase64: env.certificateFileEncryptionKey,
   keyVersion: env.certificateFileEncryptionKeyVersion,
+});
+const certificatePasswordCrypto = createCertificatePasswordCrypto({
+  keyBase64: env.certificatePasswordEncryptionKey,
+  keyVersion: env.certificatePasswordEncryptionKeyVersion,
 });
 const certificateFileStorage =
   env.storageMode === "local"
@@ -37,6 +42,7 @@ const app = createCertificateApplication({
   prisma,
   certificateFileStorage,
   certificateFileCrypto,
+  certificatePasswordCrypto,
 });
 
 app.listen(env.port, () => {
