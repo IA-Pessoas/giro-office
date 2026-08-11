@@ -100,6 +100,41 @@ export function parseComposeSecurityMetadata(contents) {
   return { services, networks };
 }
 
+function resolvedNetworkNames(service) {
+  if (Array.isArray(service.networks)) return service.networks;
+  return Object.keys(service.networks ?? {});
+}
+
+export function checkResolvedProductionSecurity(config) {
+  const errors = [];
+  const services = config.services ?? {};
+
+  for (const [serviceName, service] of Object.entries(services)) {
+    if ((service.ports ?? []).length > 0) {
+      errors.push(`production service "${serviceName}" must not publish host ports.`);
+    }
+
+    if (serviceName !== "web" && resolvedNetworkNames(service).includes("public-edge")) {
+      errors.push(`production service "${serviceName}" must not join public-edge.`);
+    }
+  }
+
+  if (!resolvedNetworkNames(services.web ?? {}).includes("public-edge")) {
+    errors.push('production service "web" must join public-edge.');
+  }
+
+  if (config.networks?.backend?.internal !== true) {
+    errors.push('production network "backend" must remain internal.');
+  }
+
+  const publicEdge = config.networks?.["public-edge"];
+  if (!publicEdge || publicEdge.external !== true || publicEdge.name !== "public-edge") {
+    errors.push('production network "public-edge" must be external and named public-edge.');
+  }
+
+  return { errors };
+}
+
 async function getDefaultComposeFiles() {
   const rootEntries = await readdir(rootDir);
   return rootEntries
