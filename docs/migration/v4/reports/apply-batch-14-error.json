@@ -1,0 +1,27 @@
+{
+  "batchIndex": 14,
+  "failedAt": "2026-08-10T13:58:54.467Z",
+  "sources": [
+    "tb_rh.score",
+    "tb_rh.solicitacoes",
+    "tb_tecnologia.estoque_entradas",
+    "tb_tecnologia.estoque_saidas",
+    "tb_workspace.solicitacoes_mensagens",
+    "tb_regularize.orientaoes_processual.atividades"
+  ],
+  "error": {
+    "name": "Error",
+    "message": "MIGRATION_AGGREGATE_TARGET_DUPLICATE",
+    "code": "MIGRATION_AGGREGATE_TARGET_DUPLICATE",
+    "details": null,
+    "stack": [
+      "Error: MIGRATION_AGGREGATE_TARGET_DUPLICATE",
+      "    at migrationError (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:889:17)",
+      "    at Object.loadMappedData [as load] (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:268:17)",
+      "    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+      "    at async runMigration (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:40:24)",
+      "    at async main (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:417:24)",
+      "    at async file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:475:3"
+    ]
+  }
+}

@@ -1,0 +1,1445 @@
+{
+  "schemaVersion": "giro-office.migration-v4.dry-run/1",
+  "inventoryCounts": {
+    "executableSources": 103,
+    "pendingSources": 209,
+    "sources": 312,
+    "steps": 133,
+    "rows": 1374880
+  },
+  "statusCounts": {
+    "prepared": 673814,
+    "notEmitted": 62046,
+    "quarantine": 761412
+  },
+  "sourceCounts": {
+    "prepared": 613743,
+    "notEmitted": 23,
+    "quarantine": 761114
+  },
+  "destinationCounts": {
+    "certificate.pf": {
+      "prepared": 346,
+      "notEmitted": 0,
+      "quarantine": 448
+    },
+    "certificate.pj": {
+      "prepared": 439,
+      "notEmitted": 0,
+      "quarantine": 341
+    },
+    "clients": {
+      "prepared": 6201,
+      "notEmitted": 1320,
+      "quarantine": 15
+    },
+    "clients.clientsGroup": {
+      "prepared": 333,
+      "notEmitted": 0,
+      "quarantine": 6
+    },
+    "clients.group": {
+      "prepared": 302,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "clients.history": {
+      "prepared": 3459,
+      "notEmitted": 0,
+      "quarantine": 48
+    },
+    "clients.pa": {
+      "prepared": 1254,
+      "notEmitted": 0,
+      "quarantine": 2
+    },
+    "clients.pf": {
+      "prepared": 181,
+      "notEmitted": 181,
+      "quarantine": 1287
+    },
+    "contabil.control": {
+      "prepared": 2739,
+      "notEmitted": 0,
+      "quarantine": 24
+    },
+    "contabil.relationship": {
+      "prepared": 135,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "contabil.responsibles": {
+      "prepared": 361,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "departments": {
+      "prepared": 48,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "emails": {
+      "prepared": 22,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "fiscal.icms": {
+      "prepared": 361,
+      "notEmitted": 3,
+      "quarantine": 4
+    },
+    "fiscal.ipi": {
+      "prepared": 11088,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "fiscal.ncm": {
+      "prepared": 31361,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "integracao.projectPlan": {
+      "prepared": 6,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "integracao.projectPlanTasks": {
+      "prepared": 47,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "integracao.projects": {
+      "prepared": 27769,
+      "notEmitted": 25428,
+      "quarantine": 2
+    },
+    "integracao.tasks": {
+      "prepared": 25371,
+      "notEmitted": 0,
+      "quarantine": 58
+    },
+    "integracao.tasksDependent": {
+      "prepared": 25,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "integracao.tasksIntegrationRegularize": {
+      "prepared": 0,
+      "notEmitted": 0,
+      "quarantine": 13
+    },
+    "integracao.tasksModel": {
+      "prepared": 25757,
+      "notEmitted": 25428,
+      "quarantine": 59
+    },
+    "logs": {
+      "prepared": 465685,
+      "notEmitted": 0,
+      "quarantine": 4442
+    },
+    "mtk.passwords": {
+      "prepared": 0,
+      "notEmitted": 0,
+      "quarantine": 54
+    },
+    "notes": {
+      "prepared": 41620,
+      "notEmitted": 0,
+      "quarantine": 8
+    },
+    "parcelamento.installments": {
+      "prepared": 0,
+      "notEmitted": 0,
+      "quarantine": 276
+    },
+    "parcelamento.installmentsCompetencies": {
+      "prepared": 0,
+      "notEmitted": 0,
+      "quarantine": 510
+    },
+    "parcelamento.panorama": {
+      "prepared": 0,
+      "notEmitted": 0,
+      "quarantine": 1240
+    },
+    "permissions": {
+      "prepared": 1153,
+      "notEmitted": 1,
+      "quarantine": 21
+    },
+    "permissions.specific": {
+      "prepared": 3,
+      "notEmitted": 0,
+      "quarantine": 11
+    },
+    "pessoal.ldd": {
+      "prepared": 955,
+      "notEmitted": 0,
+      "quarantine": 3
+    },
+    "pessoal.obrigations": {
+      "prepared": 1867,
+      "notEmitted": 0,
+      "quarantine": 14
+    },
+    "pessoal.passwords": {
+      "prepared": 330,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "pessoal.payroll": {
+      "prepared": 184,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "pessoal.situations": {
+      "prepared": 28,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "pessoal.union": {
+      "prepared": 22,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "regularize.license": {
+      "prepared": 253,
+      "notEmitted": 0,
+      "quarantine": 87
+    },
+    "regularize.municipalTaxes": {
+      "prepared": 8,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "regularize.partners": {
+      "prepared": 1412,
+      "notEmitted": 2,
+      "quarantine": 23
+    },
+    "regularize.passowordsSites": {
+      "prepared": 3593,
+      "notEmitted": 4057,
+      "quarantine": 0
+    },
+    "regularize.passwordsRegularize": {
+      "prepared": 3624,
+      "notEmitted": 4876,
+      "quarantine": 0
+    },
+    "regularize.proceduralGuidances": {
+      "prepared": 3129,
+      "notEmitted": 0,
+      "quarantine": 293
+    },
+    "regularize.process": {
+      "prepared": 1061,
+      "notEmitted": 441,
+      "quarantine": 497
+    },
+    "rh.pointConfig": {
+      "prepared": 15,
+      "notEmitted": 0,
+      "quarantine": 23
+    },
+    "rh.points": {
+      "prepared": 2241,
+      "notEmitted": 0,
+      "quarantine": 48
+    },
+    "rh.request_categories": {
+      "prepared": 7,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.request_messages": {
+      "prepared": 1891,
+      "notEmitted": 0,
+      "quarantine": 15
+    },
+    "rh.requests": {
+      "prepared": 909,
+      "notEmitted": 0,
+      "quarantine": 6
+    },
+    "rh.score": {
+      "prepared": 154,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.score_evaluations": {
+      "prepared": 1158,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.score_nitro": {
+      "prepared": 48,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.score_questions": {
+      "prepared": 26,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.timeBankReleases": {
+      "prepared": 2,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.timeClockRequest": {
+      "prepared": 138,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.timeSheets": {
+      "prepared": 80,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "stock": {
+      "prepared": 246,
+      "notEmitted": 0,
+      "quarantine": 366
+    },
+    "stock.categories": {
+      "prepared": 207,
+      "notEmitted": 0,
+      "quarantine": 37
+    },
+    "stock.entries": {
+      "prepared": 1600,
+      "notEmitted": 0,
+      "quarantine": 1480
+    },
+    "stock.exits": {
+      "prepared": 910,
+      "notEmitted": 0,
+      "quarantine": 2940
+    },
+    "stock.locations": {
+      "prepared": 22,
+      "notEmitted": 158,
+      "quarantine": 26
+    },
+    "tecnologia.inventory": {
+      "prepared": 0,
+      "notEmitted": 0,
+      "quarantine": 701
+    },
+    "tecnologia.inventoryCategories": {
+      "prepared": 48,
+      "notEmitted": 9,
+      "quarantine": 0
+    },
+    "tecnologia.inventoryLocations": {
+      "prepared": 21,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "tecnologia.passwords_users": {
+      "prepared": 170,
+      "notEmitted": 0,
+      "quarantine": 9
+    },
+    "tecnologia.request_categories": {
+      "prepared": 1,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "tecnologia.request_messages": {
+      "prepared": 0,
+      "notEmitted": 0,
+      "quarantine": 2
+    },
+    "tecnologia.requests": {
+      "prepared": 4,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "tecnologia.terms": {
+      "prepared": 200,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "triagem.configs": {
+      "prepared": 243,
+      "notEmitted": 1,
+      "quarantine": 309
+    },
+    "users": {
+      "prepared": 760,
+      "notEmitted": 141,
+      "quarantine": 126
+    }
+  },
+  "quarantine": [
+    {
+      "sourceTable": "tb.atendimento_documentos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_atendimento",
+      "reasonCode": "RETIRED_PERMISSION_MODULE",
+      "rowCount": 49
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_pec",
+      "reasonCode": "RETIRED_PERMISSION_MODULE",
+      "rowCount": 121
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_wiki",
+      "reasonCode": "RETIRED_PERMISSION_MODULE",
+      "rowCount": 12
+    },
+    {
+      "sourceTable": "tb_admin.ps",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 7
+    },
+    {
+      "sourceTable": "tb_admin.responsaveis",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 2672
+    },
+    {
+      "sourceTable": "tb_admin.responsaveis_contatos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 9
+    },
+    {
+      "sourceTable": "tb_admin.responsaveis_ps",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_admin.updates",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 12
+    },
+    {
+      "sourceTable": "tb_atendimento.atendimentos_opa",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_atendimento.contatos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1173
+    },
+    {
+      "sourceTable": "tb_atendimento.motoboy",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 41
+    },
+    {
+      "sourceTable": "tb_atendimento.psc",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 261
+    },
+    {
+      "sourceTable": "tb_atendimento.satisfacao",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 986
+    },
+    {
+      "sourceTable": "tb_atendimento.uber",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1296
+    },
+    {
+      "sourceTable": "tb_atendimento.uber_clientes",
+      "reasonCode": "NO_STABLE_MERGE_IDENTITY",
+      "rowCount": 77
+    },
+    {
+      "sourceTable": "tb_atendimento.visitas_clientes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 483
+    },
+    {
+      "sourceTable": "tb_cbc.atas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_cbc.configs",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_cbc.keep_clientes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 251
+    },
+    {
+      "sourceTable": "tb_cbc.keep_tags",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_cbc.notificacoes_popup",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 2359
+    },
+    {
+      "sourceTable": "tb_cbc.orcamentos",
+      "reasonCode": "PARTIAL_CURRENT_CONTRACT_UNRESOLVED_ADAPTATION",
+      "rowCount": 510
+    },
+    {
+      "sourceTable": "tb_cbc.orcamentos_categorias",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_cbc.panorama_clientes_parcelamento",
+      "reasonCode": "CURRENT_IDENTITY_NOT_RECONSTRUCTABLE",
+      "rowCount": 332
+    },
+    {
+      "sourceTable": "tb_cbc.preferencias",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 264
+    },
+    {
+      "sourceTable": "tb_cbc.sininhos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 13215
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_andares",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 14
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_categorias_itens",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 234
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_itens",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 451
+    },
+    {
+      "sourceTable": "tb_cbs.ramais",
+      "reasonCode": "FUNCTIONAL_FIELD_NO_CURRENT_DESTINATION",
+      "rowCount": 194
+    },
+    {
+      "sourceTable": "tb_certificados.notificacoes.vencimento_certificados",
+      "reasonCode": "DERIVED_CURRENT_STATE",
+      "rowCount": 149
+    },
+    {
+      "sourceTable": "tb_comercial.cobrancas_descricao",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1088
+    },
+    {
+      "sourceTable": "tb_contabil.alteracoes_contabil",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_contabil.bancos",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 42
+    },
+    {
+      "sourceTable": "tb_contabil.clientes_bancos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 6871
+    },
+    {
+      "sourceTable": "tb_contabil.clientes_bancos_erros",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 122
+    },
+    {
+      "sourceTable": "tb_contabil.clientes_bancos_temp",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 157
+    },
+    {
+      "sourceTable": "tb_contabil.documentos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 6596
+    },
+    {
+      "sourceTable": "tb_contabil.documentos_bancos",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 432
+    },
+    {
+      "sourceTable": "tb_contabil.documentos_padrao",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 54
+    },
+    {
+      "sourceTable": "tb_contabil.movimentacao",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_contabil.nuvens",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 262
+    },
+    {
+      "sourceTable": "tb_financeiro.contratos",
+      "reasonCode": "NO_STABLE_MERGE_IDENTITY",
+      "rowCount": 615
+    },
+    {
+      "sourceTable": "tb_fiscal.aliquota_interestadual",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 27
+    },
+    {
+      "sourceTable": "tb_fiscal.antecipacao",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 222
+    },
+    {
+      "sourceTable": "tb_fiscal.antecipacao_envolvidos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 28
+    },
+    {
+      "sourceTable": "tb_fiscal.clientes_atacadistas",
+      "reasonCode": "NO_STABLE_MERGE_IDENTITY",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_fiscal.clientes_sn",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 217
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 640
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos_anual",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos_mei",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 53
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos_normal",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 219
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos_npossui",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 24
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos_sn",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 504
+    },
+    {
+      "sourceTable": "tb_fiscal.documentos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 9485
+    },
+    {
+      "sourceTable": "tb_fiscal.iss",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 7547
+    },
+    {
+      "sourceTable": "tb_fiscal.malhas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 4
+    },
+    {
+      "sourceTable": "tb_fiscal.mva",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 522
+    },
+    {
+      "sourceTable": "tb_fiscal.portes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 6
+    },
+    {
+      "sourceTable": "tb_fiscal.sn_completo_sn",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_historico",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 125
+    },
+    {
+      "sourceTable": "tb_historico.admin",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 8784
+    },
+    {
+      "sourceTable": "tb_historico.admin_departamentos",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 60
+    },
+    {
+      "sourceTable": "tb_historico.admin_usuarios",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 947
+    },
+    {
+      "sourceTable": "tb_historico.atendimento",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 3806
+    },
+    {
+      "sourceTable": "tb_historico.cbs_estoque",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 2332
+    },
+    {
+      "sourceTable": "tb_historico.certificado",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 7941
+    },
+    {
+      "sourceTable": "tb_historico.comercial",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 18
+    },
+    {
+      "sourceTable": "tb_historico.contabil",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 51903
+    },
+    {
+      "sourceTable": "tb_historico.financeiro",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 274
+    },
+    {
+      "sourceTable": "tb_historico.fiscal",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 25615
+    },
+    {
+      "sourceTable": "tb_historico.integracao",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 3138
+    },
+    {
+      "sourceTable": "tb_historico.integracao_agenda",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 4138
+    },
+    {
+      "sourceTable": "tb_historico.integracao_clientes",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 10933
+    },
+    {
+      "sourceTable": "tb_historico.integracao_clientes_dominio",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 52
+    },
+    {
+      "sourceTable": "tb_historico.integracao_exclusoes",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 13129
+    },
+    {
+      "sourceTable": "tb_historico.integracao_grupos",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 214
+    },
+    {
+      "sourceTable": "tb_historico.integracao_objetivos",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 839
+    },
+    {
+      "sourceTable": "tb_historico.integracao_pas",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 6754
+    },
+    {
+      "sourceTable": "tb_historico.integracao_pas_historicos",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 3797
+    },
+    {
+      "sourceTable": "tb_historico.integracao_planos",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 15
+    },
+    {
+      "sourceTable": "tb_historico.integracao_prospeccao_comercial",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 15114
+    },
+    {
+      "sourceTable": "tb_historico.integracao_tarefas",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 173242
+    },
+    {
+      "sourceTable": "tb_historico.integracao_tarefas_distrato",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 3264
+    },
+    {
+      "sourceTable": "tb_historico.integracao_tarefas_express",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 897
+    },
+    {
+      "sourceTable": "tb_historico.integracao_tarefas_express_distrato",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 47
+    },
+    {
+      "sourceTable": "tb_historico.keep",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_historico.marketing",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 367
+    },
+    {
+      "sourceTable": "tb_historico.parcelamento",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 48548
+    },
+    {
+      "sourceTable": "tb_historico.permissoes",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 13
+    },
+    {
+      "sourceTable": "tb_historico.pessoal",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 26288
+    },
+    {
+      "sourceTable": "tb_historico.regularize",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 50095
+    },
+    {
+      "sourceTable": "tb_historico.rh",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 26800
+    },
+    {
+      "sourceTable": "tb_historico.tecnologia",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 14042
+    },
+    {
+      "sourceTable": "tb_historico.triagem",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 147185
+    },
+    {
+      "sourceTable": "tb_historico.wiki",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_historico.workspace",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 9
+    },
+    {
+      "sourceTable": "tb_integracao.admin_tarefas",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_integracao.admin_urgencias",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3
+    },
+    {
+      "sourceTable": "tb_integracao.agenda",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1960
+    },
+    {
+      "sourceTable": "tb_integracao.agenda_horas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 5
+    },
+    {
+      "sourceTable": "tb_integracao.agenda_locais",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 11
+    },
+    {
+      "sourceTable": "tb_integracao.agenda_status",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 7
+    },
+    {
+      "sourceTable": "tb_integracao.bloqueio",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 18
+    },
+    {
+      "sourceTable": "tb_integracao.cobradores_solucoes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3
+    },
+    {
+      "sourceTable": "tb_integracao.cobrancas_novas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.cobrancas_solucoes",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.cronograma",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 121
+    },
+    {
+      "sourceTable": "tb_integracao.envios",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1275
+    },
+    {
+      "sourceTable": "tb_integracao.fluxos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.fluxos_clientes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.metricas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 982
+    },
+    {
+      "sourceTable": "tb_integracao.objetivos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 834
+    },
+    {
+      "sourceTable": "tb_integracao.pa_historicos_pendentes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 13
+    },
+    {
+      "sourceTable": "tb_integracao.padrinhos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.portes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3
+    },
+    {
+      "sourceTable": "tb_integracao.prospeccao_metricas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1759
+    },
+    {
+      "sourceTable": "tb_integracao.prospeccao_metricas_periodo",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3
+    },
+    {
+      "sourceTable": "tb_integracao.prospeccao_paralisacoes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 15
+    },
+    {
+      "sourceTable": "tb_integracao.prospeccoes_reset",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.responsaveis_projeto",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.segmentos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 148
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_concluir",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 32
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_contratadas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1531
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_distrato",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1759
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_distrato_imagens",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 441
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_docs",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 509
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_imagens",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 5604
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_indicadores",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 11
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_justificativa",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3017
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_ordem",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 240
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_parceiros",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 57
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_total",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_mkt.controle_ia",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 79
+    },
+    {
+      "sourceTable": "tb_mkt.eventos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_mkt.eventos_edicoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_mkt.eventos_feedbacks",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_mkt.eventos_feedbacks_periodos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_mkt.solicitacoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_parcelamento.simulacoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 14
+    },
+    {
+      "sourceTable": "tb_parcelamento.simulacoes_parcelamentos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 39
+    },
+    {
+      "sourceTable": "tb_pessoal.atividades",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 337
+    },
+    {
+      "sourceTable": "tb_pessoal.grupos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 7
+    },
+    {
+      "sourceTable": "tb_regularize.agenda",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 2770
+    },
+    {
+      "sourceTable": "tb_regularize.agenda_controle",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 26
+    },
+    {
+      "sourceTable": "tb_regularize.agenda_status",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3
+    },
+    {
+      "sourceTable": "tb_regularize.alvaras_vencimentos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 6
+    },
+    {
+      "sourceTable": "tb_regularize.atividades",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1455
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_competencia",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 24
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_dominio_logos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 100
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_licitacoes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 152
+    },
+    {
+      "sourceTable": "tb_regularize.controle_inativar",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 13
+    },
+    {
+      "sourceTable": "tb_regularize.coringa",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1160
+    },
+    {
+      "sourceTable": "tb_regularize.coringa_status",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 6
+    },
+    {
+      "sourceTable": "tb_regularize.distrato_checklist",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_regularize.dte",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 2125
+    },
+    {
+      "sourceTable": "tb_regularize.dte_status",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 98
+    },
+    {
+      "sourceTable": "tb_regularize.orientaoes_checklist",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 352
+    },
+    {
+      "sourceTable": "tb_regularize.orientaoes_filiais",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 4
+    },
+    {
+      "sourceTable": "tb_regularize.permissoes_senhas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 130
+    },
+    {
+      "sourceTable": "tb_regularize.processos_dias",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1021
+    },
+    {
+      "sourceTable": "tb_regularize.regimes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 10
+    },
+    {
+      "sourceTable": "tb_regularize.sites_estado",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 10
+    },
+    {
+      "sourceTable": "tb_regularize.sites_prefeituras",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 42
+    },
+    {
+      "sourceTable": "tb_rh.andares",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 53
+    },
+    {
+      "sourceTable": "tb_rh.cargos",
+      "reasonCode": "NO_INDEPENDENT_DESTINATION",
+      "rowCount": 22
+    },
+    {
+      "sourceTable": "tb_rh.cce",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 417
+    },
+    {
+      "sourceTable": "tb_rh.cce_avaliacoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 635
+    },
+    {
+      "sourceTable": "tb_rh.colaboradores_atas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 19
+    },
+    {
+      "sourceTable": "tb_rh.feedbacks",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 13
+    },
+    {
+      "sourceTable": "tb_rh.ferias_datas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.ferias_periodos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 23
+    },
+    {
+      "sourceTable": "tb_rh.intercorrencias",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 6
+    },
+    {
+      "sourceTable": "tb_rh.intercorrencias_tipos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 8
+    },
+    {
+      "sourceTable": "tb_rh.provas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_rh.provas_inscritos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.provas_questoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.provas_respostas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.pv",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_rh.pv_objetivos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_rh.pv_tarefas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.pv_tarefas_express",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.score_nitro.avaliacoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 239
+    },
+    {
+      "sourceTable": "tb_rh.score_nitro.avaliacoes_periodos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 26
+    },
+    {
+      "sourceTable": "tb_rh.score_nitro.ch",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 34
+    },
+    {
+      "sourceTable": "tb_rh.score_nitro.erros",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_tecnologia.atualizacoes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 977
+    },
+    {
+      "sourceTable": "tb_tecnologia.atualizacoes_previsao",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 13
+    },
+    {
+      "sourceTable": "tb_tecnologia.inventario_fotos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 15
+    },
+    {
+      "sourceTable": "tb_tecnologia.reset",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 145
+    },
+    {
+      "sourceTable": "tb_tecnologia.robos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 7
+    },
+    {
+      "sourceTable": "tb_tecnologia.robos_controles",
+      "reasonCode": "UNRESOLVED_PARENT_CONTRACT",
+      "rowCount": 236
+    },
+    {
+      "sourceTable": "tb_triagem.justificativas",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 15
+    },
+    {
+      "sourceTable": "tb_triagem.prioridade",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 617
+    },
+    {
+      "sourceTable": "tb_triagem.qtdnotas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_triagem.solicitacoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_wiki.agenda",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_wiki.destaques",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_wiki.wikis",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_wiki.wikis_categorias",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_wiki.wikis_topicos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_workspace.alteracao_regimes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_workspace.alteracao_regimes_tarefas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_workspace.alteracao_regimes_tarefas_express",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_workspace.alteracao_regimes_tipos",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_workspace.mapas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 4
+    },
+    {
+      "sourceTable": "tb_workspace.mapas_clientes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 5
+    },
+    {
+      "sourceTable": "tb_workspace.natal",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    }
+  ],
+  "expectedWrites": 629486,
+  "expectedWriteCounts": {
+    "aggregate": 2981,
+    "insert": 620466,
+    "update": 6039
+  },
+  "blockers": {
+    "quarantine": 761412,
+    "unresolvedRequiredReferences": 453,
+    "unclassifiedSources": 0
+  },
+  "complete": false,
+  "executionDigest": "4070bfcf179aa594abb5ca9f872911843c0dc2207d13d3329534388d44ba0f6b",
+  "manifestDigest": "40a00ffd05a492793c54fbeb6deaaec794ab3a9846fbdf0b696fdbf98cfabcee",
+  "mappingDigest": "b19c66fd7f2a20b2a16a389c11fb51563be750018a890818f492861232c13e3d",
+  "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b",
+  "sourceDigest": "e76a761406a4cc2e2aa2cae959c51be79c59a968f06a12f0702f3233876cb742",
+  "createdAt": "2026-08-11T01:53:43.684Z",
+  "databaseIdentity": "sha256:e65e948445b36c081fadf58225f992fb533b5cdc87d1c70d6b0d5d4e8aa26d9b",
+  "mode": "dry-run",
+  "writesPerformed": false
+}

@@ -1,0 +1,707 @@
+{
+  "mode": "apply",
+  "writesPerformed": true,
+  "cleanup": {
+    "targets": 0,
+    "writes": 0
+  },
+  "load": {
+    "destinationCounts": {
+      "integracao.tasksModel": 386,
+      "pessoal.passwords": 141,
+      "parcelamento.installments": 179,
+      "notes": 41620
+    },
+    "prepared": 42326,
+    "reconciliationTargets": [
+      {
+        "aggregateColumn": null,
+        "expectedAggregateCount": null,
+        "identity": {
+          "id": "a5ba1d61-6c7e-534c-95e4-5993c613a27b"
+        },
+        "step": {
+          "key": "tb_pec.notas\u0000pec-note-insert",
+          "sourceTable": "tb_pec.notas",
+          "stepId": "pec-note-insert",
+          "destinationTable": "notes",
+          "dependencies": [
+            "tb_admin.usuarios",
+            "tb_regularize.clientes"
+          ],
+          "contract": {
+            "contextRequirements": [
+              "source:tb_admin.usuarios",
+              "source:tb_regularize.clientes"
+            ],
+            "tenantScope": {
+              "kind": "organization_column",
+              "column": "organization_id",
+              "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b"
+            },
+            "projection": {
+              "kind": "custom_projector",
+              "callbackDigests": {
+                "classifySourceRow": "88725333ed36cfcfc6687c205d9033d9d67b389e9b669875cac0aa3d1e60e23e",
+                "emitRows": "6b4495ce6d683ca3480755578de56ed27d93dd3d71967f5807506f211a8d72d3",
+                "projector": "d10017479409950eb892b4181fcc35c55311d9ab392582baff67b5255abc6408"
+              }
+            },
+            "write": {
+              "kind": "insert",
+              "conflictColumns": [
+                "id"
+              ]
+            },
+            "cleanup": {
+              "kind": "delete_by_identity",
+              "identityColumns": [
+                "id"
+              ],
+              "ownedColumns": [],
+              "resetValues": {}
+            }
+          },
+          "fields": {},
+          "jsonColumns": {},
+          "requiredForeignKeys": [
+            {
+              "column": "client_id",
+              "targetColumn": "id",
+              "targetTable": "clients"
+            },
+            {
+              "column": "organization_id",
+              "targetColumn": "id",
+              "targetTable": "organizations"
+            },
+            {
+              "column": "user_id",
+              "targetColumn": "id",
+              "targetTable": "users"
+            }
+          ],
+          "requiredColumns": [
+            "id",
+            "user_id",
+            "number",
+            "note",
+            "created_at",
+            "status",
+            "week_start_date",
+            "week_end_date",
+            "original_creation_date",
+            "has_penalty",
+            "is_urgent",
+            "is_internal",
+            "organization_id"
+          ],
+          "tableSql": "\"notes\""
+        }
+      },
+      {
+        "aggregateColumn": null,
+        "expectedAggregateCount": null,
+        "identity": {
+          "id": "d0463eb3-461f-5846-b6cd-db8c12f917ae"
+        },
+        "step": {
+          "key": "tb_pec.notas\u0000pec-note-insert",
+          "sourceTable": "tb_pec.notas",
+          "stepId": "pec-note-insert",
+          "destinationTable": "notes",
+          "dependencies": [
+            "tb_admin.usuarios",
+            "tb_regularize.clientes"
+          ],
+          "contract": {
+            "contextRequirements": [
+              "source:tb_admin.usuarios",
+              "source:tb_regularize.clientes"
+            ],
+            "tenantScope": {
+              "kind": "organization_column",
+              "column": "organization_id",
+              "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b"
+            },
+            "projection": {
+              "kind": "custom_projector",
+              "callbackDigests": {
+                "classifySourceRow": "88725333ed36cfcfc6687c205d9033d9d67b389e9b669875cac0aa3d1e60e23e",
+                "emitRows": "6b4495ce6d683ca3480755578de56ed27d93dd3d71967f5807506f211a8d72d3",
+                "projector": "d10017479409950eb892b4181fcc35c55311d9ab392582baff67b5255abc6408"
+              }
+            },
+            "write": {
+              "kind": "insert",
+              "conflictColumns": [
+                "id"
+              ]
+            },
+            "cleanup": {
+              "kind": "delete_by_identity",
+              "identityColumns": [
+                "id"
+              ],
+              "ownedColumns": [],
+              "resetValues": {}
+            }
+          },
+          "fields": {},
+          "jsonColumns": {},
+          "requiredForeignKeys": [
+            {
+              "column": "client_id",
+              "targetColumn": "id",
+              "targetTable": "clients"
+            },
+            {
+              "column": "organization_id",
+              "targetColumn": "id",
+              "targetTable": "organizations"
+            },
+            {
+              "column": "user_id",
+              "targetColumn": "id",
+              "targetTable": "users"
+            }
+          ],
+          "requiredColumns": [
+            "id",
+            "user_id",
+            "number",
+            "note",
+            "created_at",
+            "status",
+            "week_start_date",
+            "week_end_date",
+            "original_creation_date",
+            "has_penalty",
+            "is_urgent",
+            "is_internal",
+            "organization_id"
+          ],
+          "tableSql": "\"notes\""
+        }
+      },
+      {
+        "aggregateColumn": null,
+        "expectedAggregateCount": null,
+        "identity": {
+          "id": "4952f884-3563-51f1-94e5-23782cddac1f"
+        },
+        "step": {
+          "key": "tb_pec.notas\u0000pec-note-insert",
+          "sourceTable": "tb_pec.notas",
+          "stepId": "pec-note-insert",
+          "destinationTable": "notes",
+          "dependencies": [
+            "tb_admin.usuarios",
+            "tb_regularize.clientes"
+          ],
+          "contract": {
+            "contextRequirements": [
+              "source:tb_admin.usuarios",
+              "source:tb_regularize.clientes"
+            ],
+            "tenantScope": {
+              "kind": "organization_column",
+              "column": "organization_id",
+              "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b"
+            },
+            "projection": {
+              "kind": "custom_projector",
+              "callbackDigests": {
+                "classifySourceRow": "88725333ed36cfcfc6687c205d9033d9d67b389e9b669875cac0aa3d1e60e23e",
+                "emitRows": "6b4495ce6d683ca3480755578de56ed27d93dd3d71967f5807506f211a8d72d3",
+                "projector": "d10017479409950eb892b4181fcc35c55311d9ab392582baff67b5255abc6408"
+              }
+            },
+            "write": {
+              "kind": "insert",
+              "conflictColumns": [
+                "id"
+              ]
+            },
+            "cleanup": {
+              "kind": "delete_by_identity",
+              "identityColumns": [
+                "id"
+              ],
+              "ownedColumns": [],
+              "resetValues": {}
+            }
+          },
+          "fields": {},
+          "jsonColumns": {},
+          "requiredForeignKeys": [
+            {
+              "column": "client_id",
+              "targetColumn": "id",
+              "targetTable": "clients"
+            },
+            {
+              "column": "organization_id",
+              "targetColumn": "id",
+              "targetTable": "organizations"
+            },
+            {
+              "column": "user_id",
+              "targetColumn": "id",
+              "targetTable": "users"
+            }
+          ],
+          "requiredColumns": [
+            "id",
+            "user_id",
+            "number",
+            "note",
+            "created_at",
+            "status",
+            "week_start_date",
+            "week_end_date",
+            "original_creation_date",
+            "has_penalty",
+            "is_urgent",
+            "is_internal",
+            "organization_id"
+          ],
+          "tableSql": "\"notes\""
+        }
+      },
+      {
+        "aggregateColumn": null,
+        "expectedAggregateCount": null,
+        "identity": {
+          "id": "3518a127-1bca-52bf-a1e5-c4fc4cb02524"
+        },
+        "step": {
+          "key": "tb_pec.notas\u0000pec-note-insert",
+          "sourceTable": "tb_pec.notas",
+          "stepId": "pec-note-insert",
+          "destinationTable": "notes",
+          "dependencies": [
+            "tb_admin.usuarios",
+            "tb_regularize.clientes"
+          ],
+          "contract": {
+            "contextRequirements": [
+              "source:tb_admin.usuarios",
+              "source:tb_regularize.clientes"
+            ],
+            "tenantScope": {
+              "kind": "organization_column",
+              "column": "organization_id",
+              "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b"
+            },
+            "projection": {
+              "kind": "custom_projector",
+              "callbackDigests": {
+                "classifySourceRow": "88725333ed36cfcfc6687c205d9033d9d67b389e9b669875cac0aa3d1e60e23e",
+                "emitRows": "6b4495ce6d683ca3480755578de56ed27d93dd3d71967f5807506f211a8d72d3",
+                "projector": "d10017479409950eb892b4181fcc35c55311d9ab392582baff67b5255abc6408"
+              }
+            },
+            "write": {
+              "kind": "insert",
+              "conflictColumns": [
+                "id"
+              ]
+            },
+            "cleanup": {
+              "kind": "delete_by_identity",
+              "identityColumns": [
+                "id"
+              ],
+              "ownedColumns": [],
+              "resetValues": {}
+            }
+          },
+          "fields": {},
+          "jsonColumns": {},
+          "requiredForeignKeys": [
+            {
+              "column": "client_id",
+              "targetColumn": "id",
+              "targetTable": "clients"
+            },
+            {
+              "column": "organization_id",
+              "targetColumn": "id",
+              "targetTable": "organizations"
+            },
+            {
+              "column": "user_id",
+              "targetColumn": "id",
+              "targetTable": "users"
+            }
+          ],
+          "requiredColumns": [
+            "id",
+            "user_id",
+            "number",
+            "note",
+            "created_at",
+            "status",
+            "week_start_date",
+            "week_end_date",
+            "original_creation_date",
+            "has_penalty",
+            "is_urgent",
+            "is_internal",
+            "organization_id"
+          ],
+          "tableSql": "\"notes\""
+        }
+      },
+      {
+        "aggregateColumn": null,
+        "expectedAggregateCount": null,
+        "identity": {
+          "id": "1e3c0c7c-07e6-526c-af14-eaa76e6b0d94"
+        },
+        "step": {
+          "key": "tb_pec.notas\u0000pec-note-insert",
+          "sourceTable": "tb_pec.notas",
+          "stepId": "pec-note-insert",
+          "destinationTable": "notes",
+          "dependencies": [
+            "tb_admin.usuarios",
+            "tb_regularize.clientes"
+          ],
+          "contract": {
+            "contextRequirements": [
+              "source:tb_admin.usuarios",
+              "source:tb_regularize.clientes"
+            ],
+            "tenantScope": {
+              "kind": "organization_column",
+              "column": "organization_id",
+              "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b"
+            },
+            "projection": {
+              "kind": "custom_projector",
+              "callbackDigests": {
+                "classifySourceRow": "88725333ed36cfcfc6687c205d9033d9d67b389e9b669875cac0aa3d1e60e23e",
+                "emitRows": "6b4495ce6d683ca3480755578de56ed27d93dd3d71967f5807506f211a8d72d3",
+                "projector": "d10017479409950eb892b4181fcc35c55311d9ab392582baff67b5255abc6408"
+              }
+            },
+            "write": {
+              "kind": "insert",
+              "conflictColumns": [
+                "id"
+              ]
+            },
+            "cleanup": {
+              "kind": "delete_by_identity",
+              "identityColumns": [
+                "id"
+              ],
+              "ownedColumns": [],
+              "resetValues": {}
+            }
+          },
+          "fields": {},
+          "jsonColumns": {},
+          "requiredForeignKeys": [
+            {
+              "column": "client_id",
+              "targetColumn": "id",
+              "targetTable": "clients"
+            },
+            {
+              "column": "organization_id",
+              "targetColumn": "id",
+              "targetTable": "organizations"
+            },
+            {
+              "column": "user_id",
+              "targetColumn": "id",
+              "targetTable": "users"
+            }
+          ],
+          "requiredColumns": [
+            "id",
+            "user_id",
+            "number",
+            "note",
+            "created_at",
+            "status",
+            "week_start_date",
+            "week_end_date",
+            "original_creation_date",
+            "has_penalty",
+            "is_urgent",
+            "is_internal",
+            "organization_id"
+          ],
+          "tableSql": "\"notes\""
+        }
+      },
+      {
+        "aggregateColumn": null,
+        "expectedAggregateCount": null,
+        "identity": {
+          "id": "e08277a1-4e84-55dc-a42b-7302e3ec247e"
+        },
+        "step": {
+          "key": "tb_pec.notas\u0000pec-note-insert",
+          "sourceTable": "tb_pec.notas",
+          "stepId": "pec-note-insert",
+          "destinationTable": "notes",
+          "dependencies": [
+            "tb_admin.usuarios",
+            "tb_regularize.clientes"
+          ],
+          "contract": {
+            "contextRequirements": [
+              "source:tb_admin.usuarios",
+              "source:tb_regularize.clientes"
+            ],
+            "tenantScope": {
+              "kind": "organization_column",
+              "column": "organization_id",
+              "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b"
+            },
+            "projection": {
+              "kind": "custom_projector",
+              "callbackDigests": {
+                "classifySourceRow": "88725333ed36cfcfc6687c205d9033d9d67b389e9b669875cac0aa3d1e60e23e",
+                "emitRows": "6b4495ce6d683ca3480755578de56ed27d93dd3d71967f5807506f211a8d72d3",
+                "projector": "d10017479409950eb892b4181fcc35c55311d9ab392582baff67b5255abc6408"
+              }
+            },
+            "write": {
+              "kind": "insert",
+              "conflictColumns": [
+                "id"
+              ]
+            },
+            "cleanup": {
+              "kind": "delete_by_identity",
+              "identityColumns": [
+                "id"
+              ],
+              "ownedColumns": [],
+              "resetValues": {}
+            }
+          },
+          "fields": {},
+          "jsonColumns": {},
+          "requiredForeignKeys": [
+            {
+              "column": "client_id",
+              "targetColumn": "id",
+              "targetTable": "clients"
+            },
+            {
+              "column": "organization_id",
+              "targetColumn": "id",
+              "targetTable": "organizations"
+            },
+            {
+              "column": "user_id",
+              "targetColumn": "id",
+              "targetTable": "users"
+            }
+          ],
+          "requiredColumns": [
+            "id",
+            "user_id",
+            "number",
+            "note",
+            "created_at",
+            "status",
+            "week_start_date",
+            "week_end_date",
+            "original_creation_date",
+            "has_penalty",
+            "is_urgent",
+            "is_internal",
+            "organization_id"
+          ],
+          "tableSql": "\"notes\""
+        }
+      },
+      {
+        "aggregateColumn": null,
+        "expectedAggregateCount": null,
+        "identity": {
+          "id": "4c040241-387f-5d39-90f8-052093760c45"
+        },
+        "step": {
+          "key": "tb_pec.notas\u0000pec-note-insert",
+          "sourceTable": "tb_pec.notas",
+          "stepId": "pec-note-insert",
+          "destinationTable": "notes",
+          "dependencies": [
+            "tb_admin.usuarios",
+            "tb_regularize.clientes"
+          ],
+          "contract": {
+            "contextRequirements": [
+              "source:tb_admin.usuarios",
+              "source:tb_regularize.clientes"
+            ],
+            "tenantScope": {
+              "kind": "organization_column",
+              "column": "organization_id",
+              "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b"
+            },
+            "projection": {
+              "kind": "custom_projector",
+              "callbackDigests": {
+                "classifySourceRow": "88725333ed36cfcfc6687c205d9033d9d67b389e9b669875cac0aa3d1e60e23e",
+                "emitRows": "6b4495ce6d683ca3480755578de56ed27d93dd3d71967f5807506f211a8d72d3",
+                "projector": "d10017479409950eb892b4181fcc35c55311d9ab392582baff67b5255abc6408"
+              }
+            },
+            "write": {
+              "kind": "insert",
+              "conflictColumns": [
+                "id"
+              ]
+            },
+            "cleanup": {
+              "kind": "delete_by_identity",
+              "identityColumns": [
+                "id"
+              ],
+              "ownedColumns": [],
+              "resetValues": {}
+            }
+          },
+          "fields": {},
+          "jsonColumns": {},
+          "requiredForeignKeys": [
+            {
+              "column": "client_id",
+              "targetColumn": "id",
+              "targetTable": "clients"
+            },
+            {
+              "column": "organization_id",
+              "targetColumn": "id",
+              "targetTable": "organizations"
+            },
+            {
+              "column": "user_id",
+              "targetColumn": "id",
+              "targetTable": "users"
+            }
+          ],
+          "requiredColumns": [
+            "id",
+            "user_id",
+            "number",
+            "note",
+            "created_at",
+            "status",
+            "week_start_date",
+            "week_end_date",
+            "original_creation_date",
+            "has_penalty",
+            "is_urgent",
+            "is_internal",
+            "organization_id"
+          ],
+          "tableSql": "\"notes\""
+        }
+      },
+      {
+        "aggregateColumn": null,
+        "expectedAggregateCount": null,
+        "identity": {
+          "id": "41b13a6c-3180-5d6a-803e-9d871469af6f"
+        },
+        "step": {
+          "key": "tb_pec.notas\u0000pec-note-insert",
+          "sourceTable": "tb_pec.notas",
+          "stepId": "pec-note-insert",
+          "destinationTable": "notes",
+          "dependencies": [
+            "tb_admin.usuarios",
+            "tb_regularize.clientes"
+          ],
+          "contract": {
+            "contextRequirements": [
+              "source:tb_admin.usuarios",
+              "source:tb_regularize.clientes"
+            ],
+            "tenantScope": {
+              "kind": "organization_column",
+              "column": "organization_id",
+              "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b"
+            },
+            "projection": {
+              "kind": "custom_projector",
+              "callbackDigests": {
+                "classifySourceRow": "88725333ed36cfcfc6687c205d9033d9d67b389e9b669875cac0aa3d1e60e23e",
+                "emitRows": "6b4495ce6d683ca3480755578de56ed27d93dd3d71967f5807506f211a8d72d3",
+                "projector": "d10017479409950eb892b4181fcc35c55311d9ab392582baff67b5255abc6408"
+              }
+            },
+            "write": {
+              "kind": "insert",
+              "conflictColumns": [
+                "id"
+              ]
+            },
+            "cleanup": {
+              "kind": "delete_by_identity",
+              "identityColumns": [
+                "id"
+              ],
+              "ownedColumns": [],
+              "resetValues": {}
+            }
+          },
+          "fields": {},
+          "jsonColumns": {},
+          "requiredForeignKeys": [
+            {
+              "column": "client_id",
+              "targetColumn": "id",
+              "targetTable": "clients"
+            },
+            {
+              "column": "organization_id",
+              "targetColumn": "id",
+              "targetTable": "organizations"
+            },
+            {
+              "column": "user_id",
+              "targetColumn": "id",
+              "targetTable": "users"
+            }
+          ],
+          "requiredColumns": [
+            "id",
+            "user_id",
+            "number",
+            "note",
+            "created_at",
+            "status",
+            "week_start_date",
+            "week_end_date",
+            "original_creation_date",
+            "has_penalty",
+            "is_urgent",
+            "is_internal",
+            "organization_id"
+          ],
+          "tableSql": "\"notes\""
+        }
+      }
+    ],
+    "skipped": 514,
+    "writes": 8
+  },
+  "reconciliation": {
+    "databaseQueries": 1,
+    "matches": true,
+    "prepared": 42326,
+    "writes": 8
+  }
+}

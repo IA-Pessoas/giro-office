@@ -1,0 +1,4173 @@
+{
+  "schemaVersion": "giro-office.migration-v4.dry-run/1",
+  "inventoryCounts": {
+    "executableSources": 102,
+    "pendingSources": 210,
+    "sources": 312,
+    "steps": 132,
+    "rows": 1374880
+  },
+  "statusCounts": {
+    "prepared": 679260,
+    "notEmitted": 62046,
+    "quarantine": 755966
+  },
+  "sourceCounts": {
+    "prepared": 619190,
+    "notEmitted": 23,
+    "quarantine": 755667
+  },
+  "destinationCounts": {
+    "certificate.pf": {
+      "prepared": 343,
+      "notEmitted": 0,
+      "quarantine": 451
+    },
+    "certificate.pj": {
+      "prepared": 404,
+      "notEmitted": 0,
+      "quarantine": 376
+    },
+    "clients": {
+      "prepared": 6201,
+      "notEmitted": 1320,
+      "quarantine": 15
+    },
+    "clients.clientsGroup": {
+      "prepared": 333,
+      "notEmitted": 0,
+      "quarantine": 6
+    },
+    "clients.group": {
+      "prepared": 302,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "clients.history": {
+      "prepared": 3372,
+      "notEmitted": 0,
+      "quarantine": 135
+    },
+    "clients.pa": {
+      "prepared": 1254,
+      "notEmitted": 0,
+      "quarantine": 2
+    },
+    "clients.pf": {
+      "prepared": 388,
+      "notEmitted": 181,
+      "quarantine": 1080
+    },
+    "contabil.control": {
+      "prepared": 2739,
+      "notEmitted": 0,
+      "quarantine": 24
+    },
+    "contabil.relationship": {
+      "prepared": 135,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "contabil.responsibles": {
+      "prepared": 361,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "departments": {
+      "prepared": 48,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "emails": {
+      "prepared": 22,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "fiscal.icms": {
+      "prepared": 361,
+      "notEmitted": 3,
+      "quarantine": 4
+    },
+    "fiscal.ipi": {
+      "prepared": 11088,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "fiscal.ncm": {
+      "prepared": 31358,
+      "notEmitted": 0,
+      "quarantine": 4
+    },
+    "integracao.projectPlan": {
+      "prepared": 6,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "integracao.projectPlanTasks": {
+      "prepared": 47,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "integracao.projects": {
+      "prepared": 27769,
+      "notEmitted": 25428,
+      "quarantine": 2
+    },
+    "integracao.tasks": {
+      "prepared": 25371,
+      "notEmitted": 0,
+      "quarantine": 58
+    },
+    "integracao.tasksDependent": {
+      "prepared": 25,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "integracao.tasksIntegrationRegularize": {
+      "prepared": 0,
+      "notEmitted": 0,
+      "quarantine": 13
+    },
+    "integracao.tasksModel": {
+      "prepared": 25757,
+      "notEmitted": 25428,
+      "quarantine": 59
+    },
+    "logs": {
+      "prepared": 470099,
+      "notEmitted": 0,
+      "quarantine": 28
+    },
+    "mtk.passwords": {
+      "prepared": 52,
+      "notEmitted": 0,
+      "quarantine": 2
+    },
+    "notes": {
+      "prepared": 41612,
+      "notEmitted": 0,
+      "quarantine": 16
+    },
+    "parcelamento.installments": {
+      "prepared": 247,
+      "notEmitted": 0,
+      "quarantine": 29
+    },
+    "parcelamento.installmentsCompetencies": {
+      "prepared": 510,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "parcelamento.panorama": {
+      "prepared": 1238,
+      "notEmitted": 0,
+      "quarantine": 2
+    },
+    "permissions": {
+      "prepared": 1167,
+      "notEmitted": 1,
+      "quarantine": 7
+    },
+    "pessoal.ldd": {
+      "prepared": 955,
+      "notEmitted": 0,
+      "quarantine": 3
+    },
+    "pessoal.obrigations": {
+      "prepared": 1769,
+      "notEmitted": 0,
+      "quarantine": 112
+    },
+    "pessoal.passwords": {
+      "prepared": 330,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "pessoal.payroll": {
+      "prepared": 184,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "pessoal.situations": {
+      "prepared": 28,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "pessoal.union": {
+      "prepared": 6,
+      "notEmitted": 0,
+      "quarantine": 16
+    },
+    "regularize.license": {
+      "prepared": 253,
+      "notEmitted": 0,
+      "quarantine": 87
+    },
+    "regularize.municipalTaxes": {
+      "prepared": 8,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "regularize.partners": {
+      "prepared": 1412,
+      "notEmitted": 2,
+      "quarantine": 23
+    },
+    "regularize.passowordsSites": {
+      "prepared": 3593,
+      "notEmitted": 4057,
+      "quarantine": 0
+    },
+    "regularize.passwordsRegularize": {
+      "prepared": 3573,
+      "notEmitted": 4876,
+      "quarantine": 51
+    },
+    "regularize.proceduralGuidances": {
+      "prepared": 3129,
+      "notEmitted": 0,
+      "quarantine": 293
+    },
+    "regularize.process": {
+      "prepared": 1061,
+      "notEmitted": 441,
+      "quarantine": 497
+    },
+    "rh.pointConfig": {
+      "prepared": 15,
+      "notEmitted": 0,
+      "quarantine": 23
+    },
+    "rh.points": {
+      "prepared": 2241,
+      "notEmitted": 0,
+      "quarantine": 48
+    },
+    "rh.request_categories": {
+      "prepared": 7,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.request_messages": {
+      "prepared": 1890,
+      "notEmitted": 0,
+      "quarantine": 16
+    },
+    "rh.requests": {
+      "prepared": 907,
+      "notEmitted": 0,
+      "quarantine": 8
+    },
+    "rh.score": {
+      "prepared": 154,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.score_evaluations": {
+      "prepared": 1158,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.score_nitro": {
+      "prepared": 48,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.score_questions": {
+      "prepared": 26,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.timeBankReleases": {
+      "prepared": 2,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.timeClockRequest": {
+      "prepared": 138,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "rh.timeSheets": {
+      "prepared": 80,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "stock": {
+      "prepared": 192,
+      "notEmitted": 0,
+      "quarantine": 420
+    },
+    "stock.categories": {
+      "prepared": 207,
+      "notEmitted": 0,
+      "quarantine": 37
+    },
+    "stock.entries": {
+      "prepared": 872,
+      "notEmitted": 0,
+      "quarantine": 2208
+    },
+    "stock.exits": {
+      "prepared": 837,
+      "notEmitted": 0,
+      "quarantine": 3013
+    },
+    "stock.locations": {
+      "prepared": 22,
+      "notEmitted": 158,
+      "quarantine": 26
+    },
+    "tecnologia.inventory": {
+      "prepared": 0,
+      "notEmitted": 0,
+      "quarantine": 701
+    },
+    "tecnologia.inventoryCategories": {
+      "prepared": 48,
+      "notEmitted": 9,
+      "quarantine": 0
+    },
+    "tecnologia.inventoryLocations": {
+      "prepared": 21,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "tecnologia.passwords_users": {
+      "prepared": 92,
+      "notEmitted": 0,
+      "quarantine": 87
+    },
+    "tecnologia.request_categories": {
+      "prepared": 1,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "tecnologia.request_messages": {
+      "prepared": 0,
+      "notEmitted": 0,
+      "quarantine": 2
+    },
+    "tecnologia.requests": {
+      "prepared": 4,
+      "notEmitted": 0,
+      "quarantine": 1
+    },
+    "tecnologia.terms": {
+      "prepared": 200,
+      "notEmitted": 0,
+      "quarantine": 0
+    },
+    "triagem.configs": {
+      "prepared": 243,
+      "notEmitted": 1,
+      "quarantine": 309
+    },
+    "users": {
+      "prepared": 763,
+      "notEmitted": 141,
+      "quarantine": 122
+    }
+  },
+  "quarantine": [
+    {
+      "sourceTable": "tb.atendimento_documentos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_admin.logs",
+      "stepId": "admin-log-insert",
+      "destinationTable": "logs",
+      "field": "usuario_id",
+      "reasonCode": "LOG_USER_NOT_FOUND",
+      "rowCount": 28,
+      "sourceIdentityDigests": [
+        "sha256:04f8d98a5c8913f12d767b5236dfaafb8a6100faa4f22c85490f877183a2e6b1",
+        "sha256:05343e38f767e0a76e8afb957bb63c7d5c3e498695062c834f8924f66726b164",
+        "sha256:06e4dfd389d56a1e68753c2bf78b2a4c58ef327bb3a0867320257cf84ec6bcf6",
+        "sha256:0bdc6c2f0f174f620abae3bc6d5ba921d6b104670606348a8e21cbaadde98332",
+        "sha256:0c7145d7e74d0f037a0d39d182414909d56dc2dec62ddff0ee69794969211ffd",
+        "sha256:0d0d19cac116a63b49303cf5ec03ca87789dcfbe3323bf146a92fbb786a70ca3",
+        "sha256:16246270753c29ae180f5e31f467b269dcebff1ccd34b15a706ffe6e63ff7da5",
+        "sha256:2be6a22a4d6012b99034f0e8e3e7915dfee75942de46e3ccdc3c93e6a8bdf40b",
+        "sha256:2f6d6049c848e74308f6bf68696687010f8588ace15035145274dec2fafd201e",
+        "sha256:47d8d4ff7ea45af70cce1f1324ef4bd734ad81f7526c55691dc264941cdf8469",
+        "sha256:575f164659db15c768bc52c253332a4df8ec0331b99ddff60e59a4fcf44946ed",
+        "sha256:6697db9e9f5432eb481d30ae866728f93577be381de90f25381ad9280a272b4e",
+        "sha256:676b2fe141962dae33b529e1c48d3c9c784733466dd00fb1c37cd26833719f32",
+        "sha256:6acfe9d7107eb69307c03266e11d08a5c1702eff8a765e9b1f408b25a73c5ee9",
+        "sha256:712ec5072863c64f903631de2bb466a7629c85443180fbc798d15d0328ccd243",
+        "sha256:803b1345642d8f128638afe5557744bb6df8f4562c2e343722866424919120ae",
+        "sha256:942aeef6e93b30277db33d22d4c5493fe0c0ec228cbefc8c333f8701c5337a06",
+        "sha256:9e328b94b8687cf13c6f8b796f45cb97066196756b401ee3ff9d87ffd1df8e1c",
+        "sha256:a396d350ab2869dedb4f3ec0eab25b376744a1d9c605beefda39b172e590e52e",
+        "sha256:a4f04ff13293cb6aa8e141232e6926c63d8589cd838b31ec8fce7cad1b1590a0"
+      ]
+    },
+    {
+      "sourceTable": "tb_admin.permissoes",
+      "reasonCode": "DYNAMIC_PERMISSION_NOT_PROVEN",
+      "rowCount": 14
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_atendimento",
+      "reasonCode": "RETIRED_PERMISSION_MODULE",
+      "rowCount": 49
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_certificado",
+      "stepId": "permission-certificado-merge",
+      "destinationTable": "permissions",
+      "field": "permissao",
+      "reasonCode": "PERMISSION_MODULE_LEVEL_CONFLICT",
+      "rowCount": 3,
+      "sourceIdentityDigests": [
+        "sha256:0736d585446249dbfb66238893e4d7f972f02cca575a7830bb4f6406eb8d4b09",
+        "sha256:8cacf2e15f823c4ff5bfe37e662cabd3f8851b84af2fc7835c77e131203fda61",
+        "sha256:b6b32bcd12d7ed75ed72aaa9e532c25af45677712e2c785f3a5ddb24e46a6015"
+      ]
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_integracao",
+      "stepId": "permission-integracao-merge",
+      "destinationTable": "permissions",
+      "field": "user_id",
+      "reasonCode": "PERMISSION_USER_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:4f1eb9a79aa661bb90c2d91284aa63a8f1105a68936746ad2a7075332397b11a"
+      ]
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_pec",
+      "reasonCode": "RETIRED_PERMISSION_MODULE",
+      "rowCount": 121
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_regularize",
+      "stepId": "permission-regularize-merge",
+      "destinationTable": "permissions",
+      "field": "user_id",
+      "reasonCode": "PERMISSION_USER_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:c174b92209d2f68e6b75ab11bc04538719b0ad3b86e911a449274eca0af127bc"
+      ]
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_rh",
+      "stepId": "permission-rh-merge",
+      "destinationTable": "permissions",
+      "field": "user_id",
+      "reasonCode": "PERMISSION_USER_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:3ae0d2779a87c0afdf2a8a8e7207fc04bcec958dab09d3ae8d2c2fe12f353fa6"
+      ]
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_triagem",
+      "stepId": "permission-triagem-merge",
+      "destinationTable": "permissions",
+      "field": "user_id",
+      "reasonCode": "PERMISSION_USER_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:4c4d23cb6276a068bce97d5a700c5355220aed4d5dae81a4ec57fb1b8e49135f"
+      ]
+    },
+    {
+      "sourceTable": "tb_admin.permissoes_wiki",
+      "reasonCode": "RETIRED_PERMISSION_MODULE",
+      "rowCount": 12
+    },
+    {
+      "sourceTable": "tb_admin.ps",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 7
+    },
+    {
+      "sourceTable": "tb_admin.responsaveis",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 2672
+    },
+    {
+      "sourceTable": "tb_admin.responsaveis_contatos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 9
+    },
+    {
+      "sourceTable": "tb_admin.responsaveis_ps",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_admin.updates",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 12
+    },
+    {
+      "sourceTable": "tb_admin.usuarios",
+      "stepId": "user-insert",
+      "destinationTable": "users",
+      "field": "password",
+      "reasonCode": "USER_PASSWORD_EMPTY",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:29451fbcf953a6f030b143aa0c3fa5429fe4d44fd9de27a8d773056ed8fc0e7f"
+      ]
+    },
+    {
+      "sourceTable": "tb_atendimento.atendimentos_opa",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_atendimento.contatos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1173
+    },
+    {
+      "sourceTable": "tb_atendimento.motoboy",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 41
+    },
+    {
+      "sourceTable": "tb_atendimento.psc",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 261
+    },
+    {
+      "sourceTable": "tb_atendimento.satisfacao",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 986
+    },
+    {
+      "sourceTable": "tb_atendimento.uber",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1296
+    },
+    {
+      "sourceTable": "tb_atendimento.uber_clientes",
+      "reasonCode": "NO_STABLE_MERGE_IDENTITY",
+      "rowCount": 77
+    },
+    {
+      "sourceTable": "tb_atendimento.visitas_clientes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 483
+    },
+    {
+      "sourceTable": "tb_cbc.atas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_cbc.configs",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_cbc.keep_clientes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 251
+    },
+    {
+      "sourceTable": "tb_cbc.keep_tags",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_cbc.notificacoes_popup",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 2359
+    },
+    {
+      "sourceTable": "tb_cbc.orcamentos",
+      "reasonCode": "PARTIAL_CURRENT_CONTRACT_UNRESOLVED_ADAPTATION",
+      "rowCount": 510
+    },
+    {
+      "sourceTable": "tb_cbc.orcamentos_categorias",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_cbc.panorama_clientes_parcelamento",
+      "reasonCode": "CURRENT_IDENTITY_NOT_RECONSTRUCTABLE",
+      "rowCount": 332
+    },
+    {
+      "sourceTable": "tb_cbc.panorama_parcelamentos",
+      "stepId": "parcelamento-panorama-insert",
+      "destinationTable": "parcelamento.panorama",
+      "field": "cliente_id",
+      "reasonCode": "PANORAMA_CLIENT_NOT_FOUND",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:7b5939b1034eb6146dc87f46b26a5351d4a577740a8fcaeacb486d236a9f21f2",
+        "sha256:ed1e4613e31501fa465ab3abf577983670af1bf35f40310251afd44f11bab7b0"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbc.preferencias",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 264
+    },
+    {
+      "sourceTable": "tb_cbc.sininhos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 13215
+    },
+    {
+      "sourceTable": "tb_cbs.estoque",
+      "stepId": "cbs-stock-insert",
+      "destinationTable": "stock",
+      "field": "andar",
+      "reasonCode": "CBS_STOCK_LOCATION_FLOOR_MISMATCH",
+      "rowCount": 54,
+      "sourceIdentityDigests": [
+        "sha256:01066feb9fd640a15d878481594403d86055bc4db47d12e644a068bea6d008aa",
+        "sha256:0728863e28846820f99b149232db65f22249592a1910ac8653610970d31d4e5e",
+        "sha256:0a39054f4072a91acf08e48fb142116eff196aa6d6306af8e4092578fe015a9c",
+        "sha256:0c0f965460d7604643e75d59831bcfdc09b22432d97a8eea49072a8167bb801b",
+        "sha256:1384eca1edc95c74bd97b95b7a6ffa35815bad29ec56134d2310c7d15904dffa",
+        "sha256:14506210dac824e8a44201cfa2deba356ccf22e7d110b2af1f39fb40d8a6e53e",
+        "sha256:1716b8f743865b8a0513189a957939f065470f16b93e7733dc2b85c58cb55b47",
+        "sha256:197ca4de5c1a06f6400f67895a0d75061e0890835d161ca6b9df12bf546e2edd",
+        "sha256:1b17d87e4a930e070eafb76ff76af476963b27ef485e3a74266509e1e00f36c4",
+        "sha256:1f10bed50c98005a4408edef2825c47fbf9c827f0ad9e51f997534af30a06284",
+        "sha256:241f9778c899ef877f8b99dc6b9828462c169b862ea871bed09ee89f865bbb12",
+        "sha256:267206a225afd8b71e9197f67675ac581eebef0aa6683b8884e000122128d9e1",
+        "sha256:29ac45cadc5fa2313138e4381d5a9dc2aa673c876ce12bd5e4d2704494dd2039",
+        "sha256:2eb06c740897e9843344d8d3a5d081024ebd5a22e220c697c0cf1f4ea0083db2",
+        "sha256:3585c9ec75d7ebc5c4578bbfb62077d1afb05594bd04f7692ae85d821172d9c1",
+        "sha256:366d6e45c42c79727e8adcff8dc207a58e0f3f93c02ac148506016c4eaa48b0c",
+        "sha256:36b827cd65dc4586e8e6dba2a11a4d92f6a5295cd79b3bbb5fb6a7c2db9723ad",
+        "sha256:3c9466faaaf98eb889a8b4525c574b028735b7288706f6d1e7c7dede2909738c",
+        "sha256:430578a2444645d26206172bc3ee40a2e8d58b7affc3594676457ed3072e2710",
+        "sha256:48c1ddc46d79740c880c339876e783f806ec3862e5699292ddbb7f81f1d0d106"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque",
+      "stepId": "cbs-stock-insert",
+      "destinationTable": "stock",
+      "field": "departamento_id",
+      "reasonCode": "CBS_STOCK_CATEGORY_DEPARTMENT_MISMATCH",
+      "rowCount": 14,
+      "sourceIdentityDigests": [
+        "sha256:0797f60298aa8e2f23a8a93a28f8f7564f6178376ac0f02040062a001eab25a5",
+        "sha256:134e3292343c72043965f508e62c1d5d2e0c0bfe0ac73ef565a106afef0bedc6",
+        "sha256:1636d2685c68f2144285e1a02fdb41f026ca123e3b7e26d95dd5c44cd4909af8",
+        "sha256:17b6a2e5d2f761e888a3feb902933e12378ba5855b3cbc152fe5fb7aa5e721d6",
+        "sha256:518bcbcec61f27ae0c49a1945c292c84badfe3b33780329dd6f32762308fd337",
+        "sha256:54759d268ad7b7feacd58e6feab9e635fe3c00ba71742c4f0d4a8c23fabe260c",
+        "sha256:66a07c3ce08ddafd18aeadbb10e0d9329c80f7cc7d9e4b2593a341a8e0a07771",
+        "sha256:7c2b07f49c68a98c91d3ea06a6bd3e05bd2af54ad7131c71aa6ed3c77f5f21e7",
+        "sha256:a9f0e8ece2a24d3fa934d9c7ff0501b1b56794c8e01312b2e826cd0d1fec41a8",
+        "sha256:c8e3e9337ac386ee4ad019e18876f7a6c742b69537c27dd20b44d28aa4370be9",
+        "sha256:d8469fa1f704eac35c7e426f8dbad36623f3a721a1917b166f85eb0fa392b2d1",
+        "sha256:dc35ca7e8f34b06cfe8b7fe139564ac460f44f48c0e3efac057b3e296ac6d88d",
+        "sha256:dd7f22524773499edacf7514caa389314fe4f6694c4356e74abb12f1a1e77fb1",
+        "sha256:f5759cae1cbf3c067b650051cf2171509c9eaa446964836363cf62d116c932fd"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque",
+      "stepId": "cbs-stock-insert",
+      "destinationTable": "stock",
+      "field": "departamento_id",
+      "reasonCode": "CBS_STOCK_NOT_TECHNOLOGY",
+      "rowCount": 228,
+      "sourceIdentityDigests": [
+        "sha256:001865c8279e71473b97466b57044f89aa6b88c9acc7327367d433bdb7946148",
+        "sha256:012e46bed65ddc1add3f36074268de69317e965450a2a4d076e1de81d6f43714",
+        "sha256:02137dac5aa33790995025dbf767b01ec062ede42ded358cd812695495a316e2",
+        "sha256:06a1ad996dc2463c54f7a063271309aaf17ebc7937a3bc6bc334e1df16c41e2f",
+        "sha256:071552aa5ebf5874f0dd2f141b4debc0c8363e260ff50da523c78cb83ec1c883",
+        "sha256:0724364172aab3350b1f007bb0835f36604c54692db86a3df02dd2c6ea0c33a1",
+        "sha256:07cf54c05417506647de8885eebeffc8fde61b821629b9a8965f2b42265d9601",
+        "sha256:080c7d865c383b7bcba4b6c75a19c53406ffeab8826f52c4b981a8524555d805",
+        "sha256:082daef04734362808cc1a2f27b7429bf28d507858cb4197d9f85a54bf84596c",
+        "sha256:0a56377f0daa24d4d93566692f99148638a24f43a276b73a827e0a43cad75feb",
+        "sha256:0ae3c794ffd228aad9ef7015198df8381efc518e771508effb06a4f066c27d0c",
+        "sha256:0c42773750857196d72cc710bdb0756ebde43e687d6f46a9539b495e4edcc4f2",
+        "sha256:0caf98661c50e9bb4a872763692046fae5ddfe6bec1cde64ef914438478e97d7",
+        "sha256:0e252d43bae5ce569532b091e9d6d3e5fe7e1c866c6afd4f97eea085fe2bd460",
+        "sha256:0e78b73b1771cd88665fed72d197857da7f81497e1f53a4352792294bede4676",
+        "sha256:114b456ceb797fff52d167bc50b600e4a03e3e28a186ab6d57b5b2f258eacf44",
+        "sha256:121ed4aba20a334da005df750d8e8d03610aeee1644df1b805c35e64da1d59f0",
+        "sha256:12f11bb82cc7885cc99a28df13f09f42e87ef48f61b13c45dcdb6fe8d959c82b",
+        "sha256:1334b79a94df160bcb7d9f876f8516bc72a9cc441fa02a7b099bbd6b1510a68c",
+        "sha256:1393ba277ca37a6bc1b2056e4391213e643999108769b9e498d1876a8f61ca8f"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque",
+      "stepId": "cbs-stock-insert",
+      "destinationTable": "stock",
+      "field": "localizacao",
+      "reasonCode": "CBS_STOCK_LOCATION_QUARANTINED",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:8278ce333c05f086f48bbcc8fe72cae80ffa16686c84ffc319cbb62c59c60363"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque",
+      "stepId": "cbs-stock-insert",
+      "destinationTable": "stock",
+      "field": "produto_id",
+      "reasonCode": "CBS_STOCK_CATEGORY_AMBIGUOUS",
+      "rowCount": 6,
+      "sourceIdentityDigests": [
+        "sha256:07a4bfd0e44354b79e3bb2fe0f03c11899deaee9309e4cb5c58c4f394e1f3f7d",
+        "sha256:2175230ba48efad7b74f93ff73e10cccb15d266f6de2206871b224bcc8a8d39d",
+        "sha256:b56999c4c751bdc4a31150576a869f5dd883f04e950407ff9afd50d293a4c104",
+        "sha256:ca718c4d0e1871d6d0692b59428bf1087fb9386e5b18e08fbfedf10d3d1c006e",
+        "sha256:d0cadeedbc22e1a672a952de049ac2153d66ddb6fab87e4e837dfaa9f8e07369",
+        "sha256:e051184bb43d53b2fcfcbcb41ab7e5015f74a0c127fe5e67ca09e0988c376a3b"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque",
+      "stepId": "cbs-stock-insert",
+      "destinationTable": "stock",
+      "field": "produto_id",
+      "reasonCode": "CBS_STOCK_CATEGORY_NOT_FOUND",
+      "rowCount": 109,
+      "sourceIdentityDigests": [
+        "sha256:018cf4b2d87bd2a3c7396df6ff5f992a7b4f4835ea36cd85ad6a46167964c24b",
+        "sha256:043ae24fc5804518c2b95be43d8982a439a740a1c72923aa5d63e3461c1ae95b",
+        "sha256:046fcab39703b65d9976a6389507a17cc2ff6f2bf0e55e578b39ffeb242fdbb5",
+        "sha256:0a640486f5533a3dd5929bc0a5c4d4d3e067191722b4a16373723d64637f3747",
+        "sha256:0a9add879c9d460fb98639bc8ab70c0a69a3da800662b9692441cc3520e2f5c8",
+        "sha256:0c1d892d7a97a3cd03e75dc6abe7d5a67ba6508b26ab81a479661a12ffed9421",
+        "sha256:0d143145217a6dfa9c1b9e6c4cbc97eed23f1bd2d3ef5c88dda42eb651ba6e6a",
+        "sha256:0eaaa84329aa002287d94bf8f2f2642bff4e295c507178442f0f81d82b9ec7b5",
+        "sha256:130301a5e2a3f032dffb85929da9e2d160b4b7c67d6dde25494633d66636614f",
+        "sha256:135b03a29ead4410c97bf12ccdf981a98cee01ad8695370305f7edd2d35cf12e",
+        "sha256:13844fc335f04f23dcf12f280aa2ebc8e83b63fbb608239e7df978f0276b9c00",
+        "sha256:1458490f8840495fccdc813003199a27f9d1b8cada1ab3a3844b9445cc8e8645",
+        "sha256:194c9bd334f1b3bf06976e3ca55af4eaffd58cbedbe434d91468d54ba36bf19e",
+        "sha256:1adc3c4dfa68c9fd9ac59d076236e5e7a2892d1316df8eee4f1c1e59d48f55cd",
+        "sha256:1af2a30619679ed7dc95ce73f10c64029376a1907577ac915bba212d5c300562",
+        "sha256:1af2e49457d50627f8ae38617a67f88c0b39d82881d1820666201f62e6c09d78",
+        "sha256:1bb28fa95a009bfefe6f103bffee113c090f10bc342e7cae14b9799a32bd3146",
+        "sha256:1d2a5cc3426ce91ef99aa2bfe262bbf0c4f4cf97da2f6022e61987db199178fd",
+        "sha256:1e8e3d93ae898dea040ad3339b9ad12e7f52025586558eff6f099b14f4bd535a",
+        "sha256:204090f44305c55608ea914aed41b6bedaeb7429f2b445acfaa9b8f34d109ec8"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_andares",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 14
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_categorias",
+      "stepId": "cbs-stock-category-insert",
+      "destinationTable": "stock.categories",
+      "field": "departamento_id",
+      "reasonCode": "CBS_STOCK_CATEGORY_NOT_TECHNOLOGY",
+      "rowCount": 37,
+      "sourceIdentityDigests": [
+        "sha256:0b11e0909610f4f7be2f7a3bc7b586659f060e209a3d9cf41f24b10ab5a19fca",
+        "sha256:0b6ea4a215eadbd1f971098afef12e40e829a248135bb0cc4223a61356a7aa2d",
+        "sha256:1316ce093ee8ac31149a91bea8c45b19cfe2cc201c9047ec78b07e0f2d42eabe",
+        "sha256:17f79ab63c104efb9bd273f06f09cc81805383799914c63ac77966ae2450f03f",
+        "sha256:17ff89c2ab4122ba0f341556d7d8b6efe74f184dc344addcd4f0e95415bae809",
+        "sha256:1cd3cf50e06446f7bd308b0ceee923bc497129ce76948a7e80c4fc2af279aaa0",
+        "sha256:22472594b812a81507127a48f34e15b35b1f0b328ef0a43b04d86835162a91ec",
+        "sha256:226aa14fce93e35c21f1a1b48a7339bb8c795de057be487dad462da0be4a0355",
+        "sha256:25426a489d87b8f9f75dd2a99d6cee41e9790c58c47c2b05fe15644d387faf44",
+        "sha256:2f86b2500d2fa94fffb365e949c5d08f40fe2d8c35d29e9f86609e6c6e3445df",
+        "sha256:2fde36e4ef82ee1c6c27dc58572db46ae5e82865ac47d3606fe6886a55ec5b82",
+        "sha256:41c70e6287957e6ad90f50fc8b534817c02d91f0351e03c7d9b5f1f9738795e5",
+        "sha256:60001bd8ad99f3845cca8e66b2442159d22098a96a6aa5647895b2b27b555917",
+        "sha256:6debb7283c0b4a7d768f796dbd9800d0312dd19be45faee6ea0898b55001c7dd",
+        "sha256:6df33d198f4d4d094d0eefeb530f93e36ba893f2407ccdae8c711452d85130da",
+        "sha256:855725747fdbaa26e94461c4ab5e3104984ffedadd7fdc4834d488a39f371d31",
+        "sha256:8c7579e5de07cba2eb0ad56bb67bfafac64cd910cbc6fadf9961601f1ba4ebd1",
+        "sha256:8dd72ee6a3d42476cf649ffb8b5558f91f7578ee8c17c4853f6b397789b1af34",
+        "sha256:a5fdcca9e04b503e722ec183e8076eade4cceae30faf05690cbc684bf95ccb62",
+        "sha256:a7a4af51bbdc57c430ae8bc27e39a1f78694c64a02e038fb160747d96cb6a683"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_categorias_itens",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 234
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_entradas",
+      "stepId": "cbs-stock-entry-insert",
+      "destinationTable": "stock.entries",
+      "field": "produto_id",
+      "reasonCode": "CBS_STOCK_ENTRY_NOT_TECHNOLOGY",
+      "rowCount": 772,
+      "sourceIdentityDigests": [
+        "sha256:0061ce99fb6765cf384052902ed817b40a795367785678bf3fc0b90fdaef50d9",
+        "sha256:00ca7dbe66ca46c151642c954ee289b910ddb69d76bdecf6989b2e821b327f34",
+        "sha256:00ddb06f2e22d298d073b792f7d53e4dd80a9bc5ec376f8905175a5021fd7f44",
+        "sha256:0115299e35a681a388c2aedba6401e73eb5ba093289315928e59071435214202",
+        "sha256:0127a5152d6d3797dcbcf28732619250025d99e64014e08c30c5ec96766cc07d",
+        "sha256:01cae1512d2b9aec136c8924c1a9d87e135dcd194a27146b7fede4baf3682f7f",
+        "sha256:01fc4ed2fcac75028ceb104b786ca0eb35cb2bb44162ae9af6530a3f30e1bffb",
+        "sha256:02059196c3fffc72e3b3e2f5158f704c8df40673cdea4288ed0b29e5445daead",
+        "sha256:020af2f684706543d7a5098f1857f75b211bc5b739446478a772d9eb3e21288c",
+        "sha256:0212cad1d22c5f611f13f87e41604ea8de35da15f28c707fe4146b12b2ed57c6",
+        "sha256:02346adf8467cc9a1f6e86fcc032618e00e8c700abbef4d7e413898a46946da3",
+        "sha256:02914a711ce0757ad037cfb357dd877720bdc0586c98c167174e1052b8d628a9",
+        "sha256:03ac8c11fb0127a826f13194912f9f2520c722d1f17ea03eaf2dd15034ea2e2a",
+        "sha256:03e7826ecbf866b712a469417dc3e046912eea3d1b409529ad395008289e0a43",
+        "sha256:03fcdd67c8c1bf2b9020902b7e5ac1de97088ca4b5c87507c4685cfac5fdaefb",
+        "sha256:047086aea4495003ad27ff3ab82326fc4df991f78e2c95c4503c24c9ea33c662",
+        "sha256:0483ff839d6b0ac21768e60cdc1490dcb955bd6b170eeb13438b059ecf13157f",
+        "sha256:04ba300c0b9706ad05c2ef5e08ac10ccd571ccb28a0da3d72f95521311ebf25e",
+        "sha256:04be3b1527f728e403a04d24d23609f47ef9df8ffeef2b3679d144ebe9a0a014",
+        "sha256:0538e8c7ac4093aa1220f82fba45805a65ef6f1797ffab6c0c3fa1ec6f2bc726"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_entradas",
+      "stepId": "cbs-stock-entry-insert",
+      "destinationTable": "stock.entries",
+      "field": "produto_id",
+      "reasonCode": "CBS_STOCK_ENTRY_STOCK_NOT_FOUND",
+      "rowCount": 317,
+      "sourceIdentityDigests": [
+        "sha256:00e58444fcb083e0cd1fe7857881900f52cc9b51d3af09a81ed797b78b3baa93",
+        "sha256:010ab893969c4c581093d4cb7adb56f31791bc58f1b8c0917f044a9f1a6c7a14",
+        "sha256:016cf7a3a5cd05683dbca3217ee14c9838ca1dac3e303ee2659dd9bb3361d25f",
+        "sha256:01cb802de25f13a69bca310b958b054be1d36b17ff05909ec371046a35003dba",
+        "sha256:01eb20e85c66d2a772dde74cf17614ca2b3841e5775f701c21ac44eb078cc00c",
+        "sha256:02030dd0940ec65f970a8f854d7699ae2b2f2aba0cca22440fb198a38c3f7e34",
+        "sha256:020ec2d334164ce33e2754b899da525e52b1e66c2c562d114cce9e2deeab8f62",
+        "sha256:05b2d7c77de82c27073401a287956a5a34e4757d8a8e5b20f42ad160d404aeea",
+        "sha256:0672f4101cb0cc31131b89656f3c6dbe044e886aa12727ef03b7be5886708a89",
+        "sha256:06cf2aff18215f832aece6365f4742d78c37d0719acfa7954f7acf9387089b9e",
+        "sha256:07666d3f624eaa4fab5033486497a82ecc2c827ca81dd1ab10a2b7b6ee941b19",
+        "sha256:07c20b72756d2d92c818414ff79bd72e0cba6f67c25c14152f3300e727fcc3bf",
+        "sha256:08e66086f3242ae3aaaa356ef5e263b4b6ae8f7b7d04bef7d2b5492caa1897a1",
+        "sha256:090d57a16199cb5ecdd451ebf04f7b6ff36742f9529ee36412cda955039356d1",
+        "sha256:0933e433ff4b70df79fcf9ef6cb35277dd8f51a0a0290e5e21239e037b3b1b3f",
+        "sha256:09528dc080da55c78b2fdf21a0839185bf1b6f8b9f8332de8c4175445fbb1eb3",
+        "sha256:09d595af607e88479da47394508de6ffc45d8daf52af12a5e6cc13458903465c",
+        "sha256:0bd73a9a3346f91628489d300b3d6173f72302dfb13f7ee3aa2ecbbbdd97dc41",
+        "sha256:0d5fb9e96cae5b612ca8eaeddedcdbd98084aa4f301a97ce4a75bdcfd1118ff9",
+        "sha256:0dc9060bb55881cd72bf8d75f4b4a3569ed95403f09f66a73eef9384cbfddde7"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_entradas",
+      "stepId": "cbs-stock-entry-insert",
+      "destinationTable": "stock.entries",
+      "field": "produto_id",
+      "reasonCode": "CBS_STOCK_ENTRY_TARGET_QUARANTINED",
+      "rowCount": 1119,
+      "sourceIdentityDigests": [
+        "sha256:001e124d1345510c3426df88d6199c5d182777495cbee5d40d764e135808e32a",
+        "sha256:00605af9c3c267fe65acbf8fb1507862a8501f8e731bd3e2466e74c1b2acc04b",
+        "sha256:011483f26a95123d72a394cdf0b9d78eabe8c51e54e9d27e2675b290e93c44f9",
+        "sha256:01176c448107a36125138ccc9b7acb5be34bb055d6b67c33cd31dd7b128f07bb",
+        "sha256:01bcf5df67a7d74ada4b63f3e6262df1e4fea5a09eb0875c4bb3f2ae9f3b1896",
+        "sha256:01d234a025e1a13d6b5e285072b23306ccfdfef88062695ca7c74c121e3b7d5d",
+        "sha256:01ebd7a4b9b569fecf7bb904840f30659eabcce0f6fb921c813272ce7e4248de",
+        "sha256:025349840e1dbed5802835641afc4a9f5a6c1be7d1cb2e2f14ae23734338366e",
+        "sha256:02969066bc071a0f49999c23751418788330f2196552d1d98567a522b7cc60d3",
+        "sha256:0354686fc9fb56401b5d04bbd544b07e3d904a7952e44b817af75445db89967c",
+        "sha256:038d922d3d19d9047b4205b00141a15881c13f0ce1f6d30094e657908197d1cd",
+        "sha256:04a62b9c0adf31d385054a4cfcd0c1176559f0f57bd8367931fcf2746dc7f20e",
+        "sha256:04ac1c167be3c4ddc45cdac054094787e295f1ea3ec844c2a9b5ba32c56b7aba",
+        "sha256:050f36753c8f7e43f03a4943c77f1294b6b53bc3dc816cb714e282a6cd952c5b",
+        "sha256:052a56aae30810912dcf99228693d21fb4faf157c601ab487a02b35a931df0eb",
+        "sha256:053e764311a9e4e5072a9ec39180068bb8135aff85135a4df01c8ff8d1c09be4",
+        "sha256:05e898c4ac0c732f9883f005d5d7333a647c3a6a07df0134c70744008d002de0",
+        "sha256:063853c08ffc484296eb5cb67bb0272d49b1ff2ccd725b89fc5a2254d3631777",
+        "sha256:0644c6a1eca8f29fbc67a0851842989c0910d0b166e8eaaea3993ffae376a60a",
+        "sha256:0656a11d2d8c0e78cf230ab6a11b0071db99c0b1795e3eaa54aa436e58bae24b"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_itens",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 451
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_localizacoes",
+      "stepId": "cbs-stock-location-insert",
+      "destinationTable": "stock.locations",
+      "field": "andar",
+      "reasonCode": "CBS_STOCK_FLOOR_LABEL_UNMAPPABLE",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:0634af21efb2f48e32a029890655f4d986d89abe6e2df31f0b3b27af5d372128",
+        "sha256:9249c76cb17b48a1670485299d7f82dae74caef3fddcbb0e2b4ec7013f9e0581"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_localizacoes",
+      "stepId": "cbs-stock-location-insert",
+      "destinationTable": "stock.locations",
+      "field": "departamento_id",
+      "reasonCode": "CBS_STOCK_LOCATION_NOT_TECHNOLOGY",
+      "rowCount": 23,
+      "sourceIdentityDigests": [
+        "sha256:0c1abe6867e49957e7c73a5671fbafb2dd1da88cfbd56fdf485ee8bc312f6d11",
+        "sha256:1dd272037fe2a8552e52f753c8208082712cfd4b9b3e002e95f50b0e3ea98c37",
+        "sha256:1f97c0de0cb54b753f4c2b930395b8ba7f74171748c97d758f3ee442cd928cdc",
+        "sha256:22f01984f9828e74c7820e3c6336e5cf8b06804e752a9cfdf349f5d0f4b418ce",
+        "sha256:2a73de0cb3fe3c4e58236b74cd75bc60e26f6d0fe47fea49a824a1a1df88868a",
+        "sha256:331ca075670e808ab5341af8e7b4cf2bada3a60357b5ce3941f175f3808abb16",
+        "sha256:41799eb86ba82d6453a0084714cf75746bf3c705e3fda4482d0a203e85891e09",
+        "sha256:4191589c3d58f15597967ce2fd1d53713f6fcbcfa47a7d78a9dbc48194b7bb97",
+        "sha256:4e9fd75e7c1e7711abd57c171246100659bb986a7a22585af64186ecee84bbf7",
+        "sha256:4f645c8416eb591080e84749aeac09815771f3a1d97069e4dd2c3ec637d42995",
+        "sha256:4fe11a7ba4653a92d52fc27a53d009bb51dfd7d83eb6fe49577dbbaba3a3b443",
+        "sha256:661075bbaf088ced44ffd4473a6e5bedee10c4f4263ca4570523be82494b1529",
+        "sha256:6ac5dcf4c0da76996d4a0b534462ae6ccb45569054c8b4494206b29060391283",
+        "sha256:6ad1869a17e5af16a02785e5b42beb433305d77cea9d819d32cfddac20d0104f",
+        "sha256:73906aba2fb2c993f566b1e3c356d6fcaaee521241d9aa4a234c0c0e4bd9576a",
+        "sha256:854e28e001f2481d35f21300178cb0de52518e6bf1f1447aa7d8c79145ee8ac1",
+        "sha256:9a84573d30724fcd8f890d9658bf4ed943a83a378d879aaca388761c949ed82e",
+        "sha256:a7b4c51e3b20fd4979bbd6219b4ed96d791cc96f3e303b20354c2136c5162758",
+        "sha256:be15a610af468c0e65994116c27307836853ecccbffc9c237b93f02287150d3b",
+        "sha256:c663ae428ba72236fea054533a7993e3f5a10c7f58d4417efc9f623e397ecfc1"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_saidas",
+      "stepId": "cbs-stock-exit-insert",
+      "destinationTable": "stock.exits",
+      "field": "autorizador",
+      "reasonCode": "CBS_STOCK_EXIT_APPROVER_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:81dcc33326678c171e6c8a48e6934d52986bcd9fd39621cdcf82b321ca5feaa8"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_saidas",
+      "stepId": "cbs-stock-exit-insert",
+      "destinationTable": "stock.exits",
+      "field": "obs",
+      "reasonCode": "CBS_STOCK_EXIT_OBS_UNMAPPABLE",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:3f98d89061bfaa48ff815435658517bfa58205bdcb6488466099dd0f6b6c8446",
+        "sha256:d41763e98a6fa566b3966578c27bc8d0451d1092d012704098b396a6dd933abc"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_saidas",
+      "stepId": "cbs-stock-exit-insert",
+      "destinationTable": "stock.exits",
+      "field": "produto_id",
+      "reasonCode": "CBS_STOCK_EXIT_NOT_TECHNOLOGY",
+      "rowCount": 1741,
+      "sourceIdentityDigests": [
+        "sha256:0003a6c432064a8a7eafb084b8007c86d8734b44df967c47759ad51c3db2fc65",
+        "sha256:00081768b0256a270c3c9e803412196eca905e677337ea193e31e8045312f3de",
+        "sha256:002125692e047a18d9ae079d58d1bb4c7f81df2bb5b2035c57178107d3b4bfc2",
+        "sha256:002b82035890dc0dbc5ab3cc505be9c1fa03d85ff975575e615098268e68bb2d",
+        "sha256:00328be36db05d3031ada3c1b8b8769aa2be12aa88a87fb2b473f002cc6d1b97",
+        "sha256:003f9774349eb20a0a5fdd794ad8aa46335278ffdf2b771a97cf49694470455e",
+        "sha256:005fac733ff8538be4d09f675863a1138684cd026043bac3a8ad986a381a0abe",
+        "sha256:00b48b7dd2ef3c459bb43184e074b2dd7aa814ea10d73c4910b7389856d18a95",
+        "sha256:00ce50755ed6de28d5340922a10b00a8ca2fb569501157486dce34a8bd9b436d",
+        "sha256:0117aa64163668c1b23c43ed9aea60505a91ecfa0af86444a053980692e5d1f7",
+        "sha256:0123c829ed3036724f351af9e98e07f319050c26b09ebb70f5feab446f524822",
+        "sha256:015eb7f311c03666294fae01cbc7354dbe829fa2da6699e34ec3c2caa6d1eddc",
+        "sha256:019f68bf3c29ea22b309ca9e53eaf4c86bd394860f0e9412c61a5fa1c886915a",
+        "sha256:01a9110315168d0362046851756cad6189640a7361218f0f0db65bfed6ac6eae",
+        "sha256:01b5bfed8821f05ad3b5ca98bd925bb98c5115402d6c499bf5e584aa8b2cf5f4",
+        "sha256:01eb028bbb35b4bf1f302cb4e6e06c2721bcaa7a429248fe77bd2bb8d4690381",
+        "sha256:02588713d1d97fbf90ebea1adbeb8721f4dfb7811040565f086d67fcfcf81602",
+        "sha256:027c7b9bd83dd5fa1df7c3a768aeee72de04a43fdd0199f9628d700eb8d48f20",
+        "sha256:02fab73163326f4dd32caa380e11c13c7be0ad1b32a3615912c46e6966f27e86",
+        "sha256:03158b475b4bd7f12f7568b7a8c7b89965fc4d6e09fe549582e8e20e47423493"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_saidas",
+      "stepId": "cbs-stock-exit-insert",
+      "destinationTable": "stock.exits",
+      "field": "produto_id",
+      "reasonCode": "CBS_STOCK_EXIT_STOCK_NOT_FOUND",
+      "rowCount": 713,
+      "sourceIdentityDigests": [
+        "sha256:002faaf62b5ae1050b026ab462a0754ff69e319b84530c7c7adebcc16de57a48",
+        "sha256:00536169186c3cb1bc726c163b129ed71568a580d7db246aaca24a45b21cfb6f",
+        "sha256:00722bd2d5cf8048a25d29bdaa48e62c2060cf3bd75d6f37f81f278ca2a98ab7",
+        "sha256:0079a3f7f5a6858d91629cb491d69189c6873121b36fb525837577758ab60b1c",
+        "sha256:01343456fa588c6ba6f70bdc8de71f0e578bcb507bfa181dc47ab2bb16f2e2db",
+        "sha256:015a656e4b3b822f476dbb49fb7e7ee3c1813d30c0a2b3d98d13a87fcc713967",
+        "sha256:016cf597c8e233402860cc3d416eb05b979cc12feed67b46e9738cd012a4c9d4",
+        "sha256:017176df668b107037950c8d96e0338697ae6cf0f6ad6dbe9fccb78f0a28ffcc",
+        "sha256:0194083b8750c138bc0be55fad3bee66435f36146d29f619c3ebef4aa31f44e0",
+        "sha256:01a09dcf6f6f92a959a040ec8f08b76e849d589090d42f5fbfb37261a735aa1c",
+        "sha256:01e25f73b59af829b2545e7315882d153c47e2836c89b8fc6da423df025405bd",
+        "sha256:02d90c5ce931c2cffc74ad534ca6c488b53563d41e29829b6fe0308e2e44dab5",
+        "sha256:0307ec42bf18cc1c483193f4b96f41db35ff2bb8ed98ac6ded388c736fe7308d",
+        "sha256:038de18b7025a8899b58759a0f9bfeb19f729d9696a54794dbf214804c5acdbc",
+        "sha256:03b7ec25f1020edff97d6d3aee52f8731cc5669b02f39d8faaa41a8daf270d79",
+        "sha256:03d0674735963a6e8658c102abad75dfc1532f141e543c0b3f9161d5cb1568d0",
+        "sha256:042ea1dc2adb14aa1d6a26e2f45c5f09931189bcd4f14624c09d91c53001fb2a",
+        "sha256:0483dbd0dacc94b923187b55184cff4d23d294ee18ffedd54eec12233055f47a",
+        "sha256:04a7c445d2d0542b2d711f64796239dbdd00c6f8f63ba9c093b8d3cdcf1e11f2",
+        "sha256:069de9db08e9aa13f5116aff74d71640600213c56b42a9bb8ca9ff8009c709a4"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_saidas",
+      "stepId": "cbs-stock-exit-insert",
+      "destinationTable": "stock.exits",
+      "field": "produto_id",
+      "reasonCode": "CBS_STOCK_EXIT_TARGET_QUARANTINED",
+      "rowCount": 534,
+      "sourceIdentityDigests": [
+        "sha256:0012a6875e262048f3c1768f23aa7fea54a447b15be62fd613e630ff2cd7f8ec",
+        "sha256:00255023c95685395f6ab7887e11802b1c6e038d3b9f26d16290b97b5d2a7c5e",
+        "sha256:0062ffe46c76bb5c87eb8f3604c728f228f852817b795ab466fed69aab420a8b",
+        "sha256:016a943164c38fe43be40fdd7ffaa74feb20326f446e679b0d7a2f2d4adde6a7",
+        "sha256:025ece406b0aa73ef764d29f8595586576ce86d75d5719dffffc52de6b80b677",
+        "sha256:034e0d70b6d85bf2f4db3bd7d69b6a25c853e3159163ab44984cb8481d0cdf13",
+        "sha256:042d18ba5eb1658744df032262679ff0dc54236a0f5f9f80c2cc6f481c4d44d4",
+        "sha256:0447c5dfe8fecc3c082e03dd930e7755d6d14837e9d4041e5c85ec3ed44a7579",
+        "sha256:05162e2cb1b1424ba42cf4cecae5e8f11d5ca7112d2bf9c89c592748b5c0d504",
+        "sha256:052bf7df16e669d058746ca9a54fc78b3b97cd915267aa22b368cdafa97573f3",
+        "sha256:05516d44c1904d3d0f5062bff0c3a09c7483833bc65626793fe0ecc8702810f5",
+        "sha256:0557617c3d95017edc8813f0224b2a0caecddc5f66b61b2a76965e0e51179659",
+        "sha256:057871ec7ea0975dfc91b58da8a6829d2f012a6bd6f6e263cb80e906360ddb29",
+        "sha256:064079cf79b2138fe567d9e92e4dc576a4d82b90de26626cd26f48319106860d",
+        "sha256:071994cb02df365d1fdaccfc3d80202eae655dbdb5085afd871d6aa54b798e7d",
+        "sha256:07875be8f2125785d58ecbcca063799c9f310b52bdd2389bd3ecfe9be0b7e782",
+        "sha256:07afc8741e049a7a904211f24f67e4883b7c6a41d80e1ad9b5877f41dc62fcf8",
+        "sha256:09802957860e4ee1eefeb1d309dc20e2e2211202d2ded0667c36c4a46fd62c77",
+        "sha256:09888860fc4a07ea77b9a7a1143839041b030530c82b34b0ac695996aaa98473",
+        "sha256:098c96c79e6111e78efbcfe755f237e4f45dfb76703e0da1594d191ae52de74b"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_saidas",
+      "stepId": "cbs-stock-exit-insert",
+      "destinationTable": "stock.exits",
+      "field": "solicitante",
+      "reasonCode": "CBS_STOCK_EXIT_REQUESTER_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:b29370deeb883ad45fe94838fa9a1908b7cc3d01d55d15b28c89f924868bcb16"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.estoque_saidas",
+      "stepId": "cbs-stock-exit-insert",
+      "destinationTable": "stock.exits",
+      "field": "solicitante",
+      "reasonCode": "CBS_STOCK_EXIT_REQUESTER_QUARANTINED",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:6e2bc8a2f0de6521a03085701e1f99c56fd8e5e845488d9fc1f1eaff0af4715f"
+      ]
+    },
+    {
+      "sourceTable": "tb_cbs.ramais",
+      "reasonCode": "FUNCTIONAL_FIELD_NO_CURRENT_DESTINATION",
+      "rowCount": 194
+    },
+    {
+      "sourceTable": "tb_certificados.notificacoes.vencimento_certificados",
+      "reasonCode": "DERIVED_CURRENT_STATE",
+      "rowCount": 149
+    },
+    {
+      "sourceTable": "tb_certificados.pf",
+      "stepId": "certificate-pf-insert",
+      "destinationTable": "certificate.pf",
+      "field": "arquivo",
+      "reasonCode": "CERTIFICATE_FILE_LOOKUP_NOT_EXECUTED",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:11afe3d15d39d567b7f65f542841c969697ed96c23e994e6d8867156620212a4",
+        "sha256:878d06e9b790c62698460ea32fed206aa68c995edd4d409056fa8ecb877c6d55"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pf",
+      "stepId": "certificate-pf-insert",
+      "destinationTable": "certificate.pf",
+      "field": "cpf",
+      "reasonCode": "CERTIFICATE_CPF_REQUIRED",
+      "rowCount": 309,
+      "sourceIdentityDigests": [
+        "sha256:00582724ec9180b6ca6219b0be07b5f26116c14aad00970203145448524d0e54",
+        "sha256:03c3a1017714eb47b569c6aee0614159545e1b5ddf570b1631926706d79f353e",
+        "sha256:040390b34ab26af2fb6eadad16da72d26569c2f2bdadd6b02db7a11b0d8d3f02",
+        "sha256:04dd630e588289753799617e196923027bbec689361e9ecbc8dd7911707b26f0",
+        "sha256:04e587df111abacc1004bc8445616496a905c5feaba8c5e71a94f22e3138a047",
+        "sha256:075489d01791ebe2e6c14303c5839ccaf156ef71011430829ed1fcb884d5cfb8",
+        "sha256:07f127b2b9cc86578c8d712a997a5f0d2b81e72469d22050ccbdf8631911de10",
+        "sha256:0986afe808d920fda886ab5c9a7c6d3d7f9d91fea3c0488b44c8eceb663d2954",
+        "sha256:0a0032aa730d06e25fe3390901392fd1b8d37d37a74615183d668adbe2bc7ea9",
+        "sha256:0a800f125f740b4302eb56d87fe3b179e43ff5d95d79a78ec613f8bb44f79b7e",
+        "sha256:0b8eaaeec3c6875177edd15b6bdb449c4f51573dafd40423d2ef6082d290ded7",
+        "sha256:0c4d401b703dc91565e022e2a2330bd5c3b75984182c71b4b972e2c8f2187555",
+        "sha256:0df385feb825c2a89d7444dc8ca854b46c491a26bb0867d40de5e05bd5d3bf09",
+        "sha256:0ea37b95d2f72bbb22246fe5ec7edd45c80ad9744ef65665b03734ffba1b2a2b",
+        "sha256:0f18301f2f8cb10465e1c31370a63e826c43d4cb2bb7151f65ee7d236ac7bb49",
+        "sha256:0fa4dd636488c1c6881b1978bf91b9d09ed506539d68768e8e942b2fef8a9923",
+        "sha256:1274afbef09d4f67df945de7c783622c09252037cee0aa73028f2e9320f3a4d6",
+        "sha256:13411d5a8a3227018938952ebad15382c9be3752fe99ed94a018d30de99924aa",
+        "sha256:17022292c734bc19c4dde9fc08f2906ad8cd22bd2663f3a85e1cb104b5456e40",
+        "sha256:176fe8446ef8d38f5ee740a774d789e41ada74a21a72cbb39b5ec61d8a669a30"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pf",
+      "stepId": "certificate-pf-insert",
+      "destinationTable": "certificate.pf",
+      "field": "id",
+      "reasonCode": "CERTIFICATE_IDENTITY_DUPLICATE",
+      "rowCount": 3,
+      "sourceIdentityDigests": [
+        "sha256:28543d14a9ad95af041da36bddf6b2c85a76b0a41fc8f47c681592d528076a2a",
+        "sha256:91107cda55e466d1fa73755ffbd0f4097ef23725c720481f30c82e26cceed2da",
+        "sha256:c540afed0ed5c38b2a8e6989c4d298efe7ef21bed399bbfff459a4d700637124"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pf",
+      "stepId": "certificate-pf-insert",
+      "destinationTable": "certificate.pf",
+      "field": "senha",
+      "reasonCode": "CERTIFICATE_SENHA_REQUIRED",
+      "rowCount": 9,
+      "sourceIdentityDigests": [
+        "sha256:2137d63f436d96dd38aa2ec8008ba8d612a3882fc5da27328fa30accd28c14c6",
+        "sha256:46f51002267bc2551b6f49cd0a085f82fd808b72da2c2940df360ff36a4cf1b8",
+        "sha256:62f0ee853ff67c0faddc6a798c26a467b9443d04098e187e89462e5445e48a23",
+        "sha256:924263080b0f0ddc9d6accf6af83cab451510344fea8e225d23f1e71475aef91",
+        "sha256:a393d26c7531783c8ea27526942986f1fa4df76c37a9337425e3c3cc2df0a31c",
+        "sha256:c163ddfd72b52c0b79bbbf5031cf26e31b6522af3b2009577bb8d166b11a7c82",
+        "sha256:d1d9adcc1b7aa2ac04e66acc163cea4d176e85147dd8af0fba8f258d730b798d",
+        "sha256:d200c0627dd796e9c6b090b6b9a5e6e95d2a839a6f9d1f731013246a1c8861d2",
+        "sha256:e3ab514f55cd2d30888ff66dfe063890c6823b7bb5a55c5c7d5a56e54adf5f97"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pf",
+      "stepId": "certificate-pf-insert",
+      "destinationTable": "certificate.pf",
+      "field": "status",
+      "reasonCode": "CERTIFICATE_INACTIVE_STATUS_UNSUPPORTED",
+      "rowCount": 126,
+      "sourceIdentityDigests": [
+        "sha256:00b97088fe9f14dccb1d4ea253fa17bd2847d7a902dd0320178220d96a3f344b",
+        "sha256:02ab3440bf6c6d8ff40fc158eceb8f1554612029e09f7498787ac8876054e5ff",
+        "sha256:074a4c99ac9bb141bd7fbf092d4131a37df7e738a80b63ace0c900aecbbd62a9",
+        "sha256:07c1855d384721b823d873555004d9ae1a2ee1e8a2f685abf231ef058cd49ff5",
+        "sha256:08027f855959b50b59081c2e0c0be72ffe9459df1043b71ebab888f630c05219",
+        "sha256:089a8a25b87b64821933253a64df8a4370a8517a072d14e651958f865e6b1716",
+        "sha256:0919f81b181b77b84705d0d09e114f22c4a0217bbfcb559ce9ab097376c0e327",
+        "sha256:0b043216e902bd6c1e68ea5c596ceabcdecefedc00c39c362c60acfc71db1cd0",
+        "sha256:0c0c6f55788e66b5411a69ac8c5752cce0d258d97b54952e04f7281ad69a216e",
+        "sha256:0cb9b177180452d32754193c33d6dc65975ad78c2a2c98fd4e48c3b61c166cc6",
+        "sha256:0e1b1943f5d62137cf90f6078d002032d5d9fb1dce2c699994cb9edf1294f93b",
+        "sha256:10a661bcb0727b6e280be42f18c5ca6bb636ab695ec7d9ad3ecb29d7d25f6d22",
+        "sha256:1438eaea46fd451e6c400bc54e96d3e5a26824946a6aebfb1e178295ad29798e",
+        "sha256:143dfcc6907e0c2a1b0f6ca5ced420e0035cda100b4bb4cc9f8885a09f0d9aa8",
+        "sha256:15d6c39e3dbd6aad6b2ef6f9867ba1bd76a5c75cc20e8c803c36ae5e21913612",
+        "sha256:160e0b93c10299e3679c9fd62004f329edd4696bffee21d31becf04ca9152e5d",
+        "sha256:16b1f3cade180e3f27e04a119fbc6ed72bfbf1d9421b96379ad056d0c5d35cb9",
+        "sha256:181e68f8103af3f78114185b6c8c6bf64dfe034b6141585fda5eb907e159cb59",
+        "sha256:18f10038cef9945e44fddc86ca8d33c8b4f2d510f3d0601deff43871eda6e39b",
+        "sha256:193ec726cb866d4d4adaf493c38d62f3a1c608908cea03587084250ac341ac82"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pf",
+      "stepId": "certificate-pf-insert",
+      "destinationTable": "certificate.pf",
+      "field": "validade",
+      "reasonCode": "CERTIFICATE_EXPIRATION_DATE_INVALID",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:2f46cdec80b179fdd082e2245d99a06007623edcf9b9a137b5b39611493b2c9c",
+        "sha256:a87148eb3c2eaf03e693a315fa2528dfb53794afa9e7d5e8122fc9127a18a95e"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pj",
+      "stepId": "certificate-pj-insert",
+      "destinationTable": "certificate.pj",
+      "field": "arquivo",
+      "reasonCode": "CERTIFICATE_FILE_LOOKUP_NOT_EXECUTED",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:1aa74e3ac97bc2ca0a44f7932284fd4ca5dc3948ffa10fcf05cf0c02d0db2506",
+        "sha256:771292d7ec2973aa3fcc1b863f099e532ab48f015d2acce7c9433c9736e0dff3"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pj",
+      "stepId": "certificate-pj-insert",
+      "destinationTable": "certificate.pj",
+      "field": "cnpj",
+      "reasonCode": "CERTIFICATE_CNPJ_REQUIRED",
+      "rowCount": 86,
+      "sourceIdentityDigests": [
+        "sha256:03de0653b2447c660b71e8b672241d452a9e625a5b4f55af6faccbdaa94635da",
+        "sha256:0939f91006b6a495023afa98a70ea7be2c982b132a118cfefdd84b46417225f3",
+        "sha256:0d0d508d7a96549d875617edc0726e54e82dc3e35aae9dab40e4c79ea3119a16",
+        "sha256:0db3a12257afa32afdc24a97ca4f7af4ccdfbb5fc2cae4dbe5ea19661ff84fb1",
+        "sha256:11baa1dd38fe0e6a0786e3050f785a9717f28da424197a2089503fb9914f7028",
+        "sha256:18b8582a110f97734e32c087e190f44110b620b6caf0dd0c9d3202bfe8681003",
+        "sha256:19e60cf000df29fc8b33321711372571dc08e927447b5d0161ed4b598cb184d0",
+        "sha256:1d3656ace0116810f1b55427b597e1860d1e4698c0980d5d409a96283b4c2a0e",
+        "sha256:1eca74a45bc581ee4d046768d6c7d48c24185f98fe319dbee28d9e043fbea809",
+        "sha256:2130dab74ea119d95969e52d66b23843153eb6645b2323d509cf51530956ca63",
+        "sha256:2285625c33eabaaa5543b789cbe7a5c080211b59a3ae9b72e6d4a39596088e52",
+        "sha256:22a6a685c5485cc4ac7c4a1efdf4674c55b7612726b658536947f29810be8ddb",
+        "sha256:27534f4e48a32ed94f860f2fcfce1a6253a5bfd5bb5eb5a20ab920e2ce586393",
+        "sha256:28f9666b07d4b5564919d8f3a6628da60b6048fdd164c80116afd976b8ba8f22",
+        "sha256:29391feb0bc28be75a24bdf5be549265c285361b5eabc56854986befff5074c0",
+        "sha256:2bad2ca7f3ac5661360571b016e871da1452cc8383fff140cb2609aae876c94d",
+        "sha256:2e04b76496f8c8d5d7d075ccf152ef6377c8a61307d118068f3a045fa971c3ff",
+        "sha256:37519993dc63ef1c87118c9428752badefc7428b2385ccd22dcb07e08852e27b",
+        "sha256:3850230520cdb9af08a248376cc9346c9a228e6b7deb6c3dbbdb289d32c4daf5",
+        "sha256:431092256c733986190b493c46b484a47c2d0bf0ca5dcf4f352f272b1bc74e17"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pj",
+      "stepId": "certificate-pj-insert",
+      "destinationTable": "certificate.pj",
+      "field": "id",
+      "reasonCode": "CERTIFICATE_IDENTITY_DUPLICATE",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:4ad7ad9ee7cadfef26ccef6c2315eaa10e81dbe2997d33b6940d50571e98d513",
+        "sha256:d77bc49352b9408e2439b20953c3428c4f1181b4fbe0ee26c403315a2855822a"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pj",
+      "stepId": "certificate-pj-insert",
+      "destinationTable": "certificate.pj",
+      "field": "nj",
+      "reasonCode": "CERTIFICATE_NJ_REQUIRED",
+      "rowCount": 33,
+      "sourceIdentityDigests": [
+        "sha256:1051bb8792853bf58dfe657e44c0d4f5fc5552cbf228c72b142777b680e41b75",
+        "sha256:10b277c2f851560e353c1e586127f87367e9e5b353933a054df7034765b79686",
+        "sha256:17abb4a3a15671e25b537224c195092dd34a35e6761a36066bd8b3b5735544ef",
+        "sha256:23d352e7c69b50d51c71dd8f9ede73129724f105ca5662794f76e7af957a32f3",
+        "sha256:262b8dc130c203a46cffe5cc77842629f3cae82a80b0b42c284f732b527365e7",
+        "sha256:37e149dcf0c06318a58f68969edb975c617284c263f1d01eb5a4458178b022d1",
+        "sha256:39629fc9148cf3b3a68a754be5bb7c80d9d6c3fab381b9011d4667a0fdba90f3",
+        "sha256:39b57ba4eb8d18e5f8d8262cc716330464f30b1e66c93567b9a89bef58735dc3",
+        "sha256:4ed3c852afb6fd01bf1cb720b6565f3a42cec01a9a55684e30b36c46ffa0f603",
+        "sha256:57ae40728e686af369764205d7aff3fb505b5b780d33326a3abf413c2ffd2efd",
+        "sha256:5ea5c6ff5a5c45de91d20023605b23438f8ee0d10ad448fdcb8d1d7d67b18e98",
+        "sha256:6bfadf17c087f771679c89d0c5841f797dfd9d82ae29e5a95a9c4ba5c5ec5f76",
+        "sha256:6e8e4bfcad03db2dfdee04c330fbc328780f332be67c075233b3f2037bb3eb51",
+        "sha256:720adc347470c6b3770f40396d0adb8c3139f194acae48a0f18f1a5cca025f32",
+        "sha256:76c2d5c9cc300846f703dd792b7b162478d1d3984efd9deac3c1a047d05b640f",
+        "sha256:7d7f521635182dfb8a69457d0d0768514f08ce22813065ca98a5601d4fd5f70b",
+        "sha256:845108730613939eb6c7349e4f375ca2dfa98eac48743cc5f3a86a0302cdb6bd",
+        "sha256:8db2937042d256a5e12e400779ef4149d860c4a5194c3286d8c29d5c0c423bcf",
+        "sha256:af09b86fa77c7b91cad7817c534688205785a8cdf31b24a1694b61deceed0058",
+        "sha256:b3d677e3de4b2417149641c4f78fbbcce734178e15b660af45861d377c115bf0"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pj",
+      "stepId": "certificate-pj-insert",
+      "destinationTable": "certificate.pj",
+      "field": "responsavel",
+      "reasonCode": "CERTIFICATE_RESPONSAVEL_REQUIRED",
+      "rowCount": 19,
+      "sourceIdentityDigests": [
+        "sha256:08370644d04504a4098753420f7c04ca77ac20db442dc188f319b53e07023bb7",
+        "sha256:241b8d79b396605476c08a58925696250161b066e5d477052866d98f6297272e",
+        "sha256:38e9113bfeecee8e1ca03225a321b09785fd97fa7d1526673465d34d53e4794d",
+        "sha256:3b3d41342123f1e3aab5adefed56855253b4d81c586c3ecf01f7d2e19e5d4a3c",
+        "sha256:3c27aaebcfe6c7d46eb5e409ca90d57e305c6e17d5194f84dabc41265684da80",
+        "sha256:3ebe340089583e2d5901f5faa1d3c14693ccee695287dd7e2252e4265159b82a",
+        "sha256:45b4e4bfb4c189ba5c686c6b124e3bd0a210281639b06ad93f2c4644f0a0f050",
+        "sha256:585b54f4a43738dd39c44211fe083c740369d991223e99b184116cf5b1bf1d63",
+        "sha256:5f4dd368e118f08996a30ee95c5f46660d344917ab7395c6a21154d0345264e3",
+        "sha256:6c927eedd34537f478e63d78eb6f93a5c83579e0cd6ba35f31492653f38c8a34",
+        "sha256:812777ec56618e133e12c6c5462663c8b3f6d6b8e09eff4e41a181632ddb2de2",
+        "sha256:af7b818de323003cb09c9c8d0a4f9d90786cc54cc0b775560268497ab3889a2d",
+        "sha256:b2f5607247cbe62d121fc64d81bce9966eb8c3c2bd0135cce0dad9ed9ee313b1",
+        "sha256:bb06b82c4d52729f9fa6ba81cc8da9316ce5d725aee09b335e90fa04e30073f4",
+        "sha256:bfaec0cb6b5cb7a2b09906f69ff0e9686fe0c4c1a4b0594604e12a7f71313df7",
+        "sha256:d66d0daf770d502b40311ff7ad97ca57030514c1fadab4c99ea3b6356be122e6",
+        "sha256:d817b4ce1abd346728ed16ed43da944ff03083b631a7e4df886e1f571d3e0d0b",
+        "sha256:f8cf64bc7a39ceaeb1363d8b8990bd08aca4f07ad576a98df107b9c810366378",
+        "sha256:fa00faa0edc810762f4c7ae9ddbdd8ba0a77ce3d04aca92a2bac0ec14bd85cf0"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pj",
+      "stepId": "certificate-pj-insert",
+      "destinationTable": "certificate.pj",
+      "field": "senha",
+      "reasonCode": "CERTIFICATE_SENHA_REQUIRED",
+      "rowCount": 4,
+      "sourceIdentityDigests": [
+        "sha256:5fe2c61bd1ef7410e64035c6342c31bb0b80acac76dac61ba38706e244248199",
+        "sha256:914e40e3c684a43efc60ec3a640c77886e5aa3f4f9175d9b2ec103be71a2ede4",
+        "sha256:99e32795b791b05a9a108991494617df60163d7636aa5507c8f2e18bce6d3df9",
+        "sha256:a560a80412d5b5a40a8afe284e2fdfce5d27bfb1234666ea1c515c777b689e47"
+      ]
+    },
+    {
+      "sourceTable": "tb_certificados.pj",
+      "stepId": "certificate-pj-insert",
+      "destinationTable": "certificate.pj",
+      "field": "status",
+      "reasonCode": "CERTIFICATE_INACTIVE_STATUS_UNSUPPORTED",
+      "rowCount": 230,
+      "sourceIdentityDigests": [
+        "sha256:0045b2c37152415389776d727163dde388b5a7c2eb374e09796dc9ecfa1706b4",
+        "sha256:00564af39f80f3e9415ceef93c96ceb36b4e29cfac81c91afcea5ea383f268dd",
+        "sha256:00d647c4cdd4e1b9f1570f022d9a7be9f4650240d59f5ef9be9a7ecf89d51275",
+        "sha256:03d97a76149f339a109ca944416a1b7e125f3c7239950c1995fe7c50dab64db3",
+        "sha256:07072b6bde5bb4d451d9a33acbb1764794192dc84896c5a5e0eb3b0a0034f823",
+        "sha256:0739d0a68b7edd99ecb505a5c34e978b07da35706c3f4984c1cc6abf4246a088",
+        "sha256:0c74a5738c8ace17bc6c9ac1504a8142b18ccdb96c0b98317420418f2b625f82",
+        "sha256:0c99fe99514c0f6abe42d949f6fe17ea31d92ced204ab92d61614fab642ab4fd",
+        "sha256:0d15cfc8bb967f4ebeba0799008a3c7fdf4cc472a568760b28300fa710b8ea02",
+        "sha256:0d366dc614c660695a378744e41cd14b30f4ecd793833e06c9cb645c89f6ad7f",
+        "sha256:0da1883daad489aedb10372c0a0c3031230c0d1a22888a8f5d050889832508fd",
+        "sha256:0f24db1ce028e24ba74c0dab2dc68b8b1fc0fa5235034673b8591405df12c35a",
+        "sha256:10468fd0189151f32cbc74969d804987b7b5db9c1aea47b8e3fff72cc4185836",
+        "sha256:108f05102bc89f30ce79e3a361b2771b7c5261c68ab908a1dcb526fd99f3e77d",
+        "sha256:11865abece2e783710b611206967cebae6abb0063fa029cd5e6d452376f85e2a",
+        "sha256:1346040970bc26eeb0134a967ebd18db6166445ea5b11da02fa01917d5c8f031",
+        "sha256:136c88094489425c9cfbd3e79d2ee28c50c02400d7c1d563bd13075635fed12b",
+        "sha256:14066594b37c802df4057be49bed770a622da9420d12934bdae4a51653f08ea0",
+        "sha256:142ce13ef965f165b7162bcc12318dd3e256f44b1b5dfa649a2d43781a6d6920",
+        "sha256:15b68fb003a1a4f443658055ce857e2c06313013ef0b1d107b04c7402224f50f"
+      ]
+    },
+    {
+      "sourceTable": "tb_comercial.cobrancas_descricao",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1088
+    },
+    {
+      "sourceTable": "tb_contabil.alteracoes_contabil",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_contabil.bancos",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 42
+    },
+    {
+      "sourceTable": "tb_contabil.clientes_bancos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 6871
+    },
+    {
+      "sourceTable": "tb_contabil.clientes_bancos_erros",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 122
+    },
+    {
+      "sourceTable": "tb_contabil.clientes_bancos_temp",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 157
+    },
+    {
+      "sourceTable": "tb_contabil.clientes_mov",
+      "stepId": "contabil-client-movement-insert",
+      "destinationTable": "contabil.responsibles",
+      "field": "cliente_id",
+      "reasonCode": "CLIENT_REFERENCE_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:98ae1ec84278d5de822e0312f38a37b104b15d564c853b599c72946aea999e43"
+      ]
+    },
+    {
+      "sourceTable": "tb_contabil.controle",
+      "stepId": "contabil-control-insert",
+      "destinationTable": "contabil.control",
+      "field": "competencia",
+      "reasonCode": "REQUIRED_DESTINATION_TRANSFORMATION_NULL",
+      "rowCount": 24,
+      "sourceIdentityDigests": [
+        "sha256:04da3c2f79d6d055ec7e33ba9d7862a1d2910ce5da0292afee986a43eb4db621",
+        "sha256:0a677bb399c4613048fcd28345db01972ddfe5fe0ebc71530733177a84d6c261",
+        "sha256:0c56dc45bca94fdce262bcc5c00143bd5449771cabdf53f5fa820a5220811e8b",
+        "sha256:0ffb86122cdb44ce09e4711705ce3e73a3437c458c035de94eb354a4f24c116f",
+        "sha256:24c38ceee327f3e039da570e1c9d4e5e96cc133f4488e13203f1ce3b33097f6f",
+        "sha256:2526aec354c16d605800113df859471f7b4a02fb5e67454537a826239ba0bbe3",
+        "sha256:34714c0e9e636ae79564b7a4893c23ea7d8c95d1666ba9c394220e7e4a25665a",
+        "sha256:3a75ef1669e80f293f853d121f4144159471fd2fdde0aaf62af8c16fae728366",
+        "sha256:65bb59425caa4c2a3ecb0116360ca3cd3879a5b1dca9c975a5b46833e3f5afd2",
+        "sha256:6976af47f29372a05ca6f5659edd4df435200688c945064b6080d885854913c9",
+        "sha256:8d6304b28b398e38268deced96f454826aaae0f7b9523acc724db9e3c02a082d",
+        "sha256:8e00a29f0c506d5dd032c8ef7538f02d0381b03e5b5c01784d0cddcbccfbf9e7",
+        "sha256:9ce6f9a907cefb5c565c98b0ace3c35a9f48e88cafae68a4e9843cae6911447f",
+        "sha256:b66eefe51d1d6482d7327a357d22aa8e0c366f1c1f1f7828c0f7aa341adbf0b2",
+        "sha256:bec1446f96c73b0006bca15bd2457314c5fb90d0e117a76acc55819bcf47c55e",
+        "sha256:beda54be6a7c0a0078dbe683c15144c8daf158daddc3885f024e0c01bfe5c69f",
+        "sha256:d3504579875c5c67ea17ea4a77139cd16c2e1679f67af8b5bac22c9dc3f338fb",
+        "sha256:d667d72453a520a4aff7d013d6861c03de568c1be315c1128cb5707ef5cf1e29",
+        "sha256:debd2ba97f225de4fae2700559cffa1988536fe25d61bbdf1af55fb25280b259",
+        "sha256:e0b6294950fd5bf4dbfaae7b39fa0ef606fafdfef64d91c4ccc309a229fa04c9"
+      ]
+    },
+    {
+      "sourceTable": "tb_contabil.documentos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 6596
+    },
+    {
+      "sourceTable": "tb_contabil.documentos_bancos",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 432
+    },
+    {
+      "sourceTable": "tb_contabil.documentos_padrao",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 54
+    },
+    {
+      "sourceTable": "tb_contabil.movimentacao",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_contabil.nuvens",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 262
+    },
+    {
+      "sourceTable": "tb_contabil.relacoes",
+      "stepId": "contabil-relationship-insert",
+      "destinationTable": "contabil.relationship",
+      "field": "licitacao",
+      "reasonCode": "REQUIRED_DESTINATION_TRANSFORMATION_NULL",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:25ffe0a95dbba116787218dc58e64e3691633a3e9e297286be2c1a9b79234e49"
+      ]
+    },
+    {
+      "sourceTable": "tb_financeiro.contratos",
+      "reasonCode": "NO_STABLE_MERGE_IDENTITY",
+      "rowCount": 615
+    },
+    {
+      "sourceTable": "tb_fiscal.aliquota_interestadual",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 27
+    },
+    {
+      "sourceTable": "tb_fiscal.antecipacao",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 222
+    },
+    {
+      "sourceTable": "tb_fiscal.antecipacao_envolvidos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 28
+    },
+    {
+      "sourceTable": "tb_fiscal.clientes_atacadistas",
+      "reasonCode": "NO_STABLE_MERGE_IDENTITY",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_fiscal.clientes_sn",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 217
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 640
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos_anual",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos_mei",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 53
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos_normal",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 219
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos_npossui",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 24
+    },
+    {
+      "sourceTable": "tb_fiscal.controle_impostos_sn",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 504
+    },
+    {
+      "sourceTable": "tb_fiscal.documentos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 9485
+    },
+    {
+      "sourceTable": "tb_fiscal.icms",
+      "stepId": "fiscal-icms-insert",
+      "destinationTable": "fiscal.icms",
+      "field": "natural_key",
+      "reasonCode": "ICMS_NATURAL_KEY_CONFLICT",
+      "rowCount": 4,
+      "sourceIdentityDigests": [
+        "sha256:2a56cbc05cb414da22b029192c110a7e074a4361c2978a74159c51d1a315a4b6",
+        "sha256:2c7c306b5cbd3d6c0cdbf9bdddd0d27d7ba8cb4f0717557d7036c498697ab6d8",
+        "sha256:986c903ee83b54ca00d53c5e8bac0af82af278b73f81ee878754533d9ac4e521",
+        "sha256:9a56a7882ca067a6959f81e27d7e5f46883cc30588f4d96fdc34ecd4bedaf9cb"
+      ]
+    },
+    {
+      "sourceTable": "tb_fiscal.iss",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 7547
+    },
+    {
+      "sourceTable": "tb_fiscal.malhas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 4
+    },
+    {
+      "sourceTable": "tb_fiscal.mva",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 522
+    },
+    {
+      "sourceTable": "tb_fiscal.portes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 6
+    },
+    {
+      "sourceTable": "tb_fiscal.sn_completo_sn",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_fiscal.tributacao_pis_cofins",
+      "stepId": "fiscal-ncm-insert",
+      "destinationTable": "fiscal.ncm",
+      "field": "inicio_virgencia",
+      "reasonCode": "NCM_VALIDITY_START_DATE_INVALID",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:39fdfab1de5544e2543370f212f45d7f51e8bd9c3f0a529196955b383480624e"
+      ]
+    },
+    {
+      "sourceTable": "tb_fiscal.tributacao_pis_cofins",
+      "stepId": "fiscal-ncm-insert",
+      "destinationTable": "fiscal.ncm",
+      "field": "tributacao_federal",
+      "reasonCode": "NCM_FEDERAL_TAXATION_EMPTY",
+      "rowCount": 3,
+      "sourceIdentityDigests": [
+        "sha256:251d297e3665ba7a7e09bf51b2554ba2b495197bc29b7151f41c50a7321f4a03",
+        "sha256:2fdeb4a9ed6f5189d03809cca0170e9924201937a0be64a0701890b6a531e9b0",
+        "sha256:5570d800891b595985caec0e05deffe1a47be0f7ad3acf9c2a8fb9c0eae42d7f"
+      ]
+    },
+    {
+      "sourceTable": "tb_historico",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 125
+    },
+    {
+      "sourceTable": "tb_historico.admin",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 8784
+    },
+    {
+      "sourceTable": "tb_historico.admin_departamentos",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 60
+    },
+    {
+      "sourceTable": "tb_historico.admin_usuarios",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 947
+    },
+    {
+      "sourceTable": "tb_historico.atendimento",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 3806
+    },
+    {
+      "sourceTable": "tb_historico.cbs_estoque",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 2332
+    },
+    {
+      "sourceTable": "tb_historico.certificado",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 7941
+    },
+    {
+      "sourceTable": "tb_historico.comercial",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 18
+    },
+    {
+      "sourceTable": "tb_historico.contabil",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 51903
+    },
+    {
+      "sourceTable": "tb_historico.financeiro",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 274
+    },
+    {
+      "sourceTable": "tb_historico.fiscal",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 25615
+    },
+    {
+      "sourceTable": "tb_historico.integracao",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 3138
+    },
+    {
+      "sourceTable": "tb_historico.integracao_agenda",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 4138
+    },
+    {
+      "sourceTable": "tb_historico.integracao_clientes",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 10933
+    },
+    {
+      "sourceTable": "tb_historico.integracao_clientes_dominio",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 52
+    },
+    {
+      "sourceTable": "tb_historico.integracao_exclusoes",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 13129
+    },
+    {
+      "sourceTable": "tb_historico.integracao_grupos",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 214
+    },
+    {
+      "sourceTable": "tb_historico.integracao_objetivos",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 839
+    },
+    {
+      "sourceTable": "tb_historico.integracao_pas",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 6754
+    },
+    {
+      "sourceTable": "tb_historico.integracao_pas_historicos",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 3797
+    },
+    {
+      "sourceTable": "tb_historico.integracao_planos",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 15
+    },
+    {
+      "sourceTable": "tb_historico.integracao_prospeccao_comercial",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 15114
+    },
+    {
+      "sourceTable": "tb_historico.integracao_tarefas",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 173242
+    },
+    {
+      "sourceTable": "tb_historico.integracao_tarefas_distrato",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 3264
+    },
+    {
+      "sourceTable": "tb_historico.integracao_tarefas_express",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 897
+    },
+    {
+      "sourceTable": "tb_historico.integracao_tarefas_express_distrato",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 47
+    },
+    {
+      "sourceTable": "tb_historico.keep",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_historico.marketing",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 367
+    },
+    {
+      "sourceTable": "tb_historico.parcelamento",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 48548
+    },
+    {
+      "sourceTable": "tb_historico.permissoes",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 13
+    },
+    {
+      "sourceTable": "tb_historico.pessoal",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 26288
+    },
+    {
+      "sourceTable": "tb_historico.regularize",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 50095
+    },
+    {
+      "sourceTable": "tb_historico.rh",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 26800
+    },
+    {
+      "sourceTable": "tb_historico.tecnologia",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 14042
+    },
+    {
+      "sourceTable": "tb_historico.triagem",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 147185
+    },
+    {
+      "sourceTable": "tb_historico.wiki",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_historico.workspace",
+      "reasonCode": "LEGACY_HISTORY_NO_REPLAY_CONTRACT",
+      "rowCount": 9
+    },
+    {
+      "sourceTable": "tb_integracao.admin_tarefas",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_integracao.admin_urgencias",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3
+    },
+    {
+      "sourceTable": "tb_integracao.agenda",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1960
+    },
+    {
+      "sourceTable": "tb_integracao.agenda_horas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 5
+    },
+    {
+      "sourceTable": "tb_integracao.agenda_locais",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 11
+    },
+    {
+      "sourceTable": "tb_integracao.agenda_status",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 7
+    },
+    {
+      "sourceTable": "tb_integracao.bloqueio",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 18
+    },
+    {
+      "sourceTable": "tb_integracao.cobradores_solucoes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3
+    },
+    {
+      "sourceTable": "tb_integracao.cobrancas_novas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.cobrancas_solucoes",
+      "reasonCode": "NO_LEGACY_RUNTIME_REFERENCE",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.cronograma",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 121
+    },
+    {
+      "sourceTable": "tb_integracao.envios",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1275
+    },
+    {
+      "sourceTable": "tb_integracao.fluxos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.fluxos_clientes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.metricas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 982
+    },
+    {
+      "sourceTable": "tb_integracao.objetivos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 834
+    },
+    {
+      "sourceTable": "tb_integracao.pa",
+      "stepId": "integration-pa-merge",
+      "destinationTable": "clients.pa",
+      "field": "cliente_id",
+      "reasonCode": "PA_CLIENT_NOT_FOUND",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:8d8f35c8af2bea11226d71ef12c381194405379555051c9cb3b00386da238faa",
+        "sha256:c31416cfccc3db9fb322b016106a1f168c0f1a42972e55f886063eaef7e7ee3d"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.pa_historicos",
+      "stepId": "integration-pa-history-insert",
+      "destinationTable": "clients.history",
+      "field": "cliente_id",
+      "reasonCode": "PA_HISTORY_CLIENT_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:d83e171d10bab1a3e23823521c4eb3169e5e91a6d874e8d2134bc26e696142fa"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.pa_historicos",
+      "stepId": "integration-pa-history-insert",
+      "destinationTable": "clients.history",
+      "field": "dia",
+      "reasonCode": "PA_HISTORY_DATE_INVALID",
+      "rowCount": 18,
+      "sourceIdentityDigests": [
+        "sha256:166457c04fe2b3d139d1e397185dd838181b5cf336c171886bd9172eb12867b4",
+        "sha256:252e59bc46a8f2af7e45a5b25b9c6b87b2561e99a19c271c1d28b8cc4851e234",
+        "sha256:2561615b12c9bbbe79a77b597ff26e1e1270ce460f9f94ffc72b6678f3589fb9",
+        "sha256:47f1da832928da171b003620aef3ee7d5513fe6ad154e17d1aed4da3d3654752",
+        "sha256:6c302cbb8bf1c60058fbfa9e126c2228d4ee793527febe554a08be2146609774",
+        "sha256:7c9023f9cfd500b331573d6d655316df0c549400d619efe4b8c5a3578edb9ce7",
+        "sha256:7d302abcea7cae959694107e50fff66d0d6178dfdfd2badf57391455e3d61037",
+        "sha256:7d85b0808192ac671c961128336f44415af7d05d80f4da844f335723f302ada1",
+        "sha256:81104f46cfa6291cc6c0bbc6ff78380e1307fdf4ca30c7b0eec3ddf109ad8d47",
+        "sha256:82ec9aeb3b1e5567b3ada908c6176f4832ff513384550e8521b9ecfcc9a01c23",
+        "sha256:a7c37d5e5a25426839d912194a49b173253bec62e8c5d807248373faee6c1b07",
+        "sha256:af01755caf4c99f015d3f376b9d0011a9b79c81e2b0303743957490f5fff8403",
+        "sha256:b06eac5e660fade224cddea3453ed5a9003f00171dff43e4cec57dc33e8d8885",
+        "sha256:bbcb546c359dc0d50405b8a5aaf4650ca642b979686408c292f6d7378e5fae03",
+        "sha256:be2a5b0d8b9d6f4f34c9725d577f7e9567926c6848b6ae17171a874aee97aed6",
+        "sha256:e72aae9295bcaa4f6ae7e0053af7c232fe6cae7462052f57abe633bc7ae094d1",
+        "sha256:f34175c8d6b4f5b299252609642a56fa9a31f22b65b02d8f5861eb0bfa0a5b1e",
+        "sha256:fc6a19b28f875f74b24f0fa19e16e94d1f251fa5279187528fcf8145f04c886a"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.pa_historicos",
+      "stepId": "integration-pa-history-insert",
+      "destinationTable": "clients.history",
+      "field": "historico",
+      "reasonCode": "PA_HISTORY_TEXT_EMPTY",
+      "rowCount": 87,
+      "sourceIdentityDigests": [
+        "sha256:0222e5e153610333fc570f84d3657d62179cf4d77982dbdba4cd6537cf6a9836",
+        "sha256:02cf273a7dd973b82da941696211c5a536629743cee5d365cd23fec673d4829f",
+        "sha256:06d573813790e682b532c7fff8e43d782b43d24887369bcf2416fbe4cc326b29",
+        "sha256:081991c7dc75a8d788598faa47fb2c16f13d27bd286de4586ce976ee67073bbe",
+        "sha256:0a7249f12d7d56110e182efb32848fde2280891b33bdcba0e95d7ef69e33546b",
+        "sha256:0b43041ffe604a26ee06451ae0ebdc49e76223e48788eac527224769f3592f47",
+        "sha256:0e5e562503a3e9d5a173abc78c012c125a2b77c1a953e95b5a81641c81e0e614",
+        "sha256:122dd92156fdf7273bcdb96acea1de2dd36c2d549e2d72c8ca4938c6ffc24882",
+        "sha256:130ab7ac145bea6fa9e6b77956696f485e4d06228ac3eab596f4dcab561e6323",
+        "sha256:13213b1bc72947f75a0f339fd6b7f6ce00cbb310b288916b58f52f73203d9076",
+        "sha256:171a6716f7cf55849370898d2076850b9cdacefd9c7bb93c9824dd1b3f0fad8d",
+        "sha256:198e311a902541fe7020de37222426db082a56612d0739a331f9f8b974279c29",
+        "sha256:1dd18445b04d398e611f556f43c3c64687204e37027e4686845039319b64a48c",
+        "sha256:232e9e740a909db843fd09d1d5902e5144f6ad584784fd6dda94d2562591488e",
+        "sha256:235e3c9d92e53981c4bfa91fce6b271240e2d4f2b903e8b731a70e84116eacfe",
+        "sha256:2a0e6f357e9aa355e2af75c325c3d487e292b421d40ed4ee857c65847055aebd",
+        "sha256:2a7907f505755456ed46f9156afa6990b0631d7aec26ac18d3fa029a2bb49749",
+        "sha256:2ac52ab0d61bf177bb94bd521db5733796cfe60280f1fda401137069ca65a64f",
+        "sha256:2f11c41dbcbc559b28788ebfc5e0d0697d987708ad5358ca48b3297bfe739f32",
+        "sha256:2f18530dfe89ec5683bb2556c490cc2e9de641c0d030b81aa62d64e39eb04b5d"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.pa_historicos",
+      "stepId": "integration-pa-history-insert",
+      "destinationTable": "clients.history",
+      "field": "user_id",
+      "reasonCode": "PA_HISTORY_USER_LINK_INVALID",
+      "rowCount": 29,
+      "sourceIdentityDigests": [
+        "sha256:1401f8688773f0eed2c94ceb61f38037c6d732d6692bb92072ad342ebec122d1",
+        "sha256:357dc26195cc2888eb902341e96b28218a5c4ec02f19568ce557b489d7cc2c38",
+        "sha256:36c459971788845db2865a069de2aa289368ceeaaeec10664b4f54f442b79776",
+        "sha256:40b6d62d759caaace443ab0445fb9d584e91b6c7c345ed2b65e4c16b627b4730",
+        "sha256:4a46bf07826b84e92225ee420edf11d687c37acfa8a16f955f717882049e1359",
+        "sha256:4f9ebecba933303ea6f2b7f9d10aea8f63091d1b937e642dfcab9d3d0e39b449",
+        "sha256:5f57856ebff9d1d587fed3150fe04f16a6254f967a98005a5f064336b7fcca40",
+        "sha256:6e1b4c989325599ff8669f5bedb4a179931b413b3be16b1391612b0365fb25bb",
+        "sha256:6f9ce8684579d4410eb7e864787db6d3a8b0dc4da47a7cd75fe0da8ee5f02654",
+        "sha256:7fbc29100fdcb1899ee3b08cf2d9f885a7aecddc0064077bdc3cc7db22237beb",
+        "sha256:80c0662891f00049d7833d85911a85c6d68b866f4b1574a97acfa78a12d5e435",
+        "sha256:8ad6dfc1e21ead7303c251fcb893b846f615f8cbecd544812c04617ca177dd76",
+        "sha256:91fa33e7dc15b78fb257baf3d7688517159179b42ffb5af60398e86cbb48cc3e",
+        "sha256:96d7cd11fa8846df19a14275d47ebdba662cb9d69f1a56e8c8360bc8e255fcd8",
+        "sha256:a9c0273f506f109e997c7a83c25d0df4afd822b796adbc43b8c32c7a574e6f45",
+        "sha256:b2db19832888e33d06f366bd77b3568cd3857a5ca4dcf4198ec587a5dd725588",
+        "sha256:bb057a559b7cc755e4f4af92ed2c5b7602dbf23eb95ff1aadbd58c9425b5d5ca",
+        "sha256:bf9fde4d1cc6ad4f691f73ab7e87caf18a3c1cc24562238588c8e6b6687625c9",
+        "sha256:c2206fd94c7e5d6d6c7bcbdd1ab16847ed8fc6c76a8d3ea66ad974b58ee7d91b",
+        "sha256:ca0f965e6652b9026956d68a41862abcd510d6b1905a42ee1804896361dac1fa"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.pa_historicos_pendentes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 13
+    },
+    {
+      "sourceTable": "tb_integracao.padrinhos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.portes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3
+    },
+    {
+      "sourceTable": "tb_integracao.prospeccao_comercial",
+      "stepId": "prospecting-client-merge",
+      "destinationTable": "clients",
+      "field": "cliente_id",
+      "reasonCode": "V2_MERGE_TARGET_NOT_FOUND",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:d7967c27b695e1bf99308cd58d51f826b5e1aeb95ad0d27dcf19ede99049dd00",
+        "sha256:dc830ae0359d0eab12775ff4cc225bd7937a682413161d5e9fc41f20bcd24dc5"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.prospeccao_metricas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1759
+    },
+    {
+      "sourceTable": "tb_integracao.prospeccao_metricas_periodo",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3
+    },
+    {
+      "sourceTable": "tb_integracao.prospeccao_paralisacoes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 15
+    },
+    {
+      "sourceTable": "tb_integracao.prospeccoes_reset",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.responsaveis_projeto",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_integracao.segmentos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 148
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas",
+      "stepId": "task-insert",
+      "destinationTable": "integracao.tasks",
+      "field": "id",
+      "reasonCode": "TASK_IDENTITY_INVALID",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:34f6586e647bd64468eaa432242fb5ef35b9545fe9f5a78dad2c6afea3c6c329"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas",
+      "stepId": "task-insert",
+      "destinationTable": "integracao.tasks",
+      "field": "nome",
+      "reasonCode": "TASK_MODEL_AMBIGUOUS",
+      "rowCount": 57,
+      "sourceIdentityDigests": [
+        "sha256:00a4d43e3097fb2a232685da6a3aec7bf86139c1142349f4138923acc3f1235d",
+        "sha256:0256cff1d1a479b2f3f36d0c452f8e59ee50d13040231e75fbe62bfc5d028ed9",
+        "sha256:0425c025845a52c75f80dffda0384e5c1394d695cfaa0e11018f7a2eb3e3a78b",
+        "sha256:06c8af93319964f52add1c3075e6886d05df26ef26bff8c64b204d3b97f29bc6",
+        "sha256:0f152510a1e5a1ce0e0b55be7093cee8b7e6ebaf064089f736802f387c4a6c4a",
+        "sha256:0fa716c5992c0f93ea64d724c055ecc6a8cd5c71abee574db5afba22183add10",
+        "sha256:1478c505d6e3feba1afb4610d5fe49a29fb645c9ccec5c54ff80e6e08a215e3d",
+        "sha256:1810c06ef4f10748962eaf1f6126f23ea78f06bfc8850a4a46d8a2df7ab33a62",
+        "sha256:23fdff489d47776755abeea1b65980398e24553316465f482f8a49dde1bacd7f",
+        "sha256:28bdb8e4bcf2844236e6afd2fac39d0bb3744f3321b4f4e35afac03bc20688f9",
+        "sha256:2b88c5bccca032a3d3e1769727d7f532cb439ca2b59fc709eed1717ea3a2f22c",
+        "sha256:3077a7fab93e759d9322bf46de013c4cc46df0ab6db0db3126498ca5e8cc4c07",
+        "sha256:33207b6c4d800912783d14e2f90a17501bda240643dd9e63551a1596ea52c134",
+        "sha256:39ada936feaece613bdd54c9746faf44c38431946e3f1b8a47111ad2f9e527eb",
+        "sha256:45fcd89f0b25deb70f5e36e7695ef35ad88a926fbe1edab5bd0dcf6802f4f1ff",
+        "sha256:49963b2b80603094c97a9b521341648aad2a72cc2838bc13b2d627ba7689520e",
+        "sha256:4b413738b90831e98d0943c50f5edfc7050f9970f84fb2ae3672bd06c64cebaa",
+        "sha256:53f50b8846aaa55eaf4dc3fdaf1e78b64b66043be2353c56e4c4c3e3ad2cf2d0",
+        "sha256:5d181866645ea307d528053e7c100441834347dd7eaea3510a1b472994dd59ac",
+        "sha256:5d37628486ba36f984e1e1cfd029aebdd7a581097f2088d166078e13ea62f4af"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas",
+      "stepId": "task-model-derived",
+      "destinationTable": "integracao.tasksModel",
+      "field": "id",
+      "reasonCode": "TASK_IDENTITY_INVALID",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:34f6586e647bd64468eaa432242fb5ef35b9545fe9f5a78dad2c6afea3c6c329"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas",
+      "stepId": "task-model-lookup",
+      "destinationTable": "integracao.tasksModel",
+      "field": "id",
+      "reasonCode": "TASK_IDENTITY_INVALID",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:34f6586e647bd64468eaa432242fb5ef35b9545fe9f5a78dad2c6afea3c6c329"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas",
+      "stepId": "task-model-lookup",
+      "destinationTable": "integracao.tasksModel",
+      "field": "nome",
+      "reasonCode": "TASK_MODEL_AMBIGUOUS",
+      "rowCount": 57,
+      "sourceIdentityDigests": [
+        "sha256:00a4d43e3097fb2a232685da6a3aec7bf86139c1142349f4138923acc3f1235d",
+        "sha256:0256cff1d1a479b2f3f36d0c452f8e59ee50d13040231e75fbe62bfc5d028ed9",
+        "sha256:0425c025845a52c75f80dffda0384e5c1394d695cfaa0e11018f7a2eb3e3a78b",
+        "sha256:06c8af93319964f52add1c3075e6886d05df26ef26bff8c64b204d3b97f29bc6",
+        "sha256:0f152510a1e5a1ce0e0b55be7093cee8b7e6ebaf064089f736802f387c4a6c4a",
+        "sha256:0fa716c5992c0f93ea64d724c055ecc6a8cd5c71abee574db5afba22183add10",
+        "sha256:1478c505d6e3feba1afb4610d5fe49a29fb645c9ccec5c54ff80e6e08a215e3d",
+        "sha256:1810c06ef4f10748962eaf1f6126f23ea78f06bfc8850a4a46d8a2df7ab33a62",
+        "sha256:23fdff489d47776755abeea1b65980398e24553316465f482f8a49dde1bacd7f",
+        "sha256:28bdb8e4bcf2844236e6afd2fac39d0bb3744f3321b4f4e35afac03bc20688f9",
+        "sha256:2b88c5bccca032a3d3e1769727d7f532cb439ca2b59fc709eed1717ea3a2f22c",
+        "sha256:3077a7fab93e759d9322bf46de013c4cc46df0ab6db0db3126498ca5e8cc4c07",
+        "sha256:33207b6c4d800912783d14e2f90a17501bda240643dd9e63551a1596ea52c134",
+        "sha256:39ada936feaece613bdd54c9746faf44c38431946e3f1b8a47111ad2f9e527eb",
+        "sha256:45fcd89f0b25deb70f5e36e7695ef35ad88a926fbe1edab5bd0dcf6802f4f1ff",
+        "sha256:49963b2b80603094c97a9b521341648aad2a72cc2838bc13b2d627ba7689520e",
+        "sha256:4b413738b90831e98d0943c50f5edfc7050f9970f84fb2ae3672bd06c64cebaa",
+        "sha256:53f50b8846aaa55eaf4dc3fdaf1e78b64b66043be2353c56e4c4c3e3ad2cf2d0",
+        "sha256:5d181866645ea307d528053e7c100441834347dd7eaea3510a1b472994dd59ac",
+        "sha256:5d37628486ba36f984e1e1cfd029aebdd7a581097f2088d166078e13ea62f4af"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas",
+      "stepId": "task-project-derived",
+      "destinationTable": "integracao.projects",
+      "field": "id",
+      "reasonCode": "TASK_IDENTITY_INVALID",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:34f6586e647bd64468eaa432242fb5ef35b9545fe9f5a78dad2c6afea3c6c329"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas",
+      "stepId": "task-project-lookup",
+      "destinationTable": "integracao.projects",
+      "field": "id",
+      "reasonCode": "TASK_IDENTITY_INVALID",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:34f6586e647bd64468eaa432242fb5ef35b9545fe9f5a78dad2c6afea3c6c329"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_concluir",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 32
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_contratadas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1531
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_dependentes",
+      "stepId": "task-dependent-insert",
+      "destinationTable": "integracao.tasksDependent",
+      "field": "tarefa_express_id",
+      "reasonCode": "TASK_MODEL_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:39b30b81b99c5e630a1758b37511afce1288f0329f3277e9c2baae789128e9a6"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_distrato",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1759
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_distrato_imagens",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 441
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_docs",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 509
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_imagens",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 5604
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_indicadores",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 11
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_justificativa",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3017
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_ordem",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 240
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_parceiros",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 57
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_regularize",
+      "stepId": "task-regularize-link-insert",
+      "destinationTable": "integracao.tasksIntegrationRegularize",
+      "field": "tarefa",
+      "reasonCode": "TASK_REGULARIZE_MODEL_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:6c6a0256de1f3bdd35bc8c3aeadd7c2ea116f3f08699b994ff59034fa4a6a5a9"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_regularize",
+      "stepId": "task-regularize-link-insert",
+      "destinationTable": "integracao.tasksIntegrationRegularize",
+      "field": "vinculo",
+      "reasonCode": "INTEGRATION_CONTEXT_MISMATCH",
+      "rowCount": 12,
+      "sourceIdentityDigests": [
+        "sha256:06b2d67bdc0be5cc48b35f84949fefb43bff159941e1416bdb4056b3095b473e",
+        "sha256:0b94e8fee5ffd28d7be985b6dca4969d51a2df79dd951ecdc6304c1d84323317",
+        "sha256:0bc5e77a1aaeb63d2e42d0b5c2ebdab7a97336eb43a51fbaa101e93cda0f5779",
+        "sha256:109c59dc7c61853e83a0b5f797882effd9ec745b9c2f58384224f0cbaeb3fbda",
+        "sha256:282497a0938c1c6bff67cab57ab7568ac2f613fd614293d68ffd0532bed96bef",
+        "sha256:50851eb4916907a14d7640f0e9698884a98d521871549e6911bd937842005c69",
+        "sha256:547f30275fc1c5e73ede1f4a2962c8f8d9122a5c7e0a8e750d2ae986a9ce6302",
+        "sha256:584b74b510d7667024cd205309d6283264042204dbf553a04ec3baf88fc9ef9a",
+        "sha256:6fe70cb72c99b8797c93807b8c2d8b277c9469d3032caef5bbbf6ffc3e6ec4ca",
+        "sha256:92b75a661f8d9a0fbc336d158a7893347041a45a18042486cb2dde45693b44db",
+        "sha256:b2ea4a5268ff79e2a1c8d3ff105945fc44b346d88f3f1351481d20c28b01c2ef",
+        "sha256:b82f3b158e6330af825863adc736aa551193ccb8c0c05d472c90491eb7b90c39"
+      ]
+    },
+    {
+      "sourceTable": "tb_integracao.tarefas_total",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_mkt.controle_ia",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 79
+    },
+    {
+      "sourceTable": "tb_mkt.eventos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_mkt.eventos_edicoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_mkt.eventos_feedbacks",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_mkt.eventos_feedbacks_periodos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_mkt.redes_sociais",
+      "stepId": "mkt-client-social-merge",
+      "destinationTable": "clients",
+      "field": "cliente_id",
+      "reasonCode": "MKT_SOCIAL_CLIENT_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:0d062f23b3ecf67e622b5e23dad30abb6830017433b1db94a16c12803fd5151a"
+      ]
+    },
+    {
+      "sourceTable": "tb_mkt.senhas",
+      "stepId": "mkt-password-insert",
+      "destinationTable": "mtk.passwords",
+      "field": "obs",
+      "reasonCode": "MKT_PASSWORD_OBSERVATION_CONTAINS_SECRET",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:344de9cf8effdbaa5ae6982d5fbec0e9363190268cce2387d52f71dae7173e44",
+        "sha256:90ace3bf7f611ccfc12f1bb9ac2faa77607011639f91d47fdf39dd9f333c37e2"
+      ]
+    },
+    {
+      "sourceTable": "tb_mkt.solicitacoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_parcelamento.clientes",
+      "stepId": "parcelamento-client-lookup",
+      "destinationTable": "clients",
+      "field": "cpf_cnpj",
+      "reasonCode": "PARCELAMENTO_CLIENT_NOT_FOUND",
+      "rowCount": 11,
+      "sourceIdentityDigests": [
+        "sha256:3701240a00705295576a7e4e25fcd0a03d93f7977b80a8d61d74520dd5117c0d",
+        "sha256:3dc5a9d17f29269deb9ce91454ddd7debe9c0bb34db6a593a8874c14d38ce135",
+        "sha256:473bac62e3df9748a32c7168553c300de2901ea00d935021f30b26877ff9b74b",
+        "sha256:545d1804523c35b19466a364a961e0ba60678ce3414e3bf36181000cffff229f",
+        "sha256:75b7385c29c987ee6e25f99736e4605b9b8caa3cad40bff958032cf79a68e15f",
+        "sha256:e0f1f0b958c5fbca6b29cec3894236bd08a196da538ea0ef1ddf5fb479a731d7",
+        "sha256:e69433e2e2bb92716e2c2e94affe9d73ac151d056e32efea46ce32dc64ab0de5",
+        "sha256:ec1836044f6b4aab464ccb1f234ffdabade530962b027fe6107cf8da8d97ca6b",
+        "sha256:f29efcab386a42e39b98b185467bf01a6c9e4e14d6b7a568697508c15f07c14f",
+        "sha256:fa23fbf40c40f3f513d7d9ca3bdb5bc75efdc520b12aff29f4d806d805327d5e",
+        "sha256:fbd1bf11592b9573e84131c0c0e3d1d9e69cd2cf2dd01dd4a7e6bb3b8d233acd"
+      ]
+    },
+    {
+      "sourceTable": "tb_parcelamento.parcelamentos",
+      "stepId": "parcelamento-installment-insert",
+      "destinationTable": "parcelamento.installments",
+      "field": "cliente_id",
+      "reasonCode": "INSTALLMENT_CLIENT_NOT_FOUND",
+      "rowCount": 12,
+      "sourceIdentityDigests": [
+        "sha256:01842c90deb273cd606e165d1feb0f58d9d5865d2bb077a2ac17936cc27f6445",
+        "sha256:11f073ef6b46dfbcbf492c02d5be09077f18eb1c6f1f3f0f9d57c8ec37ed7b0e",
+        "sha256:1b4bade01cadb1fbb0cf8d9f000d888372de47d7eb2ed7cc9ea397a320acf911",
+        "sha256:218e9b725f32d57b27f082fe993fcbc2a002e6fde2ea2aac0ae3d54b93ef6a72",
+        "sha256:55acb15abcdbea729a0bfd0c38b26515b62714c28c03911907f6732b684475f9",
+        "sha256:571571a4859a509d4768b63b097550e543e744ac3944287f2448ecdf6058bda7",
+        "sha256:5bc5d244805a9858d5b120649831294811df8001d014130270256b745f10dd95",
+        "sha256:7e13c891a84e285959ed5e1c409a3af241eb2709a1e0417c11bcf92678528ea8",
+        "sha256:c7f39e64cb18aa62d3b32e9f128d370198edc65115f1ff2ff19a4d04b35b3d0e",
+        "sha256:d9288a158f58e490ed3d526897d17c83d51f5ecb544c905e05373c13b7260372",
+        "sha256:f5044c35bb5beecc06d076bffd6387e13069bd2668171616b1ead7a8e9116586",
+        "sha256:ff8aeb58d8fbcdef47e85e7ecd582945ba9c4b47fa3397b055079caa6794b2cf"
+      ]
+    },
+    {
+      "sourceTable": "tb_parcelamento.parcelamentos",
+      "stepId": "parcelamento-installment-insert",
+      "destinationTable": "parcelamento.installments",
+      "field": "parcelas_acordadas",
+      "reasonCode": "INSTALLMENT_AGREED_COUNT_INVALID",
+      "rowCount": 16,
+      "sourceIdentityDigests": [
+        "sha256:0b547f2926191a720b81f1e091134a5590ed14817e3952ac5ca486fa8a352d18",
+        "sha256:224a394f48745a6e948fff1792306c64fad65b7f3e7f297207382faa0fd7a65c",
+        "sha256:23714c0dff37dff1032455e10b628f20fdfa3eed920cc3784e1f7e90d980fd0d",
+        "sha256:2fef40eed33c473f0806f94d1ec6f7ac95bd068053842b5536da0be1f83890d9",
+        "sha256:31dd2997b11953b1bee44a4fdfbbccd8fa3c37b4087a959fbf8f4aa9952849c1",
+        "sha256:39e289d156e64eda7ab1550b09431eacb3aa4293da56e0ba7275d53a30f18280",
+        "sha256:4417855aaa38ea6c6f95936336bf30aef104125abe0d57652bdcea7b339de0eb",
+        "sha256:4c5aa9832596115a0339ddf9765064e365a0c19bca9c7523c61ebaedf268b319",
+        "sha256:54e5322c11c67a4df82e7b3074a98910f2b892e8218753a89e1e4aa1792c486e",
+        "sha256:a35ae6385eca050f0215a928a0c0f6de49f95cba7a8ac15affbef3c80fe8f684",
+        "sha256:bca41d3e8d89944fe1a005f2012471023d7d006a5df18bf92fc1b30ec5998009",
+        "sha256:c132c6951b195a8a34ec8e6a0afa02b36c6c8b5e45fc108f8eee551b0e95d354",
+        "sha256:cbf5ffdc8623b764fd6ddd543ef077dfc6d0fea48dbe8dc50b3982332c5f530c",
+        "sha256:ccf004010a4d41e26bc5238234cbb8dbaba9626bcd8e5a95901eaef5af2dfced",
+        "sha256:d57ee360bd51919e8b52ca0128a56972fcb36ffa26097d08d704214c3bafbb13",
+        "sha256:fb467a97ea657147f484f52161b0fc163c67d70152dd7444441dd89f7b00abb4"
+      ]
+    },
+    {
+      "sourceTable": "tb_parcelamento.parcelamentos",
+      "stepId": "parcelamento-installment-insert",
+      "destinationTable": "parcelamento.installments",
+      "field": "parcelas_restantes",
+      "reasonCode": "INSTALLMENT_COUNT_INVALID",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:476ab097f2184632761c70757bcddaf0bfd2bc5ad71e4838cdf496e4d5515118"
+      ]
+    },
+    {
+      "sourceTable": "tb_parcelamento.simulacoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 14
+    },
+    {
+      "sourceTable": "tb_parcelamento.simulacoes_parcelamentos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 39
+    },
+    {
+      "sourceTable": "tb_pec.notas",
+      "stepId": "pec-note-insert",
+      "destinationTable": "notes",
+      "field": "cliente_id",
+      "reasonCode": "PEC_NOTE_CLIENT_NOT_FOUND",
+      "rowCount": 8,
+      "sourceIdentityDigests": [
+        "sha256:1b2b59b194c79225f5077ea84130980eeb18944fa5b275240423df42a65638a3",
+        "sha256:37524155ce7ed831f1544a390245257b56c2191a82e7798cace03fc14fd14491",
+        "sha256:3d575575b6cc2f024c8c4c2b01abdf6ced8d865c6c111c3c261d8ee744985487",
+        "sha256:53eb98c7d4ea46a790ef70cbe5f700cf1dc522c86641969d75b55ee234a6e4a1",
+        "sha256:5a56518aadf07a28f15a30e97e06379e3071236c420e67cd38019b4d119219b8",
+        "sha256:84bab30e14c95eab064eee17cdc0e6c570b6383b3914c8db3dd3c292ca0e53b8",
+        "sha256:9728e5496ca4c5e7010f3aedda1b65ee07911eee3ed2cb995ccb2be2f92b6331",
+        "sha256:fb53744b1aaa6eb8e5d0959a7aa8fab8cc713098207299fd0f4eba3a4ddcdbca"
+      ]
+    },
+    {
+      "sourceTable": "tb_pec.notas",
+      "stepId": "pec-note-insert",
+      "destinationTable": "notes",
+      "field": "tarefa",
+      "reasonCode": "PEC_NOTE_TEXT_EMPTY",
+      "rowCount": 8,
+      "sourceIdentityDigests": [
+        "sha256:1632e865cfaf95e9769d78a9bb0b412a677d0273cf550a3a209573b40a845d9e",
+        "sha256:4b4bca0b2427931ddd738ce3c3ad50a6936e255f3e8c42f31b2a6f8ca695c5e1",
+        "sha256:5cad9aebc6b012b9c3a84c576abbe785eea2a1c6984782f7ff95e7a47baca84e",
+        "sha256:901532a6fc86fb348ceccca2aa4e913276ab1fd38a0e9bb5edd70fdd8b697324",
+        "sha256:cb5101f3118b64134a17bb1fec23a0268a0ad4375b348d6cc6a8da3f88c5c3ac",
+        "sha256:d363f6c59b69b24738945894668fbe2e709d26f108ce4b9c6e0116d020938ca5",
+        "sha256:dec4d1f185c2e6ee214f7a001fe00d14f0a422c3f149558a31199b5a9c1bd28f",
+        "sha256:f01c2ff5ecca18da54ccb7aace605c973f092d44c45a3b7c5fcd650f285b972a"
+      ]
+    },
+    {
+      "sourceTable": "tb_pessoal.atividades",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 337
+    },
+    {
+      "sourceTable": "tb_pessoal.bem",
+      "stepId": "tb_pessoal-bem-password-insert",
+      "destinationTable": "pessoal.passwords",
+      "field": "empresa",
+      "reasonCode": "CLIENT_REFERENCE_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:eb305f3ebc8b9165d5c001a5d92facc4d100ce3918eae6c15e45633ccb923326"
+      ]
+    },
+    {
+      "sourceTable": "tb_pessoal.folhas",
+      "stepId": "pessoal-payroll-insert",
+      "destinationTable": "pessoal.payroll",
+      "field": "cliente_id",
+      "reasonCode": "CLIENT_REFERENCE_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:33d9ce82d8d24a4f75aed344a29b2df88ea22a8f6cf48321eddd3879ebe251d5"
+      ]
+    },
+    {
+      "sourceTable": "tb_pessoal.grupos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 7
+    },
+    {
+      "sourceTable": "tb_pessoal.ldd",
+      "stepId": "pessoal-ldd-insert",
+      "destinationTable": "pessoal.ldd",
+      "field": "cliente",
+      "reasonCode": "CLIENT_REFERENCE_NOT_FOUND",
+      "rowCount": 3,
+      "sourceIdentityDigests": [
+        "sha256:147846cabf1f3725b62fa19c46f6f415dcff758f2c10979894f0ee3905ccc580",
+        "sha256:7376abdf3bc092c21703775e75b9d89135654021520c722af426b4d343666a35",
+        "sha256:843a7b588f8a35d360cc073c3d6302deafc7d2a869a2c23976b7ee7302fb0f72"
+      ]
+    },
+    {
+      "sourceTable": "tb_pessoal.obrigacoes",
+      "stepId": "pessoal-obligation-insert",
+      "destinationTable": "pessoal.obrigations",
+      "field": "cliente_id",
+      "reasonCode": "CLIENT_REFERENCE_NOT_FOUND",
+      "rowCount": 13,
+      "sourceIdentityDigests": [
+        "sha256:01fd66f8c51ea33110557c95ccfcfac4d6faebc0c770cc0aa9565a75474f8cf9",
+        "sha256:07e051f1548671610ed7feeffdfa1e2758136d1ec441b19dcf4a9c29a1c34bdb",
+        "sha256:08f2c62b283e5db6d1dff0580a97b20d2f86c0a67186e8e69f2f9a61493a9fdf",
+        "sha256:109e953c421edf485d2591fced029658955b8fd6af61a818a6fab9f5ec6877c9",
+        "sha256:1936df402eb758252aaa04de37b675bb79fbbdd5200f935de2ceef8dd2f74617",
+        "sha256:2e017c7029af2eaeeee2fd6283401516149fb4f40d0d90cea4ff2395406bcd2b",
+        "sha256:46067d4bf13316bffe2290b18f8f0f17948588f44a421baff693292af0d1f619",
+        "sha256:4a0a5f658cc36a06af8958c0726f1a0fb53faae3061072e284691b25f9e06d9d",
+        "sha256:4e4972cbd94fea57465a0e73dfcdb2b95db70fa127618231f6d329af23f0b06e",
+        "sha256:b47efc8e42b0cb2ae55709e65520e3ea76e9a514d06055238fe5e2a6003fcfd7",
+        "sha256:e6974dd88683249023edef59d1a4a95686ff3c16c51e4a1e4083648f85e3c59a",
+        "sha256:ec9396e2109491ce4c76962dd3d0655766c148158f09f0ccce0e2e3fea9ffb84",
+        "sha256:fe6f76ee4153ff5428d42c35e5e5d1af4608160472d33c7a200b6be6c1787e9d"
+      ]
+    },
+    {
+      "sourceTable": "tb_pessoal.obrigacoes",
+      "stepId": "pessoal-obligation-insert",
+      "destinationTable": "pessoal.obrigations",
+      "field": "comp",
+      "reasonCode": "REQUIRED_SOURCE_VALUE_EMPTY",
+      "rowCount": 99,
+      "sourceIdentityDigests": [
+        "sha256:01659f97d92d7e06a66fe7bdbc619fa4beb7a5dad373f47045e41e1ef9ddfbf8",
+        "sha256:0d3bdab8e08868f27f4e58b2bca17e01d611fbf88944ff562e061d9e42e6b084",
+        "sha256:1471ef968c5541117be5c7630534d5bf7608b153692ff9cb84368d24f018e2b1",
+        "sha256:1838dc0565149c9af004f4f5866e23ab2a1ceaa0f885a3f1484d9e2e4b824477",
+        "sha256:1adb6056a880cbcbe9109cfb14eff6f69cef48186059bde69e78771e22bf466a",
+        "sha256:1ffd9a95c35feb3f06402b19c9ff63b73406209612b0c89b043ad8629c1f8bbb",
+        "sha256:20535ad0840fd27c9aa3f2d8ca6102e010ce56cbe4830669229c54546c4a7078",
+        "sha256:21d453b211b401558cb1833f54d377f4a7b8ea235828cc32fe8f8b957f3c087c",
+        "sha256:22ec18fb142abfcd9b67d3c8a82fc033ca4fa76538b72c9859333d163867f72a",
+        "sha256:262e4d47aa9fb886602f3ce4f0d2adcad370296aa53a99ecd21bc692b4ad58b1",
+        "sha256:26ac9d8493e95623bd8286edac7ab8ae9d5e48544e9470fb6561161b3d364944",
+        "sha256:26ecedec7700e64f8b2ab0d4cf2dc55dc554c0ff96c16b4fb48a1346f7e1dca3",
+        "sha256:293be8a1991b0e4f8433d7472f4646b5a7380bf43b7f3426de09f44702e64925",
+        "sha256:2bd28bf94e3cefc02dc47fa2b0b20bd1307dddc5ec5693c628df3d96fa4913a3",
+        "sha256:2d040c172f11ecb12d9187c8a6b73aad2bc9e946b25cfd49381a2bf2d455622a",
+        "sha256:2e5b484910a2048058f56d4ca11a33309c6661320464cc935c3c2460e4531c64",
+        "sha256:2ea863e34febb9046bdcc79133b4710620eca4dbcc43a5b2b35677283941afcb",
+        "sha256:33997c16e7ddda642868818024e91cca52fb358bdff2b84d454bdd7b3c60ff23",
+        "sha256:344fa8ee9f612cfeceb54f6d9bb3241dceeb7b6bd0121e3a4df9e83da91c3947",
+        "sha256:3590f9c4e3d3c8967153bddef44d0e18835ca29bfa71fa7f4c0476ee41c1e625"
+      ]
+    },
+    {
+      "sourceTable": "tb_pessoal.sindicato",
+      "stepId": "pessoal-union-insert",
+      "destinationTable": "pessoal.union",
+      "field": "cnpj",
+      "reasonCode": "REQUIRED_SOURCE_VALUE_EMPTY",
+      "rowCount": 16,
+      "sourceIdentityDigests": [
+        "sha256:1737bc238e99f1667d3d08ee69824bb5c669c9fc8e76103c9f1231c237c97c86",
+        "sha256:18a96ef402de4b118b60a7470242229b9fb92c7b04725d8f38c228b85e08e14a",
+        "sha256:23b5ae4ed448fe6214857db033d54c862717a7ebf87b7af8ac2ea83e0d8bb699",
+        "sha256:2d4301193371c48b136c75a5aaaa89e0d9bf169b2add4bdd8a29ae18e397e42c",
+        "sha256:38dd9d8b9682d1efb9a2bd8c6ed6407207bd5b52a50dac9d31aa32395c703731",
+        "sha256:4209d05f18b9bff30a4cd631c38a5d998de64cdb24569b0fb8f216bc754caf02",
+        "sha256:5152b1fff41ab9caa1be70b8e82bf49d3394503fb192e6fda996994226273a9e",
+        "sha256:67eccf489688c1d27a3deac4cba1d983b99900de8659510b1f804291e5bcb292",
+        "sha256:6b686bf378bc0464c7d87aacc8b9a2388a7744b2a4d35ef7824e52da22843032",
+        "sha256:6bba6ebd4cf5b306422f41981ed8a7c80c426031d1b4b3ffd5f7bcb5d6eb5ec5",
+        "sha256:7c3f5be0dd3caa2a004a2a5eb9a5abed135cd081cfcd43c975b92034896af5ea",
+        "sha256:bb253d6f6e0bad47a6b9cb99ba5e128819ba6da268b97c18504d31c5c2aa410b",
+        "sha256:bd052ccf4da6a980e2a428b5db983bdb49be9f167433b835e4823a8b768c0b71",
+        "sha256:d129417e3c5c459fdf14ba606cf3d98233739e1d12ee3bd727e60e9abf455e29",
+        "sha256:e220b787ef96b56e6c4e20734b24e2672bd0a8deaf495fce97c41669e8fea3e6",
+        "sha256:f486ad926af2b7841e51a04acd42dc5bbff08aa7ef0b1e01d6b19963f4ce46b6"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.agenda",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 2770
+    },
+    {
+      "sourceTable": "tb_regularize.agenda_controle",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 26
+    },
+    {
+      "sourceTable": "tb_regularize.agenda_status",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 3
+    },
+    {
+      "sourceTable": "tb_regularize.alvaras",
+      "stepId": "license-insert",
+      "destinationTable": "regularize.license",
+      "field": "cpf_cnpj",
+      "reasonCode": "V2_CLIENT_REFERENCE_AMBIGUOUS",
+      "rowCount": 28,
+      "sourceIdentityDigests": [
+        "sha256:0ef2a6c4a5b0621d16dd29eb5ceca288f7902ecda66523a73b5f5c91aa3e2050",
+        "sha256:15059ebe7dc6f00292f8bc4062cc61f96de16d6e39c8b8ca2123bb651706097b",
+        "sha256:27399be1a68fe00da062223c1ec54c806f5afa60699b2d42f9adfe9816d6e2f6",
+        "sha256:3c1267243b065dddb4827265a9e3ad7c5f6cf68fe70669ed0a05a058658a2bf1",
+        "sha256:4b96f174b7bf464c3e428bc2fc0b8f4b282a820120caef74b0c468901edcb716",
+        "sha256:4e4681cb9824155a647e5daaebb9934a6a124564d362cc95b28adfa2f75e552d",
+        "sha256:58e3a890da5058a48228524daf09cafb0c822088f52cb5f1676ae3d457328824",
+        "sha256:67e9ad731ff06a8e2e524bb0b9cb50844db893df60041ecb4db1230a0f58fbf0",
+        "sha256:6f347fba2bc07d40e37ea2a7d448051307689c5880544655e701a38f719a2184",
+        "sha256:6f628e3dc6daa52e47125bbfa9f38e803db42af3e918609caceec9bd02a80269",
+        "sha256:80c9b6d07ec10e7b85637ce004869bdbcef1b94d7741649382620ee471ce8559",
+        "sha256:8b6ac62c41a4960594b31f08ba4132513ab4b645630c411d7a41f8949eb67f1a",
+        "sha256:8b91cb7b5b6ef4bc7197983abeac47d1f98e38884fa34599b0ae4610356bc261",
+        "sha256:98f66e9af3a08c920d4a60313b497148383fb596403305797f9fd5da1d28d0c2",
+        "sha256:99113bcc0c028181f29876a40393dab9e372e716910bed366c2a81fa24f6b0cb",
+        "sha256:abb7423113e2ffee5f4b90461d0fe929c78d53b493c4c2a39f50b1f09c09217d",
+        "sha256:b1bea252802e687154af6d872ea3f4b8004c14508e97b5a1c7834308afa2ffdb",
+        "sha256:c0f44cc8ab27b6efb7e81577d8b42f8928884bcf0f40f30d9cd5d71ac9ed1ec3",
+        "sha256:c41c424730ac3f34a24477421eafe0fe53a6acd79be0c8acf6a05fb98c6f358d",
+        "sha256:c5a73d9bb10fec4cfe69f3ad7d4f59fe10e9369f86eac4d5628c211e20421a3c"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.alvaras",
+      "stepId": "license-insert",
+      "destinationTable": "regularize.license",
+      "field": "data_de_entrada",
+      "reasonCode": "DATE_VALUE_INVALID",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:04c5961fdc6dc7add14b1d5eb38f5bd64e52bbb02dca51e3ddc70752594dbcdf",
+        "sha256:918bb576310d4082f1cf18b08bc0ad4110cdd545e174e02e78ff36ce7a5fc98e"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.alvaras",
+      "stepId": "license-insert",
+      "destinationTable": "regularize.license",
+      "field": "empresa",
+      "reasonCode": "V2_CLIENT_REFERENCE_AMBIGUOUS",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:6bfbfaa35b934cd874b7f0839148a95239476b42818b4e84d06d288c5f91b94b",
+        "sha256:94feb0d4f61239c207773e334a9d96548a900f33aa905087afb9687c6e8813e2"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.alvaras",
+      "stepId": "license-insert",
+      "destinationTable": "regularize.license",
+      "field": "empresa",
+      "reasonCode": "V2_CLIENT_REFERENCE_NOT_FOUND",
+      "rowCount": 55,
+      "sourceIdentityDigests": [
+        "sha256:00e9c0943770666c341577d33c14facd644ede5f9a70690afc75ee153b8ee563",
+        "sha256:04737a4b4ee6b977a650a1280b86b9888e61796eca6652f46fe92bfb052552f5",
+        "sha256:05370891d0459e7ccde3f1844190932135e38229a0933b6c7efd9a09cbf97ea8",
+        "sha256:079ee30eb04bf09fac72c11ebb99ece8a7c6348a0c675e8e475226af702f05d8",
+        "sha256:0875eadc96f643a34aa0b4d87d95960fa20ce0e9ca7aa16983caecb7a3ed9941",
+        "sha256:0efa18e2a7ced3343a3e20f0edd631d0301149d69ac82122667e4dabfb8b357c",
+        "sha256:0ffb99dae7145bd576494bca11bb0ff6d0e9e186631dba1303d4f3e0ffbdc9fe",
+        "sha256:10e3ec1b1f42483a3becc864b0f58b2fdc0749909c167361d44624fede3ac633",
+        "sha256:13e22b2f67fa5c06016cd287c117be2487d51c500b379e429481eca9d2130a4c",
+        "sha256:187c83d97ff9e22d765bb37445daab7a19a145d40211b7534910d336ac793904",
+        "sha256:1cc3df9990a833d0d5a00363744d804af76573c8c1242a1dec43712a77334fe1",
+        "sha256:1cf2b6edfaeecc9f1e11b1d5a713b9ccba691765f40006e4fe79d3b914fdd9cc",
+        "sha256:209a44754e3b1e02bfda05f3c18bf0dd0e4d3ff69cfbf5112b4cfa5edf5c409d",
+        "sha256:245a0286a07f914118412bce1a0cc9b0ff396f4ecbea59b78ec975571a6a1334",
+        "sha256:2795619fbebc66112e290b2371af67ef5eb001dfd06655e4432aa0d8da2e5fe0",
+        "sha256:2bffa63d126645fdcfb1a1dd911b5fcbad732327ccf8deb9c27f17fab9cacf67",
+        "sha256:31d49b1c4687a12bc8b96aeaf94d4c232a105cad1a27588ae8b12a7fdc03a19c",
+        "sha256:3860eb28c2e4ba3271789f54315b666c2e04dc35ae66cd3b03ef420a86917601",
+        "sha256:3c5221c77f9f4a1e151fb891ecbca9cc298db8a67c623afd7614871297877e2d",
+        "sha256:4c507fd7ad84536bf01a341340999e94bab702d83e3efb366c926eeebf52474b"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.alvaras_vencimentos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 6
+    },
+    {
+      "sourceTable": "tb_regularize.atividades",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1455
+    },
+    {
+      "sourceTable": "tb_regularize.clientes",
+      "stepId": "regularize-client-insert",
+      "destinationTable": "clients",
+      "field": "codigo",
+      "reasonCode": "REGULARIZE_CLIENT_IDENTITY_INVALID",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:543c158fd9f3c9e1e5efd6e362b2c2ced75d0f5d704122cb17394327f9c2235d"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_competencia",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 24
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_dominio_logos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 100
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_licitacoes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 152
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "stepId": "credential-slot-bacen",
+      "destinationTable": "regularize.passwordsRegularize",
+      "field": "bacen_senha",
+      "reasonCode": "CREDENTIAL_PASSWORD_EMPTY",
+      "rowCount": 3,
+      "sourceIdentityDigests": [
+        "sha256:013557a64bbdeb929bad4c452fc4832525a351097ac1a8d7fd3aef3b1b166f23",
+        "sha256:357c90a1552017ae08d45324f24404df8501d2a58a3179d37d112638fbc749fe",
+        "sha256:86c87a65b0236e273f1474d72c9dfa6eadce3108f092f07d28b0258aefb857b1"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "stepId": "credential-slot-regularize",
+      "destinationTable": "regularize.passwordsRegularize",
+      "field": "responsavel",
+      "reasonCode": "CREDENTIAL_LOGIN_EMPTY",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:4a00b48fa8d24d9d164b3d070a32580756737cb6cc4e2c77e531e5d62213b6c5",
+        "sha256:799bfe03769d3672e3efe1a8acd2177d24a687701b540e5bc6a72e0322da1515"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "stepId": "credential-slot-sefaz",
+      "destinationTable": "regularize.passwordsRegularize",
+      "field": "sefaz",
+      "reasonCode": "CREDENTIAL_PASSWORD_EMPTY",
+      "rowCount": 13,
+      "sourceIdentityDigests": [
+        "sha256:1718983851b98f0da5ddf107d8b616ac9c49258d5e5ecf787428d33b37dff3fb",
+        "sha256:18f8c21caa5d107c50902d6da51bced943a279566a4bc542af791958edea9fd2",
+        "sha256:3457b1e88d43709ad6d2acbfa2b2d85aba5fdaaed871aea0850066e20223286d",
+        "sha256:506c1175c13a8f8423a2632eb91c3d2c9b8be1258d726ac0f4830c7af259dc4e",
+        "sha256:5319c06657eb109b05fe14c04ae7089af525bca5279a8514d49048db74b2d08a",
+        "sha256:5b4782160ff6d132a2879b753984780fcd3eb90413669d6672ec26bb72afd0f8",
+        "sha256:87f1f54dbc9d90b6c71600213f4e089f8390b063a58b0254674093a4ebaaf037",
+        "sha256:a71ad86811d7e5a6067731c87d6463578d10dc54de00b08b4a5ca40fa3c06e4f",
+        "sha256:ab8d16e52a342415fc51d7f09de973731fed272ab744af86841921937e9c0e4e",
+        "sha256:bc91d153e90595bfdbf6a9dcdb061c2d4b4ea4238dc91d31e16a7447410bc785",
+        "sha256:df381c46adc07618a61b1eff5c1ce9013f704d0942f68af95dce828e616b2170",
+        "sha256:ed1b80c7d4a3828efe4abd64d93deccb6e8d9950886367e676745da94db0703a",
+        "sha256:f4e6967a59a3dfd64504d7e620eabccd8ff746cfebeb2468fd8da99531164410"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "stepId": "credential-slot-seifsa",
+      "destinationTable": "regularize.passwordsRegularize",
+      "field": "seifsa_senha",
+      "reasonCode": "CREDENTIAL_PASSWORD_EMPTY",
+      "rowCount": 5,
+      "sourceIdentityDigests": [
+        "sha256:2b0726c5080e17ad0d7544da1131500dcaa246e142b19816fe7c4c3e0409e0ee",
+        "sha256:3f8deb61f7f05714b3cbdcf713b6ecd9850777dcb54f9b8c98e84473a32f0ca5",
+        "sha256:950da030c7a8ff4ea6306b6675e4031e704d2a6175984099a6cab1aa7b17f520",
+        "sha256:addb6f19858ddd04ee144adae33befcca8e15b729d0e73a03d9445fd2f8ca9c2",
+        "sha256:d092fdc0fb54f3ba1b41c963a860bd9db703da63c1d4fa77988bffa3ff753aaa"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "stepId": "credential-slot-seifsa",
+      "destinationTable": "regularize.passwordsRegularize",
+      "field": "seifsa_usuario",
+      "reasonCode": "CREDENTIAL_LOGIN_EMPTY",
+      "rowCount": 15,
+      "sourceIdentityDigests": [
+        "sha256:0366139f0ee3289f3c55bd8e616012ed25c8e7dcad7766bb4d6ef8f8d966d90f",
+        "sha256:0b35deefa3468d653ac7157cc36382cda3c41d1d774f184ecbe4f58fd7760447",
+        "sha256:0c3622d707d5bf352d34b597eff8beaf824539795874f63f00ca9771fdf029fa",
+        "sha256:10a58cfb5ccce31f60d42835291c30efac9ec13a3b27ad34e2b0c197ca0233aa",
+        "sha256:42ee6447e05b8c95129616b024a18de461ace4aeb3a781641302d1ddd7e2d472",
+        "sha256:4dbe58d8c3753afecacb06ec020159c58bcc2fdbd7ada40028051c9f43703a1a",
+        "sha256:52eeded9659058c70abc4eb5c67e9a1dd97ed2ac9a9a0783a7869bef3e81fb67",
+        "sha256:5e1869e168385e3434d835c95003c0e06ef2f2106a14dd0ac95e237bc5ec29bd",
+        "sha256:65b3426819c3b8005dbe58cd6335412ce2173c6224e250df23284642fd5d71b0",
+        "sha256:71abb239a8721237ef3e9ab97c5da73744d67b2c409bc306065556558c965d72",
+        "sha256:83d0f1b4d8c67516952871ddf4e36da679ff8e5cfb32a4e20412832dd6622fd3",
+        "sha256:884aa4eec72e014f9868c556cad5646b4ebbfd086b11c1dca7ddaf8289812c5d",
+        "sha256:b86d46da9c2db38f81654d03f93c307f856cf1781f6efb6400476a968d99b125",
+        "sha256:c0a4ed4d1b3710191a27850bc496dfe9aae7de032dad42973512cb6b87f8960b",
+        "sha256:d5e202a66658c58268cc4d4838f801e70fea58258edddb5efe93442b47192b7e"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "stepId": "credential-slot-simples",
+      "destinationTable": "regularize.passwordsRegularize",
+      "field": "responsavel",
+      "reasonCode": "CREDENTIAL_LOGIN_EMPTY",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:4a00b48fa8d24d9d164b3d070a32580756737cb6cc4e2c77e531e5d62213b6c5",
+        "sha256:799bfe03769d3672e3efe1a8acd2177d24a687701b540e5bc6a72e0322da1515"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "stepId": "credential-slot-webiss-cpf-1",
+      "destinationTable": "regularize.passwordsRegularize",
+      "field": "webiss_cpf",
+      "reasonCode": "CREDENTIAL_PASSWORD_EMPTY",
+      "rowCount": 4,
+      "sourceIdentityDigests": [
+        "sha256:57a25d3593b95a1e49fcb01a2ed4137087a472e0055cea1b6b7a783e0bf5c016",
+        "sha256:5d2cc92237ce55940113ed610d25a8015a4a62f87881ada11b436c4da54533fa",
+        "sha256:8f7cee71889bd7671a88d5e46f205e5dadfc178a549af5948c8f050297123c8b",
+        "sha256:fb0cd1c65796f509b22c7e6b3fafaa1f695c276bfa1d82c82312f29e86544852"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "stepId": "credential-slot-webiss-cpf-1",
+      "destinationTable": "regularize.passwordsRegularize",
+      "field": "webiss_usuario_cpf",
+      "reasonCode": "CREDENTIAL_LOGIN_EMPTY",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:539d67fdc1c18bf7182f82ec3c1471b958b8d2d3b715a0a511a2a9d266b65258"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "stepId": "credential-slot-webiss-cpf-2",
+      "destinationTable": "regularize.passwordsRegularize",
+      "field": "webiss_cpf_dois",
+      "reasonCode": "CREDENTIAL_PASSWORD_EMPTY",
+      "rowCount": 6,
+      "sourceIdentityDigests": [
+        "sha256:0e53f28f1fbb9c018410d90b4659d4d30f90caab9bbc8ca44614091147b7c131",
+        "sha256:24531db563bff48a7c89c8b2f99d32187d142769909eea5e3b3153c12c8c6d29",
+        "sha256:a8f0b3027484de51c5c9b4d627c9780a448281e35032115f972e408a58fd4444",
+        "sha256:bcb47a6016f00de21c73db09f9125dc6af74563056f9a7c5b65571fae634ee5e",
+        "sha256:c256aaf9e6ebf6c49eddc607400d17a2a1005c1c47e167795ac81cd2262c1de3",
+        "sha256:f74eed8af172e88aee560d54a9d111afafefd736484b70d202f30d27bb1e7f0b"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.controle_inativar",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 13
+    },
+    {
+      "sourceTable": "tb_regularize.coringa",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1160
+    },
+    {
+      "sourceTable": "tb_regularize.coringa_status",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 6
+    },
+    {
+      "sourceTable": "tb_regularize.distrato_checklist",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_regularize.dte",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 2125
+    },
+    {
+      "sourceTable": "tb_regularize.dte_status",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 98
+    },
+    {
+      "sourceTable": "tb_regularize.grupos_integrantes",
+      "stepId": "regularize-group-member-insert",
+      "destinationTable": "clients.clientsGroup",
+      "field": "codigo_cliente",
+      "reasonCode": "GROUP_MEMBER_CLIENT_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:976114d2e547f1806011b76ef187b09752d9bd8caa764be72fb0983556888354"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.grupos_integrantes",
+      "stepId": "regularize-group-member-insert",
+      "destinationTable": "clients.clientsGroup",
+      "field": "grupo_id",
+      "reasonCode": "GROUP_MEMBER_GROUP_NOT_FOUND",
+      "rowCount": 5,
+      "sourceIdentityDigests": [
+        "sha256:01719f65608cb99287413f92235997b31f073abbb4ca942dd0454243bd245ae8",
+        "sha256:57e03dc5dbafcb9e15424666bab984b547f3eb610a000ee7d69c4e8ca8680957",
+        "sha256:84fa026619f3f2ad29e1e4d030613d95bc322f10cd7d440e67fae68545ace886",
+        "sha256:aa301d070eb8b47b39ae7ed3082b4a1e67508d3b60476bcdc56da348a8809512",
+        "sha256:c352637624814b0465d8f43417ee49eb86c8d5f24154c0cee59cdf72479b4cba"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.orientaoes_checklist",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 352
+    },
+    {
+      "sourceTable": "tb_regularize.orientaoes_filiais",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 4
+    },
+    {
+      "sourceTable": "tb_regularize.orientaoes_processual",
+      "stepId": "guidance-insert",
+      "destinationTable": "regularize.proceduralGuidances",
+      "field": "processo_id",
+      "reasonCode": "GUIDANCE_PROCESS_NOT_FOUND",
+      "rowCount": 186,
+      "sourceIdentityDigests": [
+        "sha256:0042437824f24a48d82990be5527299f1a70b3ee4027567f0d84cca6d1272627",
+        "sha256:0443eb3471a8289266f8848b652fbd32cab58ffa2da904867c6b44f34e07ef17",
+        "sha256:044c9b1324a243bbd6074a8dda6f0bb8704c15ac0bb1ee71c75cafbe778eac0f",
+        "sha256:08cf73e4bc3efe1b6dc52b5498a41986c7f0923bc3643c10b547aab88542c303",
+        "sha256:0a3f6a114a6cfe7bb9df3c75ec68d7fedf2ddf20dec9375e2462ca7a69ae550b",
+        "sha256:0a57b2667fff92178fdd52b42d8e4940a912a1ac4c87aa8719dc522c03dd7e89",
+        "sha256:0baa136be363e12c563e9d54946f972dcee2c862932613987cf5dac0e53380fb",
+        "sha256:0c1286e45c030465c31ff47392b427dea4d54eb29792733ab6d69640c79f8d47",
+        "sha256:0d9adbf19b176555138ce351efc71a5bdb1a79ef8d9f83892bea44d1e558f2ae",
+        "sha256:104da390caf640defb1887dcbae9e492ef5b693ecae0117858609a45d2dad18f",
+        "sha256:10be020ecc1884992b2ea92bcf296a9248ee8e14762e506346d25abc6b8512d4",
+        "sha256:1132d5ab551765da9befb2f10b6c71704668b875d3257ce45f394dc06fcc358e",
+        "sha256:11f99ffece53b7011a7bef312b0be36ea309f05dadd1920218dd818f540bc29c",
+        "sha256:134065828a345e7a9afd1f0ca27c5636598416bd4f311417a3b38b106323b4e9",
+        "sha256:13e27d505d1ba9573b1a8294145407a7d2d465315ea0b64c391b1293020623c1",
+        "sha256:15264687afcfb21a2cc8f302ad45a184c20c9b0acf186a26fc5f50480ceef3d4",
+        "sha256:153623ec3cfd396c7bdf1f47faa03f65a589185df6b7c2bec0474c855fb7d01c",
+        "sha256:173234517b125569b17dccaa0fb500954d9debfd8b410bd3bfe01801d288f29b",
+        "sha256:18076d7423028c0a7838d1da02cd807f02a9c8c2a2765a0c1ebaad9a8be8c58a",
+        "sha256:18e56ec2e98efd80f51cc1f347818ee1765e424f31f4caf2264c5fe69aab525a"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.orientaoes_processual",
+      "stepId": "guidance-process-lookup",
+      "destinationTable": "regularize.process",
+      "field": "processo_id",
+      "reasonCode": "GUIDANCE_PROCESS_NOT_FOUND",
+      "rowCount": 186,
+      "sourceIdentityDigests": [
+        "sha256:0042437824f24a48d82990be5527299f1a70b3ee4027567f0d84cca6d1272627",
+        "sha256:0443eb3471a8289266f8848b652fbd32cab58ffa2da904867c6b44f34e07ef17",
+        "sha256:044c9b1324a243bbd6074a8dda6f0bb8704c15ac0bb1ee71c75cafbe778eac0f",
+        "sha256:08cf73e4bc3efe1b6dc52b5498a41986c7f0923bc3643c10b547aab88542c303",
+        "sha256:0a3f6a114a6cfe7bb9df3c75ec68d7fedf2ddf20dec9375e2462ca7a69ae550b",
+        "sha256:0a57b2667fff92178fdd52b42d8e4940a912a1ac4c87aa8719dc522c03dd7e89",
+        "sha256:0baa136be363e12c563e9d54946f972dcee2c862932613987cf5dac0e53380fb",
+        "sha256:0c1286e45c030465c31ff47392b427dea4d54eb29792733ab6d69640c79f8d47",
+        "sha256:0d9adbf19b176555138ce351efc71a5bdb1a79ef8d9f83892bea44d1e558f2ae",
+        "sha256:104da390caf640defb1887dcbae9e492ef5b693ecae0117858609a45d2dad18f",
+        "sha256:10be020ecc1884992b2ea92bcf296a9248ee8e14762e506346d25abc6b8512d4",
+        "sha256:1132d5ab551765da9befb2f10b6c71704668b875d3257ce45f394dc06fcc358e",
+        "sha256:11f99ffece53b7011a7bef312b0be36ea309f05dadd1920218dd818f540bc29c",
+        "sha256:134065828a345e7a9afd1f0ca27c5636598416bd4f311417a3b38b106323b4e9",
+        "sha256:13e27d505d1ba9573b1a8294145407a7d2d465315ea0b64c391b1293020623c1",
+        "sha256:15264687afcfb21a2cc8f302ad45a184c20c9b0acf186a26fc5f50480ceef3d4",
+        "sha256:153623ec3cfd396c7bdf1f47faa03f65a589185df6b7c2bec0474c855fb7d01c",
+        "sha256:173234517b125569b17dccaa0fb500954d9debfd8b410bd3bfe01801d288f29b",
+        "sha256:18076d7423028c0a7838d1da02cd807f02a9c8c2a2765a0c1ebaad9a8be8c58a",
+        "sha256:18e56ec2e98efd80f51cc1f347818ee1765e424f31f4caf2264c5fe69aab525a"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.orientaoes_processual.atividades",
+      "stepId": "guidance-activities-aggregate",
+      "destinationTable": "regularize.proceduralGuidances",
+      "field": "atividade",
+      "reasonCode": "GUIDANCE_ACTIVITY_VALUE_INVALID",
+      "rowCount": 7,
+      "sourceIdentityDigests": [
+        "sha256:049ecb2fcc40ef2902c80b00c6e0ca24d61a18ae01e3a59c1588a868e15e23cd",
+        "sha256:408539a1b02f301f464ea12702bd389495b998bdf4bb746b1f053aa667dce31e",
+        "sha256:462a44a84970cd6c70dca30a0f8299d67f4695723ab5941e8a80531d1473109b",
+        "sha256:510afb911d9621150390ca56da37ba2dd186a9aa89003eaae92ab45f15eada25",
+        "sha256:9b038cd88a2b502eb32bab25f6cf3bdeb0269710a140ed973199b51c77fcb1cf",
+        "sha256:ad035da763540992f81f7e8ccf8544067cc47ebdcef812d99da857ed945d5f30",
+        "sha256:e7c71f8d2bea827c7d3f9fc8a95c232e1d6164317a777d75d671bd433036a3f1"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.orientaoes_processual.atividades",
+      "stepId": "guidance-activities-aggregate",
+      "destinationTable": "regularize.proceduralGuidances",
+      "field": "op_id",
+      "reasonCode": "GUIDANCE_ACTIVITY_PARENT_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:f39ad3215594368e542e98a86129234de1e0958eb5a153428cf0cccece6c759c"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.orientaoes_processual.socios",
+      "stepId": "guidance-partners-aggregate",
+      "destinationTable": "regularize.proceduralGuidances",
+      "field": "porcent",
+      "reasonCode": "V2_PARTNER_SHARE_INVALID",
+      "rowCount": 99,
+      "sourceIdentityDigests": [
+        "sha256:00d8e2c330b525efbb76b3dddff98804f2380171371700096b964a4229ba1565",
+        "sha256:03aa15cbde6dcda0e7bd52d75992441bb54d86875f883c31523577e9a02a7999",
+        "sha256:03db3da892047cb6ac0aa8210520b77c66a20945ce77f3f4ddd9c8c096111a26",
+        "sha256:046d04964b73ccbc82009aa7ba927b499ccec695968d51d3372d00b0465f20ad",
+        "sha256:0634edb89a2ff2afd8e5717442d354563f6477c2be8c4bb184d19a72bd9d7793",
+        "sha256:09643db490403f1d2addc2fea39c62be951bf932e5024b774ba13f7f26200d6a",
+        "sha256:09c15be3d28210a2d4c695a40c4efb685c4bb94301270eafff806095bfaa4a13",
+        "sha256:09dc0e3074036904c3036adb9a02a5b273b0141c941ccc2f0f462a2385cea7c4",
+        "sha256:0a00982efe1c360eb38324af06f80a632d3fd90f8e39d000860fcbd2216b293d",
+        "sha256:0a8c1a2a009fcfe5b3fa5dbd04de149bb6753c14ccf616c236e6cfa313169c25",
+        "sha256:0ec4e7267113576573ac3e12eb59c27e4e242032979f9144ba62a36c98d99d13",
+        "sha256:11f156d096318be1ce0dae8bc77b0a27b9a27bbb9bb876b0d23240210defc8cc",
+        "sha256:1385bfe2318558adf518f74b5374bee738f7c3892127dfa3af81e7cdb27bbea8",
+        "sha256:1749adf0f0a487125b0770c5dd96c4f6e8d0aa2a89c961fa7fdee4f76f1bf84e",
+        "sha256:1af217ef652153277cf294d9a112249132c84f5ef7b712583a9e7dbb3f14642f",
+        "sha256:1af666bb249ad956f4c5a4ba0cf333ef74f8332e2c9a5989e5005ed3d15b036b",
+        "sha256:1d35e40aee538939f00829137c8d3b40a53f42a9858aeebef26e0ed791007ac8",
+        "sha256:21a8aac9430892f472b8937ed3f0c56982a14fc6fd47249f25f2af700148a0f0",
+        "sha256:22a096d9f19db998b0698e18e3660aa84bbd0c98ee3ac5771ed28fde63f270b0",
+        "sha256:22a994eb43defb98e2ae61d2d98f324e360d7b2a021892d0ef1763daa9ecc083"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.permissoes_senhas",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 130
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "cep",
+      "reasonCode": "CLIENT_PF_ZIP_CODE_EMPTY",
+      "rowCount": 13,
+      "sourceIdentityDigests": [
+        "sha256:2cc26845d607487f9c16fd8ed3aac3c9a1612b149a209d448f8c851b91b0b738",
+        "sha256:338a3b841195a3def897d33f1b070606c14d1b69332a7ec524b7b9504f1e0b63",
+        "sha256:338e64d67698b3f47f39c941fc734a3f12fa023f9ca7160f7158b2c95c9bd00b",
+        "sha256:52661bd650d505c365f96bce84ff4ebdbb889252c38030ecc912a589f4351e46",
+        "sha256:5ed1a0f04bd994ef3a24a76a3512f0784bc547e764b573f4eb4c90a7dc6a15a9",
+        "sha256:6b66a79d676b9c1de316ff8f245df201a64884d8a3f686ae0f1a9a271d6c69f9",
+        "sha256:96df03014e35a71d2b138491c3f7883dedfa96c780c0c69c35773ff337fa0fd5",
+        "sha256:9fc8945ed12fdd85587cb3e20f81d60293bbe13efc83b4c98cc92d5cb5e30fa9",
+        "sha256:a1fec9d83662ee83a8e82d7e4ff9f30b725640aa0d7f6566a5f393e22c5ecee8",
+        "sha256:b98245b06bbfaf0376a34fe4dbc00c044be927d4264a2c349633bb682fba020c",
+        "sha256:c7c713882d5fcb8e05fba4fcb98823c927de7588bc540073c5d7190cca871232",
+        "sha256:e395d1e07cafb3ef89bb81b0d860281e4a7cd027db0f7c76467ab44e9a0513d1",
+        "sha256:ef0cf76e2e5335667cef2c8fe5b51ebde5af8817a004fcdabf97894cb727a9a2"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "cidade",
+      "reasonCode": "CLIENT_PF_CITY_EMPTY",
+      "rowCount": 12,
+      "sourceIdentityDigests": [
+        "sha256:00ca9d884a436a899420953984beb846174cacc5e64f2875822e8492dd1e7288",
+        "sha256:01d1f7b393d4eba3213f691571232a4427d6806da2cd4f0914a0c24e9755f3e4",
+        "sha256:0cec439f35c6274f5c738850f4f169f9723590787cbe9755f81a1b5aa72660a6",
+        "sha256:17ae8fd2a2a89bb61baf8ae2183e7dfcef09304c3f114991951b5c70f4a1d512",
+        "sha256:1947ab6234e51a39edc054fdcf3d0cce0e8b34ab93df863430e1107d2b782a86",
+        "sha256:367e54541a1bf213ff8315dec1564aa486f0f67018d5cbd91f7fc573a8acf232",
+        "sha256:5d559b6fae28b8b2cc0ffb3908b3625aa57cb10e04ca2f5588334fe8fb52adf9",
+        "sha256:7d185a2e42a3d6e7891a4e47611b3afb578911d339ab216da2f2c8c81b187735",
+        "sha256:a03daefea007c91267f5efc53a34d91bff556004b5a657285dbabd5d2397e6fb",
+        "sha256:a0cf827789aa679f3d036c5907a1d7e44cd61898810c7ef645ed3cae3636668e",
+        "sha256:a408cc02bb03f8351c789e40f5af835173af66e11b4556c38f471544df5a5b2a",
+        "sha256:ae5c264615c042e52ebf619fc8227fe1ec9ee625ea4ec29c1f95cbb3ec60b92f"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "cpf_cnpj",
+      "reasonCode": "CLIENT_PF_CPF_INVALID",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:1acffa2c964c20e67ac9f04fdea3fc9e9b24a0bd5424c593b5d023726a3650e4"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "endereco",
+      "reasonCode": "CLIENT_PF_ADDRESS_EMPTY",
+      "rowCount": 85,
+      "sourceIdentityDigests": [
+        "sha256:014a5fe79adad2373ed5290cde6a064bd425abec2d0ba334d0ed5ed63aec343b",
+        "sha256:068fd93b4a88d130708e32408c77b5117c3e4fc8d72ebe7bbfbd574ba43ea242",
+        "sha256:085dd2c0a4eada36cbc122d89f7a0664af337a61e16933045f4da61e48cb8ec2",
+        "sha256:08cfa46fb1cd8feb677a2e0a4575b1c71c2173c0f7780cdef6861ab17ecf1687",
+        "sha256:11c87e3129d68f58dfc89dc89e1f08db614e1579f950335d6fea1005d260733f",
+        "sha256:1267aa46f0b0180dbdec723249bb3ac4327e085d905b5fde40ed072eea688b52",
+        "sha256:156892be1e2e2e53adf613ad0b0d1ab2b47cf829c9d3508ed881fa61d02db062",
+        "sha256:163c2b453a72d4d9c482c65f0fdaea161a61b78076e8069e295abb5d6b512157",
+        "sha256:1678dce6cca2b16d1dcf1a8cea23723fbd46c4a16f0f435c8a3b3e04983a2abb",
+        "sha256:1a09a4534ac734c8adb4ccf65b976096e13622835c95688f08d784dda45f8a93",
+        "sha256:1abfe2b3058cc285ee68d3469ac1326d00c536cbf308ba95f550a704d197bc37",
+        "sha256:1c6322160cbf822f8b2cfc04fe5fded259daae1953bd624ca7b94a5d4c6648b1",
+        "sha256:1db5ec7dae9bed482969151d67c68ab23170759c699228c125041d740dc67e8b",
+        "sha256:22f802924fcd07c6adc1c38398d0a2a2d8ffaeb3dd57d6dc3a434cf3317c4b5e",
+        "sha256:2557fd8f1512efd21b4781d6da598d42dd0aa3e27d2e9e000abace66e749dbe1",
+        "sha256:2a9d080d7a9df26e2e7a963fb4b1f74004711516951fe5a88564474746f3ea4f",
+        "sha256:2bf8f5c6a5a9a9ab880c950373f4f4a136115f1a4d8a48fb429cdf51e4da54c0",
+        "sha256:2c58dce2c57c1a37d3b822b49ff82a57bd6339664ea0128a6ca3eff8bdb5563f",
+        "sha256:2f232231f9e8213e9e10631fcbb5d72a2765e1404ca3c654b0883eafb612246d",
+        "sha256:371fd3d1c032e2b93bd3d2dde9a496b74141d1f8ed5e3ead7e530e9e24427f97"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "estado_civil",
+      "reasonCode": "CLIENT_PF_MARITAL_STATUS_INVALID",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:0a3e89d665f06373af147a4b311f97189fabbb3da4fdbfa621ea218bd38e1610",
+        "sha256:30cb0d6b28eaf9e71b634dcaa5923d6b459f8ebf8fea2ea6a3983ac115a8d83a"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "identidade",
+      "reasonCode": "CLIENT_PF_RG_EMPTY",
+      "rowCount": 55,
+      "sourceIdentityDigests": [
+        "sha256:058788222e969a2ee834fc94a4a55a410992d0c51532a2b306ebfac961ccb404",
+        "sha256:0894d3c9192552d0c5c907ffcad037c5b4c2fdb4ece49303bede7a54d56f2652",
+        "sha256:170173a331f331024585bb1569272409fbd4f00616873c9ed739c22e25fac1d6",
+        "sha256:175246ead7999c95bdd3fc835a4d445724f73dec65e5be5d219f4ea80542ff37",
+        "sha256:1f35f096a119c797e1bbbe49ad04a63cd7ba726a96b6a571bfe2b766aa627090",
+        "sha256:230498fd7667058b21f8d1a856b21c251e9f28eb714fdcdd65ddf1c8298e9111",
+        "sha256:2518406ceee4e1a640c4f93570e0ba99df64d0c3ce09796e678f06f453a4d6bc",
+        "sha256:2590d25a52e2309c2d1a8dc623fdc8fc6af1ac5f60eda4d5d7a7935bd242fd09",
+        "sha256:2b0f1633e3d0daf5d07dd8d04b0df99068f462377d98354767880d62654e3798",
+        "sha256:33d5d1a92ad8c9e0b4ae6f9beddf500f8004b1c1434c6de30695631eaf23ae78",
+        "sha256:3a05dfef6cb1bf45a9c1e442efbff1577835724d064504c4374eecede0305333",
+        "sha256:3b1508268484650557c5869ebc8e40ab768a9ebf73c25ba69920aa2c095e0ffa",
+        "sha256:48f152572ea60e9728c76c2a65445eb47a681763b7d674a857ce3788781d8f0e",
+        "sha256:4b6ea2c44df542d938cfa6a2dbde93d160caf075d680d163ad1775bd047835b9",
+        "sha256:4f26ae438270baf038d5b3249e65a3973e18c15966c65f7ba34ca8f47c9bde52",
+        "sha256:528c4c6529ed37671282ad4574631fb3b50ae5c67a19461d0d2412d29ee29ec3",
+        "sha256:53a63042af2157894a22ddcfd7196bcd207f7440b12c86b83c81a24153acdc5e",
+        "sha256:53e5fc5f7d19e82f29265786a80412cca37afb42b801dd85febcfaddd24eeb0e",
+        "sha256:5481eecd34d37690bcd5e11db735f4f31a38b38b8f5ad2f0ba59a8d3a8284ee9",
+        "sha256:5705521a2e9b5bbe1b2415adcdbca9e2d5b544a20d938069e05502ccd45f2192"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "nascimento",
+      "reasonCode": "CLIENT_PF_BIRTH_DATE_INVALID",
+      "rowCount": 6,
+      "sourceIdentityDigests": [
+        "sha256:7c422ebb57aabc3cad3d9b5fd20d90c91694b6287375a0944c98327df9f5b140",
+        "sha256:9a2f8cb466842f62feafc2a2b522c2ff5e839d9a3042934fd77b01f20b9ed6a1",
+        "sha256:bc2381a2b818e537aab04ddd9d4feb4dca61983ec6bac782f82c3254e64b034a",
+        "sha256:ccff5eec54c8d989f5ba807848bde1c2dd922570a0e9f3d5f192cac7d427ea2d",
+        "sha256:f22e354516cf19bedec7c62312434557c6470621faee489a5d07bac4303f8e22",
+        "sha256:f94261b24beb023a16c728f96883a52a99a1e94e6f88370f0b6935c546ed4264"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "pai",
+      "reasonCode": "CLIENT_PF_FATHER_EMPTY",
+      "rowCount": 112,
+      "sourceIdentityDigests": [
+        "sha256:0204068984624aab2e4f8dc6c46b1c2d496cc19ff6bbc372a575f80b92ba52cc",
+        "sha256:046a79078316709aec6b46535327a029e45daf6dd7b4ca9fd42db94ad90e316e",
+        "sha256:048d3d0fc81ac15ec733cda1761e292a0c8658aaa564cf0020ca1b075fa37526",
+        "sha256:0799c0ad6299e887e5a424329dc2835b99c94a4268bc2fee92b98717a99a07a3",
+        "sha256:080e8b42fd7276d3e04ddb32d7b9938d86f5c74e7cfcfe9e69f8b66f72149d24",
+        "sha256:093e38aa3c4e04ccacab9cc7349a3ee81ebc5e7fbd85fe90cfdd9563329f6212",
+        "sha256:0a8cde8ab62b9b1909de210910a9460788d5c1b43104d2a5b9a2bc172f17b2d0",
+        "sha256:0cd07fa44bd60e282f440dd8bedbf0b23ebbe597339509c211a0b9daaf13b70a",
+        "sha256:0e0601d060daeebd562054e40ca35f46473abd49d166c5fe487d373b751d2d03",
+        "sha256:1c6408c457be11acfc02ad769217516210984bb80166ea9f31a61c673fa4ff37",
+        "sha256:247c9d6bd9a0f07d352cce2a754f150942d8a2013d5b2f992955b350a4fae94f",
+        "sha256:265a49757884822791c45c6057a47c02669a157131c45a9781e72c1c85c829d5",
+        "sha256:2bb88678105d096867d1b3b0f5deea179acd4b5394cf317259a6f4e9b89f1c32",
+        "sha256:2ec4056e33b5677f4fbb7f12e7a269927de1f7a90c985d16cbddad41b03de6d0",
+        "sha256:2f49b4525d62e9d1d9ef6e512e80a5e704d2220a2557b7e15b34e53efde46f34",
+        "sha256:2f92b8172c741f365e06aa4bb4fa3fefb27742015b4a242c0b492d607457e662",
+        "sha256:300f955cc7836e69ad39b1f26e2fc0ccedd9474c0620bf4db97ed0ac13c03b6b",
+        "sha256:32a57fe450e0871ecc98b6787edf66ae736308c3230d042a43e587bd63362eb7",
+        "sha256:32f3b9caa9676bc815d182a8379b7116b422e04712fa64c4995aca8dcd9b396e",
+        "sha256:331ec308d2c8a2b2b1a34b8a34b4f4fb8a29a8d800a7869bfc1f6f13a33a3686"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "profissao",
+      "reasonCode": "CLIENT_PF_PROFESSION_EMPTY",
+      "rowCount": 790,
+      "sourceIdentityDigests": [
+        "sha256:00768b8ffea11c600619609c12b9b3b13f8793008f6cc1cf09ff9bf8a92c134c",
+        "sha256:00e41a2863f412c52438f317396db5a4de2ba5a67facb44cc18db8b4b586563f",
+        "sha256:01265d3a52c2096144943d97bd36535fc428146b5472b00166ce190a8934b824",
+        "sha256:01396de5caf8dbc27f1fc0358c5123dd5493552fcc336e98673aa75b9e278420",
+        "sha256:016aa5e8c82ded9f351f9556bb38423964bf88045d1dfe25aad6746f0ba3f7b9",
+        "sha256:019602f6e9b53b5f5ba9db77fb5c553d6376374969844cd9802517459b17edf6",
+        "sha256:01bdef9215be22bcad98862161c7de32dbfbabc44d6916bfa6a65d0700f9010f",
+        "sha256:01f07a5e7f74c2f9b26e832be1174961d49435774c11d7dbd0fa74f97b13da81",
+        "sha256:01fd3e1291495fd9eb492233a62d99a1934ff5d40f61b6f8410c60f5bff4459e",
+        "sha256:020ddae8486abe50ad2c6db8d3cf4d82ead1aaf3374e1595e8bd2265251f33bc",
+        "sha256:02401296e093c3ad4dc01fac48893244e99b983a33c99f4ab82346debc8d451a",
+        "sha256:033ae58a247b8f8a58bec15410b83e7ed0c21a613b2af4e73a8d53475095e595",
+        "sha256:034b8a8b0b34b5a64b9e128ec91b6a85a6a6153ef84c7d8a08fb604922e33bb1",
+        "sha256:0394e01463584a3a62a7d239eb327ca419a9b77449b7a7625a7282856c286418",
+        "sha256:04145d9eff71810af460e3fbf3108add78486b9312ad3b651698e7762cb9898c",
+        "sha256:044b155e2d26a1ebfe2b1f9c26bdbfc1a21bd39ee40abc38c7ec868f99b845e1",
+        "sha256:0458c43d8fb78519d8f2a3269b9d5aad0520cc53e339e57b876f1a38dff0dbbb",
+        "sha256:0476d5e942a85e8e090b1daea7d4f9dc91fe6731195caa6141d20798447a34e4",
+        "sha256:04a47f1114386c347c2bf26ce8c87bbc0bcccd0d54ed346ae356e8eb22f0ecd4",
+        "sha256:04dd96996d581d44c5ee52556d43e4518ba4dcd11ba8574b2035173995e2716a"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "sexo",
+      "reasonCode": "CLIENT_PF_SEX_INVALID",
+      "rowCount": 3,
+      "sourceIdentityDigests": [
+        "sha256:0ec90fe843e7c6b2d5b1e53846d3c161a8866f6105cfb221f7eeae480d82ef0f",
+        "sha256:1d898b3cfc9e7d6f3eb7efe4745689ddb71814de64ff3f2635cffccffe9078ac",
+        "sha256:a6e3e6aecb3cc26ae7159c94277c60d145a8d7bc6f306417ae08afc26a65a4c9"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf",
+      "stepId": "regularize-client-pf-insert",
+      "destinationTable": "clients.pf",
+      "field": "uf",
+      "reasonCode": "CLIENT_PF_STATE_INVALID",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:72cd3c50133878a6be74e1eec3d4adf8c296d5cbb833896bcbd1a4874ebc14b2"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf_empresas",
+      "stepId": "regularize-partner-insert",
+      "destinationTable": "regularize.partners",
+      "field": "empresa_id",
+      "reasonCode": "PARTNER_PJ_NOT_FOUND",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:2f3e0270b60b2f1942a3c1903974154ee5f6be6e311c7c4bbdf7f872f2474b54",
+        "sha256:4e09adbd353186c11a20ab8fba00e84ebae3761df6828c0164f900a941a6fdbe"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf_empresas",
+      "stepId": "regularize-partner-insert",
+      "destinationTable": "regularize.partners",
+      "field": "entrada",
+      "reasonCode": "PARTNER_ENTRY_DATE_INVALID",
+      "rowCount": 4,
+      "sourceIdentityDigests": [
+        "sha256:35dddbdda6719f29c03944af0c53d64eb29d6ff4ee2deecdbba167cf80426971",
+        "sha256:63801526536f75a7f1a7d780fb33f56d041c415c81347f25ef5dcb52fac14e9c",
+        "sha256:89e8df990c5f2ddc706e5730d157c62293fb5a5f194fedc993752c144f92946e",
+        "sha256:a09e7f641eed889a63ede94890f938f94f3a382ff53e9f2ef14793e616fe42e8"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf_empresas",
+      "stepId": "regularize-partner-insert",
+      "destinationTable": "regularize.partners",
+      "field": "id",
+      "reasonCode": "PARTNER_PAIR_HISTORY_CONFLICT",
+      "rowCount": 16,
+      "sourceIdentityDigests": [
+        "sha256:045830ddca0d8b0bf5639c811e008a1dcfaf0d241bafc13771d9fd61079aa681",
+        "sha256:5521cb8a51ffa4f3a76000787279e45268f22ffd544e35fc245cc977f0438d04",
+        "sha256:5bfe53fcf6c0cf8f856d354a5b1135c31262466d554e9c3a1cd390b391f22fb1",
+        "sha256:71365b1a3225e14d90d6068596dd012720371fedf51e7a759e321f7645884725",
+        "sha256:722bcbea8003423364d6f70334702e31aa3d498d032f69393d60ddaa5ebf319f",
+        "sha256:7de8b6ff3cb4a7494f6681a860013c4b5663bd3b1bb985022cb6140a107d2c7a",
+        "sha256:7e025485862a3db888956509c2c8333a19b47b1bec21a2b1d61b05d813304793",
+        "sha256:99522b45478f24ca160a05dffd13c2f1b253820aa5cc82aa4c6913cdf2797e3a",
+        "sha256:a2810b9023d91e8b7e9623b3de26ef2c03a03e3bfbb547e5013cf7029397e3db",
+        "sha256:a570b4f4f6c59420d6f5ab7bd9b0750642d9051797cd2f90e26a8d47f642bd10",
+        "sha256:bf3930ec4f97bcc1aff95beb982f68164194120c502a6c40a22af0fb42f862a9",
+        "sha256:c012e4549b90ca39479b06fa08c596afa606f3532bc3c020ca139300910a8ba3",
+        "sha256:ce040083818cbfcc140c5e65aa77ddcc99cc432d3b153b9b5e81efdcbc293c51",
+        "sha256:e642d7ae0a7512a13022239daaa30d0b18d783c6a37e84b7945288f03ef5fb97",
+        "sha256:f511b56a073379685432c49a4c649e8bf3dbcb1c965eb7b091e6818a90ddebfc",
+        "sha256:f8095b83189f45d2130740b314e6760adaac909598aa3b4f7b9258e171fbd293"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.pf_empresas",
+      "stepId": "regularize-partner-insert",
+      "destinationTable": "regularize.partners",
+      "field": "saida",
+      "reasonCode": "PARTNER_EXIT_BEFORE_ENTRY",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:0a14928aafd470c960e14426909728f86082bf37aa1e074d1ff4f6fc748b33a6"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.processos",
+      "stepId": "process-insert",
+      "destinationTable": "regularize.process",
+      "field": "cliente",
+      "reasonCode": "V2_CLIENT_REFERENCE_NOT_FOUND",
+      "rowCount": 141,
+      "sourceIdentityDigests": [
+        "sha256:010e2d431f45cbdda44ee40df43211bc2ad15e2ddc6760a3032496c0f7efd1f9",
+        "sha256:0fc7c0acc354e0f160c78fffd29aef3dc738f32a75d96faff0e6320da2c44f77",
+        "sha256:11958d3157c666dc986f7088a8212a7668789c85e1e9b51ef1b33a4ce0e598d3",
+        "sha256:133e97aaa07885142419cebf3a2ee484632ce819baed699e2f141e53300561c2",
+        "sha256:15b9491a000171f3e811e1848a4704485f64327abc3fb68200c3313d6b995736",
+        "sha256:15d0ff2936f9b3d9630552eab829189adfca1d192f66ddb44f27b22e2e4a4b58",
+        "sha256:1630a5bf76d9c3b9f72342817d05ae60f5e18a449813dcadd74aaee75022f4f9",
+        "sha256:19db2ee69465cd7350354e3845dc1991f9231546f781057cbd74926ed67452f9",
+        "sha256:1a739ff63b411607f5afa5d42a022c783eb9367c2882fb1e0602d121ef083d01",
+        "sha256:1b19cf1eec020711de1f6efbd510eddb56f7473a2c3babea5a7e4444c880d92c",
+        "sha256:1d2174d42de8c5dde116735f2acf27137ae0f7a3815c79fdf4ef75b19c39b616",
+        "sha256:1d7ae3483be6196098281a046bf61db7148602701241490ff5a95df253d1524f",
+        "sha256:1def24e11763a2adc16ec2c95ff7e58d7aa74098fea0f0b2d46b6346fafc62c3",
+        "sha256:20c4bbcb0e7ba1f6e4f71cde4bf07faa0c289062f504c31897b978ac73645b9d",
+        "sha256:220b72506a1f0ec89c428e3a82fc340c40a185ed7fc5cbd8d4920b4a28c34249",
+        "sha256:22a2a37340cd89b1949da544c85246047c79ff0161814ba112b619cb4fd78ba0",
+        "sha256:2829bf406b8ece0689a34cac798878ab750db79126920364333cf815aef94465",
+        "sha256:29392de94362e07f2324aaffe04ee9ebe11240d53c28c724d5a6007c842f424b",
+        "sha256:2aaf4689f7c3a43abd6fd2ad7fba3d7e00334ec602150a0a8cc9b914687a8212",
+        "sha256:2b1512afeac06fea84bbc64e5a53299d9321370e988055240d381f488900b5a1"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.processos",
+      "stepId": "process-insert",
+      "destinationTable": "regularize.process",
+      "field": "cpf_cnpj",
+      "reasonCode": "V2_CLIENT_REFERENCE_AMBIGUOUS",
+      "rowCount": 170,
+      "sourceIdentityDigests": [
+        "sha256:002e39e9c4ec1ff64a9725f5addd001454e162a0859a34ff6294616dd2967330",
+        "sha256:013b4c3ea17e4b51275ab68be7b831059cb7a25e059f2d5f8c1e9162ad90739e",
+        "sha256:02d9aaeaf6e3461ac5a7efd364e39c85399f830405e8b7043d438bf4a8a7a35f",
+        "sha256:0866ec4d043a8307d37d293b81dfc4c6c92b4027f8e68db1a95794113adb146f",
+        "sha256:0a45d488f2ae01046f6d3fc3d3ad8776c3776a3ce6718c2c56be135f67b5e58e",
+        "sha256:0c46a7158978c00bc5fdf8a360aa793f8759e41311c082464e80e167bfb9ae69",
+        "sha256:0c6977beb4388a7f044e3d0d7af109dc6fa7247f65b5bd91fdecba4f10c13ade",
+        "sha256:0c97943a83cc109a66a7d01f30344dc7a5a1c0331ab5b8cc5154a9a3ba83a269",
+        "sha256:0de3c10b0c223b67c6e90d8889ad267b695bbb14f6186b4c33d1efc6bae89d53",
+        "sha256:0e4cc752b219a29b2069dff3c04f8ba7a51ae352d032b51c113358fbb3c5d548",
+        "sha256:0eb6f6f3385a3781803c82d5849766fc973b59d2d744cb9dfbc8998f5003554c",
+        "sha256:0fc7f35213f6f61d4326d3ceb4421dec1fbc1056d2d6c1bfb9bbdab8c22a026e",
+        "sha256:115399d4e82655b94fe680bbbffaf8ca7cc60c494b2afc0900a7bbb38686879a",
+        "sha256:129d634c57162aa2dea965c965ce21065fb463d2befa1b488713ad227003aeb7",
+        "sha256:15d295e5e74726fd4052ff84fa51f4edf58da9cd315e4a299b506cf9f022e597",
+        "sha256:178200ae1bae49c16ddd9368a5de4bb00853b01adc2ccae10338ed69429ad68d",
+        "sha256:18180dc5641e20aba50a810aa6cc4eb5de55937fff68bf872adf6b4d2dadaaf7",
+        "sha256:18988357b4cd3c7bbb34db3ab535f8053941b8c17ef6e11739a23d9cea432886",
+        "sha256:1929bae6931f1095ce2c1ac015f7a14f81d9b07fe12f5756583ee438209be78c",
+        "sha256:1ac8f7a6a20b3674712a4275a32f6d2a4c917d97a12da353f61ed553179132e9"
+      ]
+    },
+    {
+      "sourceTable": "tb_regularize.processos_dias",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 1021
+    },
+    {
+      "sourceTable": "tb_regularize.regimes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 10
+    },
+    {
+      "sourceTable": "tb_regularize.sites_estado",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 10
+    },
+    {
+      "sourceTable": "tb_regularize.sites_prefeituras",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 42
+    },
+    {
+      "sourceTable": "tb_rh.andares",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 53
+    },
+    {
+      "sourceTable": "tb_rh.cargos",
+      "reasonCode": "NO_INDEPENDENT_DESTINATION",
+      "rowCount": 22
+    },
+    {
+      "sourceTable": "tb_rh.cce",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 417
+    },
+    {
+      "sourceTable": "tb_rh.cce_avaliacoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 635
+    },
+    {
+      "sourceTable": "tb_rh.colaboradores",
+      "stepId": "collaborator-job-title-merge",
+      "destinationTable": "users",
+      "field": "user_id",
+      "reasonCode": "USER_LINK_EMPTY",
+      "rowCount": 49,
+      "sourceIdentityDigests": [
+        "sha256:15e805cf1b3c315a08bc984181b23c0d00a760b1d7ad9c1568484adf49379395",
+        "sha256:1a6f0b3de7d1968c17391ee7e2a8ae95c177948068dcf3482a0125ab1ce447c2",
+        "sha256:1d4e7124c7964497cd63e75dc932f8bf1482e5875fe5d73803bb1abe4a5d00e2",
+        "sha256:2b88cccf604a784620076064f0515c9df5d6bce15308cee2746304820e884863",
+        "sha256:2beb97a1e0ebc02c3a0b928899b829c61c6f9404ec278f4e1f3fa1cb66603f5e",
+        "sha256:2cf0b08f53f36d46d2ca0dabb44ac6f61428924622d56954ec323b3afedf152b",
+        "sha256:331a51c777bb9b9a3a0ca062c90e2f2eb955a1e24f318f1d67c9b200ee105998",
+        "sha256:3bfd489905e86f5768193c0b0598d14c038c3027ae8c00b7bb44620a1d9207b1",
+        "sha256:478ca0825583eec20ca2bbcec202283abfc9289a5ead1ff2c9b4478a38cb9879",
+        "sha256:5679eca59e7206633d1af068ca5489e18e5b482b3c116d17f2d77bdb5e8a3fe4",
+        "sha256:577b730ec621b1b9b587089d70df409299a81ac72ad39b88729a86ae064fef7e",
+        "sha256:59063fed6d952d06c72721e76c7d8825f044dc380a12da45c73bffbe63741934",
+        "sha256:5e7a5074302f9245aebcc078d796f9c96dcfadea110cde633f012330418dbbab",
+        "sha256:61184b290b233f97dfab07e1d3f0b9ad3ded4767d1b9422797909eb8d89de5e6",
+        "sha256:6b4c7875e19e4e12a71d3621f7d227fdc09237b7eaa8cd97a11269c5343090ea",
+        "sha256:77695ab6a230cd0dd0af21c47149efffcfaf5e03026afac190b617e1f83b6bf9",
+        "sha256:79bfebe9b8c8e9d82bc92e6680683e6df1a9b59dc1aa047c86e6bc34698e8bcc",
+        "sha256:7b07bbac4b4d45063b1c7f0c272c53b1cf2380c30c4dbb5c50dcaed46bd25225",
+        "sha256:7e0dfa0a2ecf0870a27925cb788a11f443df34a4459d6dfcda7ef7bec28b59e4",
+        "sha256:8298cb6a833f8d262445435a00755a35ccfe6df9b54594d69f61232f28976884"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.colaboradores",
+      "stepId": "collaborator-user-merge",
+      "destinationTable": "users",
+      "field": "user_id",
+      "reasonCode": "USER_LINK_EMPTY",
+      "rowCount": 49,
+      "sourceIdentityDigests": [
+        "sha256:15e805cf1b3c315a08bc984181b23c0d00a760b1d7ad9c1568484adf49379395",
+        "sha256:1a6f0b3de7d1968c17391ee7e2a8ae95c177948068dcf3482a0125ab1ce447c2",
+        "sha256:1d4e7124c7964497cd63e75dc932f8bf1482e5875fe5d73803bb1abe4a5d00e2",
+        "sha256:2b88cccf604a784620076064f0515c9df5d6bce15308cee2746304820e884863",
+        "sha256:2beb97a1e0ebc02c3a0b928899b829c61c6f9404ec278f4e1f3fa1cb66603f5e",
+        "sha256:2cf0b08f53f36d46d2ca0dabb44ac6f61428924622d56954ec323b3afedf152b",
+        "sha256:331a51c777bb9b9a3a0ca062c90e2f2eb955a1e24f318f1d67c9b200ee105998",
+        "sha256:3bfd489905e86f5768193c0b0598d14c038c3027ae8c00b7bb44620a1d9207b1",
+        "sha256:478ca0825583eec20ca2bbcec202283abfc9289a5ead1ff2c9b4478a38cb9879",
+        "sha256:5679eca59e7206633d1af068ca5489e18e5b482b3c116d17f2d77bdb5e8a3fe4",
+        "sha256:577b730ec621b1b9b587089d70df409299a81ac72ad39b88729a86ae064fef7e",
+        "sha256:59063fed6d952d06c72721e76c7d8825f044dc380a12da45c73bffbe63741934",
+        "sha256:5e7a5074302f9245aebcc078d796f9c96dcfadea110cde633f012330418dbbab",
+        "sha256:61184b290b233f97dfab07e1d3f0b9ad3ded4767d1b9422797909eb8d89de5e6",
+        "sha256:6b4c7875e19e4e12a71d3621f7d227fdc09237b7eaa8cd97a11269c5343090ea",
+        "sha256:77695ab6a230cd0dd0af21c47149efffcfaf5e03026afac190b617e1f83b6bf9",
+        "sha256:79bfebe9b8c8e9d82bc92e6680683e6df1a9b59dc1aa047c86e6bc34698e8bcc",
+        "sha256:7b07bbac4b4d45063b1c7f0c272c53b1cf2380c30c4dbb5c50dcaed46bd25225",
+        "sha256:7e0dfa0a2ecf0870a27925cb788a11f443df34a4459d6dfcda7ef7bec28b59e4",
+        "sha256:8298cb6a833f8d262445435a00755a35ccfe6df9b54594d69f61232f28976884"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.colaboradores",
+      "stepId": "collaborator-user-merge",
+      "destinationTable": "users",
+      "field": "user_id",
+      "reasonCode": "V2_MERGE_TARGET_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:efde3fb881fa7c8787276b2f206c22f6f034bfd5241e1f3ebe16a03fb7ecc661"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.colaboradores_atas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 19
+    },
+    {
+      "sourceTable": "tb_rh.contatos_emergencia",
+      "stepId": "user-emergency-contacts-merge",
+      "destinationTable": "users",
+      "field": "colaborador_id",
+      "reasonCode": "USER_REFERENCE_NOT_FOUND",
+      "rowCount": 22,
+      "sourceIdentityDigests": [
+        "sha256:0b6c0fd36be279a5887429cc2b15732fd3e0451fdc3705d1ee4d4db740aa2bc0",
+        "sha256:0c2b61fe9bf81a5691a607e9ee340d990228b79f3e1fcb0ef3b7877a78d01e6e",
+        "sha256:10237f2ce488f56cd503ba5284d24fb3cb46d44bdac5609312463d832ab1634c",
+        "sha256:2ddc99f406cf255432fd95410ebdc66b9a433d731af8a77a2c8a0310e95e6cc5",
+        "sha256:2fce7badfbbfdd643807f942c2ff1e40f1fd6d7c2fa19b044a545419b1145b1c",
+        "sha256:580c9d781778155056de3a13fc4f8ea9b2c2879b17cbc6d77e07db38f90a18a1",
+        "sha256:6812f4de3e61db27abe7a725ec76933844408ee567f16cffab26279d40740406",
+        "sha256:6a49702f6b79c0d46b64267c132f5126a6bf83de998f5cb2d23440d7c40f0519",
+        "sha256:86f30eaa5d45fbc78260a00570bac6b68edf4665f7f8625403bc3051ae4f2e78",
+        "sha256:91f7fe3fe5538c8c852f2c93ecb60902102227e5acd70381f26c256f679c1352",
+        "sha256:92fa814dc292b7cbdc9af21f33a48880ab858d4169bea551dc3c4c939695ec89",
+        "sha256:a1a4a588e001e40179a5bb9b81141421c83e0d15da5e8d6c8fb1f24f550453fe",
+        "sha256:a29e34ba7b631ca6bcae5a569fcecc05cd6d4046638e4bfac032e56528763410",
+        "sha256:b397facec1f1010acb1c806ae809106b9d6881d5871a2baf642aef3e9ba71a42",
+        "sha256:b76d0e5d573fcc41db37dc8bc79f399b5b86a052b49ed8f863d41befe48bcb05",
+        "sha256:bd202c9a85dffa465724b05f45b578b3d93380c05a00c1f95fb5e7011e743e08",
+        "sha256:cd26996b5f9f294412d8f6b10e67cebf7274c406474a9c76ea8c8272b4f6e6ee",
+        "sha256:ce7d1950da19aefa3b21d8480904f70b07bcb5c852606f966861da6168cdaf17",
+        "sha256:cf9da64e591ef90816bc0dfc35a170f93fc9fa697f0789e0c33727c806ed0da5",
+        "sha256:d3b03b4b7aaba0cb047b39d96910f0d428730ad08206529cacaa2e2ffd58480c"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.feedbacks",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 13
+    },
+    {
+      "sourceTable": "tb_rh.ferias_datas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.ferias_periodos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 23
+    },
+    {
+      "sourceTable": "tb_rh.intercorrencias",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 6
+    },
+    {
+      "sourceTable": "tb_rh.intercorrencias_tipos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 8
+    },
+    {
+      "sourceTable": "tb_rh.pontos",
+      "stepId": "rh-point-config-insert",
+      "destinationTable": "rh.pointConfig",
+      "field": "entrada",
+      "reasonCode": "REQUIRED_TIME_EMPTY",
+      "rowCount": 3,
+      "sourceIdentityDigests": [
+        "sha256:610311cbef50c72a33f46462844788c249329ca53b051df885a522159351f76a",
+        "sha256:ad914e708e5c9e074cf8fcee9a138e4566df330634be180c244dfe0d297eb8f9",
+        "sha256:eae8d3a718aab8a6a90255ad230f8618b075f27b251440590e7e298a4ac76988"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.pontos",
+      "stepId": "rh-point-config-insert",
+      "destinationTable": "rh.pointConfig",
+      "field": "retorno_almoco",
+      "reasonCode": "REQUIRED_TIME_EMPTY",
+      "rowCount": 19,
+      "sourceIdentityDigests": [
+        "sha256:0dbf2db39478d488c2a38c01217e409e75fd32c9f65c69ebd11ac4e2b5093401",
+        "sha256:17be2237ca95bd7a19d947d4a807a1be02b6b3493266235802fbb813e2b84510",
+        "sha256:1fff48384cd7b441569493810bbbc3231e629051e45a2e3604597f49397e48fb",
+        "sha256:21097273642a240913abd618f8d983d65fceb4a891489a14aff4d4c10b2e0244",
+        "sha256:44605a1abd9a46166aa5d1999152da36a1cab92ed5d01470936e29485e5c3ede",
+        "sha256:498b1fc79bf39187a368652b59ed4e3a3ce930d9f991459135fdaa2d96cfc409",
+        "sha256:56beaaec21419e223df8baadcc772d267ef7d84eeb2648951c98bfcf32491311",
+        "sha256:8e982f3b3a615e2c367f9036d4f6c06a1f19673beff8d9f6c141d261a56fbbf9",
+        "sha256:95d1f275b6b83cec3c365b59670c290a2e7695bcbdb5ab573e9baaf63743d25e",
+        "sha256:98b87181b76f02e895ec38aa878c2c5b0efad06446692641b7a41197de936f4b",
+        "sha256:a05d2e6a01d389bdcc1ee2e2dd465e15f34b6d235a6c3901a698553992202eff",
+        "sha256:a3ab0a169b9ebb7d334db449ca29751433c6a83baf357846b76c93548bffc5be",
+        "sha256:ad433af1d7f9d3a00e77b826b01c9f0352a69b327943397da39c2ba272308703",
+        "sha256:cc9ff892226526783767cec11c5f43de3aff65a0f74ab132aee08fc6f17a40d2",
+        "sha256:d3a082b1bbffe5cf60abd1623208eb1fce80a4dc979f364ad2b82c48a9ff14d2",
+        "sha256:dee2764427183908670ef54ebf88cae1673c11a94f1e471bb1c978bfba9b423d",
+        "sha256:f1ebc1aa0463aba956262d5f891aea7d0677b208cd76a54b9217e1e2ccf3aac4",
+        "sha256:f2996c7065dd07b619ed89e8bbbe872292c1ba5b21ec4a03311eeefd71619370",
+        "sha256:fc3822f24998bd606ee32b98f7ffba0a27db7914e88bb813a4cf5abf9c053e4e"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.pontos",
+      "stepId": "rh-point-config-insert",
+      "destinationTable": "rh.pointConfig",
+      "field": "saida",
+      "reasonCode": "REQUIRED_TIME_EMPTY",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:21a8058d569e7ed364abc9253e11041a4586196f5739e6526bfb157bc70ea816"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.pontos_registros",
+      "stepId": "rh-point-insert",
+      "destinationTable": "rh.points",
+      "field": "entrada",
+      "reasonCode": "REQUIRED_TIME_EMPTY",
+      "rowCount": 48,
+      "sourceIdentityDigests": [
+        "sha256:09e40d18273bb5626235e30fa549010428ecfd2e9dd3679c74ff031d05b19a41",
+        "sha256:0bcdee7554ed2acef7c215a2fa27d7da7769962e86f9b6865e0929220619026b",
+        "sha256:1679b30414439e2a591771661e3f646cb9af1e92da82298c3630198917738334",
+        "sha256:16f4c8ae4a361becc5121e6aa957f61f269430434403794df966cd23969d52ff",
+        "sha256:172756c35c53582987c69783f4c0d5ef7b0bc0733d4b11694a826ca0dc5aa1a8",
+        "sha256:1ca51792c2538b3a57f86277e6e1dbe1223019bfc477964baff09b8c99681dbb",
+        "sha256:238bb3ce2e2e8210f683aa69c7d10f1ba1b52aa9a67f6eaa4c80957f7e35b098",
+        "sha256:3248b0289f6bce0885ec783c720ff62804e893087764e38a50e9541cd8221ccf",
+        "sha256:360f136585a573117b87d9254bf01b2b9a048ae2bd8b461a8668b84555cf940f",
+        "sha256:3e8b40c0b0f112a3232584142399063bfb8e14ab24e03f003392cc2326d0845f",
+        "sha256:4022db64c71c83c4a75ecc6fcef7e08cc968eb6f8b6bc4fa6c4d71ad5e6c3146",
+        "sha256:42ff0e431332a5007d798c0a16fa6353778754724516407cc26b8f9e979f0cba",
+        "sha256:446806bdcda8330a5db6d217e5d0201673a3c00e88114816054775f600c0ec6b",
+        "sha256:44f6ea6212270359e466750246dbe6ffb49173ced570c120f3fffb485f2c7366",
+        "sha256:48f22c14e40f31219f3ea016fac2c2e487f91a4699ab3d50478ce1f342613cc8",
+        "sha256:49f20c1af110e4e939b6891c9cf82ee3f21927770ee10a200209440363e18f4d",
+        "sha256:4f67364896711f83705d3689c3722adbadee2531b1bcef10484276c17f406716",
+        "sha256:5906090284ae0186e3e9ce353ba1ed4527c6e5b216b1975ec120fd480539139e",
+        "sha256:5e8c960b64a5ec6b1b959750b2f06997729acc9d3a3c7fa1d47fa563ccad3c20",
+        "sha256:62b638b40a65bb9386ebc705500449826339386e47d754432aa18d6ad143181a"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.provas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_rh.provas_inscritos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.provas_questoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.provas_respostas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.pv",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_rh.pv_objetivos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 2
+    },
+    {
+      "sourceTable": "tb_rh.pv_tarefas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.pv_tarefas_express",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_rh.score_nitro.avaliacoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 239
+    },
+    {
+      "sourceTable": "tb_rh.score_nitro.avaliacoes_periodos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 26
+    },
+    {
+      "sourceTable": "tb_rh.score_nitro.ch",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 34
+    },
+    {
+      "sourceTable": "tb_rh.score_nitro.erros",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_rh.solicitacoes",
+      "stepId": "rh-request-insert",
+      "destinationTable": "rh.requests",
+      "field": "atribuido",
+      "reasonCode": "ASSIGNEE_EQUALS_REQUESTER",
+      "rowCount": 6,
+      "sourceIdentityDigests": [
+        "sha256:10bea808c2656e83a41b97f8d811f4fc22a6cad392a21d9dd10a42a34a1c992a",
+        "sha256:4988e033139e8a4947ac419ecbc6954ba83c50ab4f0911bc9fe27d5b7c3830b6",
+        "sha256:6388069fabea5ff3cdc12d7d02776df2deae999d503f967dd34575927553bc52",
+        "sha256:d446f66a6a5faa592b10e36094b1747904d8b23dbdd6b0345bdfb27c4650fee7",
+        "sha256:dc1ad3d42a094f3e96fd9d7658bf32eea6022c762288245398e48a97e31e792d",
+        "sha256:ec957a227b9b5a9a509805b994832cfcd7a2d12b07657036f073e46e95a68ec0"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.solicitacoes",
+      "stepId": "rh-request-insert",
+      "destinationTable": "rh.requests",
+      "field": "descricao",
+      "reasonCode": "RH_REQUEST_DESCRIPTION_REQUIRED",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:2568eb831716126e6df497d37f5587eb1fb9ab2bf63d0cf141b04b9748ad6f29",
+        "sha256:c1dc37290b3e39f191fc45cce91d2666768928a099336295eb8a6ffe754e0014"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.solicitacoes_mensagens",
+      "stepId": "rh-request-message-insert",
+      "destinationTable": "rh.request_messages",
+      "field": "mensagem",
+      "reasonCode": "REQUIRED_SOURCE_VALUE_EMPTY",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:ad2c6e5a0f51ae7c341a42e96395d5ced2282199f21c4dcb80e5380206ce9a96"
+      ]
+    },
+    {
+      "sourceTable": "tb_rh.solicitacoes_mensagens",
+      "stepId": "rh-request-message-insert",
+      "destinationTable": "rh.request_messages",
+      "field": "solicitacao",
+      "reasonCode": "REQUEST_REFERENCE_NOT_FOUND",
+      "rowCount": 15,
+      "sourceIdentityDigests": [
+        "sha256:00d6f2e9179e8944dbf23eab68c98bf7c238f8134d6934a628d84a6bf3da8c03",
+        "sha256:0388947dba604ef7742d912291469b856c81752d713643b3fa1120bcb6821e7e",
+        "sha256:1bf9520f0e37ffe0c9e824817af710da07676dbdb66e5c4658a6dbc2382c1f83",
+        "sha256:28e7b92927908ad8dd2471b34bd95e803a652ae6d1cf80123c4400d26bdbd066",
+        "sha256:3932f86fc220f7e4110e88ac71f078f8d9e9f34954f24293287f60ae636badf7",
+        "sha256:4533341ba46c46aa36b49f9212edb7c11512d022d69b754cc58088b2fb019402",
+        "sha256:58f9703acce8ee52f164f9f00ec00888173b47dd9843c45075d0a30faf5e316d",
+        "sha256:5f2c7b0450fd0f6022a16ed1d1dc09f36f39f8520dcf26ef9c35cc89b8dd77df",
+        "sha256:6d083adc5bade2317f19397a35b10465e73afea096b3e5f1ff19c4094c8d5f73",
+        "sha256:7e53c4319274099cd1a9d23422a022efacb8c0ada06760bc330ab129ecad7315",
+        "sha256:c0b9b736d34c8b50dc4dc1e7bdc8773f1412014ae0a166cbdf3181249ea401ea",
+        "sha256:c49a058a78a25aaaa9efceda82ccb1854d4a7055291183955650e78eeecb0dc9",
+        "sha256:ce012c3ab0a7104e228eb4b83eceefb1117d9f21a204927d677c42ab1742f691",
+        "sha256:f3c6911348446e1f8b8cf1d4bb80a2beef1e542412f4352fb2eadc0000420a69",
+        "sha256:f7d827ef5d11c505e27f701833c5e9b4da584f6ce4199e5eae585c77ad5fb8c7"
+      ]
+    },
+    {
+      "sourceTable": "tb_tecnologia.atualizacoes",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 977
+    },
+    {
+      "sourceTable": "tb_tecnologia.atualizacoes_previsao",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 13
+    },
+    {
+      "sourceTable": "tb_tecnologia.estoque",
+      "stepId": "technology-stock-item-insert",
+      "destinationTable": "stock",
+      "field": "localizacao",
+      "reasonCode": "STOCK_LOCATION_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:45491014d1b2ab4bf0cf2f9acbd37e4eaf2c04f42e8f57529b3f5af3d669e5cf"
+      ]
+    },
+    {
+      "sourceTable": "tb_tecnologia.estoque",
+      "stepId": "technology-stock-item-insert",
+      "destinationTable": "stock",
+      "field": "quantidade",
+      "reasonCode": "STOCK_QUANTITY_INVALID",
+      "rowCount": 7,
+      "sourceIdentityDigests": [
+        "sha256:2ba6bb9ce2891c3c20222798739de5ac11444807ab6739c44a4e98eb00330cf2",
+        "sha256:77636a770cfa43116f2532a1c83e58ec223707ba3b80c8dba69e2483394a9402",
+        "sha256:86e9845e470d9d64ecc676df35d463ec9e2270e7ec40a0b629c6e4475b7a4b9f",
+        "sha256:d0d93f68fd3fd2cac60391fb457260bea1bf2951062b1781be0a5235f14d335e",
+        "sha256:d17b6b204ae7d0519e5af8dc4367801cea534b29aa336dc070093c74e8251e08",
+        "sha256:e4d66b55f47bdbcedba89d938866f4e5ad2417b636b150e380888a8f9ffbeea1",
+        "sha256:fff414c5d655917ae4af205b9b53393a849ff3426e009442fac1b7b595172b62"
+      ]
+    },
+    {
+      "sourceTable": "tb_tecnologia.estoque",
+      "stepId": "technology-stock-location-derived",
+      "destinationTable": "stock.locations",
+      "field": "localizacao",
+      "reasonCode": "STOCK_LOCATION_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:cf7b71ea0bf4afd9ea39d465aa78b647928ae1a0c56c9a64adc240d20ebd7cfb"
+      ]
+    },
+    {
+      "sourceTable": "tb_tecnologia.estoque_saidas",
+      "stepId": "technology-stock-exit-insert",
+      "destinationTable": "stock.exits",
+      "field": "solicitante",
+      "reasonCode": "REQUESTER_NOT_FOUND",
+      "rowCount": 20,
+      "sourceIdentityDigests": [
+        "sha256:03947a9c3ed9194b1d64ccb72b179cbd91aa167048b5a94919da0c0874c4d65f",
+        "sha256:1fa30445640f21fe62d740ea1299deefac6aaa72c95707f110aaddaf579d3f33",
+        "sha256:2159a5d1848353660d60be9f53d8d3fc2556ee195feac543fe52a4a6a6535033",
+        "sha256:303d732a3fae48baafe6f3146da56df7c3f2bcc200aeedc9c45b50eacb522a2a",
+        "sha256:3354a9b7f190ef20b17fd29dc5041bf556aca175f43d1cedb9314a3309b36679",
+        "sha256:440f1316563caa91b6a6c38a612b437c0fd6491b51e9ad20983e05befc7f8839",
+        "sha256:5ea60867af1e23e3c43b2ab894aff7f6fa502461cd219ae08ec21784779a2497",
+        "sha256:61b56035c875a66e4d3dcd29b9a6603f61ac2cf92f9d9af53b6b155fe5e89133",
+        "sha256:7435b88d963cf978ea48c1681b8b6627d435a6bdd468d448294ee2b0f170f808",
+        "sha256:a586313ae9c33e532c97b6fbe37bfea343a75874c221c52346798b029269c184",
+        "sha256:aabce757a1504fabc501365d8e021b08b6596b2cbc85119ebb08f483375a900f",
+        "sha256:b07adfc4db498e4030187db9f45cfd4bee8b8f7c451bc96f9365c3b98803ffaa",
+        "sha256:b77d529f04d98237fc27d4b231d6b2c9909c6fc71796a65c2d8b12c1627ef93d",
+        "sha256:c9a929c237d158e95d89ec9e72afb49d55ce30968c54ec177890e570b4327dd5",
+        "sha256:e3cd1fc521b0314e26d7e81aaac9c4629e5bdc44aec01d69ac1ffa385e28d42b",
+        "sha256:e5b2251541b2cd50c0c935e25dcf32a22b9fcdf47e7010eac0cc6cf96e04f0bf",
+        "sha256:e9998a3f75de1a625ee8543e43cfe11ef45f466e40cdafdef1ad948f9bb0a80a",
+        "sha256:fbeb41843312b09fd61a89e68cc1343746fff4c0eb5724cf7a14642544eb0bb9",
+        "sha256:fedaaec2b0b1d52e809c06d1f70b8292b92a91f1f408bfd3bf38b963614d91d5",
+        "sha256:ffe9e8b66bf1ba8c2d10cb57182d8d648de426d9717eb7bf2be650573cbb9e33"
+      ]
+    },
+    {
+      "sourceTable": "tb_tecnologia.inventario",
+      "stepId": "technology-inventory-assigned-insert",
+      "destinationTable": "tecnologia.inventory",
+      "field": "cod",
+      "reasonCode": "INVENTORY_ASSET_CODE_LOOKUP_NOT_EXECUTED",
+      "rowCount": 658,
+      "sourceIdentityDigests": [
+        "sha256:004962cbdc161c0e9c916da3bcab3cbfb8d8bf9c69232cf94ac640a6dc0fc94b",
+        "sha256:00b3af2fe20a75933970f0ec39f5cfeef540c71f1db3593914383dd707954c49",
+        "sha256:014315960d98e7bb6046665899cccf2fbe5f5fbc7603166efcb5e4f00d518c58",
+        "sha256:019559168355b0994d433c88c7bcafa92634792e2938bc10eef048198dbe1bf8",
+        "sha256:0255296507e327af552c86d6168b8d8a0a0ef8e7e69c2277ccb89e0f4ac0abf2",
+        "sha256:028bd5777775a04fea8b825520d437a217144ec6b8e8074b792316d50bca4d7e",
+        "sha256:02f3f46ac5a2842a20c8cefa35a21fd85d27e1d4451f608039eca1a6dc10b003",
+        "sha256:0300e812378f32dfccd2dd7289598071ef8237db4da8de1fe25ca344043985ce",
+        "sha256:03455e706aa2b4d59802e4b57a44505bd86d8b93916f43cdad6efbca9c0353b3",
+        "sha256:035c6326768750350d1f2bf42e33789ddaf1f1c8729e536a21701a06f7602151",
+        "sha256:03de5f99742f5a37c19f5a7541e247d22fd2ddb69df01b06272fa0c1cf274345",
+        "sha256:05695bdc72f713a737fc1556151968de57b13961101d9a6dc866087627740f9d",
+        "sha256:058e23b4bf6ee4123aaed904430e3a89ff6806a2101816a5831496a9279d85a9",
+        "sha256:0595c9859674880d8684a623bea7809b4822a9e281d5b15eae07e2ecb60812b0",
+        "sha256:066bffcccbf0454be682c1e23e8105151cc79e47700f0fb5cc5fb39d4de95e9c",
+        "sha256:073c53b3241789ca7eac43c28074a69d38e0c69611800715ab366f08e0b144d3",
+        "sha256:075786f8a03404773cd5177f1076957bbc4f6da644ab0d581adb6879fa956519",
+        "sha256:08b7e7774fbc109600ceba7d8ac875b17b0766d264407bf60e1b1bc4c89d2f0b",
+        "sha256:09c27199fc90e4572fac297d558a6df465c4308c7102992ed5e5e31b4d92c307",
+        "sha256:0a1badf1554f6c3a4856d3a79f9e92efc5d9bffe9900d46e478f75a10cb1b27b"
+      ]
+    },
+    {
+      "sourceTable": "tb_tecnologia.inventario",
+      "stepId": "technology-inventory-assigned-insert",
+      "destinationTable": "tecnologia.inventory",
+      "field": "tipo",
+      "reasonCode": "INVENTORY_CATEGORY_NOT_FOUND",
+      "rowCount": 2,
+      "sourceIdentityDigests": [
+        "sha256:a2618d868faa8676c1b7cda1b064f10b50227e8f96ae1a00250af185daef3134",
+        "sha256:e96ecca23365fcb1b84803fdb033ecda26599fe7e8be4ddfd8659aa6dede75f4"
+      ]
+    },
+    {
+      "sourceTable": "tb_tecnologia.inventario_fotos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 15
+    },
+    {
+      "sourceTable": "tb_tecnologia.inventario_itens",
+      "stepId": "technology-inventory-location-item-insert",
+      "destinationTable": "tecnologia.inventory",
+      "field": "cod",
+      "reasonCode": "INVENTORY_ASSET_CODE_LOOKUP_NOT_EXECUTED",
+      "rowCount": 41,
+      "sourceIdentityDigests": [
+        "sha256:02c95c5caa4cad30c430eddc1e1bc6ac89a0e37a8925151f84d0693244d8ce6a",
+        "sha256:093462fe6a0c1cf2b6d8f4b2dfc8556444eb8209befb6f3b0c9113a7d61e1a01",
+        "sha256:130c721c011904494639e255805c71123769a909d0b1a2f16cfc8e6ea72db07c",
+        "sha256:1877ff20f409411e3bf1de0c98ffd8fb2492765252de59c0232f1542dbc5e395",
+        "sha256:18a30074c72e0cb866bde75cddc07ec41034c9578d004fb30ae6feceee3cdd67",
+        "sha256:18cf72b5a9d1600062045afba37afda7f97f2f794f8cf6ee872cae955405d44d",
+        "sha256:1ca1bdaaa914b2b30844866aaab35b3045196007ec0a5862c6b84ab222061c95",
+        "sha256:2c2074f70502308bede8bac0c9d67fbc6030997bfb8a3be4f5dfba86ad19ebae",
+        "sha256:344ad61cec2a96919c1e3730bbe4883702b8f83a198e47bd55b795d0997e49a0",
+        "sha256:39b65cf0fb2d44218a9ebfeb5b09c0f1452b7dec183e181210ebf694ad1b7742",
+        "sha256:4351cc86a26ec74a1acf9b27243b0e324e77b7001a5c3ce0ca6baccf6c47c73d",
+        "sha256:472ce8f7b4336ac5962c99acf3ec5b2ddb1e3452e6907765e7c9e89ce7a30b4b",
+        "sha256:493f42b09c6ba848b0f890ee09c6efe243c1254a09fed23f29e1a5bde29bd6d4",
+        "sha256:54f5b6e63eed68dd4d15ea9d6fe86851ac1a5bc251aa915828ccdd85f1ca6449",
+        "sha256:55fac439abf76bcd250f525601169f590cfad11c24675263dcf51e9443212574",
+        "sha256:5a48a35344f504d67014b16793036015bfbd20e6f5bfc0f386677e3f42b078d6",
+        "sha256:5b387cb09691c2ad9d9fc148642eb716720fcc24064ea24f778de17faf0df401",
+        "sha256:5d61201778d4b7ebb0a346a50deb93a6875b874d3bec815606db2e4caf10a34d",
+        "sha256:658c36696aaccab91fe1a294f17dfc602c93d10410a2938235f0f3675d7c9e7c",
+        "sha256:661a41570ff98540c7d9f4cb223ff41b3d4500a6dbf085ad888bba38bfb08210"
+      ]
+    },
+    {
+      "sourceTable": "tb_tecnologia.reset",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 145
+    },
+    {
+      "sourceTable": "tb_tecnologia.robos",
+      "reasonCode": "CURRENT_CONTRACT_NOT_FAITHFUL",
+      "rowCount": 7
+    },
+    {
+      "sourceTable": "tb_tecnologia.robos_controles",
+      "reasonCode": "UNRESOLVED_PARENT_CONTRACT",
+      "rowCount": 236
+    },
+    {
+      "sourceTable": "tb_tecnologia.senhas",
+      "stepId": "technology-password-insert",
+      "destinationTable": "tecnologia.passwords_users",
+      "field": "password",
+      "reasonCode": "TI_CREDENTIAL_PASSWORD_EMPTY",
+      "rowCount": 80,
+      "sourceIdentityDigests": [
+        "sha256:023e9703dba4c10868bac21cff37135b0e10347959acd2dafadb776bed51b643",
+        "sha256:05460566ae3a2d962f302041775f536e4b71eec1bbc8dfa6d74b10d4455df37f",
+        "sha256:055adae2ebc36325099ddb7c8c18308aa0a57a751f67f2b0a0c8fa3c32a7c000",
+        "sha256:08d2fb64cca47576938f3b68d4f4984fa4189c39ace217c3cfb02da9c2549a65",
+        "sha256:0ae7043d2d49b60c74c0ea43175d4c5a6ca685ff590504792d33a8acbf1cf428",
+        "sha256:0fb8a95f04c6642aa3f23f6ec5b887b7db2074e2e27fe8e795fd8fa60bf3d9c6",
+        "sha256:13114d1ef8a56b3bd08b31c9e333f68858d0036deec4122199a509e1ebc50785",
+        "sha256:2301917665917f21d9d2d1f61135023da84623d5a04dfb526ee0675909afa567",
+        "sha256:252ae2ecfc704508fac3d51f6db8f49f3b9673a65909642775dd311fbf662bf8",
+        "sha256:2750eb2a37ad542e6339b5ee369b134c81deeea54d28399e580e31b545070769",
+        "sha256:28677acff5ce76a1f21b406a827af42594931b0d61fda52086589462a62fcab0",
+        "sha256:29188fdf5f8bddcdf9ccc962356541465b71d7c285116259c6f59788b85a4517",
+        "sha256:2c77fa19121f60d0b02fbcaa0eafe5f32c3b48468bf0d8f88a4f49c6f472546f",
+        "sha256:2cd23ccdc1b79ab80b00e41878cc077606a859657bc40d82899675af276a8015",
+        "sha256:2ed789472f2214615a3056aba38a37eacf55d1e944960469c2d6ab1ed0acc442",
+        "sha256:2f61a6a8901eea61201723ed9fa6fed7387ba9b2875e254187f498f0b34d94ee",
+        "sha256:3338da2de82c157897ae2ea7619d9f587521ec7df2cb834e35116b6f077291a8",
+        "sha256:344d6a186c57df0303b5581dfb33f3a1eca2fbf85abccbb105a1067115a4b901",
+        "sha256:386847f4982e8059832525418e6f65c238334c2b39e78fb24bf5232893dbf1a5",
+        "sha256:38a528ad22f31b27798d0a3f1862148acfa234ff66517856d8def1c992e82f41"
+      ]
+    },
+    {
+      "sourceTable": "tb_tecnologia.senhas",
+      "stepId": "technology-password-insert",
+      "destinationTable": "tecnologia.passwords_users",
+      "field": "tipo",
+      "reasonCode": "TI_LOCATION_CREDENTIAL_UNSUPPORTED",
+      "rowCount": 7,
+      "sourceIdentityDigests": [
+        "sha256:272442567c2d576bf93d1a69152ae130e1da083f36dffeb33f67bd8c8b459db1",
+        "sha256:545e53b744e5d290228db2c2a6a6789da0611afedb51d8021fd2cc95b3b59e04",
+        "sha256:599a375f823514b31f2b0ad13bfaefdd83cda3e8a2ed3b27e6991bd7e5669f39",
+        "sha256:5ccf77225d5572f68660b34d328146ab662ef50675d0d1018edece5642ee5429",
+        "sha256:b9dc20dacd00a670740ec21c78efe43e6309fae126bf139c255fe60c6742776f",
+        "sha256:c1f1338a593592b0867eb4971ea22f4b5c3e4ac753dd783d2f4496979b177e29",
+        "sha256:d7ce6b6b9fe5ec6a018672f8aee642c625a11d76ad032357f541530b8b05e30f"
+      ]
+    },
+    {
+      "sourceTable": "tb_triagem.campos",
+      "stepId": "triage-fiscal-config-insert",
+      "destinationTable": "triagem.configs",
+      "field": "cliente_id",
+      "reasonCode": "TRIAGE_CONFIG_CANONICAL_CLIENT_CONFLICT",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:daf951592de6b1f8510212c6ee35f43cc2a41430e01bfa31210d1cf2d27a1941"
+      ]
+    },
+    {
+      "sourceTable": "tb_triagem.campos",
+      "stepId": "triage-fiscal-config-insert",
+      "destinationTable": "triagem.configs",
+      "field": "cliente_id",
+      "reasonCode": "TRIAGE_CONFIG_CLIENT_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:a6203d719ceba5af196665a32ccb57907897329c2e9f97ab6ec7f12163c0e563"
+      ]
+    },
+    {
+      "sourceTable": "tb_triagem.campos",
+      "stepId": "triage-fiscal-config-insert",
+      "destinationTable": "triagem.configs",
+      "field": "envio",
+      "reasonCode": "TRIAGE_FUNCTIONAL_FIELD_UNMAPPABLE",
+      "rowCount": 262,
+      "sourceIdentityDigests": [
+        "sha256:003fe6062f7e76a65cd1ab7b9fc6c1095e85c786bcec10df8d1960a8e5092da0",
+        "sha256:0091efad681dc05ba0e00cede342137d4b899d26b91a3c95df98d109f3bd6987",
+        "sha256:00c2def793cca5ac449f0564254d5b62e27fd15e08696f07914566b205870afb",
+        "sha256:01432a71962e33964bebcecf00f8b98015689bf0896799e5414c2d9970f12f88",
+        "sha256:0331e6bef3686b1676e2a17e37fbcc8ac72db27f9d9be52279acfd275418b75d",
+        "sha256:037c921e9f8e22b67c34fa9c50f2683d94b2ba84b4c17c01251823fce09ee264",
+        "sha256:0887ca21f9355bae137c8ff9a8ae3c08d1d7cba56c4cae6b1324684b69ec1259",
+        "sha256:096f051ddbb05bcebf9f4e0b22ff484941b666e08e88de401d6dfb3b948355fc",
+        "sha256:09876d3d95c77f668f5c9f81029931301e27d6834844796bcb38deeaeff90d53",
+        "sha256:09edf4ad3500a5f6f4dbaf9b998417c0675b4a4d91714ef64313cd1a8b811dea",
+        "sha256:0aae14ca451944f10ab9711239a120c182ea1e6a1b989048e450326e2af284a4",
+        "sha256:0eaf72a364f5c171fc4b675fd031648f8bc8bead11ed066082598d51632ee7d4",
+        "sha256:0fe858bd156f3e28b11582c95c32caa7119722cb150128d69f1227ed4c06832f",
+        "sha256:107f9939ecd5ea68963d5f7cb3c975bdf13de38097cf836277458c87dfd8abf1",
+        "sha256:11dc5160daa85f11b3bc3d9a5314f2313dcdec21ec9cecc912cf58a7b0e5d25c",
+        "sha256:1342cdeb7c8f19dacfab73a453c53f515b4b7f29d0ca6100662e265eb23fc6b9",
+        "sha256:136a707a8dbc8eb2959009de17a975995fb3cc1ce18c90b3f07550229bea5b25",
+        "sha256:13d89590806986010237bb072199f31825a5530d610c0fc7e56fec268c4bf3e3",
+        "sha256:14903609543a9a637a5d0bc4558121e9ee600adb96afa92904380847bfdbb3b0",
+        "sha256:16231f649e1e16facadec26fbe8a85a62f1bcba89a3bb87b398fcd56f034fb44"
+      ]
+    },
+    {
+      "sourceTable": "tb_triagem.campos",
+      "stepId": "triage-fiscal-config-insert",
+      "destinationTable": "triagem.configs",
+      "field": "faturamento",
+      "reasonCode": "TRIAGE_FUNCTIONAL_FIELD_UNMAPPABLE",
+      "rowCount": 45,
+      "sourceIdentityDigests": [
+        "sha256:06570cc78d6e66b097f0bb1bcd9f12d2b67b2d57a1d8d4f562a3ced24f24a176",
+        "sha256:0672659edcfb5bb1655b5eb7ab2b57a5dc39ac38430ad6118501fa7bb0378a86",
+        "sha256:111c6196371e0b82d935e25167d0df51a8b9a4bacf02ff02711686326831ee4d",
+        "sha256:115426f3b0a3bd68744398d0aed4d83e65d5de2708edc214da720a27d4512f79",
+        "sha256:184acb045918dce91eadb6b25e11e0be73d03f2fb8c26e306aa02b1eb5b4cd24",
+        "sha256:1955e00bb6f3e00864342151bf187236747f42b8e8512beaa7741600e55beb4b",
+        "sha256:2bc3c109d31e5c0c59b5e29da8508c9049d85a11d26f01ea3e4ca5f20a4aad3c",
+        "sha256:2d94d32d345ec77002ef1bc89a110bde93c4606cff3cc229392363307e68f1fa",
+        "sha256:3682ea68bf4f88fd35613b00c1f9f4fcc1d95614ea88833239280a702712557a",
+        "sha256:394723692c72b506e19e12cac8db24c0fb3059101ea5ce10c0bf8c14d19e3beb",
+        "sha256:3da2e5f033bf887126ed80b507a6a2d153d66eb6cbd98a7065ce58eed7156a28",
+        "sha256:3fb8c8b32a192914e7a2ba618c9e151f7f8cd0f662f24c51b803bc288ed87547",
+        "sha256:609ab11761374e52a73e98b436abcaa8057973a1706c7216206aea9063fd0ebb",
+        "sha256:63ccb6147d0c3dda4cbacbad39c8a3229efc3904812ccd751e7432b2eb6309eb",
+        "sha256:6abf4a702d151bad0219bcc04c85722387d1773f4959a308f9e51a2a64c181a5",
+        "sha256:702b06525d9708c292d1649ecf76b84adb6f1ef130aa8d3d7a6075c00f13f759",
+        "sha256:8070bfa2e1896197365d3acc90c25f5b64a3f2b04c9971a706b414e395849eed",
+        "sha256:822836c0d9a1295411df366b63ce35bcad918f901d80065b9b02e85e5e44a707",
+        "sha256:857d856347f728aad0a1626014dbced793f05505f118114605826df92bea1758",
+        "sha256:94eae22d55afa6f33ef480609e8fdbb331edf8eb6b337cc8e75b238bfe20170a"
+      ]
+    },
+    {
+      "sourceTable": "tb_triagem.justificativas",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 15
+    },
+    {
+      "sourceTable": "tb_triagem.prioridade",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 617
+    },
+    {
+      "sourceTable": "tb_triagem.qtdnotas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_triagem.solicitacoes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_wiki.agenda",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_wiki.destaques",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_wiki.wikis",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_wiki.wikis_categorias",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_wiki.wikis_topicos",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_workspace.alteracao_regimes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_workspace.alteracao_regimes_tarefas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_workspace.alteracao_regimes_tarefas_express",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_workspace.alteracao_regimes_tipos",
+      "reasonCode": "LEGACY_AUXILIARY_NO_CURRENT_CONTRACT",
+      "rowCount": 1
+    },
+    {
+      "sourceTable": "tb_workspace.mapas",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 4
+    },
+    {
+      "sourceTable": "tb_workspace.mapas_clientes",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 5
+    },
+    {
+      "sourceTable": "tb_workspace.natal",
+      "reasonCode": "NO_CURRENT_CONTRACT",
+      "rowCount": 0
+    },
+    {
+      "sourceTable": "tb_workspace.solicitacoes",
+      "stepId": "workspace-ti-request-insert",
+      "destinationTable": "tecnologia.requests",
+      "field": "categoria",
+      "reasonCode": "WORKSPACE_REQUEST_CATEGORY_NOT_FOUND",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:3537770b5ee5bc229e79e2a9509d0c98755ce0ec5f42e32d0d99be568d902128"
+      ]
+    },
+    {
+      "sourceTable": "tb_workspace.solicitacoes_mensagens",
+      "stepId": "workspace-ti-message-insert",
+      "destinationTable": "tecnologia.request_messages",
+      "field": "lida",
+      "reasonCode": "WORKSPACE_MESSAGE_READ_STATE_UNMAPPABLE",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:5423613913e092293d056a94075dc6f9e68b3004023675ed84c8f5dcb19d3e19"
+      ]
+    },
+    {
+      "sourceTable": "tb_workspace.solicitacoes_mensagens",
+      "stepId": "workspace-ti-message-insert",
+      "destinationTable": "tecnologia.request_messages",
+      "field": "mensagem",
+      "reasonCode": "WORKSPACE_ATTACHMENT_CORRELATION_UNRESOLVED",
+      "rowCount": 1,
+      "sourceIdentityDigests": [
+        "sha256:d56eeb50a7c11bd4296bf73095ef1122751af43aaf1f0d549fbf9fad6c11d11f"
+      ]
+    }
+  ],
+  "expectedWrites": 634931,
+  "expectedWriteCounts": {
+    "aggregate": 2982,
+    "insert": 625897,
+    "update": 6052
+  },
+  "blockers": {
+    "quarantine": 755966,
+    "unresolvedRequiredReferences": 452,
+    "unclassifiedSources": 0
+  },
+  "complete": false,
+  "executionDigest": "d99424fdcda50d4e66691a1045b86ac11390ad3b7e586adfecb9fd53e9447eb3",
+  "manifestDigest": "c0310302bd8510888ca54d0c1891ef3ebedae216a8984eba960a1a007dac5103",
+  "mappingDigest": "9f7a0a353b749f5dd5be48d1eb2cda5fa925d358bdd27588efff406ebe460d5f",
+  "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b",
+  "sourceDigest": "e76a761406a4cc2e2aa2cae959c51be79c59a968f06a12f0702f3233876cb742",
+  "createdAt": "2026-08-07T12:30:40.524Z",
+  "databaseIdentity": "sha256:fd9bdc2e034a768c638394085a809f3862b75c0efe4d55c76a4604503110692c",
+  "mode": "dry-run",
+  "writesPerformed": false
+}

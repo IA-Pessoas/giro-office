@@ -1,0 +1,28 @@
+{
+  "batchIndex": 6,
+  "failedAt": "2026-08-10T13:28:49.411Z",
+  "sources": [
+    "tb_admin.permissoes_integracao",
+    "tb_admin.permissoes_parcelamento",
+    "tb_admin.permissoes_pessoal",
+    "tb_admin.permissoes_regularize",
+    "tb_admin.permissoes_rh",
+    "tb_cbc.panorama_parcelamentos"
+  ],
+  "error": {
+    "name": "error",
+    "message": "could not determine data type of parameter $1",
+    "code": "42P18",
+    "details": null,
+    "stack": [
+      "error: could not determine data type of parameter $1",
+      "    at /home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js:631:17",
+      "    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+      "    at async filterRowsWithMissingForeignKeys (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:318:20)",
+      "    at async flush (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:210:26)",
+      "    at async Object.loadMappedData [as load] (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:250:47)",
+      "    at async runMigration (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:40:24)",
+      "    at async main (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:417:24)"
+    ]
+  }
+}

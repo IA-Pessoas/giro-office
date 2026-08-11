@@ -1,0 +1,3081 @@
+{
+  "blockers": [],
+  "configurationChecks": [
+    {
+      "configured": true,
+      "name": "CERTIFICATE_FILE_ENCRYPTION_KEY"
+    },
+    {
+      "configured": true,
+      "name": "CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION"
+    },
+    {
+      "configured": true,
+      "name": "MTK_ENCRYPTION_KEY"
+    },
+    {
+      "configured": true,
+      "name": "PESSOAL_PASSWORD_ENCRYPTION_KEY"
+    },
+    {
+      "configured": true,
+      "name": "PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION"
+    }
+  ],
+  "databaseSummary": {
+    "catalogTableCount": 101,
+    "schema": "public"
+  },
+  "dependencyOrder": [
+    "tb_admin.departamentos:department-insert",
+    "tb_cbc.emails:shared-email-recipient-insert",
+    "tb_cbs.estoque_inventario:cbs-inventory-category-insert",
+    "tb_certificados.pf:certificate-pf-insert",
+    "tb_certificados.pj:certificate-pj-insert",
+    "tb_fiscal.icms:fiscal-icms-insert",
+    "tb_fiscal.ipi:fiscal-ipi-insert",
+    "tb_fiscal.tributacao_pis_cofins:fiscal-ncm-insert",
+    "tb_integracao.clientes:integration-client-insert",
+    "tb_integracao.grupos:integration-group-insert",
+    "tb_integracao.planos:project-plan-insert",
+    "tb_mkt.senhas:mkt-password-insert",
+    "tb_parcelamento.clientes:parcelamento-client-lookup",
+    "tb_pessoal.sindicato:pessoal-union-insert",
+    "tb_regularize.grupos:regularize-group-insert",
+    "tb_regularize.pf:regularize-client-pf-insert",
+    "tb_rh.feriados:rh-holiday-insert",
+    "tb_rh.score_perguntas:rh-score-question-insert",
+    "tb_rh.solicitacoes_categorias:rh-request-category-insert",
+    "tb_tecnologia.inventario_loc:technology-inventory-location-insert",
+    "tb_tecnologia.opcoes:technology-inventory-category-insert",
+    "tb_admin.usuarios:user-insert",
+    "tb_cbs.estoque_categorias:cbs-stock-category-insert",
+    "tb_cbs.estoque_localizacoes:cbs-stock-location-insert",
+    "tb_integracao.pa:integration-pa-merge",
+    "tb_integracao.prospeccao_comercial:prospecting-client-merge",
+    "tb_integracao.prospeccao_comercial:prospecting-project-insert",
+    "tb_pessoal.codigos_acesso:tb_pessoal-codigos_acesso-password-insert",
+    "tb_pessoal.contri_assis:tb_pessoal-contri_assis-password-insert",
+    "tb_pessoal.empregador_web:tb_pessoal-empregador_web-password-insert",
+    "tb_pessoal.ldd:pessoal-ldd-insert",
+    "tb_regularize.clientes:regularize-client-insert",
+    "tb_regularize.clientes:regularize-client-merge",
+    "tb_regularize.vencimento:client-pf-cnh-expiration-merge",
+    "tb_regularize.vencimento:client-pf-rg-expiration-merge",
+    "tb_workspace.solicitacoes_categorias:workspace-ti-category-insert",
+    "tb_admin.logs:admin-log-insert",
+    "tb_admin.permissoes_certificado:permission-certificado-merge",
+    "tb_admin.permissoes_comercial:permission-comercial-merge",
+    "tb_admin.permissoes_contabil:permission-contabil-merge",
+    "tb_admin.permissoes_financeiro:permission-financeiro-merge",
+    "tb_admin.permissoes_fiscal:permission-fiscal-merge",
+    "tb_admin.permissoes_integracao:permission-integracao-merge",
+    "tb_admin.permissoes_marketing:permission-marketing-merge",
+    "tb_admin.permissoes_parcelamento:permission-parcelamento-merge",
+    "tb_admin.permissoes_pessoal:permission-pessoal-merge",
+    "tb_admin.permissoes_regularize:permission-regularize-merge",
+    "tb_admin.permissoes_rh:permission-rh-merge",
+    "tb_admin.permissoes_triagem:permission-triagem-merge",
+    "tb_cbc.panorama_parcelamentos:parcelamento-panorama-insert",
+    "tb_cbs.estoque:cbs-stock-insert",
+    "tb_contabil.clientes_mov:contabil-client-movement-insert",
+    "tb_contabil.clientes_observacao:contabil-client-history-insert",
+    "tb_contabil.controle:contabil-control-insert",
+    "tb_contabil.relacoes:contabil-relationship-insert",
+    "tb_integracao.pa_historicos:integration-pa-history-insert",
+    "tb_integracao.tarefas_express:task-model-insert",
+    "tb_integracao.tarefas_express_distrato:termination-task-model-insert",
+    "tb_mkt.redes_sociais:mkt-client-social-merge",
+    "tb_parcelamento.parcelamentos:parcelamento-installment-insert",
+    "tb_pec.notas:pec-note-insert",
+    "tb_pessoal.bem:tb_pessoal-bem-password-insert",
+    "tb_pessoal.bsf:tb_pessoal-bsf-password-insert",
+    "tb_pessoal.clientes_situacoes:pessoal-situation-insert",
+    "tb_pessoal.folhas:pessoal-payroll-insert",
+    "tb_pessoal.obrigacoes:pessoal-obligation-insert",
+    "tb_regularize.alvaras:license-insert",
+    "tb_regularize.clientes_senhas:credential-site-bacen",
+    "tb_regularize.clientes_senhas:credential-site-gov-br",
+    "tb_regularize.clientes_senhas:credential-site-mei",
+    "tb_regularize.clientes_senhas:credential-site-regularize",
+    "tb_regularize.clientes_senhas:credential-site-sefaz",
+    "tb_regularize.clientes_senhas:credential-site-seifsa",
+    "tb_regularize.clientes_senhas:credential-site-simples",
+    "tb_regularize.clientes_senhas:credential-site-webiss-cpf",
+    "tb_regularize.clientes_senhas:credential-site-webiss-master",
+    "tb_regularize.clientes_senhas:credential-slot-bacen",
+    "tb_regularize.clientes_senhas:credential-slot-gov-br",
+    "tb_regularize.clientes_senhas:credential-slot-mei",
+    "tb_regularize.clientes_senhas:credential-slot-regularize",
+    "tb_regularize.clientes_senhas:credential-slot-sefaz",
+    "tb_regularize.clientes_senhas:credential-slot-seifsa",
+    "tb_regularize.clientes_senhas:credential-slot-simples",
+    "tb_regularize.clientes_senhas:credential-slot-webiss-cpf-1",
+    "tb_regularize.clientes_senhas:credential-slot-webiss-cpf-2",
+    "tb_regularize.clientes_senhas:credential-slot-webiss-master",
+    "tb_regularize.grupos_integrantes:regularize-group-member-insert",
+    "tb_regularize.pf_empresas:regularize-partner-insert",
+    "tb_regularize.processos:process-insert",
+    "tb_regularize.taxas_municipais:municipal-tax-insert",
+    "tb_rh.colaboradores:collaborator-job-title-merge",
+    "tb_rh.colaboradores:collaborator-user-merge",
+    "tb_tecnologia.estoque:technology-stock-category-derived",
+    "tb_tecnologia.estoque:technology-stock-item-insert",
+    "tb_tecnologia.estoque:technology-stock-location-derived",
+    "tb_tecnologia.inventario:technology-inventory-assigned-insert",
+    "tb_tecnologia.inventario_itens:technology-inventory-location-item-insert",
+    "tb_tecnologia.senhas:technology-password-insert",
+    "tb_tecnologia.termos:technology-term-insert",
+    "tb_triagem.campos:triage-fiscal-config-insert",
+    "tb_workspace.solicitacoes:workspace-ti-request-insert",
+    "tb_cbs.estoque_entradas:cbs-stock-entry-insert",
+    "tb_cbs.estoque_saidas:cbs-stock-exit-insert",
+    "tb_integracao.tarefas:task-insert",
+    "tb_integracao.tarefas:task-model-derived",
+    "tb_integracao.tarefas:task-model-lookup",
+    "tb_integracao.tarefas:task-project-derived",
+    "tb_integracao.tarefas:task-project-lookup",
+    "tb_integracao.tarefas_dependentes:task-dependent-insert",
+    "tb_integracao.tarefas_planos:project-plan-task-insert",
+    "tb_integracao.tarefas_regularize:task-regularize-link-insert",
+    "tb_parcelamento.competencia:parcelamento-installment-competency-insert",
+    "tb_regularize.orientaoes_processual:guidance-insert",
+    "tb_regularize.orientaoes_processual:guidance-process-derived",
+    "tb_regularize.orientaoes_processual:guidance-process-lookup",
+    "tb_rh.alergias:user-allergies-merge",
+    "tb_rh.contatos_emergencia:user-emergency-contacts-merge",
+    "tb_rh.pontos:rh-point-config-insert",
+    "tb_rh.pontos_adicionais_folhas:rh-time-bank-release-insert",
+    "tb_rh.pontos_folhas:rh-time-sheet-insert",
+    "tb_rh.pontos_registros:rh-point-insert",
+    "tb_rh.score:rh-score-insert",
+    "tb_rh.solicitacoes:rh-request-insert",
+    "tb_tecnologia.estoque_entradas:technology-stock-entry-insert",
+    "tb_tecnologia.estoque_saidas:technology-stock-exit-insert",
+    "tb_workspace.solicitacoes_mensagens:workspace-ti-message-insert",
+    "tb_regularize.orientaoes_processual.atividades:guidance-activities-aggregate",
+    "tb_regularize.orientaoes_processual.socios:guidance-partners-aggregate",
+    "tb_rh.pontos_solicitacoes:rh-time-clock-request-insert",
+    "tb_rh.score_avaliacoes:rh-score-evaluation-insert",
+    "tb_rh.score_nitro:rh-score-nitro-insert",
+    "tb_rh.solicitacoes_mensagens:rh-request-message-insert"
+  ],
+  "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b",
+  "readyForMigration": true,
+  "steps": [
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "departments",
+      "sourceTable": "tb_admin.departamentos",
+      "status": "ready",
+      "stepId": "department-insert",
+      "tenant": {
+        "casteloRowCount": 50,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "logs",
+      "sourceTable": "tb_admin.logs",
+      "status": "ready",
+      "stepId": "admin-log-insert",
+      "tenant": {
+        "casteloRowCount": 81,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_certificado",
+      "status": "ready",
+      "stepId": "permission-certificado-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_comercial",
+      "status": "ready",
+      "stepId": "permission-comercial-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_contabil",
+      "status": "ready",
+      "stepId": "permission-contabil-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_financeiro",
+      "status": "ready",
+      "stepId": "permission-financeiro-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_fiscal",
+      "status": "ready",
+      "stepId": "permission-fiscal-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_integracao",
+      "status": "ready",
+      "stepId": "permission-integracao-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_marketing",
+      "status": "ready",
+      "stepId": "permission-marketing-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_parcelamento",
+      "status": "ready",
+      "stepId": "permission-parcelamento-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_pessoal",
+      "status": "ready",
+      "stepId": "permission-pessoal-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_regularize",
+      "status": "ready",
+      "stepId": "permission-regularize-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_rh",
+      "status": "ready",
+      "stepId": "permission-rh-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "permissions",
+      "sourceTable": "tb_admin.permissoes_triagem",
+      "status": "ready",
+      "stepId": "permission-triagem-merge",
+      "tenant": {
+        "casteloRowCount": 248,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "users",
+      "sourceTable": "tb_admin.usuarios",
+      "status": "ready",
+      "stepId": "user-insert",
+      "tenant": {
+        "casteloRowCount": 312,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "emails",
+      "sourceTable": "tb_cbc.emails",
+      "status": "ready",
+      "stepId": "shared-email-recipient-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 0,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "parcelamento.panorama",
+      "sourceTable": "tb_cbc.panorama_parcelamentos",
+      "status": "ready",
+      "stepId": "parcelamento-panorama-insert",
+      "tenant": {
+        "casteloRowCount": 1012,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "stock",
+      "sourceTable": "tb_cbs.estoque",
+      "status": "ready",
+      "stepId": "cbs-stock-insert",
+      "tenant": {
+        "casteloRowCount": 180,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "stock.categories",
+      "sourceTable": "tb_cbs.estoque_categorias",
+      "status": "ready",
+      "stepId": "cbs-stock-category-insert",
+      "tenant": {
+        "casteloRowCount": 180,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "stock.entries",
+      "sourceTable": "tb_cbs.estoque_entradas",
+      "status": "ready",
+      "stepId": "cbs-stock-entry-insert",
+      "tenant": {
+        "casteloRowCount": 836,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "tecnologia.inventoryCategories",
+      "sourceTable": "tb_cbs.estoque_inventario",
+      "status": "ready",
+      "stepId": "cbs-inventory-category-insert",
+      "tenant": {
+        "casteloRowCount": 23,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "stock.locations",
+      "sourceTable": "tb_cbs.estoque_localizacoes",
+      "status": "ready",
+      "stepId": "cbs-stock-location-insert",
+      "tenant": {
+        "casteloRowCount": 22,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "stock.exits",
+      "sourceTable": "tb_cbs.estoque_saidas",
+      "status": "ready",
+      "stepId": "cbs-stock-exit-insert",
+      "tenant": {
+        "casteloRowCount": 832,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "certificate.pf",
+      "sourceTable": "tb_certificados.pf",
+      "status": "ready",
+      "stepId": "certificate-pf-insert",
+      "tenant": {
+        "casteloRowCount": 724,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "certificate.pj",
+      "sourceTable": "tb_certificados.pj",
+      "status": "ready",
+      "stepId": "certificate-pj-insert",
+      "tenant": {
+        "casteloRowCount": 763,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "contabil.responsibles",
+      "sourceTable": "tb_contabil.clientes_mov",
+      "status": "ready",
+      "stepId": "contabil-client-movement-insert",
+      "tenant": {
+        "casteloRowCount": 1,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients.history",
+      "sourceTable": "tb_contabil.clientes_observacao",
+      "status": "ready",
+      "stepId": "contabil-client-history-insert",
+      "tenant": {
+        "casteloRowCount": 1,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "contabil.control",
+      "sourceTable": "tb_contabil.controle",
+      "status": "ready",
+      "stepId": "contabil-control-insert",
+      "tenant": {
+        "casteloRowCount": 9,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "contabil.relationship",
+      "sourceTable": "tb_contabil.relacoes",
+      "status": "ready",
+      "stepId": "contabil-relationship-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 0,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "fiscal.icms",
+      "sourceTable": "tb_fiscal.icms",
+      "status": "ready",
+      "stepId": "fiscal-icms-insert",
+      "tenant": {
+        "casteloRowCount": 9,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "fiscal.ipi",
+      "sourceTable": "tb_fiscal.ipi",
+      "status": "ready",
+      "stepId": "fiscal-ipi-insert",
+      "tenant": {
+        "casteloRowCount": 10,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "fiscal.ncm",
+      "sourceTable": "tb_fiscal.tributacao_pis_cofins",
+      "status": "ready",
+      "stepId": "fiscal-ncm-insert",
+      "tenant": {
+        "casteloRowCount": 20,
+        "distinctOrganizationCount": 2,
+        "otherTenantRowCount": 1,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients",
+      "sourceTable": "tb_integracao.clientes",
+      "status": "ready",
+      "stepId": "integration-client-insert",
+      "tenant": {
+        "casteloRowCount": 3623,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients.group",
+      "sourceTable": "tb_integracao.grupos",
+      "status": "ready",
+      "stepId": "integration-group-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 0,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients.pa",
+      "sourceTable": "tb_integracao.pa",
+      "status": "ready",
+      "stepId": "integration-pa-merge",
+      "tenant": {
+        "casteloRowCount": 1,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients.history",
+      "sourceTable": "tb_integracao.pa_historicos",
+      "status": "ready",
+      "stepId": "integration-pa-history-insert",
+      "tenant": {
+        "casteloRowCount": 1,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.projectPlan",
+      "sourceTable": "tb_integracao.planos",
+      "status": "ready",
+      "stepId": "project-plan-insert",
+      "tenant": {
+        "casteloRowCount": 6,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients",
+      "sourceTable": "tb_integracao.prospeccao_comercial",
+      "status": "ready",
+      "stepId": "prospecting-client-merge",
+      "tenant": {
+        "casteloRowCount": 3623,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.projects",
+      "sourceTable": "tb_integracao.prospeccao_comercial",
+      "status": "ready",
+      "stepId": "prospecting-project-insert",
+      "tenant": {
+        "casteloRowCount": 2318,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.tasks",
+      "sourceTable": "tb_integracao.tarefas",
+      "status": "ready",
+      "stepId": "task-insert",
+      "tenant": {
+        "casteloRowCount": 25032,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.tasksModel",
+      "sourceTable": "tb_integracao.tarefas",
+      "status": "ready",
+      "stepId": "task-model-derived",
+      "tenant": {
+        "casteloRowCount": 417,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.tasksModel",
+      "sourceTable": "tb_integracao.tarefas",
+      "status": "ready",
+      "stepId": "task-model-lookup",
+      "tenant": {
+        "casteloRowCount": 417,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.projects",
+      "sourceTable": "tb_integracao.tarefas",
+      "status": "ready",
+      "stepId": "task-project-derived",
+      "tenant": {
+        "casteloRowCount": 2318,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.projects",
+      "sourceTable": "tb_integracao.tarefas",
+      "status": "ready",
+      "stepId": "task-project-lookup",
+      "tenant": {
+        "casteloRowCount": 2318,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.tasksDependent",
+      "sourceTable": "tb_integracao.tarefas_dependentes",
+      "status": "ready",
+      "stepId": "task-dependent-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 0,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.tasksModel",
+      "sourceTable": "tb_integracao.tarefas_express",
+      "status": "ready",
+      "stepId": "task-model-insert",
+      "tenant": {
+        "casteloRowCount": 417,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.tasksModel",
+      "sourceTable": "tb_integracao.tarefas_express_distrato",
+      "status": "ready",
+      "stepId": "termination-task-model-insert",
+      "tenant": {
+        "casteloRowCount": 417,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.projectPlanTasks",
+      "sourceTable": "tb_integracao.tarefas_planos",
+      "status": "ready",
+      "stepId": "project-plan-task-insert",
+      "tenant": {
+        "casteloRowCount": 47,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "integracao.tasksIntegrationRegularize",
+      "sourceTable": "tb_integracao.tarefas_regularize",
+      "status": "ready",
+      "stepId": "task-regularize-link-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 0,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients",
+      "sourceTable": "tb_mkt.redes_sociais",
+      "status": "ready",
+      "stepId": "mkt-client-social-merge",
+      "tenant": {
+        "casteloRowCount": 3623,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "mtk.passwords",
+      "sourceTable": "tb_mkt.senhas",
+      "status": "ready",
+      "stepId": "mkt-password-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 0,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients",
+      "sourceTable": "tb_parcelamento.clientes",
+      "status": "ready",
+      "stepId": "parcelamento-client-lookup",
+      "tenant": {
+        "casteloRowCount": 3623,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "parcelamento.installmentsCompetencies",
+      "sourceTable": "tb_parcelamento.competencia",
+      "status": "ready",
+      "stepId": "parcelamento-installment-competency-insert",
+      "tenant": {
+        "casteloRowCount": 393,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "parcelamento.installments",
+      "sourceTable": "tb_parcelamento.parcelamentos",
+      "status": "ready",
+      "stepId": "parcelamento-installment-insert",
+      "tenant": {
+        "casteloRowCount": 225,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "notes",
+      "sourceTable": "tb_pec.notas",
+      "status": "ready",
+      "stepId": "pec-note-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 0,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "pessoal.passwords",
+      "sourceTable": "tb_pessoal.bem",
+      "status": "ready",
+      "stepId": "tb_pessoal-bem-password-insert",
+      "tenant": {
+        "casteloRowCount": 308,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "pessoal.passwords",
+      "sourceTable": "tb_pessoal.bsf",
+      "status": "ready",
+      "stepId": "tb_pessoal-bsf-password-insert",
+      "tenant": {
+        "casteloRowCount": 308,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "pessoal.situations",
+      "sourceTable": "tb_pessoal.clientes_situacoes",
+      "status": "ready",
+      "stepId": "pessoal-situation-insert",
+      "tenant": {
+        "casteloRowCount": 28,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "pessoal.passwords",
+      "sourceTable": "tb_pessoal.codigos_acesso",
+      "status": "ready",
+      "stepId": "tb_pessoal-codigos_acesso-password-insert",
+      "tenant": {
+        "casteloRowCount": 308,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "pessoal.passwords",
+      "sourceTable": "tb_pessoal.contri_assis",
+      "status": "ready",
+      "stepId": "tb_pessoal-contri_assis-password-insert",
+      "tenant": {
+        "casteloRowCount": 308,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "pessoal.passwords",
+      "sourceTable": "tb_pessoal.empregador_web",
+      "status": "ready",
+      "stepId": "tb_pessoal-empregador_web-password-insert",
+      "tenant": {
+        "casteloRowCount": 308,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "pessoal.payroll",
+      "sourceTable": "tb_pessoal.folhas",
+      "status": "ready",
+      "stepId": "pessoal-payroll-insert",
+      "tenant": {
+        "casteloRowCount": 176,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "pessoal.ldd",
+      "sourceTable": "tb_pessoal.ldd",
+      "status": "ready",
+      "stepId": "pessoal-ldd-insert",
+      "tenant": {
+        "casteloRowCount": 914,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "pessoal.obrigations",
+      "sourceTable": "tb_pessoal.obrigacoes",
+      "status": "ready",
+      "stepId": "pessoal-obligation-insert",
+      "tenant": {
+        "casteloRowCount": 1504,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "pessoal.union",
+      "sourceTable": "tb_pessoal.sindicato",
+      "status": "ready",
+      "stepId": "pessoal-union-insert",
+      "tenant": {
+        "casteloRowCount": 22,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.license",
+      "sourceTable": "tb_regularize.alvaras",
+      "status": "ready",
+      "stepId": "license-insert",
+      "tenant": {
+        "casteloRowCount": 341,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients",
+      "sourceTable": "tb_regularize.clientes",
+      "status": "ready",
+      "stepId": "regularize-client-insert",
+      "tenant": {
+        "casteloRowCount": 3623,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients",
+      "sourceTable": "tb_regularize.clientes",
+      "status": "ready",
+      "stepId": "regularize-client-merge",
+      "tenant": {
+        "casteloRowCount": 3623,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passowordsSites",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-site-bacen",
+      "tenant": {
+        "casteloRowCount": 19,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passowordsSites",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-site-gov-br",
+      "tenant": {
+        "casteloRowCount": 19,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passowordsSites",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-site-mei",
+      "tenant": {
+        "casteloRowCount": 19,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passowordsSites",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-site-regularize",
+      "tenant": {
+        "casteloRowCount": 19,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passowordsSites",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-site-sefaz",
+      "tenant": {
+        "casteloRowCount": 19,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passowordsSites",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-site-seifsa",
+      "tenant": {
+        "casteloRowCount": 19,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passowordsSites",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-site-simples",
+      "tenant": {
+        "casteloRowCount": 19,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passowordsSites",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-site-webiss-cpf",
+      "tenant": {
+        "casteloRowCount": 19,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passowordsSites",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-site-webiss-master",
+      "tenant": {
+        "casteloRowCount": 19,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passwordsRegularize",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-slot-bacen",
+      "tenant": {
+        "casteloRowCount": 5667,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passwordsRegularize",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-slot-gov-br",
+      "tenant": {
+        "casteloRowCount": 5667,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passwordsRegularize",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-slot-mei",
+      "tenant": {
+        "casteloRowCount": 5667,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passwordsRegularize",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-slot-regularize",
+      "tenant": {
+        "casteloRowCount": 5667,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passwordsRegularize",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-slot-sefaz",
+      "tenant": {
+        "casteloRowCount": 5667,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passwordsRegularize",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-slot-seifsa",
+      "tenant": {
+        "casteloRowCount": 5667,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passwordsRegularize",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-slot-simples",
+      "tenant": {
+        "casteloRowCount": 5667,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passwordsRegularize",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-slot-webiss-cpf-1",
+      "tenant": {
+        "casteloRowCount": 5667,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passwordsRegularize",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-slot-webiss-cpf-2",
+      "tenant": {
+        "casteloRowCount": 5667,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.passwordsRegularize",
+      "sourceTable": "tb_regularize.clientes_senhas",
+      "status": "ready",
+      "stepId": "credential-slot-webiss-master",
+      "tenant": {
+        "casteloRowCount": 5667,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients.group",
+      "sourceTable": "tb_regularize.grupos",
+      "status": "ready",
+      "stepId": "regularize-group-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 0,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients.clientsGroup",
+      "sourceTable": "tb_regularize.grupos_integrantes",
+      "status": "ready",
+      "stepId": "regularize-group-member-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 0,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.proceduralGuidances",
+      "sourceTable": "tb_regularize.orientaoes_processual",
+      "status": "ready",
+      "stepId": "guidance-insert",
+      "tenant": {
+        "casteloRowCount": 433,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.process",
+      "sourceTable": "tb_regularize.orientaoes_processual",
+      "status": "ready",
+      "stepId": "guidance-process-derived",
+      "tenant": {
+        "casteloRowCount": 1332,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.process",
+      "sourceTable": "tb_regularize.orientaoes_processual",
+      "status": "ready",
+      "stepId": "guidance-process-lookup",
+      "tenant": {
+        "casteloRowCount": 1332,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.proceduralGuidances",
+      "sourceTable": "tb_regularize.orientaoes_processual.atividades",
+      "status": "ready",
+      "stepId": "guidance-activities-aggregate",
+      "tenant": {
+        "casteloRowCount": 433,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.proceduralGuidances",
+      "sourceTable": "tb_regularize.orientaoes_processual.socios",
+      "status": "ready",
+      "stepId": "guidance-partners-aggregate",
+      "tenant": {
+        "casteloRowCount": 433,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients.pf",
+      "sourceTable": "tb_regularize.pf",
+      "status": "ready",
+      "stepId": "regularize-client-pf-insert",
+      "tenant": {
+        "casteloRowCount": 345,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.partners",
+      "sourceTable": "tb_regularize.pf_empresas",
+      "status": "ready",
+      "stepId": "regularize-partner-insert",
+      "tenant": {
+        "casteloRowCount": 522,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.process",
+      "sourceTable": "tb_regularize.processos",
+      "status": "ready",
+      "stepId": "process-insert",
+      "tenant": {
+        "casteloRowCount": 1332,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "regularize.municipalTaxes",
+      "sourceTable": "tb_regularize.taxas_municipais",
+      "status": "ready",
+      "stepId": "municipal-tax-insert",
+      "tenant": {
+        "casteloRowCount": 9,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients.pf",
+      "sourceTable": "tb_regularize.vencimento",
+      "status": "ready",
+      "stepId": "client-pf-cnh-expiration-merge",
+      "tenant": {
+        "casteloRowCount": 345,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "clients.pf",
+      "sourceTable": "tb_regularize.vencimento",
+      "status": "ready",
+      "stepId": "client-pf-rg-expiration-merge",
+      "tenant": {
+        "casteloRowCount": 345,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "users",
+      "sourceTable": "tb_rh.alergias",
+      "status": "ready",
+      "stepId": "user-allergies-merge",
+      "tenant": {
+        "casteloRowCount": 312,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "users",
+      "sourceTable": "tb_rh.colaboradores",
+      "status": "ready",
+      "stepId": "collaborator-job-title-merge",
+      "tenant": {
+        "casteloRowCount": 312,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 2
+      },
+      "destinationTable": "users",
+      "sourceTable": "tb_rh.colaboradores",
+      "status": "ready",
+      "stepId": "collaborator-user-merge",
+      "tenant": {
+        "casteloRowCount": 312,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "users",
+      "sourceTable": "tb_rh.contatos_emergencia",
+      "status": "ready",
+      "stepId": "user-emergency-contacts-merge",
+      "tenant": {
+        "casteloRowCount": 312,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "rh.holidays",
+      "sourceTable": "tb_rh.feriados",
+      "status": "ready",
+      "stepId": "rh-holiday-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 2,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "rh.pointConfig",
+      "sourceTable": "tb_rh.pontos",
+      "status": "ready",
+      "stepId": "rh-point-config-insert",
+      "tenant": {
+        "casteloRowCount": 16,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "rh.timeBankReleases",
+      "sourceTable": "tb_rh.pontos_adicionais_folhas",
+      "status": "ready",
+      "stepId": "rh-time-bank-release-insert",
+      "tenant": {
+        "casteloRowCount": 3,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "rh.timeSheets",
+      "sourceTable": "tb_rh.pontos_folhas",
+      "status": "ready",
+      "stepId": "rh-time-sheet-insert",
+      "tenant": {
+        "casteloRowCount": 81,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "rh.points",
+      "sourceTable": "tb_rh.pontos_registros",
+      "status": "ready",
+      "stepId": "rh-point-insert",
+      "tenant": {
+        "casteloRowCount": 2108,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "rh.timeClockRequest",
+      "sourceTable": "tb_rh.pontos_solicitacoes",
+      "status": "ready",
+      "stepId": "rh-time-clock-request-insert",
+      "tenant": {
+        "casteloRowCount": 136,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "rh.score",
+      "sourceTable": "tb_rh.score",
+      "status": "ready",
+      "stepId": "rh-score-insert",
+      "tenant": {
+        "casteloRowCount": 157,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "rh.score_evaluations",
+      "sourceTable": "tb_rh.score_avaliacoes",
+      "status": "ready",
+      "stepId": "rh-score-evaluation-insert",
+      "tenant": {
+        "casteloRowCount": 1214,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "rh.score_nitro",
+      "sourceTable": "tb_rh.score_nitro",
+      "status": "ready",
+      "stepId": "rh-score-nitro-insert",
+      "tenant": {
+        "casteloRowCount": 51,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "rh.score_questions",
+      "sourceTable": "tb_rh.score_perguntas",
+      "status": "ready",
+      "stepId": "rh-score-question-insert",
+      "tenant": {
+        "casteloRowCount": 27,
+        "distinctOrganizationCount": 2,
+        "otherTenantRowCount": 4,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "rh.requests",
+      "sourceTable": "tb_rh.solicitacoes",
+      "status": "ready",
+      "stepId": "rh-request-insert",
+      "tenant": {
+        "casteloRowCount": 880,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "rh.request_categories",
+      "sourceTable": "tb_rh.solicitacoes_categorias",
+      "status": "ready",
+      "stepId": "rh-request-category-insert",
+      "tenant": {
+        "casteloRowCount": 7,
+        "distinctOrganizationCount": 2,
+        "otherTenantRowCount": 3,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "rh.request_messages",
+      "sourceTable": "tb_rh.solicitacoes_mensagens",
+      "status": "ready",
+      "stepId": "rh-request-message-insert",
+      "tenant": {
+        "casteloRowCount": 1747,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "stock.categories",
+      "sourceTable": "tb_tecnologia.estoque",
+      "status": "ready",
+      "stepId": "technology-stock-category-derived",
+      "tenant": {
+        "casteloRowCount": 180,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "stock",
+      "sourceTable": "tb_tecnologia.estoque",
+      "status": "ready",
+      "stepId": "technology-stock-item-insert",
+      "tenant": {
+        "casteloRowCount": 180,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "stock.locations",
+      "sourceTable": "tb_tecnologia.estoque",
+      "status": "ready",
+      "stepId": "technology-stock-location-derived",
+      "tenant": {
+        "casteloRowCount": 22,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "stock.entries",
+      "sourceTable": "tb_tecnologia.estoque_entradas",
+      "status": "ready",
+      "stepId": "technology-stock-entry-insert",
+      "tenant": {
+        "casteloRowCount": 836,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "stock.exits",
+      "sourceTable": "tb_tecnologia.estoque_saidas",
+      "status": "ready",
+      "stepId": "technology-stock-exit-insert",
+      "tenant": {
+        "casteloRowCount": 832,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "tecnologia.inventory",
+      "sourceTable": "tb_tecnologia.inventario",
+      "status": "ready",
+      "stepId": "technology-inventory-assigned-insert",
+      "tenant": {
+        "casteloRowCount": 698,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "tecnologia.inventory",
+      "sourceTable": "tb_tecnologia.inventario_itens",
+      "status": "ready",
+      "stepId": "technology-inventory-location-item-insert",
+      "tenant": {
+        "casteloRowCount": 698,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "tecnologia.inventoryLocations",
+      "sourceTable": "tb_tecnologia.inventario_loc",
+      "status": "ready",
+      "stepId": "technology-inventory-location-insert",
+      "tenant": {
+        "casteloRowCount": 20,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "tecnologia.inventoryCategories",
+      "sourceTable": "tb_tecnologia.opcoes",
+      "status": "ready",
+      "stepId": "technology-inventory-category-insert",
+      "tenant": {
+        "casteloRowCount": 23,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "tecnologia.passwords_users",
+      "sourceTable": "tb_tecnologia.senhas",
+      "status": "ready",
+      "stepId": "technology-password-insert",
+      "tenant": {
+        "casteloRowCount": 100,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "tecnologia.terms",
+      "sourceTable": "tb_tecnologia.termos",
+      "status": "ready",
+      "stepId": "technology-term-insert",
+      "tenant": {
+        "casteloRowCount": 201,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 1
+      },
+      "destinationTable": "triagem.configs",
+      "sourceTable": "tb_triagem.campos",
+      "status": "ready",
+      "stepId": "triage-fiscal-config-insert",
+      "tenant": {
+        "casteloRowCount": 0,
+        "distinctOrganizationCount": 0,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "tecnologia.requests",
+      "sourceTable": "tb_workspace.solicitacoes",
+      "status": "ready",
+      "stepId": "workspace-ti-request-insert",
+      "tenant": {
+        "casteloRowCount": 982,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "tecnologia.request_categories",
+      "sourceTable": "tb_workspace.solicitacoes_categorias",
+      "status": "ready",
+      "stepId": "workspace-ti-category-insert",
+      "tenant": {
+        "casteloRowCount": 27,
+        "distinctOrganizationCount": 2,
+        "otherTenantRowCount": 2,
+        "scopeProven": true
+      }
+    },
+    {
+      "blockerCodes": [],
+      "conflictChecks": {
+        "candidateLimitExceeded": false,
+        "complete": true,
+        "deterministicIdCandidateCount": 0,
+        "mergeCandidateCount": 0,
+        "preparedRowCount": 0,
+        "uniqueCandidateCount": 0,
+        "uniqueConstraintCount": 0
+      },
+      "destinationTable": "tecnologia.request_messages",
+      "sourceTable": "tb_workspace.solicitacoes_mensagens",
+      "status": "ready",
+      "stepId": "workspace-ti-message-insert",
+      "tenant": {
+        "casteloRowCount": 19,
+        "distinctOrganizationCount": 1,
+        "otherTenantRowCount": 0,
+        "scopeProven": true
+      }
+    }
+  ],
+  "summary": {
+    "blockedStepCount": 0,
+    "blockerCount": 0,
+    "excludedPendingTableCount": 210,
+    "pendingTableCount": 210,
+    "stepCount": 132,
+    "unresolvedQuarantineCount": 0
+  },
+  "transactionMode": "READ ONLY",
+  "writesPerformed": false
+}

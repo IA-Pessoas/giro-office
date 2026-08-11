@@ -1,0 +1,572 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import test from "node:test";
+
+import { validateMappingRule } from "../lib/mapping-contract.mjs";
+import { loadPrismaCatalog } from "../lib/prisma-catalog.mjs";
+import { iterateSqlRows } from "../lib/sql-dump-parser.mjs";
+import { buildRuleRegistry, RH_PESSOAL_RULES, V2_RULES } from "../rules/index.mjs";
+import { buildRhPessoalRuleContext } from "../rules/rh-pessoal.mjs";
+import { buildRhPessoalRuntimeState } from "../runtime/rh-pessoal.mjs";
+
+const LEGACY_DUMP_ROOT = "/home/bruno/Documents/03.08.2026";
+
+function rule(sourceTable) {
+  const found = buildRuleRegistry(RH_PESSOAL_RULES).get(sourceTable);
+  assert.ok(found, `regra ausente: ${sourceTable}`);
+  return found;
+}
+
+function step(mappingRule, stepId) {
+  const found = mappingRule.destinations.find((candidate) => candidate.stepId === stepId);
+  assert.ok(found, `passo ausente: ${mappingRule.sourceTable}.${stepId}`);
+  return found;
+}
+
+async function inspectDeclaredColumns(sourceTable) {
+  const dump = await readFile(path.join(LEGACY_DUMP_ROOT, `${sourceTable}.sql`), "utf8");
+  const createBody = dump.match(/CREATE TABLE[\s\S]*?\(([\s\S]*?)\) ENGINE=/)?.[1];
+  assert.ok(createBody, `CREATE TABLE ausente: ${sourceTable}`);
+  return [...createBody.matchAll(/^\s*`([^`]+)`/gm)].map((match) => match[1]);
+}
+
+test("registro combinado contém V2 e RH/Pessoal sem colisões de sourceTable", () => {
+  const registry = buildRuleRegistry(RH_PESSOAL_RULES);
+
+  assert.equal(V2_RULES.length, 16);
+  assert.equal(RH_PESSOAL_RULES.length, 25);
+  assert.equal(registry.size, 41);
+  assert.equal(
+    new Set([...V2_RULES, ...RH_PESSOAL_RULES].map(({ sourceTable }) => sourceTable)).size,
+    41,
+  );
+  assert.equal(
+    RH_PESSOAL_RULES.some(({ sourceTable }) => sourceTable === "tb_rh.colaboradores"),
+    false,
+  );
+});
+
+test("todas as regras RH/Pessoal são válidas contra o catálogo Prisma atual", async () => {
+  const catalog = await loadPrismaCatalog("infra/prisma/schema.prisma");
+
+  for (const mappingRule of RH_PESSOAL_RULES) {
+    assert.equal(validateMappingRule(mappingRule, catalog), true, mappingRule.sourceTable);
+  }
+});
+
+test("toda coluna declarada nos 25 dumps confirmed termina mapped ou not_preserved com razão", async () => {
+  for (const mappingRule of RH_PESSOAL_RULES) {
+    const expected = await inspectDeclaredColumns(mappingRule.sourceTable);
+    const classified = new Set();
+
+    for (const destination of mappingRule.destinations) {
+      for (const column of destination.columns) {
+        if (column.sourceColumn === null) continue;
+        assert.ok(
+          expected.includes(column.sourceColumn),
+          `${mappingRule.sourceTable}.${column.sourceColumn}`,
+        );
+        classified.add(column.sourceColumn);
+        assert.ok(["mapped", "not_preserved"].includes(column.status));
+        assert.ok(column.reason.length >= 20, `${mappingRule.sourceTable}.${column.sourceColumn}`);
+        if (column.status === "not_preserved") {
+          assert.equal(column.destinationColumn, null);
+        }
+      }
+    }
+
+    assert.deepEqual([...classified].sort(), [...expected].sort(), mappingRule.sourceTable);
+  }
+});
+
+test("referência de User ausente não fabrica identidade e produz USER_REFERENCE_NOT_FOUND", () => {
+  const mappingRule = rule("tb_rh.alergias");
+  const classification = mappingRule.classifySourceRow(
+    { id: 7, colaborador_id: 91, nome: "sentinela pessoal" },
+    { userResolution: "zero" },
+  );
+  const emissions = mappingRule.emitRows(
+    { id: 7, colaborador_id: 91, nome: "sentinela pessoal" },
+    { userResolution: "zero" },
+  );
+
+  assert.deepEqual(classification, {
+    status: "quarantine",
+    field: "colaborador_id",
+    reasonCode: "USER_REFERENCE_NOT_FOUND",
+  });
+  assert.equal(emissions[0].status, "quarantine");
+  assert.equal(emissions[0].reasonCode, "USER_REFERENCE_NOT_FOUND");
+  assert.doesNotMatch(JSON.stringify({ classification, emissions }), /sentinela pessoal/);
+  assert.doesNotMatch(emissions[0].identityRef, /unknown/);
+});
+
+test("alergias e contatos usam contrato aggregate N:1 com identidade do colaborador pai", () => {
+  for (const sourceTable of ["tb_rh.alergias", "tb_rh.contatos_emergencia"]) {
+    const mappingRule = rule(sourceTable);
+    const destination = mappingRule.destinations[0];
+    const rows = [
+      { id: 5, colaborador_id: 2 },
+      { id: 4, colaborador_id: 2 },
+    ];
+
+    assert.equal(mappingRule.cardinality, "N:1", sourceTable);
+    assert.equal(destination.mode, "aggregate", sourceTable);
+    assert.deepEqual(destination.identity, {
+      kind: "aggregate",
+      parentSourceTable: "tb_rh.colaboradores",
+      parentLegacyColumn: "id",
+      childForeignKey: "colaborador_id",
+    });
+    const emissions = mappingRule.emitRows(rows, { userResolution: "one" });
+    assert.equal(emissions.length, 2, sourceTable);
+    assert.ok(
+      emissions.every(({ status }) => status === "prepared"),
+      sourceTable,
+    );
+    assert.ok(
+      emissions.every(({ identityRef }) => identityRef === "tb_rh.colaboradores:2"),
+      sourceTable,
+    );
+  }
+});
+
+test("credenciais exigem criptografia e nenhuma decisão expõe login, senha, email ou CPF", () => {
+  const credentialRules = [
+    "tb_pessoal.bem",
+    "tb_pessoal.bsf",
+    "tb_pessoal.codigos_acesso",
+    "tb_pessoal.contri_assis",
+    "tb_pessoal.empregador_web",
+  ];
+  const sentinels = {
+    usuario: "SENTINEL_LOGIN",
+    identificador: "SENTINEL_IDENTIFIER",
+    cpf: "SENTINEL_CPF",
+    login: "SENTINEL_LOGIN_2",
+    senha: "SENTINEL_PASSWORD",
+    cod_acesso: "SENTINEL_ACCESS_CODE",
+    senha_gov: "SENTINEL_GOV_PASSWORD",
+    email: "SENTINEL_EMAIL",
+    senha_email: "SENTINEL_EMAIL_PASSWORD",
+  };
+
+  for (const sourceTable of credentialRules) {
+    const mappingRule = rule(sourceTable);
+    const row = { id: 5, empresa: 8, cliente_id: 8, responsavel: 0, ...sentinels };
+    const context = { clientResolution: "one", responsibleResolution: "one" };
+    const classification = mappingRule.classifySourceRow(row, context);
+    const emissions = mappingRule.emitRows(row, context);
+    const serialized = JSON.stringify({
+      classification,
+      emissions,
+      evidence: mappingRule.evidence,
+    });
+
+    assert.equal(classification.status, "quarantine", sourceTable);
+    assert.equal(classification.reasonCode, "CREDENTIAL_REQUIRES_ENCRYPTION", sourceTable);
+    assert.equal(emissions[0].reasonCode, "CREDENTIAL_REQUIRES_ENCRYPTION", sourceTable);
+    for (const sentinel of Object.values(sentinels)) {
+      assert.doesNotMatch(serialized, new RegExp(sentinel), sourceTable);
+    }
+
+    const encrypted = mappingRule.destinations[0].columns.filter(
+      ({ sensitivity }) => sensitivity === "credential",
+    );
+    assert.ok(encrypted.length > 0, sourceTable);
+    assert.ok(encrypted.every(({ transformation }) => transformation === "encrypt_credential"));
+  }
+});
+
+test("solicitação converte responsável legado ausente em null e quarentena referências inválidas", () => {
+  const mappingRule = rule("tb_rh.solicitacoes");
+  const destination = step(mappingRule, "rh-request-insert");
+  const requester = destination.columns.find(({ sourceColumn }) => sourceColumn === "requerente");
+  const assignee = destination.columns.find(({ sourceColumn }) => sourceColumn === "atribuido");
+
+  assert.equal(requester.destinationColumn, "requester_user_id");
+  assert.equal(requester.transformation, "resolve_collaborator_user_reference");
+  assert.match(requester.reason, /tb_rh\.colaboradores/i);
+  assert.equal(assignee.destinationColumn, "assigned_to_user_id");
+  assert.equal(assignee.transformation, "resolve_optional_collaborator_rh_assignee");
+  assert.equal(assignee.nullHandling, "zero_empty_or_missing_to_null");
+  assert.ok(destination.dependencies.includes("tb_rh.colaboradores"));
+  assert.ok(destination.dependencies.includes("tb_admin.usuarios"));
+
+  const base = {
+    id: 17,
+    titulo: "Solicitação válida",
+    descricao: "Descrição válida",
+    requerente: 145,
+    categoria: 3,
+  };
+  const required = {
+    requesterResolution: "one",
+    requesterUserId: "user-requester",
+    categoryResolution: "one",
+  };
+
+  for (const atribuido of [0, "0", "", null, undefined]) {
+    assert.equal(mappingRule.emitRows({ ...base, atribuido }, required)[0].status, "prepared");
+  }
+
+  assert.equal(
+    mappingRule.emitRows(
+      { ...base, atribuido: 44 },
+      { ...required, assigneeResolution: "one", assigneeUserId: "user-assignee" },
+    )[0].status,
+    "prepared",
+  );
+
+  const [sameRequesterAssignee] = mappingRule.emitRows(
+    { ...base, atribuido: 44 },
+    { ...required, assigneeResolution: "one", assigneeUserId: "user-requester" },
+  );
+  assert.equal(sameRequesterAssignee.status, "quarantine");
+  assert.equal(sameRequesterAssignee.reasonCode, "ASSIGNEE_EQUALS_REQUESTER");
+
+  for (const assigneeResolution of ["zero", "many", "not_executed"]) {
+    const [emission] = mappingRule.emitRows(
+      { ...base, atribuido: 44 },
+      { ...required, assigneeResolution, assigneeUserId: "user-assignee" },
+    );
+    assert.equal(emission.status, "quarantine", assigneeResolution);
+    assert.match(emission.reasonCode, /^ASSIGNEE_REFERENCE_/, assigneeResolution);
+  }
+  assert.equal(
+    mappingRule.emitRows(
+      { ...base, atribuido: "id inválido" },
+      { ...required, assigneeResolution: "one", assigneeUserId: "user-assignee" },
+    )[0].reasonCode,
+    "ASSIGNEE_REFERENCE_INVALID",
+  );
+});
+
+test("adaptador runtime de solicitação separa categoria, solicitante e responsável", () => {
+  const state = buildRhPessoalRuntimeState({
+    resolveCollaboratorUser: (legacyId) => (legacyId === 145 ? { id: "requester-user" } : null),
+    resolveRequestCategory: (legacyId) => (legacyId === 3 ? { id: "request-category" } : null),
+  });
+  const base = {
+    id: 17,
+    titulo: "Solicitação válida",
+    descricao: "Descrição válida",
+    requerente: 145,
+    categoria: 3,
+  };
+
+  assert.deepEqual(
+    buildRhPessoalRuleContext("tb_rh.solicitacoes", { ...base, atribuido: 0 }, state),
+    {
+      requesterResolution: "one",
+      requesterUserId: "requester-user",
+      categoryResolution: "one",
+      categoryId: "request-category",
+      assigneeResolution: "zero",
+      assigneeUserId: null,
+    },
+  );
+
+  assert.deepEqual(
+    buildRhPessoalRuleContext(
+      "tb_rh.solicitacoes",
+      { ...base, categoria: 99, atribuido: 0 },
+      state,
+    ),
+    {
+      requesterResolution: "one",
+      requesterUserId: "requester-user",
+      categoryResolution: "zero",
+      categoryId: null,
+      assigneeResolution: "zero",
+      assigneeUserId: null,
+    },
+  );
+});
+
+test("solicitação usa marcador para title e description vazios", () => {
+  const mappingRule = rule("tb_rh.solicitacoes");
+  const destination = step(mappingRule, "rh-request-insert");
+  const validRow = {
+    id: 17,
+    titulo: "Solicitação válida",
+    descricao: "Descrição válida",
+    requerente: 145,
+    atribuido: 44,
+    categoria: 3,
+  };
+  const validContext = {
+    requesterResolution: "one",
+    requesterUserId: "user-requester",
+    assigneeResolution: "one",
+    assigneeUserId: "user-assignee",
+    categoryResolution: "one",
+  };
+  const emptyCases = [
+    ["titulo", undefined],
+    ["titulo", "   "],
+    ["descricao", undefined],
+    ["descricao", "\t"],
+  ];
+
+  for (const [field, value] of emptyCases) {
+    const [emission] = mappingRule.emitRows({ ...validRow, [field]: value }, validContext);
+    assert.equal(emission.status, "prepared", `${field}:${String(value)}`);
+  }
+  assert.equal(mappingRule.emitRows(validRow, validContext)[0].status, "prepared");
+  assert.equal("description" in destination.defaults, false);
+});
+
+test("IDs de operador RH legados resolvem o User pelo vínculo de colaborador", () => {
+  const cases = [
+    ["tb_rh.pontos_adicionais_folhas", "adicionado_por", "added_by_user_id"],
+    ["tb_rh.pontos_solicitacoes", "aprovador", "approver_user_id"],
+    ["tb_rh.solicitacoes_mensagens", "remetente", "sender_user_id"],
+  ];
+
+  for (const [sourceTable, sourceColumn, destinationColumn] of cases) {
+    const mappingRule = rule(sourceTable);
+    const column = mappingRule.destinations[0].columns.find(
+      (candidate) => candidate.sourceColumn === sourceColumn,
+    );
+
+    assert.equal(column.destinationColumn, destinationColumn, sourceTable);
+    assert.equal(column.transformation, "resolve_collaborator_user_reference", sourceTable);
+    assert.match(column.reason, /tb_rh\.colaboradores/i, sourceTable);
+    assert.ok(mappingRule.destinations[0].dependencies.includes("tb_rh.colaboradores"));
+  }
+});
+
+test("score_avaliacoes usa user_id como avaliador e avaliador como código de papel", () => {
+  const mappingRule = rule("tb_rh.score_avaliacoes");
+  const destination = step(mappingRule, "rh-score-evaluation-insert");
+  const userId = destination.columns.find(({ sourceColumn }) => sourceColumn === "user_id");
+  const evaluatorRole = destination.columns.find(
+    ({ sourceColumn, destinationColumn }) =>
+      sourceColumn === "avaliador" && destinationColumn === "evaluator_role",
+  );
+  const type = destination.columns.find(
+    ({ sourceColumn, destinationColumn }) =>
+      sourceColumn === "tipo" && destinationColumn === "type",
+  );
+
+  assert.equal(userId.status, "mapped");
+  assert.equal(userId.destinationColumn, "evaluator_id");
+  assert.equal(userId.transformation, "resolve_optional_user_reference");
+  assert.equal(evaluatorRole.transformation, "normalize_score_evaluator_role_code");
+  assert.match(evaluatorRole.reason, /0=SELF.*1=LEADER.*2=RH.*3=DIRECTOR.*4=TI.*5=SUBORDINATE/);
+  assert.equal(type.transformation, "normalize_score_question_type");
+  assert.equal(
+    destination.columns.some(
+      ({ sourceColumn, destinationColumn }) =>
+        sourceColumn === "tipo" && destinationColumn === "evaluator_role",
+    ),
+    false,
+  );
+});
+
+test("score_nitro executa a fórmula legada nos limiares e em linhas reais do dump", async () => {
+  const { SCORE_NITRO_TRANSFORMATIONS } = await import("../rules/rh-pessoal.mjs");
+  const mappingRule = rule("tb_rh.score_nitro");
+  const destination = step(mappingRule, "rh-score-nitro-insert");
+
+  function transformRow(row) {
+    const transformed = {};
+    for (const column of destination.columns) {
+      if (
+        ![
+          "hours_score",
+          "projects_score",
+          "errors_score",
+          "folders_score",
+          "total_hours",
+          "total_errors",
+        ].includes(column.destinationColumn)
+      ) {
+        continue;
+      }
+      const transform = SCORE_NITRO_TRANSFORMATIONS?.[column.transformation];
+      assert.equal(typeof transform, "function", column.transformation);
+      transformed[column.destinationColumn] = transform(row);
+    }
+    return transformed;
+  }
+
+  assert.deepEqual(transformRow({ avaliacoes: 7.999, ch: 9, projetos: 0, erros: 0, pastas: 0 }), {
+    hours_score: 0,
+    total_hours: 9,
+    projects_score: 0,
+    errors_score: 0,
+    total_errors: 0,
+    folders_score: 0,
+  });
+  assert.deepEqual(transformRow({ avaliacoes: 8, ch: 10, projetos: 2, erros: -3, pastas: -4 }), {
+    hours_score: 1.5,
+    total_hours: 10,
+    projects_score: 2,
+    errors_score: 3,
+    total_errors: 3,
+    folders_score: -0.5,
+  });
+
+  const dumpRows = [];
+  for await (const row of iterateSqlRows(path.join(LEGACY_DUMP_ROOT, "tb_rh.score_nitro.sql"))) {
+    dumpRows.push(row);
+  }
+  assert.equal(dumpRows.length, 48);
+  for (const row of dumpRows) {
+    const transformed = transformRow(row);
+    const legacyContribution =
+      (Number(row.avaliacoes) >= 8 ? 0.5 : 0) +
+      (Number(row.ch) >= 10 ? 1 : 0) +
+      Number(row.projetos) +
+      Number(row.erros) +
+      (Number(row.pastas) > 0 ? 0.5 : Number(row.pastas) < 0 ? -0.5 : 0);
+    const currentContribution =
+      transformed.projects_score +
+      transformed.hours_score -
+      transformed.errors_score +
+      transformed.folders_score;
+    assert.equal(currentContribution, legacyContribution, `score_nitro id=${row.id}`);
+  }
+  const realRows = new Map(dumpRows.map((row) => [Number(row.id), row]));
+  const row19 = transformRow(realRows.get(19));
+  assert.deepEqual(row19, {
+    hours_score: 1.5,
+    total_hours: 14,
+    projects_score: 0,
+    errors_score: 0,
+    total_errors: 0,
+    folders_score: 0,
+  });
+  assert.deepEqual(transformRow(realRows.get(7)), {
+    hours_score: 0,
+    total_hours: 0,
+    projects_score: 1,
+    errors_score: 1,
+    total_errors: 1,
+    folders_score: 0,
+  });
+  const row49 = transformRow(realRows.get(49));
+  assert.deepEqual(row49, {
+    hours_score: 0,
+    total_hours: 0,
+    projects_score: 1,
+    errors_score: 0,
+    total_errors: 0,
+    folders_score: 0.5,
+  });
+
+  const currentContribution = transformRow(realRows.get(7));
+  assert.equal(
+    currentContribution.projects_score +
+      currentContribution.hours_score -
+      currentContribution.errors_score +
+      currentContribution.folders_score,
+    0,
+  );
+  assert.equal(
+    row19.projects_score + row19.hours_score - row19.errors_score + row19.folders_score,
+    1.5,
+  );
+  assert.equal(
+    row49.projects_score + row49.hours_score - row49.errors_score + row49.folders_score,
+    1.5,
+  );
+});
+
+test("ponto real com entrada zero fica em quarentena antes de projetar clock_in nulo", async () => {
+  const mappingRule = rule("tb_rh.pontos_registros");
+  let realRow;
+  for await (const row of iterateSqlRows(
+    path.join(LEGACY_DUMP_ROOT, "tb_rh.pontos_registros.sql"),
+  )) {
+    if (String(row.id) === "63") {
+      realRow = row;
+      break;
+    }
+  }
+  assert.ok(realRow, "tb_rh.pontos_registros id=63 ausente do dump aprovado");
+  assert.equal(realRow.entrada, "00:00:00");
+
+  assert.deepEqual(mappingRule.classifySourceRow(realRow, { userResolution: "one" }), {
+    status: "quarantine",
+    field: "entrada",
+    reasonCode: "REQUIRED_TIME_EMPTY",
+  });
+});
+
+test("sindicato e obrigação respeitam as identidades compostas dos contratos atuais", () => {
+  const unionRule = rule("tb_pessoal.sindicato");
+  const obligationRule = rule("tb_pessoal.obrigacoes");
+  const unionStep = step(unionRule, "pessoal-union-insert");
+  const obligationStep = step(obligationRule, "pessoal-obligation-insert");
+
+  assert.ok(unionStep.precedence.includes("unique_organization_name_cnpj_base_date"));
+  assert.equal(
+    unionRule.emitRows(
+      { id: 1, nome: "Sindicato", cnpj: "00", data_base: "2026-01-01" },
+      { unionUniqueResolution: "zero" },
+    )[0].status,
+    "prepared",
+  );
+  assert.equal(
+    unionRule.emitRows(
+      { id: 1, nome: "Sindicato", cnpj: "00", data_base: "2026-01-01" },
+      { unionUniqueResolution: "one" },
+    )[0].reasonCode,
+    "UNION_UNIQUE_CONFLICT",
+  );
+
+  assert.ok(obligationStep.precedence.includes("unique_organization_client_competence"));
+  assert.equal(
+    obligationRule.emitRows(
+      { id: 2, cliente_id: 9, comp: "08/2026", responsavel_id: 0 },
+      {
+        clientResolution: "one",
+        obligationUniqueResolution: "zero",
+      },
+    )[0].status,
+    "prepared",
+  );
+  assert.equal(
+    obligationRule.emitRows(
+      { id: 2, cliente_id: 9, comp: "08/2026", responsavel_id: 0 },
+      {
+        clientResolution: "one",
+        obligationUniqueResolution: "one",
+      },
+    )[0].reasonCode,
+    "OBLIGATION_UNIQUE_CONFLICT",
+  );
+});
+
+test("quarentena nunca inclui valores pessoais nem conteúdo livre da origem", () => {
+  const sentinel = "SENTINEL_PERSONAL_CONTENT";
+  const cases = [
+    [
+      "tb_rh.contatos_emergencia",
+      { id: 1, colaborador_id: 7, nome: sentinel, referencia: sentinel, numero: sentinel },
+      { userResolution: "many" },
+    ],
+    [
+      "tb_pessoal.clientes_situacoes",
+      { id: 2, cliente_id: 9, titulo: sentinel, descricao: sentinel, cadastrado_por: 4 },
+      { clientResolution: "zero", registeredByResolution: "one" },
+    ],
+    [
+      "tb_rh.solicitacoes_mensagens",
+      { id: 3, solicitacao: 10, remetente: 11, mensagem: sentinel },
+      { requestResolution: "zero", senderResolution: "one" },
+    ],
+  ];
+
+  for (const [sourceTable, row, context] of cases) {
+    const mappingRule = rule(sourceTable);
+    const classification = mappingRule.classifySourceRow(row, context);
+    const emissions = mappingRule.emitRows(row, context);
+    assert.equal(classification.status, "quarantine", sourceTable);
+    assert.doesNotMatch(JSON.stringify({ classification, emissions }), new RegExp(sentinel));
+  }
+});

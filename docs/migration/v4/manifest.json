@@ -1,0 +1,57 @@
+{
+  "packageVersion": 4,
+  "mode": "dry-run",
+  "sourceBackup": "03.08.2026",
+  "legacySourceLabel": "workspace2",
+  "tenant": {
+    "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b",
+    "slug": "castelo-contabilidade"
+  },
+  "namespace": "3f68d246-0b54-4a10-9415-a8845a767fb5",
+  "sourceDigest": "e76a761406a4cc2e2aa2cae959c51be79c59a968f06a12f0702f3233876cb742",
+  "sourceTables": 312,
+  "counts": {
+    "origins": 312,
+    "confirmed": 103,
+    "pending": 209,
+    "destinations": 133,
+    "sourceRows": 1374880,
+    "prepared": 0,
+    "quarantine": 0,
+    "notEmitted": 0,
+    "blockedRows": 751741,
+    "modes": {
+      "aggregate": 4,
+      "derived": 14,
+      "insert": 90,
+      "lookup": 4,
+      "merge": 21
+    }
+  },
+  "preflightExecuted": true,
+  "transactionMode": "READ ONLY",
+  "readyForMigration": true,
+  "writesPerformed": false,
+  "hashes": {
+    ".gitattributes": "49db1badf4a820b264f5edafe1bcc54f191d99a6e05f842632c884b855849b79",
+    "README.md": "39c65d0bab3cea40313786b987f730ecb4531c81d8fc7c47c0f50b937c0becb7",
+    "mapping/columns.csv": "8e2f72b19d48f00f3c451a58a627de6c9946dba78fb1475e94924cb71f5b4c4c",
+    "mapping/columns.json": "f64b44291c9c89c02e5cd24d5d5578745dcddf0b2477d78b6a325ef7ca511569",
+    "mapping/destinations.csv": "5e8e8670557e2a01ef5babe28289f9fb39b5cbc761aea06dbcb4f6b39bda14a1",
+    "mapping/destinations.json": "e67f68d0e5273faad48b02a3268b034109050d0403fef9f5bc44e6113d8fc128",
+    "mapping/tables.csv": "8dd6ed9ec2524eb8325a79450da798ef41396b30831058011fbe1a3f29a9c5bd",
+    "mapping/tables.json": "7b5b767b058967593c31a2929c365999cd7fe895823488b9c7315476a0c87da9",
+    "pending-mapping/tables.csv": "cfdc35aca7f1bbd9cf78d11762760b1dbf9b0769387a4cb9a8f41867a8d2c6da",
+    "pending-mapping/tables.json": "4c0838be8ba1fb1e3895809d7968db13cbcb7ad0b41723615e9fe06d062f41be",
+    "preflight/blocked.csv": "c2c43429f731280e71cec7d35d709bd00c0f04030970a2635eb97326c1c5bf53",
+    "preflight/summary.json": "c57895aa3e20e60cc9d5c8f33fb3426ca2739b509b5002cfd1b9e9f45b4097ef",
+    "quarantine/reasons.csv": "390a0d21582005b2eadc6cfb91f21ee8356d9c1e4330ad6438d68bf0a78548dc",
+    "quarantine/summary.json": "0c52d58138b62e413718b20c0d1b3c1e9a36b828bea9ef8ce38191fc006879d6",
+    "reports/legacy-behavior-analysis.json": "816cd61b4c538d949bc904eae67737446c08d594f9416273bbb143fcad1a0f82",
+    "reports/legacy-behavior-analysis.md": "6e6825e380dd7cca92453d26c24f25fdc6bc3763f3f51c786e2a295e8eefbe59",
+    "reports/previous-mapping-comparison.json": "392eb8e6db470ca5ff28aa4e3bc1eea33a7d8a3e38f90a375fa58ebecc041768",
+    "reports/semantic-decisions.json": "4c791813724ba97924c7bcdd856587603a41db3ae7ba878afec9ce42c34ead20",
+    "reports/source-inventory.json": "d0b8d765f9a7cd591f47599b732fd0dc74ebcc576b925e589243a34779d0da1a",
+    "reports/supabase-preflight.json": "81aaa1822ebb33097b6453287b90fc4dac2f16a7f95aaccf23e279d35523154c"
+  }
+}

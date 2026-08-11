@@ -1,0 +1,105 @@
+{
+  "mode": "apply",
+  "writesPerformed": true,
+  "cleanup": {
+    "targets": 0,
+    "writes": 0
+  },
+  "load": {
+    "destinationCounts": {
+      "users": 1,
+      "rh.timeBankReleases": 2,
+      "rh.timeSheets": 80,
+      "rh.points": 2241
+    },
+    "prepared": 2324,
+    "reconciliationTargets": [
+      {
+        "aggregateColumn": "emergency_contacts",
+        "expectedAggregateCount": 2,
+        "identity": {
+          "id": "f6c38aa5-b2d9-5b8f-af8c-185b0094bda6"
+        },
+        "step": {
+          "key": "tb_rh.contatos_emergencia\u0000user-emergency-contacts-merge",
+          "sourceTable": "tb_rh.contatos_emergencia",
+          "stepId": "user-emergency-contacts-merge",
+          "destinationTable": "users",
+          "dependencies": [
+            "tb_rh.colaboradores",
+            "tb_admin.usuarios"
+          ],
+          "contract": {
+            "contextRequirements": [],
+            "tenantScope": {
+              "kind": "organization_column",
+              "column": "organization_id",
+              "organizationId": "e8048d1c-0830-45d7-84de-68e20abd685b"
+            },
+            "projection": {
+              "kind": "column_transformers",
+              "callbackDigests": {
+                "classifySourceRow": "3875ff98a2b1f51525868111db66dfa71559caec87e4fda8b1cf7529ca39cdc6",
+                "emitRows": "7c7ee2ef660b20ebe4f7eefcc9d929c251d5aedf70a7a69ed0e574781f3284f7",
+                "projector": "e9ed89488dce5fac1a6ae47f4d3407dcc5321476ce31272022f87d725540d241"
+              }
+            },
+            "write": {
+              "kind": "replace_owned_aggregate"
+            },
+            "cleanup": {
+              "kind": "replace_owned_aggregate",
+              "identityColumns": [
+                "id"
+              ],
+              "ownedColumns": [
+                "emergency_contacts"
+              ],
+              "resetValues": {
+                "emergency_contacts": null
+              }
+            }
+          },
+          "fields": {},
+          "jsonColumns": {},
+          "requiredForeignKeys": [
+            {
+              "column": "organization_id",
+              "targetColumn": "id",
+              "targetTable": "organizations"
+            },
+            {
+              "column": "permission_id",
+              "targetColumn": "id",
+              "targetTable": "permissions"
+            },
+            {
+              "column": "department_id",
+              "targetColumn": "id",
+              "targetTable": "departments"
+            }
+          ],
+          "requiredColumns": [
+            "id",
+            "name",
+            "login",
+            "password",
+            "permission",
+            "status",
+            "session_version",
+            "department_id"
+          ],
+          "tableSql": "\"users\""
+        }
+      }
+    ],
+    "skipped": 0,
+    "writes": 1
+  },
+  "reconciliation": {
+    "databaseQueries": 1,
+    "matches": true,
+    "prepared": 2324,
+    "writes": 1
+  }
+}

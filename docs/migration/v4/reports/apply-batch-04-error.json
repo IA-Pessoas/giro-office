@@ -1,0 +1,76 @@
+{
+  "batchIndex": 4,
+  "failedAt": "2026-08-10T12:13:23.926Z",
+  "sources": [
+    "tb_pessoal.codigos_acesso",
+    "tb_pessoal.contri_assis",
+    "tb_pessoal.empregador_web",
+    "tb_pessoal.ldd",
+    "tb_regularize.clientes",
+    "tb_regularize.vencimento"
+  ],
+  "error": {
+    "name": "Error",
+    "message": "MIGRATION_UPDATE_COLUMNS_NOT_OWNED",
+    "code": "MIGRATION_UPDATE_COLUMNS_NOT_OWNED",
+    "details": {
+      "stepKey": "tb_regularize.clientes\u0000regularize-client-merge",
+      "sourceTable": "tb_regularize.clientes",
+      "stepId": "regularize-client-merge",
+      "destinationTable": "clients",
+      "columns": [
+        "dominio_code",
+        "name",
+        "company_name",
+        "fantasy_name",
+        "cpf_cnpj",
+        "cnae",
+        "responsible",
+        "number",
+        "email",
+        "address",
+        "cep",
+        "neighborhood",
+        "state",
+        "city",
+        "customer_since",
+        "municipal_registration",
+        "state_registration",
+        "commercial_board_registration",
+        "status",
+        "competence_entry",
+        "competence_output"
+      ],
+      "ownedColumns": [
+        "dominio_code",
+        "company_name",
+        "fantasy_name",
+        "cpf_cnpj",
+        "cnae",
+        "responsible",
+        "number",
+        "email",
+        "address",
+        "cep",
+        "neighborhood",
+        "state",
+        "city",
+        "customer_since",
+        "municipal_registration",
+        "state_registration",
+        "commercial_board_registration",
+        "competence_entry",
+        "competence_output"
+      ]
+    },
+    "stack": [
+      "Error: MIGRATION_UPDATE_COLUMNS_NOT_OWNED",
+      "    at migrationError (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:769:17)",
+      "    at assertOwnedUpdate (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:722:11)",
+      "    at Object.loadMappedData [as load] (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:245:7)",
+      "    at async runMigration (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/lib/migration-runner.mjs:39:24)",
+      "    at async main (file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:395:24)",
+      "    at async file:///home/bruno/Documents/Projects/giro-office/.worktrees/migration-v4-mapping/docs/migration/v4/scripts/apply-batches.mjs:450:3"
+    ]
+  }
+}
