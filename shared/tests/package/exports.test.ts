@@ -16,4 +16,5 @@ test("package root and subpath exports resolve", async () => {
   assert.equal(root.createAuditRecorder, audit.createAuditRecorder);
   assert.equal(root.createLogger, logger.createLogger);
   assert.equal(root.EncryptionService, security.EncryptionService);
+  assert.equal(root.createEncryptedTextCrypto, security.createEncryptedTextCrypto);
 });
