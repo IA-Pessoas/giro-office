@@ -53,6 +53,8 @@
     },
     "./security": {
       "types": "./dist/security/index.d.ts",
+      "development": "./src/security/index.ts",
+      "import": "./dist/security/index.js",
       "default": "./dist/security/index.js"
     },
     "./storage": {
