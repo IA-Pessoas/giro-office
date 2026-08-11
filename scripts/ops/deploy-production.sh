@@ -49,6 +49,11 @@ if [[ "$ENV_ROOT" != "$ROOT" ]]; then
   exit 1
 fi
 
+# `env_file` configura o container, mas args NEXT_PUBLIC_* precisam estar no ambiente do Compose
+# durante o build da imagem Next.js.
+# shellcheck source=scripts/ops/load-production-web-env.sh
+source "$ROOT/scripts/ops/load-production-web-env.sh" "$ROOT/.env.vps.web"
+
 phase compose-config
 "${COMPOSE[@]}" config --quiet
 
