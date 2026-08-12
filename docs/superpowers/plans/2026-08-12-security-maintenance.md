@@ -110,7 +110,7 @@ git commit -m "fix(ops): harden production host access"
 
 **Files:**
 - Create on host: `/home/debian/.ssh/authorized_keys`
-- Create on host: `/etc/ssh/sshd_config.d/99-giro-hardening.conf`
+- Create on host: `/etc/ssh/sshd_config.d/00-giro-hardening.conf`
 - Create on host: `/etc/fail2ban/jail.d/giro-sshd.local`
 - Create on host: `/usr/local/sbin/apply-giro-docker-firewall`
 - Create on host: `/etc/systemd/system/giro-docker-firewall.service`
@@ -140,7 +140,8 @@ Create `/home/debian/.ssh`, copy `/root/.ssh/authorized_keys`, set `debian:debia
 
 - [ ] **Step 4: Validate and reload SSH hardening**
 
-Install the drop-in, run `sshd -t`, reload `ssh.service`, and verify effective values with
+Install the drop-in with a `00-` prefix so it is evaluated before cloud-init's
+`50-cloud-init.conf`, run `sshd -t`, reload `ssh.service`, and verify effective values with
 `sshd -T`. Do not restart the SSH daemon and do not remove the root authorized key.
 
 - [ ] **Step 5: Enable UFW without cutting the active services**
