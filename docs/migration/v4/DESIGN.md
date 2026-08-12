@@ -267,6 +267,14 @@ reconciliação precisam ser explícitas, documentadas e testadas.
 
 ## Pending e quarentena
 
+Somente linhas que a primeira classificação colocou em `quarantine` são reavaliadas. Para essas
+linhas, em uma tabela `confirmed`, campos textuais vazios são normalizados para `******`. Quando a
+identidade primária legada está vazia, a execução usa um identificador numérico determinístico
+derivado da tabela e do conteúdo sanitizado da linha, que então alimenta a mesma estratégia UUID v5
+já usada pela V4. Referências/FKs ausentes não são inventadas: uma FK opcional recebe `NULL`; uma FK
+obrigatória sem destino permanece registrada como não migrada com o motivo correspondente. Linhas
+já preparadas, fontes `pending` e itens fora da quarentena funcional permanecem inalterados.
+
 Cada item de `pending-mapping` registra tabela, contagem, motivo e evidência do contrato ausente ou
 incompatível.
 
