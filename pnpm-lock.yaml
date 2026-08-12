@@ -1059,7 +1059,9 @@ importers:
       node-cron:
         specifier: ^3.0.2
         version: 3.0.3
-$19.0.1$29.0.1
+      nodemailer:
+        specifier: 9.0.1
+        version: 9.0.1
       pg:
         specifier: ^8.13.0
         version: 8.20.0
