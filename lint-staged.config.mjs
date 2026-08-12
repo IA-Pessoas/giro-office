@@ -1,5 +1,3 @@
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
 function shellQuote(value) {
   if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) {
     return value;
