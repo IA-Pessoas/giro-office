@@ -1,0 +1,48 @@
+name: Ruleset Policy Drift
+
+on:
+  pull_request:
+    branches: [develop, main, staging]
+  schedule:
+    - cron: "47 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ruleset-policy:
+    name: security/ruleset-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout sem credenciais persistentes
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Exportar rulesets efetivos sem mutação
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pages="${RUNNER_TEMP}/ruleset-pages.json"
+          details="${RUNNER_TEMP}/ruleset-details"
+          actual="${RUNNER_TEMP}/actual-rulesets.json"
+          mkdir -p "$details"
+          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/rulesets" > "$pages"
+          mapfile -t ids < <(jq -r 'flatten | .[] | .id' "$pages")
+          if [ "${#ids[@]}" -eq 0 ]; then
+            printf '[]\n' > "$actual"
+          else
+            for id in "${ids[@]}"; do
+              gh api "repos/${GITHUB_REPOSITORY}/rulesets/${id}" > "${details}/${id}.json"
+            done
+            jq -s '.' "${details}"/*.json > "$actual"
+          fi
+          node scripts/github-ruleset-policy.mjs --policy .github/security/rulesets-policy.json --actual "$actual"
