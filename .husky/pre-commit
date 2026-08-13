@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
 set -eu
 
+node --test scripts/supply-chain-security.test.mjs
 pnpm lint-staged --concurrent false
