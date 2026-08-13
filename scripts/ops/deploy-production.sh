@@ -58,18 +58,31 @@ phase compose-config
 "${COMPOSE[@]}" config --quiet
 
 mkdir -p "$ROOT/.deploy"
-rollback_file="$ROOT/.deploy/production-image-ids-before.txt"
+rollback_file="$ROOT/.deploy/production-image-tags-before.txt"
+rollback_suffix="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 : >"$rollback_file"
 while IFS= read -r image; do
   [[ "$image" != workspace-* ]] && continue
   image_id="$(docker image inspect "$image" --format '{{.Id}}' 2>/dev/null || true)"
-  printf '%s|%s\n' "$image" "$image_id" >>"$rollback_file"
+  backup_image=""
+  if [[ -n "$image_id" ]]; then
+    backup_image="${image%:*}:rollback-${rollback_suffix}"
+    docker image tag "$image" "$backup_image"
+  fi
+  printf '%s|%s|%s\n' "$image" "$backup_image" "$image_id" >>"$rollback_file"
 done < <("${COMPOSE[@]}" config --images | sort -u)
 
 restore_images() {
-  while IFS='|' read -r image image_id; do
-    [[ -z "$image_id" ]] && continue
-    docker image tag "$image_id" "$image" >/dev/null 2>&1 || true
+  while IFS='|' read -r image backup_image image_id; do
+    [[ -z "$backup_image" || -z "$image_id" ]] && continue
+    docker image tag "$backup_image" "$image" >/dev/null 2>&1 || true
+  done <"$rollback_file"
+}
+
+cleanup_rollback_images() {
+  while IFS='|' read -r image backup_image image_id; do
+    [[ -z "$backup_image" || -z "$image_id" ]] && continue
+    docker image rm "$backup_image" >/dev/null 2>&1 || true
   done <"$rollback_file"
 }
 
@@ -116,5 +129,6 @@ if ! COMPOSE_PROJECT_NAME="$PROJECT" bash "$ROOT/scripts/ops/wait-production-end
 fi
 
 git -C "$ROOT" rev-parse HEAD >"$ROOT/.deploy/production-last-good-commit"
+cleanup_rollback_images
 rm -f "$rollback_file"
 echo "Deploy de produção concluído."

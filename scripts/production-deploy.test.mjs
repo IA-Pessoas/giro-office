@@ -11,6 +11,21 @@ const deployScript = path.join(repoRoot, "scripts", "ops", "deploy-production.sh
 const webEnvLoader = path.join(repoRoot, "scripts", "ops", "load-production-web-env.sh");
 const endpointWaiter = path.join(repoRoot, "scripts", "ops", "wait-production-endpoints.sh");
 const turboConfig = path.join(repoRoot, "turbo.json");
+const serviceDockerfile = path.join(repoRoot, "docker", "service.Dockerfile");
+
+test("production service image invalidates copied TypeScript incremental state before build", () => {
+  const dockerfile = readFileSync(serviceDockerfile, "utf8");
+  const installIndex = dockerfile.indexOf("RUN pnpm install --frozen-lockfile");
+  const buildArgumentIndex = dockerfile.indexOf("ARG WORKSPACE_PACKAGE");
+  const cleanupIndex = dockerfile.indexOf('rm -rf "${SERVICE_DIR}/dist" "${SERVICE_DIR}/tsconfig.tsbuildinfo"');
+  const buildIndex = dockerfile.indexOf('pnpm turbo run build --filter="${WORKSPACE_PACKAGE}"');
+
+  assert.ok(installIndex >= 0, "frozen install must remain present");
+  assert.ok(buildArgumentIndex > installIndex, "service-specific args must not invalidate dependency install cache");
+  assert.ok(cleanupIndex >= 0, "service build must remove copied incremental state");
+  assert.ok(buildIndex >= 0, "service build command must remain present");
+  assert.ok(cleanupIndex < buildIndex, "incremental state must be removed before tsc runs");
+});
 
 test("production build forwards the internal API URL through Turbo strict env", () => {
   const config = JSON.parse(readFileSync(turboConfig, "utf8"));
@@ -77,6 +92,18 @@ test("production deploy plans validation and build before replacing containers",
     assert.ok(index > previousIndex, `${marker} must appear after the previous phase`);
     previousIndex = index;
   }
+});
+
+test("production deploy preserves rollback image tags before overwriting production tags", () => {
+  const script = readFileSync(deployScript, "utf8");
+  const snapshotIndex = script.indexOf('docker image tag "$image" "$backup_image"');
+  const buildIndex = script.lastIndexOf('phase build-images-sequentially');
+  const restoreIndex = script.indexOf('docker image tag "$backup_image" "$image"');
+
+  assert.ok(snapshotIndex >= 0, "current images must receive durable rollback tags");
+  assert.ok(buildIndex >= 0, "sequential build phase must remain present");
+  assert.ok(snapshotIndex < buildIndex, "rollback tags must exist before builds overwrite production tags");
+  assert.ok(restoreIndex >= 0, "rollback must restore from the preserved tag, not a stale image id");
 });
 
 test("production deploy refuses to start when required env files are absent", () => {
