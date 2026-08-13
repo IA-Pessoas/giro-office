@@ -36,20 +36,20 @@ RUN apt-get update && \
 # Define a pasta de trabalho
 WORKDIR /app
 
-# Copia arquivos de dependência e instala
+# Copia arquivos de depend?ncia e instala
 COPY package*.json ./
-RUN npm install
+RUN npm install --ignore-scripts
 
-# Copia restante do código
+# Copia restante do c?digo
 COPY . .
 
 # Gera Prisma Client
 RUN npx prisma generate
 
-# (Opcional) Força o download do Chromium
+# (Opcional) For?a o download do Chromium
 RUN npx puppeteer install
 
-# Expõe a porta da API
+# Exp?e a porta da API
 EXPOSE 3333
 
 # Comando de desenvolvimento com hot reload

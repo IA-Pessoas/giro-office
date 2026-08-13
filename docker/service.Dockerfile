@@ -26,13 +26,15 @@ COPY infra ./infra
 COPY services ./services
 COPY scripts ./scripts
 
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
 ARG WORKSPACE_PACKAGE
 ARG SERVICE_DIR
 
-RUN pnpm install --frozen-lockfile
-RUN pnpm turbo run build --filter="${WORKSPACE_PACKAGE}"
-# Runtime: só produção (reduz CVEs no Trivy). Sem `--filter`, o install --prod inclui app → Next.js (árbitros/vendors com picomatch antigo que o Trivy acusa).
-# `...` = este pacote + dependências do workspace (ex.: shared); não instala os outros microserviços nem o frontend.
+RUN rm -rf "${SERVICE_DIR}/dist" "${SERVICE_DIR}/tsconfig.tsbuildinfo" \
+  && pnpm turbo run build --filter="${WORKSPACE_PACKAGE}"
+# Runtime: s? produ??o (reduz CVEs no Trivy). Sem `--filter`, o install --prod inclui app ? Next.js (?rbitros/vendors com picomatch antigo que o Trivy acusa).
+# `...` = este pacote + depend?ncias do workspace (ex.: shared); n?o instala os outros microservi?os nem o frontend.
 RUN rm -rf node_modules \
   && npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod --filter "${WORKSPACE_PACKAGE}..."
 

@@ -39,6 +39,7 @@
     "graphify:postprocess:ui": "node scripts/graphify-postprocess.mjs ui",
     "graphify:postprocess:services": "node scripts/graphify-postprocess.mjs services",
     "graphify:refresh": "node scripts/graphify-refresh.mjs",
+    "deploy:production": "bash scripts/ops/deploy-production.sh",
     "security:compose": "node scripts/check-compose-security.mjs",
     "migration:test": "node --test scripts/migration-v2-build-load.test.mjs scripts/migration-v2-phase1-load.test.mjs scripts/migration-v2-phase2-load.test.mjs scripts/migration-v3-docs.test.mjs scripts/fix-rh-request-requesters.test.mjs"
   },
@@ -52,14 +53,14 @@
   },
   "packageManager": "pnpm@9.15.0",
   "dependencies": {
-    "@prisma/client": "7.4.1"
+    "@prisma/client": "7.9.1"
   },
   "pnpm": {
     "overrides": {
       "@biomejs/biome": "2.4.5",
       "typescript": "5.3.3",
-      "prisma": "7.4.1",
-      "@prisma/client": "7.4.1",
+      "prisma": "7.9.1",
+      "@prisma/client": "7.9.1",
       "hono": "4.12.25",
       "@hono/node-server": "1.19.13",
       "effect": "3.20.0",
@@ -72,7 +73,10 @@
       "cookie": "0.7.2",
       "qs": "6.15.2",
       "picomatch": "4.0.4",
-      "postcss": "8.5.11"
+      "postcss": "8.5.26",
+      "socket.io-parser": "4.2.7",
+      "body-parser": "1.20.6",
+      "uuid": "11.1.1"
     }
   }
 }

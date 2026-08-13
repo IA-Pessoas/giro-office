@@ -1,0 +1,93 @@
+# Produção single-slot atrás do Caddy compartilhado do host.
+x-production-logging: &production_logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-small-service: &small_service
+  cpus: 0.25
+  mem_limit: 192m
+  logging: *production_logging
+
+x-medium-service: &medium_service
+  cpus: 0.25
+  mem_limit: 256m
+  logging: *production_logging
+
+x-heavy-service: &heavy_service
+  cpus: 0.25
+  mem_limit: 384m
+  logging: *production_logging
+
+services:
+  reverse-proxy:
+    <<: *medium_service
+    profiles: ["internal-proxy"]
+    ports: !override []
+
+  web:
+    cpus: 0.5
+    mem_limit: 512m
+    logging: *production_logging
+    ports: !override []
+    networks:
+      - edge
+      - backend
+      - public-edge
+
+  gateway:
+    cpus: 0.5
+    mem_limit: 256m
+    logging: *production_logging
+    ports: !override []
+
+  organization-service:
+    <<: *small_service
+
+  user-service:
+    <<: *heavy_service
+
+  department-service:
+    <<: *heavy_service
+
+  task-service:
+    <<: *small_service
+
+  project-service:
+    <<: *small_service
+
+  client-service:
+    <<: *heavy_service
+
+  fiscal-service:
+    <<: *small_service
+
+  contabil-service:
+    <<: *small_service
+
+  regularize-service:
+    <<: *medium_service
+
+  rh-service:
+    <<: *heavy_service
+
+  ti-service:
+    <<: *small_service
+
+  certificate-service:
+    <<: *small_service
+
+  pessoal-service:
+    <<: *small_service
+
+  parcelamento-service:
+    <<: *small_service
+
+  audit-service:
+    <<: *medium_service
+
+networks:
+  public-edge:
+    external: true
+    name: public-edge

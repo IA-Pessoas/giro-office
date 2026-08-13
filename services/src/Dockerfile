@@ -1,7 +1,7 @@
 # Usa imagem base com Debian 11 (bullseye), que ainda possui libssl1.1
 FROM node:18-bullseye
 
-# Instala dependências do sistema, incluindo libssl1.1 e bibliotecas do Chrome headless
+# Instala depend?ncias do sistema, incluindo libssl1.1 e bibliotecas do Chrome headless
 RUN apt-get update && \
     apt-get install -y \
     openssl \
@@ -27,16 +27,16 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Define o diretório de trabalho dentro do container
+# Define o diret?rio de trabalho dentro do container
 WORKDIR /app
 
-# Copia os arquivos de dependência para instalar pacotes
+# Copia os arquivos de depend?ncia para instalar pacotes
 COPY package*.json ./
 
-# Instala as dependências do projeto
-RUN npm install
+# Instala as depend?ncias do projeto
+RUN npm install --ignore-scripts
 
-# Copia o restante do código-fonte da aplicação
+# Copia o restante do c?digo-fonte da aplica??o
 COPY . .
 
 # Gera os arquivos do cliente Prisma
@@ -45,7 +45,7 @@ RUN npx prisma generate
 # Compila os arquivos TypeScript
 RUN npm run build
 
-# Expõe a porta 3000 (ou a que seu servidor usa)
+# Exp?e a porta 3000 (ou a que seu servidor usa)
 EXPOSE 3000
 
 # Comando para iniciar o servidor
