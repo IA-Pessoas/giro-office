@@ -4,7 +4,7 @@
 
 `.github/security/rulesets-policy.json` é a fonte versionada da política local. O verificador compara somente campos aprovados e não cria, altera ou remove rulesets.
 
-O workflow `Ruleset Policy Drift` exporta os rulesets efetivos com `gh api` em modo somente leitura e passa o JSON sanitizado ao verificador. O token do workflow tem apenas `contents: read` e nenhum segredo de produção.
+O workflow `Ruleset Policy Drift` valida a política local em pull requests e exporta os rulesets efetivos com `gh api` em modo somente leitura nos agendamentos/manuais. O token do workflow tem apenas `contents: read` e nenhum segredo de produção.
 
 ## Sequência operacional
 

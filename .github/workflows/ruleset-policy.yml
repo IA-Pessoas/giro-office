@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  ruleset-policy:
+  policy-file:
     name: security/ruleset-policy
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -26,7 +26,12 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Validar política versionada
+        if: github.event_name == 'pull_request'
+        run: node scripts/github-ruleset-policy.mjs --policy .github/security/rulesets-policy.json --actual scripts/fixtures/rulesets/approved.json
+
       - name: Exportar rulesets efetivos sem mutação
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
