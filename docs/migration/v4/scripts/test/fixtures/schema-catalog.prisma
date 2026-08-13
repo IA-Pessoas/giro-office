@@ -1,0 +1,37 @@
+generator fixtureClient {
+  provider = "prisma-client"
+}
+
+datasource fixtureDb {
+  provider = "postgresql"
+}
+
+enum FixtureStatus {
+  ACTIVE
+}
+
+type IgnoredComposite {
+  label String
+}
+
+model Workspace {
+  id             String   @id @map("workspace_id")
+  name           String   @unique @map("workspace_name")
+  note           String?  @map("workspace_note")
+  organizationId String   @map("organization_id")
+  active         Boolean  @default(true)
+  labels         String[]
+  members        Member[]
+
+  @@unique([name, note])
+  @@index([name, note])
+  @@map("workspace_table")
+}
+
+model Member {
+  id          String    @id
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@map("members_table")
+}

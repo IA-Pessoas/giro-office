@@ -161,7 +161,7 @@ export class LicenseService {
       ...(params.paginationRequested
         ? { skip: (params.page - 1) * params.limit, take: params.limit }
         : {}),
-    };
+    } as const;
 
     if (!params.paginationRequested) {
       return this.prisma.license.findMany(findManyArgs) as unknown as Record<string, unknown>[];

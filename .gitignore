@@ -56,3 +56,13 @@ novo layout/
 smoke-*/
 services_env_summary.md
 .codex/run-logs/
+# Migration V4 generated tenant data and execution artifacts
+/docs/migration/v4/manifest.json
+/docs/migration/v4/mapping/
+/docs/migration/v4/pending-mapping/
+/docs/migration/v4/preflight/
+/docs/migration/v4/quarantine/
+/docs/migration/v4/reports/
+# Keep migration source code and synthetic test fixtures versioned:
+!/docs/migration/v4/scripts/
+!/docs/migration/v4/scripts/**

@@ -1,5 +1,8 @@
 # VPS Stable Stack Deploy
 
+Para o ambiente single-slot publicado em `useoffice.com.br`, consulte
+[`production-deploy.md`](production-deploy.md).
+
 ## Files
 
 - `docker-compose.vps.yml`
