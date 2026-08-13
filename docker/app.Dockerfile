@@ -33,7 +33,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.js
 COPY packages/api ./packages/api
 COPY app ./app
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 RUN pnpm turbo run build --filter=@workspace/app
 RUN rm -rf node_modules \
   && npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod --filter "@workspace/app..."
