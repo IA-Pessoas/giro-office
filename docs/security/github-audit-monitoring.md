@@ -18,6 +18,10 @@ O coletor usa REST para eventos Git; GraphQL nao e usado para essa finalidade.
 O parametro `include=all` e enviado explicitamente para incluir eventos web e Git.
 `--since` usa a frase documentada `created:>=<ISO>`; o cursor opaco da API e aceito
 separadamente por `--cursor` e somente ele e enviado como `after`.
+O workflow roda no cron de cinco minutos, sempre fixa o checkout em `develop` e
+consulta uma janela sobreposta dos ultimos quinze minutos. Ele nao possui
+`workflow_dispatch`: execucoes com token nao podem carregar codigo de uma ref
+escolhida manualmente.
 
 O payload REST oficial minimo de `git.push` nao promete ref, indicador de force-push,
 delecao ou SHAs anterior/novo. Quando esses metadados nao estao presentes, o monitor
@@ -43,6 +47,9 @@ job como verificacao de saude e lacunas.
 
 Cada alerta preserva apenas tipo e identificador sanitizado do ator, organizacao,
 repositorio, acao, ref, SHAs anterior e novo quando fornecidos, origem e timestamp.
+Tambem inclui `alertKey`, um SHA-256 deterministico calculado somente desses campos
+sanitizados e do request/ruleset quando presentes. Consumers downstream devem
+deduplicar por essa chave; a janela sobreposta entre execucoes e intencional.
 Alertas duplicados com a mesma acao, ator, repositorio, ref e timestamp sao
 consolidados. Eventos recentes do mesmo ator, repositorio, ref e request sao
 correlacionados de forma deterministica em uma janela de dez minutos, com no maximo
@@ -70,7 +77,27 @@ automatica inventada com Slack, e-mail ou abertura de issue, nem permissao de es
 adicionada ao workflow.
 
 O artefato sanitizado tem retencao configurada de sete dias (`retention-days: 7`),
-com acesso restrito pelas permissoes do repositorio/organizacao ao time de seguranca.
+mas ACL de artefatos, acesso de membros e qualquer estado persistente sao controles
+administrativos do GitHub; nao sao inventados pelo workflow nem podem ser garantidos
+por `permissions: contents: read`. O repositorio nao persiste cursor ou payload.
+Se o owner habilitar um sink aprovado para `alertKey`/cursor, ele deve aplicar a
+retencao e ACL corporativas sem armazenar payload bruto ou token.
+
+### Procedimento verificavel
+
+1. Um owner da organizacao confirma em GitHub Settings que o repositorio nao publica
+   artefatos para fora do escopo autorizado e que a politica de membros/artefatos do
+   repositorio corresponde ao time de seguranca; registra URL, data, owner e evidencia
+   no registro de seguranca aprovado.
+2. O owner executa duas coletas sobrepostas no cron e compara somente
+   `.alerts[].alertKey` com `jq`; chaves repetidas devem ser consolidadas pelo
+   consumer downstream. O resultado da comparacao e sanitizado e nao inclui o JSON
+   bruto do audit log.
+3. Um administrador verifica a expiracao de sete dias no artefato da execucao e
+   testa acesso com uma identidade autorizada e uma identidade sem acesso, sem copiar
+   o relatorio para fora do GitHub. Falha de ACL, retencao ou deduplicacao vira
+   incidente operacional; nenhuma permissao adicional e concedida automaticamente.
+
 Apos sete dias, preserve somente a chave sanitizada do evento, decisao, owner, SLA e
 referencia do incidente conforme a politica de retencao corporativa; nunca retenha o
 payload bruto ou o token.

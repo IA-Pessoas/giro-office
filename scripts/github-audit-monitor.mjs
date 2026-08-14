@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +16,26 @@ export const EVENT_RULES = Object.freeze({
   "protected_branch.policy_override": {
     severity: "high",
     category: "protected-ref-bypass",
+    alert: true,
+  },
+  "protected_branch.create": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.dismiss_stale_reviews": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.dismissal_restricted_users_teams": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.rejected_ref_update": {
+    severity: "medium",
+    category: "protected-ref-rejected-update",
     alert: true,
   },
   "protected_branch.authorized_users_teams": {
@@ -97,6 +118,16 @@ export const EVENT_RULES = Object.freeze({
     category: "protected-ref-policy-change",
     alert: true,
   },
+  "protected_branch.update_required_deployments_enforcement_level": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_required_review_thread_resolution_enforcement_level": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
   "protected_branch.update_signature_requirement_enforcement_level": {
     severity: "high",
     category: "protected-ref-policy-change",
@@ -159,6 +190,7 @@ const SENSITIVE_VALUE = /(?:gh[pousr]_|github_pat_|bearer\s+|authorization\b|tok
 const EMAIL_VALUE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const IPV4_VALUE = /^(?:\d{1,3}\.){3}\d{1,3}$/u;
 const SHA_VALUE = /^[a-f0-9]{7,64}$/iu;
+const ALLOWED_NEXT_QUERY_KEYS = new Set(["after", "before", "include", "order", "page", "per_page", "phrase"]);
 
 export class AuditMonitorError extends Error {
   constructor(code) {
@@ -197,6 +229,9 @@ function readActor(event) {
 function readActorType(event) {
   if (event?.actor_is_agent === true) return "Agent";
   if (event?.actor_is_bot === true) return "Bot";
+  if (event?.oauth_application_id || /github\s*app|oauth\s*application|integration/iu.test(event?.programmatic_access_type ?? "")) {
+    return "App";
+  }
   const actor = event?.actor;
   if (actor && typeof actor === "object") {
     const actorType = firstString(actor.type, actor.actor_type);
@@ -211,9 +246,7 @@ function readActorType(event) {
   if (actorType && /agent/iu.test(actorType)) return "Agent";
   if (actorType && /bot/iu.test(actorType)) return "Bot";
   if (actorType && /user/iu.test(actorType)) return "User";
-  if (event?.oauth_application_id || /github\s*app/iu.test(event?.programmatic_access_type ?? "")) {
-    return "App";
-  }
+  if (event?.actor_is_bot === false && event?.actor_is_agent === false) return "User";
   return actorType;
 }
 
@@ -239,6 +272,13 @@ function readRef(event) {
     return firstString(event?.name, event?.branch, event?.ref);
   }
   return firstString(event?.ref, event?.branch, event?.tag);
+}
+
+function readRulesetName(event) {
+  const action = safeString(event?.action, { sensitive: false }) ?? "";
+  return action.startsWith("repository_ruleset.")
+    ? firstString(event?.ruleset_name, event?.name)
+    : undefined;
 }
 
 function readRequestId(event) {
@@ -285,6 +325,24 @@ function isDeletedRef(event) {
     event?.ref_update_type === "deleted" ||
     event?.ref_update_type === "delete"
   );
+}
+
+function buildAlertKey(event) {
+  return createHash("sha256")
+    .update(
+      [
+        event.action,
+        event.actorType,
+        event.actor,
+        event.organization,
+        event.repository,
+        event.ref,
+        event.rulesetName ?? "",
+        event.requestId ?? "",
+        event.createdAt ?? "[unknown-time]",
+      ].join("\u001f"),
+    )
+    .digest("hex");
 }
 
 function hasRefMetadata(event) {
@@ -335,7 +393,11 @@ export function normalizeAuditEvent(event) {
     source: firstString(event?.source, event?.source_name, event?.origin) ?? "github-audit-log",
   };
 
-  return Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== undefined));
+  const sanitized = Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== undefined));
+  const rulesetName = readRulesetName(event);
+  if (rulesetName) sanitized.rulesetName = rulesetName;
+  sanitized.alertKey = buildAlertKey(sanitized);
+  return sanitized;
 }
 
 export function deduplicateAlerts(events) {
@@ -490,9 +552,16 @@ function validateNextPage(link, organization, baseUrl) {
   if (
     next.protocol !== "https:" ||
     next.origin !== baseUrl ||
-    next.pathname !== expectedPath
+    next.pathname !== expectedPath ||
+    next.username ||
+    next.password
   ) {
     throw new AuditMonitorError("invalid_next_link");
+  }
+  for (const [key, value] of next.searchParams) {
+    if (!ALLOWED_NEXT_QUERY_KEYS.has(key) || /[\r\n]/u.test(value) || SENSITIVE_VALUE.test(`${key}=${value}`)) {
+      throw new AuditMonitorError("invalid_next_link");
+    }
   }
   return next;
 }

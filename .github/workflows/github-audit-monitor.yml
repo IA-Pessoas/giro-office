@@ -3,7 +3,6 @@ name: GitHub Audit Monitoring
 on:
   schedule:
     - cron: "*/5 * * * *"
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,6 +16,7 @@ jobs:
       - name: Checkout sem credenciais persistentes
         uses: actions/checkout@v4
         with:
+          ref: develop
           persist-credentials: false
 
       - name: Configurar Node.js
@@ -30,6 +30,7 @@ jobs:
         run: >-
           node scripts/github-audit-monitor.mjs
           --org IA-Pessoas
+          --since "$(date -u -d '15 minutes ago' '+%Y-%m-%dT%H:%M:%SZ')"
           --report "${RUNNER_TEMP}/github-audit-report.json"
           --fail-on-alert
 

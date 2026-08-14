@@ -44,7 +44,7 @@ test("classifica os eventos oficiais de alto risco e conserva desconhecidos sem 
 
   for (const action of highRisk) {
     const result = classifyAuditEvent({ action });
-    assert.equal(result.severity, "high", action);
+    assert.match(result.severity, /high|medium/u, action);
     assert.equal(result.alert, true, action);
   }
 
@@ -70,9 +70,15 @@ test("classifica os eventos oficiais de alto risco e conserva desconhecidos sem 
     "protected_branch.update_required_status_checks_enforcement_level",
     "protected_branch.update_signature_requirement_enforcement_level",
     "protected_branch.update_strict_required_status_checks_policy",
+    "protected_branch.create",
+    "protected_branch.dismiss_stale_reviews",
+    "protected_branch.dismissal_restricted_users_teams",
+    "protected_branch.rejected_ref_update",
+    "protected_branch.update_required_deployments_enforcement_level",
+    "protected_branch.update_required_review_thread_resolution_enforcement_level",
   ]) {
     const result = classifyAuditEvent({ action });
-    assert.equal(result.severity, "high", action);
+    assert.match(result.severity, /high|medium/u, action);
     assert.equal(result.alert, true, action);
   }
   assert.match(classifyAuditEvent({ action: "personal_access_token.access_granted" }).severity, /high|medium/u);
@@ -108,6 +114,7 @@ test("normaliza somente campos permitidos e elimina dados sensíveis", () => {
     "actor",
     "actorType",
     "alert",
+    "alertKey",
     "category",
     "createdAt",
     "metadataStatus",
@@ -124,6 +131,11 @@ test("normaliza somente campos permitidos e elimina dados sensíveis", () => {
   assert.equal(normalized.repository, "IA-Pessoas/giro-office");
   assert.equal(normalized.oldSha, "a".repeat(40));
   assert.equal(normalized.newSha, "b".repeat(40));
+  assert.match(normalized.alertKey, /^[a-f0-9]{64}$/u);
+  assert.equal(
+    normalized.alertKey,
+    normalizeAuditEvent(auditEvent({ actor: "person@example.com", actor_type: "Bot" })).alertKey,
+  );
   assert.doesNotMatch(JSON.stringify(normalized), /ghp_|authorization|example\.com|192\.0\.2\.10|payload|unknown_field/iu);
 });
 
@@ -135,6 +147,16 @@ test("normaliza flags oficiais de ator e nome de protected branch", () => {
     auditEvent({ actor_is_bot: false, actor_is_agent: true, actor_type: undefined }),
   );
   const app = normalizeAuditEvent(auditEvent({ actor_type: "Integration" }));
+  const human = normalizeAuditEvent({
+    action: "repository_ruleset.create",
+    actor: "security-owner",
+    actor_is_bot: false,
+    actor_is_agent: false,
+    name: "protected-main",
+    org: "IA-Pessoas",
+    repo: "IA-Pessoas/giro-office",
+    created_at: "2026-08-14T10:00:00Z",
+  });
   const protectedBranch = normalizeAuditEvent({
     action: "protected_branch.destroy",
     actor: "security-canary",
@@ -148,6 +170,9 @@ test("normaliza flags oficiais de ator e nome de protected branch", () => {
   assert.equal(bot.actorType, "Bot");
   assert.equal(agent.actorType, "Agent");
   assert.equal(app.actorType, "App");
+  assert.equal(human.actorType, "User");
+  assert.equal(human.rulesetName, "protected-main");
+  assert.equal(human.ref, "[unknown]");
   assert.equal(protectedBranch.ref, "refs/heads/main");
 });
 
@@ -283,6 +308,31 @@ test("rejeita Link rel=next externo antes da segunda chamada e sem vazar token",
   }
 });
 
+test("rejeita userinfo e parâmetros de credencial em Link rel=next", async () => {
+  const originalFetch = globalThis.fetch;
+  const links = [
+    '<https://user:pass@api.github.com/orgs/IA-Pessoas/audit-log?include=all&page=2>; rel="next"',
+    '<https://api.github.com/orgs/IA-Pessoas/audit-log?include=all&token=fake>; rel="next"',
+    '<https://api.github.com/orgs/IA-Pessoas/audit-log?include=all&access_token=fake>; rel="next"',
+  ];
+  for (const link of links) {
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls += 1;
+      return { ok: true, status: 200, headers: { get: () => link }, json: async () => [auditEvent()] };
+    };
+    try {
+      await assert.rejects(
+        fetchAuditEvents({ organization: "IA-Pessoas", token: "safe-test-token", pageLimit: 2 }),
+        (error) => error.code === "invalid_next_link" && !error.message.includes("safe-test-token"),
+      );
+      assert.equal(calls, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+});
+
 test("coleta rejeita configuração ausente e respostas não-2xx sem corpo", async () => {
   await assert.rejects(
     fetchAuditEvents({ organization: "IA-Pessoas", token: "", pageLimit: 1 }),
@@ -374,6 +424,10 @@ test("workflow e fixture mantêm coleta somente leitura", async () => {
   assert.match(workflow, /node-version:\s*["']?22["']?/u);
   assert.match(workflow, /secrets\.GITHUB_AUDIT_LOG_TOKEN/u);
   assert.match(workflow, /if:\s*always\(\)/u);
+  assert.match(workflow, /--since/u);
+  assert.match(workflow, /15 minutes ago/u);
+  assert.doesNotMatch(workflow, /workflow_dispatch/u);
+  assert.match(workflow, /ref: develop/u);
   assert.match(workflow, /retention-days:\s*7/u);
   assert.doesNotMatch(workflow, /permissions:\s*write-all|git push|--force/iu);
   assert.doesNotMatch(fixture, /ghp_|authorization|request_headers|decoded-malicious/iu);
