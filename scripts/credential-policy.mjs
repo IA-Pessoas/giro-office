@@ -131,6 +131,13 @@ function unquoteYamlScalar(value) {
 
 function hasSecretShellOperation(line, inRunBlock) {
   if (!SECRET_REFERENCE.test(line)) return false;
+  if (
+    /\b(?:curl|wget)\b/iu.test(line) ||
+    /\bheaders?\s*:/iu.test(line) ||
+    /(?:^|\s)--?header(?:=|\s)/iu.test(line)
+  ) {
+    return true;
+  }
   return (
     inRunBlock ||
     /^\s*run\s*:/u.test(line) ||
@@ -246,19 +253,34 @@ function permissionFinding(relativePath, rule, line, remediation) {
   return makeFinding(rule, relativePath, line, "high", remediation);
 }
 
-function findJobRanges(lines) {
-  const jobsIndex = lines.findIndex((line) => /^jobs\s*:/u.test(line));
-  if (jobsIndex === -1) return [];
+function findJobsBlock(lines) {
+  const index = lines.findIndex(
+    (line) => indentation(line) === 0 && /^jobs\s*:/u.test(line),
+  );
+  if (index === -1) return null;
+
+  const rawValue = stripYamlComment(lines[index].slice(lines[index].indexOf(":") + 1));
+  let end = lines.length - 1;
+  for (let next = index + 1; next < lines.length; next += 1) {
+    if (!isCommentOrEmpty(lines[next]) && indentation(lines[next]) === 0) {
+      end = next - 1;
+      break;
+    }
+  }
+  return { index, end, inline: rawValue !== "" };
+}
+
+function findJobRanges(lines, jobsBlock = findJobsBlock(lines)) {
+  if (!jobsBlock || jobsBlock.inline) return [];
 
   const ranges = [];
   let current;
-  for (let index = jobsIndex + 1; index < lines.length; index += 1) {
+  for (let index = jobsBlock.index + 1; index <= jobsBlock.end; index += 1) {
     const line = lines[index];
-    if (!isCommentOrEmpty(line) && indentation(line) === 0) break;
     const job = line.match(/^(\s{2})([A-Za-z0-9_-]+)\s*:\s*$/u);
     if (!job) continue;
     if (current) current.end = index - 1;
-    current = { start: index, end: lines.length - 1, indent: job[1].length };
+    current = { start: index, end: jobsBlock.end, indent: job[1].length };
     ranges.push(current);
   }
   return ranges;
@@ -413,7 +435,8 @@ function parsePermissionMap(relativePath, lines, index, findings) {
 }
 
 function scanPermissions(relativePath, lines, findings) {
-  const jobs = findJobRanges(lines);
+  const jobsBlock = findJobsBlock(lines);
+  const jobs = findJobRanges(lines, jobsBlock);
   const declarations = [];
   for (let index = 0; index < lines.length; index += 1) {
     if (!/^\s*permissions\s*:/u.test(lines[index])) continue;
@@ -427,6 +450,49 @@ function scanPermissions(relativePath, lines, findings) {
         index > start && index <= end && indent === jobIndent + 2,
     );
     if (job) declarations.push({ index, scope: "job" });
+  }
+
+  if (jobsBlock) {
+    const meaningfulLines = [];
+    for (let index = jobsBlock.index + 1; index <= jobsBlock.end; index += 1) {
+      if (!isCommentOrEmpty(lines[index])) meaningfulLines.push(index);
+    }
+    if (jobsBlock.inline) {
+      findings.push(
+        permissionFinding(
+          relativePath,
+          "permissions-ambiguous",
+          jobsBlock.index + 1,
+          "declare jobs em um mapa YAML analisavel antes de avaliar permissoes",
+        ),
+      );
+    } else if (!jobs.length && meaningfulLines.length > 0) {
+      findings.push(
+        permissionFinding(
+          relativePath,
+          "permissions-ambiguous",
+          meaningfulLines[0] + 1,
+          "declare cada job com indentacao e estrutura YAML analisaveis",
+        ),
+      );
+    } else {
+      for (const index of meaningfulLines) {
+        if (!/^\s*permissions\s*:/u.test(lines[index])) continue;
+        const recognized = jobs.some(
+          ({ start, end, indent: jobIndent }) =>
+            index > start && index <= end && indentation(lines[index]) === jobIndent + 2,
+        );
+        if (recognized) continue;
+        findings.push(
+          permissionFinding(
+            relativePath,
+            "permissions-ambiguous",
+            index + 1,
+            "mova permissions para o nivel de job reconhecido pelo verificador",
+          ),
+        );
+      }
+    }
   }
 
   const workflowDeclarations = declarations.filter(({ scope }) => scope === "workflow");

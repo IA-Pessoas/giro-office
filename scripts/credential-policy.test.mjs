@@ -263,6 +263,42 @@ test("analisa permissions do workflow e dos jobs e falha fechado para mapas ambi
   assert.match(JSON.stringify(ambiguous), /permissions-ambiguous/u);
 });
 
+test("falha fechado quando o bloco jobs usa um layout de permissions nao reconhecido", () => {
+  const findings = scanWorkflowText(
+    "unrecognized-jobs-layout.yml",
+    [
+      "permissions:",
+      "  contents: read",
+      "jobs:",
+      "    build:",
+      "      permissions:",
+      "        contents: write",
+    ].join("\n"),
+  );
+
+  assert.match(JSON.stringify(findings), /permissions-ambiguous/u);
+});
+
+test("detecta secrets diretos em comandos HTTP e headers sem env intermediario", () => {
+  const findings = scanWorkflowText(
+    "direct-secret-http.yml",
+    [
+      "permissions:",
+      "  contents: read",
+      "jobs:",
+      "  build:",
+      "    steps:",
+      "      - name: Direct HTTP secret",
+      '        command: curl -H "Authorization: ${{ secrets.DOT_TOKEN }}" https://example.invalid',
+      '        args: wget --header "X-Token: ${{ secrets[\'SINGLE_TOKEN\'] }}" https://example.invalid',
+      '        headers: Authorization: ${{ secrets["DOUBLE_TOKEN"] }}',
+    ].join("\n"),
+  );
+
+  assert.equal(findings.filter(({ rule }) => rule === "secret-shell-exposure").length, 3);
+  assert.doesNotMatch(JSON.stringify(findings), /DOT_TOKEN|SINGLE_TOKEN|DOUBLE_TOKEN/u);
+});
+
 test("ignora workflow composto apenas por comentarios", () => {
   assert.deepEqual(
     scanWorkflowText(
