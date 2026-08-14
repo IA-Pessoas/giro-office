@@ -1,0 +1,43 @@
+name: pnpm security policy
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main, staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable the pinned Corepack package manager
+        run: corepack enable
+
+      - name: Check the repository pnpm policy
+        run: node scripts/pnpm-security-policy.mjs --root . --report pnpm-security-policy.json
+
+      - name: Install without lifecycle scripts
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Upload sanitized policy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pnpm-security-policy
+          path: pnpm-security-policy.json
+          if-no-files-found: ignore
