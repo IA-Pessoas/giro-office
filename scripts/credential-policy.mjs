@@ -12,6 +12,11 @@ const EXCLUDED_DIRECTORIES = new Set([
 ]);
 
 const MATERIAL_EXTENSIONS = new Set([".crt", ".key", ".pem"]);
+const SAFE_BASELINE_OWNERS = new Set(["ia-pessoas-security"]);
+const SAFE_BASELINE_JUSTIFICATIONS = new Set([
+  "preexisting-key-rotation",
+  "preexisting-service-account-rotation",
+]);
 const TEXT_EXTENSIONS = new Set([
   "",
   ".cjs",
@@ -292,7 +297,9 @@ function scanCheckouts(relativePath, lines, findings) {
 
 function scanSecretShell(relativePath, lines, findings) {
   let runIndent = null;
-  let derivedVariables = [];
+  const globalSecretVariables = new Set();
+  const jobSecretVariables = new Set();
+  const stepSecretVariables = new Set();
   let inJobs = false;
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -302,23 +309,39 @@ function scanSecretShell(relativePath, lines, findings) {
 
     if (/^jobs\s*:\s*$/u.test(trimmed)) {
       inJobs = true;
-      derivedVariables = [];
+      jobSecretVariables.clear();
+      stepSecretVariables.clear();
       runIndent = null;
       continue;
     }
 
     if (inJobs && indentation(line) === 2 && /^[A-Za-z0-9_-]+\s*:\s*$/u.test(trimmed)) {
-      derivedVariables = [];
+      jobSecretVariables.clear();
+      stepSecretVariables.clear();
       runIndent = null;
       continue;
     }
 
     if (/^\s*-\s+\S/u.test(line)) {
       runIndent = null;
+      stepSecretVariables.clear();
     }
 
-    derivedVariables = [
-      ...new Set([...derivedVariables, ...extractDerivedSecretVariables(line)]),
+    for (const variable of extractDerivedSecretVariables(line)) {
+      if (inJobs) {
+        stepSecretVariables.add(variable);
+        jobSecretVariables.add(variable);
+      } else {
+        globalSecretVariables.add(variable);
+      }
+    }
+
+    const derivedVariables = [
+      ...new Set([
+        ...globalSecretVariables,
+        ...jobSecretVariables,
+        ...stepSecretVariables,
+      ]),
     ];
 
     if (/^run\s*:\s*[|>][-+]?\s*$/u.test(trimmed)) {
@@ -434,10 +457,29 @@ function baselineEntryForFinding(finding, entries, today) {
       entry.rule === finding.rule &&
       normalizePath(entry.path) === finding.path &&
       entry.line === finding.line &&
-      entry.owner &&
-      entry.justification &&
+      isSafeBaselineMetadata(entry) &&
       isValidIsoDate(entry.expiresAt) &&
       entry.expiresAt >= today,
+  );
+}
+
+function isSafeBaselineMetadata(entry) {
+  return (
+    entry &&
+    SAFE_BASELINE_OWNERS.has(entry.owner) &&
+    SAFE_BASELINE_JUSTIFICATIONS.has(entry.justification)
+  );
+}
+
+function isSafeBaselineEntry(entry) {
+  return (
+    entry &&
+    typeof entry.rule === "string" &&
+    typeof entry.path === "string" &&
+    Number.isInteger(entry.line) &&
+    entry.line > 0 &&
+    isSafeBaselineMetadata(entry) &&
+    isValidIsoDate(entry.expiresAt)
   );
 }
 
@@ -499,9 +541,41 @@ async function readCredentialBaseline(root) {
   try {
     const source = await readFile(path.join(path.resolve(root), relativePath), "utf8");
     const parsed = JSON.parse(source);
+    if (!Array.isArray(parsed.entries)) {
+      return {
+        entries: [],
+        findings: [
+          makeFinding(
+            "baseline-invalid",
+            relativePath,
+            1,
+            "high",
+            "corrija o baseline usando somente metadata controlada",
+          ),
+        ],
+      };
+    }
+    const entries = parsed.entries;
+    const validEntries = [];
+    const findings = [];
+    entries.forEach((entry, index) => {
+      if (isSafeBaselineEntry(entry)) {
+        validEntries.push(entry);
+      } else {
+        findings.push(
+          makeFinding(
+            "baseline-invalid",
+            relativePath,
+            index + 2,
+            "high",
+            "corrija o baseline usando somente metadata controlada",
+          ),
+        );
+      }
+    });
     return {
-      entries: Array.isArray(parsed.entries) ? parsed.entries : [],
-      findings: [],
+      entries: validEntries,
+      findings,
     };
   } catch (error) {
     if (error?.code === "ENOENT") return { entries: [], findings: [] };

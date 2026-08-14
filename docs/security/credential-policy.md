@@ -28,6 +28,8 @@ expiração em `2026-09-13`. O scanner não descarta as exposições: elas apare
 `baselinedFindings` e no bloco `baseline` do relatório sanitizado, mas não mantêm o
 gate vermelho enquanto a rotação externa é executada. As exceções devem ser removidas
 após a rotação; se expirarem, voltam a bloquear o workflow automaticamente.
+Os campos `owner` e `justification` aceitam somente identificadores controlados pelo
+checker; texto livre é rejeitado e nunca é ecoado no relatório.
 
 O marcador de chave existente em `docs/migration/v4/scripts/test/sensitivity.test.mjs`
 é apenas uma fixture sem material codificado e não é tratado como exposição real.

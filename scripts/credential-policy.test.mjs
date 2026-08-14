@@ -171,6 +171,32 @@ test("rastreia secrets em env de job e step ate steps posteriores", () => {
   assert.doesNotMatch(JSON.stringify(findings), /JOB_TOKEN|STEP_TOKEN/u);
 });
 
+test("rastreia env global e de job ate headers em steps posteriores", () => {
+  const findings = scanWorkflowText(
+    "global-job-secret.yml",
+    [
+      "permissions:",
+      "  contents: read",
+      "env:",
+      "  GLOBAL_TOKEN: ${{ secrets.GLOBAL_TOKEN }}",
+      "jobs:",
+      "  build:",
+      "    env:",
+      "      JOB_TOKEN: ${{ secrets.JOB_TOKEN }}",
+      "    steps:",
+      "      - name: Prepare",
+      "        run: echo ready",
+      "      - name: Use global env",
+      '        run: curl -H "X-Global: $GLOBAL_TOKEN" https://example.invalid',
+      "      - name: Use job env",
+      '        run: curl -H "X-Job: $env:JOB_TOKEN" https://example.invalid',
+    ].join("\n"),
+  );
+
+  assert.equal(findings.filter(({ rule }) => rule === "secret-shell-exposure").length, 2);
+  assert.doesNotMatch(JSON.stringify(findings), /GLOBAL_TOKEN|JOB_TOKEN/u);
+});
+
 test("ignora workflow composto apenas por comentarios", () => {
   assert.deepEqual(
     scanWorkflowText(
@@ -292,8 +318,8 @@ test("mantem baseline temporaria visivel sem bloquear o gate", () => {
           rule: "unsafe-private-key-literal",
           path: "services/src/src/config/google.json",
           line: 5,
-          owner: "IA-Pessoas security owner",
-          justification: "rotacao externa necessaria para remover material preexistente",
+          owner: "ia-pessoas-security",
+          justification: "preexisting-service-account-rotation",
           expiresAt: "2026-09-13",
         },
       ],
@@ -303,7 +329,7 @@ test("mantem baseline temporaria visivel sem bloquear o gate", () => {
   assert.equal(report.ok, true);
   assert.deepEqual(report.findings, []);
   assert.equal(report.baselinedFindings.length, 1);
-  assert.equal(report.baseline[0].owner, "IA-Pessoas security owner");
+  assert.equal(report.baseline[0].owner, "ia-pessoas-security");
   assert.equal(report.summary.baselined, 1);
 });
 
@@ -324,8 +350,8 @@ test("baseline com data ISO invalida ou expirada falha fechada", () => {
           rule: finding.rule,
           path: finding.path,
           line: finding.line,
-          owner: "IA-Pessoas security owner",
-          justification: "teste de expiracao",
+          owner: "ia-pessoas-security",
+          justification: "preexisting-service-account-rotation",
           expiresAt,
         },
       ],
@@ -335,6 +361,39 @@ test("baseline com data ISO invalida ou expirada falha fechada", () => {
     assert.equal(report.findings.length, 1);
     assert.deepEqual(report.baseline, []);
   }
+});
+
+test("baseline rejeita metadata livre e nao ecoa texto arbitrario", () => {
+  const secretText = `ghp_${"z".repeat(24)}`;
+  const report = buildCredentialReport(
+    [
+      {
+        rule: "unsafe-private-key-literal",
+        path: "services/src/src/config/google.json",
+        line: 5,
+        severity: "high",
+        remediation: "remova a chave privada e rotacione a credencial exposta",
+      },
+    ],
+    {
+      now: "2026-08-14T00:00:00.000Z",
+      baseline: [
+        {
+          rule: "unsafe-private-key-literal",
+          path: "services/src/src/config/google.json",
+          line: 5,
+          owner: secretText,
+          justification: "texto livre que nao deve ser reportado",
+          expiresAt: "2026-09-13",
+        },
+      ],
+    },
+  );
+
+  assert.equal(report.ok, false);
+  assert.equal(report.baseline.length, 0);
+  assert.doesNotMatch(JSON.stringify(report), new RegExp(secretText, "u"));
+  assert.doesNotMatch(JSON.stringify(report), /texto livre/u);
 });
 
 test("CLI grava relatorio sanitizado para uma raiz informada", async () => {
