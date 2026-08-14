@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -31,6 +32,21 @@ function auditEvent(overrides = {}) {
     created_at: "2026-08-14T10:00:00Z",
     ...overrides,
   };
+}
+
+const inputSecret = "test-only-ingest-secret";
+
+function signedInput(events, overrides = {}) {
+  const envelope = {
+    source: "normalized-webhook",
+    issuedAt: "2026-08-14T10:00:00Z",
+    nonce: "nonce-765-test",
+    events,
+    ...overrides,
+  };
+  const body = JSON.stringify(envelope);
+  const signature = `sha256=${createHmac("sha256", inputSecret).update(body).digest("hex")}`;
+  return { body, signature };
 }
 
 test("classifica os eventos oficiais de alto risco e conserva desconhecidos sem alerta", () => {
@@ -76,6 +92,43 @@ test("classifica os eventos oficiais de alto risco e conserva desconhecidos sem 
     "protected_branch.rejected_ref_update",
     "protected_branch.update_required_deployments_enforcement_level",
     "protected_branch.update_required_review_thread_resolution_enforcement_level",
+    "repo.add_member",
+    "repo.remove_member",
+    "org.add_member",
+    "org.remove_member",
+    "org.add_outside_collaborator",
+    "org.remove_outside_collaborator",
+    "org.required_workflow_create",
+    "org.required_workflow_delete",
+    "org.required_workflow_update",
+    "integration.create",
+    "integration.destroy",
+    "integration.revoke_tokens",
+    "integration.revoke_all_tokens",
+    "integration.suspend",
+    "integration.unsuspend",
+    "integration.transfer",
+    "integration.manager_added",
+    "integration.manager_removed",
+    "integration.remove_client_secret",
+    "integration_installation.create",
+    "integration_installation.destroy",
+    "integration_installation.repositories_added",
+    "integration_installation.repositories_removed",
+    "workflows.prepared_workflow_job",
+    "workflows.disable_workflow",
+    "workflows.enable_workflow",
+    "workflows.delete_workflow_run",
+    "workflows.reject_workflow_job",
+    "workflows.rerun_workflow_run",
+    "workflows.cancel_workflow_run",
+    "workflows.actions_policy_violation",
+    "workflows.approve_workflow_job",
+    "public_key.create",
+    "public_key.delete",
+    "public_key.update",
+    "public_key.unverify",
+    "public_key.unverification_failure",
   ]) {
     const result = classifyAuditEvent({ action });
     assert.match(result.severity, /high|medium/u, action);
@@ -84,6 +137,7 @@ test("classifica os eventos oficiais de alto risco e conserva desconhecidos sem 
   assert.match(classifyAuditEvent({ action: "personal_access_token.access_granted" }).severity, /high|medium/u);
   assert.match(classifyAuditEvent({ action: "personal_access_token.access_revoked" }).severity, /high|medium/u);
   assert.equal(classifyAuditEvent({ action: "workflows.created_workflow_run" }).severity, "low");
+  assert.equal(classifyAuditEvent({ action: "workflows.completed_workflow_run" }).severity, "low");
   assert.equal(classifyAuditEvent({ action: "repo.access" }).alert, true);
 
   assert.deepEqual(classifyAuditEvent({ action: "future.unknown_action" }), {
@@ -232,7 +286,7 @@ test("coleta REST usa paginação limitada e não inclui token nos erros", async
       headers: {
         get: (name) =>
           name.toLowerCase() === "link"
-            ? '<https://api.github.com/orgs/IA-Pessoas/audit-log?include=all&page=2>; rel="next"'
+            ? '<https://api.github.com/orgs/IA-Pessoas/audit-log?include=all&phrase=created%3A%3E%3D2026-08-14T09%3A00%3A00Z&page=2>; rel="next"'
             : null,
       },
       json: async () => [auditEvent()],
@@ -333,6 +387,36 @@ test("rejeita userinfo e parâmetros de credencial em Link rel=next", async () =
   }
 });
 
+test("rejeita downgrade de include e phrase em Link rel=next antes da segunda chamada", async () => {
+  const originalFetch = globalThis.fetch;
+  const links = [
+    '<https://api.github.com/orgs/IA-Pessoas/audit-log?page=2>; rel="next"',
+    '<https://api.github.com/orgs/IA-Pessoas/audit-log?include=web&page=2>; rel="next"',
+    '<https://api.github.com/orgs/IA-Pessoas/audit-log?include=all&phrase=created%3A%3E%3D2026-08-14T08%3A00%3A00Z&page=2>; rel="next"',
+  ];
+  for (const link of links) {
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls += 1;
+      return { ok: true, status: 200, headers: { get: () => link }, json: async () => [auditEvent()] };
+    };
+    try {
+      await assert.rejects(
+        fetchAuditEvents({
+          organization: "IA-Pessoas",
+          token: "safe-test-token",
+          since: "2026-08-14T09:00:00Z",
+          pageLimit: 2,
+        }),
+        (error) => error.code === "invalid_next_link",
+      );
+      assert.equal(calls, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+});
+
 test("coleta rejeita configuração ausente e respostas não-2xx sem corpo", async () => {
   await assert.rejects(
     fetchAuditEvents({ organization: "IA-Pessoas", token: "", pageLimit: 1 }),
@@ -393,7 +477,8 @@ test("CLI grava relatório sanitizado e retorna falha somente com alerta relevan
   const directory = await mkdtemp(path.join(tmpdir(), "github-audit-monitor-"));
   const inputPath = path.join(directory, "events.json");
   const reportPath = path.join(directory, "report.json");
-  await writeFile(inputPath, JSON.stringify([auditEvent({ token_id: "ghp_not-for-output" })]));
+  const input = signedInput([auditEvent({ token_id: "ghp_not-for-output" })]);
+  await writeFile(inputPath, input.body);
 
   try {
     const exitCode = await main([
@@ -402,13 +487,70 @@ test("CLI grava relatório sanitizado e retorna falha somente com alerta relevan
       "--report",
       reportPath,
       "--fail-on-alert",
+      "--input-signature",
+      input.signature,
       "--now",
       "2026-08-14T10:01:00Z",
-    ]);
+    ],
+      { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
+    );
     assert.equal(exitCode, 1);
     const report = await readFile(reportPath, "utf8");
     assert.match(report, /ref-rewrite/u);
     assert.doesNotMatch(report, /ghp_not-for-output|old_oid|token_id|force_push/iu);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("input complementar exige HMAC, janela de replay e limite de eventos", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "github-audit-input-security-"));
+  const inputPath = path.join(directory, "events.json");
+  const reportPath = path.join(directory, "report.json");
+  const input = signedInput([auditEvent()], { issuedAt: "2026-08-14T09:00:00Z" });
+  await writeFile(inputPath, input.body);
+
+  try {
+    const missingSignature = await main(
+      ["--input", inputPath, "--report", reportPath, "--now", "2026-08-14T10:01:00Z"],
+      { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
+    );
+    assert.equal(missingSignature, 1);
+    assert.equal(JSON.parse(await readFile(reportPath, "utf8")).error.code, "input_signature_required");
+
+    const expired = await main(
+      ["--input", inputPath, "--report", reportPath, "--input-signature", input.signature, "--now", "2026-08-14T10:01:00Z"],
+      { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
+    );
+    assert.equal(expired, 1);
+    assert.equal(JSON.parse(await readFile(reportPath, "utf8")).error.code, "input_replay_window");
+
+    const tooMany = signedInput(Array.from({ length: 1001 }, () => auditEvent()));
+    await writeFile(inputPath, tooMany.body);
+    const tooManyExit = await main(
+      ["--input", inputPath, "--report", reportPath, "--input-signature", tooMany.signature, "--now", "2026-08-14T10:01:00Z"],
+      { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
+    );
+    assert.equal(tooManyExit, 1);
+    assert.equal(JSON.parse(await readFile(reportPath, "utf8")).error.code, "input_too_many_events");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("input complementar rejeita envelope acima do limite de bytes antes do parse", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "github-audit-input-size-"));
+  const inputPath = path.join(directory, "events.json");
+  const reportPath = path.join(directory, "report.json");
+  const input = signedInput([auditEvent()], { padding: "x".repeat(1024 * 1024) });
+  await writeFile(inputPath, input.body);
+  try {
+    const exitCode = await main(
+      ["--input", inputPath, "--report", reportPath, "--input-signature", input.signature, "--now", "2026-08-14T10:01:00Z"],
+      { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
+    );
+    assert.equal(exitCode, 1);
+    assert.equal(JSON.parse(await readFile(reportPath, "utf8")).error.code, "input_too_large");
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -429,6 +571,10 @@ test("workflow e fixture mantêm coleta somente leitura", async () => {
   assert.doesNotMatch(workflow, /workflow_dispatch/u);
   assert.match(workflow, /ref: develop/u);
   assert.match(workflow, /retention-days:\s*7/u);
+  assert.match(workflow, /actions\/checkout@[a-f0-9]{40}/u);
+  assert.match(workflow, /actions\/setup-node@[a-f0-9]{40}/u);
+  assert.match(workflow, /actions\/upload-artifact@[a-f0-9]{40}/u);
+  assert.match(workflow, /sem confirmar force-push/u);
   assert.doesNotMatch(workflow, /permissions:\s*write-all|git push|--force/iu);
   assert.doesNotMatch(fixture, /ghp_|authorization|request_headers|decoded-malicious/iu);
 });
@@ -468,22 +614,31 @@ test("correlaciona eventos sanitizados por ator/repo/ref/request em janela e tam
 
   const bounded = correlateAuditEvents(events, { windowMinutes: 10, maxEvents: 2, maxGroups: 1 });
   assert.equal(bounded.length, 1);
-  assert.equal(bounded[0].eventCount, 2);
+  assert.equal(bounded[0].eventCount, 1);
+});
+
+test("correlação limitada mantém somente a cauda mais recente", () => {
+  const events = [
+    auditEvent({ action: "protected_branch.policy_override", request_id: "old", created_at: "2026-08-14T09:00:00Z" }),
+    auditEvent({ action: "workflows.created_workflow_run", request_id: "new", created_at: "2026-08-14T10:00:00Z" }),
+    auditEvent({ action: "git.push", request_id: "new", force_push: true, created_at: "2026-08-14T10:01:00Z" }),
+  ];
+  const correlations = correlateAuditEvents(events, { windowMinutes: 10, maxEvents: 2, maxGroups: 10 });
+  assert.equal(correlations.length, 1);
+  assert.equal(correlations[0].requestId, "new");
 });
 
 test("input normalizado complementar identifica a fonte sem alegar que REST fornece SHAs", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "github-audit-source-"));
   const inputPath = path.join(directory, "webhook.json");
   const reportPath = path.join(directory, "report.json");
-  await writeFile(
-    inputPath,
-    JSON.stringify({
-      source: "normalized-webhook",
-      events: [auditEvent({ source_type: "webhook", force_push: true })],
-    }),
-  );
+  const input = signedInput([auditEvent({ source_type: "webhook", force_push: true })]);
+  await writeFile(inputPath, input.body);
   try {
-    const exitCode = await main(["--input", inputPath, "--report", reportPath, "--now", "2026-08-14T10:01:00Z"]);
+    const exitCode = await main(
+      ["--input", inputPath, "--report", reportPath, "--input-signature", input.signature, "--now", "2026-08-14T10:01:00Z"],
+      { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
+    );
     const report = JSON.parse(await readFile(reportPath, "utf8"));
     assert.equal(exitCode, 0);
     assert.equal(report.collection.source, "normalized-webhook");

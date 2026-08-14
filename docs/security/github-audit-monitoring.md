@@ -12,8 +12,8 @@ necessario e o token de leitura `GITHUB_AUDIT_LOG_TOKEN`, criado e mantido por u
 administrador da organizacao. O token e injetado apenas no processo e nunca e escrito
 no relatorio, nos logs ou em artefatos.
 
-A fonte autoritativa para nomes e campos de eventos e a documentacao do
-[audit log do GitHub](https://docs.github.com/en/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/reviewing-the-audit-log-for-your-organization).
+A fonte autoritativa para nomes e campos de eventos e o
+[catalogo de eventos do audit log do GitHub](https://docs.github.com/en/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/audit-log-events-for-your-organization).
 O coletor usa REST para eventos Git; GraphQL nao e usado para essa finalidade.
 O parametro `include=all` e enviado explicitamente para incluir eventos web e Git.
 `--since` usa a frase documentada `created:>=<ISO>`; o cursor opaco da API e aceito
@@ -22,15 +22,32 @@ O workflow roda no cron de cinco minutos, sempre fixa o checkout em `develop` e
 consulta uma janela sobreposta dos ultimos quinze minutos. Ele nao possui
 `workflow_dispatch`: execucoes com token nao podem carregar codigo de uma ref
 escolhida manualmente.
+As actions do workflow sao fixadas por SHA de commit verificado.
 
 O payload REST oficial minimo de `git.push` nao promete ref, indicador de force-push,
 delecao ou SHAs anterior/novo. Quando esses metadados nao estao presentes, o monitor
-gera `metadata-insufficient` e falha a saude sem inventar valores. A confirmacao de
-ref rewrite/force-push exige uma fonte complementar suportada (por exemplo, webhook
-normalizado ou audit streaming contratado). A CLI aceita um envelope `--input` com
-`{"source":"normalized-webhook","events":[...]}` para essa fonte complementar;
-esse caminho preserva somente o contrato sanitizado e nao afirma que REST sozinho
-fornece os campos ausentes.
+gera `metadata-insufficient` e falha a saude sem inventar valores. O workflow nomeia
+essa limitacao explicitamente: REST nao confirma force-push nem ref rewrite sozinho.
+A confirmacao exige uma fonte complementar suportada (webhook normalizado ou audit
+streaming contratado). A CLI oferece esse caminho sem token REST: `--input` recebe
+somente um envelope assinado com HMAC-SHA256, usando `GITHUB_AUDIT_INGEST_HMAC_SECRET`
+e a assinatura `--input-signature sha256=<hex>`. O envelope deve ter `source`
+`normalized-webhook` ou `audit-stream`, `issuedAt`, `nonce` e `events`. A assinatura
+e calculada sobre os bytes do envelope sanitizado/arquivo antes do parse; entrada sem
+assinatura, com assinatura invalida, fonte nao permitida, janela expirada, mais de
+1000 eventos ou mais de 1 MiB e rejeitada. O adaptador de webhook/stream aprovado
+deve remover payload bruto, headers, credenciais e campos nao contratados antes de
+assinar. O monitor nao afirma que REST fornece os campos ausentes.
+
+Exemplo de conexao operacional (o segredo deve ser injetado pelo gerenciador de
+segredos do operador, nunca em shell history, fixture ou log):
+
+`GITHUB_AUDIT_INGEST_HMAC_SECRET=<secret> node scripts/github-audit-monitor.mjs --input <envelope-sanitizado.json> --input-signature sha256=<assinatura> --report <relatorio.json> --now <ISO>`
+
+O arquivo complementar nao e uma integracao automatica com GitHub: e um ponto de
+entrada verificavel para o adaptador aprovado. A janela de `issuedAt` limita replay,
+mas a rejeicao de nonce repetido e a persistencia de estado dependem de um consumer
+externo com ACL e retencao administrativas aprovadas.
 
 O plano de polling depende da retencao e do plano do GitHub. Se a organizacao precisar
 de entrega continua, o administrador deve avaliar audit log streaming e manter este
@@ -42,7 +59,7 @@ job como verificacao de saude e lacunas.
 | --- | --- | --- |
 | Alta | `git.push` forcado, alteracoes ou bypass de branch protegida, exclusao de ref, bypass de push protection, concessao de PAT, alteracao de ruleset e alteracao de acesso do repositorio | Interromper a mudanca, preservar evidencias e escalar imediatamente |
 | Media | Revogacao de PAT e eventos de credencial que nao indiquem concessao | Confirmar o operador, revisar o escopo e tratar dentro do SLA de seguranca |
-| Baixa | `workflows.created_workflow_run` | Manter para correlacao e tendencia; nao falha o job sozinho |
+| Baixa | `workflows.created_workflow_run`, `workflows.completed_workflow_run` | Manter para correlacao e tendencia; nao falha o job sozinho |
 | Nao classificada | Acao fora do catalogo versionado | Reter somente os campos permitidos, sem alerta automatico; revisar o catalogo |
 
 Cada alerta preserva apenas tipo e identificador sanitizado do ator, organizacao,
@@ -53,9 +70,12 @@ deduplicar por essa chave; a janela sobreposta entre execucoes e intencional.
 Alertas duplicados com a mesma acao, ator, repositorio, ref e timestamp sao
 consolidados. Eventos recentes do mesmo ator, repositorio, ref e request sao
 correlacionados de forma deterministica em uma janela de dez minutos, com no maximo
-200 eventos e 50 grupos por relatorio. O coletor limita paginas para impedir
-crescimento sem limite, valida o host/caminho HTTPS de cada `Link: rel="next"` e
-falha quando a paginacao nao pode ser concluida.
+200 eventos e 50 grupos por relatorio. O limite usa somente a cauda mais recente e
+nenhum grupo pode ultrapassar a janela desde seu primeiro evento. O coletor limita
+paginas para impedir crescimento sem limite, exige `include=all` e preserva a frase
+`created:>=<ISO>` em cada `Link: rel="next"`; tambem valida host/caminho HTTPS e
+rejeita userinfo, credenciais, controle ou parametros inesperados antes de qualquer
+segunda chamada.
 
 ## Redacao e evidencias
 
@@ -80,6 +100,9 @@ O artefato sanitizado tem retencao configurada de sete dias (`retention-days: 7`
 mas ACL de artefatos, acesso de membros e qualquer estado persistente sao controles
 administrativos do GitHub; nao sao inventados pelo workflow nem podem ser garantidos
 por `permissions: contents: read`. O repositorio nao persiste cursor ou payload.
+Quando `--cursor` e fornecido, o relatorio expoe apenas `collection.cursor` apos
+validacao de tamanho, caracteres e ausencia de marcadores sensiveis; o workflow usa
+a janela sobreposta `--since` de quinze minutos em vez de depender de estado local.
 Se o owner habilitar um sink aprovado para `alertKey`/cursor, ele deve aplicar a
 retencao e ACL corporativas sem armazenar payload bruto ou token.
 
@@ -93,7 +116,13 @@ retencao e ACL corporativas sem armazenar payload bruto ou token.
    `.alerts[].alertKey` com `jq`; chaves repetidas devem ser consolidadas pelo
    consumer downstream. O resultado da comparacao e sanitizado e nao inclui o JSON
    bruto do audit log.
-3. Um administrador verifica a expiracao de sete dias no artefato da execucao e
+3. Para confirmar um force-push/ref rewrite, o owner conecta um adaptador de webhook
+   ou streaming aprovado ao envelope HMAC descrito acima, valida assinatura e janela
+   antes de executar a CLI sem `GITHUB_AUDIT_LOG_TOKEN`; o canario deve mostrar
+   `source=normalized-webhook` ou `source=audit-stream` e os metadados fornecidos pela
+   fonte complementar. O fixture REST continua obrigatoriamente em
+   `metadata-insufficient` quando os campos nao existem.
+4. Um administrador verifica a expiracao de sete dias no artefato da execucao e
    testa acesso com uma identidade autorizada e uma identidade sem acesso, sem copiar
    o relatorio para fora do GitHub. Falha de ACL, retencao ou deduplicacao vira
    incidente operacional; nenhuma permissao adicional e concedida automaticamente.

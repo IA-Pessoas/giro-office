@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,9 @@ const MAX_EVENTS_PER_PAGE = 100;
 const DEFAULT_CORRELATION_WINDOW_MINUTES = 10;
 const MAX_CORRELATION_EVENTS = 200;
 const MAX_CORRELATION_GROUPS = 50;
+const MAX_INPUT_BYTES = 1024 * 1024;
+const MAX_INPUT_EVENTS = 1000;
+const DEFAULT_INPUT_MAX_AGE_MINUTES = 15;
 
 export const EVENT_RULES = Object.freeze({
   "protected_branch.policy_override": {
@@ -128,6 +131,29 @@ export const EVENT_RULES = Object.freeze({
     category: "protected-ref-policy-change",
     alert: true,
   },
+  "repo.add_member": { severity: "high", category: "repository-access-change", alert: true },
+  "repo.remove_member": { severity: "high", category: "repository-access-change", alert: true },
+  "org.add_member": { severity: "high", category: "organization-access-change", alert: true },
+  "org.remove_member": { severity: "high", category: "organization-access-change", alert: true },
+  "org.add_outside_collaborator": { severity: "high", category: "organization-access-change", alert: true },
+  "org.remove_outside_collaborator": { severity: "high", category: "organization-access-change", alert: true },
+  "org.required_workflow_create": { severity: "high", category: "workflow-security", alert: true },
+  "org.required_workflow_delete": { severity: "high", category: "workflow-security", alert: true },
+  "org.required_workflow_update": { severity: "high", category: "workflow-security", alert: true },
+  "integration.create": { severity: "high", category: "integration-change", alert: true },
+  "integration.destroy": { severity: "high", category: "integration-change", alert: true },
+  "integration.revoke_tokens": { severity: "high", category: "credential-change", alert: true },
+  "integration.revoke_all_tokens": { severity: "high", category: "credential-change", alert: true },
+  "integration.suspend": { severity: "high", category: "integration-change", alert: true },
+  "integration.unsuspend": { severity: "high", category: "integration-change", alert: true },
+  "integration.transfer": { severity: "high", category: "integration-change", alert: true },
+  "integration.manager_added": { severity: "high", category: "integration-change", alert: true },
+  "integration.manager_removed": { severity: "high", category: "integration-change", alert: true },
+  "integration.remove_client_secret": { severity: "high", category: "credential-change", alert: true },
+  "integration_installation.create": { severity: "high", category: "integration-change", alert: true },
+  "integration_installation.destroy": { severity: "high", category: "integration-change", alert: true },
+  "integration_installation.repositories_added": { severity: "high", category: "integration-change", alert: true },
+  "integration_installation.repositories_removed": { severity: "high", category: "integration-change", alert: true },
   "protected_branch.update_signature_requirement_enforcement_level": {
     severity: "high",
     category: "protected-ref-policy-change",
@@ -178,6 +204,23 @@ export const EVENT_RULES = Object.freeze({
     category: "workflow-activity",
     alert: true,
   },
+  "workflows.prepared_workflow_job": { severity: "high", category: "workflow-security", alert: true },
+  "workflows.completed_workflow_run": { severity: "low", category: "workflow-activity", alert: true },
+  "workflows.disable_workflow": { severity: "high", category: "workflow-security", alert: true },
+  "workflows.enable_workflow": { severity: "medium", category: "workflow-security", alert: true },
+  "workflows.delete_workflow_run": { severity: "high", category: "workflow-security", alert: true },
+  "workflows.reject_workflow_job": { severity: "high", category: "workflow-security", alert: true },
+  "workflows.rerun_workflow_run": { severity: "medium", category: "workflow-security", alert: true },
+  "workflows.cancel_workflow_run": { severity: "medium", category: "workflow-security", alert: true },
+  "workflows.actions_policy_violation": { severity: "high", category: "workflow-security", alert: true },
+  "workflows.approve_workflow_job": { severity: "high", category: "workflow-security", alert: true },
+  "workflows.pin_workflow": { severity: "medium", category: "workflow-security", alert: true },
+  "workflows.unpin_workflow": { severity: "medium", category: "workflow-security", alert: true },
+  "public_key.create": { severity: "high", category: "deploy-key-change", alert: true },
+  "public_key.delete": { severity: "high", category: "deploy-key-change", alert: true },
+  "public_key.update": { severity: "high", category: "deploy-key-change", alert: true },
+  "public_key.unverify": { severity: "high", category: "deploy-key-change", alert: true },
+  "public_key.unverification_failure": { severity: "high", category: "deploy-key-change", alert: true },
   "repo.access": {
     severity: "high",
     category: "repository-access-change",
@@ -191,6 +234,7 @@ const EMAIL_VALUE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const IPV4_VALUE = /^(?:\d{1,3}\.){3}\d{1,3}$/u;
 const SHA_VALUE = /^[a-f0-9]{7,64}$/iu;
 const ALLOWED_NEXT_QUERY_KEYS = new Set(["after", "before", "include", "order", "page", "per_page", "phrase"]);
+const HMAC_SIGNATURE = /^sha256=([a-f0-9]{64})$/iu;
 
 export class AuditMonitorError extends Error {
   constructor(code) {
@@ -450,14 +494,14 @@ export function correlateAuditEvents(events, options = {}) {
         (event.ref !== "[unknown]" || event.requestId),
     )
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-    .slice(0, maxEvents);
+    .slice(-maxEvents);
   const groups = [];
 
   for (const event of normalizedEvents) {
     const key = [event.actorType, event.actor, event.repository, event.ref, event.requestId ?? ""].join("|");
     const timestamp = Date.parse(event.createdAt);
     const group = groups.find(
-      (candidate) => candidate.key === key && timestamp - Date.parse(candidate.lastAt) <= windowMinutes * 60_000,
+      (candidate) => candidate.key === key && timestamp - Date.parse(candidate.firstAt) <= windowMinutes * 60_000,
     );
     if (group) {
       group.lastAt = event.createdAt;
@@ -541,7 +585,7 @@ function buildAuditUrl(organization, { since, cursor, baseUrl } = {}) {
   return url;
 }
 
-function validateNextPage(link, organization, baseUrl) {
+function validateNextPage(link, organization, baseUrl, since) {
   let next;
   try {
     next = new URL(link, baseUrl);
@@ -559,10 +603,18 @@ function validateNextPage(link, organization, baseUrl) {
     throw new AuditMonitorError("invalid_next_link");
   }
   for (const [key, value] of next.searchParams) {
-    if (!ALLOWED_NEXT_QUERY_KEYS.has(key) || /[\r\n]/u.test(value) || SENSITIVE_VALUE.test(`${key}=${value}`)) {
+    if (
+      !ALLOWED_NEXT_QUERY_KEYS.has(key) ||
+      next.searchParams.getAll(key).length !== 1 ||
+      /[\r\n]/u.test(value) ||
+      SENSITIVE_VALUE.test(`${key}=${value}`)
+    ) {
       throw new AuditMonitorError("invalid_next_link");
     }
   }
+  if (next.searchParams.get("include") !== "all") throw new AuditMonitorError("invalid_next_link");
+  const expectedPhrase = since ? `created:>=${since}` : null;
+  if (next.searchParams.get("phrase") !== expectedPhrase) throw new AuditMonitorError("invalid_next_link");
   return next;
 }
 
@@ -620,12 +672,14 @@ async function collectAuditEvents({
     events.push(...page);
     pages += 1;
     const nextLink = nextPageFromLink(response.headers?.get?.("link"));
-    url = nextLink ? validateNextPage(nextLink, organization.trim(), resolvedBaseUrl) : undefined;
+    url = nextLink
+      ? validateNextPage(nextLink, organization.trim(), resolvedBaseUrl, normalizedSince)
+      : undefined;
     hasNextPage = Boolean(url);
   }
 
   if (hasNextPage) throw new AuditMonitorError("pagination_limit");
-  return { events, pages, paginationLimitReached: false };
+  return { events, pages, cursor: normalizedCursor, paginationLimitReached: false };
 }
 
 export async function fetchAuditEvents(options) {
@@ -704,6 +758,7 @@ export function buildAuditReport(events, options = {}) {
     latestEventAt: latestEventAt ?? null,
     lagMinutes,
     ...(options.source ? { source: safeString(options.source, { sensitive: false }) } : {}),
+    ...(options.cursor ? { cursor: validateCursor(options.cursor) } : {}),
   };
 
   return {
@@ -727,19 +782,64 @@ function hasArgument(args, name) {
 }
 
 function usage() {
-  return "usage: node scripts/github-audit-monitor.mjs --org <organization> --report <path> [--since <ISO>] [--cursor <opaque>] [--page-limit <n>] [--fail-on-alert] [--input <json>]";
+  return "usage: node scripts/github-audit-monitor.mjs --org <organization> --report <path> [--since <ISO>] [--cursor <opaque>] [--page-limit <n>] [--fail-on-alert] [--input <json> --input-signature <sha256=...>]";
 }
 
-async function readInput(filePath) {
+function parseInputMaxAge(value) {
+  if (value === undefined) return DEFAULT_INPUT_MAX_AGE_MINUTES;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 60) throw new AuditMonitorError("invalid_input_max_age");
+  return parsed;
+}
+
+function verifyInputSignature(bytes, signature, secret) {
+  if (!signature) throw new AuditMonitorError("input_signature_required");
+  if (!secret || typeof secret !== "string") throw new AuditMonitorError("input_signature_secret_missing");
+  const match = HMAC_SIGNATURE.exec(signature);
+  if (!match) throw new AuditMonitorError("input_signature_invalid");
+  const actual = Buffer.from(match[1].toLowerCase(), "hex");
+  const expected = createHmac("sha256", secret).update(bytes).digest();
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    throw new AuditMonitorError("input_signature_invalid");
+  }
+}
+
+async function readInput(filePath, { signature, secret, now, maxAgeMinutes } = {}) {
+  let bytes;
   try {
-    const parsed = JSON.parse(await readFile(filePath, "utf8"));
-    const events = Array.isArray(parsed) ? parsed : parsed?.events;
+    bytes = await readFile(filePath);
+  } catch {
+    throw new AuditMonitorError("input_malformed_json");
+  }
+  if (bytes.byteLength > MAX_INPUT_BYTES) throw new AuditMonitorError("input_too_large");
+  verifyInputSignature(bytes, signature, secret);
+
+  try {
+    const parsed = JSON.parse(bytes.toString("utf8"));
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+      throw new AuditMonitorError("input_malformed_json");
+    }
+    const source = safeString(parsed.source, { sensitive: false });
+    if (!source || !new Set(["normalized-webhook", "audit-stream"]).has(source)) {
+      throw new AuditMonitorError("input_source_not_allowed");
+    }
+    const issuedAt = toIsoTimestamp(parsed.issuedAt ?? parsed.issued_at);
+    const nonce = safeString(parsed.nonce, { sensitive: false, maxLength: 128 });
+    if (!issuedAt || !nonce || /[\r\n]/u.test(nonce)) throw new AuditMonitorError("input_envelope_invalid");
+    const ageMs = Date.parse(safeNow(now)) - Date.parse(issuedAt);
+    if (ageMs < 0 || ageMs > parseInputMaxAge(maxAgeMinutes) * 60_000) {
+      throw new AuditMonitorError("input_replay_window");
+    }
+    const events = parsed.events;
     if (!Array.isArray(events)) throw new AuditMonitorError("input_malformed_json");
+    if (events.length > MAX_INPUT_EVENTS) throw new AuditMonitorError("input_too_many_events");
+    if (events.some((event) => !event || typeof event !== "object" || Array.isArray(event))) {
+      throw new AuditMonitorError("input_malformed_event");
+    }
     return {
       events,
-      ...(parsed && !Array.isArray(parsed) && parsed.source
-        ? { source: safeString(parsed.source, { sensitive: false }) }
-        : {}),
+      source,
+      ...(parsed.cursor !== undefined ? { cursor: validateCursor(parsed.cursor) } : {}),
     };
   } catch (error) {
     if (error instanceof AuditMonitorError) throw error;
@@ -756,6 +856,8 @@ export async function main(args = process.argv.slice(2), environment = process.e
   const pageLimit = argumentValue(args, "--page-limit");
   const now = argumentValue(args, "--now");
   const lagThresholdMinutes = argumentValue(args, "--lag-threshold");
+  const inputSignature = argumentValue(args, "--input-signature");
+  const inputMaxAge = argumentValue(args, "--input-max-age");
 
   if (!reportPath || (hasArgument(args, "--input") && !inputPath) || (!inputPath && !organization)) {
     process.stderr.write(`${usage()}\n`);
@@ -765,12 +867,18 @@ export async function main(args = process.argv.slice(2), environment = process.e
   let report;
   try {
     if (inputPath) {
-      const input = await readInput(inputPath);
+      const input = await readInput(inputPath, {
+        signature: inputSignature,
+        secret: environment.GITHUB_AUDIT_INGEST_HMAC_SECRET,
+        now,
+        maxAgeMinutes: inputMaxAge,
+      });
       report = buildAuditReport(input.events, {
         now,
         lagThresholdMinutes,
         pages: 1,
         source: input.source,
+        cursor: input.cursor,
       });
     } else {
       const startedAt = safeNow(now);
@@ -787,6 +895,7 @@ export async function main(args = process.argv.slice(2), environment = process.e
         startedAt,
         completedAt: safeNow(now),
         pages: result.pages,
+        cursor: result.cursor,
         paginationLimitReached: result.paginationLimitReached,
       });
     }
@@ -819,7 +928,7 @@ export async function main(args = process.argv.slice(2), environment = process.e
   }
 
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
-  if (hasArgument(args, "--fail-on-alert") && !report.ok) return 1;
+  if (report.error || (hasArgument(args, "--fail-on-alert") && !report.ok)) return 1;
   return 0;
 }
 
