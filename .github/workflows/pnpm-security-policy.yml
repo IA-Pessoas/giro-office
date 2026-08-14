@@ -34,6 +34,9 @@ jobs:
       - name: Install without lifecycle scripts
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Run safe offline pnpm fixtures
+        run: corepack pnpm run security:pnpm:fixtures
+
       - name: Upload sanitized policy report
         if: always()
         uses: actions/upload-artifact@v4

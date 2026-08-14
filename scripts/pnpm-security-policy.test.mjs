@@ -53,21 +53,24 @@ test("parsePnpmVersion rejects ranges and other package managers", () => {
 });
 
 test("readWorkspacePolicy parses supported scalar settings and allowBuilds", () => {
-  assert.deepEqual(readWorkspacePolicy(`minimumReleaseAge: 1440
+  assert.deepEqual(
+    readWorkspacePolicy(`minimumReleaseAge: 1440
 trustPolicy: no-downgrade
 blockExoticSubdeps: true
 strictDepBuilds: true
 dangerouslyAllowAllBuilds: false
 allowBuilds:
   esbuild: true
-`), {
-    minimumReleaseAge: 1440,
-    trustPolicy: "no-downgrade",
-    blockExoticSubdeps: true,
-    strictDepBuilds: true,
-    dangerouslyAllowAllBuilds: false,
-    allowBuilds: { esbuild: true },
-  });
+`),
+    {
+      minimumReleaseAge: 1440,
+      trustPolicy: "no-downgrade",
+      blockExoticSubdeps: true,
+      strictDepBuilds: true,
+      dangerouslyAllowAllBuilds: false,
+      allowBuilds: { esbuild: true },
+    },
+  );
 });
 
 test("readWorkspacePolicy rejects duplicate and malformed settings", () => {
@@ -129,13 +132,61 @@ trustLockfile: false
   }
 });
 
+test("accepts only boolean values and valid package names in allowBuilds", () => {
+  const findings = validatePnpmPolicy({
+    packageJson: validPackage,
+    workspaceYaml: `minimumReleaseAge: 1440
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+strictDepBuilds: true
+dangerouslyAllowAllBuilds: false
+allowBuilds:
+  esbuild: true
+  "@scope/native-addon": false
+`,
+    workflowSources: [validWorkflow],
+  });
+
+  assert.deepEqual(findings, []);
+});
+
+test("fails closed for invalid allowBuilds values, names, nested maps and lists", () => {
+  const invalidPolicies = [
+    `allowBuilds:\n  esbuild: "true"\n`,
+    `allowBuilds:\n  "bad package": true\n`,
+    `allowBuilds:\n  esbuild:\n    command: true\n`,
+    "allowBuilds: []\n",
+  ];
+
+  for (const allowBuilds of invalidPolicies) {
+    const findings = validatePnpmPolicy({
+      packageJson: validPackage,
+      workspaceYaml: `${validWorkspace.replace("allowBuilds: {}\n", "")}${allowBuilds}`,
+      workflowSources: [validWorkflow],
+    });
+    assert.notDeepEqual(findings, [], allowBuilds);
+    assert.match(JSON.stringify(findings), /ALLOW_BUILDS/u, allowBuilds);
+  }
+});
+
+test("fails closed for duplicate allowBuilds package entries", () => {
+  const findings = validatePnpmPolicy({
+    packageJson: validPackage,
+    workspaceYaml: `${validWorkspace.replace("allowBuilds: {}\n", "")}allowBuilds:\n  esbuild: true\n  esbuild: false\n`,
+    workflowSources: [validWorkflow],
+  });
+
+  assert.match(JSON.stringify(findings), /DUPLICATE_SETTING/u);
+});
+
 test("requires frozen lockfiles and rejects npm/yarn install commands", () => {
   const findings = validatePnpmPolicy({
     packageJson: validPackage,
     workspaceYaml: validWorkspace,
-    workflowSources: [{
-      path: ".github/workflows/bad.yml",
-      source: `permissions: read
+    workflowSources: [
+      {
+        path: ".github/workflows/bad.yml",
+        source: `permissions: read
 jobs:
   check:
     steps:
@@ -143,7 +194,8 @@ jobs:
       - run: npm install
       - run: yarn install --frozen-lockfile
 `,
-    }],
+      },
+    ],
   });
 
   const text = JSON.stringify(findings);
@@ -155,16 +207,20 @@ test("rejects production, deploy and admin token names in install workflows", ()
   const findings = validatePnpmPolicy({
     packageJson: validPackage,
     workspaceYaml: validWorkspace,
-    workflowSources: [{
-      path: ".github/workflows/secrets.yml",
-      source: `permissions: contents: read
-jobs:
-  check:
-    steps:
-      - run: PROD_TOKEN="${"${{ secrets.PRODUCTION_TOKEN }}"}" pnpm install --frozen-lockfile
-      - run: echo "${"${{ secrets.ADMIN_TOKEN }}"}"
-`,
-    }],
+    workflowSources: [
+      {
+        path: ".github/workflows/secrets.yml",
+        source: [
+          "permissions: contents: read",
+          "jobs:",
+          "  check:",
+          "    steps:",
+          '      - run: PROD_TOKEN="${' +
+            '{ secrets.PRODUCTION_TOKEN }}" pnpm install --frozen-lockfile',
+          '      - run: echo "${' + '{ secrets.ADMIN_TOKEN }}"',
+        ].join("\n"),
+      },
+    ],
   });
 
   assert.match(JSON.stringify(findings), /SENSITIVE_TOKEN/u);
@@ -189,10 +245,13 @@ test("ignores commented install examples and returns stable findings", () => {
   const findings = validatePnpmPolicy({
     packageJson: validPackage,
     workspaceYaml: validWorkspace,
-    workflowSources: [{
-      path: ".github/workflows/commented.yml",
-      source: `# pnpm install\n# npm install\n`,
-    }, validWorkflow],
+    workflowSources: [
+      {
+        path: ".github/workflows/commented.yml",
+        source: `# pnpm install\n# npm install\n`,
+      },
+      validWorkflow,
+    ],
   });
 
   assert.deepEqual(findings, []);

@@ -31,6 +31,22 @@ corepack pnpm run check
 instalação de validação usa `--ignore-scripts`; fixtures que demonstram bloqueio
 de scripts nunca devem executar payloads maliciosos.
 
+O harness `node --test scripts/pnpm-security-policy-fixtures.test.mjs` cria
+workspaces temporários, invoca exatamente `pnpm@10.26.0` via Corepack e usa
+`--offline`. Ele verifica configuração efetiva de `minimumReleaseAge`, rejeição
+estática de idade insegura e fontes git/tarball, mutação rejeitada pelo
+`--frozen-lockfile`, lifecycle não aprovado sem alterar um sentinel e um build
+mínimo benigno quando o pacote está explicitamente em `allowBuilds`. O sentinel
+é apenas um arquivo de evidência; não há payload malicioso, segredo ou acesso ao
+registry.
+
+O fixture de lifecycle usa um tarball local temporário apenas para obter um
+pacote isolado sem depender de registry. Tarballs e fontes git reais continuam
+sendo rejeitados pelo verificador de política. A idade de publicação não é
+testada contra o relógio de um registry: o limite offline é coberto pela
+configuração efetiva e pelo fixture controlado rejeitado pelo checker, evitando
+simular uma resposta de registry.
+
 ## Builds aprovados
 
 O mapa `allowBuilds` começa vazio. Uma exceção só pode ser adicionada depois de
