@@ -1,62 +1,96 @@
 # Monitoramento do audit log do GitHub
 
-Este controle coleta, a cada cinco minutos, eventos do audit log da organização
-`IA-Pessoas` usando o endpoint REST de auditoria. O objetivo é observar todos os
-repositórios atuais, forks e repositórios criados no futuro sem executar mutações.
+Este controle coleta, a cada cinco minutos, eventos do audit log da organizacao
+`IA-Pessoas` usando o endpoint REST de auditoria. O objetivo e observar todos os
+repositorios atuais, forks e repositorios criados no futuro sem executar mutacoes.
 
-## Operação
+## Operacao
 
 O workflow `.github/workflows/github-audit-monitor.yml` usa somente `contents: read`,
-desabilita credenciais persistentes do checkout e executa Node.js 22. O único segredo
-necessário é o token de leitura `GITHUB_AUDIT_LOG_TOKEN`, criado e mantido por um
-administrador da organização. O token é injetado apenas no processo e nunca é escrito
-no relatório, nos logs ou em artefatos.
+desabilita credenciais persistentes do checkout e executa Node.js 22. O unico segredo
+necessario e o token de leitura `GITHUB_AUDIT_LOG_TOKEN`, criado e mantido por um
+administrador da organizacao. O token e injetado apenas no processo e nunca e escrito
+no relatorio, nos logs ou em artefatos.
 
-A fonte autoritativa para nomes e campos de eventos é a documentação do
+A fonte autoritativa para nomes e campos de eventos e a documentacao do
 [audit log do GitHub](https://docs.github.com/en/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/reviewing-the-audit-log-for-your-organization).
-O coletor usa REST para eventos Git; GraphQL não é usado para essa finalidade. O
-plano de polling depende da retenção e do plano do GitHub: se a organização precisar
-de entrega contínua, o administrador deve avaliar audit log streaming e manter este
-job como verificação de saúde e lacunas.
+O coletor usa REST para eventos Git; GraphQL nao e usado para essa finalidade.
+O parametro `include=all` e enviado explicitamente para incluir eventos web e Git.
+`--since` usa a frase documentada `created:>=<ISO>`; o cursor opaco da API e aceito
+separadamente por `--cursor` e somente ele e enviado como `after`.
 
-## Classificação
+O payload REST oficial minimo de `git.push` nao promete ref, indicador de force-push,
+delecao ou SHAs anterior/novo. Quando esses metadados nao estao presentes, o monitor
+gera `metadata-insufficient` e falha a saude sem inventar valores. A confirmacao de
+ref rewrite/force-push exige uma fonte complementar suportada (por exemplo, webhook
+normalizado ou audit streaming contratado). A CLI aceita um envelope `--input` com
+`{"source":"normalized-webhook","events":[...]}` para essa fonte complementar;
+esse caminho preserva somente o contrato sanitizado e nao afirma que REST sozinho
+fornece os campos ausentes.
 
-| Severidade | Eventos observados | Ação |
+O plano de polling depende da retencao e do plano do GitHub. Se a organizacao precisar
+de entrega continua, o administrador deve avaliar audit log streaming e manter este
+job como verificacao de saude e lacunas.
+
+## Classificacao
+
+| Severidade | Eventos observados | Acao |
 | --- | --- | --- |
-| Alta | `git.push` forçado, alterações ou bypass de branch protegida, exclusão de ref, bypass de push protection, concessão de PAT e alteração de acesso do repositório | Interromper a mudança, preservar evidências e escalar imediatamente |
-| Média | Revogação de PAT e eventos de credencial que não indiquem concessão | Confirmar o operador, revisar o escopo e tratar dentro do SLA de segurança |
-| Baixa | `workflows.created_workflow_run` | Manter para correlação e tendência; não falha o job sozinho |
-| Não classificada | Ação fora do catálogo versionado | Reter somente os campos permitidos, sem alerta automático; revisar o catálogo |
+| Alta | `git.push` forcado, alteracoes ou bypass de branch protegida, exclusao de ref, bypass de push protection, concessao de PAT, alteracao de ruleset e alteracao de acesso do repositorio | Interromper a mudanca, preservar evidencias e escalar imediatamente |
+| Media | Revogacao de PAT e eventos de credencial que nao indiquem concessao | Confirmar o operador, revisar o escopo e tratar dentro do SLA de seguranca |
+| Baixa | `workflows.created_workflow_run` | Manter para correlacao e tendencia; nao falha o job sozinho |
+| Nao classificada | Acao fora do catalogo versionado | Reter somente os campos permitidos, sem alerta automatico; revisar o catalogo |
 
-Cada alerta preserva apenas tipo e identificador sanitizado do ator, organização,
-repositório, ação, ref, SHAs anterior e novo quando fornecidos, origem e timestamp.
-Alertas duplicados com a mesma ação, ator, repositório, ref e timestamp são
-consolidados. O coletor limita páginas para impedir crescimento sem limite e falha
-quando a paginação não pode ser concluída.
+Cada alerta preserva apenas tipo e identificador sanitizado do ator, organizacao,
+repositorio, acao, ref, SHAs anterior e novo quando fornecidos, origem e timestamp.
+Alertas duplicados com a mesma acao, ator, repositorio, ref e timestamp sao
+consolidados. Eventos recentes do mesmo ator, repositorio, ref e request sao
+correlacionados de forma deterministica em uma janela de dez minutos, com no maximo
+200 eventos e 50 grupos por relatorio. O coletor limita paginas para impedir
+crescimento sem limite, valida o host/caminho HTTPS de cada `Link: rel="next"` e
+falha quando a paginacao nao pode ser concluida.
 
-## Redação e evidências
+## Redacao e evidencias
 
-IDs e escopos de tokens, e-mails, IPs, headers de autenticação, `data` bruto,
-payloads desconhecidos e corpos de resposta nunca entram no relatório. A evidência
-operacional deve guardar somente o relatório sanitizado, a URL do workflow, o SHA da
-execução, o período consultado e o responsável pela revisão. Restrinja os artefatos
-ao time de segurança e aplique a retenção aprovada pela organização; não copie o
+IDs e escopos de tokens, e-mails, IPs, headers de autenticacao, `data` bruto,
+payloads desconhecidos e corpos de resposta nunca entram no relatorio. A evidencia
+operacional deve guardar somente o relatorio sanitizado, a URL do workflow, o SHA da
+execucao, o periodo consultado e o responsavel pela revisao. Restrinja os artefatos
+ao time de seguranca e aplique a retencao aprovada pela organizacao; nao copie o
 audit log bruto para issues, PRs ou chats.
+
+## Operacao, owner, SLA e canal
+
+O owner operacional e `Security Engineering`, com backup do owner do repositorio
+afetado. Alertas altos tem SLA de triagem de cinco minutos e medios de trinta
+minutos; falha de saude ou `metadata-insufficient` tem SLA de quinze minutos. O
+canal e a verificacao `security/github-audit` no GitHub Actions, consumida pelo
+on-call de seguranca e pelo processo de incidentes ja aprovado. Nao ha integracao
+automatica inventada com Slack, e-mail ou abertura de issue, nem permissao de escrita
+adicionada ao workflow.
+
+O artefato sanitizado tem retencao configurada de sete dias (`retention-days: 7`),
+com acesso restrito pelas permissoes do repositorio/organizacao ao time de seguranca.
+Apos sete dias, preserve somente a chave sanitizada do evento, decisao, owner, SLA e
+referencia do incidente conforme a politica de retencao corporativa; nunca retenha o
+payload bruto ou o token.
 
 ## Resposta e lacunas
 
-Para um alerta alto ou médio: confirmar o ator e o tipo de identidade, preservar o
-relatório, proteger ou bloquear a ref afetada, revogar/rotacionar a credencial se
-necessário, revisar eventos correlatos recentes e escalar ao owner do repositório e
-ao administrador da organização. A equipe deve registrar severidade, owner, SLA,
-horários, evidência sanitizada, contenção e decisão de encerramento.
+Para um alerta alto ou medio: confirmar o ator e o tipo de identidade, preservar o
+relatorio, proteger ou bloquear a ref afetada, revogar/rotacionar a credencial se
+necessario, revisar eventos correlatos recentes e escalar ao owner do repositorio e
+ao administrador da organizacao. A equipe deve registrar severidade, owner, SLA,
+horarios, evidencia sanitizada, contencao e decisao de encerramento.
 
-Falha de autenticação, resposta não-2xx, JSON inválido, organização ausente, limite
-de paginação ou atraso superior a dez minutos são falhas de saúde. O atraso deve ser
-tratado como lacuna até que uma coleta posterior prove recuperação.
+Falha de autenticacao, resposta nao-2xx, JSON invalido, organizacao ausente, limite
+de paginacao, `metadata-insufficient` ou atraso superior a dez minutos sao falhas de
+saude. O atraso deve ser tratado como lacuna ate que uma coleta posterior prove
+recuperacao.
 
-Mensalmente, execute o fixture seguro como canário em um ambiente sandbox e confirme
-que um force-push controlado gera alerta alto em até cinco minutos. Trimestralmente,
-realize um tabletop com os owners para testar bypass de proteção, exclusão de ref,
-alteração de workflow, push protection e comprometimento de token, incluindo a
-revisão de retenção e acesso aos relatórios.
+Mensalmente, execute o fixture oficial minimo e o fixture complementar normalizado
+como canario em um ambiente sandbox; confirme que o primeiro gera
+`metadata-insufficient` e que a fonte complementar confirma um force-push em ate
+cinco minutos. Trimestralmente, realize um tabletop com os owners para testar bypass
+de protecao, exclusao de ref, alteracao de workflow, push protection e comprometimento
+de token, incluindo a revisao de retencao e acesso aos relatorios.

@@ -1,0 +1,23 @@
+[
+  {
+    "action": "git.push",
+    "actor": "security-canary",
+    "actor_is_agent": false,
+    "actor_is_bot": true,
+    "created_at": "2026-08-14T10:00:00Z",
+    "org": "IA-Pessoas",
+    "programmatic_access_type": "OAuth application",
+    "repo": "IA-Pessoas/giro-office",
+    "transport_protocol": "ssh"
+  },
+  {
+    "action": "protected_branch.policy_override",
+    "actor": "security-canary",
+    "actor_is_agent": true,
+    "actor_is_bot": false,
+    "created_at": "2026-08-14T10:01:00Z",
+    "name": "refs/heads/main",
+    "org": "IA-Pessoas",
+    "repo": "IA-Pessoas/giro-office"
+  }
+]

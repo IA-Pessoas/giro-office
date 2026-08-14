@@ -39,4 +39,5 @@ jobs:
         with:
           name: github-audit-report
           path: ${{ runner.temp }}/github-audit-report.json
+          retention-days: 7
           if-no-files-found: ignore

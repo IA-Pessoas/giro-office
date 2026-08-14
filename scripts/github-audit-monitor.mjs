@@ -7,6 +7,9 @@ const DEFAULT_PAGE_LIMIT = 10;
 const DEFAULT_LAG_THRESHOLD_MINUTES = 10;
 const MAX_PAGE_LIMIT = 100;
 const MAX_EVENTS_PER_PAGE = 100;
+const DEFAULT_CORRELATION_WINDOW_MINUTES = 10;
+const MAX_CORRELATION_EVENTS = 200;
+const MAX_CORRELATION_GROUPS = 50;
 
 export const EVENT_RULES = Object.freeze({
   "protected_branch.policy_override": {
@@ -32,6 +35,91 @@ export const EVENT_RULES = Object.freeze({
   "protected_branch.update_allow_deletions_enforcement_level": {
     severity: "high",
     category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_admin_enforced": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_ignore_approvals_from_contributors": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_linear_history_requirement_enforcement_level": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_lock_allows_fetch_and_merge": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_lock_branch_enforcement_level": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_merge_queue_enforcement_level": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_name": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_pull_request_reviews_enforcement_level": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_require_code_owner_review": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_require_last_push_approval": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_required_approving_review_count": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_required_status_checks_enforcement_level": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_signature_requirement_enforcement_level": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "protected_branch.update_strict_required_status_checks_policy": {
+    severity: "high",
+    category: "protected-ref-policy-change",
+    alert: true,
+  },
+  "repository_ruleset.create": {
+    severity: "high",
+    category: "ruleset-change",
+    alert: true,
+  },
+  "repository_ruleset.update": {
+    severity: "high",
+    category: "ruleset-change",
+    alert: true,
+  },
+  "repository_ruleset.destroy": {
+    severity: "high",
+    category: "ruleset-change",
     alert: true,
   },
   "protected_branch.destroy": {
@@ -107,11 +195,26 @@ function readActor(event) {
 }
 
 function readActorType(event) {
+  if (event?.actor_is_agent === true) return "Agent";
+  if (event?.actor_is_bot === true) return "Bot";
   const actor = event?.actor;
   if (actor && typeof actor === "object") {
-    return firstString(actor.type, actor.actor_type);
+    const actorType = firstString(actor.type, actor.actor_type);
+    if (actorType && /integration|app/iu.test(actorType)) return "App";
+    if (actorType && /agent/iu.test(actorType)) return "Agent";
+    if (actorType && /bot/iu.test(actorType)) return "Bot";
+    if (actorType && /user/iu.test(actorType)) return "User";
+    return actorType;
   }
-  return firstString(event?.actor_type, event?.user_type, event?.actorType);
+  const actorType = firstString(event?.actor_type, event?.user_type, event?.actorType);
+  if (actorType && /integration|app/iu.test(actorType)) return "App";
+  if (actorType && /agent/iu.test(actorType)) return "Agent";
+  if (actorType && /bot/iu.test(actorType)) return "Bot";
+  if (actorType && /user/iu.test(actorType)) return "User";
+  if (event?.oauth_application_id || /github\s*app/iu.test(event?.programmatic_access_type ?? "")) {
+    return "App";
+  }
+  return actorType;
 }
 
 function readRepository(event) {
@@ -128,6 +231,18 @@ function readOrganization(event) {
     return firstString(organization.login, organization.name);
   }
   return firstString(organization, event?.org_name, event?.organization_name);
+}
+
+function readRef(event) {
+  const action = safeString(event?.action, { sensitive: false }) ?? "";
+  if (action.startsWith("protected_branch.")) {
+    return firstString(event?.name, event?.branch, event?.ref);
+  }
+  return firstString(event?.ref, event?.branch, event?.tag);
+}
+
+function readRequestId(event) {
+  return firstString(event?.request_id, event?.requestId, event?.event_id, event?.document_id);
 }
 
 function readTimestamp(event) {
@@ -172,11 +287,22 @@ function isDeletedRef(event) {
   );
 }
 
+function hasRefMetadata(event) {
+  return Boolean(
+    readRef(event) ||
+      readSha(event?.old_sha, event?.old_oid, event?.old_commit, event?.old_commit_id) ||
+      readSha(event?.new_sha, event?.new_oid, event?.new_commit, event?.new_commit_id),
+  );
+}
+
 export function classifyAuditEvent(event) {
   const action = safeString(event?.action, { sensitive: false });
   if (action === "git.push") {
     if (isDeletedRef(event)) return { severity: "high", category: "ref-deletion", alert: true };
     if (isForcedPush(event)) return { severity: "high", category: "ref-rewrite", alert: true };
+    if (!hasRefMetadata(event)) {
+      return { severity: "medium", category: "metadata-insufficient", alert: true };
+    }
     return { severity: "low", category: "ref-update", alert: false };
   }
 
@@ -198,10 +324,12 @@ export function normalizeAuditEvent(event) {
     alert: classification.alert,
     category: classification.category,
     createdAt: toIsoTimestamp(readTimestamp(event)),
+    metadataStatus: classification.category === "metadata-insufficient" ? "insufficient" : "complete",
     newSha: readSha(event?.new_sha, event?.new_oid, event?.new_commit, event?.new_commit_id),
     oldSha: readSha(event?.old_sha, event?.old_oid, event?.old_commit, event?.old_commit_id),
     organization: readOrganization(event) ?? "[unknown]",
-    ref: firstString(event?.ref, event?.branch, event?.tag) ?? "[unknown]",
+    ref: readRef(event) ?? "[unknown]",
+    requestId: readRequestId(event),
     repository: readRepository(event) ?? "[unknown]",
     severity: classification.severity,
     source: firstString(event?.source, event?.source_name, event?.origin) ?? "github-audit-log",
@@ -233,6 +361,70 @@ export function deduplicateAlerts(events) {
   });
 }
 
+function parseCorrelationOption(value, fallback, maximum) {
+  if (value === undefined) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > maximum) {
+    throw new AuditMonitorError("invalid_correlation_limit");
+  }
+  return parsed;
+}
+
+export function correlateAuditEvents(events, options = {}) {
+  const windowMinutes = parseCorrelationOption(
+    options.windowMinutes,
+    DEFAULT_CORRELATION_WINDOW_MINUTES,
+    24 * 60,
+  );
+  const maxEvents = parseCorrelationOption(options.maxEvents, MAX_CORRELATION_EVENTS, MAX_CORRELATION_EVENTS);
+  const maxGroups = parseCorrelationOption(options.maxGroups, MAX_CORRELATION_GROUPS, MAX_CORRELATION_GROUPS);
+  const normalizedEvents = (Array.isArray(events) ? events : [])
+    .map(normalizeAuditEvent)
+    .filter(
+      (event) =>
+        event.createdAt &&
+        event.actor !== "[unknown]" &&
+        event.repository !== "[unknown]" &&
+        (event.ref !== "[unknown]" || event.requestId),
+    )
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+    .slice(0, maxEvents);
+  const groups = [];
+
+  for (const event of normalizedEvents) {
+    const key = [event.actorType, event.actor, event.repository, event.ref, event.requestId ?? ""].join("|");
+    const timestamp = Date.parse(event.createdAt);
+    const group = groups.find(
+      (candidate) => candidate.key === key && timestamp - Date.parse(candidate.lastAt) <= windowMinutes * 60_000,
+    );
+    if (group) {
+      group.lastAt = event.createdAt;
+      group.eventCount += 1;
+      group.actions.add(event.action);
+      continue;
+    }
+    if (groups.length >= maxGroups) continue;
+    groups.push({
+      key,
+      actor: event.actor,
+      actorType: event.actorType,
+      organization: event.organization,
+      repository: event.repository,
+      ref: event.ref,
+      ...(event.requestId ? { requestId: event.requestId } : {}),
+      firstAt: event.createdAt,
+      lastAt: event.createdAt,
+      eventCount: 1,
+      actions: new Set([event.action]),
+    });
+  }
+
+  return groups.map(({ key, actions, ...group }) => ({
+    ...group,
+    actions: [...actions].sort(),
+  }));
+}
+
 function positiveInteger(value, fallback, maximum) {
   if (value === undefined) return fallback;
   const parsed = Number(value);
@@ -248,22 +440,87 @@ function nextPageFromLink(linkHeader) {
   return match?.[1];
 }
 
-function buildAuditUrl(organization, since) {
-  const url = new URL(`/orgs/${encodeURIComponent(organization)}/audit-log`, API_URL);
+function validateIsoSince(value) {
+  if (value === undefined) return undefined;
+  const normalized = toIsoTimestamp(value);
+  if (!normalized || !/T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(String(value))) {
+    throw new AuditMonitorError("invalid_since");
+  }
+  return String(value);
+}
+
+function validateCursor(value) {
+  if (value === undefined) return undefined;
+  const normalized = safeString(value, { sensitive: false, maxLength: 512 });
+  if (!normalized || /[\r\n]/u.test(normalized)) throw new AuditMonitorError("invalid_cursor");
+  return normalized;
+}
+
+function resolveBaseUrl(baseUrl, allowCustomBaseUrl = false) {
+  let parsed;
+  try {
+    parsed = new URL(baseUrl ?? API_URL);
+  } catch {
+    throw new AuditMonitorError("invalid_base_url");
+  }
+  if (parsed.protocol !== "https:") throw new AuditMonitorError("invalid_base_url");
+  if (parsed.hostname !== "api.github.com" && !allowCustomBaseUrl) {
+    throw new AuditMonitorError("invalid_base_url");
+  }
+  return parsed.origin;
+}
+
+function buildAuditUrl(organization, { since, cursor, baseUrl } = {}) {
+  const url = new URL(`/orgs/${encodeURIComponent(organization)}/audit-log`, baseUrl ?? API_URL);
   url.searchParams.set("per_page", String(MAX_EVENTS_PER_PAGE));
-  if (since) url.searchParams.set("after", since);
+  url.searchParams.set("include", "all");
+  if (since) url.searchParams.set("phrase", `created:>=${since}`);
+  if (cursor) url.searchParams.set("after", cursor);
   return url;
 }
 
-async function collectAuditEvents({ organization, token, since, pageLimit = DEFAULT_PAGE_LIMIT }) {
+function validateNextPage(link, organization, baseUrl) {
+  let next;
+  try {
+    next = new URL(link, baseUrl);
+  } catch {
+    throw new AuditMonitorError("invalid_next_link");
+  }
+  const expectedPath = `/orgs/${encodeURIComponent(organization)}/audit-log`;
+  if (
+    next.protocol !== "https:" ||
+    next.origin !== baseUrl ||
+    next.pathname !== expectedPath
+  ) {
+    throw new AuditMonitorError("invalid_next_link");
+  }
+  return next;
+}
+
+async function collectAuditEvents({
+  organization,
+  token,
+  since,
+  cursor,
+  pageLimit = DEFAULT_PAGE_LIMIT,
+  baseUrl,
+  allowCustomBaseUrl = false,
+}) {
   if (!organization || typeof organization !== "string" || !organization.trim()) {
     throw new AuditMonitorError("missing_organization");
   }
   if (!token || typeof token !== "string") throw new AuditMonitorError("missing_token");
 
   const limit = positiveInteger(pageLimit, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT);
+  const normalizedSince = validateIsoSince(since);
+  const normalizedCursor = validateCursor(cursor);
+  const resolvedBaseUrl = resolveBaseUrl(baseUrl, allowCustomBaseUrl);
   const events = [];
-  let url = buildAuditUrl(organization.trim(), since);
+  let url = buildAuditUrl(organization.trim(), {
+    since: normalizedSince,
+    cursor: normalizedCursor,
+    baseUrl: resolvedBaseUrl,
+  });
   let pages = 0;
   let hasNextPage = false;
 
@@ -293,7 +550,8 @@ async function collectAuditEvents({ organization, token, since, pageLimit = DEFA
     if (page.length > MAX_EVENTS_PER_PAGE) throw new AuditMonitorError("api_page_too_large");
     events.push(...page);
     pages += 1;
-    url = nextPageFromLink(response.headers?.get?.("link"));
+    const nextLink = nextPageFromLink(response.headers?.get?.("link"));
+    url = nextLink ? validateNextPage(nextLink, organization.trim(), resolvedBaseUrl) : undefined;
     hasNextPage = Boolean(url);
   }
 
@@ -338,6 +596,7 @@ export function buildAuditReport(events, options = {}) {
   const lagThresholdMinutes = parseLagThreshold(options.lagThresholdMinutes);
   const normalizedEvents = rawEvents.map(normalizeAuditEvent);
   const alerts = deduplicateAlerts(rawEvents);
+  const correlations = correlateAuditEvents(rawEvents, options.correlation);
   const latestEventAt = normalizedEvents
     .map((event) => event.createdAt)
     .filter(Boolean)
@@ -352,6 +611,8 @@ export function buildAuditReport(events, options = {}) {
     error = { code: "invalid_event_timestamp", message: "audit event timestamp is invalid" };
   } else if (options.paginationLimitReached) {
     error = { code: "pagination_limit", message: "audit pagination limit reached" };
+  } else if (normalizedEvents.some((event) => event.metadataStatus === "insufficient")) {
+    error = { code: "metadata_insufficient", message: "audit event metadata is insufficient" };
   } else if (lagMinutes !== null && lagMinutes > lagThresholdMinutes) {
     error = { code: "audit_lag", message: "audit collection lag exceeds threshold" };
   }
@@ -362,6 +623,7 @@ export function buildAuditReport(events, options = {}) {
     high: alerts.filter((alert) => alert.severity === "high").length,
     medium: alerts.filter((alert) => alert.severity === "medium").length,
     low: alerts.filter((alert) => alert.severity === "low").length,
+    metadataInsufficient: normalizedEvents.filter((event) => event.metadataStatus === "insufficient").length,
     health: error ? "failed" : "ok",
   };
   const blockingAlerts = alerts.some((alert) => alert.severity === "high" || alert.severity === "medium");
@@ -372,6 +634,7 @@ export function buildAuditReport(events, options = {}) {
     events: rawEvents.length,
     latestEventAt: latestEventAt ?? null,
     lagMinutes,
+    ...(options.source ? { source: safeString(options.source, { sensitive: false }) } : {}),
   };
 
   return {
@@ -379,6 +642,7 @@ export function buildAuditReport(events, options = {}) {
     generatedAt: completedAt,
     collection,
     alerts,
+    correlations,
     summary,
     ...(error ? { error } : {}),
   };
@@ -394,7 +658,7 @@ function hasArgument(args, name) {
 }
 
 function usage() {
-  return "usage: node scripts/github-audit-monitor.mjs --org <organization> --report <path> [--since <ISO>] [--page-limit <n>] [--fail-on-alert] [--input <json>]";
+  return "usage: node scripts/github-audit-monitor.mjs --org <organization> --report <path> [--since <ISO>] [--cursor <opaque>] [--page-limit <n>] [--fail-on-alert] [--input <json>]";
 }
 
 async function readInput(filePath) {
@@ -402,7 +666,12 @@ async function readInput(filePath) {
     const parsed = JSON.parse(await readFile(filePath, "utf8"));
     const events = Array.isArray(parsed) ? parsed : parsed?.events;
     if (!Array.isArray(events)) throw new AuditMonitorError("input_malformed_json");
-    return events;
+    return {
+      events,
+      ...(parsed && !Array.isArray(parsed) && parsed.source
+        ? { source: safeString(parsed.source, { sensitive: false }) }
+        : {}),
+    };
   } catch (error) {
     if (error instanceof AuditMonitorError) throw error;
     throw new AuditMonitorError("input_malformed_json");
@@ -414,6 +683,7 @@ export async function main(args = process.argv.slice(2), environment = process.e
   const inputPath = argumentValue(args, "--input");
   const organization = argumentValue(args, "--org");
   const since = argumentValue(args, "--since");
+  const cursor = argumentValue(args, "--cursor");
   const pageLimit = argumentValue(args, "--page-limit");
   const now = argumentValue(args, "--now");
   const lagThresholdMinutes = argumentValue(args, "--lag-threshold");
@@ -426,14 +696,20 @@ export async function main(args = process.argv.slice(2), environment = process.e
   let report;
   try {
     if (inputPath) {
-      const events = await readInput(inputPath);
-      report = buildAuditReport(events, { now, lagThresholdMinutes, pages: 1 });
+      const input = await readInput(inputPath);
+      report = buildAuditReport(input.events, {
+        now,
+        lagThresholdMinutes,
+        pages: 1,
+        source: input.source,
+      });
     } else {
       const startedAt = safeNow(now);
       const result = await collectAuditEvents({
         organization,
         token: environment.GITHUB_AUDIT_LOG_TOKEN,
         since,
+        cursor,
         pageLimit,
       });
       report = buildAuditReport(result.events, {
@@ -459,7 +735,16 @@ export async function main(args = process.argv.slice(2), environment = process.e
         lagMinutes: null,
       },
       alerts: [],
-      summary: { totalEvents: 0, totalAlerts: 0, high: 0, medium: 0, low: 0, health: "failed" },
+      correlations: [],
+      summary: {
+        totalEvents: 0,
+        totalAlerts: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        metadataInsufficient: 0,
+        health: "failed",
+      },
       error: { code: safeError.code, message: safeError.message },
     };
   }
