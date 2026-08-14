@@ -143,6 +143,34 @@ test("bloqueia uso de variavel derivada de secret em shell e clientes HTTP", () 
   assert.doesNotMatch(JSON.stringify(findings), /API_TOKEN/u);
 });
 
+test("rastreia secrets em env de job e step ate steps posteriores", () => {
+  const findings = scanWorkflowText(
+    "cross-step-secret.yml",
+    [
+      "permissions:",
+      "  contents: read",
+      "jobs:",
+      "  build:",
+      "    env:",
+      "      JOB_TOKEN: ${{ secrets.JOB_TOKEN }}",
+      "    steps:",
+      "      - name: Prepare",
+      "        run: echo ready",
+      "      - name: Call with job secret",
+      '        run: curl -H "Authorization: Bearer $JOB_TOKEN" https://example.invalid',
+      "      - name: Declare step secret",
+      "        env:",
+      "          STEP_TOKEN: ${{ secrets.STEP_TOKEN }}",
+      "        run: echo configured",
+      "      - name: Call with PowerShell secret",
+      '        run: Invoke-RestMethod -Headers @{ Authorization = "Bearer $env:STEP_TOKEN" } https://example.invalid',
+    ].join("\n"),
+  );
+
+  assert.equal(findings.filter(({ rule }) => rule === "secret-shell-exposure").length, 2);
+  assert.doesNotMatch(JSON.stringify(findings), /JOB_TOKEN|STEP_TOKEN/u);
+});
+
 test("ignora workflow composto apenas por comentarios", () => {
   assert.deepEqual(
     scanWorkflowText(
@@ -277,6 +305,36 @@ test("mantem baseline temporaria visivel sem bloquear o gate", () => {
   assert.equal(report.baselinedFindings.length, 1);
   assert.equal(report.baseline[0].owner, "IA-Pessoas security owner");
   assert.equal(report.summary.baselined, 1);
+});
+
+test("baseline com data ISO invalida ou expirada falha fechada", () => {
+  const finding = {
+    rule: "unsafe-private-key-literal",
+    path: "services/src/src/config/google.json",
+    line: 5,
+    severity: "high",
+    remediation: "remova a chave privada e rotacione a credencial exposta",
+  };
+
+  for (const expiresAt of ["2027-02-30", "2026-08-13", "nao-e-data"]) {
+    const report = buildCredentialReport([finding], {
+      now: "2026-08-14T00:00:00.000Z",
+      baseline: [
+        {
+          rule: finding.rule,
+          path: finding.path,
+          line: finding.line,
+          owner: "IA-Pessoas security owner",
+          justification: "teste de expiracao",
+          expiresAt,
+        },
+      ],
+    });
+
+    assert.equal(report.ok, false, `baseline invalida deveria bloquear: ${expiresAt}`);
+    assert.equal(report.findings.length, 1);
+    assert.deepEqual(report.baseline, []);
+  }
 });
 
 test("CLI grava relatorio sanitizado para uma raiz informada", async () => {

@@ -126,7 +126,10 @@ function extractDerivedSecretVariables(line) {
 function referencesDerivedVariable(line, variables) {
   return variables.some((variable) => {
     const escaped = variable.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-    return new RegExp(`\\$\\{${escaped}\\}|\\$${escaped}\\b`, "u").test(line);
+    return new RegExp(
+      `\\$\\{${escaped}\\}|\\$${escaped}\\b|\\$env:${escaped}\\b|\\$\\{env:${escaped}\\}`,
+      "iu",
+    ).test(line);
   });
 }
 
@@ -290,15 +293,28 @@ function scanCheckouts(relativePath, lines, findings) {
 function scanSecretShell(relativePath, lines, findings) {
   let runIndent = null;
   let derivedVariables = [];
+  let inJobs = false;
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const trimmed = line.trim();
     if (isCommentOrEmpty(line)) continue;
 
+    if (/^jobs\s*:\s*$/u.test(trimmed)) {
+      inJobs = true;
+      derivedVariables = [];
+      runIndent = null;
+      continue;
+    }
+
+    if (inJobs && indentation(line) === 2 && /^[A-Za-z0-9_-]+\s*:\s*$/u.test(trimmed)) {
+      derivedVariables = [];
+      runIndent = null;
+      continue;
+    }
+
     if (/^\s*-\s+\S/u.test(line)) {
       runIndent = null;
-      derivedVariables = [];
     }
 
     derivedVariables = [
@@ -420,9 +436,15 @@ function baselineEntryForFinding(finding, entries, today) {
       entry.line === finding.line &&
       entry.owner &&
       entry.justification &&
-      /^\d{4}-\d{2}-\d{2}$/u.test(entry.expiresAt) &&
+      isValidIsoDate(entry.expiresAt) &&
       entry.expiresAt >= today,
   );
+}
+
+function isValidIsoDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 export function buildCredentialReport(findings, options = {}) {
