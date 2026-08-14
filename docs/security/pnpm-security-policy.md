@@ -32,8 +32,8 @@ instalação de validação usa `--ignore-scripts`; fixtures que demonstram bloq
 de scripts nunca devem executar payloads maliciosos.
 
 O harness `node --test scripts/pnpm-security-policy-fixtures.test.mjs` cria
-workspaces temporários, invoca exatamente `pnpm@10.26.0` via Corepack e usa
-`--offline`. Ele verifica configuração efetiva de `minimumReleaseAge`, rejeição
+workspaces temporários, invoca exatamente `pnpm@10.26.0` via Corepack com
+`COREPACK_ENABLE_NETWORK=0` e usa `--offline`. Ele verifica configuração efetiva de `minimumReleaseAge`, rejeição
 estática de idade insegura e fontes git/tarball, mutação rejeitada pelo
 `--frozen-lockfile`, lifecycle não aprovado sem alterar um sentinel e um build
 mínimo benigno quando o pacote está explicitamente em `allowBuilds`. O sentinel

@@ -32,6 +32,7 @@ function runPnpm(root, args, extraEnv = {}, cwd = root) {
     env: {
       ...process.env,
       CI: "1",
+      COREPACK_ENABLE_NETWORK: "0",
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0",
       ...extraEnv,
     },
