@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "rulesets": [
+    {
+      "name": "global-ref-integrity",
+      "target": "branch",
+      "patterns": ["*"],
+      "enforcement": "active",
+      "bypassActors": [],
+      "rules": {
+        "deletion": true,
+        "nonFastForward": true
+      }
+    },
+    {
+      "name": "protected-lifecycle",
+      "target": "branch",
+      "patterns": ["develop", "main", "staging", "release/**", "prod-*"],
+      "enforcement": "active",
+      "bypassActors": [
+        {
+          "type": "Integration",
+          "name": "security-break-glass",
+          "mode": "always"
+        }
+      ],
+      "rules": {
+        "deletion": true,
+        "nonFastForward": true,
+        "requiredSignatures": true,
+        "pullRequest": {
+          "requiredApprovingReviewCount": 2,
+          "requireCodeOwnerReview": true,
+          "requiredReviewThreadResolution": true,
+          "dismissStaleReviewsOnPush": true,
+          "requireLastPushApproval": true
+        },
+        "requiredStatusChecks": {
+          "contexts": ["security/supply-chain"]
+        }
+      }
+    }
+  ]
+}

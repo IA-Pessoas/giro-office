@@ -42,6 +42,7 @@
     "deploy:production": "bash scripts/ops/deploy-production.sh",
     "security:compose": "node scripts/check-compose-security.mjs",
     "security:supply-chain": "node scripts/supply-chain-integrity.mjs",
+    "security:rulesets": "node scripts/github-ruleset-policy.mjs --policy .github/security/rulesets-policy.json --actual scripts/fixtures/rulesets/approved.json",
     "migration:test": "node --test scripts/migration-v2-build-load.test.mjs scripts/migration-v2-phase1-load.test.mjs scripts/migration-v2-phase2-load.test.mjs scripts/migration-v3-docs.test.mjs scripts/fix-rh-request-requesters.test.mjs"
   },
   "devDependencies": {

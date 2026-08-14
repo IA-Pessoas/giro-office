@@ -1,0 +1,48 @@
+[
+  {
+    "name": "protected-lifecycle",
+    "target": "branch",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "include": ["release/**", "main", "develop", "staging", "prod-*"]
+      }
+    },
+    "bypass_actors": [
+      {
+        "actor_type": "Integration",
+        "actor_name": "security-break-glass",
+        "bypass_mode": "always"
+      }
+    ],
+    "rules": [
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "required_status_checks": [{ "context": "security/supply-chain" }]
+        }
+      },
+      {
+        "type": "pull_request",
+        "parameters": {
+          "required_approving_review_count": 2,
+          "require_code_owner_review": true,
+          "required_review_thread_resolution": true,
+          "dismiss_stale_reviews_on_push": true,
+          "require_last_push_approval": true
+        }
+      },
+      { "type": "non_fast_forward" },
+      { "type": "deletion" },
+      { "type": "required_signatures" }
+    ]
+  },
+  {
+    "name": "global-ref-integrity",
+    "target": "branch",
+    "enforcement": "active",
+    "conditions": { "ref_name": { "include": ["*"] } },
+    "bypass_actors": [],
+    "rules": [{ "type": "non_fast_forward" }, { "type": "deletion" }]
+  }
+]
