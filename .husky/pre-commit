@@ -2,4 +2,5 @@
 set -eu
 
 node --test scripts/supply-chain-security.test.mjs
+node scripts/supply-chain-integrity.mjs
 pnpm lint-staged --concurrent false
