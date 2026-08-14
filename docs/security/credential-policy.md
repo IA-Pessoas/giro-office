@@ -30,6 +30,10 @@ gate vermelho enquanto a rotação externa é executada. As exceções devem ser
 após a rotação; se expirarem, voltam a bloquear o workflow automaticamente.
 Os campos `owner` e `justification` aceitam somente identificadores controlados pelo
 checker; texto livre é rejeitado e nunca é ecoado no relatório.
+O baseline também só pode apontar para as exposições conhecidas pelo checker, usando
+paths relativos normalizados. O scanner falha fechado ao exceder 12 níveis, 5.000
+arquivos, 8 MiB por arquivo ou 64 MiB no total; esses limites evitam que uma árvore
+ou arquivo inesperado contorne a análise por exaustão de recursos.
 
 O marcador de chave existente em `docs/migration/v4/scripts/test/sensitivity.test.mjs`
 é apenas uma fixture sem material codificado e não é tratado como exposição real.

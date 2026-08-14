@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +17,16 @@ const SAFE_BASELINE_JUSTIFICATIONS = new Set([
   "preexisting-key-rotation",
   "preexisting-service-account-rotation",
 ]);
+const KNOWN_BASELINE_EXPOSURES = new Set([
+  "credential-material-file|services/src/key.pem|1",
+  "unsafe-private-key-literal|services/src/src/config/google.json|5",
+]);
+export const SCAN_LIMITS = Object.freeze({
+  maxDepth: 12,
+  maxFiles: 5000,
+  maxFileBytes: 8 * 1024 * 1024,
+  maxTotalBytes: 64 * 1024 * 1024,
+});
 const TEXT_EXTENSIONS = new Set([
   "",
   ".cjs",
@@ -56,10 +66,25 @@ const UNSAFE_LITERAL_RULES = [
   },
 ];
 
-const SECRET_REFERENCE = /\bsecrets\.[A-Za-z0-9_]+\b/u;
+const SECRET_EXPRESSION = String.raw`secrets(?:\.[A-Za-z_][A-Za-z0-9_]*|\[['"][A-Za-z_][A-Za-z0-9_]*['"]\])`;
+const SECRET_REFERENCE = new RegExp(`\\b${SECRET_EXPRESSION}`, "u");
+const SECRET_TEMPLATE = new RegExp(`\\$\\{\\{\\s*${SECRET_EXPRESSION}`, "u");
 
 function normalizePath(relativePath) {
   return String(relativePath).replaceAll("\\", "/");
+}
+
+function normalizeRelativePath(relativePath) {
+  if (typeof relativePath !== "string") return null;
+  const normalized = normalizePath(relativePath);
+  if (normalized.startsWith("/") || /^[A-Za-z]:\//u.test(normalized)) return null;
+  const segments = [];
+  for (const segment of normalized.split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") return null;
+    segments.push(segment);
+  }
+  return segments.length > 0 ? segments.join("/") : null;
 }
 
 function makeFinding(rule, relativePath, line, severity, remediation) {
@@ -117,12 +142,15 @@ function hasSecretShellOperation(line, inRunBlock) {
 function extractDerivedSecretVariables(line) {
   const variables = [];
   const yamlVariable = line.match(
-    /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*["']?\$\{\{\s*secrets\./u,
+    new RegExp(`^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*:\\s*["']?${SECRET_TEMPLATE.source}`, "u"),
   );
   if (yamlVariable) variables.push(yamlVariable[1]);
 
   const shellVariable = line.match(
-    /(?:^|[;&|]\s*)(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*["']?\$\{\{\s*secrets\./u,
+    new RegExp(
+      `(?:^|[;&|]\\s*)(?:export\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*["']?${SECRET_TEMPLATE.source}`,
+      "u",
+    ),
   );
   if (shellVariable) variables.push(shellVariable[1]);
   return variables;
@@ -200,54 +228,266 @@ function scanPrivateKeyMaterial(relativePath, source) {
   return [];
 }
 
-function scanPermissions(relativePath, lines, findings) {
-  const permissionsIndex = lines.findIndex((line) => /^permissions\s*:/u.test(line));
-  if (permissionsIndex === -1) {
-    findings.push(
-      makeFinding(
-        "permissions-required",
-        relativePath,
-        1,
-        "high",
-        "declare permissoes de topo explicitamente e mantenha-as somente leitura",
-      ),
-    );
-    return;
+function stripYamlComment(value) {
+  let quote = null;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if ((character === "'" || character === '"') && value[index - 1] !== "\\") {
+      quote = quote === character ? null : quote || character;
+    }
+    if (character === "#" && !quote && (index === 0 || /\s/u.test(value[index - 1]))) {
+      return value.slice(0, index).trim();
+    }
   }
+  return value.trim();
+}
 
-  const permissionLine = lines[permissionsIndex];
-  const inlineValue = unquoteYamlScalar(
-    permissionLine.replace(/^permissions\s*:\s*/u, "").trim(),
-  );
-  if (/^(?:write|write-all)$/u.test(inlineValue)) {
-    findings.push(
-      makeFinding(
-        "permissions-write",
-        relativePath,
-        permissionsIndex + 1,
-        "high",
-        "substitua permissoes de escrita por escopos read ou none",
-      ),
-    );
-  }
+function permissionFinding(relativePath, rule, line, remediation) {
+  return makeFinding(rule, relativePath, line, "high", remediation);
+}
 
-  for (let index = permissionsIndex + 1; index < lines.length; index += 1) {
+function findJobRanges(lines) {
+  const jobsIndex = lines.findIndex((line) => /^jobs\s*:/u.test(line));
+  if (jobsIndex === -1) return [];
+
+  const ranges = [];
+  let current;
+  for (let index = jobsIndex + 1; index < lines.length; index += 1) {
     const line = lines[index];
     if (!isCommentOrEmpty(line) && indentation(line) === 0) break;
-    const match = line.match(/^\s+([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/u);
-    const value = match ? unquoteYamlScalar(match[2]) : "";
-    if (/^(?:write|write-all)$/u.test(value)) {
+    const job = line.match(/^(\s{2})([A-Za-z0-9_-]+)\s*:\s*$/u);
+    if (!job) continue;
+    if (current) current.end = index - 1;
+    current = { start: index, end: lines.length - 1, indent: job[1].length };
+    ranges.push(current);
+  }
+  return ranges;
+}
+
+function parsePermissionMap(relativePath, lines, index, findings) {
+  const line = lines[index];
+  const permissionIndent = indentation(line);
+  const rawValue = stripYamlComment(line.slice(line.indexOf(":") + 1));
+  const values = new Map();
+
+  const recordValue = (key, value, lineNumber) => {
+    if (values.has(key)) {
       findings.push(
-        makeFinding(
-          "permissions-write",
+        permissionFinding(
           relativePath,
-          index + 1,
-          "high",
+          "permissions-duplicate",
+          lineNumber,
+          "remova chaves de permissao duplicadas",
+        ),
+      );
+      findings.push(
+        permissionFinding(
+          relativePath,
+          "permissions-ambiguous",
+          lineNumber,
+          "remova entradas duplicadas antes de avaliar o mapa de permissoes",
+        ),
+      );
+      return;
+    }
+    const normalized = unquoteYamlScalar(stripYamlComment(value));
+    if (!/^(?:read|none|write|write-all)$/u.test(normalized)) {
+      findings.push(
+        permissionFinding(
+          relativePath,
+          "permissions-ambiguous",
+          lineNumber,
+          "use somente valores read, none ou write explicitamente analisaveis",
+        ),
+      );
+      return;
+    }
+    values.set(key, normalized);
+    if (/^write(?:-all)?$/u.test(normalized)) {
+      findings.push(
+        permissionFinding(
+          relativePath,
+          "permissions-write",
+          lineNumber,
           "substitua permissoes de escrita por escopos read ou none",
         ),
       );
     }
+  };
+
+  if (rawValue === "") {
+    let foundEntry = false;
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const candidate = lines[next];
+      if (isCommentOrEmpty(candidate)) continue;
+      if (indentation(candidate) <= permissionIndent) break;
+      const match = candidate.match(/^\s+([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/u);
+      if (!match || indentation(candidate) !== permissionIndent + 2) {
+        findings.push(
+          permissionFinding(
+            relativePath,
+            "permissions-ambiguous",
+            next + 1,
+            "declare um mapa de permissoes simples e sem aninhamento",
+          ),
+        );
+        continue;
+      }
+      foundEntry = true;
+      recordValue(match[1], match[2], next + 1);
+    }
+    if (!foundEntry) {
+      findings.push(
+        permissionFinding(
+          relativePath,
+          "permissions-ambiguous",
+          index + 1,
+          "declare permissoes explicitamente em um mapa somente leitura",
+        ),
+      );
+    }
+    return;
   }
+
+  if (rawValue.startsWith("{")) {
+    findings.push(
+      permissionFinding(
+        relativePath,
+        "permissions-ambiguous",
+        index + 1,
+        "use um mapa de permissoes em bloco para evitar sintaxe inline ambigua",
+      ),
+    );
+    if (!rawValue.endsWith("}")) {
+      findings.push(
+        permissionFinding(
+          relativePath,
+          "permissions-ambiguous",
+          index + 1,
+          "feche o mapa inline de permissoes sem sintaxe ambigua",
+        ),
+      );
+      return;
+    }
+    const inner = rawValue.slice(1, -1).trim();
+    if (inner === "") return;
+    for (const part of inner.split(",")) {
+      const match = part.match(/^\s*([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/u);
+      if (!match) {
+        findings.push(
+          permissionFinding(
+            relativePath,
+            "permissions-ambiguous",
+            index + 1,
+            "use pares key/value simples no mapa inline de permissoes",
+          ),
+        );
+        continue;
+      }
+      recordValue(match[1], match[2], index + 1);
+    }
+    return;
+  }
+
+  const scalar = unquoteYamlScalar(rawValue);
+  if (/^(?:read|read-all|none)$/u.test(scalar)) return;
+  if (/^write(?:-all)?$/u.test(scalar)) {
+    findings.push(
+      permissionFinding(
+        relativePath,
+        "permissions-write",
+        index + 1,
+        "substitua permissoes de escrita por escopos read ou none",
+      ),
+    );
+    return;
+  }
+  findings.push(
+    permissionFinding(
+      relativePath,
+      "permissions-ambiguous",
+      index + 1,
+      "use somente mapas ou valores de permissao explicitamente suportados",
+    ),
+  );
+}
+
+function scanPermissions(relativePath, lines, findings) {
+  const jobs = findJobRanges(lines);
+  const declarations = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^\s*permissions\s*:/u.test(lines[index])) continue;
+    const indent = indentation(lines[index]);
+    if (indent === 0) {
+      declarations.push({ index, scope: "workflow" });
+      continue;
+    }
+    const job = jobs.find(
+      ({ start, end, indent: jobIndent }) =>
+        index > start && index <= end && indent === jobIndent + 2,
+    );
+    if (job) declarations.push({ index, scope: "job" });
+  }
+
+  const workflowDeclarations = declarations.filter(({ scope }) => scope === "workflow");
+  if (workflowDeclarations.length === 0) {
+    findings.push(
+      permissionFinding(
+        relativePath,
+        "permissions-required",
+        1,
+        "declare permissoes de topo explicitamente e mantenha-as somente leitura",
+      ),
+    );
+  }
+  if (workflowDeclarations.length > 1) {
+    for (const { index } of workflowDeclarations.slice(1)) {
+      findings.push(
+        permissionFinding(
+          relativePath,
+          "permissions-duplicate",
+          index + 1,
+          "mantenha uma unica declaracao de permissoes no workflow",
+        ),
+      );
+    }
+  }
+
+  const jobCounts = new Map();
+  for (const declaration of declarations) {
+    if (declaration.scope === "job") {
+      const key = jobs.find(
+        ({ start, end, indent: jobIndent }) =>
+          declaration.index > start && declaration.index <= end &&
+          indentation(lines[declaration.index]) === jobIndent + 2,
+      );
+      const jobKey = key?.start ?? declaration.index;
+      jobCounts.set(jobKey, (jobCounts.get(jobKey) ?? 0) + 1);
+    }
+  }
+  for (const [jobStart, count] of jobCounts) {
+    if (count <= 1) continue;
+    const jobDeclarations = declarations.filter(({ index, scope }) => {
+      if (scope !== "job") return false;
+      const job = jobs.find(
+        ({ start, end, indent: jobIndent }) =>
+          index > start && index <= end && indentation(lines[index]) === jobIndent + 2,
+      );
+      return job?.start === jobStart;
+    });
+    for (const { index } of jobDeclarations.slice(1)) {
+      findings.push(
+        permissionFinding(
+          relativePath,
+          "permissions-duplicate",
+          index + 1,
+          "mantenha uma unica declaracao de permissoes por job",
+        ),
+      );
+    }
+  }
+
+  for (const { index } of declarations) parsePermissionMap(relativePath, lines, index, findings);
 }
 
 function scanCheckouts(relativePath, lines, findings) {
@@ -402,7 +642,29 @@ function shouldReadFile(relativePath) {
   return TEXT_EXTENSIONS.has(extension);
 }
 
-async function collectFiles(directory, relativeDirectory = "") {
+class ScanLimitError extends Error {
+  constructor(rule, relativePath, remediation) {
+    super(rule);
+    this.rule = rule;
+    this.relativePath = relativePath;
+    this.remediation = remediation;
+  }
+}
+
+async function collectFiles(
+  directory,
+  relativeDirectory = "",
+  depth = 0,
+  limits = SCAN_LIMITS,
+  state = { fileCount: 0, totalBytes: 0 },
+) {
+  if (depth > limits.maxDepth) {
+    throw new ScanLimitError(
+      "scan-limit-depth",
+      relativeDirectory || ".",
+      "reduza a profundidade do repositorio escaneado",
+    );
+  }
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
 
@@ -411,8 +673,32 @@ async function collectFiles(directory, relativeDirectory = "") {
     if (isExcluded(relativePath)) continue;
     const absolutePath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      files.push(...(await collectFiles(absolutePath, relativePath)));
+      files.push(...(await collectFiles(absolutePath, relativePath, depth + 1, limits, state)));
     } else if (entry.isFile() && shouldReadFile(relativePath)) {
+      const metadata = await stat(absolutePath);
+      if (metadata.size > limits.maxFileBytes) {
+        throw new ScanLimitError(
+          "scan-limit-file-bytes",
+          normalizePath(relativePath),
+          "reduza o tamanho dos arquivos ou ajuste o limite aprovado",
+        );
+      }
+      state.fileCount += 1;
+      if (state.fileCount > limits.maxFiles) {
+        throw new ScanLimitError(
+          "scan-limit-files",
+          normalizePath(relativePath),
+          "reduza a quantidade de arquivos do repositorio escaneado",
+        );
+      }
+      state.totalBytes += metadata.size;
+      if (state.totalBytes > limits.maxTotalBytes) {
+        throw new ScanLimitError(
+          "scan-limit-total-bytes",
+          normalizePath(relativePath),
+          "reduza o volume total de bytes do repositorio escaneado",
+        );
+      }
       files.push({ absolutePath, relativePath: normalizePath(relativePath) });
     }
   }
@@ -420,42 +706,60 @@ async function collectFiles(directory, relativeDirectory = "") {
   return files;
 }
 
-export async function scanRepositoryCredentials(root) {
-  const findings = [];
-  const files = await collectFiles(path.resolve(root));
+export async function scanRepositoryCredentials(root, options = {}) {
+  const limits = { ...SCAN_LIMITS, ...(options.limits ?? {}) };
+  try {
+    const findings = [];
+    const files = await collectFiles(path.resolve(root), "", 0, limits);
 
-  for (const { absolutePath, relativePath } of files) {
-    const buffer = await readFile(absolutePath);
-    const extension = path.posix.extname(relativePath).toLowerCase();
-    if (MATERIAL_EXTENSIONS.has(extension) && buffer.length > 0) {
-      findings.push(
-        makeFinding(
-          "credential-material-file",
-          relativePath,
-          1,
-          "high",
-          "remova o material de credencial do repositorio e rotacione-o",
-        ),
-      );
-      continue;
+    for (const { absolutePath, relativePath } of files) {
+      const buffer = await readFile(absolutePath);
+      const extension = path.posix.extname(relativePath).toLowerCase();
+      if (MATERIAL_EXTENSIONS.has(extension) && buffer.length > 0) {
+        findings.push(
+          makeFinding(
+            "credential-material-file",
+            relativePath,
+            1,
+            "high",
+            "remova o material de credencial do repositorio e rotacione-o",
+          ),
+        );
+        continue;
+      }
+      if (buffer.includes(0)) continue;
+      const source = buffer.toString("utf8");
+      if (relativePath.startsWith(".github/workflows/")) {
+        findings.push(...scanWorkflowText(relativePath, source));
+      } else {
+        findings.push(...scanUnsafeLiterals(relativePath, source));
+      }
     }
-    if (buffer.includes(0)) continue;
-    const source = buffer.toString("utf8");
-    if (relativePath.startsWith(".github/workflows/")) {
-      findings.push(...scanWorkflowText(relativePath, source));
-    } else {
-      findings.push(...scanUnsafeLiterals(relativePath, source));
-    }
+
+    return sortFindings(findings);
+  } catch (error) {
+    return [
+      makeFinding(
+        error instanceof ScanLimitError ? error.rule : "scan-read-failure",
+        error instanceof ScanLimitError ? error.relativePath : ".",
+        1,
+        "high",
+        error instanceof ScanLimitError
+          ? error.remediation
+          : "corrija o acesso ao repositorio antes de executar a politica",
+      ),
+    ];
   }
-
-  return sortFindings(findings);
 }
 
 function baselineEntryForFinding(finding, entries, today) {
+  const findingPath = normalizeRelativePath(finding.path);
+  const findingKey = `${finding.rule}|${findingPath}|${finding.line}`;
+  if (!findingPath || !KNOWN_BASELINE_EXPOSURES.has(findingKey)) return undefined;
   return entries.find(
     (entry) =>
       entry.rule === finding.rule &&
-      normalizePath(entry.path) === finding.path &&
+      normalizeRelativePath(entry.path) === findingPath &&
       entry.line === finding.line &&
       isSafeBaselineMetadata(entry) &&
       isValidIsoDate(entry.expiresAt) &&
@@ -472,15 +776,22 @@ function isSafeBaselineMetadata(entry) {
 }
 
 function isSafeBaselineEntry(entry) {
+  const normalizedPath = normalizeRelativePath(entry?.path);
   return (
     entry &&
     typeof entry.rule === "string" &&
-    typeof entry.path === "string" &&
+    normalizedPath !== null &&
     Number.isInteger(entry.line) &&
     entry.line > 0 &&
     isSafeBaselineMetadata(entry) &&
-    isValidIsoDate(entry.expiresAt)
+    isValidIsoDate(entry.expiresAt) &&
+    KNOWN_BASELINE_EXPOSURES.has(`${entry.rule}|${normalizedPath}|${entry.line}`)
   );
+}
+
+function normalizeBaselineEntry(entry) {
+  const normalizedPath = normalizeRelativePath(entry.path);
+  return { ...entry, path: normalizedPath };
 }
 
 function isValidIsoDate(value) {
@@ -560,7 +871,7 @@ async function readCredentialBaseline(root) {
     const findings = [];
     entries.forEach((entry, index) => {
       if (isSafeBaselineEntry(entry)) {
-        validEntries.push(entry);
+        validEntries.push(normalizeBaselineEntry(entry));
       } else {
         findings.push(
           makeFinding(

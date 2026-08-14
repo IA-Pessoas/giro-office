@@ -197,6 +197,72 @@ test("rastreia env global e de job ate headers em steps posteriores", () => {
   assert.doesNotMatch(JSON.stringify(findings), /GLOBAL_TOKEN|JOB_TOKEN/u);
 });
 
+test("reconhece secrets com ponto e colchetes em todas as variaveis derivadas", () => {
+  const findings = scanWorkflowText(
+    "secret-syntaxes.yml",
+    [
+      "permissions:",
+      "  contents: read",
+      "jobs:",
+      "  build:",
+      "    steps:",
+      "      - name: Declare secrets",
+      "        env:",
+      "          DOT_TOKEN: ${{ secrets.DOT_TOKEN }}",
+      "          SINGLE_TOKEN: ${{ secrets['SINGLE_TOKEN'] }}",
+      '          DOUBLE_TOKEN: ${{ secrets["DOUBLE_TOKEN"] }}',
+      "        run: echo configured",
+      "      - name: Use dot secret later",
+      '        run: curl -H "X-Dot: $DOT_TOKEN" https://example.invalid',
+      "      - name: Use single secret later",
+      '        run: curl -H "X-Single: $SINGLE_TOKEN" https://example.invalid',
+      "      - name: Use double secret later",
+      '        run: curl -H "X-Double: $env:DOUBLE_TOKEN" https://example.invalid',
+    ].join("\n"),
+  );
+
+  assert.equal(findings.filter(({ rule }) => rule === "secret-shell-exposure").length, 3);
+  assert.doesNotMatch(JSON.stringify(findings), /DOT_TOKEN|SINGLE_TOKEN|DOUBLE_TOKEN/u);
+});
+
+test("analisa permissions do workflow e dos jobs e falha fechado para mapas ambiguos", () => {
+  const jobWrite = scanWorkflowText(
+    "job-write.yml",
+    [
+      "permissions: { contents: read }",
+      "jobs:",
+      "  build:",
+      "    permissions:",
+      "      contents: write",
+    ].join("\n"),
+  );
+  assert.match(JSON.stringify(jobWrite), /permissions-write/u);
+
+  const inlineWrite = scanWorkflowText(
+    "inline-write.yml",
+    "permissions: { contents: write, actions: none }\njobs:\n  build:\n",
+  );
+  assert.match(JSON.stringify(inlineWrite), /permissions-write/u);
+  assert.match(JSON.stringify(inlineWrite), /permissions-ambiguous/u);
+
+  const duplicate = scanWorkflowText(
+    "duplicate.yml",
+    [
+      "permissions: { contents: read }",
+      "permissions: { actions: none }",
+      "jobs:",
+      "  build:",
+    ].join("\n"),
+  );
+  assert.match(JSON.stringify(duplicate), /permissions-duplicate/u);
+
+  const ambiguous = scanWorkflowText(
+    "ambiguous.yml",
+    "permissions: { contents: read, contents: none }\njobs:\n  build:\n",
+  );
+  assert.match(JSON.stringify(ambiguous), /permissions-ambiguous/u);
+});
+
 test("ignora workflow composto apenas por comentarios", () => {
   assert.deepEqual(
     scanWorkflowText(
@@ -234,6 +300,41 @@ test("varre o repositorio sem entrar em diretorios e arquivos excluidos", async 
       false,
       `nao deveria encontrar ${excluded}`,
     );
+  }
+});
+
+test("falha fechado ao exceder limites de profundidade, arquivos ou bytes", async () => {
+  const cases = [
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), "credential-limit-depth-"));
+      await mkdir(path.join(root, "one", "two"), { recursive: true });
+      await writeFile(path.join(root, "one", "two", "file.txt"), "safe");
+      return [root, { maxDepth: 1 }, "scan-limit-depth"];
+    },
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), "credential-limit-files-"));
+      await writeFile(path.join(root, "one.txt"), "safe");
+      await writeFile(path.join(root, "two.txt"), "safe");
+      return [root, { maxFiles: 1 }, "scan-limit-files"];
+    },
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), "credential-limit-file-bytes-"));
+      await writeFile(path.join(root, "large.txt"), "large");
+      return [root, { maxFileBytes: 3 }, "scan-limit-file-bytes"];
+    },
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), "credential-limit-total-bytes-"));
+      await writeFile(path.join(root, "one.txt"), "123");
+      await writeFile(path.join(root, "two.txt"), "456");
+      return [root, { maxTotalBytes: 5 }, "scan-limit-total-bytes"];
+    },
+  ];
+
+  for (const createCase of cases) {
+    const [root, limits, rule] = await createCase();
+    const findings = await scanRepositoryCredentials(root, { limits });
+    assert.match(JSON.stringify(findings), new RegExp(rule, "u"));
+    assert.doesNotMatch(JSON.stringify(findings), /123|456/u);
   }
 });
 
@@ -394,6 +495,62 @@ test("baseline rejeita metadata livre e nao ecoa texto arbitrario", () => {
   assert.equal(report.baseline.length, 0);
   assert.doesNotMatch(JSON.stringify(report), new RegExp(secretText, "u"));
   assert.doesNotMatch(JSON.stringify(report), /texto livre/u);
+});
+
+test("baseline aceita somente exposicoes conhecidas e paths relativos normalizados", () => {
+  const known = buildCredentialReport(
+    [
+      {
+        rule: "credential-material-file",
+        path: "services/src/key.pem",
+        line: 1,
+        severity: "high",
+        remediation: "remova o material de credencial do repositorio e rotacione-o",
+      },
+    ],
+    {
+      now: "2026-08-14T00:00:00.000Z",
+      baseline: [
+        {
+          rule: "credential-material-file",
+          path: ".\\services\\src\\key.pem",
+          line: 1,
+          owner: "ia-pessoas-security",
+          justification: "preexisting-key-rotation",
+          expiresAt: "2026-09-13",
+        },
+      ],
+    },
+  );
+  assert.equal(known.ok, true);
+  assert.equal(known.baseline.length, 1);
+
+  const unknown = buildCredentialReport(
+    [
+      {
+        rule: "unsafe-token-literal",
+        path: "docs/unknown.txt",
+        line: 1,
+        severity: "high",
+        remediation: "remova o token literal e use um segredo aprovado",
+      },
+    ],
+    {
+      now: "2026-08-14T00:00:00.000Z",
+      baseline: [
+        {
+          rule: "unsafe-token-literal",
+          path: "../docs/unknown.txt",
+          line: 1,
+          owner: "ia-pessoas-security",
+          justification: "preexisting-key-rotation",
+          expiresAt: "2026-09-13",
+        },
+      ],
+    },
+  );
+  assert.equal(unknown.ok, false);
+  assert.equal(unknown.baseline.length, 0);
 });
 
 test("CLI grava relatorio sanitizado para uma raiz informada", async () => {
