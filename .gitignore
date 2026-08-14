@@ -66,3 +66,7 @@ services_env_summary.md
 # Keep migration source code and synthetic test fixtures versioned:
 !/docs/migration/v4/scripts/
 !/docs/migration/v4/scripts/**
+
+# Codex execution plan/spec for the supply-chain PRs (local-only)
+/docs/superpowers/plans/2026-08-13-supply-chain-hardening.md
+/docs/superpowers/specs/2026-08-13-supply-chain-hardening-design.md
