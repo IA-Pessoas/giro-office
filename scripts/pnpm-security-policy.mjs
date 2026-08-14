@@ -168,6 +168,59 @@ function collectDependencyValues(value, path, findings) {
   }
 }
 
+function indentation(line) {
+  return line.length - line.trimStart().length;
+}
+
+function checkoutStepBlock(lines, checkoutIndex) {
+  const checkoutIndent = indentation(lines[checkoutIndex]);
+  let start = checkoutIndex;
+  for (let index = checkoutIndex; index >= 0; index -= 1) {
+    const step = /^(\s*)-\s+/u.exec(lines[index]);
+    if (step && step[1].length <= checkoutIndent) {
+      start = index;
+      break;
+    }
+  }
+
+  const stepIndent = indentation(lines[start]);
+  let end = lines.length;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const step = /^(\s*)-\s+/u.exec(lines[index]);
+    if (step && step[1].length <= stepIndent) {
+      end = index;
+      break;
+    }
+  }
+  return lines.slice(start, end);
+}
+
+function scanCheckoutCredentialAssociation(path, lines, findings) {
+  const checkoutPattern = /^\s*(?:-\s+)?uses:\s*actions\/checkout@/u;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!checkoutPattern.test(lines[index])) continue;
+    const block = checkoutStepBlock(lines, index);
+    const checkoutCount = block.filter((line) => checkoutPattern.test(line)).length;
+    const credentialLines = block.filter((line) => /persist-credentials\s*:/u.test(line));
+    const falseCount = credentialLines.filter((line) =>
+      /persist-credentials\s*:\s*false\b/u.test(line),
+    ).length;
+    if (checkoutCount !== 1 || credentialLines.length !== 1 || falseCount !== 1) {
+      const ambiguous = checkoutCount > 1 || credentialLines.length > 1;
+      findings.push(
+        finding(
+          ambiguous ? "CHECKOUT_CREDENTIALS_AMBIGUOUS" : "CHECKOUT_CREDENTIALS",
+          path,
+          index + 1,
+          ambiguous
+            ? "checkout credential configuration cannot be associated unambiguously"
+            : "the same checkout step must set persist-credentials to false",
+        ),
+      );
+    }
+  }
+}
+
 function scanWorkflowSources(sources, findings) {
   for (const entry of sources) {
     const path = typeof entry?.path === "string" ? entry.path : "workflow.yml";
@@ -187,14 +240,7 @@ function scanWorkflowSources(sources, findings) {
       );
     }
 
-    if (
-      /uses:\s*actions\/checkout@/u.test(activeText) &&
-      !/persist-credentials:\s*false/u.test(activeText)
-    ) {
-      findings.push(
-        finding("CHECKOUT_CREDENTIALS", path, 0, "checkout must disable persisted credentials"),
-      );
-    }
+    scanCheckoutCredentialAssociation(path, active, findings);
 
     for (let index = 0; index < active.length; index += 1) {
       const line = active[index];

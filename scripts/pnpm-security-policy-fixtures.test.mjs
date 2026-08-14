@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import test from "node:test";
 
 import { validatePnpmPolicy } from "./pnpm-security-policy.mjs";
@@ -25,17 +25,41 @@ dangerouslyAllowAllBuilds: false
 allowBuilds: ${allowBuilds}
 `;
 
+function archiveSpecifierForFixture(root, archive) {
+  return `file:./${basename(relative(root.replaceAll("\\", "/"), archive.replaceAll("\\", "/")))}`;
+}
+
+function buildPnpmEnvironment(source, extraEnv = {}) {
+  const allowedKeys = [
+    "PATH",
+    "Path",
+    "CI",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LANGUAGE",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "COREPACK_HOME",
+  ];
+  const environment = Object.fromEntries(
+    allowedKeys.filter((key) => typeof source[key] === "string").map((key) => [key, source[key]]),
+  );
+  environment.CI = "1";
+  environment.COREPACK_ENABLE_NETWORK = "0";
+  environment.COREPACK_ENABLE_DOWNLOAD_PROMPT = "0";
+  if (Object.keys(extraEnv).some((key) => key !== "SENTINEL_PATH")) {
+    throw new Error("fixture requested a non-allowlisted environment variable");
+  }
+  return { ...environment, ...extraEnv };
+}
+
 function runPnpm(root, args, extraEnv = {}, cwd = root) {
   return spawnSync(COREPACK, [...COREPACK_ARGS, `pnpm@${PNPM_VERSION}`, ...args], {
     cwd,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      CI: "1",
-      COREPACK_ENABLE_NETWORK: "0",
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0",
-      ...extraEnv,
-    },
+    env: buildPnpmEnvironment(process.env, extraEnv),
     timeout: 120_000,
     windowsHide: true,
   });
@@ -141,6 +165,35 @@ async function removeFixture(root) {
   await rm(root, { recursive: true, force: true });
 }
 
+test("uses basename and relative for POSIX archive paths", () => {
+  assert.equal(
+    archiveSpecifierForFixture(
+      "/tmp/giro-pnpm-policy",
+      "/tmp/giro-pnpm-policy/fixture-lifecycle-1.0.0.tgz",
+    ),
+    "file:./fixture-lifecycle-1.0.0.tgz",
+  );
+});
+
+test("builds a minimal allowlisted pnpm environment", () => {
+  const environment = buildPnpmEnvironment(
+    {
+      PATH: "path-value",
+      LANG: "pt_BR.UTF-8",
+      TEMP: "temp-value",
+      SECRET_TOKEN: "must-not-propagate",
+    },
+    { SENTINEL_PATH: "sentinel-value" },
+  );
+
+  assert.equal(environment.PATH, "path-value");
+  assert.equal(environment.LANG, "pt_BR.UTF-8");
+  assert.equal(environment.TEMP, "temp-value");
+  assert.equal(environment.COREPACK_ENABLE_NETWORK, "0");
+  assert.equal(environment.SENTINEL_PATH, "sentinel-value");
+  assert.equal(environment.SECRET_TOKEN, undefined);
+});
+
 test("pnpm fixture harness checks effective release age and rejects unsafe age offline", {
   concurrency: false,
 }, async () => {
@@ -170,7 +223,9 @@ test("unapproved lifecycle fixture is blocked without executing its sentinel", {
   const sentinel = join(root, "lifecycle-sentinel.txt");
   try {
     const archive = await writeLifecyclePackage(root);
-    await setRootDependencies(root, { "fixture-lifecycle": `file:./${archive.split("\\").pop()}` });
+    await setRootDependencies(root, {
+      "fixture-lifecycle": archiveSpecifierForFixture(root, archive),
+    });
     const lockfile = runPnpm(root, ["install", "--lockfile-only", "--offline", "--ignore-scripts"]);
     assertPnpmSuccess(lockfile, "unapproved lifecycle lockfile generation");
     const install = runPnpm(root, ["install", "--frozen-lockfile", "--offline"], {

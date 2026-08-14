@@ -256,3 +256,38 @@ test("ignores commented install examples and returns stable findings", () => {
 
   assert.deepEqual(findings, []);
 });
+
+test("associates persist-credentials false with the same checkout step", () => {
+  const findings = validatePnpmPolicy({
+    packageJson: validPackage,
+    workspaceYaml: validWorkspace,
+    workflowSources: [
+      {
+        path: ".github/workflows/ambiguous-checkout.yml",
+        source: `jobs:
+  check:
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo unrelated
+        with:
+          persist-credentials: false
+`,
+      },
+      {
+        path: ".github/workflows/two-checkouts.yml",
+        source: `jobs:
+  check:
+    steps:
+      - name: first
+        uses: actions/checkout@v4
+      - name: second
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+`,
+      },
+    ],
+  });
+
+  assert.equal(findings.filter(({ rule }) => rule === "CHECKOUT_CREDENTIALS").length, 2);
+});
