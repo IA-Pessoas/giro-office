@@ -1,0 +1,42 @@
+name: GitHub Audit Monitoring
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-monitor:
+    name: security/github-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout sem credenciais persistentes
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Coletar eventos de auditoria sem mutação
+        env:
+          GITHUB_AUDIT_LOG_TOKEN: ${{ secrets.GITHUB_AUDIT_LOG_TOKEN }}
+        run: >-
+          node scripts/github-audit-monitor.mjs
+          --org IA-Pessoas
+          --report "${RUNNER_TEMP}/github-audit-report.json"
+          --fail-on-alert
+
+      - name: Publicar somente relatório sanitizado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-audit-report
+          path: ${{ runner.temp }}/github-audit-report.json
+          if-no-files-found: ignore
