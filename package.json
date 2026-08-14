@@ -7,7 +7,7 @@
     "dev:reset": "node scripts/dev-reset.mjs",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test && pnpm qa:integracao",
+    "test": "node --test scripts/supply-chain-integrity.test.mjs scripts/supply-chain-security.test.mjs scripts/supply-chain-ci.test.mjs && turbo run test && pnpm qa:integracao",
     "lint": "biome lint .",
     "dev:app": "turbo run dev --filter=@workspace/app",
     "dev:api": "turbo run dev --filter=@workspace/legacy-api",
@@ -41,6 +41,7 @@
     "graphify:refresh": "node scripts/graphify-refresh.mjs",
     "deploy:production": "bash scripts/ops/deploy-production.sh",
     "security:compose": "node scripts/check-compose-security.mjs",
+    "security:supply-chain": "node scripts/supply-chain-integrity.mjs",
     "security:rulesets": "node scripts/github-ruleset-policy.mjs --policy .github/security/rulesets-policy.json --actual scripts/fixtures/rulesets/approved.json",
     "migration:test": "node --test scripts/migration-v2-build-load.test.mjs scripts/migration-v2-phase1-load.test.mjs scripts/migration-v2-phase2-load.test.mjs scripts/migration-v3-docs.test.mjs scripts/fix-rh-request-requesters.test.mjs"
   },

@@ -67,7 +67,7 @@ test('executable project configs contain no PolinRider indicators', async () => 
 
 test('pre-commit scans for supply-chain payloads before loading lint-staged config', async () => {
   const hook = await readFile(path.join(repositoryRoot, '.husky', 'pre-commit'), 'utf8');
-  const scannerIndex = hook.indexOf('node --test scripts/supply-chain-security.test.mjs');
+  const scannerIndex = hook.indexOf('node scripts/supply-chain-integrity.mjs');
   const lintStagedIndex = hook.indexOf('pnpm lint-staged');
 
   assert.ok(scannerIndex >= 0, 'pre-commit must execute the supply-chain scanner');
