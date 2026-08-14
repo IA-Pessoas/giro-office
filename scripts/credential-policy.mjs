@@ -11,6 +11,28 @@ const EXCLUDED_DIRECTORIES = new Set([
   "node_modules",
 ]);
 
+const MATERIAL_EXTENSIONS = new Set([".crt", ".key", ".pem"]);
+const TEXT_EXTENSIONS = new Set([
+  "",
+  ".cjs",
+  ".crt",
+  ".css",
+  ".json",
+  ".js",
+  ".key",
+  ".md",
+  ".mjs",
+  ".pem",
+  ".ps1",
+  ".sh",
+  ".sql",
+  ".ts",
+  ".tsx",
+  ".txt",
+  ".yml",
+  ".yaml",
+]);
+
 const UNSAFE_LITERAL_RULES = [
   {
     pattern: /\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{12,}\b/u,
@@ -21,11 +43,6 @@ const UNSAFE_LITERAL_RULES = [
     pattern: /\bAKIA[0-9A-Z]{16}\b/u,
     rule: "unsafe-cloud-key-literal",
     remediation: "remova a chave literal e use identidade federada",
-  },
-  {
-    pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/u,
-    rule: "unsafe-private-key-literal",
-    remediation: "remova a chave privada e rotacione a credencial exposta",
   },
   {
     pattern: /Authorization\s*:\s*Bearer\s+[A-Za-z0-9._~+/=-]{12,}/iu,
@@ -70,12 +87,59 @@ function indentation(line) {
   return line.length - line.trimStart().length;
 }
 
+function unquoteYamlScalar(value) {
+  const scalar = value.trim();
+  if (scalar.length >= 2) {
+    const first = scalar[0];
+    const last = scalar.at(-1);
+    if ((first === "'" || first === '"') && last === first) {
+      return scalar.slice(1, -1);
+    }
+  }
+  return scalar;
+}
+
 function hasSecretShellOperation(line, inRunBlock) {
   if (!SECRET_REFERENCE.test(line)) return false;
   return (
     inRunBlock ||
     /^\s*run\s*:/u.test(line) ||
     /\b(?:cat|echo|env|printenv|printf|set\s+-x|tee)\b/u.test(line) ||
+    />>?\s*[^&]/u.test(line)
+  );
+}
+
+function extractDerivedSecretVariables(line) {
+  const variables = [];
+  const yamlVariable = line.match(
+    /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*["']?\$\{\{\s*secrets\./u,
+  );
+  if (yamlVariable) variables.push(yamlVariable[1]);
+
+  const shellVariable = line.match(
+    /(?:^|[;&|]\s*)(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*["']?\$\{\{\s*secrets\./u,
+  );
+  if (shellVariable) variables.push(shellVariable[1]);
+  return variables;
+}
+
+function referencesDerivedVariable(line, variables) {
+  return variables.some((variable) => {
+    const escaped = variable.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    return new RegExp(`\\$\\{${escaped}\\}|\\$${escaped}\\b`, "u").test(line);
+  });
+}
+
+function hasDerivedSecretShellOperation(line, variables) {
+  if (!variables.length) return false;
+  const referencesSecret = referencesDerivedVariable(line, variables);
+  const debug = /\bset\s+-x\b/u.test(line);
+  if (!referencesSecret && !debug) return false;
+  return (
+    debug ||
+    /\b(?:cat|curl|echo|env|fetch|http|httpie|Invoke-RestMethod|Invoke-WebRequest|printenv|printf|request|tee|wget)\b/iu.test(
+      line,
+    ) ||
     />>?\s*[^&]/u.test(line)
   );
 }
@@ -93,7 +157,39 @@ function scanUnsafeLiterals(relativePath, source, activeOnly = false) {
     }
   }
 
+  findings.push(...scanPrivateKeyMaterial(relativePath, source));
   return findings;
+}
+
+function scanPrivateKeyMaterial(relativePath, source) {
+  const extension = path.posix.extname(normalizePath(relativePath)).toLowerCase();
+  if (MATERIAL_EXTENSIONS.has(extension) && source.trim()) {
+    return [
+      makeFinding(
+        "credential-material-file",
+        relativePath,
+        1,
+        "high",
+        "remova o material de credencial do repositorio e rotacione-o",
+      ),
+    ];
+  }
+
+  const normalized = source.replaceAll("\\r\\n", "\n").replaceAll("\\n", "\n");
+  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----\s*[A-Za-z0-9+/=]{32,}/u.test(normalized)) {
+    const line = source.slice(0, source.indexOf("-----BEGIN")).split(/\r?\n/u).length;
+    return [
+      makeFinding(
+        "unsafe-private-key-literal",
+        relativePath,
+        line,
+        "high",
+        "remova a chave privada e rotacione a credencial exposta",
+      ),
+    ];
+  }
+
+  return [];
 }
 
 function scanPermissions(relativePath, lines, findings) {
@@ -112,8 +208,10 @@ function scanPermissions(relativePath, lines, findings) {
   }
 
   const permissionLine = lines[permissionsIndex];
-  const inlineValue = permissionLine.replace(/^permissions\s*:\s*/u, "").trim();
-  if (/\b(?:write|write-all)\b/u.test(inlineValue)) {
+  const inlineValue = unquoteYamlScalar(
+    permissionLine.replace(/^permissions\s*:\s*/u, "").trim(),
+  );
+  if (/^(?:write|write-all)$/u.test(inlineValue)) {
     findings.push(
       makeFinding(
         "permissions-write",
@@ -128,8 +226,9 @@ function scanPermissions(relativePath, lines, findings) {
   for (let index = permissionsIndex + 1; index < lines.length; index += 1) {
     const line = lines[index];
     if (!isCommentOrEmpty(line) && indentation(line) === 0) break;
-    const match = line.match(/^\s+([A-Za-z0-9_-]+)\s*:\s*(write(?:-all)?|read|none)\s*$/u);
-    if (match?.[2].startsWith("write")) {
+    const match = line.match(/^\s+([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/u);
+    const value = match ? unquoteYamlScalar(match[2]) : "";
+    if (/^(?:write|write-all)$/u.test(value)) {
       findings.push(
         makeFinding(
           "permissions-write",
@@ -145,14 +244,27 @@ function scanPermissions(relativePath, lines, findings) {
 
 function scanCheckouts(relativePath, lines, findings) {
   for (let index = 0; index < lines.length; index += 1) {
-    const checkout = lines[index].match(/^(\s*)-\s+uses:\s*actions\/checkout@/u);
+    const checkout = lines[index].match(/^(?:\s*-\s+|\s*)uses:\s*actions\/checkout@/u);
     if (!checkout) continue;
 
-    const stepIndent = checkout[1].length;
+    const usesIndent = indentation(lines[index]);
+    let stepIndent = usesIndent;
+    for (let previous = index; previous >= 0; previous -= 1) {
+      const step = lines[previous].match(/^(\s*)-\s+/u);
+      if (step && step[1].length <= usesIndent) {
+        stepIndent = step[1].length;
+        break;
+      }
+    }
+
     let hasSafePersistence = false;
     for (let next = index + 1; next < lines.length; next += 1) {
       const candidate = lines[next];
-      if (candidate.trim() && indentation(candidate) === stepIndent && /^-\s+/u.test(candidate.trim())) {
+      if (
+        candidate.trim() &&
+        indentation(candidate) === stepIndent &&
+        /^-\s+/u.test(candidate.trim())
+      ) {
         break;
       }
       if (/^\s+persist-credentials\s*:\s*false\s*$/u.test(candidate)) {
@@ -177,11 +289,21 @@ function scanCheckouts(relativePath, lines, findings) {
 
 function scanSecretShell(relativePath, lines, findings) {
   let runIndent = null;
+  let derivedVariables = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const trimmed = line.trim();
     if (isCommentOrEmpty(line)) continue;
+
+    if (/^\s*-\s+\S/u.test(line)) {
+      runIndent = null;
+      derivedVariables = [];
+    }
+
+    derivedVariables = [
+      ...new Set([...derivedVariables, ...extractDerivedSecretVariables(line)]),
+    ];
 
     if (/^run\s*:\s*[|>][-+]?\s*$/u.test(trimmed)) {
       runIndent = indentation(line);
@@ -189,7 +311,10 @@ function scanSecretShell(relativePath, lines, findings) {
     }
 
     if (runIndent !== null && indentation(line) <= runIndent) runIndent = null;
-    if (hasSecretShellOperation(line, runIndent !== null)) {
+    if (
+      hasSecretShellOperation(line, runIndent !== null) ||
+      hasDerivedSecretShellOperation(line, derivedVariables)
+    ) {
       findings.push(
         makeFinding(
           "secret-shell-exposure",
@@ -235,22 +360,7 @@ function isExcluded(relativePath) {
 
 function shouldReadFile(relativePath) {
   const extension = path.posix.extname(normalizePath(relativePath)).toLowerCase();
-  return extension === "" || new Set([
-    ".cjs",
-    ".css",
-    ".json",
-    ".js",
-    ".mjs",
-    ".md",
-    ".ps1",
-    ".sh",
-    ".sql",
-    ".ts",
-    ".tsx",
-    ".txt",
-    ".yml",
-    ".yaml",
-  ]).has(extension);
+  return TEXT_EXTENSIONS.has(extension);
 }
 
 async function collectFiles(directory, relativeDirectory = "") {
@@ -277,6 +387,19 @@ export async function scanRepositoryCredentials(root) {
 
   for (const { absolutePath, relativePath } of files) {
     const buffer = await readFile(absolutePath);
+    const extension = path.posix.extname(relativePath).toLowerCase();
+    if (MATERIAL_EXTENSIONS.has(extension) && buffer.length > 0) {
+      findings.push(
+        makeFinding(
+          "credential-material-file",
+          relativePath,
+          1,
+          "high",
+          "remova o material de credencial do repositorio e rotacione-o",
+        ),
+      );
+      continue;
+    }
     if (buffer.includes(0)) continue;
     const source = buffer.toString("utf8");
     if (relativePath.startsWith(".github/workflows/")) {
@@ -289,23 +412,90 @@ export async function scanRepositoryCredentials(root) {
   return sortFindings(findings);
 }
 
-export function buildCredentialReport(findings) {
+function baselineEntryForFinding(finding, entries, today) {
+  return entries.find(
+    (entry) =>
+      entry.rule === finding.rule &&
+      normalizePath(entry.path) === finding.path &&
+      entry.line === finding.line &&
+      entry.owner &&
+      entry.justification &&
+      /^\d{4}-\d{2}-\d{2}$/u.test(entry.expiresAt) &&
+      entry.expiresAt >= today,
+  );
+}
+
+export function buildCredentialReport(findings, options = {}) {
   const sanitizedFindings = sortFindings(Array.isArray(findings) ? findings : []);
+  const today = new Date(options.now ?? Date.now()).toISOString().slice(0, 10);
+  const entries = Array.isArray(options.baseline) ? options.baseline : [];
+  const blockingFindings = [];
+  const baselinedFindings = [];
+  const appliedBaseline = [];
+
+  for (const finding of sanitizedFindings) {
+    const entry = baselineEntryForFinding(finding, entries, today);
+    if (!entry) {
+      blockingFindings.push(finding);
+      continue;
+    }
+
+    baselinedFindings.push(finding);
+    appliedBaseline.push({
+      rule: finding.rule,
+      path: finding.path,
+      line: finding.line,
+      owner: String(entry.owner),
+      justification: String(entry.justification),
+      expiresAt: entry.expiresAt,
+    });
+  }
+
   const bySeverity = Object.fromEntries(
     ["high", "medium", "low"].map((severity) => [
       severity,
-      sanitizedFindings.filter((finding) => finding.severity === severity).length,
+      blockingFindings.filter((finding) => finding.severity === severity).length,
     ]),
   );
 
   return {
-    ok: sanitizedFindings.length === 0,
-    findings: sanitizedFindings,
+    ok: blockingFindings.length === 0,
+    findings: blockingFindings,
+    baselinedFindings,
+    baseline: appliedBaseline,
     summary: {
       total: sanitizedFindings.length,
+      blocking: blockingFindings.length,
+      baselined: baselinedFindings.length,
       bySeverity,
     },
   };
+}
+
+async function readCredentialBaseline(root) {
+  const relativePath = ".github/credential-policy-baseline.json";
+  try {
+    const source = await readFile(path.join(path.resolve(root), relativePath), "utf8");
+    const parsed = JSON.parse(source);
+    return {
+      entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+      findings: [],
+    };
+  } catch (error) {
+    if (error?.code === "ENOENT") return { entries: [], findings: [] };
+    return {
+      entries: [],
+      findings: [
+        makeFinding(
+          "baseline-invalid",
+          relativePath,
+          1,
+          "high",
+          "corrija o baseline sanitizado antes de aceitar excecoes",
+        ),
+      ],
+    };
+  }
 }
 
 function parseArguments(argv) {
@@ -338,7 +528,11 @@ async function main() {
     return;
   }
 
-  const report = buildCredentialReport(await scanRepositoryCredentials(options.root));
+  const baseline = await readCredentialBaseline(options.root);
+  const report = buildCredentialReport(
+    [...(await scanRepositoryCredentials(options.root)), ...baseline.findings],
+    { baseline: baseline.entries },
+  );
   if (options.reportPath) {
     await mkdir(path.dirname(path.resolve(options.reportPath)), { recursive: true });
     await writeFile(options.reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");

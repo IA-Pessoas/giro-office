@@ -11,12 +11,26 @@ remediação; valores de segredos, payloads e trechos de origem nunca são grava
 - Segredos podem ser referenciados por `env` ou `with`, mas não podem ser impressos,
   persistidos em arquivos, expostos por `set -x` ou incluídos em headers no código.
 - Tokens, chaves privadas e headers de autorização literais são bloqueados.
+- Arquivos `.pem`, `.key` e `.crt` não podem conter material de credencial no repositório.
 - `.env*`, `node_modules`, `.git`, `dist`, `.next`, `.turbo` e `graphify-out` não são
   lidos pelo scanner.
 
 O workflow de política roda em pull requests, pushes para `develop`, `main` e
 `staging`, diariamente e sob demanda. Ele usa Node.js 22, permissões somente leitura,
 checkout sem credenciais persistidas e publica apenas o relatório sanitizado.
+
+## Baseline temporária
+
+O arquivo `.github/credential-policy-baseline.json` contém duas exceções temporárias
+para materiais preexistentes em `services/src/src/config/google.json` e
+`services/src/key.pem`. Cada entrada identifica proprietário, justificativa e
+expiração em `2026-09-13`. O scanner não descarta as exposições: elas aparecem em
+`baselinedFindings` e no bloco `baseline` do relatório sanitizado, mas não mantêm o
+gate vermelho enquanto a rotação externa é executada. As exceções devem ser removidas
+após a rotação; se expirarem, voltam a bloquear o workflow automaticamente.
+
+O marcador de chave existente em `docs/migration/v4/scripts/test/sensitivity.test.mjs`
+é apenas uma fixture sem material codificado e não é tratado como exposição real.
 
 ## Controles de organização e administração
 
