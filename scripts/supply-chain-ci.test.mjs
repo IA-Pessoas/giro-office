@@ -35,7 +35,7 @@ test("workspace rejeita npm e declara pnpm como gerenciador obrigatório", async
 
   assert.deepEqual(packageJson.devEngines?.packageManager, {
     name: "pnpm",
-    version: "9.15.0",
+    version: "10.26.0",
     onFail: "error",
   });
 });

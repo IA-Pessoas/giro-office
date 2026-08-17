@@ -20,3 +20,10 @@ packages:
   - "services/pessoal-service"
   - "services/parcelamento-service"
   - "services/src"
+
+minimumReleaseAge: 1440
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+strictDepBuilds: true
+dangerouslyAllowAllBuilds: false
+allowBuilds: {}
