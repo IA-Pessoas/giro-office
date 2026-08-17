@@ -136,6 +136,45 @@ test("verifies a snapshot and restores it only to a new quarantine mirror", asyn
   }
 });
 
+test("does not retain source locations in snapshot or quarantine mirror configuration", async () => {
+  const fixture = await createBareFixture();
+  try {
+    const snapshot = await createSnapshot({
+      source: fixture.source,
+      destination: path.join(fixture.root, "snapshots"),
+      repositoryId: "owner/repo",
+    });
+    const quarantineDirectory = path.join(fixture.root, "quarantine.git");
+    await runRecoveryDrill({ snapshotDirectory: snapshot.snapshotDirectory, quarantineDirectory });
+
+    await assert.rejects(() =>
+      runGit(["-C", path.join(snapshot.snapshotDirectory, "mirror.git"), "config", "--get", "remote.origin.url"]),
+    );
+    await assert.rejects(() => runGit(["-C", quarantineDirectory, "config", "--get", "remote.origin.url"]));
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("sanitizes unreadable snapshot errors", async () => {
+  const fixture = await createBareFixture();
+  try {
+    const snapshot = await createSnapshot({
+      source: fixture.source,
+      destination: path.join(fixture.root, "snapshots"),
+      repositoryId: "owner/repo",
+    });
+    await rm(snapshot.bundlePath, { force: true });
+
+    await assert.rejects(
+      () => verifySnapshot({ snapshotDirectory: snapshot.snapshotDirectory }),
+      (error) => error.message === "snapshot bundle cannot be read",
+    );
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("stores only allowlisted GitHub metadata fields", async () => {
   const fixture = await createBareFixture();
   try {

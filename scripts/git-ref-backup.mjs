@@ -83,11 +83,15 @@ async function requireAbsent(directory, label) {
 }
 
 async function sha256(file) {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(file)) {
-    hash.update(chunk);
+  try {
+    const hash = createHash("sha256");
+    for await (const chunk of createReadStream(file)) {
+      hash.update(chunk);
+    }
+    return hash.digest("hex");
+  } catch {
+    throw new Error("snapshot bundle cannot be read");
   }
-  return hash.digest("hex");
 }
 
 function parseRefs(output) {
@@ -346,7 +350,11 @@ export async function verifySnapshot({ snapshotDirectory, commandRunner } = {}) 
   const manifest = await readManifest(snapshotDirectory);
   const mirrorDirectory = path.join(snapshotDirectory, "mirror.git");
   const bundlePath = path.join(snapshotDirectory, BUNDLE_FILE);
-  await access(mirrorDirectory);
+  try {
+    await access(mirrorDirectory);
+  } catch {
+    throw new Error("snapshot mirror cannot be read");
+  }
   if ((await sha256(bundlePath)) !== manifest.bundle.sha256) {
     throw new Error("snapshot bundle checksum does not match");
   }
@@ -365,6 +373,7 @@ export async function runRecoveryDrill({ snapshotDirectory, quarantineDirectory,
   const { manifest } = await verifySnapshot({ snapshotDirectory, commandRunner });
   const bundlePath = path.join(snapshotDirectory, manifest.bundle.file);
   await run("git", ["clone", "--bare", bundlePath, quarantineDirectory], { commandRunner });
+  await run("git", ["-C", quarantineDirectory, "remote", "remove", "origin"], { commandRunner });
   await run("git", ["-C", quarantineDirectory, "fsck", "--full", "--strict"], { commandRunner });
   const restoredRefs = parseRefs(
     await run(
