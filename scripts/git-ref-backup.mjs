@@ -11,6 +11,7 @@ const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const OBJECT_ID_PATTERN = /^[a-f0-9]{40,64}$/u;
 const REF_NAME_PATTERN = /^refs\/[A-Za-z0-9._/-]+$/u;
 const GITHUB_REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
+const REPOSITORY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}\/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/u;
 const METADATA_PAGE_SIZE = 100;
 const METADATA_MAX_ITEMS = 1_000;
 const METADATA_MAX_PAGES = METADATA_MAX_ITEMS / METADATA_PAGE_SIZE;
@@ -70,19 +71,18 @@ async function run(command, args, { cwd, commandRunner, maxOutputBytes } = {}) {
 
 async function createNewDirectory(directory, label) {
   try {
-    await lstat(directory);
+    await mkdir(directory);
   } catch {
-    await mkdir(directory, { recursive: true });
-    return;
+    throw new Error(`${label} must be new`);
   }
-  throw new Error(`${label} must be new`);
 }
 
 async function requireAbsent(directory, label) {
   try {
     await lstat(directory);
-  } catch {
-    return;
+  } catch (error) {
+    if (error?.code === "ENOENT") return;
+    throw new Error(`${label} must be new`);
   }
   throw new Error(`${label} must be new`);
 }
@@ -110,6 +110,30 @@ function parseRefs(output) {
     refs.push({ name, objectId });
   }
   return refs;
+}
+
+function parseBundleRefs(output) {
+  const refs = [];
+  for (const line of output.split(/\r?\n/u)) {
+    if (!line) continue;
+    const [objectId, name] = line.split(" ");
+    if (!REF_NAME_PATTERN.test(name) || !OBJECT_ID_PATTERN.test(objectId)) {
+      throw new Error("git returned invalid refs");
+    }
+    refs.push({ name, objectId });
+  }
+  return refs;
+}
+
+function refsMatch(left, right) {
+  if (left.length !== right.length) return false;
+  const sort = (first, second) =>
+    `${first.name}\0${first.objectId}`.localeCompare(`${second.name}\0${second.objectId}`);
+  const expected = [...left].sort(sort);
+  const actual = [...right].sort(sort);
+  return expected.every(
+    (ref, index) => ref.name === actual[index].name && ref.objectId === actual[index].objectId,
+  );
 }
 
 function validateManifest(value) {
@@ -146,6 +170,30 @@ async function readManifest(snapshotDirectory) {
 
 function snapshotName(createdAt) {
   return `snapshot-${createdAt.replace(/[:.]/gu, "-")}`;
+}
+
+function normalizeSource(source) {
+  if (typeof source !== "string" || !source) {
+    throw new Error("source must be an absolute local path or safe HTTPS URL");
+  }
+  if (path.isAbsolute(source)) return path.resolve(source);
+  try {
+    const url = new URL(source);
+    if (
+      url.protocol !== "https:" ||
+      !url.hostname ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname === "/"
+    ) {
+      throw new Error();
+    }
+    return url.toString();
+  } catch {
+    throw new Error("source must be an absolute local path or safe HTTPS URL");
+  }
 }
 
 function appendQuery(route, query) {
@@ -294,9 +342,8 @@ export async function createSnapshot({
   includeMetadata = false,
   commandRunner,
 } = {}) {
-  if (typeof source !== "string" || !source || typeof repositoryId !== "string" || !repositoryId) {
-    throw new Error("source and repositoryId are required");
-  }
+  const normalizedSource = normalizeSource(source);
+  if (!REPOSITORY_ID_PATTERN.test(repositoryId ?? "")) throw new Error("repositoryId is invalid");
   if (typeof destination !== "string" || !destination) {
     throw new Error("snapshot destination is required");
   }
@@ -304,16 +351,21 @@ export async function createSnapshot({
     throw new Error("a valid GitHub repository is required for metadata");
   }
 
-  await createNewDirectory(destination, "snapshot destination");
+  const normalizedDestination = path.resolve(destination);
+  await createNewDirectory(normalizedDestination, "snapshot destination");
   const createdAt = new Date().toISOString();
-  const snapshotDirectory = path.join(destination, snapshotName(createdAt));
+  const snapshotDirectory = path.join(normalizedDestination, snapshotName(createdAt));
   const mirrorDirectory = path.join(snapshotDirectory, "mirror.git");
   const bundlePath = path.join(snapshotDirectory, BUNDLE_FILE);
   const manifestPath = path.join(snapshotDirectory, MANIFEST_FILE);
   await mkdir(snapshotDirectory);
 
-  await run("git", ["clone", "--mirror", "--no-local", source, mirrorDirectory], { commandRunner });
-  await run("git", ["-C", mirrorDirectory, "remote", "remove", "origin"], { commandRunner });
+  await run("git", ["clone", "--mirror", "--no-local", normalizedSource, mirrorDirectory], {
+    commandRunner,
+  });
+  await run("git", ["-C", mirrorDirectory, "remote", "remove", "--", "origin"], {
+    commandRunner,
+  });
   await run("git", ["-C", mirrorDirectory, "fsck", "--full", "--strict"], { commandRunner });
   const refs = parseRefs(
     await run("git", ["-C", mirrorDirectory, "for-each-ref", "--format=%(refname) %(objectname)"], {
@@ -365,6 +417,19 @@ export async function verifySnapshot({ snapshotDirectory, commandRunner } = {}) 
   }
   await run("git", ["-C", mirrorDirectory, "fsck", "--full", "--strict"], { commandRunner });
   await run("git", ["-C", mirrorDirectory, "bundle", "verify", bundlePath], { commandRunner });
+  const mirrorRefs = parseRefs(
+    await run("git", ["-C", mirrorDirectory, "for-each-ref", "--format=%(refname) %(objectname)"], {
+      commandRunner,
+    }),
+  );
+  const bundleRefs = parseBundleRefs(
+    await run("git", ["-C", mirrorDirectory, "bundle", "list-heads", bundlePath], {
+      commandRunner,
+    }),
+  );
+  if (!refsMatch(manifest.refs, mirrorRefs) || !refsMatch(manifest.refs, bundleRefs)) {
+    throw new Error("snapshot refs do not match");
+  }
 
   return { ok: true, manifest };
 }
@@ -373,17 +438,24 @@ export async function runRecoveryDrill({ snapshotDirectory, quarantineDirectory,
   if (typeof quarantineDirectory !== "string" || !quarantineDirectory) {
     throw new Error("quarantine directory is required");
   }
-  await requireAbsent(quarantineDirectory, "quarantine directory");
+  const normalizedQuarantineDirectory = path.resolve(quarantineDirectory);
+  await requireAbsent(normalizedQuarantineDirectory, "quarantine directory");
 
   const { manifest } = await verifySnapshot({ snapshotDirectory, commandRunner });
   const bundlePath = path.join(snapshotDirectory, manifest.bundle.file);
-  await run("git", ["clone", "--bare", bundlePath, quarantineDirectory], { commandRunner });
-  await run("git", ["-C", quarantineDirectory, "remote", "remove", "origin"], { commandRunner });
-  await run("git", ["-C", quarantineDirectory, "fsck", "--full", "--strict"], { commandRunner });
+  await run("git", ["clone", "--bare", bundlePath, normalizedQuarantineDirectory], {
+    commandRunner,
+  });
+  await run("git", ["-C", normalizedQuarantineDirectory, "remote", "remove", "--", "origin"], {
+    commandRunner,
+  });
+  await run("git", ["-C", normalizedQuarantineDirectory, "fsck", "--full", "--strict"], {
+    commandRunner,
+  });
   const restoredRefs = parseRefs(
     await run(
       "git",
-      ["-C", quarantineDirectory, "for-each-ref", "--format=%(refname) %(objectname)"],
+      ["-C", normalizedQuarantineDirectory, "for-each-ref", "--format=%(refname) %(objectname)"],
       { commandRunner },
     ),
   ).length;
@@ -423,8 +495,8 @@ export async function main(args = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
-    process.stderr.write(`${error.message}\n`);
+  main().catch(() => {
+    process.stderr.write("git ref backup operation failed\n");
     process.exitCode = 1;
   });
 }

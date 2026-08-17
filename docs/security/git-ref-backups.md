@@ -23,10 +23,14 @@ write-once, retenção, conta separada ou aprovação de produção.
 
 ## Operação
 
-Crie um destino novo para cada snapshot e execute o comando `snapshot`. Para metadados, informe
-explicitamente `--github-repo owner/repo --include-metadata`. Sem essa flag, a ferramenta não chama
-`gh`. Execute `verify` antes de qualquer drill e informe um diretório de quarentena ainda inexistente
-para `drill`.
+Crie um destino novo para cada snapshot, sob um diretório-pai que já exista, e execute o comando
+`snapshot`. A reserva do destino é exclusiva: não reutilize um destino mesmo após uma falha. A origem
+aceita somente caminho local absoluto ou URL HTTPS sem credenciais, query ou fragment; não use opções
+Git como origem. O `git clone` não recebe `--` antes da origem por compatibilidade, portanto essa
+validação é obrigatória. Para metadados, informe explicitamente `--github-repo owner/repo
+--include-metadata`. Sem essa flag, a ferramenta não chama `gh`. O `repositoryId` também deve ser
+`owner/repo`, com até 100 caracteres em cada parte. Execute `verify` antes de qualquer drill e informe
+um diretório de quarentena ainda inexistente para `drill`.
 
 Falhas preservam evidências locais para investigação; não reutilize ou sobrescreva um destino já
 existente. A aprovação explícita de produção, os controles de imutabilidade e a retenção continuam
