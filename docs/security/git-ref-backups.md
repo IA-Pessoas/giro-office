@@ -16,16 +16,16 @@ write-once, retenção, conta separada ou aprovação de produção.
 
 - Execute snapshots de repositórios ativos a cada hora; capture metadata diariamente quando ela for
   necessária.
-- O objetivo de recuperação é quatro hours (4 hours) ou menos; ajuste a cadência à RPO aprovada.
-- Verifique o bundle e restaure somente em um mirror de quarantine novo e isolado.
-- Alterações de refs de produção exigem explicit approval documentada fora desta ferramenta. O drill
+- O objetivo de recuperação é quatro horas (4 horas) ou menos; ajuste a cadência à RPO aprovada.
+- Verifique o bundle e restaure somente em um mirror de quarentena novo e isolado.
+- Alterações de refs de produção exigem aprovação explícita documentada fora desta ferramenta. O drill
   nunca faz push, checkout, reset, exclusão ou restauração de produção.
 
 ## Operação
 
 Crie um destino novo para cada snapshot e execute o comando `snapshot`. Para metadados, informe
 explicitamente `--github-repo owner/repo --include-metadata`. Sem essa flag, a ferramenta não chama
-`gh`. Execute `verify` antes de qualquer drill e informe um diretório de quarantine ainda inexistente
+`gh`. Execute `verify` antes de qualquer drill e informe um diretório de quarentena ainda inexistente
 para `drill`.
 
 Falhas preservam evidências locais para investigação; não reutilize ou sobrescreva um destino já

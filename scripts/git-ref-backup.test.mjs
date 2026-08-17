@@ -337,7 +337,7 @@ test("documents external immutable storage and quarantine-only recovery prerequi
   const guide = await readFile(path.join(repositoryRoot, "docs/security/git-ref-backups.md"), "utf8");
 
   assert.match(guide, /object lock|write-once/iu);
-  assert.match(guide, /quarantine/iu);
-  assert.match(guide, /four hours|4 hours/iu);
-  assert.match(guide, /explicit approval/iu);
+  assert.match(guide, /quarentena/iu);
+  assert.match(guide, /quatro horas|4 horas/iu);
+  assert.match(guide, /aprovação explícita/iu);
 });
