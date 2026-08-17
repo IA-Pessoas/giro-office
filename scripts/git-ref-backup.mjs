@@ -23,7 +23,12 @@ function commandFailure(command, status) {
 
 async function run(command, args, { cwd, commandRunner, maxOutputBytes } = {}) {
   if (commandRunner) {
-    const result = await commandRunner(command, args, { cwd });
+    let result;
+    try {
+      result = await commandRunner(command, args, { cwd });
+    } catch {
+      throw commandFailure(command);
+    }
     if (!result || typeof result.stdout !== "string") {
       throw new Error(`${command} returned an invalid result`);
     }

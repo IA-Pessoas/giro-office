@@ -175,6 +175,26 @@ test("sanitizes unreadable snapshot errors", async () => {
   }
 });
 
+test("sanitizes command runner failures", async () => {
+  const fixture = await createBareFixture();
+  try {
+    await assert.rejects(
+      () =>
+        createSnapshot({
+          source: fixture.source,
+          destination: path.join(fixture.root, "snapshots"),
+          repositoryId: "owner/repo",
+          commandRunner: async () => {
+            throw new Error("source token must not be exposed");
+          },
+        }),
+      (error) => error.message === "git failed with status unknown",
+    );
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("stores only allowlisted GitHub metadata fields", async () => {
   const fixture = await createBareFixture();
   try {
