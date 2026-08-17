@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { lstat, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -205,6 +205,39 @@ test("verifies a snapshot and restores it only to a new quarantine mirror", asyn
   }
 });
 
+test("atomically reserves quarantine before verifying the snapshot", async () => {
+  const fixture = await createBareFixture();
+  try {
+    const snapshot = await createSnapshot({
+      source: fixture.source,
+      destination: path.join(fixture.root, "snapshots"),
+      repositoryId: "owner/repo",
+    });
+    const quarantineDirectory = path.join(fixture.root, "quarantine.git");
+    let lateCreationAttempted = false;
+    const commandRunner = async (command, args, { cwd } = {}) => {
+      if (command === "git" && !lateCreationAttempted && args.includes("fsck")) {
+        lateCreationAttempted = true;
+        await mkdir(quarantineDirectory);
+      }
+      return { stdout: await runGit(args, undefined, { cwd }) };
+    };
+
+    await assert.rejects(
+      () =>
+        runRecoveryDrill({
+          snapshotDirectory: snapshot.snapshotDirectory,
+          quarantineDirectory,
+          commandRunner,
+        }),
+      (error) => error.message === "git failed with status unknown",
+    );
+    assert.equal(lateCreationAttempted, true);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("rejects a snapshot when mirror refs differ from the manifest", async () => {
   const fixture = await createBareFixture();
   try {
@@ -256,6 +289,27 @@ test("rejects a snapshot when manifest refs differ from the verified bundle", as
     await assert.rejects(
       () => verifySnapshot({ snapshotDirectory: snapshot.snapshotDirectory }),
       (error) => error.message === "snapshot refs do not match",
+    );
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("rejects a manifest whose repositoryId violates the snapshot allowlist", async () => {
+  const fixture = await createBareFixture();
+  try {
+    const snapshot = await createSnapshot({
+      source: fixture.source,
+      destination: path.join(fixture.root, "snapshots"),
+      repositoryId: "owner/repo",
+    });
+    const manifest = JSON.parse(await readFile(snapshot.manifestPath, "utf8"));
+    manifest.repositoryId = "https://token@example.invalid/owner/repo";
+    await writeFile(snapshot.manifestPath, `${JSON.stringify(manifest)}\n`, "utf8");
+
+    await assert.rejects(
+      () => verifySnapshot({ snapshotDirectory: snapshot.snapshotDirectory }),
+      (error) => error.message === "snapshot manifest is invalid",
     );
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
