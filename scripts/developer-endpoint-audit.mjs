@@ -18,9 +18,15 @@ const PROFILE_PATHS = {
   ],
 };
 const EXTENSION_DIRECTORIES = [".vscode/extensions", ".cursor/extensions"];
+const WORKSPACE_METADATA_DIRECTORIES = [
+  [".vscode", "vscode-workspace-metadata"],
+  [".cursor", "cursor-workspace-metadata"],
+  [".git/hooks", "git-hooks"],
+];
 const REMEDIATION = {
   "audit.invalid-arguments": "Use apenas as opções documentadas para executar a auditoria.",
   "audit.profile-data-unreadable": "Revise o perfil selecionado sem seguir links simbólicos.",
+  "audit.workspace-metadata-unreadable": "Revise os metadados do workspace sem seguir links simbólicos.",
   "editor.automatic-tasks-enabled": "Defina task.allowAutomaticTasks como off.",
   "editor.settings-invalid": "Restaure settings.json a partir de uma configuração revisada.",
   "editor.workspace-trust-disabled": "Habilite security.workspace.trust.enabled.",
@@ -139,10 +145,11 @@ function hasCustomHooksPath(gitConfig) {
 }
 
 async function inspectWorkspaceMetadata(workspaceDirectory) {
-  await Promise.all(
-    [".vscode", ".cursor", ".git/hooks"].map((relativePath) =>
-      readDirectoryNames(path.join(workspaceDirectory, relativePath)),
-    ),
+  return Promise.all(
+    WORKSPACE_METADATA_DIRECTORIES.map(async ([relativePath, scope]) => ({
+      scope,
+      result: await readDirectoryNames(path.join(workspaceDirectory, relativePath)),
+    })),
   );
 }
 
@@ -200,9 +207,16 @@ export async function auditDeveloperEndpoint({
     }
   }
 
-  await inspectWorkspaceMetadata(workspace);
+  const workspaceMetadata = await inspectWorkspaceMetadata(workspace);
+  for (const { scope, result } of workspaceMetadata) {
+    if (result.state === "unreadable") {
+      findings.push(finding("audit.workspace-metadata-unreadable", scope));
+    }
+  }
   const gitConfig = await readRegularFile(path.join(workspace, ".git", "config"));
-  if (gitConfig.state === "found" && hasCustomHooksPath(gitConfig.value)) {
+  if (gitConfig.state === "unreadable") {
+    findings.push(finding("audit.workspace-metadata-unreadable", "git-config"));
+  } else if (gitConfig.state === "found" && hasCustomHooksPath(gitConfig.value)) {
     findings.push(finding("git.custom-hooks-path", "git-config"));
   }
 

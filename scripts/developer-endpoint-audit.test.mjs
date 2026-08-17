@@ -120,7 +120,11 @@ test("fails closed when profile data is a symbolic link", async (t) => {
   await symlink(targetPath, extensionsPath, "junction");
   t.after(() => rm(root, { recursive: true, force: true }));
 
-  const report = await auditDeveloperEndpoint({ homeDirectory: root, platform: "linux" });
+  const report = await auditDeveloperEndpoint({
+    homeDirectory: root,
+    platform: "linux",
+    workspace: path.join(root, "clean-workspace"),
+  });
 
   assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
     { ruleId: "audit.profile-data-unreadable", scope: "editor-extensions" },
@@ -141,8 +145,15 @@ test("fails closed when an extension directory is irregular", async (t) => {
   ]);
 });
 
-test("fails closed when profile paths cannot be read", async () => {
-  const report = await auditDeveloperEndpoint({ homeDirectory: "\0", platform: "win32" });
+test("fails closed when profile paths cannot be read", async (t) => {
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "giro-endpoint-workspace-"));
+  t.after(() => rm(workspace, { recursive: true, force: true }));
+
+  const report = await auditDeveloperEndpoint({
+    homeDirectory: "\0",
+    platform: "win32",
+    workspace,
+  });
 
   assert.deepEqual(report.findings.map(({ ruleId }) => ruleId), [
     "audit.profile-data-unreadable",
@@ -151,6 +162,36 @@ test("fails closed when profile paths cannot be read", async () => {
     "audit.profile-data-unreadable",
   ]);
   assert.doesNotMatch(JSON.stringify(report), /\\u0000/u);
+});
+
+test("fails closed when workspace git metadata is a symbolic link", async (t) => {
+  const root = await createProfile({
+    platform: "win32",
+    settings: compliantSettings,
+    extensions: ["biomejs.biome-2.4.5"],
+  });
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "giro-endpoint-workspace-"));
+  const gitConfigPath = path.join(workspace, ".git", "config");
+  const targetPath = path.join(workspace, "reviewed-git-metadata");
+  await mkdir(path.dirname(gitConfigPath), { recursive: true });
+  await mkdir(targetPath);
+  await symlink(targetPath, gitConfigPath, "junction");
+  t.after(() => Promise.all([rm(root, { recursive: true, force: true }), rm(workspace, { recursive: true, force: true })]));
+
+  const report = await auditDeveloperEndpoint({
+    homeDirectory: root,
+    platform: "win32",
+    workspace,
+  });
+
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
+    { ruleId: "audit.workspace-metadata-unreadable", scope: "git-config" },
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(report),
+    new RegExp(`${escapeRegex(root)}|${escapeRegex(workspace)}`, "u"),
+  );
 });
 
 test("fails closed for invalid policy fields without returning policy values", async (t) => {
