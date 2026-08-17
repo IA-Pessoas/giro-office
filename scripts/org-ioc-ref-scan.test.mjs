@@ -217,6 +217,33 @@ test("bounds empty GitHub pagination and records the coverage limit", async () =
   }
 });
 
+test("retries a throttled inventory request with bounded backoff", async () => {
+  const fixture = await createBareFixture();
+  let attempts = 0;
+  const waits = [];
+  try {
+    const report = await scanOrganization({
+      organization: "IA-Pessoas",
+      token: "secret",
+      workspace: fixture.workspace,
+      fetchImpl: async () => {
+        attempts += 1;
+        return attempts === 1
+          ? new Response("[]", { status: 429, headers: { "retry-after": "0" } })
+          : new Response(JSON.stringify([descriptor("fixture")]));
+      },
+      commandRunner: fixtureRunner(fixture),
+      sleep: async (delay) => waits.push(delay),
+    });
+
+    assert.equal(attempts, 2);
+    assert.deepEqual(waits, [0]);
+    assert.equal(report.inventory.repositoriesScanned, 1);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("turns clone failures into a fixed repository error code", async () => {
   const fixture = await createBareFixture();
   try {
@@ -259,6 +286,27 @@ test("sanitizes temporary-workspace failures as a repository scan error", async 
   }
 });
 
+test("marks oversized blobs as incomplete coverage instead of silently skipping them", async () => {
+  const fixture = await createBareFixture();
+  try {
+    const report = await scanOrganization({
+      organization: "IA-Pessoas",
+      token: "secret",
+      workspace: fixture.workspace,
+      fetchImpl: fakeFetch([{ body: [descriptor("fixture")] }]),
+      commandRunner: fixtureRunner(fixture),
+      maxBlobBytes: 1,
+    });
+
+    assert.ok(report.summary.largeBlobsSkipped > 0);
+    assert.deepEqual(report.errors, [
+      { repository: "IA-Pessoas/fixture", code: "blob_size_limit_reached" },
+    ]);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("reports a missing previous ref root as a human-approved history replacement", async () => {
   const fixture = await createBareFixture();
   try {
@@ -290,6 +338,33 @@ test("reports a missing previous ref root as a human-approved history replacemen
         rollbackPath: "manual-approved-quarantine-recovery",
       },
     ]);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("does not alert when the previous ref is an ancestor of the current ref", async () => {
+  const fixture = await createBareFixture();
+  const runner = fixtureRunner(fixture);
+  try {
+    const report = await scanOrganization({
+      organization: "IA-Pessoas",
+      token: "secret",
+      workspace: fixture.workspace,
+      fetchImpl: fakeFetch([{ body: [descriptor("fixture")] }]),
+      commandRunner: async (command, args, options) =>
+        args.includes("merge-base") ? { stdout: Buffer.alloc(0) } : runner(command, args, options),
+      previousReport: {
+        repositories: [
+          {
+            fullName: "IA-Pessoas/fixture",
+            refs: [{ name: "refs/heads/main", objectId: "a".repeat(40) }],
+          },
+        ],
+      },
+    });
+
+    assert.deepEqual(report.refChanges, []);
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
   }
@@ -343,6 +418,7 @@ test("uses only git with the fixed read-only argument allowlist", async () => {
       ],
     );
     assert.ok(calls[0].options.env.GIT_CONFIG_VALUE_0.startsWith("Authorization: Bearer "));
+    assert.deepEqual(calls[1].options.env, calls[0].options.env);
     assert.doesNotMatch(JSON.stringify(calls.map(({ args }) => args)), /secret|Authorization/u);
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
@@ -451,6 +527,8 @@ test("workflow agendado preserva o escopo somente leitura e publica o relatório
 
   assert.match(workflow, /permissions:\s*\n\s*contents: read/u);
   assert.match(workflow, /GITHUB_ORG_SCANNER_TOKEN/u);
+  assert.match(workflow, /ORG_IOC_REF_PREVIOUS_REPORT/u);
+  assert.match(workflow, /--previous-report/u);
   assert.match(workflow, /--fail-on-findings/u);
   assert.match(workflow, /actions\/upload-artifact@[a-f0-9]{40}/u);
   assert.doesNotMatch(workflow, /issues: write|pull-requests: write|contents: write/u);
@@ -458,4 +536,5 @@ test("workflow agendado preserva o escopo somente leitura e publica o relatório
   assert.match(runbook, /somente leitura/u);
   assert.match(runbook, /aprovacao humana/u);
   assert.match(runbook, /sandbox/u);
+  assert.match(runbook, /ORG_IOC_REF_PREVIOUS_REPORT/u);
 });

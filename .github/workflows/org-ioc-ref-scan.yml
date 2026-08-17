@@ -24,6 +24,14 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Materializar baseline sanitizado
+        env:
+          ORG_IOC_REF_PREVIOUS_REPORT: ${{ secrets.ORG_IOC_REF_PREVIOUS_REPORT }}
+        run: |
+          test -n "$ORG_IOC_REF_PREVIOUS_REPORT"
+          umask 077
+          printf '%s' "$ORG_IOC_REF_PREVIOUS_REPORT" > "${RUNNER_TEMP}/org-ioc-ref-previous-report.json"
+
       - name: Coletar IOCs e anomalias de refs
         env:
           GITHUB_ORG_SCANNER_TOKEN: ${{ secrets.GITHUB_ORG_SCANNER_TOKEN }}
@@ -31,6 +39,7 @@ jobs:
           node scripts/org-ioc-ref-scan.mjs
           --org IA-Pessoas
           --workspace "${RUNNER_TEMP}/org-ioc-ref-scan"
+          --previous-report "${RUNNER_TEMP}/org-ioc-ref-previous-report.json"
           --report "${RUNNER_TEMP}/org-ioc-ref-scan-report.json"
           --fail-on-findings
 

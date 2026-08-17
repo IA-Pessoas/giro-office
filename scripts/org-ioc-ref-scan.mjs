@@ -9,6 +9,8 @@ import { scanBlob } from "./supply-chain-integrity.mjs";
 const API_ORIGIN = "https://api.github.com";
 const MAX_REPOSITORIES = 500;
 const MAX_REPOSITORY_PAGES = 5;
+const MAX_FETCH_ATTEMPTS = 3;
+const MAX_BACKOFF_MS = 60_000;
 const MAX_CONCURRENCY = 2;
 const MAX_REFS_PER_REPOSITORY = 10_000;
 const MAX_BLOB_BYTES = 1024 * 1024;
@@ -20,13 +22,13 @@ const REPOSITORY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}\/[A-Za-z0-9][A-Za-z
 const REF_PATTERN = /^refs\/(?:heads|tags|pull)\/[A-Za-z0-9._/-]+$/u;
 const OBJECT_ID_PATTERN = /^[a-f0-9]{40,64}$/u;
 const SAFE_PATH_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[\x20-\x7e]{1,1024}$/u;
-const ELIGIBLE_PATH_PATTERN = /(?:^|\/)(?:\.(?:vscode)\/(?:tasks|launch)\.json|(?:babel|biome|eslint|next|nuxt|postcss|prettier|tailwind|tsup|vite|webpack)\.config\.(?:cjs|cts|js|json|mjs|mts|ts)|(?:Dockerfile)|[^/]+\.(?:woff|woff2))$/iu;
+const ELIGIBLE_PATH_PATTERN = /(?:^|\/)(?:\.github\/workflows\/[^/]+\.ya?ml|\.npmrc|package\.json|scripts\/[^/]+\.(?:cjs|cts|js|json|mjs|mts|ts)|\.(?:vscode)\/(?:tasks|launch)\.json|(?:babel|biome|eslint|next|nuxt|postcss|prettier|tailwind|tsup|vite|webpack)\.config\.(?:cjs|cts|js|json|mjs|mts|ts)|Dockerfile|[^/]+\.(?:woff|woff2))$/iu;
 
 function fail(message) {
   throw new Error(message);
 }
 
-function validateOptions({ organization, token, workspace, maxRepositories, concurrency }) {
+function validateOptions({ organization, token, workspace, maxRepositories, concurrency, maxBlobBytes }) {
   if (typeof organization !== "string" || !OWNER_PATTERN.test(organization)) {
     fail("invalid organization");
   }
@@ -37,6 +39,9 @@ function validateOptions({ organization, token, workspace, maxRepositories, conc
   }
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > MAX_CONCURRENCY) {
     fail("invalid concurrency");
+  }
+  if (!Number.isInteger(maxBlobBytes) || maxBlobBytes < 1 || maxBlobBytes > MAX_BLOB_BYTES) {
+    fail("invalid blob limit");
   }
 }
 
@@ -89,7 +94,30 @@ function projectRepository(value) {
   };
 }
 
-async function listRepositories({ organization, token, fetchImpl, maxRepositories }) {
+function retryDelay(response, attempt, now = Date.now()) {
+  const retryAfter = Number(response.headers.get("retry-after"));
+  if (Number.isFinite(retryAfter) && retryAfter >= 0) return Math.min(retryAfter * 1000, MAX_BACKOFF_MS);
+  const resetAt = Number(response.headers.get("x-ratelimit-reset"));
+  if (Number.isFinite(resetAt) && resetAt * 1000 > now) return Math.min(resetAt * 1000 - now, MAX_BACKOFF_MS);
+  return Math.min(100 * 2 ** attempt, MAX_BACKOFF_MS);
+}
+
+async function fetchInventoryPage(fetchImpl, url, headers, sleep) {
+  for (let attempt = 0; attempt < MAX_FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetchImpl(url, { headers });
+      if (response?.ok || !response || ![429, 500, 502, 503, 504].includes(response.status)) return response;
+      if (attempt === MAX_FETCH_ATTEMPTS - 1) return response;
+      await sleep(retryDelay(response, attempt));
+    } catch {
+      if (attempt === MAX_FETCH_ATTEMPTS - 1) throw new Error("inventory request failed");
+      await sleep(Math.min(100 * 2 ** attempt, MAX_BACKOFF_MS));
+    }
+  }
+  throw new Error("inventory request failed");
+}
+
+async function listRepositories({ organization, token, fetchImpl, maxRepositories, sleep }) {
   const repositories = [];
   let coverageLimited = false;
   let pages = 0;
@@ -99,13 +127,11 @@ async function listRepositories({ organization, token, fetchImpl, maxRepositorie
     pages += 1;
     let response;
     try {
-      response = await fetchImpl(next, {
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${token}`,
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-      });
+      response = await fetchInventoryPage(fetchImpl, next, {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+      }, sleep);
     } catch {
       return { repositories, errors: [{ code: "inventory_request_failed" }], coverageLimited: true };
     }
@@ -216,7 +242,7 @@ function parseTree(output) {
   return entries;
 }
 
-function refChangesFor(repository, refs, previousReport) {
+async function refChangesFor(repository, refs, previousReport, commandRunner, mirrorDirectory) {
   const previousRefs = new Map();
   for (const item of previousReport?.repositories ?? []) {
     if (!item || item.fullName !== repository.fullName || !Array.isArray(item.refs)) continue;
@@ -226,18 +252,33 @@ function refChangesFor(repository, refs, previousReport) {
       }
     }
   }
-  return refs
-    .filter(({ name, objectId }) => previousRefs.has(name) && previousRefs.get(name) !== objectId)
-    .map(({ name }) => ({
-      repository: repository.fullName,
-      ref: name,
-      kind: "root-history-replacement",
-      cleanRecoverySha: previousRefs.get(name),
-      requiresHumanApproval: true,
-      backupStatus: "unknown",
-      approver: "human-approval-required",
-      rollbackPath: "manual-approved-quarantine-recovery",
-    }));
+  const changes = [];
+  for (const { name, objectId } of refs) {
+    const previousObjectId = previousRefs.get(name);
+    if (!previousObjectId || previousObjectId === objectId) continue;
+    try {
+      await runGit(commandRunner, [
+        "-C",
+        mirrorDirectory,
+        "merge-base",
+        "--is-ancestor",
+        previousObjectId,
+        objectId,
+      ]);
+    } catch {
+      changes.push({
+        repository: repository.fullName,
+        ref: name,
+        kind: "root-history-replacement",
+        cleanRecoverySha: previousObjectId,
+        requiresHumanApproval: true,
+        backupStatus: "unknown",
+        approver: "human-approval-required",
+        rollbackPath: "manual-approved-quarantine-recovery",
+      });
+    }
+  }
+  return changes;
 }
 
 function safeDedupeKey({ repository, ref, blobSha, path: relativePath, ruleId }) {
@@ -246,8 +287,9 @@ function safeDedupeKey({ repository, ref, blobSha, path: relativePath, ruleId })
     .digest("hex");
 }
 
-async function scanRepository({ repository, workspace, token, commandRunner, now, previousReport }) {
+async function scanRepository({ repository, workspace, token, commandRunner, now, previousReport, maxBlobBytes }) {
   let mirrorDirectory;
+  let largeBlobsSkipped = 0;
   try {
     await mkdir(workspace, { recursive: true });
     mirrorDirectory = await mkdtemp(path.join(path.resolve(workspace), "org-ioc-ref-"));
@@ -264,7 +306,7 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
       "fetch",
       "origin",
       "+refs/pull/*/head:refs/pull/*/head",
-    ]);
+    ], { env: cloneHeader });
     await runGit(commandRunner, ["-C", mirrorDirectory, "remote", "remove", "origin"]);
     const refs = parseRefs(
       await runGit(commandRunner, ["-C", mirrorDirectory, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(creatordate:unix)", "refs/heads", "refs/tags", "refs/pull"]),
@@ -285,7 +327,10 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
     const findings = [];
     for (const [blobSha, mappings] of blobs) {
       const size = Number((await runGit(commandRunner, ["-C", mirrorDirectory, "cat-file", "-s", blobSha])).toString("utf8").trim());
-      if (!Number.isSafeInteger(size) || size < 0 || size > MAX_BLOB_BYTES) continue;
+      if (!Number.isSafeInteger(size) || size < 0 || size > maxBlobBytes) {
+        largeBlobsSkipped += 1;
+        continue;
+      }
       const bytes = await runGit(commandRunner, ["-C", mirrorDirectory, "cat-file", "blob", blobSha]);
       for (const mapping of mappings) {
         for (const finding of scanBlob(mapping.path, bytes)) {
@@ -309,9 +354,10 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
     return {
       repository: { ...repository, refs, scanStatus: "scanned" },
       findings,
-      refChanges: refChangesFor(repository, refs, previousReport),
-      errors: [],
+      refChanges: await refChangesFor(repository, refs, previousReport, commandRunner, mirrorDirectory),
+      errors: largeBlobsSkipped > 0 ? [{ repository: repository.fullName, code: "blob_size_limit_reached" }] : [],
       blobs: blobs.size,
+      largeBlobsSkipped,
     };
   } catch {
     return {
@@ -320,6 +366,7 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
       refChanges: [],
       errors: [{ repository: repository.fullName, code: "repository_scan_failed" }],
       blobs: 0,
+      largeBlobsSkipped: 0,
     };
   } finally {
     if (mirrorDirectory) await rm(mirrorDirectory, { recursive: true, force: true });
@@ -350,13 +397,15 @@ export async function scanOrganization({
   previousReport,
   maxRepositories = MAX_REPOSITORIES,
   concurrency = MAX_CONCURRENCY,
+  maxBlobBytes = MAX_BLOB_BYTES,
+  sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay)),
 } = {}) {
-  validateOptions({ organization, token, workspace, maxRepositories, concurrency });
+  validateOptions({ organization, token, workspace, maxRepositories, concurrency, maxBlobBytes });
   const generatedAt = new Date(now).toISOString();
   if (Number.isNaN(Date.parse(generatedAt))) fail("invalid timestamp");
-  const inventory = await listRepositories({ organization, token, fetchImpl, maxRepositories });
+  const inventory = await listRepositories({ organization, token, fetchImpl, maxRepositories, sleep });
   const results = await mapWithConcurrency(inventory.repositories, concurrency, (repository) =>
-    scanRepository({ repository, workspace, token, commandRunner, now: Date.parse(generatedAt), previousReport }),
+    scanRepository({ repository, workspace, token, commandRunner, now: Date.parse(generatedAt), previousReport, maxBlobBytes }),
   );
   const repositories = results.map(({ repository }) => repository);
   const findings = results.flatMap(({ findings: entries }) => entries).sort((left, right) =>
@@ -392,6 +441,7 @@ export async function scanOrganization({
     errors,
     summary: {
       uniqueBlobsScanned: results.reduce((total, result) => total + result.blobs, 0),
+      largeBlobsSkipped: results.reduce((total, result) => total + result.largeBlobsSkipped, 0),
       findings: findings.length,
       errors: errors.length,
     },

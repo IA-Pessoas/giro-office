@@ -6,8 +6,8 @@
   <circle cx="70" cy="64" r="8" fill="#ff7b72"/><circle cx="96" cy="64" r="8" fill="#d29922"/><circle cx="122" cy="64" r="8" fill="#3fb950"/>
   <text x="160" y="70" fill="#c9d1d9" font-family="Consolas, monospace" font-size="22">verification / issue #763</text>
   <text x="72" y="126" fill="#58a6ff" font-family="Consolas, monospace" font-size="21">$ organization IOC/ref scanner tests</text>
-  <text x="72" y="164" fill="#3fb950" font-family="Consolas, monospace" font-size="24">PASS 11 / 11</text>
+  <text x="72" y="164" fill="#3fb950" font-family="Consolas, monospace" font-size="24">PASS 15 / 15</text>
   <text x="72" y="214" fill="#58a6ff" font-family="Consolas, monospace" font-size="21">$ security regression suite</text>
-  <text x="72" y="250" fill="#3fb950" font-family="Consolas, monospace" font-size="24">PASS 23 / 23</text>
+  <text x="72" y="250" fill="#3fb950" font-family="Consolas, monospace" font-size="24">PASS 26 / 26</text>
   <text x="72" y="296" fill="#8b949e" font-family="Consolas, monospace" font-size="18">bare mirrors · no checkout · sanitized report only</text>
 </svg>
