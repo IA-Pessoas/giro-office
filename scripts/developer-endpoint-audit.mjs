@@ -20,6 +20,7 @@ const PROFILE_PATHS = {
 const EXTENSION_DIRECTORIES = [".vscode/extensions", ".cursor/extensions"];
 const REMEDIATION = {
   "audit.invalid-arguments": "Use apenas as opções documentadas para executar a auditoria.",
+  "audit.profile-data-unreadable": "Revise o perfil selecionado sem seguir links simbólicos.",
   "editor.automatic-tasks-enabled": "Defina task.allowAutomaticTasks como off.",
   "editor.settings-invalid": "Restaure settings.json a partir de uma configuração revisada.",
   "editor.workspace-trust-disabled": "Habilite security.workspace.trust.enabled.",
@@ -46,20 +47,22 @@ function finding(ruleId, scope) {
 async function readRegularFile(filePath) {
   try {
     const stats = await lstat(filePath);
-    return stats.isFile() && !stats.isSymbolicLink() ? await readFile(filePath, "utf8") : undefined;
-  } catch {
-    return undefined;
+    if (!stats.isFile() || stats.isSymbolicLink()) return { state: "unreadable" };
+    return { state: "found", value: await readFile(filePath, "utf8") };
+  } catch (error) {
+    return { state: error?.code === "ENOENT" ? "missing" : "unreadable" };
   }
 }
 
 async function readDirectoryNames(directoryPath) {
   try {
     const stats = await lstat(directoryPath);
-    if (!stats.isDirectory() || stats.isSymbolicLink()) return [];
+    if (!stats.isDirectory() || stats.isSymbolicLink()) return { state: "unreadable" };
     const entries = await readdir(directoryPath, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory() && !entry.isSymbolicLink()).map((entry) => entry.name);
-  } catch {
-    return [];
+    if (entries.some((entry) => entry.isSymbolicLink())) return { state: "unreadable" };
+    return { state: "found", value: entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name) };
+  } catch (error) {
+    return { state: error?.code === "ENOENT" ? "missing" : "unreadable" };
   }
 }
 
@@ -82,6 +85,16 @@ function parseExtension(directoryName) {
   return match ? { id: match[1], version: match[2] } : undefined;
 }
 
+function hasText(value) {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+function isCalendarDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function isValidPolicy(policy) {
   return (
     policy?.version === 1 &&
@@ -92,11 +105,12 @@ function isValidPolicy(policy) {
     Array.isArray(policy.approvedExtensions) &&
     policy.approvedExtensions.every(
       (extension) =>
-        typeof extension?.id === "string" &&
-        typeof extension.owner === "string" &&
+        hasText(extension?.id) &&
+        hasText(extension.owner) &&
+        hasText(extension.minimumVersion) &&
         isVersion(extension.minimumVersion) &&
-        typeof extension.updatePolicy === "string" &&
-        /^\d{4}-\d{2}-\d{2}$/u.test(extension.reviewDate),
+        hasText(extension.updatePolicy) &&
+        isCalendarDate(extension.reviewDate),
     )
   );
 }
@@ -104,7 +118,7 @@ function isValidPolicy(policy) {
 async function readPolicy(policyPath) {
   const source = await readRegularFile(policyPath);
   try {
-    const policy = JSON.parse(source);
+    const policy = JSON.parse(source.value);
     return isValidPolicy(policy) ? policy : undefined;
   } catch {
     return undefined;
@@ -147,11 +161,15 @@ export async function auditDeveloperEndpoint({
   } else {
     for (const [relativePath, scope] of PROFILE_PATHS[platform]) {
       const source = await readRegularFile(path.join(homeDirectory, relativePath));
-      if (source === undefined) continue;
+      if (source.state === "missing") continue;
+      if (source.state === "unreadable") {
+        findings.push(finding("audit.profile-data-unreadable", scope));
+        continue;
+      }
 
       let settings;
       try {
-        settings = JSON.parse(source);
+        settings = JSON.parse(source.value);
       } catch {
         findings.push(finding("editor.settings-invalid", scope));
         continue;
@@ -166,8 +184,13 @@ export async function auditDeveloperEndpoint({
 
     for (const directory of EXTENSION_DIRECTORIES) {
       const extensions = await readDirectoryNames(path.join(homeDirectory, directory));
-      extensionsScanned += extensions.length;
-      for (const extensionDirectory of extensions) {
+      if (extensions.state === "missing") continue;
+      if (extensions.state === "unreadable") {
+        findings.push(finding("audit.profile-data-unreadable", "editor-extensions"));
+        continue;
+      }
+      extensionsScanned += extensions.value.length;
+      for (const extensionDirectory of extensions.value) {
         const extension = parseExtension(extensionDirectory);
         const approved = policy.approvedExtensions.find(({ id }) => id === extension?.id);
         if (!extension || !approved || !versionAtLeast(extension.version, approved.minimumVersion)) {
@@ -179,7 +202,7 @@ export async function auditDeveloperEndpoint({
 
   await inspectWorkspaceMetadata(workspace);
   const gitConfig = await readRegularFile(path.join(workspace, ".git", "config"));
-  if (gitConfig && hasCustomHooksPath(gitConfig)) {
+  if (gitConfig.state === "found" && hasCustomHooksPath(gitConfig.value)) {
     findings.push(finding("git.custom-hooks-path", "git-config"));
   }
 

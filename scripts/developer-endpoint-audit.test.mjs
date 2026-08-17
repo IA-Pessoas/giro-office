@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -11,6 +11,10 @@ const settingsPaths = {
   win32: "AppData/Roaming/Code/User/settings.json",
   darwin: "Library/Application Support/Code/User/settings.json",
   linux: ".config/Code/User/settings.json",
+};
+const compliantSettings = {
+  "security.workspace.trust.enabled": true,
+  "task.allowAutomaticTasks": "off",
 };
 
 function escapeRegex(value) {
@@ -39,10 +43,7 @@ async function createProfile({ platform, settings, extensions = [], gitConfig })
 test("reports a compliant Windows profile without leaking its path", async (t) => {
   const root = await createProfile({
     platform: "win32",
-    settings: {
-      "security.workspace.trust.enabled": true,
-      "task.allowAutomaticTasks": "off",
-    },
+    settings: compliantSettings,
     extensions: ["biomejs.biome-2.4.5"],
   });
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -93,6 +94,112 @@ test("reports malformed settings without returning their content", async (t) => 
 
   assert.deepEqual(report.findings.map(({ ruleId }) => ruleId), ["editor.settings-invalid"]);
   assert.doesNotMatch(JSON.stringify(report), /private-value|credentials/u);
+});
+
+test("fails closed when a settings path is a directory", async (t) => {
+  const root = await createProfile({ platform: "win32", settings: compliantSettings });
+  const settingsPath = path.join(root, settingsPaths.win32);
+  await rm(settingsPath);
+  await mkdir(settingsPath);
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const report = await auditDeveloperEndpoint({ homeDirectory: root, platform: "win32" });
+
+  assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
+    { ruleId: "audit.profile-data-unreadable", scope: "vscode-user-settings" },
+  ]);
+  assert.doesNotMatch(JSON.stringify(report), new RegExp(escapeRegex(root), "u"));
+});
+
+test("fails closed when profile data is a symbolic link", async (t) => {
+  const root = await createProfile({ platform: "linux", settings: compliantSettings });
+  const extensionsPath = path.join(root, ".vscode", "extensions");
+  const targetPath = path.join(root, "reviewed-extensions");
+  await mkdir(targetPath);
+  await mkdir(path.dirname(extensionsPath), { recursive: true });
+  await symlink(targetPath, extensionsPath, "junction");
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const report = await auditDeveloperEndpoint({ homeDirectory: root, platform: "linux" });
+
+  assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
+    { ruleId: "audit.profile-data-unreadable", scope: "editor-extensions" },
+  ]);
+});
+
+test("fails closed when an extension directory is irregular", async (t) => {
+  const root = await createProfile({ platform: "darwin", settings: compliantSettings });
+  const extensionsPath = path.join(root, ".vscode", "extensions");
+  await mkdir(path.dirname(extensionsPath), { recursive: true });
+  await writeFile(extensionsPath, "not-a-directory", "utf8");
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const report = await auditDeveloperEndpoint({ homeDirectory: root, platform: "darwin" });
+
+  assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
+    { ruleId: "audit.profile-data-unreadable", scope: "editor-extensions" },
+  ]);
+});
+
+test("fails closed when profile paths cannot be read", async () => {
+  const report = await auditDeveloperEndpoint({ homeDirectory: "\0", platform: "win32" });
+
+  assert.deepEqual(report.findings.map(({ ruleId }) => ruleId), [
+    "audit.profile-data-unreadable",
+    "audit.profile-data-unreadable",
+    "audit.profile-data-unreadable",
+    "audit.profile-data-unreadable",
+  ]);
+  assert.doesNotMatch(JSON.stringify(report), /\\u0000/u);
+});
+
+test("fails closed for invalid policy fields without returning policy values", async (t) => {
+  const root = await createProfile({
+    platform: "win32",
+    settings: compliantSettings,
+    extensions: ["biomejs.biome-2.4.5"],
+  });
+  const policyPath = path.join(root, "editor-policy.json");
+  await writeFile(
+    policyPath,
+    JSON.stringify({
+      version: 1,
+      requiredSettings: compliantSettings,
+      approvedExtensions: [
+        {
+          id: "",
+          owner: "",
+          minimumVersion: "2.4.5",
+          updatePolicy: "",
+          reviewDate: "2026-02-31",
+        },
+      ],
+    }),
+    "utf8",
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const report = await auditDeveloperEndpoint({
+    homeDirectory: root,
+    platform: "win32",
+    policyPath,
+  });
+
+  assert.deepEqual(report.findings.map(({ ruleId }) => ruleId), ["policy.invalid"]);
+  assert.doesNotMatch(JSON.stringify(report), /2026-02-31/u);
+});
+
+test("reports an approved extension below its minimum version", async (t) => {
+  const root = await createProfile({
+    platform: "linux",
+    settings: compliantSettings,
+    extensions: ["biomejs.biome-2.4.4"],
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const report = await auditDeveloperEndpoint({ homeDirectory: root, platform: "linux" });
+
+  assert.deepEqual(report.findings.map(({ ruleId }) => ruleId), ["extension.unapproved"]);
 });
 
 test("documents the read-only endpoint control rollout", async () => {
