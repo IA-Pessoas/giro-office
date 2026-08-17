@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -231,8 +231,11 @@ function refChangesFor(repository, refs, previousReport) {
       repository: repository.fullName,
       ref: name,
       kind: "root-history-replacement",
+      cleanRecoverySha: previousRefs.get(name),
       requiresHumanApproval: true,
       backupStatus: "unknown",
+      approver: "human-approval-required",
+      rollbackPath: "manual-approved-quarantine-recovery",
     }));
 }
 
@@ -242,14 +245,7 @@ function safeDedupeKey({ repository, ref, blobSha, path: relativePath, ruleId })
     .digest("hex");
 }
 
-function scanEligibleRepository(repository) {
-  return !repository.archived && !repository.disabled && !repository.fork && !repository.isTemplate && !repository.mirror;
-}
-
 async function scanRepository({ repository, workspace, token, commandRunner, now, previousReport }) {
-  if (!scanEligibleRepository(repository)) {
-    return { repository: { ...repository, refs: [], scanStatus: "skipped" }, findings: [], refChanges: [], errors: [], blobs: 0 };
-  }
   let mirrorDirectory;
   try {
     await mkdir(workspace, { recursive: true });
@@ -261,6 +257,13 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
       GIT_TERMINAL_PROMPT: "0",
     };
     await runGit(commandRunner, ["clone", "--mirror", "--no-local", "--", `https://github.com/${repository.fullName}.git`, mirrorDirectory], { env: cloneHeader });
+    await runGit(commandRunner, [
+      "-C",
+      mirrorDirectory,
+      "fetch",
+      "origin",
+      "+refs/pull/*/head:refs/pull/*/head",
+    ]);
     await runGit(commandRunner, ["-C", mirrorDirectory, "remote", "remove", "origin"]);
     const refs = parseRefs(
       await runGit(commandRunner, ["-C", mirrorDirectory, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(creatordate:unix)", "refs/heads", "refs/tags", "refs/pull"]),
@@ -394,19 +397,39 @@ export async function scanOrganization({
   };
 }
 
-export async function main(args = process.argv.slice(2), environment = process.env) {
-  const valueAfter = (flag) => args[args.indexOf(flag) + 1];
+export async function main(
+  args = process.argv.slice(2),
+  environment = process.env,
+  {
+    scanOrganization: scan = scanOrganization,
+    writeReport = writeFile,
+    writeOutput = (output) => process.stdout.write(output),
+  } = {},
+) {
+  const valueAfter = (flag) => {
+    const index = args.indexOf(flag);
+    return index >= 0 && args[index + 1] && !args[index + 1].startsWith("--")
+      ? args[index + 1]
+      : undefined;
+  };
   const organization = valueAfter("--org");
+  const reportPath = valueAfter("--report");
   const workspace = valueAfter("--workspace") ?? path.join(os.tmpdir(), "giro-org-ioc-ref-scan");
-  if (!organization || !environment.GITHUB_ORG_SCANNER_TOKEN) return 2;
+  if (!organization || !reportPath || !environment.GITHUB_ORG_SCANNER_TOKEN) return 2;
   try {
-    const report = await scanOrganization({
+    const report = await scan({
       organization,
       token: environment.GITHUB_ORG_SCANNER_TOKEN,
       workspace,
     });
-    process.stdout.write(`${JSON.stringify(report)}\n`);
-    return report.errors.length === 0 ? 0 : 1;
+    const output = `${JSON.stringify(report)}\n`;
+    await writeReport(reportPath, output, "utf8");
+    writeOutput(output);
+    return report.errors.length > 0 ||
+      (args.includes("--fail-on-findings") &&
+        (report.findings.length > 0 || report.refChanges.length > 0))
+      ? 1
+      : 0;
   } catch {
     return 2;
   }

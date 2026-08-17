@@ -133,6 +133,8 @@ test("inventories repository kinds and scans each eligible bare blob once", asyn
     });
 
     assert.equal(report.inventory.repositoriesDiscovered, 6);
+    assert.equal(report.inventory.repositoriesScanned, 6);
+    assert.ok(report.repositories.every(({ scanStatus }) => scanStatus === "scanned"));
     assert.equal(report.summary.uniqueBlobsScanned, 2);
     assert.deepEqual(
       report.findings.map(({ repository, ref, ruleId }) => ({ repository, ref, ruleId })),
@@ -281,8 +283,11 @@ test("reports a missing previous ref root as a human-approved history replacemen
         repository: "IA-Pessoas/fixture",
         ref: "refs/heads/main",
         kind: "root-history-replacement",
+        cleanRecoverySha: "a".repeat(40),
         requiresHumanApproval: true,
         backupStatus: "unknown",
+        approver: "human-approval-required",
+        rollbackPath: "manual-approved-quarantine-recovery",
       },
     ]);
   } finally {
@@ -316,6 +321,7 @@ test("uses only git with the fixed read-only argument allowlist", async () => {
           "https://github.com/IA-Pessoas/fixture.git",
           "<mirror>",
         ],
+        ["-C", "<mirror>", "fetch", "origin", "+refs/pull/*/head:refs/pull/*/head"],
         ["-C", "<mirror>", "remote", "remove", "origin"],
         [
           "-C",
@@ -375,4 +381,41 @@ test("caps mirror work at the default concurrency of two", async () => {
 
 test("main rejects missing required arguments without exposing environment values", async () => {
   assert.equal(await main([], { GITHUB_ORG_SCANNER_TOKEN: "must-not-leak" }), 2);
+});
+
+test("main writes a sanitized report and fails when findings require triage", async () => {
+  const originalFetch = globalThis.fetch;
+  let written;
+  let writtenOutput;
+  globalThis.fetch = async () => new Response("[]");
+  try {
+    const exitCode = await main(
+      ["--org", "IA-Pessoas", "--report", "report.json", "--fail-on-findings"],
+      { GITHUB_ORG_SCANNER_TOKEN: "must-not-leak" },
+      {
+        scanOrganization: async () => ({
+          errors: [],
+          findings: [{ repository: "IA-Pessoas/fixture", ruleId: "ioc.incident-marker" }],
+          refChanges: [],
+        }),
+        writeReport: async (target, content) => {
+          written = { target, content };
+        },
+        writeOutput: (content) => {
+          writtenOutput = content;
+        },
+      },
+    );
+
+    assert.equal(exitCode, 1);
+    assert.deepEqual(written, {
+      target: "report.json",
+      content:
+        '{"errors":[],"findings":[{"repository":"IA-Pessoas/fixture","ruleId":"ioc.incident-marker"}],"refChanges":[]}\n',
+    });
+    assert.doesNotMatch(written.content, /must-not-leak/u);
+    assert.equal(writtenOutput, written.content);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
