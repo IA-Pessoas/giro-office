@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -28,4 +28,20 @@ test("test runner raiz inclui o scanner compartilhado", async () => {
     packageJson.scripts["security:supply-chain"],
     "node scripts/supply-chain-integrity.mjs",
   );
+});
+
+test("workspace rejeita npm e declara pnpm como gerenciador obrigatório", async () => {
+  const packageJson = JSON.parse(await read("package.json"));
+
+  assert.deepEqual(packageJson.devEngines?.packageManager, {
+    name: "pnpm",
+    version: "10.26.0",
+    onFail: "error",
+  });
+});
+
+test("workspace não mantém lockfile npm legado no pacote gerenciado por pnpm", async () => {
+  await assert.rejects(access(path.join(repositoryRoot, "services", "src", "package-lock.json")), {
+    code: "ENOENT",
+  });
 });
