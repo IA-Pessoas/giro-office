@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "requiredSettings": {
+    "security.workspace.trust.enabled": true,
+    "task.allowAutomaticTasks": "off"
+  },
+  "approvedExtensions": [
+    {
+      "id": "biomejs.biome",
+      "owner": "Giro Office Engineering",
+      "minimumVersion": "2.4.5",
+      "updatePolicy": "major versions require review",
+      "reviewDate": "2026-09-29"
+    }
+  ]
+}
