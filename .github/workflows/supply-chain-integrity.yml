@@ -29,7 +29,7 @@ jobs:
           node-version: "22"
 
       - name: Testes do scanner
-        run: node --test scripts/supply-chain-integrity.test.mjs scripts/supply-chain-security.test.mjs
+        run: node --test scripts/supply-chain-integrity.test.mjs scripts/supply-chain-security.test.mjs scripts/developer-endpoint-audit.test.mjs
 
       - name: Varredura integral
         run: node scripts/supply-chain-integrity.mjs --report supply-chain-integrity-report.json
