@@ -194,6 +194,41 @@ test("fails closed when workspace git metadata is a symbolic link", async (t) =>
   );
 });
 
+test("fails closed when the .git ancestor is a symbolic link", async (t) => {
+  const root = await createProfile({
+    platform: "win32",
+    settings: compliantSettings,
+    extensions: ["biomejs.biome-2.4.5"],
+  });
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "giro-endpoint-workspace-"));
+  const externalGit = path.join(workspace, "external-git-metadata");
+  await mkdir(path.join(externalGit, "hooks"), { recursive: true });
+  await writeFile(path.join(externalGit, "config"), "[core]\n", "utf8");
+  await symlink(externalGit, path.join(workspace, ".git"), "junction");
+  t.after(() =>
+    Promise.all([
+      rm(root, { recursive: true, force: true }),
+      rm(workspace, { recursive: true, force: true }),
+    ]),
+  );
+
+  const report = await auditDeveloperEndpoint({
+    homeDirectory: root,
+    platform: "win32",
+    workspace,
+  });
+
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
+    { ruleId: "audit.workspace-metadata-unreadable", scope: "git-hooks" },
+    { ruleId: "audit.workspace-metadata-unreadable", scope: "git-config" },
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(report),
+    new RegExp(`${escapeRegex(root)}|${escapeRegex(workspace)}|external-git-metadata`, "u"),
+  );
+});
+
 test("fails closed for invalid policy fields without returning policy values", async (t) => {
   const root = await createProfile({
     platform: "win32",

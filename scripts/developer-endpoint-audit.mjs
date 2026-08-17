@@ -72,6 +72,37 @@ async function readDirectoryNames(directoryPath) {
   }
 }
 
+async function inspectWorkspacePath(workspaceDirectory, relativePath) {
+  let currentPath = workspaceDirectory;
+  const components = relativePath.split("/");
+  for (const [index, component] of components.entries()) {
+    currentPath = path.join(currentPath, component);
+    try {
+      const stats = await lstat(currentPath);
+      if (stats.isSymbolicLink() || (index < components.length - 1 && !stats.isDirectory())) {
+        return { state: "unreadable" };
+      }
+    } catch (error) {
+      return { state: error?.code === "ENOENT" ? "missing" : "unreadable" };
+    }
+  }
+  return { state: "found" };
+}
+
+async function readWorkspaceDirectoryNames(workspaceDirectory, relativePath) {
+  const pathState = await inspectWorkspacePath(workspaceDirectory, relativePath);
+  return pathState.state === "found"
+    ? readDirectoryNames(path.join(workspaceDirectory, relativePath))
+    : pathState;
+}
+
+async function readWorkspaceRegularFile(workspaceDirectory, relativePath) {
+  const pathState = await inspectWorkspacePath(workspaceDirectory, relativePath);
+  return pathState.state === "found"
+    ? readRegularFile(path.join(workspaceDirectory, relativePath))
+    : pathState;
+}
+
 function isVersion(value) {
   return /^\d+(?:\.\d+){1,2}(?:-[0-9A-Za-z.-]+)?$/u.test(value);
 }
@@ -148,7 +179,7 @@ async function inspectWorkspaceMetadata(workspaceDirectory) {
   return Promise.all(
     WORKSPACE_METADATA_DIRECTORIES.map(async ([relativePath, scope]) => ({
       scope,
-      result: await readDirectoryNames(path.join(workspaceDirectory, relativePath)),
+      result: await readWorkspaceDirectoryNames(workspaceDirectory, relativePath),
     })),
   );
 }
@@ -213,7 +244,7 @@ export async function auditDeveloperEndpoint({
       findings.push(finding("audit.workspace-metadata-unreadable", scope));
     }
   }
-  const gitConfig = await readRegularFile(path.join(workspace, ".git", "config"));
+  const gitConfig = await readWorkspaceRegularFile(workspace, ".git/config");
   if (gitConfig.state === "unreadable") {
     findings.push(finding("audit.workspace-metadata-unreadable", "git-config"));
   } else if (gitConfig.state === "found" && hasCustomHooksPath(gitConfig.value)) {
