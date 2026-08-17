@@ -10,12 +10,18 @@ const MANIFEST_FILE = "manifest.json";
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const OBJECT_ID_PATTERN = /^[a-f0-9]{40,64}$/u;
 const REF_NAME_PATTERN = /^refs\/[A-Za-z0-9._/-]+$/u;
+const GITHUB_REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
+const METADATA_PAGE_SIZE = 100;
+const METADATA_MAX_ITEMS = 1_000;
+const METADATA_MAX_PAGES = METADATA_MAX_ITEMS / METADATA_PAGE_SIZE;
+const METADATA_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
+const DEPLOYMENT_STATUS_CONCURRENCY = 4;
 
 function commandFailure(command, status) {
   return new Error(`${command} failed with status ${status ?? "unknown"}`);
 }
 
-async function run(command, args, { cwd, commandRunner } = {}) {
+async function run(command, args, { cwd, commandRunner, maxOutputBytes } = {}) {
   if (commandRunner) {
     const result = await commandRunner(command, args, { cwd });
     if (!result || typeof result.stdout !== "string") {
@@ -32,11 +38,23 @@ async function run(command, args, { cwd, commandRunner } = {}) {
       stdio: ["ignore", "pipe", "ignore"],
     });
     const chunks = [];
+    let outputBytes = 0;
+    let outputTooLarge = false;
 
-    child.stdout.on("data", (chunk) => chunks.push(chunk));
+    child.stdout.on("data", (chunk) => {
+      outputBytes += chunk.length;
+      if (maxOutputBytes && outputBytes > maxOutputBytes) {
+        outputTooLarge = true;
+        child.kill();
+      } else {
+        chunks.push(chunk);
+      }
+    });
     child.once("error", () => reject(commandFailure(command)));
     child.once("close", (status) => {
-      if (status === 0) {
+      if (outputTooLarge) {
+        reject(new Error(`${command} output exceeded limit`));
+      } else if (status === 0) {
         resolve(Buffer.concat(chunks).toString("utf8"));
       } else {
         reject(commandFailure(command, status));
@@ -45,11 +63,20 @@ async function run(command, args, { cwd, commandRunner } = {}) {
   });
 }
 
-async function requireNewDirectory(directory, label) {
+async function createNewDirectory(directory, label) {
   try {
     await lstat(directory);
   } catch {
     await mkdir(directory, { recursive: true });
+    return;
+  }
+  throw new Error(`${label} must be new`);
+}
+
+async function requireAbsent(directory, label) {
+  try {
+    await lstat(directory);
+  } catch {
     return;
   }
   throw new Error(`${label} must be new`);
@@ -112,15 +139,163 @@ function snapshotName(createdAt) {
   return `snapshot-${createdAt.replace(/[:.]/gu, "-")}`;
 }
 
-export async function createSnapshot({ source, destination, repositoryId, commandRunner } = {}) {
+function appendQuery(route, query) {
+  return `${route}?${new URLSearchParams(query).toString()}`;
+}
+
+function metadataError() {
+  return new Error("GitHub metadata response is invalid");
+}
+
+function parseMetadataArray(output) {
+  try {
+    const value = JSON.parse(output);
+    if (!Array.isArray(value) || value.length > METADATA_PAGE_SIZE) throw metadataError();
+    return value;
+  } catch {
+    throw metadataError();
+  }
+}
+
+function stringField(value) {
+  return typeof value === "string" && value.length > 0 && value.length <= 500 ? value : undefined;
+}
+
+function positiveId(value) {
+  return Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function githubUrl(value, repository, resource, number) {
+  const expected = `https://github.com/${repository}/${resource}/${number}`;
+  return value === expected ? value : undefined;
+}
+
+async function readMetadataCollection(repository, route, project, commandRunner, query = {}) {
+  const items = [];
+  for (let page = 1; page <= METADATA_MAX_PAGES; page += 1) {
+    const output = await run(
+      "gh",
+      [
+        "api",
+        "--method",
+        "GET",
+        appendQuery(`repos/${repository}/${route}`, {
+          ...query,
+          per_page: METADATA_PAGE_SIZE,
+          page,
+        }),
+      ],
+      { commandRunner, maxOutputBytes: METADATA_MAX_OUTPUT_BYTES },
+    );
+    const response = parseMetadataArray(output);
+    for (const value of response) {
+      const projected = project(value);
+      if (projected === undefined) throw metadataError();
+      if (projected !== null) items.push(projected);
+    }
+    if (response.length < METADATA_PAGE_SIZE) break;
+  }
+  return items;
+}
+
+async function mapBounded(items, limit, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+async function captureMetadata(repository, commandRunner) {
+  const rulesets = await readMetadataCollection(repository, "rulesets", (value) => {
+    const id = positiveId(value?.id);
+    const name = stringField(value?.name);
+    return id && name ? { id, name } : undefined;
+  }, commandRunner);
+  const releases = await readMetadataCollection(repository, "releases", (value) => {
+    const id = positiveId(value?.id);
+    const tag = stringField(value?.tag_name);
+    return id && tag ? { id, tag } : undefined;
+  }, commandRunner);
+  const issues = await readMetadataCollection(
+    repository,
+    "issues",
+    (value) => {
+      if (value?.pull_request) return null;
+      const number = positiveId(value?.number);
+      const state = stringField(value?.state);
+      const url = githubUrl(value?.html_url, repository, "issues", number);
+      return number && state && url ? { number, state, url } : undefined;
+    },
+    commandRunner,
+    { state: "all" },
+  );
+  const pullRequests = await readMetadataCollection(
+    repository,
+    "pulls",
+    (value) => {
+      const number = positiveId(value?.number);
+      const state = stringField(value?.state);
+      const url = githubUrl(value?.html_url, repository, "pull", number);
+      return number && state && url ? { number, state, url } : undefined;
+    },
+    commandRunner,
+    { state: "all" },
+  );
+  const deployments = await readMetadataCollection(repository, "deployments", (value) => {
+    const id = positiveId(value?.id);
+    const environment = stringField(value?.environment);
+    return id && environment ? { id, environment } : undefined;
+  }, commandRunner);
+  const deploymentMetadata = await mapBounded(
+    deployments,
+    DEPLOYMENT_STATUS_CONCURRENCY,
+    async (deployment) => {
+      const output = await run(
+        "gh",
+        [
+          "api",
+          "--method",
+          "GET",
+          appendQuery(`repos/${repository}/deployments/${deployment.id}/statuses`, { per_page: 1 }),
+        ],
+        { commandRunner, maxOutputBytes: METADATA_MAX_OUTPUT_BYTES },
+      );
+      const [status] = parseMetadataArray(output);
+      const state = stringField(status?.state);
+      if (!state) throw metadataError();
+      return { ...deployment, state };
+    },
+  );
+
+  return { rulesets, releases, issues, pullRequests, deployments: deploymentMetadata };
+}
+
+export async function createSnapshot({
+  source,
+  destination,
+  repositoryId,
+  githubRepository,
+  includeMetadata = false,
+  commandRunner,
+} = {}) {
   if (typeof source !== "string" || !source || typeof repositoryId !== "string" || !repositoryId) {
     throw new Error("source and repositoryId are required");
   }
   if (typeof destination !== "string" || !destination) {
     throw new Error("snapshot destination is required");
   }
+  if (includeMetadata && !GITHUB_REPOSITORY_PATTERN.test(githubRepository ?? "")) {
+    throw new Error("a valid GitHub repository is required for metadata");
+  }
 
-  await requireNewDirectory(destination, "snapshot destination");
+  await createNewDirectory(destination, "snapshot destination");
   const createdAt = new Date().toISOString();
   const snapshotDirectory = path.join(destination, snapshotName(createdAt));
   const mirrorDirectory = path.join(snapshotDirectory, "mirror.git");
@@ -150,6 +325,14 @@ export async function createSnapshot({ source, destination, repositoryId, comman
     verification: { gitFsck: "passed", bundleVerify: "passed" },
     immutability: { status: "external-control-required" },
   };
+  if (includeMetadata) {
+    const metadata = await captureMetadata(githubRepository, commandRunner);
+    await writeFile(
+      path.join(snapshotDirectory, "github-metadata.json"),
+      `${JSON.stringify(metadata, null, 2)}\n`,
+      "utf8",
+    );
+  }
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
   return { snapshotDirectory, manifestPath, bundlePath, manifest };
@@ -177,7 +360,7 @@ export async function runRecoveryDrill({ snapshotDirectory, quarantineDirectory,
   if (typeof quarantineDirectory !== "string" || !quarantineDirectory) {
     throw new Error("quarantine directory is required");
   }
-  await requireNewDirectory(quarantineDirectory, "quarantine directory");
+  await requireAbsent(quarantineDirectory, "quarantine directory");
 
   const { manifest } = await verifySnapshot({ snapshotDirectory, commandRunner });
   const bundlePath = path.join(snapshotDirectory, manifest.bundle.file);
@@ -206,6 +389,8 @@ export async function main(args = process.argv.slice(2)) {
       source: option(args, "--source"),
       destination: option(args, "--destination"),
       repositoryId: option(args, "--repository-id"),
+      githubRepository: option(args, "--github-repo"),
+      includeMetadata: args.includes("--include-metadata"),
     });
     return 0;
   }
