@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -418,4 +418,44 @@ test("main writes a sanitized report and fails when findings require triage", as
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("main aceita somente o relatório sanitizado anterior para comparar refs", async () => {
+  let scanOptions;
+  const exitCode = await main(
+    ["--org", "IA-Pessoas", "--report", "report.json", "--previous-report", "previous.json"],
+    { GITHUB_ORG_SCANNER_TOKEN: "must-not-leak" },
+    {
+      readPreviousReport: async () =>
+        Buffer.from('{"repositories":[{"fullName":"IA-Pessoas/fixture","refs":[]}]}'),
+      scanOrganization: async (options) => {
+        scanOptions = options;
+        return { errors: [], findings: [], refChanges: [] };
+      },
+      writeReport: async () => {},
+      writeOutput: () => {},
+    },
+  );
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(scanOptions.previousReport, {
+    repositories: [{ fullName: "IA-Pessoas/fixture", refs: [] }],
+  });
+});
+
+test("workflow agendado preserva o escopo somente leitura e publica o relatório", async () => {
+  const [workflow, runbook] = await Promise.all([
+    readFile(new URL("../.github/workflows/org-ioc-ref-scan.yml", import.meta.url), "utf8"),
+    readFile(new URL("../docs/security/org-ioc-ref-scanning.md", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(workflow, /permissions:\s*\n\s*contents: read/u);
+  assert.match(workflow, /GITHUB_ORG_SCANNER_TOKEN/u);
+  assert.match(workflow, /--fail-on-findings/u);
+  assert.match(workflow, /actions\/upload-artifact@[a-f0-9]{40}/u);
+  assert.doesNotMatch(workflow, /issues: write|pull-requests: write|contents: write/u);
+  assert.match(runbook, /GitHub App/u);
+  assert.match(runbook, /somente leitura/u);
+  assert.match(runbook, /aprovacao humana/u);
+  assert.match(runbook, /sandbox/u);
 });

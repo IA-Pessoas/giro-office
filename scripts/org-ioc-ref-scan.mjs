@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,7 @@ const MAX_CONCURRENCY = 2;
 const MAX_REFS_PER_REPOSITORY = 10_000;
 const MAX_BLOB_BYTES = 1024 * 1024;
 const MAX_GIT_OUTPUT_BYTES = 2 * 1024 * 1024;
+const MAX_PREVIOUS_REPORT_BYTES = 2 * 1024 * 1024;
 const STALE_AFTER_MS = 90 * 24 * 60 * 60 * 1000;
 const OWNER_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/u;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}\/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/u;
@@ -402,6 +403,7 @@ export async function main(
   environment = process.env,
   {
     scanOrganization: scan = scanOrganization,
+    readPreviousReport = readFile,
     writeReport = writeFile,
     writeOutput = (output) => process.stdout.write(output),
   } = {},
@@ -414,13 +416,24 @@ export async function main(
   };
   const organization = valueAfter("--org");
   const reportPath = valueAfter("--report");
+  const previousReportPath = valueAfter("--previous-report");
   const workspace = valueAfter("--workspace") ?? path.join(os.tmpdir(), "giro-org-ioc-ref-scan");
   if (!organization || !reportPath || !environment.GITHUB_ORG_SCANNER_TOKEN) return 2;
   try {
+    let previousReport;
+    if (previousReportPath) {
+      const previousReportBytes = await readPreviousReport(previousReportPath);
+      if (!Buffer.isBuffer(previousReportBytes) || previousReportBytes.length > MAX_PREVIOUS_REPORT_BYTES) {
+        return 2;
+      }
+      previousReport = JSON.parse(previousReportBytes.toString("utf8"));
+      if (!previousReport || typeof previousReport !== "object" || Array.isArray(previousReport)) return 2;
+    }
     const report = await scan({
       organization,
       token: environment.GITHUB_ORG_SCANNER_TOKEN,
       workspace,
+      previousReport,
     });
     const output = `${JSON.stringify(report)}\n`;
     await writeReport(reportPath, output, "utf8");
