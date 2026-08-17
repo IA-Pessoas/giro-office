@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { access, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -77,16 +77,6 @@ async function createNewDirectory(directory, label) {
   }
 }
 
-async function requireAbsent(directory, label) {
-  try {
-    await lstat(directory);
-  } catch (error) {
-    if (error?.code === "ENOENT") return;
-    throw new Error(`${label} must be new`);
-  }
-  throw new Error(`${label} must be new`);
-}
-
 async function sha256(file) {
   try {
     const hash = createHash("sha256");
@@ -141,7 +131,7 @@ function validateManifest(value) {
     !value ||
     value.schemaVersion !== 1 ||
     typeof value.repositoryId !== "string" ||
-    !value.repositoryId ||
+    !REPOSITORY_ID_PATTERN.test(value.repositoryId) ||
     typeof value.createdAt !== "string" ||
     !value.bundle ||
     value.bundle.file !== BUNDLE_FILE ||
@@ -439,7 +429,7 @@ export async function runRecoveryDrill({ snapshotDirectory, quarantineDirectory,
     throw new Error("quarantine directory is required");
   }
   const normalizedQuarantineDirectory = path.resolve(quarantineDirectory);
-  await requireAbsent(normalizedQuarantineDirectory, "quarantine directory");
+  await createNewDirectory(normalizedQuarantineDirectory, "quarantine directory");
 
   const { manifest } = await verifySnapshot({ snapshotDirectory, commandRunner });
   const bundlePath = path.join(snapshotDirectory, manifest.bundle.file);

@@ -30,7 +30,8 @@ Git como origem. O `git clone` não recebe `--` antes da origem por compatibilid
 validação é obrigatória. Para metadados, informe explicitamente `--github-repo owner/repo
 --include-metadata`. Sem essa flag, a ferramenta não chama `gh`. O `repositoryId` também deve ser
 `owner/repo`, com até 100 caracteres em cada parte. Execute `verify` antes de qualquer drill e informe
-um diretório de quarentena ainda inexistente para `drill`.
+um diretório de quarentena ainda inexistente para `drill`. O drill reserva esse diretório antes da
+validação; se ela falhar, não reutilize a reserva.
 
 Falhas preservam evidências locais para investigação; não reutilize ou sobrescreva um destino já
 existente. A aprovação explícita de produção, os controles de imutabilidade e a retenção continuam
