@@ -1,0 +1,44 @@
+name: GitHub Audit Monitoring
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  audit-monitor:
+    name: security/github-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout sem credenciais persistentes
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: develop
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Coletar audit log REST (sem confirmar force-push)
+        env:
+          GITHUB_AUDIT_LOG_TOKEN: ${{ secrets.GITHUB_AUDIT_LOG_TOKEN }}
+        run: >-
+          node scripts/github-audit-monitor.mjs
+          --org IA-Pessoas
+          --since "$(date -u -d '15 minutes ago' '+%Y-%m-%dT%H:%M:%SZ')"
+          --report "${RUNNER_TEMP}/github-audit-report.json"
+          --fail-on-alert
+
+      - name: Publicar somente relatório sanitizado
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: github-audit-report
+          path: ${{ runner.temp }}/github-audit-report.json
+          retention-days: 7
+          if-no-files-found: ignore
