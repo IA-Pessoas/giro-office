@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { auditDeveloperEndpoint } from "./developer-endpoint-audit.mjs";
 
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const settingsPaths = {
   win32: "AppData/Roaming/Code/User/settings.json",
   darwin: "Library/Application Support/Code/User/settings.json",
@@ -91,4 +93,16 @@ test("reports malformed settings without returning their content", async (t) => 
 
   assert.deepEqual(report.findings.map(({ ruleId }) => ruleId), ["editor.settings-invalid"]);
   assert.doesNotMatch(JSON.stringify(report), /private-value|credentials/u);
+});
+
+test("documents the read-only endpoint control rollout", async () => {
+  const guide = await readFile(
+    path.join(repositoryRoot, "docs/security/editor-endpoint-controls.md"),
+    "utf8",
+  );
+
+  assert.match(guide, /Restricted Mode/u);
+  assert.match(guide, /task\.allowAutomaticTasks/u);
+  assert.match(guide, /read-only/u);
+  assert.match(guide, /ticket|alert/iu);
 });
