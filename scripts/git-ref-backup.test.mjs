@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -79,6 +79,17 @@ function createFixtureRunner(responseForRoute, seenRoutes = []) {
   };
 }
 
+function runProgram(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, args, { shell: false, stdio: ["ignore", "ignore", "pipe"] });
+    const chunks = [];
+
+    child.once("error", () => reject(new Error("program fixture command failed")));
+    child.once("close", (status) => resolve({ status, stderr: Buffer.concat(chunks).toString("utf8") }));
+    child.stderr.on("data", (chunk) => chunks.push(chunk));
+  });
+}
+
 test("creates a mirror-only bundle and a checksum manifest", async () => {
   const fixture = await createBareFixture();
   try {
@@ -114,6 +125,64 @@ test("refuses a snapshot destination that already exists", async () => {
   }
 });
 
+test("rejects option-like sources before creating a snapshot destination", async () => {
+  const fixture = await createBareFixture();
+  const destination = path.join(fixture.root, "snapshots");
+  try {
+    await assert.rejects(
+      () =>
+        createSnapshot({
+          source: "--upload-pack=untrusted",
+          destination,
+          repositoryId: "owner/repo",
+          commandRunner: async () => {
+            throw new Error("git must not run");
+          },
+        }),
+      (error) => error.message === "source must be an absolute local path or safe HTTPS URL",
+    );
+    await assert.rejects(() => lstat(destination));
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("rejects repository identifiers that could persist a path, URL, or secret", async () => {
+  const fixture = await createBareFixture();
+  const destination = path.join(fixture.root, "snapshots");
+  try {
+    await assert.rejects(
+      () =>
+        createSnapshot({
+          source: fixture.source,
+          destination,
+          repositoryId: "https://token@example.invalid/owner/repo",
+        }),
+      (error) => error.message === "repositoryId is invalid",
+    );
+    await assert.rejects(() => lstat(destination));
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("atomically reserves a new snapshot destination", async () => {
+  const fixture = await createBareFixture();
+  try {
+    const destination = path.join(fixture.root, "snapshots");
+    const attempts = await Promise.allSettled([
+      createSnapshot({ source: fixture.source, destination, repositoryId: "owner/repo" }),
+      createSnapshot({ source: fixture.source, destination, repositoryId: "owner/repo" }),
+    ]);
+
+    assert.equal(attempts.filter(({ status }) => status === "fulfilled").length, 1);
+    const rejected = attempts.find(({ status }) => status === "rejected");
+    assert.equal(rejected.reason.message, "snapshot destination must be new");
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("verifies a snapshot and restores it only to a new quarantine mirror", async () => {
   const fixture = await createBareFixture();
   try {
@@ -131,6 +200,84 @@ test("verifies a snapshot and restores it only to a new quarantine mirror", asyn
     });
 
     assert.deepEqual(drill, { ok: true, restoredRefs: 1 });
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("rejects a snapshot when mirror refs differ from the manifest", async () => {
+  const fixture = await createBareFixture();
+  try {
+    const snapshot = await createSnapshot({
+      source: fixture.source,
+      destination: path.join(fixture.root, "snapshots"),
+      repositoryId: "owner/repo",
+    });
+    await runGit(
+      ["-C", path.join(snapshot.snapshotDirectory, "mirror.git"), "fast-import"],
+      [
+        "blob",
+        "mark :1",
+        "data 5",
+        "extra",
+        "commit refs/heads/extra",
+        "author Fixture <fixture@example.invalid> 0 +0000",
+        "committer Fixture <fixture@example.invalid> 0 +0000",
+        "data 5",
+        "extra",
+        "M 100644 :1 EXTRA.md",
+        "",
+        "done",
+        "",
+      ].join("\n"),
+    );
+
+    await assert.rejects(
+      () => verifySnapshot({ snapshotDirectory: snapshot.snapshotDirectory }),
+      (error) => error.message === "snapshot refs do not match",
+    );
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("rejects a snapshot when manifest refs differ from the verified bundle", async () => {
+  const fixture = await createBareFixture();
+  try {
+    const snapshot = await createSnapshot({
+      source: fixture.source,
+      destination: path.join(fixture.root, "snapshots"),
+      repositoryId: "owner/repo",
+    });
+    const manifest = JSON.parse(await readFile(snapshot.manifestPath, "utf8"));
+    manifest.refs[0].objectId = "a".repeat(40);
+    await writeFile(snapshot.manifestPath, `${JSON.stringify(manifest)}\n`, "utf8");
+
+    await assert.rejects(
+      () => verifySnapshot({ snapshotDirectory: snapshot.snapshotDirectory }),
+      (error) => error.message === "snapshot refs do not match",
+    );
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("CLI sanitizes filesystem failures", async () => {
+  const fixture = await createBareFixture();
+  try {
+    const result = await runProgram([
+      path.join(repositoryRoot, "scripts", "git-ref-backup.mjs"),
+      "snapshot",
+      "--source",
+      fixture.source,
+      "--destination",
+      path.join(fixture.root, "missing-parent", "snapshots"),
+      "--repository-id",
+      "owner/repo",
+    ]);
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stderr, "git ref backup operation failed\n");
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
   }
