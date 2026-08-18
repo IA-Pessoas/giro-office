@@ -170,6 +170,15 @@ function removeFilePrivateMetadata(record: CertificatePfPrivateRecord): Certific
   return safeRecord;
 }
 
+function isJsonValue(value: string): boolean {
+  try {
+    JSON.parse(value.trim());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function buildListWhere(organizationId: string, query: CertificatePfListQuery) {
   return {
     organization_id: organizationId,
@@ -249,7 +258,7 @@ export class CertificatePfService {
     }
 
     const passwordCrypto = this.requirePasswordCrypto();
-    if (record.password.startsWith("{")) {
+    if (isJsonValue(record.password)) {
       return removeFilePrivateMetadata({
         ...record,
         password: passwordCrypto.decrypt(record.password),
@@ -290,7 +299,7 @@ export class CertificatePfService {
         },
       });
 
-      return removeFilePrivateMetadata(record);
+      return removePassword(removeFilePrivateMetadata(record));
     } catch (err: unknown) {
       logError("Erro ao criar certificado PF", { err });
       if (err instanceof ServiceError) throw err;
@@ -345,7 +354,7 @@ export class CertificatePfService {
         },
       });
 
-      return removeFilePrivateMetadata(record);
+      return removePassword(removeFilePrivateMetadata(record));
     } catch (err: unknown) {
       logError("Erro ao atualizar certificado PF", { err });
       if (err instanceof ServiceError) throw err;

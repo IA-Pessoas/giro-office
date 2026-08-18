@@ -212,6 +212,30 @@ describe("CertificatePjService", () => {
     ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
   });
 
+  it.each([
+    " []",
+    ' "senha"',
+    '  {"v":"v1"}',
+  ])("fails closed for persisted JSON that is not an envelope: %s", async (password) => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => createCertificatePjRecord({ password })),
+        update: vi.fn(),
+      },
+    };
+    const service = new CertificatePjServiceBase(prisma as never, undefined, crypto);
+
+    await expect(
+      service.getCertificatePj({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+        canViewPassword: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
+    expect(prisma.certificatePJ.update).not.toHaveBeenCalled();
+  });
+
   it("migrates a legacy password during an authorized detail read", async () => {
     const crypto = createCertificatePasswordCryptoForTest();
     const prisma = {
@@ -269,7 +293,7 @@ describe("CertificatePjService", () => {
     };
     const service = new CertificatePjServiceBase(prisma as never, undefined, crypto);
 
-    await service.createCertificatePj({
+    const result = await service.createCertificatePj({
       organizationId: certificateOrganizationId,
       data: {
         client_castelo_status: true,
@@ -288,6 +312,37 @@ describe("CertificatePjService", () => {
     const password = vi.mocked(prisma.certificatePJ.create).mock.calls[0]?.[0].data.password;
     expect(password).not.toBe("senha-segura");
     expect(crypto.decrypt(password as string)).toBe("senha-segura");
+    expect(result).not.toHaveProperty("password");
+  });
+
+  it("does not serialize a password when creating without one", async () => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const encrypt = vi.spyOn(crypto, "encrypt");
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async ({ data }) => createCertificatePjRecord(data)),
+      },
+    };
+    const service = new CertificatePjServiceBase(prisma as never, undefined, crypto);
+
+    const result = await service.createCertificatePj({
+      organizationId: certificateOrganizationId,
+      data: {
+        client_castelo_status: true,
+        client_focus_status: false,
+        name: "Empresa Castelo",
+        cnpj: "11222333000144",
+        responsible: "Maria Silva",
+        model: "A1",
+        legal_nature: "LTDA",
+        expiration_date: new Date("2026-12-31T00:00:00.000Z"),
+        was_paid: true,
+      } as never,
+    });
+
+    expect(encrypt).not.toHaveBeenCalled();
+    expect(result).not.toHaveProperty("password");
   });
 
   it("encrypts a password before updating a certificate", async () => {
@@ -300,7 +355,7 @@ describe("CertificatePjService", () => {
     };
     const service = new CertificatePjServiceBase(prisma as never, undefined, crypto);
 
-    await service.updateCertificatePj({
+    const result = await service.updateCertificatePj({
       id: certificateId,
       organizationId: certificateOrganizationId,
       data: { password: "senha-segura" },
@@ -309,6 +364,28 @@ describe("CertificatePjService", () => {
     const password = vi.mocked(prisma.certificatePJ.update).mock.calls[0]?.[0].data.password;
     expect(password).not.toBe("senha-segura");
     expect(crypto.decrypt(password as string)).toBe("senha-segura");
+    expect(result).not.toHaveProperty("password");
+  });
+
+  it("does not serialize a password when updating without one", async () => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const encrypt = vi.spyOn(crypto, "encrypt");
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () => createCertificatePjRecord()),
+        update: vi.fn(async ({ data }) => createCertificatePjRecord(data)),
+      },
+    };
+    const service = new CertificatePjServiceBase(prisma as never, undefined, crypto);
+
+    const result = await service.updateCertificatePj({
+      id: certificateId,
+      organizationId: certificateOrganizationId,
+      data: { notes: "Atualizado" },
+    });
+
+    expect(encrypt).not.toHaveBeenCalled();
+    expect(result).not.toHaveProperty("password");
   });
 
   it("createCertificatePj blocks duplicates by organization_id, name, cnpj and model", async () => {
