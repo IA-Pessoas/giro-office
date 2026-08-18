@@ -13,9 +13,17 @@ import type { CertificateServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { createCertificateFileCrypto } from "../services/certificateFileCrypto.js";
 import type { CertificateFileStorage } from "../services/certificateFileStorage.js";
+import { createCertificatePasswordCrypto } from "../services/certificatePasswordCrypto.js";
 
 export const certificateOrganizationId = "10000000-0000-4000-8000-000000000001";
 export const certificateUserId = "00000000-0000-4000-8000-000000000001";
+
+export function createCertificatePasswordCryptoForTest() {
+  return createCertificatePasswordCrypto({
+    keyBase64: Buffer.alloc(32, 9).toString("base64"),
+    keyVersion: "v1",
+  });
+}
 
 export function certificateGatewayHeaders(certificado = 1): Record<string, string> {
   return {
@@ -64,7 +72,7 @@ export function createCertificatePrismaMock(): PrismaClient {
         responsible: "Maria Silva",
         model: "A1",
         legal_nature: "LTDA",
-        password: "secret-password",
+        password: createCertificatePasswordCryptoForTest().encrypt("secret-password"),
         expiration_date: new Date("2026-12-31T00:00:00.000Z"),
         client_castelo_status: true,
         client_focus_status: false,
@@ -119,7 +127,7 @@ export function createCertificatePrismaMock(): PrismaClient {
         name: "Joao Silva",
         cpf: "12345678901",
         model: "A1",
-        password: "secret-password",
+        password: createCertificatePasswordCryptoForTest().encrypt("secret-password"),
         expiration_date: new Date("2026-12-31T00:00:00.000Z"),
         client_castelo_status: true,
         client_focus_status: false,

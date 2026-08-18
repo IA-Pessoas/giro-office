@@ -4,10 +4,24 @@ import type { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { createCertificateFileCrypto } from "../services/certificateFileCrypto.js";
-import { CertificatePfService } from "../services/certificatePfService.js";
-import { certificateOrganizationId, certificateUserId } from "./testUtils.js";
+import { CertificatePfService as CertificatePfServiceBase } from "../services/certificatePfService.js";
+import {
+  certificateOrganizationId,
+  certificateUserId,
+  createCertificatePasswordCryptoForTest,
+} from "./testUtils.js";
 
 const certificateId = "30000000-0000-4000-8000-000000000001";
+const passwordCrypto = createCertificatePasswordCryptoForTest();
+
+class CertificatePfService extends CertificatePfServiceBase {
+  constructor(
+    prisma: ConstructorParameters<typeof CertificatePfServiceBase>[0],
+    fileDeps?: ConstructorParameters<typeof CertificatePfServiceBase>[1],
+  ) {
+    super(prisma, fileDeps, passwordCrypto);
+  }
+}
 const privateFileMetadataFields = [
   "file_path",
   "file_original_name",
@@ -31,7 +45,7 @@ function createCertificatePfRecord(overrides: Record<string, unknown> = {}) {
     name: "Joao Silva",
     cpf: "12345678901",
     model: "A1",
-    password: "secret-password",
+    password: passwordCrypto.encrypt("secret-password"),
     expiration_date: new Date("2026-12-31T00:00:00.000Z"),
     notes: "Renovar com antecedencia",
     enterprise: "Empresa Castelo",
@@ -164,6 +178,141 @@ describe("CertificatePfService", () => {
     });
 
     expect(result).not.toHaveProperty("password");
+  });
+
+  it("decrypts the persisted password only for an authorized detail read", async () => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () =>
+          createCertificatePfRecord({ password: crypto.encrypt("senha-segura") }),
+        ),
+      },
+    };
+    const service = new CertificatePfServiceBase(prisma as never, undefined, crypto);
+
+    await expect(
+      service.getCertificatePf({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+        canViewPassword: true,
+      }),
+    ).resolves.toMatchObject({ password: "senha-segura" });
+  });
+
+  it("does not return an invalid persisted password envelope", async () => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () => createCertificatePfRecord({ password: '{"v":"v1"}' })),
+      },
+    };
+    const service = new CertificatePfServiceBase(prisma as never, undefined, crypto);
+
+    await expect(
+      service.getCertificatePf({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+        canViewPassword: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
+  });
+
+  it("migrates a legacy password during an authorized detail read", async () => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () => createCertificatePfRecord({ password: "senha-legada" })),
+        update: vi.fn(async () => createCertificatePfRecord()),
+      },
+    };
+    const service = new CertificatePfServiceBase(prisma as never, undefined, crypto);
+
+    await expect(
+      service.getCertificatePf({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+        canViewPassword: true,
+      }),
+    ).resolves.toMatchObject({ password: "senha-legada" });
+
+    const password = vi.mocked(prisma.certificatePF.update).mock.calls[0]?.[0].data.password;
+    expect(password).not.toBe("senha-legada");
+    expect(crypto.decrypt(password as string)).toBe("senha-legada");
+  });
+
+  it("does not decrypt or migrate a password for a Viewer", async () => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const decrypt = vi.spyOn(crypto, "decrypt");
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () =>
+          createCertificatePfRecord({ password: crypto.encrypt("senha-segura") }),
+        ),
+        update: vi.fn(),
+      },
+    };
+    const service = new CertificatePfServiceBase(prisma as never, undefined, crypto);
+
+    const result = await service.getCertificatePf({
+      id: certificateId,
+      organizationId: certificateOrganizationId,
+      canViewPassword: false,
+    });
+
+    expect(result).not.toHaveProperty("password");
+    expect(decrypt).not.toHaveBeenCalled();
+    expect(prisma.certificatePF.update).not.toHaveBeenCalled();
+  });
+
+  it("encrypts a password before creating a certificate", async () => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async ({ data }) => createCertificatePfRecord(data)),
+      },
+    };
+    const service = new CertificatePfServiceBase(prisma as never, undefined, crypto);
+
+    await service.createCertificatePf({
+      organizationId: certificateOrganizationId,
+      data: {
+        client_castelo_status: true,
+        client_focus_status: false,
+        name: "Joao Silva",
+        cpf: "12345678901",
+        model: "A1",
+        password: "senha-segura",
+        expiration_date: new Date("2026-12-31T00:00:00.000Z"),
+        was_paid: true,
+      },
+    });
+
+    const password = vi.mocked(prisma.certificatePF.create).mock.calls[0]?.[0].data.password;
+    expect(password).not.toBe("senha-segura");
+    expect(crypto.decrypt(password as string)).toBe("senha-segura");
+  });
+
+  it("encrypts a password before updating a certificate", async () => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () => createCertificatePfRecord()),
+        update: vi.fn(async ({ data }) => createCertificatePfRecord(data)),
+      },
+    };
+    const service = new CertificatePfServiceBase(prisma as never, undefined, crypto);
+
+    await service.updateCertificatePf({
+      id: certificateId,
+      organizationId: certificateOrganizationId,
+      data: { password: "senha-segura" },
+    });
+
+    const password = vi.mocked(prisma.certificatePF.update).mock.calls[0]?.[0].data.password;
+    expect(password).not.toBe("senha-segura");
+    expect(crypto.decrypt(password as string)).toBe("senha-segura");
   });
 
   it("createCertificatePf blocks duplicates by organization_id, name, cpf and model", async () => {

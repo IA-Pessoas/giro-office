@@ -24,6 +24,7 @@ import { createCertificatePjRoutes } from "./routes/certificatePj.routes.js";
 import { createInternalNotificationRoutes } from "./routes/internalNotification.routes.js";
 import type { createCertificateFileCrypto } from "./services/certificateFileCrypto.js";
 import type { CertificateFileStorage } from "./services/certificateFileStorage.js";
+import { createCertificatePasswordCrypto } from "./services/certificatePasswordCrypto.js";
 
 function certificateServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const out: Record<string, unknown> = {};
@@ -57,6 +58,10 @@ export function createCertificateApplication({
   certificateFileCrypto,
 }: CreateCertificateApplicationOptions): express.Express {
   const app = express();
+  const certificatePasswordCrypto = createCertificatePasswordCrypto({
+    keyBase64: env.certificatePasswordEncryptionKey,
+    keyVersion: env.certificatePasswordEncryptionKeyVersion,
+  });
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -91,6 +96,7 @@ export function createCertificateApplication({
       prisma: _prisma,
       certificateFileStorage,
       certificateFileCrypto,
+      certificatePasswordCrypto,
       maxFileSizeBytes: env.certificateFileMaxSizeBytes,
       storageProvider: env.storageMode,
       storageBucket: env.storageBucket,
@@ -108,6 +114,7 @@ export function createCertificateApplication({
       prisma: _prisma,
       certificateFileStorage,
       certificateFileCrypto,
+      certificatePasswordCrypto,
       maxFileSizeBytes: env.certificateFileMaxSizeBytes,
       storageProvider: env.storageMode,
       storageBucket: env.storageBucket,

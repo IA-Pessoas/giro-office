@@ -17,6 +17,7 @@ import {
   type CertificateFileStorage,
 } from "./certificateFileStorage.js";
 import type { CertificateUploadFile } from "./certificateFileValidation.js";
+import type { CertificatePasswordCrypto } from "./certificatePasswordCrypto.js";
 import { isPrismaUniqueConstraintError } from "./prismaErrors.js";
 
 export interface CertificatePjContext {
@@ -193,6 +194,7 @@ export class CertificatePjService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly fileDeps?: CertificatePjFileDeps,
+    private readonly passwordCrypto?: CertificatePasswordCrypto,
   ) {}
 
   async listCertificatePj(input: CertificatePjListInput): Promise<CertificatePjListResult> {
@@ -231,6 +233,23 @@ export class CertificatePjService {
       return removePassword(removeFilePrivateMetadata(record));
     }
 
+    if (record.password === undefined) {
+      return removeFilePrivateMetadata(record);
+    }
+
+    const passwordCrypto = this.requirePasswordCrypto();
+    if (record.password.startsWith("{")) {
+      return removeFilePrivateMetadata({
+        ...record,
+        password: passwordCrypto.decrypt(record.password),
+      });
+    }
+
+    await this.prisma.certificatePJ.update({
+      where: { id: input.id, organization_id: input.organizationId },
+      data: { password: passwordCrypto.encrypt(record.password) },
+    });
+
     return removeFilePrivateMetadata(record);
   }
 
@@ -252,6 +271,9 @@ export class CertificatePjService {
       const record = await this.prisma.certificatePJ.create({
         data: {
           ...input.data,
+          ...(input.data.password === undefined
+            ? {}
+            : { password: this.requirePasswordCrypto().encrypt(input.data.password) }),
           organization_id: input.organizationId,
           has_certificate: false,
         },
@@ -304,7 +326,12 @@ export class CertificatePjService {
 
       const record = await this.prisma.certificatePJ.update({
         where: { id: input.id, organization_id: input.organizationId },
-        data: input.data,
+        data: {
+          ...input.data,
+          ...(input.data.password === undefined
+            ? {}
+            : { password: this.requirePasswordCrypto().encrypt(input.data.password) }),
+        },
       });
 
       return removeFilePrivateMetadata(record);
@@ -475,6 +502,14 @@ export class CertificatePjService {
     }
 
     return this.fileDeps;
+  }
+
+  private requirePasswordCrypto(): CertificatePasswordCrypto {
+    if (!this.passwordCrypto) {
+      throw new ServiceError(500, "Criptografia de senha de certificado nao configurada.");
+    }
+
+    return this.passwordCrypto;
   }
 
   private async findCertificatePjForFile(
