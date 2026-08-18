@@ -17,10 +17,10 @@ ele, URLs autenticadas, conteudo de blobs e caminhos temporarios nao entram em l
 relatorios ou artefatos.
 
 `ORG_IOC_REF_PREVIOUS_REPORT` e o baseline sanitizado aprovado da coleta anterior.
-Ele e materializado com permissao restrita apenas durante o job e passado por
-`--previous-report`; o processo humano que atualiza esse segredo deve validar o JSON,
-registrar a decisao e nunca armazenar conteudo de blob. Se o baseline estiver ausente
-ou invalido, o job falha em vez de ignorar anomalias de refs.
+O Node le o valor diretamente do ambiente, sem interpolacao em shell ou arquivo
+temporario. O processo humano que atualiza esse segredo deve validar o JSON, registrar
+a decisao e nunca armazenar conteudo de blob. Se o baseline estiver ausente ou invalido,
+o job falha em vez de ignorar anomalias de refs.
 
 O scanner usa a API REST paginada com `type=all`, limita a inventariacao a 500
 repositorios/cinco paginas, e limita espelhos simultaneos a dois. Falha de API,

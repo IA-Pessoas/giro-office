@@ -154,10 +154,10 @@ test("normaliza somente campos permitidos e elimina dados sensíveis", () => {
       actor_type: "Bot",
       source_ip: "192.0.2.10",
       email: "person@example.com",
-      token_id: "ghp_fake_token_should_never_appear",
+      token_id: "synthetic-redacted-value",
       token_scopes: ["repo"],
-      authorization: "Bearer ghp_fake_token_should_never_appear",
-      request_headers: { authorization: "Bearer ghp_fake_token_should_never_appear" },
+      authorization: "Bearer synthetic-redacted-value",
+      request_headers: { authorization: "Bearer synthetic-redacted-value" },
       data: { old_payload: "decoded-malicious-payload" },
       unknown_field: "must-be-dropped",
     }),
@@ -190,7 +190,7 @@ test("normaliza somente campos permitidos e elimina dados sensíveis", () => {
     normalized.alertKey,
     normalizeAuditEvent(auditEvent({ actor: "person@example.com", actor_type: "Bot" })).alertKey,
   );
-  assert.doesNotMatch(JSON.stringify(normalized), /ghp_|authorization|example\.com|192\.0\.2\.10|payload|unknown_field/iu);
+  assert.doesNotMatch(JSON.stringify(normalized), /synthetic|authorization|example\.com|192\.0\.2\.10|payload|unknown_field/iu);
 });
 
 test("normaliza flags oficiais de ator e nome de protected branch", () => {
@@ -297,11 +297,11 @@ test("coleta REST usa paginação limitada e não inclui token nos erros", async
     await assert.rejects(
       fetchAuditEvents({
         organization: "IA-Pessoas",
-        token: "ghp_fake_token_should_never_appear",
+        token: "synthetic-redacted-value",
         since: "2026-08-14T09:00:00Z",
         pageLimit: 1,
       }),
-      (error) => error.code === "pagination_limit" && !error.message.includes("ghp_"),
+      (error) => error.code === "pagination_limit" && !error.message.includes("synthetic"),
     );
     assert.equal(calls.length, 1);
     assert.match(calls[0].url, /orgs%2FIA-Pessoas|orgs\/IA-Pessoas/u);

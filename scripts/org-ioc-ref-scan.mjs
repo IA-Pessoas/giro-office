@@ -22,13 +22,13 @@ const REPOSITORY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}\/[A-Za-z0-9][A-Za-z
 const REF_PATTERN = /^refs\/(?:heads|tags|pull)\/[A-Za-z0-9._/-]+$/u;
 const OBJECT_ID_PATTERN = /^[a-f0-9]{40,64}$/u;
 const SAFE_PATH_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[\x20-\x7e]{1,1024}$/u;
-const ELIGIBLE_PATH_PATTERN = /(?:^|\/)(?:\.github\/workflows\/[^/]+\.ya?ml|\.npmrc|package\.json|scripts\/[^/]+\.(?:cjs|cts|js|json|mjs|mts|ts)|\.(?:vscode)\/(?:tasks|launch)\.json|(?:babel|biome|eslint|next|nuxt|postcss|prettier|tailwind|tsup|vite|webpack)\.config\.(?:cjs|cts|js|json|mjs|mts|ts)|Dockerfile|[^/]+\.(?:woff|woff2))$/iu;
+const ELIGIBLE_PATH_PATTERN = /(?:^|\/)(?:\.github\/(?:actions|workflows)\/.+|\.husky\/.+|\.vscode\/.+|\.cursor\/.+|\.agents\/.+|scripts\/.+|docker\/.+|\.npmrc|package\.json|(?:babel|biome|eslint|next|nuxt|postcss|prettier|tailwind|tsup|vite|webpack)\.config\.(?:cjs|cts|js|json|mjs|mts|ts)|Dockerfile|[^/]+\.(?:woff|woff2))$/iu;
 
 function fail(message) {
   throw new Error(message);
 }
 
-function validateOptions({ organization, token, workspace, maxRepositories, concurrency, maxBlobBytes }) {
+function validateOptions({ organization, token, workspace, maxRepositories, concurrency, maxBlobBytes, maxRefsPerRepository }) {
   if (typeof organization !== "string" || !OWNER_PATTERN.test(organization)) {
     fail("invalid organization");
   }
@@ -42,6 +42,13 @@ function validateOptions({ organization, token, workspace, maxRepositories, conc
   }
   if (!Number.isInteger(maxBlobBytes) || maxBlobBytes < 1 || maxBlobBytes > MAX_BLOB_BYTES) {
     fail("invalid blob limit");
+  }
+  if (
+    !Number.isInteger(maxRefsPerRepository) ||
+    maxRefsPerRepository < 1 ||
+    maxRefsPerRepository > MAX_REFS_PER_REPOSITORY
+  ) {
+    fail("invalid ref limit");
   }
 }
 
@@ -207,7 +214,7 @@ async function runGit(commandRunner, args, options = {}) {
   }
 }
 
-function parseRefs(output, repository, now) {
+function parseRefs(output, repository, now, maxRefsPerRepository) {
   const refs = [];
   for (const line of output.toString("utf8").split(/\r?\n/u)) {
     if (!line) continue;
@@ -225,7 +232,11 @@ function parseRefs(output, repository, now) {
             : "active";
     refs.push({ name, objectId, status });
   }
-  return refs.sort((left, right) => left.name.localeCompare(right.name)).slice(0, MAX_REFS_PER_REPOSITORY);
+  const sorted = refs.sort((left, right) => left.name.localeCompare(right.name));
+  return {
+    refs: sorted.slice(0, maxRefsPerRepository),
+    limited: sorted.length > maxRefsPerRepository,
+  };
 }
 
 function isEligiblePath(relativePath) {
@@ -287,7 +298,7 @@ function safeDedupeKey({ repository, ref, blobSha, path: relativePath, ruleId })
     .digest("hex");
 }
 
-async function scanRepository({ repository, workspace, token, commandRunner, now, previousReport, maxBlobBytes }) {
+async function scanRepository({ repository, workspace, token, commandRunner, now, previousReport, maxBlobBytes, maxRefsPerRepository }) {
   let mirrorDirectory;
   let largeBlobsSkipped = 0;
   try {
@@ -308,11 +319,13 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
       "+refs/pull/*/head:refs/pull/*/head",
     ], { env: cloneHeader });
     await runGit(commandRunner, ["-C", mirrorDirectory, "remote", "remove", "origin"]);
-    const refs = parseRefs(
+    const parsedRefs = parseRefs(
       await runGit(commandRunner, ["-C", mirrorDirectory, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(creatordate:unix)", "refs/heads", "refs/tags", "refs/pull"]),
       repository,
       now,
+      maxRefsPerRepository,
     );
+    const { refs } = parsedRefs;
     const blobs = new Map();
     for (const ref of refs) {
       const entries = parseTree(
@@ -355,7 +368,10 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
       repository: { ...repository, refs, scanStatus: "scanned" },
       findings,
       refChanges: await refChangesFor(repository, refs, previousReport, commandRunner, mirrorDirectory),
-      errors: largeBlobsSkipped > 0 ? [{ repository: repository.fullName, code: "blob_size_limit_reached" }] : [],
+      errors: [
+        ...(largeBlobsSkipped > 0 ? [{ repository: repository.fullName, code: "blob_size_limit_reached" }] : []),
+        ...(parsedRefs.limited ? [{ repository: repository.fullName, code: "ref_limit_reached" }] : []),
+      ],
       blobs: blobs.size,
       largeBlobsSkipped,
     };
@@ -398,14 +414,15 @@ export async function scanOrganization({
   maxRepositories = MAX_REPOSITORIES,
   concurrency = MAX_CONCURRENCY,
   maxBlobBytes = MAX_BLOB_BYTES,
+  maxRefsPerRepository = MAX_REFS_PER_REPOSITORY,
   sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay)),
 } = {}) {
-  validateOptions({ organization, token, workspace, maxRepositories, concurrency, maxBlobBytes });
+  validateOptions({ organization, token, workspace, maxRepositories, concurrency, maxBlobBytes, maxRefsPerRepository });
   const generatedAt = new Date(now).toISOString();
   if (Number.isNaN(Date.parse(generatedAt))) fail("invalid timestamp");
   const inventory = await listRepositories({ organization, token, fetchImpl, maxRepositories, sleep });
   const results = await mapWithConcurrency(inventory.repositories, concurrency, (repository) =>
-    scanRepository({ repository, workspace, token, commandRunner, now: Date.parse(generatedAt), previousReport, maxBlobBytes }),
+    scanRepository({ repository, workspace, token, commandRunner, now: Date.parse(generatedAt), previousReport, maxBlobBytes, maxRefsPerRepository }),
   );
   const repositories = results.map(({ repository }) => repository);
   const findings = results.flatMap(({ findings: entries }) => entries).sort((left, right) =>
@@ -467,12 +484,18 @@ export async function main(
   const organization = valueAfter("--org");
   const reportPath = valueAfter("--report");
   const previousReportPath = valueAfter("--previous-report");
+  const requirePreviousReport = args.includes("--require-previous-report");
   const workspace = valueAfter("--workspace") ?? path.join(os.tmpdir(), "giro-org-ioc-ref-scan");
   if (!organization || !reportPath || !environment.GITHUB_ORG_SCANNER_TOKEN) return 2;
   try {
     let previousReport;
-    if (previousReportPath) {
-      const previousReportBytes = await readPreviousReport(previousReportPath);
+    const previousReportBytes = previousReportPath
+      ? await readPreviousReport(previousReportPath)
+      : environment.ORG_IOC_REF_PREVIOUS_REPORT
+        ? Buffer.from(environment.ORG_IOC_REF_PREVIOUS_REPORT, "utf8")
+        : undefined;
+    if (requirePreviousReport && !previousReportBytes) return 2;
+    if (previousReportBytes) {
       if (!Buffer.isBuffer(previousReportBytes) || previousReportBytes.length > MAX_PREVIOUS_REPORT_BYTES) {
         return 2;
       }
