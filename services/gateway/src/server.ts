@@ -5,6 +5,7 @@ import { createLogger } from "@workspace/shared";
 import { createApp } from "./app.js";
 import { getGatewayEnv } from "./config/env.js";
 import { createUserServiceSessionValidator } from "./middlewares/authenticate.js";
+import { isAuthorizedWebSocketUpgrade } from "./middlewares/websocketAuthorize.js";
 import { proxyWebSocketUpgrade } from "./proxy/wsProxy.js";
 
 function getUpstreamContext(url: string): { host?: string; path?: string } {
@@ -26,13 +27,18 @@ const logger = createLogger({
   level: env.logLevel,
   pretty: env.logPretty,
 });
+const sessionValidator = createUserServiceSessionValidator(
+  env.userServiceUrl,
+  env.auditServiceToken,
+);
 const app = createApp(env, logger, {
-  sessionValidator: createUserServiceSessionValidator(env.userServiceUrl, env.auditServiceToken),
+  sessionValidator,
 });
 const server = createServer(app);
 
-server.on("upgrade", (request, socket, head) => {
-  if (!request.url?.startsWith("/socket.io")) {
+server.on("upgrade", async (request, socket, head) => {
+  const requestPath = request.url?.split("?", 1)[0];
+  if (requestPath !== "/socket.io" && !requestPath?.startsWith("/socket.io/")) {
     socket.destroy();
     return;
   }
@@ -41,6 +47,20 @@ server.on("upgrade", (request, socket, head) => {
     logger.warn({
       event: "ws.upgrade.skipped",
       message: "WEBSOCKET_UPSTREAM_URL não definido; encerrando socket.",
+    });
+    socket.destroy();
+    return;
+  }
+
+  const authorized = await isAuthorizedWebSocketUpgrade(
+    request.headers.authorization,
+    env.jwtSecret,
+    sessionValidator,
+  );
+  if (!authorized) {
+    logger.warn({
+      event: "ws.upgrade.denied",
+      message: "WebSocket upgrade denied because authentication failed.",
     });
     socket.destroy();
     return;

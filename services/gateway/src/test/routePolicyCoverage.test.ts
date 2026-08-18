@@ -1,10 +1,7 @@
 import { expect, it } from "vitest";
 
-import { classifyActivity } from "../audit/activityCatalog.js";
 import type { GatewayEnv } from "../config/env.js";
-import { buildGatewayOpenApiSpec } from "../openapi/gatewaySpec.js";
-
-const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
+import { getUnclassifiedGatewayOperations } from "../security/routePolicyCoverage.js";
 
 function createCoverageEnv(): GatewayEnv {
   return {
@@ -45,23 +42,6 @@ function createCoverageEnv(): GatewayEnv {
   };
 }
 
-function materializePath(path: string): string {
-  return path.replace(/\{[^}]+\}/g, "9a68a809-9a78-4ef9-94d0-b9bb9787ad2e");
-}
-
-it("classifica toda operação pública do gateway", () => {
-  const spec = buildGatewayOpenApiSpec(createCoverageEnv());
-  const unknown: string[] = [];
-
-  for (const [path, pathItem] of Object.entries(spec.paths)) {
-    for (const method of HTTP_METHODS) {
-      if (!(pathItem as Record<string, unknown> | undefined)?.[method]) continue;
-
-      if (classifyActivity(method, materializePath(path)).kind === "unknown") {
-        unknown.push(`${method.toUpperCase()} ${path}`);
-      }
-    }
-  }
-
-  expect(unknown).toEqual([]);
+it("classifies every documented gateway operation as public or policy-protected", () => {
+  expect(getUnclassifiedGatewayOperations(createCoverageEnv())).toEqual([]);
 });
