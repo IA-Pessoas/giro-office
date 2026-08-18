@@ -4,6 +4,7 @@ import { getCertificateServiceEnv } from "../config/env.js";
 
 const baseEnv = { ...process.env };
 const validKey = Buffer.alloc(32, 7).toString("base64");
+const validPasswordKey = Buffer.alloc(32, 9).toString("base64");
 
 function resetEnv(overrides: NodeJS.ProcessEnv = {}): void {
   process.env = {
@@ -16,6 +17,7 @@ function resetEnv(overrides: NodeJS.ProcessEnv = {}): void {
     AUDIT_SERVICE_TOKEN: "test-audit-token",
     CERTIFICATE_SERVICE_INTERNAL_TOKEN: "test-internal-token",
     CERTIFICATE_FILE_ENCRYPTION_KEY: validKey,
+    CERTIFICATE_PASSWORD_ENCRYPTION_KEY: validPasswordKey,
     ...overrides,
   };
 }
@@ -31,6 +33,7 @@ describe("certificate service env", () => {
       CERTIFICATE_STORAGE_DIR: ".data/test-certificate-files",
       CERTIFICATE_FILE_MAX_SIZE_BYTES: "12345",
       CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION: "v2",
+      CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION: "v3",
       UPLOAD_RATE_LIMIT_MAX: "12",
       UPLOAD_RATE_LIMIT_WINDOW_MS: "3456",
     });
@@ -43,6 +46,8 @@ describe("certificate service env", () => {
     expect(env.certificateFileMaxSizeBytes).toBe(12345);
     expect(env.certificateFileEncryptionKey).toBe(validKey);
     expect(env.certificateFileEncryptionKeyVersion).toBe("v2");
+    expect(env.certificatePasswordEncryptionKey).toBe(validPasswordKey);
+    expect(env.certificatePasswordEncryptionKeyVersion).toBe("v3");
     expect(env.uploadRateLimitMax).toBe(12);
     expect(env.uploadRateLimitWindowMs).toBe(3456);
   });
@@ -81,6 +86,17 @@ describe("certificate service env", () => {
 
     expect(() => getCertificateServiceEnv()).toThrow(
       /CERTIFICATE_FILE_ENCRYPTION_KEY deve ser base64 com 32 bytes/,
+    );
+  });
+
+  it("rejects certificate password encryption keys that are not 32 base64 bytes", () => {
+    resetEnv({
+      CERTIFICATE_STORAGE_MODE: "local",
+      CERTIFICATE_PASSWORD_ENCRYPTION_KEY: "invalid",
+    });
+
+    expect(() => getCertificateServiceEnv()).toThrow(
+      /CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64/,
     );
   });
 });
