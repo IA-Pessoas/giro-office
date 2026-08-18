@@ -3,9 +3,22 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { scanRepository } from "./supply-chain-integrity.mjs";
+import { scanBlob, scanRepository } from "./supply-chain-integrity.mjs";
 
 const decode = (value) => Buffer.from(value, "base64").toString("utf8");
+
+test("scans a detached executable-config blob without returning its source", () => {
+  const report = scanBlob(
+    "postcss.config.js",
+    Buffer.from("For only test\nglobal.o='abc'"),
+  );
+
+  assert.deepEqual(report.map(({ ruleId }) => ruleId), [
+    "ioc.incident-marker",
+    "ioc.global-assignment",
+  ]);
+  assert.doesNotMatch(JSON.stringify(report), /For only test|global\.o=/u);
+});
 
 async function withFixture(files, callback) {
   const root = await mkdtemp(path.join(os.tmpdir(), "giro-supply-chain-"));

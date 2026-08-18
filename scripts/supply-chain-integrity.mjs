@@ -253,6 +253,56 @@ function isAllowed(entries, relativePath, ruleId) {
   );
 }
 
+export function scanBlob(relativePath, bytes, options = {}) {
+  const normalizedPath = normalizePath(relativePath);
+  const blobSha = createHash("sha256").update(bytes).digest("hex");
+  const allowlist = options.allowlist ?? [];
+  const extension = path.extname(normalizedPath).toLowerCase();
+  const findings = [];
+
+  if (extension === ".woff" || extension === ".woff2") {
+    const expected = extension === ".woff" ? "wOFF" : "wOF2";
+    if (
+      bytes.subarray(0, 4).toString("ascii") !== expected &&
+      !isAllowed(allowlist, normalizedPath, "font.invalid-magic")
+    ) {
+      findings.push(finding(normalizedPath, "font.invalid-magic", blobSha, undefined));
+    }
+    return findings;
+  }
+
+  const executableConfig = isExecutableConfig(normalizedPath);
+  const commandSurface = isCommandSurface(normalizedPath);
+  if (!executableConfig && !commandSurface) {
+    return findings;
+  }
+  if (isBinary(normalizedPath, bytes)) {
+    return findings;
+  }
+
+  const source = bytes.toString("utf8");
+  for (const [index, line] of source.split(/\r?\n/u).entries()) {
+    const lineNumber = index + 1;
+    const lineBytes = Buffer.byteLength(line, "utf8");
+    const rules = [
+      ...(executableConfig ? IOC_RULES : []),
+      ...(commandSurface || executableConfig ? COMMAND_RULES : []),
+      ...(executableConfig && lineBytes > 2_000
+        ? [{ ruleId: "config.long-line", pattern: /.*/u }]
+        : []),
+    ];
+
+    for (const rule of rules) {
+      if (!rule.pattern.test(line) || isAllowed(allowlist, normalizedPath, rule.ruleId)) {
+        continue;
+      }
+      findings.push(finding(normalizedPath, rule.ruleId, blobSha, lineNumber));
+    }
+  }
+
+  return findings;
+}
+
 export async function scanRepository(root, options = {}) {
   const resolvedRoot = path.resolve(root);
   const now = new Date(options.now ?? Date.now()).getTime();
@@ -297,48 +347,7 @@ export async function scanRepository(root, options = {}) {
       continue;
     }
     const bytes = await readFile(filePath);
-    const blobSha = createHash("sha256").update(bytes).digest("hex");
-    const extension = path.extname(filePath).toLowerCase();
-
-    if (extension === ".woff" || extension === ".woff2") {
-      const expected = extension === ".woff" ? "wOFF" : "wOF2";
-      if (
-        bytes.subarray(0, 4).toString("ascii") !== expected &&
-        !isAllowed(allowlist.entries, relativePath, "font.invalid-magic")
-      ) {
-        findings.push(finding(relativePath, "font.invalid-magic", blobSha, undefined));
-      }
-      continue;
-    }
-
-    const executableConfig = isExecutableConfig(relativePath);
-    const commandSurface = isCommandSurface(relativePath);
-    if (!executableConfig && !commandSurface) {
-      continue;
-    }
-    if (isBinary(relativePath, bytes)) {
-      continue;
-    }
-
-    const source = bytes.toString("utf8");
-    for (const [index, line] of source.split(/\r?\n/u).entries()) {
-      const lineNumber = index + 1;
-      const lineBytes = Buffer.byteLength(line, "utf8");
-      const rules = [
-        ...(executableConfig ? IOC_RULES : []),
-        ...(commandSurface || executableConfig ? COMMAND_RULES : []),
-        ...(executableConfig && lineBytes > 2_000
-          ? [{ ruleId: "config.long-line", pattern: /.*/u }]
-          : []),
-      ];
-
-      for (const rule of rules) {
-        if (!rule.pattern.test(line) || isAllowed(allowlist.entries, relativePath, rule.ruleId)) {
-          continue;
-        }
-        findings.push(finding(relativePath, rule.ruleId, blobSha, lineNumber));
-      }
-    }
+    findings.push(...scanBlob(relativePath, bytes, { allowlist: allowlist.entries }));
   }
 
   findings.sort((left, right) =>
