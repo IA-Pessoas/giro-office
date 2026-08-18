@@ -265,8 +265,12 @@ export class CertificatePfService {
       });
     }
 
-    await this.prisma.certificatePF.update({
-      where: { id: input.id, organization_id: input.organizationId },
+    await this.prisma.certificatePF.updateMany({
+      where: {
+        id: input.id,
+        organization_id: input.organizationId,
+        password: record.password,
+      },
       data: { password: passwordCrypto.encrypt(record.password) },
     });
 

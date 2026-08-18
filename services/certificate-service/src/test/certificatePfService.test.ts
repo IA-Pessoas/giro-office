@@ -247,7 +247,7 @@ describe("CertificatePfService", () => {
     const prisma = {
       certificatePF: {
         findFirst: vi.fn(async () => createCertificatePfRecord({ password: "senha-legada" })),
-        update: vi.fn(async () => createCertificatePfRecord()),
+        updateMany: vi.fn(async () => ({ count: 1 })),
       },
     };
     const service = new CertificatePfServiceBase(prisma as never, undefined, crypto);
@@ -260,9 +260,47 @@ describe("CertificatePfService", () => {
       }),
     ).resolves.toMatchObject({ password: "senha-legada" });
 
-    const password = vi.mocked(prisma.certificatePF.update).mock.calls[0]?.[0].data.password;
+    expect(prisma.certificatePF.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: certificateId,
+        organization_id: certificateOrganizationId,
+        password: "senha-legada",
+      },
+      data: { password: expect.any(String) },
+    });
+    const password = vi.mocked(prisma.certificatePF.updateMany).mock.calls[0]?.[0].data.password;
     expect(password).not.toBe("senha-legada");
     expect(crypto.decrypt(password as string)).toBe("senha-legada");
+  });
+
+  it("does not overwrite a concurrent password change during legacy migration", async () => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const prisma = {
+      certificatePF: {
+        findFirst: vi.fn(async () => createCertificatePfRecord({ password: "senha-legada" })),
+        update: vi.fn(async () => createCertificatePfRecord()),
+        updateMany: vi.fn(async () => ({ count: 0 })),
+      },
+    };
+    const service = new CertificatePfServiceBase(prisma as never, undefined, crypto);
+
+    await expect(
+      service.getCertificatePf({
+        id: certificateId,
+        organizationId: certificateOrganizationId,
+        canViewPassword: true,
+      }),
+    ).resolves.toMatchObject({ password: "senha-legada" });
+
+    expect(prisma.certificatePF.update).not.toHaveBeenCalled();
+    expect(prisma.certificatePF.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: certificateId,
+        organization_id: certificateOrganizationId,
+        password: "senha-legada",
+      },
+      data: { password: expect.any(String) },
+    });
   });
 
   it("does not decrypt or migrate a password for a Viewer", async () => {
