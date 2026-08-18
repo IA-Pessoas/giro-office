@@ -249,7 +249,10 @@ class AuthService {
 
     const user = await prismaClient.user.findUnique({
       where: { id: identity.user_id },
-      include: {
+      select: {
+        status: true,
+        session_version: true,
+        organization_id: true,
         organization: { select: { id: true, status: true } },
         department: {
           select: {
