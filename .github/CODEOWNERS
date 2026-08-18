@@ -1,0 +1,50 @@
+# Supply-chain critical paths for giro-office.
+# Later matches take precedence, so keep every protected surface on the same owner.
+
+/.github/** @eedsilva
+
+**/package.json @eedsilva
+**/pnpm-lock.yaml @eedsilva
+**/pnpm-workspace.yaml @eedsilva
+**/.npmrc @eedsilva
+**/.pnpmfile.* @eedsilva
+**/.node-version @eedsilva
+**/.nvmrc @eedsilva
+
+**/*config*.js @eedsilva
+**/*config*.mjs @eedsilva
+**/*config*.cjs @eedsilva
+**/*config*.ts @eedsilva
+
+/.husky/** @eedsilva
+**/scripts/** @eedsilva
+
+/.vscode/** @eedsilva
+/.cursor/** @eedsilva
+/.codex/** @eedsilva
+/.claude/** @eedsilva
+**/AGENTS.md @eedsilva
+**/CLAUDE.md @eedsilva
+
+**/Dockerfile @eedsilva
+**/*.Dockerfile @eedsilva
+**/docker-compose*.yml @eedsilva
+**/docker-compose*.yaml @eedsilva
+**/compose*.yml @eedsilva
+**/compose*.yaml @eedsilva
+**/Caddyfile @eedsilva
+**/*caddy* @eedsilva
+**/*nginx* @eedsilva
+**/*proxy* @eedsilva
+/docker/** @eedsilva
+/infra/** @eedsilva
+**/*.tf @eedsilva
+**/*.tfvars @eedsilva
+**/wrangler*.toml @eedsilva
+**/wrangler*.json @eedsilva
+**/wrangler*.jsonc @eedsilva
+
+**/.env* @eedsilva
+**/SECURITY.md @eedsilva
+**/*allowlist* @eedsilva
+**/*policy* @eedsilva
