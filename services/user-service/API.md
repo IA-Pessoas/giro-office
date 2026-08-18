@@ -288,7 +288,7 @@ Cria um novo usuário.
 
 ### GET /user/session/validate
 
-Valida o JWT atual contra o usuário ativo e a versão de sessão persistida. O gateway usa esta rota para revogar sessões imediatamente após alterações sensíveis.
+Valida o JWT atual contra o usuário e a organização ativos, a associação persistida entre usuário e departamento, e a versão de sessão persistida. O gateway usa esta rota para revogar sessões imediatamente após alterações sensíveis.
 
 **Autenticação:** Bearer JWT obrigatório
 
