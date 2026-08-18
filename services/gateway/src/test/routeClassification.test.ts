@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getPublicRoute } from "../security/publicRoutes.js";
+import { getPublicRoute, isPublicRoute } from "../security/publicRoutes.js";
 import { matchesGatewayRouteTemplate, normalizeGatewayPath } from "../security/routeClassification.js";
 
 describe("route classification", () => {
@@ -33,5 +33,11 @@ describe("route classification", () => {
       reason: "Cria uma sessão sem contexto autenticado.",
     });
     expect(getPublicRoute("GET", "/user/session")).toBeNull();
+  });
+
+  it("keeps Socket.IO transport public because the upstream validates its auth handshake", () => {
+    expect(isPublicRoute("GET", "/socket.io/?EIO=4&transport=polling")).toBe(true);
+    expect(isPublicRoute("POST", "/socket.io/")).toBe(true);
+    expect(isPublicRoute("GET", "/socket.io-not-a-transport")).toBe(false);
   });
 });

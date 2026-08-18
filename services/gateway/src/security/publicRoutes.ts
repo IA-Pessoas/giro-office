@@ -11,10 +11,22 @@ const publicRoutes = new Map<string, PublicRoute>([
   ["POST /user/start-config", { reason: "Inicializa a configuração sem contexto autenticado." }],
 ]);
 
+const socketIoPublicRoute: PublicRoute = {
+  reason: "Encaminha o handshake Socket.IO, autenticado pelo serviço de tempo real.",
+};
+
+function isSocketIoPath(path: string): boolean {
+  return path === "/socket.io" || path.startsWith("/socket.io/");
+}
+
 export function getPublicRoute(method: string, path: string): PublicRoute | null {
   const normalizedPath = normalizeGatewayPath(path);
   if (!normalizedPath) {
     return null;
+  }
+
+  if (isSocketIoPath(normalizedPath)) {
+    return socketIoPublicRoute;
   }
 
   return publicRoutes.get(`${method.toUpperCase()} ${normalizedPath}`) ?? null;
