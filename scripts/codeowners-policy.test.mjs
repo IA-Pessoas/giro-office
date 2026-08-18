@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const expectedOwner = "@eedsilva";
+const expectedOwner = "@IA-Pessoas/security-platform";
 const representativeCriticalPaths = [
   ".github/CODEOWNERS",
   "package.json",
