@@ -68,6 +68,8 @@ const optionalUrlEnvSchema = z
 const gatewayEnvSchema = z
   .object({
     nodeEnv: z.string().optional().default("development"),
+    enableApiDocsEnv: z.string().optional(),
+    authorizationMode: z.enum(["enforce", "observe"]).optional().default("enforce"),
     auditEnabled: z
       .string()
       .optional()
@@ -144,6 +146,10 @@ const gatewayEnvSchema = z
       .transform((value, ctx) => parseJsonBodyLimit(value, ctx)),
   })
   .transform((env) => {
+    const enableApiDocs =
+      env.enableApiDocsEnv === undefined
+        ? env.nodeEnv !== "production"
+        : parseBoolean(env.enableApiDocsEnv);
     const clientServiceInternalToken =
       env.nodeEnv === "production"
         ? env.clientServiceInternalToken
@@ -183,12 +189,15 @@ const gatewayEnvSchema = z
     return {
       ...env,
       clientServiceInternalToken,
+      enableApiDocs,
       logPretty: env.nodeEnv !== "production" && env.logPretty,
     };
   });
 
 export interface GatewayEnv {
   nodeEnv: string;
+  enableApiDocs: boolean;
+  authorizationMode: "enforce" | "observe";
   auditEnabled: boolean;
   auditServiceToken: string;
   auditServiceUrl: string;
@@ -227,6 +236,8 @@ export interface GatewayEnv {
 export function getGatewayEnv(): GatewayEnv {
   return gatewayEnvSchema.parse({
     nodeEnv: process.env.NODE_ENV,
+    enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+    authorizationMode: process.env.GATEWAY_AUTHORIZATION_MODE,
     auditEnabled: process.env.AUDIT_ENABLED,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,

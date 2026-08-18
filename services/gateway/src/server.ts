@@ -32,7 +32,8 @@ const app = createApp(env, logger, {
 const server = createServer(app);
 
 server.on("upgrade", (request, socket, head) => {
-  if (!request.url?.startsWith("/socket.io")) {
+  const requestPath = request.url?.split("?", 1)[0];
+  if (requestPath !== "/socket.io" && !requestPath?.startsWith("/socket.io/")) {
     socket.destroy();
     return;
   }

@@ -63,7 +63,7 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "User Service",
       buildSpec: () =>
         buildUserServiceOpenApiSpec({ port: getPortFromUrl(env.userServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && path !== "/user/session/validate",
     },
     {
       key: "department-service",
@@ -72,14 +72,14 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
         buildDepartmentServiceOpenApiSpec({
           port: getPortFromUrl(env.departmentServiceUrl),
         } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "task-service",
       label: "Task Service",
       buildSpec: () =>
         buildTaskServiceOpenApiSpec({ port: getPortFromUrl(env.taskServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "project-service",
@@ -94,7 +94,10 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       buildSpec: () =>
         buildClientServiceOpenApiSpec({ port: getPortFromUrl(env.clientServiceUrl) } as never),
       includePath: (path) =>
-        path !== "/health" && path !== "/ready" && !isGatewayOpenApiPathDisabled(path),
+        path !== "/health" &&
+        path !== "/ready" &&
+        !path.startsWith("/internal/") &&
+        !isGatewayOpenApiPathDisabled(path),
     },
     {
       key: "regularize-service",
@@ -140,7 +143,7 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       key: "ti-service",
       label: "TI Service",
       buildSpec: () => buildTiServiceOpenApiSpec({ port: getPortFromUrl(env.tiServiceUrl) }),
-      includePath: (path) => path !== "/health" && path !== "/ready",
+      includePath: (path) => path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
     },
     {
       key: "certificate-service",
@@ -180,7 +183,8 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
         buildAuditServiceOpenApiSpec({
           auditServicePort: getPortFromUrl(env.auditServiceUrl),
         } as never),
-      includePath: (path) => path !== "/health" && path !== "/ready",
+      includePath: (path) =>
+        path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
       isInternalPath: (path) => path.startsWith("/internal/"),
     },
   ];

@@ -17,6 +17,8 @@ function setGatewayEnv(overrides: NodeJS.ProcessEnv) {
   restoreEnv();
   delete process.env.GATEWAY_PUBLIC_URL;
   delete process.env.GATEWAY_JSON_BODY_LIMIT;
+  delete process.env.ENABLE_API_DOCS;
+  delete process.env.GATEWAY_AUTHORIZATION_MODE;
   process.env.JWT_SECRET = "test-secret";
   process.env.NODE_ENV = "production";
   process.env.AUDIT_SERVICE_TOKEN = "secure-internal-token-with-at-least-32-chars";
@@ -80,6 +82,20 @@ describe("gateway env security validation", () => {
 
     expect(env.publicGatewayUrl).toBeUndefined();
     expect(env.jsonBodyLimit).toBe("1mb");
+    expect(env.enableApiDocs).toBe(false);
+    expect(env.authorizationMode).toBe("enforce");
+  });
+
+  it("enables gateway API docs outside production when requested", () => {
+    setGatewayEnv({ NODE_ENV: "development", ENABLE_API_DOCS: "true" });
+
+    expect(getGatewayEnv().enableApiDocs).toBe(true);
+  });
+
+  it("accepts observe mode during the authorization rollout", () => {
+    setGatewayEnv({ GATEWAY_AUTHORIZATION_MODE: "observe" });
+
+    expect(getGatewayEnv().authorizationMode).toBe("observe");
   });
 
   it("uses parcelamento service default URL", () => {

@@ -14,6 +14,8 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `GATEWAY_ALLOWED_ORIGINS`
 - `GATEWAY_PUBLIC_URL` (opcional, usado no `servers[0].url` do OpenAPI agregado)
 - `GATEWAY_JSON_BODY_LIMIT` (opcional, padrao `1mb`)
+- `ENABLE_API_DOCS` (opcional; por padrão habilitado fora de produção e desabilitado em produção)
+- `GATEWAY_AUTHORIZATION_MODE` (`enforce`, padrão seguro; `observe` somente para rollout temporário)
 - `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN`
 - `ORGANIZATION_SERVICE_URL`
 - `RH_SERVICE_URL`
@@ -63,6 +65,24 @@ Para servicos que validam contexto autenticado encaminhado internamente, o gatew
 - `/client` usa `CLIENT_SERVICE_INTERNAL_TOKEN` para autenticação do contexto encaminhado.
 
 Quando `AUDIT_ENABLED=true`, o gateway tambem proxya `/audit` para `AUDIT_SERVICE_URL` e injeta o header interno com `AUDIT_SERVICE_TOKEN`.
+
+## Autorização de rotas
+
+O gateway aplica *default-deny*: toda rota autenticada precisa de uma política explícita antes de
+ser encaminhada ao upstream. `GET` exige nível modular `>=1` e operações de escrita exigem
+`>=2`, exceto políticas declaradas específicas. As únicas rotas HTTP sem sessão são `GET /health`,
+`GET /ready`, `POST /user/session` e `POST /user/start-config`. O transporte `/socket.io` é uma
+exceção de compatibilidade: o gateway apenas encaminha o handshake e o serviço de tempo real
+valida `socket.handshake.auth.token` antes de aceitar a conexão.
+
+Em produção, `/docs` e `/openapi.json` respondem `404` por padrão. Habilite
+`ENABLE_API_DOCS=true` apenas quando a documentação precisar ser exposta deliberadamente.
+
+Para o rollout, use `GATEWAY_AUTHORIZATION_MODE=observe` por uma janela limitada (por exemplo,
+sete dias). Nesse modo, rotas autenticadas ainda sem política são encaminhadas e emitem somente
+o evento agregado `authorization.unclassified_route` com método e namespace — sem URL completa,
+identificadores, query, cabeçalhos ou corpo. Depois de classificar os eventos observados, retorne
+para `enforce`.
 
 ## Desenvolvimento
 

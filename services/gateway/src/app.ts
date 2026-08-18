@@ -25,7 +25,7 @@ import {
   createUserServiceSessionValidator,
   type SessionValidator,
 } from "./middlewares/authenticate.js";
-import { authorizeRequest } from "./middlewares/authorize.js";
+import { buildAuthorizeMiddleware } from "./middlewares/authorize.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
@@ -249,20 +249,26 @@ function mountPublicRoutes(
   env: GatewayEnv,
   gatewayOpenApiSpec: GatewayOpenApiSpec,
 ): void {
-  app.get("/openapi.json", (request: Request, response: Response) => {
-    response.json({
-      ...gatewayOpenApiSpec,
-      servers: [{ url: getPublicServerUrl(env, request) }],
+  if (env.enableApiDocs) {
+    app.get("/openapi.json", (request: Request, response: Response) => {
+      response.json({
+        ...gatewayOpenApiSpec,
+        servers: [{ url: getPublicServerUrl(env, request) }],
+      });
     });
-  });
 
-  mountOpenApiDocs(app, {
-    spec: gatewayOpenApiSpec,
-    docsPath: "/docs",
-    jsonPath: "/__gateway-openapi-static.json",
-    specUrl: "/openapi.json",
-    siteTitle: "gateway - OpenAPI",
-  });
+    mountOpenApiDocs(app, {
+      spec: gatewayOpenApiSpec,
+      docsPath: "/docs",
+      jsonPath: "/__gateway-openapi-static.json",
+      specUrl: "/openapi.json",
+      siteTitle: "gateway - OpenAPI",
+    });
+  } else {
+    app.use(["/docs", "/openapi.json", "/__gateway-openapi-static.json"], (_request, _response, next) => {
+      next(new ServiceError(404, "Recurso não encontrado."));
+    });
+  }
 
   app.get("/health", (_request, response) => {
     response.status(200).json(
@@ -314,6 +320,7 @@ function mountPublicBlockedRoutes(app: express.Express, env: GatewayEnv): void {
 function mountAuthenticationBoundary(
   app: express.Express,
   env: GatewayEnv,
+  logger: Logger,
   sessionValidator?: SessionValidator,
 ): void {
   const generalRateLimit = createRateLimitMiddleware({
@@ -325,7 +332,7 @@ function mountAuthenticationBoundary(
   app.use(buildAuthenticateMiddleware(env.jwtSecret, sessionValidator));
   app.use(generalRateLimit);
   mountProtectedBlockedRoutes(app);
-  app.use(authorizeRequest);
+  app.use(buildAuthorizeMiddleware(env.authorizationMode, logger));
 }
 
 function mountProtectedBlockedRoutes(app: express.Express): void {
@@ -444,7 +451,7 @@ export function createApp(
     (env.nodeEnv === "test"
       ? undefined
       : createUserServiceSessionValidator(env.userServiceUrl, env.auditServiceToken));
-  mountAuthenticationBoundary(app, env, sessionValidator);
+  mountAuthenticationBoundary(app, env, logger, sessionValidator);
   mountDashboardRoutes(app, dashboardStatsService);
   mountServiceRoutes(app, env);
   mountFallbackRoute(app);
