@@ -80,6 +80,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
           responses: {
             "200": { description: "Sessão", ...successJson },
+            "401": { description: "Credenciais ou contexto da conta inválidos" },
           },
         },
       },

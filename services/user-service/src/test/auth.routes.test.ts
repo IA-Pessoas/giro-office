@@ -1,3 +1,4 @@
+import { ServiceError } from "@workspace/shared";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -25,6 +26,23 @@ describe("auth routes", () => {
 
     expect(res.status).toBe(200);
     expect(authServiceMock.login).toHaveBeenCalledWith({ login: "admin", password: "secret" });
+  });
+
+  it("POST /user/session serializa a falha genérica sem redirect", async () => {
+    authServiceMock.login.mockRejectedValue(new ServiceError(401, "Login ou senha inválidos."));
+
+    const response = await request(createTestApp())
+      .post("/user/session")
+      .send({ login: "account", password: "secret" });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Login ou senha inválidos.",
+      code: "UNAUTHORIZED",
+    });
+    expect(Object.keys(response.body).sort()).toEqual(["code", "error", "requestId", "success"]);
+    expect(response.headers.location).toBeUndefined();
   });
 
   it("POST /user/start-config executa configuracao inicial", async () => {
