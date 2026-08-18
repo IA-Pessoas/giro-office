@@ -11,10 +11,15 @@
 **/.node-version @eedsilva
 **/.nvmrc @eedsilva
 
-**/*config*.js @eedsilva
-**/*config*.mjs @eedsilva
-**/*config*.cjs @eedsilva
-**/*config*.ts @eedsilva
+**/*.config.* @eedsilva
+**/tsconfig*.json @eedsilva
+/*config*.* @eedsilva
+/app/*config*.* @eedsilva
+/services/*/*config*.* @eedsilva
+/packages/*/*config*.* @eedsilva
+**/turbo.json @eedsilva
+**/biome.json @eedsilva
+**/.editorconfig @eedsilva
 
 /.husky/** @eedsilva
 **/scripts/** @eedsilva
@@ -23,6 +28,7 @@
 /.cursor/** @eedsilva
 /.codex/** @eedsilva
 /.claude/** @eedsilva
+/.agents/** @eedsilva
 **/AGENTS.md @eedsilva
 **/CLAUDE.md @eedsilva
 
@@ -33,9 +39,10 @@
 **/compose*.yml @eedsilva
 **/compose*.yaml @eedsilva
 **/Caddyfile @eedsilva
-**/*caddy* @eedsilva
-**/*nginx* @eedsilva
-**/*proxy* @eedsilva
+**/*caddy*.json @eedsilva
+**/*caddy*.conf @eedsilva
+**/*nginx*.conf @eedsilva
+**/*proxy*.conf @eedsilva
 /docker/** @eedsilva
 /infra/** @eedsilva
 **/*.tf @eedsilva
@@ -46,5 +53,10 @@
 
 **/.env* @eedsilva
 **/SECURITY.md @eedsilva
-**/*allowlist* @eedsilva
-**/*policy* @eedsilva
+**/*allowlist*.json @eedsilva
+**/*allowlist*.yaml @eedsilva
+**/*allowlist*.yml @eedsilva
+**/*policy*.json @eedsilva
+**/*policy*.yaml @eedsilva
+**/*policy*.yml @eedsilva
+**/*policy*.md @eedsilva
