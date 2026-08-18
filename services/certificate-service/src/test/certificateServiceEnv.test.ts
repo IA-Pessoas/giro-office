@@ -99,4 +99,15 @@ describe("certificate service env", () => {
       /CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64/,
     );
   });
+
+  it("rejects malformed certificate password encryption keys that decode to 32 bytes", () => {
+    resetEnv({
+      CERTIFICATE_STORAGE_MODE: "local",
+      CERTIFICATE_PASSWORD_ENCRYPTION_KEY: `${validPasswordKey}!`,
+    });
+
+    expect(() => getCertificateServiceEnv()).toThrow(
+      /CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64/,
+    );
+  });
 });

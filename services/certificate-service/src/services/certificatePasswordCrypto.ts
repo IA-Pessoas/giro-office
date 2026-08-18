@@ -22,8 +22,15 @@ type EncryptedTextPayload = {
 const decryptionError = () =>
   new ServiceError(500, "Erro ao descriptografar senha de certificado.");
 
+function isCanonicalBase64(value: string): boolean {
+  return (
+    /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value) &&
+    Buffer.from(value, "base64").toString("base64") === value
+  );
+}
+
 function decodeBase64(value: string): Buffer {
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+  if (!isCanonicalBase64(value)) {
     throw decryptionError();
   }
 
@@ -63,9 +70,11 @@ function parseEncryptedTextPayload(value: string, keyVersion: string): Encrypted
 export function createCertificatePasswordCrypto(
   options: CertificatePasswordCryptoOptions,
 ): CertificatePasswordCrypto {
-  const key = Buffer.from(options.keyBase64, "base64");
+  const key = isCanonicalBase64(options.keyBase64)
+    ? Buffer.from(options.keyBase64, "base64")
+    : undefined;
 
-  if (key.length !== 32) {
+  if (!key || key.length !== 32) {
     throw new ServiceError(500, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64.");
   }
 

@@ -27,6 +27,13 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function isCanonicalBase64(value: string): boolean {
+  return (
+    /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value) &&
+    Buffer.from(value, "base64").toString("base64") === value
+  );
+}
+
 const storageModeSchema = z.enum(["supabase", "local"]);
 
 const certificateServiceEnvSchema = z
@@ -66,7 +73,7 @@ const certificateServiceEnvSchema = z
       .string()
       .min(1, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY nao definida.")
       .refine(
-        (value) => Buffer.from(value, "base64").length === 32,
+        (value) => isCanonicalBase64(value) && Buffer.from(value, "base64").length === 32,
         "CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64.",
       ),
     certificatePasswordEncryptionKeyVersion: z.string().min(1).default("v1"),
