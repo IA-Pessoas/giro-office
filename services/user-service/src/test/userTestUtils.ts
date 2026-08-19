@@ -134,8 +134,15 @@ export function gatewayAuthHeaders(overrides?: {
   };
 }
 
-export function createTestApp(overrides: Partial<UserServiceEnv> = {}) {
-  const env = { ...getUserServiceEnv(), ...overrides };
+export function createTestApp(
+  overrides: Partial<UserServiceEnv> = {},
+  options: { rateLimitStore?: import("@workspace/shared/http").RateLimitStore } = {},
+) {
+  const env = {
+    ...getUserServiceEnv(),
+    authRateLimitDegradationMode: "observe" as const,
+    ...overrides,
+  };
   const logger = createLogger({
     service: "user-service-test",
     env: "test",
@@ -143,7 +150,7 @@ export function createTestApp(overrides: Partial<UserServiceEnv> = {}) {
     destination: new MemoryLogStream(),
   });
 
-  return createUserApp(env, logger);
+  return createUserApp(env, logger, options);
 }
 
 export function resetUserRouteMocks() {

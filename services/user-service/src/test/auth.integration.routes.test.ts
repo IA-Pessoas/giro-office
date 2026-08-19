@@ -38,7 +38,7 @@ function activeUser(overrides: Record<string, unknown> = {}) {
 
 function createTestApp() {
   return createUserApp(
-    getUserServiceEnv(),
+    { ...getUserServiceEnv(), authRateLimitDegradationMode: "observe" },
     createLogger({
       service: "user-service-test",
       env: "test",

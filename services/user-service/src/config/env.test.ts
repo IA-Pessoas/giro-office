@@ -21,6 +21,7 @@ function setUserServiceEnv(overrides: NodeJS.ProcessEnv) {
   process.env.ADMIN_PASSWORD = "admin-password";
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
+  process.env.AUTH_RATE_LIMIT_KEY_SECRET = "secure-auth-rate-limit-key-with-at-least-32-chars";
   process.env.AUDIT_SERVICE_TOKEN = "secure-internal-token-with-at-least-32-chars";
   process.env.SERVICE_ALLOWED_ORIGINS = "https://app.example.com";
   Object.assign(process.env, overrides);
@@ -41,5 +42,12 @@ describe("user-service env security validation", () => {
     setUserServiceEnv({ SERVICE_ALLOWED_ORIGINS: "*" });
 
     expect(() => getUserServiceEnv()).toThrow(/SERVICE_ALLOWED_ORIGINS/);
+  });
+
+  it("requires the auth rate-limit HMAC secret in production", () => {
+    setUserServiceEnv({});
+    delete process.env.AUTH_RATE_LIMIT_KEY_SECRET;
+
+    expect(() => getUserServiceEnv()).toThrow(/AUTH_RATE_LIMIT_KEY_SECRET/);
   });
 });

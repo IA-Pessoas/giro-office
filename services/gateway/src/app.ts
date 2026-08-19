@@ -1,18 +1,22 @@
 import {
   type AuthLogContext,
   createAuditRecorder,
+  createAuthenticationRateLimitMiddleware,
   createExpressErrorHandler,
+  createPostgresRateLimitStore,
   createRateLimitMiddleware,
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
   type Logger,
   type LogLevel,
+  type RateLimitStore,
   ServiceError,
 } from "@workspace/shared";
 import { mountOpenApiDocs } from "@workspace/shared/http";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
+import pg from "pg";
 import { isGatewayRouteDisabled } from "./config/disabledRoutes.js";
 import type { GatewayEnv } from "./config/env.js";
 import { getGatewayServiceDefinitions, resolveGatewayService } from "./config/serviceRegistry.js";
@@ -35,10 +39,12 @@ import { DashboardStatsService } from "./services/dashboardStatsService.js";
 type GatewayOpenApiSpec = ReturnType<typeof buildGatewayOpenApiSpec>;
 type AuditRecorder = ReturnType<typeof createAuditRecorder>;
 type GatewayProxy = ReturnType<typeof buildHttpProxyMiddleware>;
+const { Pool } = pg;
 
 export interface GatewayAppDeps {
   dashboardStatsService?: DashboardStatsProvider;
   sessionValidator?: SessionValidator;
+  rateLimitStore?: RateLimitStore;
 }
 
 function getRequestLogger(request: Request, logger: Logger): Logger {
@@ -213,7 +219,7 @@ function normalizeJsonBodyError(
 }
 
 function configureExpress(app: express.Express, env: GatewayEnv): void {
-  app.set("trust proxy", true);
+  app.set("trust proxy", env.trustedProxyCidrs);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
 }
 
@@ -265,9 +271,12 @@ function mountPublicRoutes(
       siteTitle: "gateway - OpenAPI",
     });
   } else {
-    app.use(["/docs", "/openapi.json", "/__gateway-openapi-static.json"], (_request, _response, next) => {
-      next(new ServiceError(404, "Recurso não encontrado."));
-    });
+    app.use(
+      ["/docs", "/openapi.json", "/__gateway-openapi-static.json"],
+      (_request, _response, next) => {
+        next(new ServiceError(404, "Recurso não encontrado."));
+      },
+    );
   }
 
   app.get("/health", (_request, response) => {
@@ -297,16 +306,31 @@ function mountPublicRoutes(
   });
 }
 
-function mountAuthRateLimits(app: express.Express, env: GatewayEnv): void {
-  const authRateLimit = createRateLimitMiddleware({
-    key: "gateway:auth",
-    max: env.authRateLimitMax,
+function mountAuthRateLimits(
+  app: express.Express,
+  env: GatewayEnv,
+  logger: Logger,
+  store: RateLimitStore | undefined,
+): void {
+  const options = {
+    store,
+    keySecret: env.authRateLimitKeySecret,
+    ipMax: env.authRateLimitIpMax,
+    accountMax: env.authRateLimitAccountMax,
+    ipAccountMax: env.authRateLimitIpAccountMax,
     windowMs: env.authRateLimitWindowMs,
-    methods: ["POST"],
-  });
+    timeoutMs: env.authRateLimitTimeoutMs,
+    degradationMode: env.authRateLimitDegradationMode,
+    onDecision: ({ bucket, outcome }: { bucket: string; outcome: "blocked" | "observed" }) =>
+      logger.warn({ event: "auth.rate_limit.decision", data: { bucket, outcome } }),
+    onDegraded: () => logger.warn({ event: "auth.rate_limit.degraded" }),
+  };
 
-  app.use("/user/session", authRateLimit);
-  app.use("/user/start-config", authRateLimit);
+  app.use("/user/session", createAuthenticationRateLimitMiddleware(options));
+  app.use(
+    "/user/start-config",
+    createAuthenticationRateLimitMiddleware({ ...options, buckets: ["ip"] }),
+  );
 }
 
 function mountPublicBlockedRoutes(app: express.Express, env: GatewayEnv): void {
@@ -439,12 +463,17 @@ export function createApp(
     serviceToken: env.auditServiceToken,
     logger,
   });
+  const rateLimitStore =
+    deps.rateLimitStore ??
+    (env.nodeEnv === "test" || !env.databaseUrl
+      ? undefined
+      : createPostgresRateLimitStore(new Pool({ connectionString: env.databaseUrl })));
 
   configureExpress(app, env);
   mountObservability(app, env, logger, recordAuditRequest);
   mountCorsAndParsing(app, env);
   mountPublicRoutes(app, env, gatewayOpenApiSpec);
-  mountAuthRateLimits(app, env);
+  mountAuthRateLimits(app, env, logger, rateLimitStore);
   mountPublicBlockedRoutes(app, env);
   const sessionValidator =
     deps.sessionValidator ??

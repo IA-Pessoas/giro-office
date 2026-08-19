@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import path from "node:path";
 
 import { fileURLToPath } from "node:url";
@@ -26,6 +27,57 @@ function parseBoolean(value: string | undefined): boolean {
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseBoundedPositiveInteger(
+  value: string | undefined,
+  fallback: number,
+  maximum: number,
+  envName: string,
+  ctx: z.RefinementCtx,
+): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  const result = value === undefined || value.trim() === "" ? fallback : parsed;
+
+  if (!Number.isInteger(result) || result < 1 || result > maximum) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${envName} deve ser um inteiro entre 1 e ${maximum}.`,
+    });
+    return z.NEVER;
+  }
+
+  return result;
+}
+
+function parseTrustedProxyCidrs(value: string | undefined, ctx: z.RefinementCtx): string[] {
+  const cidrs = (value ?? "")
+    .split(",")
+    .map((cidr) => cidr.trim())
+    .filter(Boolean);
+
+  for (const cidr of cidrs) {
+    const [address, prefix, ...rest] = cidr.split("/");
+    const family = address ? isIP(address) : 0;
+    const maxPrefix = family === 4 ? 32 : 128;
+    const parsedPrefix = Number.parseInt(prefix ?? "", 10);
+
+    if (
+      rest.length > 0 ||
+      family === 0 ||
+      !Number.isInteger(parsedPrefix) ||
+      parsedPrefix < 0 ||
+      parsedPrefix > maxPrefix
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "TRUSTED_PROXY_CIDRS deve conter apenas CIDRs válidos.",
+      });
+      return z.NEVER;
+    }
+  }
+
+  return cidrs;
 }
 
 const rawEnvSchema = z
@@ -98,6 +150,45 @@ const rawEnvSchema = z
       .string()
       .optional()
       .transform((value) => parsePositiveInteger(value, 600_000)),
+    authRateLimitKeySecret: z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || undefined),
+    authRateLimitIpMax: z
+      .string()
+      .optional()
+      .transform((value, ctx) =>
+        parseBoundedPositiveInteger(value, 10, 1_000, "AUTH_RATE_LIMIT_IP_MAX", ctx),
+      ),
+    authRateLimitAccountMax: z
+      .string()
+      .optional()
+      .transform((value, ctx) =>
+        parseBoundedPositiveInteger(value, 3, 1_000, "AUTH_RATE_LIMIT_ACCOUNT_MAX", ctx),
+      ),
+    authRateLimitIpAccountMax: z
+      .string()
+      .optional()
+      .transform((value, ctx) =>
+        parseBoundedPositiveInteger(value, 5, 1_000, "AUTH_RATE_LIMIT_IP_ACCOUNT_MAX", ctx),
+      ),
+    authRateLimitWindowMs: z
+      .string()
+      .optional()
+      .transform((value, ctx) =>
+        parseBoundedPositiveInteger(value, 60_000, 86_400_000, "AUTH_RATE_LIMIT_WINDOW_MS", ctx),
+      ),
+    authRateLimitTimeoutMs: z
+      .string()
+      .optional()
+      .transform((value, ctx) =>
+        parseBoundedPositiveInteger(value, 1_000, 10_000, "AUTH_RATE_LIMIT_TIMEOUT_MS", ctx),
+      ),
+    authRateLimitDegradationMode: z.enum(["block", "observe"]).optional().default("block"),
+    trustedProxyCidrs: z
+      .string()
+      .optional()
+      .transform((value, ctx) => parseTrustedProxyCidrs(value, ctx)),
   })
 
   .superRefine((env, ctx) => {
@@ -132,6 +223,14 @@ const envSchema = rawEnvSchema.transform((env) => {
     envName: "SERVICE_ALLOWED_ORIGINS",
     allowedOrigins: rest.allowedOrigins,
   });
+  if (
+    rest.nodeEnv === "production" &&
+    (!rest.authRateLimitKeySecret || rest.authRateLimitKeySecret.length < 32)
+  ) {
+    throw new Error(
+      "user-service: AUTH_RATE_LIMIT_KEY_SECRET deve ter ao menos 32 caracteres em produção.",
+    );
+  }
 
   return {
     ...rest,
@@ -139,6 +238,7 @@ const envSchema = rawEnvSchema.transform((env) => {
     logPretty: rest.nodeEnv !== "production" && rest.logPretty,
 
     enableApiDocs,
+    authRateLimitKeySecret: rest.authRateLimitKeySecret ?? "development-auth-rate-limit-secret",
   };
 });
 
@@ -173,5 +273,13 @@ export function getUserServiceEnv(): UserServiceEnv {
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
     uploadRateLimitMax: process.env.UPLOAD_RATE_LIMIT_MAX,
     uploadRateLimitWindowMs: process.env.UPLOAD_RATE_LIMIT_WINDOW_MS,
+    authRateLimitKeySecret: process.env.AUTH_RATE_LIMIT_KEY_SECRET,
+    authRateLimitIpMax: process.env.AUTH_RATE_LIMIT_IP_MAX,
+    authRateLimitAccountMax: process.env.AUTH_RATE_LIMIT_ACCOUNT_MAX,
+    authRateLimitIpAccountMax: process.env.AUTH_RATE_LIMIT_IP_ACCOUNT_MAX,
+    authRateLimitWindowMs: process.env.AUTH_RATE_LIMIT_WINDOW_MS,
+    authRateLimitTimeoutMs: process.env.AUTH_RATE_LIMIT_TIMEOUT_MS,
+    authRateLimitDegradationMode: process.env.AUTH_RATE_LIMIT_DEGRADATION_MODE,
+    trustedProxyCidrs: process.env.TRUSTED_PROXY_CIDRS,
   });
 }

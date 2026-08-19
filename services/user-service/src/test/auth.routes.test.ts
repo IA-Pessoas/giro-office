@@ -1,4 +1,5 @@
 import { ServiceError } from "@workspace/shared";
+import { createMemoryRateLimitStore } from "@workspace/shared/http";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -26,6 +27,48 @@ describe("auth routes", () => {
 
     expect(res.status).toBe(200);
     expect(authServiceMock.login).toHaveBeenCalledWith({ login: "admin", password: "secret" });
+  });
+
+  it("bloqueia o quarto login paralelo da mesma conta normalizada em IPs distintos", async () => {
+    authServiceMock.login.mockResolvedValue({ token: "jwt" });
+    const app = createTestApp(
+      {
+        trustedProxyCidrs: ["127.0.0.1/32"],
+        authRateLimitIpMax: 10,
+        authRateLimitAccountMax: 3,
+        authRateLimitIpAccountMax: 10,
+        authRateLimitDegradationMode: "block",
+      },
+      { rateLimitStore: createMemoryRateLimitStore() },
+    );
+
+    const responses = await Promise.all(
+      ["10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"].map((ip) =>
+        request(app)
+          .post("/user/session")
+          .set("X-Forwarded-For", ip)
+          .send({ login: " A@EXAMPLE.COM ", password: "secret" }),
+      ),
+    );
+
+    expect(responses.filter((response) => response.status === 429)).toHaveLength(1);
+    expect(responses.find((response) => response.status === 429)?.headers["retry-after"]).toMatch(
+      /^\d+$/,
+    );
+  });
+
+  it("bloqueia o login quando o armazenamento distribuído está indisponível", async () => {
+    const app = createTestApp(
+      { authRateLimitDegradationMode: "block" },
+      { rateLimitStore: { consume: async () => Promise.reject(new Error("unavailable")) } },
+    );
+
+    const response = await request(app)
+      .post("/user/session")
+      .send({ login: "account", password: "secret" });
+
+    expect(response.status).toBe(503);
+    expect(authServiceMock.login).not.toHaveBeenCalled();
   });
 
   it("POST /user/session serializa a falha genérica sem redirect", async () => {

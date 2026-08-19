@@ -1,9 +1,13 @@
+import { createRequire } from "node:module";
 import {
+  createAuthenticationRateLimitMiddleware,
   createExpressErrorHandler,
+  createPostgresRateLimitStore,
   createRateLimitMiddleware,
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
+  type RateLimitStore,
 } from "@workspace/shared";
 import { mountOpenApiDocs } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
@@ -19,6 +23,17 @@ import { buildUserServiceOpenApiSpec } from "./openapi/spec.js";
 import { authRoutes } from "./routes/auth.routes.js";
 import { createPermissionRoutes } from "./routes/permission.routes.js";
 import { createUserRoutes } from "./routes/user.routes.js";
+
+const { Pool } = createRequire(import.meta.url)("pg") as {
+  Pool: new (options: {
+    connectionString: string;
+  }) => {
+    query(
+      text: string,
+      values: readonly unknown[],
+    ): Promise<{ rows: Array<{ allowed: boolean; retry_after_seconds: number }> }>;
+  };
+};
 
 function userServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -36,12 +51,32 @@ function userServiceErrorLogContext(request: Request): Record<string, unknown> |
 export function createUserApp(
   env: UserServiceEnv,
   logger: Logger,
-  options: { audit?: UserAuditRecorder } = {},
+  options: { audit?: UserAuditRecorder; rateLimitStore?: RateLimitStore } = {},
 ): Express {
   const app = express();
   const userRoutes = createUserRoutes({ audit: options.audit });
   const permissionRoutes = createPermissionRoutes({ audit: options.audit });
 
+  const rateLimitStore =
+    options.rateLimitStore ??
+    (env.nodeEnv === "test"
+      ? undefined
+      : createPostgresRateLimitStore(new Pool({ connectionString: env.databaseUrl })));
+  const authRateLimitOptions = {
+    store: rateLimitStore,
+    keySecret: env.authRateLimitKeySecret,
+    ipMax: env.authRateLimitIpMax,
+    accountMax: env.authRateLimitAccountMax,
+    ipAccountMax: env.authRateLimitIpAccountMax,
+    windowMs: env.authRateLimitWindowMs,
+    timeoutMs: env.authRateLimitTimeoutMs,
+    degradationMode: env.authRateLimitDegradationMode,
+    onDecision: ({ bucket, outcome }: { bucket: string; outcome: "blocked" | "observed" }) =>
+      logger.warn({ event: "auth.rate_limit.decision", data: { bucket, outcome } }),
+    onDegraded: () => logger.warn({ event: "auth.rate_limit.degraded" }),
+  };
+
+  app.set("trust proxy", env.trustedProxyCidrs);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "user-service")));
   app.use(express.json());
@@ -58,6 +93,11 @@ export function createUserApp(
     });
   }
 
+  app.use("/user/session", createAuthenticationRateLimitMiddleware(authRateLimitOptions));
+  app.use(
+    "/user/start-config",
+    createAuthenticationRateLimitMiddleware({ ...authRateLimitOptions, buckets: ["ip"] }),
+  );
   app.use("/user", authRoutes);
   app.post(
     "/user/:id/photo",

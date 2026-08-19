@@ -5,6 +5,7 @@ import { Writable } from "node:stream";
 import type { CreateAuditRequestPayload } from "@workspace/shared";
 import {
   createLogger,
+  createMemoryRateLimitStore,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
@@ -185,8 +186,14 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     allowedOrigins: ["*"],
     rateLimitMax: 300,
     rateLimitWindowMs: 60_000,
-    authRateLimitMax: 10,
     authRateLimitWindowMs: 60_000,
+    authRateLimitKeySecret: "test-auth-rate-limit-key-with-at-least-32-chars",
+    authRateLimitIpMax: 10,
+    authRateLimitAccountMax: 3,
+    authRateLimitIpAccountMax: 5,
+    authRateLimitTimeoutMs: 1_000,
+    authRateLimitDegradationMode: "observe",
+    trustedProxyCidrs: [],
     jsonBodyLimit: "1mb",
     ...overrides,
   };
@@ -946,7 +953,16 @@ it("rate limits repeated public login attempts", async () => {
   });
   const userServiceUrl = await startServer(upstream);
 
-  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const app = createApp(
+    createEnv({
+      userServiceUrl,
+      authRateLimitAccountMax: 10,
+      authRateLimitIpAccountMax: 10,
+      authRateLimitDegradationMode: "block",
+    }),
+    createTestLogger(),
+    { rateLimitStore: createMemoryRateLimitStore() },
+  );
   const gateway = createServer(app);
   const gatewayUrl = await startServer(gateway);
 
@@ -974,6 +990,51 @@ it("rate limits repeated public login attempts", async () => {
     expect(limited.status).toBe(429);
     expect(body.code).toBe("TOO_MANY_REQUESTS");
     expect(upstreamHits).toBe(10);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("ignores X-Forwarded-For supplied by a direct client when rate limiting login", async () => {
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { token: "ok" } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const gateway = createServer(
+    createApp(
+      createEnv({
+        userServiceUrl,
+        authRateLimitIpMax: 1,
+        authRateLimitAccountMax: 10,
+        authRateLimitIpAccountMax: 10,
+        authRateLimitDegradationMode: "block",
+      }),
+      createTestLogger(),
+      { rateLimitStore: createMemoryRateLimitStore() },
+    ),
+  );
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const first = await fetch(`${gatewayUrl}/user/session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "198.51.100.1" },
+      body: JSON.stringify({ login: "first", password: "secret" }),
+    });
+    const second = await fetch(`${gatewayUrl}/user/session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "198.51.100.2" },
+      body: JSON.stringify({ login: "second", password: "secret" }),
+    });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(429);
+    expect(upstreamHits).toBe(1);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -1077,7 +1138,6 @@ it("does not apply the general rate limit to gateway infrastructure routes", asy
   const app = createApp(
     createEnv({
       rateLimitMax: 1,
-      authRateLimitMax: 1,
     }),
     createTestLogger(),
   );

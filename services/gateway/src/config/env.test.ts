@@ -21,6 +21,8 @@ function setGatewayEnv(overrides: NodeJS.ProcessEnv) {
   delete process.env.GATEWAY_AUTHORIZATION_MODE;
   process.env.JWT_SECRET = "test-secret";
   process.env.NODE_ENV = "production";
+  process.env.DATABASE_URL = "postgresql://127.0.0.1:5432/test";
+  process.env.AUTH_RATE_LIMIT_KEY_SECRET = "secure-auth-rate-limit-key-with-at-least-32-chars";
   process.env.AUDIT_SERVICE_TOKEN = "secure-internal-token-with-at-least-32-chars";
   process.env.CLIENT_SERVICE_INTERNAL_TOKEN = "secure-client-service-token-with-at-least-32-chars";
   process.env.TI_SERVICE_INTERNAL_TOKEN = "secure-ti-service-token-with-at-least-32-chars";
@@ -73,6 +75,21 @@ describe("gateway env security validation", () => {
     setGatewayEnv({ GATEWAY_ALLOWED_ORIGINS: "*" });
 
     expect(() => getGatewayEnv()).toThrow(/GATEWAY_ALLOWED_ORIGINS/);
+  });
+
+  it("requires the auth rate-limit HMAC secret in production", () => {
+    setGatewayEnv({});
+    delete process.env.AUTH_RATE_LIMIT_KEY_SECRET;
+
+    expect(() => getGatewayEnv()).toThrow(/AUTH_RATE_LIMIT_KEY_SECRET/);
+  });
+
+  it("rejects unbounded auth rate-limit and proxy configuration", () => {
+    setGatewayEnv({ AUTH_RATE_LIMIT_ACCOUNT_MAX: "1001" });
+    expect(() => getGatewayEnv()).toThrow(/AUTH_RATE_LIMIT_ACCOUNT_MAX/);
+
+    setGatewayEnv({ TRUSTED_PROXY_CIDRS: "proxy.example.com" });
+    expect(() => getGatewayEnv()).toThrow(/TRUSTED_PROXY_CIDRS/);
   });
 
   it("uses safe defaults for optional gateway public URL and JSON body limit", () => {

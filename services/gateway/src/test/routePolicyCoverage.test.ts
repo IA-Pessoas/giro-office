@@ -36,8 +36,14 @@ function createCoverageEnv(): GatewayEnv {
     allowedOrigins: ["*"],
     rateLimitMax: 300,
     rateLimitWindowMs: 60_000,
-    authRateLimitMax: 10,
     authRateLimitWindowMs: 60_000,
+    authRateLimitKeySecret: "test-auth-rate-limit-key-with-at-least-32-chars",
+    authRateLimitIpMax: 10,
+    authRateLimitAccountMax: 3,
+    authRateLimitIpAccountMax: 5,
+    authRateLimitTimeoutMs: 1_000,
+    authRateLimitDegradationMode: "observe",
+    trustedProxyCidrs: [],
     jsonBodyLimit: "1mb",
   };
 }

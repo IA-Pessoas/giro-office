@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { ServiceError } from "./errors.js";
 
@@ -23,6 +24,26 @@ export interface RateLimitStore {
     windowMs: number;
     now?: Date;
   }): Promise<{ allowed: boolean; retryAfterSeconds: number }>;
+}
+
+export type AuthenticationRateLimitBucket = "ip" | "account" | "ip-account";
+
+export interface AuthenticationRateLimitOptions {
+  store?: RateLimitStore;
+  keySecret: string;
+  ipMax: number;
+  accountMax: number;
+  ipAccountMax: number;
+  windowMs: number;
+  timeoutMs: number;
+  degradationMode: "block" | "observe";
+  methods?: string[];
+  buckets?: AuthenticationRateLimitBucket[];
+  onDecision?: (input: {
+    bucket: AuthenticationRateLimitBucket;
+    outcome: "blocked" | "observed";
+  }) => void;
+  onDegraded?: () => void;
 }
 
 const POSTGRES_RATE_LIMIT_QUERY = `
@@ -94,6 +115,114 @@ type RequestWithAuthContext = Request & {
 
 function getRequestIp(request: Request): string {
   return request.ip || request.socket?.remoteAddress || "unknown";
+}
+
+function getLoginFromRequest(request: Request): string {
+  const body = request.body as { login?: unknown } | undefined;
+  return typeof body?.login === "string" ? body.login.trim().toLocaleLowerCase("en-US") : "";
+}
+
+function createAuthenticationKey(secret: string, value: string): string {
+  return createHmac("sha256", secret).update(value).digest("base64url");
+}
+
+async function consumeWithTimeout(
+  store: RateLimitStore,
+  input: Parameters<RateLimitStore["consume"]>[0],
+  timeoutMs: number,
+): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      store.consume(input),
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error("Rate limit storage timed out.")), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+export function createAuthenticationRateLimitMiddleware({
+  store,
+  keySecret,
+  ipMax,
+  accountMax,
+  ipAccountMax,
+  windowMs,
+  timeoutMs,
+  degradationMode,
+  methods = ["POST"],
+  buckets = ["ip", "account", "ip-account"],
+  onDecision,
+  onDegraded,
+}: AuthenticationRateLimitOptions) {
+  const limits: Record<AuthenticationRateLimitBucket, number> = {
+    ip: ipMax,
+    account: accountMax,
+    "ip-account": ipAccountMax,
+  };
+
+  return async function authenticationRateLimit(
+    request: Request,
+    response: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    if (!methods.includes(request.method.toUpperCase())) {
+      next();
+      return;
+    }
+
+    const ip = getRequestIp(request);
+    const login = getLoginFromRequest(request);
+    const keys: Record<AuthenticationRateLimitBucket, string> = {
+      ip: `auth:ip:${createAuthenticationKey(keySecret, ip)}`,
+      account: `auth:account:${createAuthenticationKey(keySecret, login)}`,
+      "ip-account": `auth:ip-account:${createAuthenticationKey(keySecret, `${ip}\u001f${login}`)}`,
+    };
+
+    try {
+      if (!store) {
+        throw new Error("Rate limit storage is unavailable.");
+      }
+
+      for (const bucket of buckets) {
+        const result = await consumeWithTimeout(
+          store,
+          { key: keys[bucket], max: limits[bucket], windowMs },
+          timeoutMs,
+        );
+
+        if (result.allowed) {
+          continue;
+        }
+
+        if (degradationMode === "observe") {
+          onDecision?.({ bucket, outcome: "observed" });
+          continue;
+        }
+
+        response.setHeader("Retry-After", String(result.retryAfterSeconds));
+        onDecision?.({ bucket, outcome: "blocked" });
+        next(
+          new ServiceError(429, "Muitas tentativas de autenticação. Tente novamente em instantes."),
+        );
+        return;
+      }
+    } catch {
+      onDegraded?.();
+      if (degradationMode === "block") {
+        next(new ServiceError(503, "Serviço de autenticação temporariamente indisponível."));
+        return;
+      }
+    }
+
+    next();
+  };
 }
 
 function getAuthScopedKey(request: Request): string | undefined {
