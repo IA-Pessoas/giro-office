@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { ServiceError } from "../../src/http/errors.js";
-import { createRateLimitMiddleware } from "../../src/http/rate-limit.js";
+import {
+  createMemoryRateLimitStore,
+  createPostgresRateLimitStore,
+  createRateLimitMiddleware,
+} from "../../src/http/rate-limit.js";
 
 type NextResult = Error | undefined;
 
@@ -80,4 +84,49 @@ test("createRateLimitMiddleware uses auth context before IP when generating defa
 
   assert(error instanceof ServiceError);
   assert.equal(error.statusCode, 429);
+});
+
+test("shares one atomic bucket between concurrent consumers", async () => {
+  const store = createMemoryRateLimitStore();
+  const results = await Promise.all(
+    Array.from({ length: 8 }, () => store.consume({ key: "safe", max: 3, windowMs: 60_000 })),
+  );
+
+  assert.equal(results.filter((result) => !result.allowed).length, 5);
+});
+
+test("resets a memory bucket after its expiry", async () => {
+  const store = createMemoryRateLimitStore();
+
+  assert.deepEqual(
+    await store.consume({ key: "safe", max: 1, windowMs: 60_000, now: new Date(1_000) }),
+    { allowed: true, retryAfterSeconds: 60 },
+  );
+  assert.equal(
+    (await store.consume({ key: "safe", max: 1, windowMs: 60_000, now: new Date(1_000) })).allowed,
+    false,
+  );
+  assert.equal(
+    (await store.consume({ key: "safe", max: 1, windowMs: 60_000, now: new Date(61_000) })).allowed,
+    true,
+  );
+});
+
+test("maps the atomic PostgreSQL result to the rate-limit contract", async () => {
+  let receivedQuery = "";
+  let receivedValues: readonly unknown[] = [];
+  const store = createPostgresRateLimitStore({
+    async query(text, values) {
+      receivedQuery = text;
+      receivedValues = values;
+      return { rows: [{ allowed: false, retry_after_seconds: 42 }] };
+    },
+  });
+
+  assert.deepEqual(await store.consume({ key: "safe", max: 3, windowMs: 60_000 }), {
+    allowed: false,
+    retryAfterSeconds: 42,
+  });
+  assert.match(receivedQuery, /INSERT INTO security\.rate_limit_buckets/);
+  assert.deepEqual(receivedValues, ["safe", 60_000, 3]);
 });

@@ -16,6 +16,73 @@ interface RateLimitEntry {
   resetAt: number;
 }
 
+export interface RateLimitStore {
+  consume(input: {
+    key: string;
+    max: number;
+    windowMs: number;
+    now?: Date;
+  }): Promise<{ allowed: boolean; retryAfterSeconds: number }>;
+}
+
+const POSTGRES_RATE_LIMIT_QUERY = `
+INSERT INTO security.rate_limit_buckets (bucket_key, expires_at, hits)
+VALUES ($1, clock_timestamp() + ($2 * interval '1 millisecond'), 1)
+ON CONFLICT (bucket_key) DO UPDATE
+SET hits = CASE WHEN security.rate_limit_buckets.expires_at <= clock_timestamp() THEN 1 ELSE security.rate_limit_buckets.hits + 1 END,
+    expires_at = CASE WHEN security.rate_limit_buckets.expires_at <= clock_timestamp() THEN clock_timestamp() + ($2 * interval '1 millisecond') ELSE security.rate_limit_buckets.expires_at END
+RETURNING hits <= $3 AS allowed, GREATEST(1, CEIL(EXTRACT(EPOCH FROM (expires_at - clock_timestamp())))::int) AS retry_after_seconds;
+`;
+
+export function createMemoryRateLimitStore(): RateLimitStore {
+  const buckets = new Map<string, RateLimitEntry>();
+
+  return {
+    async consume({ key, max, windowMs, now = new Date() }) {
+      const currentTime = now.getTime();
+      const current = buckets.get(key);
+      const entry =
+        current && current.resetAt > currentTime
+          ? current
+          : { count: 0, resetAt: currentTime + windowMs };
+
+      if (entry.count >= max) {
+        return {
+          allowed: false,
+          retryAfterSeconds: Math.max(1, Math.ceil((entry.resetAt - currentTime) / 1000)),
+        };
+      }
+
+      entry.count += 1;
+      buckets.set(key, entry);
+      return {
+        allowed: true,
+        retryAfterSeconds: Math.max(1, Math.ceil((entry.resetAt - currentTime) / 1000)),
+      };
+    },
+  };
+}
+
+export function createPostgresRateLimitStore(client: {
+  query(
+    text: string,
+    values: readonly unknown[],
+  ): Promise<{ rows: Array<{ allowed: boolean; retry_after_seconds: number }> }>;
+}): RateLimitStore {
+  return {
+    async consume({ key, max, windowMs }) {
+      const { rows } = await client.query(POSTGRES_RATE_LIMIT_QUERY, [key, windowMs, max]);
+      const result = rows[0];
+
+      if (!result) {
+        throw new Error("A consulta de limite de requisições não retornou resultado.");
+      }
+
+      return { allowed: result.allowed, retryAfterSeconds: result.retry_after_seconds };
+    },
+  };
+}
+
 type RequestWithAuthContext = Request & {
   auth?: {
     userId?: unknown;
