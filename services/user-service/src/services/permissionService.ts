@@ -51,7 +51,7 @@ type PermissionTransaction = {
     "findFirst" | "create" | "updateMany"
   >;
   user: Pick<Prisma.TransactionClient["user"], "update">;
-  logs: Pick<Prisma.TransactionClient["logs"], "create">;
+  logs: Pick<Prisma.TransactionClient["logs"], "createMany">;
 };
 
 type UpdatePermissionInput = Partial<ModulePermissions>;
@@ -157,20 +157,22 @@ class PermissionService {
           });
 
           if (audit.actorUserId) {
-            await prisma.logs.create({
-              data: {
-                user_id: audit.actorUserId,
-                organization_id: organizationId,
-                action: "UPDATE",
-                referring: "Permission",
-                referring_id: userId,
-                changes: {
-                  affected_user_id: userId,
+            await prisma.logs.createMany({
+              data: [
+                {
+                  user_id: audit.actorUserId,
                   organization_id: organizationId,
-                  previous: previousPermission,
-                  next: nextPermission,
+                  action: "UPDATE",
+                  referring: "Permission",
+                  referring_id: userId,
+                  changes: {
+                    affected_user_id: userId,
+                    organization_id: organizationId,
+                    previous: previousPermission,
+                    next: nextPermission,
+                  },
                 },
-              },
+              ],
             });
           }
 

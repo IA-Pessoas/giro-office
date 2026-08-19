@@ -38,6 +38,19 @@ test("URL da role temporária substitui as credenciais administrativas", async (
   assert.equal(url.hostname, "db.example");
 });
 
+test("URL temporária preserva o project ref no pooler do Supabase", async () => {
+  const { createRuntimeDatabaseUrl } = await import("./verify-user-service-rls.mjs");
+  const url = new URL(
+    createRuntimeDatabaseUrl(
+      "postgresql://postgres.projectref:admin-secret@aws-1-us-east-1.pooler.supabase.com:5432/postgres",
+      { name: "giro_user_verify_abc", password: "runtime-secret" },
+    ),
+  );
+
+  assert.equal(url.username, "giro_user_verify_abc.projectref");
+  assert.equal(url.password, "runtime-secret");
+});
+
 test("login SQL usa bcrypt dummy quando não há candidato", () => {
   const migration = readFileSync(LOGIN_MIGRATION_URL, "utf8");
 
@@ -127,6 +140,10 @@ test("verificador cria role efêmera e reverte todo seed", async () => {
     /LOGIN INHERIT NOBYPASSRLS .* IN ROLE giro_user_runtime/,
   );
   assert.equal(
+    adminQueries.some((query) => query.startsWith('GRANT "giro_user_verify_')),
+    true,
+  );
+  assert.equal(
     adminQueries.includes(
       "SELECT to_regprocedure('extensions.crypt(text,text)') AS crypt_function",
     ),
@@ -139,7 +156,15 @@ test("verificador cria role efêmera e reverte todo seed", async () => {
     true,
   );
   assert.equal(
+    adminQueries.some((query) => query.startsWith('REVOKE "giro_user_verify_')),
+    true,
+  );
+  assert.equal(
     runtimeQueries.includes("SELECT current_setting('app.organization_id', true) AS value"),
     true,
+  );
+  assert.match(
+    adminQueries.find((query) => query.startsWith("INSERT INTO public.organizations")),
+    /updated_at/,
   );
 });
