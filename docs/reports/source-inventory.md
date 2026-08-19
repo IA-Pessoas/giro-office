@@ -27,7 +27,12 @@ servem somente para relações entre fontes: não são campos exportáveis.
 
 ## Gate G1
 
-Antes de criar uma terceira fonte ou fechar a milestone, é obrigatório ter:
+O Gate G1 aprova exatamente quatro fontes: as três de Parcelamento e a de
+Integração listadas acima. Parcelamento e Integração são os dois únicos
+domínios/adaptadores aprovados.
+
+Antes de liberar um terceiro domínio/adaptador ou fechar a milestone, é
+obrigatório ter:
 
 - matriz completa;
 - links válidos das issues [#811](https://github.com/IA-Pessoas/giro-office/issues/811) e [#812](https://github.com/IA-Pessoas/giro-office/issues/812);
