@@ -16,6 +16,10 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `GATEWAY_JSON_BODY_LIMIT` (opcional, padrao `1mb`)
 - `ENABLE_API_DOCS` (opcional; por padrão habilitado fora de produção e desabilitado em produção)
 - `GATEWAY_AUTHORIZATION_MODE` (`enforce`, padrão seguro; `observe` somente para rollout temporário)
+- `DATABASE_URL` e `AUTH_RATE_LIMIT_KEY_SECRET` (obrigatórias em produção para o limite distribuído de autenticação; o segredo tem ao menos 32 caracteres e é compartilhado com o user-service)
+- `AUTH_RATE_LIMIT_IP_MAX`, `AUTH_RATE_LIMIT_ACCOUNT_MAX`, `AUTH_RATE_LIMIT_IP_ACCOUNT_MAX`, `AUTH_RATE_LIMIT_WINDOW_MS`, `AUTH_RATE_LIMIT_TIMEOUT_MS`
+- `AUTH_RATE_LIMIT_DEGRADATION_MODE` (`block`, padrão; `observe` somente para canário limitado)
+- `TRUSTED_PROXY_CIDRS` (lista de CIDRs dos proxies confiáveis; vazio não confia em cabeçalhos encaminhados)
 - `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN`
 - `ORGANIZATION_SERVICE_URL`
 - `RH_SERVICE_URL`
@@ -83,6 +87,13 @@ sete dias). Nesse modo, rotas autenticadas ainda sem política são encaminhadas
 o evento agregado `authorization.unclassified_route` com método e namespace — sem URL completa,
 identificadores, query, cabeçalhos ou corpo. Depois de classificar os eventos observados, retorne
 para `enforce`.
+
+## Limite distribuído de autenticação
+
+O gateway usa PostgreSQL para os limites de `POST /user/session` e `POST /user/start-config`.
+Consulte o [runbook de rollout](../../docs/security/distributed-auth-rate-limits.md) antes de
+habilitar em produção; ele define a migration obrigatória, o canário em observe, métricas seguras
+e rollback sem adaptador local.
 
 ## Desenvolvimento
 
