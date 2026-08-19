@@ -1,0 +1,123 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
+import { type LoggerLevel, loggerLevelSchema } from "@workspace/shared/logger";
+import dotenv from "dotenv";
+import { z } from "zod";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootEnvPath = path.resolve(__dirname, "../../../../.env");
+const serviceEnvPath = path.resolve(__dirname, "../../.env");
+
+dotenv.config({ path: rootEnvPath });
+dotenv.config({ path: serviceEnvPath, override: process.env.NODE_ENV !== "test" });
+
+function parseBoolean(value: string | undefined): boolean {
+  return value === "true" || value === "1";
+}
+
+const reportsServiceEnvSchema = z
+  .object({
+    port: z.coerce.number().int().positive().default(3044),
+    nodeEnv: z.string().optional().default("development"),
+    databaseUrl: z.string().min(1, "DATABASE_URL nao definido para o reports-service."),
+    jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o reports-service."),
+    reportsInternalToken: z.string().optional().default("reports-service-token"),
+    reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
+    userServiceUrl: z.string().url("USER_SERVICE_URL invalida.").default("http://localhost:3001"),
+    parcelamentoServiceUrl: z
+      .string()
+      .url("PARCELAMENTO_SERVICE_URL invalida.")
+      .default("http://localhost:3043"),
+    clientServiceUrl: z
+      .string()
+      .url("CLIENT_SERVICE_URL invalida.")
+      .default("http://localhost:3000"),
+    workerPollIntervalMs: z.coerce.number().int().positive().default(5000),
+    workerConcurrency: z.coerce.number().int().positive().default(2),
+    workerLeaseSeconds: z.coerce.number().int().positive().default(120),
+    adapterTimeoutMs: z.coerce.number().int().positive().default(10000),
+    logLevel: loggerLevelSchema.optional().default("info"),
+    logPretty: z
+      .string()
+      .optional()
+      .default("false")
+      .transform((value) => parseBoolean(value)),
+    allowedOrigins: z
+      .string()
+      .optional()
+      .default("*")
+      .transform((value) => parseAllowedOrigins(value)),
+    enableApiDocsEnv: z.string().optional(),
+  })
+  .transform((env) => {
+    const { enableApiDocsEnv, ...rest } = env;
+    const enableApiDocs =
+      enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
+        ? parseBoolean(enableApiDocsEnv)
+        : rest.nodeEnv !== "production";
+
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "reports-service",
+      envName: "REPORTS_INTERNAL_TOKEN",
+      token: rest.reportsInternalToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "reports-service",
+      envName: "REPORTS_GRANT_SECRET",
+      token: rest.reportsGrantSecret,
+    });
+    validateProductionCorsOrigins({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "reports-service",
+      envName: "SERVICE_ALLOWED_ORIGINS",
+      allowedOrigins: rest.allowedOrigins,
+    });
+
+    return {
+      ...rest,
+      logPretty: rest.nodeEnv !== "production" && rest.logPretty,
+      enableApiDocs,
+    };
+  });
+
+export type ReportsServiceEnv = z.infer<typeof reportsServiceEnvSchema> & {
+  logLevel: LoggerLevel;
+  logPretty: boolean;
+};
+
+export function parseReportsServiceEnv(
+  source: NodeJS.ProcessEnv | Record<string, string | undefined>,
+): ReportsServiceEnv {
+  return reportsServiceEnvSchema.parse({
+    port: source.PORT,
+    nodeEnv: source.NODE_ENV,
+    databaseUrl: source.DATABASE_URL,
+    jwtSecret: source.JWT_SECRET,
+    reportsInternalToken: source.REPORTS_INTERNAL_TOKEN,
+    reportsGrantSecret: source.REPORTS_GRANT_SECRET,
+    userServiceUrl: source.USER_SERVICE_URL,
+    parcelamentoServiceUrl: source.PARCELAMENTO_SERVICE_URL,
+    clientServiceUrl: source.CLIENT_SERVICE_URL,
+    workerPollIntervalMs: source.REPORTS_WORKER_POLL_INTERVAL_MS,
+    workerConcurrency: source.REPORTS_WORKER_CONCURRENCY,
+    workerLeaseSeconds: source.REPORTS_WORKER_LEASE_SECONDS,
+    adapterTimeoutMs: source.REPORTS_ADAPTER_TIMEOUT_MS,
+    logLevel: source.LOG_LEVEL,
+    logPretty: source.LOG_PRETTY,
+    allowedOrigins: source.SERVICE_ALLOWED_ORIGINS,
+    enableApiDocsEnv: source.ENABLE_API_DOCS,
+  });
+}
+
+export function getReportsServiceEnv(): ReportsServiceEnv {
+  return parseReportsServiceEnv(process.env);
+}

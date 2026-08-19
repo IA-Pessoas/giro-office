@@ -19,6 +19,7 @@ packages:
   - "services/certificate-service"
   - "services/pessoal-service"
   - "services/parcelamento-service"
+  - "services/reports-service"
   - "services/src"
 
 minimumReleaseAge: 1440
