@@ -1,8 +1,18 @@
 import { ServiceError } from "@workspace/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, bcryptMock, permissionServiceMock, userAuditMock } = vi.hoisted(() => ({
+const {
+  prismaMock,
+  bcryptMock,
+  permissionServiceMock,
+  permissionServiceConstructorMock,
+  userAuditMock,
+} = vi.hoisted(() => ({
   prismaMock: {
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(async (action: (transaction: unknown) => unknown) => {
+      return await action(prismaMock);
+    }),
     user: {
       findMany: vi.fn(),
       count: vi.fn(),
@@ -23,6 +33,7 @@ const { prismaMock, bcryptMock, permissionServiceMock, userAuditMock } = vi.hois
     getByUserId: vi.fn(),
     update: vi.fn(),
   },
+  permissionServiceConstructorMock: vi.fn(),
   userAuditMock: vi.fn(),
 }));
 
@@ -35,49 +46,53 @@ vi.mock("bcryptjs", () => ({
 }));
 
 vi.mock("../services/permissionService.js", () => ({
-  PermissionService: vi.fn(function PermissionService() {
-    return permissionServiceMock;
-  }),
+  PermissionService: permissionServiceConstructorMock,
 }));
 
 import { UserService } from "../services/userService.js";
 
 describe("UserService", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    permissionServiceConstructorMock.mockImplementation(function PermissionService() {
+      return permissionServiceMock;
+    });
+    prismaMock.$transaction.mockImplementation(
+      async (action: (transaction: unknown) => unknown) => {
+        return await action(prismaMock);
+      },
+    );
   });
 
-  it("getById aceita usuário legado vinculado pela organização do departamento", async () => {
+  it("getById consulta o usuário pela organização obrigatória", async () => {
     prismaMock.user.findFirst.mockResolvedValue({
-      id: "user-legacy",
-      name: "Legacy",
-      login: "legacy",
+      id: "user-1",
+      name: "User",
+      login: "user",
       permission: 2,
       status: "active",
       department_id: "dep-1",
       photo_url: null,
       joined_at: new Date("2025-01-01"),
-      organization_id: null,
+      organization_id: "org-1",
       type: "admin",
       first_owner_flag: false,
       permission_id: "permission-1",
     });
     const service = new UserService();
 
-    const result = await service.getById("user-legacy", "org-1");
+    const result = await service.getById("user-1", "org-1");
 
-    expect(result).toMatchObject({ id: "user-legacy", organization_id: "org-1" });
+    expect(result).toMatchObject({ id: "user-1", organization_id: "org-1" });
     expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          id: "user-legacy",
-          OR: [
-            { organization_id: "org-1" },
-            { organization_id: null, department: { organization_id: "org-1" } },
-          ],
+          id: "user-1",
+          organization_id: "org-1",
         },
       }),
     );
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.findFirst);
   });
 
   it("getById lança 404 quando usuário não existe na organização", async () => {
@@ -89,10 +104,7 @@ describe("UserService", () => {
       expect.objectContaining({
         where: {
           id: "user-1",
-          OR: [
-            { organization_id: "org-1" },
-            { organization_id: null, department: { organization_id: "org-1" } },
-          ],
+          organization_id: "org-1",
         },
       }),
     );
@@ -178,6 +190,17 @@ describe("UserService", () => {
     });
   });
 
+  it("list fixa o tenant antes de consultar usuários", async () => {
+    prismaMock.user.findMany.mockResolvedValue([{ id: "user-1" }]);
+    prismaMock.user.count.mockResolvedValue(1);
+
+    await new UserService().list({ organizationId: "org-1" });
+
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.findMany);
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.count);
+  });
+
   it("create com organization_id cria permissão do usuário", async () => {
     bcryptMock.hash.mockResolvedValue("hashed");
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });
@@ -220,7 +243,77 @@ describe("UserService", () => {
       { fiscal: 1, rh: 1, ti: 1 },
       "org-1",
     );
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.create);
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.update);
     expect(result).toMatchObject({ id: "user-1", permission_id: "permission-1" });
+  });
+
+  it("create compartilha a transação tenant-aware com department e PermissionService", async () => {
+    const transactionMock = {
+      $executeRaw: vi.fn(),
+      department: { findFirst: vi.fn().mockResolvedValue({ id: "dep-1", name: "Fiscal" }) },
+      user: {
+        create: vi.fn().mockResolvedValue({ id: "user-1", permission_id: null }),
+        update: vi.fn(),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(
+      async (action: (transaction: unknown) => unknown) => {
+        return await action(transactionMock);
+      },
+    );
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1", name: "Fiscal" });
+    bcryptMock.hash.mockResolvedValue("hashed");
+    permissionServiceMock.create.mockResolvedValue({ id: "permission-1" });
+
+    await new UserService().create({
+      name: "Novo",
+      login: "novo",
+      password: "secret",
+      department_id: "dep-1",
+      permission: 1,
+      organization_id: "org-1",
+    });
+
+    expect(transactionMock.department.findFirst).toHaveBeenCalledWith({
+      where: { id: "dep-1", organization_id: "org-1" },
+      select: { id: true, name: true },
+    });
+    expect(prismaMock.department.findFirst).not.toHaveBeenCalled();
+    expect(permissionServiceConstructorMock).toHaveBeenCalledWith(undefined, transactionMock);
+  });
+
+  it("getByIdWithModules compartilha a transação tenant-aware com PermissionService", async () => {
+    const transactionMock = {
+      $executeRaw: vi.fn(),
+      user: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "user-1",
+          name: "Usuário",
+          login: "user",
+          permission: 1,
+          status: "active",
+          department_id: "dep-1",
+          photo_url: null,
+          joined_at: new Date("2025-01-01"),
+          organization_id: "org-1",
+          type: "user",
+          first_owner_flag: false,
+          permission_id: "permission-1",
+        }),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(
+      async (action: (transaction: unknown) => unknown) => {
+        return await action(transactionMock);
+      },
+    );
+    permissionServiceMock.getByUserId.mockResolvedValue({ organization_id: "org-1", rh: 1 });
+
+    await new UserService().getByIdWithModules("user-1", "org-1");
+
+    expect(permissionServiceConstructorMock).toHaveBeenCalledWith(undefined, transactionMock);
   });
 
   it("create concede RH e TI self-service para usuario elegivel", async () => {
@@ -452,14 +545,14 @@ describe("UserService", () => {
       expect.objectContaining({
         where: {
           id: "user-1",
-          OR: [
-            { organization_id: "org-1" },
-            { organization_id: null, department: { organization_id: "org-1" } },
-          ],
+          organization_id: "org-1",
         },
       }),
     );
     expect(prismaMock.user.update).toHaveBeenCalled();
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.findFirst);
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.update);
   });
 
   it("update records a safe administrative audit with actor and diff", async () => {
@@ -586,6 +679,9 @@ describe("UserService", () => {
         outcome: "success",
       }),
     );
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.findFirst);
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.update);
   });
 
   it("update photo uses the dedicated audit action", async () => {

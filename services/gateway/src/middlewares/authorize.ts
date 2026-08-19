@@ -5,7 +5,7 @@ import { getRoutePolicy } from "../security/policies.js";
 import { isPublicRoute } from "../security/publicRoutes.js";
 import { normalizeGatewayPath } from "../security/routeClassification.js";
 
-const selfUserPutPath = /^\/user\/(?!me$|session$|start-config$|permission\/)([^/]+)$/;
+const selfUserPutPath = /^\/user\/(?!me$|session$|permission\/)([^/]+)$/;
 const observedRouteNamespaces = new Set([
   "audit",
   "certificate",
@@ -41,7 +41,11 @@ export function buildAuthorizeMiddleware(
   mode: GatewayAuthorizationMode,
   logger?: Pick<Logger, "warn">,
 ) {
-  return function authorizeRequest(request: Request, _response: Response, next: NextFunction): void {
+  return function authorizeRequest(
+    request: Request,
+    _response: Response,
+    next: NextFunction,
+  ): void {
     const normalizedPath = normalizeGatewayPath(request.originalUrl);
     if (!normalizedPath) {
       deny(next);

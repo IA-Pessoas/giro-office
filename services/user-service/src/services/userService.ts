@@ -6,6 +6,7 @@ import {
   type ModulePermissions,
   normalizeModulePermissions,
   ServiceError,
+  withTenantTransaction,
 } from "@workspace/shared";
 import bcrypt from "bcryptjs";
 
@@ -94,7 +95,7 @@ interface CreateUserInput {
   status?: string;
   photo_url?: string;
   invited_by?: string;
-  organization_id?: string;
+  organization_id: string;
   type?: AuthUserType;
   first_owner_flag?: boolean;
   modules?: Record<string, number>;
@@ -108,7 +109,7 @@ interface UpdateUserInput {
   permission?: number;
   status?: string;
   photo_url?: string | null;
-  organization_id?: string | null;
+  organization_id?: string;
   type?: AuthUserType | null;
   first_owner_flag?: boolean;
   modules?: Record<string, number>;
@@ -128,24 +129,13 @@ interface DepartmentAccessContext {
 type UserPublicRow = Prisma.UserGetPayload<{ select: typeof USER_PUBLIC_SELECT }>;
 type UserCreateRow = Prisma.UserGetPayload<{ select: typeof USER_CREATE_SELECT }>;
 type UserSessionRow = UserPublicRow & { modules: ModulePermissions };
+type UserUpdateRow = UserPublicRow & { permission_id: string | null };
+type UserTransaction = Prisma.TransactionClient;
 
 function userOrganizationWhere(id: string, organizationId: string): Prisma.UserWhereInput {
   return {
     id,
-    OR: [
-      { organization_id: organizationId },
-      { organization_id: null, department: { organization_id: organizationId } },
-    ],
-  };
-}
-
-function normalizeUserOrganization<T extends { organization_id: string | null }>(
-  user: T,
-  organizationId: string,
-): Omit<T, "organization_id"> & { organization_id: string } {
-  return {
-    ...user,
-    organization_id: user.organization_id ?? organizationId,
+    organization_id: organizationId,
   };
 }
 
@@ -271,44 +261,57 @@ class UserService {
     take: number;
   }> {
     const where = { organization_id: organizationId };
-    const [users, total] = await Promise.all([
-      prismaClient.user.findMany({
+    const { users, total } = await withTenantTransaction<
+      UserTransaction,
+      { users: UserPublicRow[]; total: number }
+    >(prismaClient, organizationId, async (prisma: UserTransaction) => {
+      const users = await prisma.user.findMany({
         where,
         select: USER_PUBLIC_SELECT,
         skip,
         take,
         orderBy: { name: "asc" },
-      }),
-      prismaClient.user.count({ where }),
-    ]);
+      });
+      const total = await prisma.user.count({ where });
+
+      return { users, total };
+    });
 
     return { users, total, skip, take };
   }
 
   async getById(id: string, organizationId: string): Promise<UserPublicRow> {
-    const user = await prismaClient.user.findFirst({
-      where: userOrganizationWhere(id, organizationId),
-      select: USER_PUBLIC_SELECT,
-    });
-
-    if (!user) {
-      throw new ServiceError(404, "Usuario nao encontrado.");
-    }
-
-    return normalizeUserOrganization(user, organizationId);
+    return await withTenantTransaction<UserTransaction, UserPublicRow>(
+      prismaClient,
+      organizationId,
+      async (prisma: UserTransaction) => {
+        return await this.#getById(prisma, id, organizationId);
+      },
+    );
   }
 
   async getByIdWithModules(id: string, organizationId: string): Promise<UserSessionRow> {
-    const user = await this.getById(id, organizationId);
-    let permission: unknown;
+    const { user, permission } = await withTenantTransaction<
+      UserTransaction,
+      { user: UserPublicRow; permission: unknown }
+    >(prismaClient, organizationId, async (prisma: UserTransaction) => {
+      const user = await this.#getById(prisma, id, organizationId);
+      let permission: unknown;
 
-    try {
-      permission = await new PermissionService().getByUserId(id, undefined, organizationId);
-    } catch (err: unknown) {
-      if (!(err instanceof ServiceError) || err.statusCode !== 404) {
-        throw err;
+      try {
+        permission = await new PermissionService(undefined, prisma).getByUserId(
+          id,
+          undefined,
+          organizationId,
+        );
+      } catch (err: unknown) {
+        if (!(err instanceof ServiceError) || err.statusCode !== 404) {
+          throw err;
+        }
       }
-    }
+
+      return { user, permission };
+    });
 
     return {
       ...user,
@@ -320,46 +323,50 @@ class UserService {
     data: CreateUserInput,
     actorUserId?: string,
   ): Promise<UserPublicRow | UserCreateRow> {
-    const department = data.organization_id
-      ? await this.#requireDepartmentInOrganization(data.department_id, data.organization_id)
-      : null;
-    const normalizedType = normalizeUserType(data.type);
-    const normalizedPermission = normalizePermissionForType(normalizedType, data.permission);
-    const modulesToApply =
-      normalizedType === "owner"
-        ? MAX_MODULES
-        : withDefaultSelfServiceModules(
-            withDepartmentAdminModule(
-              pickKnownModules(data.modules),
-              normalizedType,
-              department?.name ?? null,
-            ),
-            normalizedPermission,
-          );
-
     const passwordHash = await bcrypt.hash(data.password, 8);
 
     try {
-      const user = await prismaClient.user.create({
-        data: {
-          name: data.name,
-          login: data.login,
-          password: passwordHash,
-          department_id: data.department_id,
-          permission: normalizedPermission,
-          status: data.status ?? "active",
-          photo_url: data.photo_url,
-          invited_by: data.invited_by,
-          organization_id: data.organization_id ?? null,
-          type: normalizedType,
-          first_owner_flag: data.first_owner_flag ?? false,
-        },
-        select: data.organization_id ? USER_CREATE_SELECT : USER_PUBLIC_SELECT,
-      });
+      const createdUser = await withTenantTransaction<
+        UserTransaction,
+        UserPublicRow | UserCreateRow
+      >(prismaClient, data.organization_id, async (prisma: UserTransaction) => {
+        const department = await this.#requireDepartmentInOrganization(
+          prisma,
+          data.department_id,
+          data.organization_id,
+        );
+        const normalizedType = normalizeUserType(data.type);
+        const normalizedPermission = normalizePermissionForType(normalizedType, data.permission);
+        const modulesToApply =
+          normalizedType === "owner"
+            ? MAX_MODULES
+            : withDefaultSelfServiceModules(
+                withDepartmentAdminModule(
+                  pickKnownModules(data.modules),
+                  normalizedType,
+                  department.name,
+                ),
+                normalizedPermission,
+              );
+        const user = await prisma.user.create({
+          data: {
+            name: data.name,
+            login: data.login,
+            password: passwordHash,
+            department_id: data.department_id,
+            permission: normalizedPermission,
+            status: data.status ?? "active",
+            photo_url: data.photo_url,
+            invited_by: data.invited_by,
+            organization_id: data.organization_id,
+            type: normalizedType,
+            first_owner_flag: data.first_owner_flag ?? false,
+          },
+          select: USER_CREATE_SELECT,
+        });
 
-      if (data.organization_id) {
         try {
-          const permissionService = new PermissionService(this.audit);
+          const permissionService = new PermissionService(this.audit, prisma);
           const permission = await permissionService.create(user.id, data.organization_id);
 
           if (hasModulePatch(modulesToApply)) {
@@ -372,35 +379,31 @@ class UserService {
             }
           }
 
-          await prismaClient.user.update({
+          await prisma.user.update({
             where: { id: user.id },
             data: { permission_id: permission.id },
           });
 
-          const createdUser = {
-            ...user,
-            permission_id: permission.id,
-          };
-          if (this.audit && actorUserId) {
-            this.#recordAudit({
-              actorUserId,
-              organizationId: data.organization_id,
-              action: "CREATE",
-              referring: "user",
-              referringId: user.id,
-              changes: { next: pickUserAuditFields(createdUser) },
-              outcome: "success",
-            });
-          }
-
-          return createdUser;
+          return { ...user, permission_id: permission.id };
         } catch (permErr: unknown) {
           logError("Erro ao criar/atualizar permissao no create de usuario", { err: permErr });
           throw new ServiceError(500, "Erro ao criar permissao para o usuario.", permErr);
         }
+      });
+
+      if (this.audit && actorUserId) {
+        this.#recordAudit({
+          actorUserId,
+          organizationId: data.organization_id,
+          action: "CREATE",
+          referring: "user",
+          referringId: createdUser.id,
+          changes: { next: pickUserAuditFields(createdUser) },
+          outcome: "success",
+        });
       }
 
-      return user;
+      return createdUser;
     } catch (err: unknown) {
       const isUniqueViolation =
         err &&
@@ -422,135 +425,148 @@ class UserService {
     actorUserId?: string,
     action = "UPDATE",
   ): Promise<UserPublicRow> {
-    const existingUser = await prismaClient.user.findFirst({
-      where: userOrganizationWhere(id, organizationId),
-      select: { ...USER_PUBLIC_SELECT, permission_id: true },
-    });
-
-    if (!existingUser) {
-      throw new ServiceError(404, "Usuario nao encontrado.");
-    }
-
-    const updateData: Record<string, unknown> = {};
-    let departmentForAccess: DepartmentAccessContext | null = null;
-    const currentType = normalizeUserType(existingUser.type);
-    const requestedType = data.type !== undefined ? normalizeUserType(data.type) : currentType;
-
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.login !== undefined) updateData.login = data.login;
-    if (data.department_id !== undefined) {
-      departmentForAccess = await this.#requireDepartmentInOrganization(
-        data.department_id,
-        organizationId,
-      );
-      updateData.department_id = data.department_id;
-    }
-    if (data.permission !== undefined) {
-      updateData.permission = normalizePermissionForType(requestedType, data.permission);
-    } else if (data.type !== undefined && requestedType === "owner") {
-      updateData.permission = OWNER_GLOBAL_PERMISSION;
-    } else if (
-      data.type !== undefined &&
-      requestedType === "admin" &&
-      typeof existingUser.permission === "number" &&
-      existingUser.permission >= OWNER_GLOBAL_PERMISSION
-    ) {
-      updateData.permission = DEFAULT_NON_OWNER_PERMISSION;
-    } else if (
-      data.type === "user" &&
-      typeof existingUser.permission === "number" &&
-      existingUser.permission >= OWNER_GLOBAL_PERMISSION
-    ) {
-      updateData.permission = DEFAULT_NON_OWNER_PERMISSION;
-    }
-    if (data.status !== undefined) updateData.status = data.status;
-    if (data.photo_url !== undefined) updateData.photo_url = data.photo_url;
-    if (data.organization_id !== undefined) {
-      if (data.organization_id !== organizationId) {
-        throw new ServiceError(403, "Organizacao da requisicao nao confere.");
-      }
-      updateData.organization_id = data.organization_id;
-    }
-    if (data.type !== undefined) updateData.type = requestedType;
-    if (data.first_owner_flag !== undefined) updateData.first_owner_flag = data.first_owner_flag;
-
-    if (data.password !== undefined) {
-      updateData.password = await bcrypt.hash(data.password, 8);
-    }
-
-    let modulesToApply: ModulePatch | null = null;
-    if (requestedType === "owner" && (data.type === "owner" || data.first_owner_flag === true)) {
-      modulesToApply = MAX_MODULES;
-    } else if (data.modules !== undefined) {
-      modulesToApply = pickKnownModules(data.modules);
-    }
-
-    if (
-      requestedType === "admin" &&
-      (data.type !== undefined || data.permission !== undefined || data.department_id !== undefined)
-    ) {
-      departmentForAccess ??= await this.#requireDepartmentInOrganization(
-        data.department_id ?? existingUser.department_id,
-        organizationId,
-      );
-      modulesToApply = withDepartmentAdminModule(
-        modulesToApply ?? {},
-        requestedType,
-        departmentForAccess.name,
-      );
-    }
-
-    const shouldClearModules =
-      data.modules === undefined &&
-      (data.type === "user" ||
-        (data.permission !== undefined &&
-          data.permission <= DEFAULT_NON_OWNER_PERMISSION &&
-          requestedType !== "admin"));
-    if (shouldClearModules) {
-      modulesToApply = EMPTY_MODULES;
-    }
-
-    const effectivePermission =
-      typeof updateData.permission === "number"
-        ? updateData.permission
-        : typeof existingUser.permission === "number"
-          ? normalizePermissionForType(requestedType, existingUser.permission)
-          : 0;
-    const shouldProvisionSelfService =
-      modulesToApply === null &&
-      data.modules === undefined &&
-      (data.permission !== undefined || data.type !== undefined) &&
-      requestedType !== "owner" &&
-      effectivePermission >= DEFAULT_NON_OWNER_PERMISSION;
-    if (shouldProvisionSelfService) {
-      modulesToApply = {};
-    }
-
-    if (modulesToApply) {
-      modulesToApply = withDefaultSelfServiceModules(modulesToApply, effectivePermission);
-    }
-
     try {
-      const user = await prismaClient.user.update({
-        where: { id },
-        data: updateData,
-        select: USER_PUBLIC_SELECT,
+      const passwordHash =
+        data.password !== undefined ? await bcrypt.hash(data.password, 8) : undefined;
+      const { existingUser, user } = await withTenantTransaction<
+        UserTransaction,
+        { existingUser: UserUpdateRow; user: UserPublicRow }
+      >(prismaClient, organizationId, async (prisma: UserTransaction) => {
+        const existingUser = await prisma.user.findFirst({
+          where: userOrganizationWhere(id, organizationId),
+          select: { ...USER_PUBLIC_SELECT, permission_id: true },
+        });
+
+        if (!existingUser) {
+          throw new ServiceError(404, "Usuario nao encontrado.");
+        }
+
+        const updateData: Record<string, unknown> = {};
+        let departmentForAccess: DepartmentAccessContext | null = null;
+        const currentType = normalizeUserType(existingUser.type);
+        const requestedType = data.type !== undefined ? normalizeUserType(data.type) : currentType;
+
+        if (data.name !== undefined) updateData.name = data.name;
+        if (data.login !== undefined) updateData.login = data.login;
+        if (data.department_id !== undefined) {
+          departmentForAccess = await this.#requireDepartmentInOrganization(
+            prisma,
+            data.department_id,
+            organizationId,
+          );
+          updateData.department_id = data.department_id;
+        }
+        if (data.permission !== undefined) {
+          updateData.permission = normalizePermissionForType(requestedType, data.permission);
+        } else if (data.type !== undefined && requestedType === "owner") {
+          updateData.permission = OWNER_GLOBAL_PERMISSION;
+        } else if (
+          data.type !== undefined &&
+          requestedType === "admin" &&
+          typeof existingUser.permission === "number" &&
+          existingUser.permission >= OWNER_GLOBAL_PERMISSION
+        ) {
+          updateData.permission = DEFAULT_NON_OWNER_PERMISSION;
+        } else if (
+          data.type === "user" &&
+          typeof existingUser.permission === "number" &&
+          existingUser.permission >= OWNER_GLOBAL_PERMISSION
+        ) {
+          updateData.permission = DEFAULT_NON_OWNER_PERMISSION;
+        }
+        if (data.status !== undefined) updateData.status = data.status;
+        if (data.photo_url !== undefined) updateData.photo_url = data.photo_url;
+        if (data.organization_id !== undefined) {
+          if (data.organization_id !== organizationId) {
+            throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+          }
+          updateData.organization_id = data.organization_id;
+        }
+        if (data.type !== undefined) updateData.type = requestedType;
+        if (data.first_owner_flag !== undefined)
+          updateData.first_owner_flag = data.first_owner_flag;
+        if (passwordHash !== undefined) updateData.password = passwordHash;
+
+        let modulesToApply: ModulePatch | null = null;
+        if (
+          requestedType === "owner" &&
+          (data.type === "owner" || data.first_owner_flag === true)
+        ) {
+          modulesToApply = MAX_MODULES;
+        } else if (data.modules !== undefined) {
+          modulesToApply = pickKnownModules(data.modules);
+        }
+
+        if (
+          requestedType === "admin" &&
+          (data.type !== undefined ||
+            data.permission !== undefined ||
+            data.department_id !== undefined)
+        ) {
+          departmentForAccess ??= await this.#requireDepartmentInOrganization(
+            prisma,
+            data.department_id ?? existingUser.department_id,
+            organizationId,
+          );
+          modulesToApply = withDepartmentAdminModule(
+            modulesToApply ?? {},
+            requestedType,
+            departmentForAccess.name,
+          );
+        }
+
+        const shouldClearModules =
+          data.modules === undefined &&
+          (data.type === "user" ||
+            (data.permission !== undefined &&
+              data.permission <= DEFAULT_NON_OWNER_PERMISSION &&
+              requestedType !== "admin"));
+        if (shouldClearModules) {
+          modulesToApply = EMPTY_MODULES;
+        }
+
+        const effectivePermission =
+          typeof updateData.permission === "number"
+            ? updateData.permission
+            : typeof existingUser.permission === "number"
+              ? normalizePermissionForType(requestedType, existingUser.permission)
+              : 0;
+        const shouldProvisionSelfService =
+          modulesToApply === null &&
+          data.modules === undefined &&
+          (data.permission !== undefined || data.type !== undefined) &&
+          requestedType !== "owner" &&
+          effectivePermission >= DEFAULT_NON_OWNER_PERMISSION;
+        if (shouldProvisionSelfService) {
+          modulesToApply = {};
+        }
+
+        if (modulesToApply) {
+          modulesToApply = withDefaultSelfServiceModules(modulesToApply, effectivePermission);
+        }
+
+        const user = await prisma.user.update({
+          where: { id },
+          data: updateData,
+          select: USER_PUBLIC_SELECT,
+        });
+
+        if (modulesToApply && hasModulePatch(modulesToApply)) {
+          if (!existingUser.permission_id) {
+            logError("Usuario sem permissao: nao e possivel atualizar modules", { userId: id });
+            throw new ServiceError(400, "Usuario nao possui permissao. Crie a permissao primeiro.");
+          }
+          const permissionService = new PermissionService(this.audit, prisma);
+          if (actorUserId) {
+            await permissionService.update(id, modulesToApply, organizationId, { actorUserId });
+          } else {
+            await permissionService.update(id, modulesToApply, organizationId);
+          }
+        }
+
+        return { existingUser, user };
       });
 
-      if (modulesToApply && hasModulePatch(modulesToApply)) {
-        if (!existingUser.permission_id) {
-          logError("Usuario sem permissao: nao e possivel atualizar modules", { userId: id });
-          throw new ServiceError(400, "Usuario nao possui permissao. Crie a permissao primeiro.");
-        }
-        const permissionService = new PermissionService(this.audit);
-        if (actorUserId) {
-          await permissionService.update(id, modulesToApply, organizationId, { actorUserId });
-        } else {
-          await permissionService.update(id, modulesToApply, organizationId);
-        }
-      }
-
-      const normalizedUser = normalizeUserOrganization(user, organizationId);
       if (this.audit && actorUserId) {
         this.#recordAudit({
           actorUserId,
@@ -558,12 +574,12 @@ class UserService {
           action,
           referring: "user",
           referringId: id,
-          changes: buildUserAuditChanges(existingUser, normalizedUser),
+          changes: buildUserAuditChanges(existingUser, user),
           outcome: "success",
         });
       }
 
-      return normalizedUser;
+      return user;
     } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
       const isUniqueViolation =
@@ -590,13 +606,19 @@ class UserService {
   }
 
   async delete(id: string, organizationId: string, actorUserId?: string): Promise<void> {
-    const existingUser = await this.getById(id, organizationId);
-
     try {
-      await prismaClient.user.update({
-        where: { id },
-        data: { status: "inactive" },
-      });
+      const existingUser = await withTenantTransaction<UserTransaction, UserPublicRow>(
+        prismaClient,
+        organizationId,
+        async (prisma: UserTransaction) => {
+          const existingUser = await this.#getById(prisma, id, organizationId);
+          await prisma.user.update({
+            where: { id },
+            data: { status: "inactive" },
+          });
+          return existingUser;
+        },
+      );
       if (this.audit && actorUserId) {
         this.#recordAudit({
           actorUserId,
@@ -619,10 +641,11 @@ class UserService {
   }
 
   async #requireDepartmentInOrganization(
+    prisma: UserTransaction,
     departmentId: string,
     organizationId: string,
   ): Promise<DepartmentAccessContext> {
-    const department = await prismaClient.department.findFirst({
+    const department = await prisma.department.findFirst({
       where: { id: departmentId, organization_id: organizationId },
       select: { id: true, name: true },
     });
@@ -635,6 +658,23 @@ class UserService {
       id: department.id,
       name: department.name ?? null,
     };
+  }
+
+  async #getById(
+    prisma: UserTransaction,
+    id: string,
+    organizationId: string,
+  ): Promise<UserPublicRow> {
+    const user = await prisma.user.findFirst({
+      where: userOrganizationWhere(id, organizationId),
+      select: USER_PUBLIC_SELECT,
+    });
+
+    if (!user) {
+      throw new ServiceError(404, "Usuario nao encontrado.");
+    }
+
+    return user;
   }
 }
 

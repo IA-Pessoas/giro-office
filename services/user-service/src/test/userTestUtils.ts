@@ -14,7 +14,6 @@ import { type Mock, vi } from "vitest";
 interface UserRouteMocks {
   authServiceMock: {
     login: Mock;
-    firstCreate: Mock;
     validateSession: Mock;
   };
   userServiceMock: {
@@ -40,7 +39,6 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
   (): UserRouteMocks => ({
     authServiceMock: {
       login: vi.fn(),
-      firstCreate: vi.fn(),
       validateSession: vi.fn(),
     },
     userServiceMock: {

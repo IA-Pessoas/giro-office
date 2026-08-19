@@ -49,7 +49,7 @@ export const updateUserBodySchema = z
     permission: z.number().int().optional(),
     status: z.string().trim().min(1).optional(),
     photo_url: z.union([z.string().trim().min(1), z.null()]).optional(),
-    organization_id: z.union([z.string().trim().min(1), z.null()]).optional(),
+    organization_id: z.string().trim().min(1).optional(),
     type: z.union([userTypeSchema, z.null()]).optional(),
     first_owner_flag: z.boolean().optional(),
     modules: modulesSchema.optional(),

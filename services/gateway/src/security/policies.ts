@@ -146,17 +146,17 @@ const routePolicyMatchers: Array<{
   { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: { special: "ownerOnly" } },
   {
     method: "GET",
-    path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
+    path: /^\/user\/(?!me$|session$|permission\/)[^/]+$/,
     policy: userManagementPolicy,
   },
   {
     method: "PUT",
-    path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
+    path: /^\/user\/(?!me$|session$|permission\/)[^/]+$/,
     policy: userManagementPolicy,
   },
   {
     method: "DELETE",
-    path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
+    path: /^\/user\/(?!me$|session$|permission\/)[^/]+$/,
     policy: userManagementPolicy,
   },
   { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },

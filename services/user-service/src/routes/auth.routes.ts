@@ -28,17 +28,6 @@ router.post("/session", async (request: Request, response: Response, next: NextF
   }
 });
 
-router.post("/start-config", async (_request: Request, response: Response, next: NextFunction) => {
-  try {
-    const user = await authService.firstCreate();
-
-    response.json(createSuccessResponse({ ...user, service: "user-service" }));
-  } catch (err) {
-    logError("Erro no firstCreate", { err });
-    next(err);
-  }
-});
-
 router.get(
   "/session/validate",
   isAuthenticated,

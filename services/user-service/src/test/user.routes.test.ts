@@ -384,6 +384,17 @@ describe("user routes", () => {
     );
   });
 
+  it("PUT /user/:id rejeita organization_id nulo", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).put("/user/user-3").set(gatewayAuthHeaders()).send({
+      organization_id: null,
+    });
+
+    expect(res.status).toBe(400);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it("PUT /user/:id permite ao usuario comum alterar somente a propria senha", async () => {
     userServiceMock.update.mockResolvedValue({ id: "user-1" });
     const app = createTestApp();

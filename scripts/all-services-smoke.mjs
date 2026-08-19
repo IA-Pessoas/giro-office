@@ -699,29 +699,14 @@ async function attemptLogin() {
   return { error: lastFailure };
 }
 
-async function bootstrapAndLogin() {
-  const firstAttempt = await attemptLogin();
-  if (firstAttempt?.token) {
-    return firstAttempt;
-  }
-
-  await helperCall("bootstrap-user", {
-    method: "POST",
-    path: "/user/start-config",
-    target: "gateway",
-    service: "user-service",
-    auth: "public",
-    expectedStatus: [200, 409],
-    expectEnvelope: false,
-  });
-
-  const secondAttempt = await attemptLogin();
-  if (secondAttempt?.token) {
-    return secondAttempt;
+async function loginForSmoke() {
+  const attempt = await attemptLogin();
+  if (attempt?.token) {
+    return attempt;
   }
 
   throw new Error(
-    `Unable to log in through /user/session. Last failure: ${secondAttempt?.error?.text ?? "unknown"}`,
+    `Unable to log in through /user/session. Last failure: ${attempt?.error?.text ?? "unknown"}`,
   );
 }
 
@@ -1777,7 +1762,7 @@ const handlers = {
   },
 
   async userSession(_op) {
-    const session = await bootstrapAndLogin();
+    const session = await loginForSmoke();
     state.session = session;
     state.bearerToken = session.token;
     state.adminBearerToken =
@@ -1787,13 +1772,6 @@ const handlers = {
       "PASS",
       `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`,
     );
-  },
-
-  async userStartConfig(op) {
-    await httpRequest(op, {
-      expectedStatus: [200, 409],
-      expectEnvelope: false,
-    });
   },
 
   async userMe(op) {

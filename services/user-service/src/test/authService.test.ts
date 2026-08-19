@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, bcryptMock, jwtMock } = vi.hoisted(() => ({
   prismaMock: {
+    $executeRaw: vi.fn(),
+    $queryRaw: vi.fn(),
+    $transaction: vi.fn(async (action: (transaction: unknown) => unknown) => {
+      return await action(prismaMock);
+    }),
     user: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
@@ -49,6 +54,7 @@ import { UserService } from "../services/userService.js";
 describe("AuthService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.$queryRaw.mockResolvedValue([]);
   });
 
   function activeUser(overrides: Record<string, unknown> = {}) {
@@ -73,8 +79,22 @@ describe("AuthService", () => {
     };
   }
 
+  function loginSession(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "user-1",
+      name: "Usuário ativo",
+      login: "account",
+      permission: 1,
+      type: "user",
+      session_version: 1,
+      department_id: "dep-1",
+      organization_id: "org-1",
+      modules: { ti: 1 },
+      ...overrides,
+    };
+  }
+
   it("login lança 401 quando usuário não existe", async () => {
-    prismaMock.user.findFirst.mockResolvedValue(null);
     const service = new AuthService();
 
     await expect(service.login({ login: "admin", password: "secret" })).rejects.toMatchObject({
@@ -83,25 +103,9 @@ describe("AuthService", () => {
   });
 
   it("login mantém a mesma falha pública para credencial ou contexto inválido", async () => {
-    const cases = [
-      { user: null, passwordMatches: false },
-      { user: activeUser({ password: "hash-wrong" }), passwordMatches: false },
-      { user: activeUser({ status: "inactive" }), passwordMatches: true },
-      {
-        user: activeUser({ organization: { id: "org-1", status: "inactive" } }),
-        passwordMatches: true,
-      },
-      {
-        user: activeUser({ department: { organization_id: "org-2" } }),
-        passwordMatches: true,
-      },
-    ];
     const failures: Array<{ statusCode: number; code: string; message: string }> = [];
 
-    for (const testCase of cases) {
-      prismaMock.user.findFirst.mockResolvedValueOnce(testCase.user);
-      bcryptMock.compare.mockResolvedValueOnce(testCase.passwordMatches);
-
+    for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
         await new AuthService().login({ login: "  account  ", password: "secret" });
       } catch (err: unknown) {
@@ -120,46 +124,21 @@ describe("AuthService", () => {
       { statusCode: 401, code: "UNAUTHORIZED", message: "Login ou senha inválidos." },
       { statusCode: 401, code: "UNAUTHORIZED", message: "Login ou senha inválidos." },
     ]);
-    expect(bcryptMock.compare).toHaveBeenCalledTimes(5);
-    expect(bcryptMock.compare).toHaveBeenNthCalledWith(
-      1,
-      "secret",
-      "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
-    );
-    expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { login: "account" } }),
-    );
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(5);
+    expect(prismaMock.user.findFirst).not.toHaveBeenCalled();
+    expect(bcryptMock.compare).not.toHaveBeenCalled();
   });
 
   it("login retorna sessão com token quando credenciais são válidas", async () => {
-    prismaMock.user.findFirst.mockResolvedValue(
-      activeUser({
+    prismaMock.$queryRaw.mockResolvedValue([
+      loginSession({
         name: "Admin",
         login: "admin",
-        password: "hash",
         permission: 2,
         type: "admin",
-        permissions: [
-          {
-            organization_id: "org-1",
-            certificado: null,
-            comercial: null,
-            contabil: null,
-            financeiro: null,
-            fiscal: null,
-            integracao: null,
-            marketing: null,
-            parcelamento: null,
-            pessoal: null,
-            regularize: null,
-            rh: null,
-            ti: 2,
-            triagem: null,
-          },
-        ],
+        modules: { ti: 2 },
       }),
-    );
-    bcryptMock.compare.mockResolvedValue(true);
+    ]);
     jwtMock.sign.mockReturnValue("jwt-token");
     const service = new AuthService();
 
@@ -203,27 +182,42 @@ describe("AuthService", () => {
     );
   });
 
+  it("login delega a verificação de credenciais para a função privada do banco", async () => {
+    prismaMock.$queryRaw.mockResolvedValue([
+      loginSession({
+        name: "Admin",
+        login: "admin",
+        permission: 2,
+        type: "admin",
+        modules: { ti: 2 },
+      }),
+    ]);
+    jwtMock.sign.mockReturnValue("jwt-token");
+
+    await expect(
+      new AuthService().login({ login: "  admin  ", password: "secret" }),
+    ).resolves.toMatchObject({
+      id: "user-1",
+      organization_id: "org-1",
+      token: "jwt-token",
+    });
+
+    expect(prismaMock.$queryRaw).toHaveBeenCalledOnce();
+    expect(prismaMock.user.findFirst).not.toHaveBeenCalled();
+    expect(bcryptMock.compare).not.toHaveBeenCalled();
+  });
+
   it("login carrega somente a permissão da organização ativa", async () => {
-    prismaMock.user.findFirst.mockResolvedValue(
-      activeUser({
+    prismaMock.$queryRaw.mockResolvedValue([
+      loginSession({
         name: "Usuário",
         login: "user",
-        password: "hash",
         permission: 0,
         type: "user",
         organization_id: "org-b",
-        organization: { id: "org-b", status: "active" },
-        department: {
-          organization_id: "org-b",
-          organization: { id: "org-b", status: "active" },
-        },
-        permissions: [
-          { organization_id: "org-a", fiscal: 3 },
-          { organization_id: "org-b", fiscal: 1 },
-        ],
+        modules: { fiscal: 1 },
       }),
-    );
-    bcryptMock.compare.mockResolvedValue(true);
+    ]);
     jwtMock.sign.mockReturnValue("jwt-token");
     const service = new AuthService();
 
@@ -258,6 +252,10 @@ describe("AuthService", () => {
     bcryptMock.compare.mockImplementation(
       async (password: string, hash: string) => hash === `hash:${password}`,
     );
+    prismaMock.$queryRaw.mockImplementation(
+      async (_query: TemplateStringsArray, _login: string, password: string) =>
+        user.password === `hash:${password}` ? [loginSession({ login: "user" })] : [],
+    );
     jwtMock.sign.mockReturnValue("jwt-token");
 
     await new UserService().update("user-1", { password: "nova-senha" }, "org-1", "user-1");
@@ -272,33 +270,6 @@ describe("AuthService", () => {
       new AuthService().login({ login: "user", password: "senha-antiga" }),
     ).rejects.toMatchObject({
       statusCode: 401,
-    });
-  });
-
-  it("firstCreate cria admin inicial quando banco está vazio", async () => {
-    prismaMock.user.findFirst.mockResolvedValueOnce(null);
-    prismaMock.organization.findFirst.mockResolvedValue({ id: "org-1" });
-    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });
-    bcryptMock.hash.mockResolvedValue("hashed");
-    prismaMock.user.create.mockResolvedValue({
-      id: "user-1",
-      name: "Admin",
-      login: "Admin",
-      permission: 2,
-      department_id: "dep-1",
-    });
-    const service = new AuthService();
-
-    const result = await service.firstCreate();
-
-    expect(result).toEqual({
-      user: {
-        id: "user-1",
-        name: "Admin",
-        login: "Admin",
-        permission: 2,
-        department_id: "dep-1",
-      },
     });
   });
 
@@ -344,26 +315,17 @@ describe("AuthService", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("mantém login e sessão de usuário legado vinculados pela organização do departamento", async () => {
-    const legacyUser = activeUser({ organization_id: null, organization: null });
-    prismaMock.user.findFirst.mockResolvedValue(legacyUser);
-    prismaMock.user.findUnique.mockResolvedValue(legacyUser);
-    bcryptMock.compare.mockResolvedValue(true);
-    jwtMock.sign.mockReturnValue("jwt-token");
+  it("validateSession fixa o tenant antes de consultar o usuário", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(activeUser());
 
-    await expect(
-      new AuthService().login({ login: "account", password: "secret" }),
-    ).resolves.toMatchObject({
+    await new AuthService().validateSession({
+      user_id: "user-1",
       organization_id: "org-1",
-      token: "jwt-token",
+      session_version: 1,
     });
-    await expect(
-      new AuthService().validateSession({
-        user_id: "user-1",
-        organization_id: "org-1",
-        session_version: 1,
-      }),
-    ).resolves.toBeUndefined();
+
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.findUnique);
   });
 
   it.each([

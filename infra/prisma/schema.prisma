@@ -257,7 +257,7 @@ model User {
   password                    String
   permission                  Int
   status                      String
-  organization_id             String?
+  organization_id             String
   type                        enumType?
   first_owner_flag            Boolean?               @default(false)
   session_version             Int                    @default(0)
@@ -301,7 +301,7 @@ model User {
   tasksModel                  TaskModel[]            @relation("responsible")
   logs                        Logs[]
   notes                       Note[]
-  organization                Organization?         @relation("UserOrganization", fields: [organization_id], references: [id])
+  organization                Organization          @relation("UserOrganization", fields: [organization_id], references: [id])
   permissionRef               Permission?           @relation("UserPrimaryPermission", fields: [permission_id], references: [id])
   panoramasParcelameto        PanoramaParcelameto[]  @relation("responsavelPanorama")
   permissions                 Permission[]

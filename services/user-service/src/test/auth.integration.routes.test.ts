@@ -3,38 +3,14 @@ import { MemoryLogStream } from "@workspace/shared/testUtils";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-const { bcryptMock, prismaMock } = vi.hoisted(() => ({
-  bcryptMock: { compare: vi.fn() },
-  prismaMock: { user: { findFirst: vi.fn() } },
+const { prismaMock } = vi.hoisted(() => ({
+  prismaMock: { $queryRaw: vi.fn() },
 }));
 
 vi.mock("../prisma/index.js", () => ({ default: prismaMock }));
-vi.mock("bcryptjs", () => ({ default: bcryptMock }));
 
 import { createUserApp } from "../app.js";
 import { getUserServiceEnv } from "../config/env.js";
-
-function activeUser(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "user-1",
-    name: "Usuário ativo",
-    login: "account",
-    password: "hash-active",
-    permission: 1,
-    type: "user",
-    status: "active",
-    session_version: 1,
-    department_id: "dep-1",
-    organization_id: "org-1",
-    organization: { id: "org-1", status: "active" },
-    department: {
-      organization_id: "org-1",
-      organization: { id: "org-1", status: "active" },
-    },
-    permissions: [{ organization_id: "org-1", ti: 1 }],
-    ...overrides,
-  };
-}
 
 function createTestApp() {
   return createUserApp(
@@ -50,23 +26,12 @@ function createTestApp() {
 
 describe("auth integration routes", () => {
   it("POST /user/session mantém idêntica a resposta pública para credenciais e contextos inválidos", async () => {
-    const cases = [
-      { user: null, passwordMatches: false },
-      { user: activeUser({ password: "hash-wrong" }), passwordMatches: false },
-      { user: activeUser({ status: "inactive" }), passwordMatches: true },
-      {
-        user: activeUser({ organization: { id: "org-1", status: "inactive" } }),
-        passwordMatches: true,
-      },
-      { user: activeUser({ department: { organization_id: "org-2" } }), passwordMatches: true },
-    ];
+    const cases = Array.from({ length: 5 });
     const app = createTestApp();
     const responses = [];
+    prismaMock.$queryRaw.mockResolvedValue([]);
 
-    for (const testCase of cases) {
-      prismaMock.user.findFirst.mockResolvedValueOnce(testCase.user);
-      bcryptMock.compare.mockResolvedValueOnce(testCase.passwordMatches);
-
+    for (const _case of cases) {
       const response = await request(app)
         .post("/user/session")
         .send({ login: "account", password: "secret" });

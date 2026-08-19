@@ -25,7 +25,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
     servers: [{ url: baseUrl }],
     tags: [
       { name: "Health", description: "Saúde do serviço" },
-      { name: "Auth", description: "Sessão e configuração inicial" },
+      { name: "Auth", description: "Sessão" },
       { name: "Users", description: "Usuários" },
       { name: "Permission", description: "Permissões por usuário" },
     ],
@@ -94,15 +94,6 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           responses: {
             "200": { description: "Sessão válida", ...successJson },
             "401": { description: "Sessão inválida ou revogada" },
-          },
-        },
-      },
-      "/user/start-config": {
-        post: {
-          tags: ["Auth"],
-          summary: "Primeira configuração (bootstrap)",
-          responses: {
-            "200": { description: "Usuário inicial", ...successJson },
           },
         },
       },
