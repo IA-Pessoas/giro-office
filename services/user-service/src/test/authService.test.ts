@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, bcryptMock, jwtMock } = vi.hoisted(() => ({
   prismaMock: {
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(async (action: (transaction: unknown) => unknown) => {
+      return await action(prismaMock);
+    }),
     user: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
@@ -315,6 +319,19 @@ describe("AuthService", () => {
         session_version: 1,
       }),
     ).resolves.toBeUndefined();
+  });
+
+  it("validateSession fixa o tenant antes de consultar o usuário", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(activeUser());
+
+    await new AuthService().validateSession({
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_version: 1,
+    });
+
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.user.findUnique);
   });
 
   it.each([

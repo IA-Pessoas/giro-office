@@ -2,15 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, auditMock } = vi.hoisted(() => ({
   prismaMock: {
+    $executeRaw: vi.fn(),
     permission: {
       findFirst: vi.fn(),
       create: vi.fn(),
       updateMany: vi.fn(),
     },
     permissionSpecific: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
     user: { update: vi.fn() },
     logs: { create: vi.fn() },
@@ -29,7 +30,12 @@ import { PermissionService } from "../services/permissionService.js";
 
 describe("PermissionService", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    prismaMock.$transaction.mockImplementation(
+      async (callback: (client: typeof prismaMock) => unknown) => {
+        return await callback(prismaMock);
+      },
+    );
   });
 
   it("create lança 409 quando permissão já existe", async () => {
@@ -60,6 +66,74 @@ describe("PermissionService", () => {
         }),
       }),
     );
+  });
+
+  it("getByUserId fixa o tenant antes de consultar a permissão", async () => {
+    prismaMock.permission.findFirst.mockResolvedValue({
+      id: "permission-1",
+      user_id: "user-1",
+      organization_id: "org-1",
+    });
+
+    await new PermissionService().getByUserId("user-1", undefined, "org-1");
+
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.permission.findFirst);
+  });
+
+  it("update reutiliza a transação tenant-aware fornecida", async () => {
+    const transactionMock = {
+      permission: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce({
+            id: "permission-1",
+            user_id: "user-1",
+            organization_id: "org-1",
+            fiscal: 1,
+          })
+          .mockResolvedValueOnce({
+            id: "permission-1",
+            user_id: "user-1",
+            organization_id: "org-1",
+            fiscal: 2,
+          }),
+        create: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      permissionSpecific: {
+        findFirst: vi.fn(),
+        create: vi.fn(),
+        updateMany: vi.fn(),
+      },
+      user: { update: vi.fn() },
+      logs: { create: vi.fn() },
+    };
+    prismaMock.permission.findFirst
+      .mockResolvedValueOnce({
+        id: "permission-1",
+        user_id: "user-1",
+        organization_id: "org-1",
+        fiscal: 1,
+      })
+      .mockResolvedValueOnce({
+        id: "permission-1",
+        user_id: "user-1",
+        organization_id: "org-1",
+        fiscal: 2,
+      });
+    prismaMock.permission.updateMany.mockResolvedValue({ count: 1 });
+
+    await new PermissionService(undefined, transactionMock).update(
+      "user-1",
+      { fiscal: 2 },
+      "org-1",
+    );
+
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(transactionMock.permission.updateMany).toHaveBeenCalledWith({
+      where: { user_id: "user-1", organization_id: "org-1" },
+      data: { fiscal: 2 },
+    });
   });
 
   it("getByUserId rejeita um módulo de permissão aposentado", async () => {
@@ -193,5 +267,62 @@ describe("PermissionService", () => {
         }),
       }),
     );
+  });
+
+  it("createSpecific fixa o tenant antes de consultar PermissionSpecific", async () => {
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue(null);
+    prismaMock.permissionSpecific.create.mockResolvedValue({
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_completion: null,
+    });
+
+    await new PermissionService().createSpecific("user-1", "org-1");
+
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.permissionSpecific.findFirst);
+    expect(prismaMock.permissionSpecific.findFirst).toHaveBeenCalledWith({
+      where: { user_id: "user-1", organization_id: "org-1" },
+    });
+  });
+
+  it("updateSpecific compartilha a transação tenant-aware e limita o tenant", async () => {
+    const transactionMock = {
+      permission: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
+      permissionSpecific: {
+        findFirst: vi.fn().mockResolvedValue({
+          user_id: "user-1",
+          organization_id: "org-1",
+          task_completion: true,
+        }),
+        create: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      user: { update: vi.fn() },
+      logs: { create: vi.fn() },
+    };
+
+    await new PermissionService(undefined, transactionMock).updateSpecific("user-1", true, "org-1");
+
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(transactionMock.permissionSpecific.updateMany).toHaveBeenCalledWith({
+      where: { user_id: "user-1", organization_id: "org-1" },
+      data: { task_completion: true },
+    });
+  });
+
+  it("getSpecific fixa o tenant antes de consultar PermissionSpecific", async () => {
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue({
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_completion: true,
+    });
+
+    await new PermissionService().getSpecific("user-1", "org-1");
+
+    expect(prismaMock.$executeRaw).toHaveBeenCalledBefore(prismaMock.permissionSpecific.findFirst);
+    expect(prismaMock.permissionSpecific.findFirst).toHaveBeenCalledWith({
+      where: { user_id: "user-1", organization_id: "org-1" },
+      select: expect.any(Object),
+    });
   });
 });

@@ -2,8 +2,8 @@ import { createSuccessResponse, error as logError, parseWithZod } from "@workspa
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import type { UserAuditRecorder } from "../integrations/audit.js";
+import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   permissionQuerySchema,
   permissionUserIdParamsSchema,

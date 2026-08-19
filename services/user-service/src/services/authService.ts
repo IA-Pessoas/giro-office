@@ -6,11 +6,13 @@ import {
   type ModulePermissionKey,
   type ModulePermissions,
   ServiceError,
+  withTenantTransaction,
 } from "@workspace/shared";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 import { getUserServiceEnv } from "../config/env.js";
+import type { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
 
 interface LoginRequest {
@@ -38,6 +40,7 @@ type LoginFailureReason =
   | "inactive_user"
   | "inactive_organization"
   | "invalid_membership";
+type AuthTransaction = Prisma.TransactionClient;
 
 function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
   return value === "owner" || value === "admin" || value === "user" ? value : undefined;
@@ -182,20 +185,25 @@ class AuthService {
       throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
     }
 
-    const user = await prismaClient.user.findUnique({
-      where: { id: identity.user_id },
-      select: {
-        status: true,
-        session_version: true,
-        organization_id: true,
-        organization: { select: { id: true, status: true } },
-        department: {
-          select: {
-            organization_id: true,
-            organization: { select: { id: true, status: true } },
+    const user = await withTenantTransaction<
+      AuthTransaction,
+      (PersistedAuthContext & { session_version: number }) | null
+    >(prismaClient, identity.organization_id, async (prisma: AuthTransaction) => {
+      return await prisma.user.findUnique({
+        where: { id: identity.user_id },
+        select: {
+          status: true,
+          session_version: true,
+          organization_id: true,
+          organization: { select: { id: true, status: true } },
+          department: {
+            select: {
+              organization_id: true,
+              organization: { select: { id: true, status: true } },
+            },
           },
         },
-      },
+      });
     });
 
     if (
