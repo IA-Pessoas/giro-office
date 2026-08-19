@@ -18,6 +18,7 @@ export async function runCli({ argv = process.argv.slice(2), dependencies = {} }
     await verifyCryptFunction(adminClient);
     temporaryRole = createTemporaryRole(runtime.randomBytes);
     await createTemporaryLoginRole(adminClient, temporaryRole);
+    await adminClient.query(`GRANT ${quoteIdentifier(temporaryRole.name)} TO CURRENT_USER`);
 
     runtimeClient = await runtime.createClient(
       createRuntimeDatabaseUrl(options.adminDatabaseUrl, temporaryRole),
@@ -43,8 +44,12 @@ export async function runCli({ argv = process.argv.slice(2), dependencies = {} }
         if (runtimeClient) await runtimeClient.end();
       } finally {
         try {
-          if (temporaryRole)
+          if (temporaryRole) {
+            await adminClient.query(
+              `REVOKE ${quoteIdentifier(temporaryRole.name)} FROM CURRENT_USER`,
+            );
             await adminClient.query(`DROP ROLE ${quoteIdentifier(temporaryRole.name)}`);
+          }
         } finally {
           await adminClient.end();
         }
@@ -63,7 +68,11 @@ export function parseOptions(argv) {
 
 export function createRuntimeDatabaseUrl(adminDatabaseUrl, temporaryRole) {
   const url = new URL(adminDatabaseUrl);
-  url.username = temporaryRole.name;
+  const projectRef =
+    url.hostname.endsWith(".pooler.supabase.com") && url.username.includes(".")
+      ? url.username.slice(url.username.indexOf(".") + 1)
+      : undefined;
+  url.username = projectRef ? `${temporaryRole.name}.${projectRef}` : temporaryRole.name;
   url.password = temporaryRole.password;
   return url.toString();
 }
@@ -161,7 +170,7 @@ async function seedTenants(client, randomUuid) {
     ],
   ]) {
     await client.query(
-      "INSERT INTO public.organizations (id, name, slug, cnpj, email_created_by) VALUES ($1, $2, $3, $4, $5)",
+      "INSERT INTO public.organizations (id, name, slug, cnpj, email_created_by, updated_at) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)",
       [id, name, slug, cnpj, email],
     );
   }
@@ -251,7 +260,7 @@ async function verifyLogin(client, seed) {
 
 async function verifyLogInsert(client, seed) {
   const result = await client.query(
-    "INSERT INTO public.logs (id, user_id, action, referring, referring_id, changes, organization_id) VALUES ($1, $2, 'rls.verify', 'rls.verify', $3, '{}'::jsonb, $4) RETURNING id",
+    "INSERT INTO public.logs (id, user_id, action, referring, referring_id, changes, organization_id) VALUES ($1, $2, 'rls.verify', 'rls.verify', $3, '{}'::jsonb, $4)",
     [`rls-log-${seed.suffix}`, seed.userA, seed.userA, seed.tenantA],
   );
   if (result.rowCount !== 1)

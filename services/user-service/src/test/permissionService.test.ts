@@ -14,7 +14,7 @@ const { prismaMock, auditMock } = vi.hoisted(() => ({
       updateMany: vi.fn(),
     },
     user: { update: vi.fn() },
-    logs: { create: vi.fn() },
+    logs: { createMany: vi.fn() },
     $transaction: vi.fn(async (callback: (client: typeof prismaMock) => unknown) =>
       callback(prismaMock),
     ),
@@ -106,7 +106,7 @@ describe("PermissionService", () => {
         updateMany: vi.fn(),
       },
       user: { update: vi.fn() },
-      logs: { create: vi.fn() },
+      logs: { createMany: vi.fn() },
     };
     prismaMock.permission.findFirst
       .mockResolvedValueOnce({
@@ -236,20 +236,22 @@ describe("PermissionService", () => {
       where: { id: "user-1" },
       data: { session_version: { increment: 1 } },
     });
-    expect(prismaMock.logs.create).toHaveBeenCalledWith(
+    expect(prismaMock.logs.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          user_id: "actor-1",
-          organization_id: "org-1",
-          referring: "Permission",
-          referring_id: "user-1",
-          changes: expect.objectContaining({
-            affected_user_id: "user-1",
+        data: [
+          expect.objectContaining({
+            user_id: "actor-1",
             organization_id: "org-1",
-            previous: expect.objectContaining({ fiscal: 1 }),
-            next: expect.objectContaining({ fiscal: 2 }),
+            referring: "Permission",
+            referring_id: "user-1",
+            changes: expect.objectContaining({
+              affected_user_id: "user-1",
+              organization_id: "org-1",
+              previous: expect.objectContaining({ fiscal: 1 }),
+              next: expect.objectContaining({ fiscal: 2 }),
+            }),
           }),
-        }),
+        ],
       }),
     );
     expect(auditMock).toHaveBeenCalledWith(
@@ -298,7 +300,7 @@ describe("PermissionService", () => {
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       user: { update: vi.fn() },
-      logs: { create: vi.fn() },
+      logs: { createMany: vi.fn() },
     };
 
     await new PermissionService(undefined, transactionMock).updateSpecific("user-1", true, "org-1");
