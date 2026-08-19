@@ -275,33 +275,6 @@ describe("AuthService", () => {
     });
   });
 
-  it("firstCreate cria admin inicial quando banco está vazio", async () => {
-    prismaMock.user.findFirst.mockResolvedValueOnce(null);
-    prismaMock.organization.findFirst.mockResolvedValue({ id: "org-1" });
-    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });
-    bcryptMock.hash.mockResolvedValue("hashed");
-    prismaMock.user.create.mockResolvedValue({
-      id: "user-1",
-      name: "Admin",
-      login: "Admin",
-      permission: 2,
-      department_id: "dep-1",
-    });
-    const service = new AuthService();
-
-    const result = await service.firstCreate();
-
-    expect(result).toEqual({
-      user: {
-        id: "user-1",
-        name: "Admin",
-        login: "Admin",
-        permission: 2,
-        department_id: "dep-1",
-      },
-    });
-  });
-
   it("rejeita token quando a versão persistida da sessão mudou", async () => {
     prismaMock.user.findUnique.mockResolvedValue({
       ...activeUser(),
@@ -335,28 +308,6 @@ describe("AuthService", () => {
   it("aceita sessão para usuário e organização ativos com associação compatível", async () => {
     prismaMock.user.findUnique.mockResolvedValue(activeUser());
 
-    await expect(
-      new AuthService().validateSession({
-        user_id: "user-1",
-        organization_id: "org-1",
-        session_version: 1,
-      }),
-    ).resolves.toBeUndefined();
-  });
-
-  it("mantém login e sessão de usuário legado vinculados pela organização do departamento", async () => {
-    const legacyUser = activeUser({ organization_id: null, organization: null });
-    prismaMock.user.findFirst.mockResolvedValue(legacyUser);
-    prismaMock.user.findUnique.mockResolvedValue(legacyUser);
-    bcryptMock.compare.mockResolvedValue(true);
-    jwtMock.sign.mockReturnValue("jwt-token");
-
-    await expect(
-      new AuthService().login({ login: "account", password: "secret" }),
-    ).resolves.toMatchObject({
-      organization_id: "org-1",
-      token: "jwt-token",
-    });
     await expect(
       new AuthService().validateSession({
         user_id: "user-1",

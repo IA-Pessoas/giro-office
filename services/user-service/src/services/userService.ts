@@ -94,7 +94,7 @@ interface CreateUserInput {
   status?: string;
   photo_url?: string;
   invited_by?: string;
-  organization_id?: string;
+  organization_id: string;
   type?: AuthUserType;
   first_owner_flag?: boolean;
   modules?: Record<string, number>;
@@ -108,7 +108,7 @@ interface UpdateUserInput {
   permission?: number;
   status?: string;
   photo_url?: string | null;
-  organization_id?: string | null;
+  organization_id?: string;
   type?: AuthUserType | null;
   first_owner_flag?: boolean;
   modules?: Record<string, number>;
@@ -132,20 +132,7 @@ type UserSessionRow = UserPublicRow & { modules: ModulePermissions };
 function userOrganizationWhere(id: string, organizationId: string): Prisma.UserWhereInput {
   return {
     id,
-    OR: [
-      { organization_id: organizationId },
-      { organization_id: null, department: { organization_id: organizationId } },
-    ],
-  };
-}
-
-function normalizeUserOrganization<T extends { organization_id: string | null }>(
-  user: T,
-  organizationId: string,
-): Omit<T, "organization_id"> & { organization_id: string } {
-  return {
-    ...user,
-    organization_id: user.organization_id ?? organizationId,
+    organization_id: organizationId,
   };
 }
 
@@ -295,7 +282,7 @@ class UserService {
       throw new ServiceError(404, "Usuario nao encontrado.");
     }
 
-    return normalizeUserOrganization(user, organizationId);
+    return user;
   }
 
   async getByIdWithModules(id: string, organizationId: string): Promise<UserSessionRow> {
@@ -320,9 +307,10 @@ class UserService {
     data: CreateUserInput,
     actorUserId?: string,
   ): Promise<UserPublicRow | UserCreateRow> {
-    const department = data.organization_id
-      ? await this.#requireDepartmentInOrganization(data.department_id, data.organization_id)
-      : null;
+    const department = await this.#requireDepartmentInOrganization(
+      data.department_id,
+      data.organization_id,
+    );
     const normalizedType = normalizeUserType(data.type);
     const normalizedPermission = normalizePermissionForType(normalizedType, data.permission);
     const modulesToApply =
@@ -332,7 +320,7 @@ class UserService {
             withDepartmentAdminModule(
               pickKnownModules(data.modules),
               normalizedType,
-              department?.name ?? null,
+              department.name,
             ),
             normalizedPermission,
           );
@@ -350,57 +338,53 @@ class UserService {
           status: data.status ?? "active",
           photo_url: data.photo_url,
           invited_by: data.invited_by,
-          organization_id: data.organization_id ?? null,
+          organization_id: data.organization_id,
           type: normalizedType,
           first_owner_flag: data.first_owner_flag ?? false,
         },
-        select: data.organization_id ? USER_CREATE_SELECT : USER_PUBLIC_SELECT,
+        select: USER_CREATE_SELECT,
       });
 
-      if (data.organization_id) {
-        try {
-          const permissionService = new PermissionService(this.audit);
-          const permission = await permissionService.create(user.id, data.organization_id);
+      try {
+        const permissionService = new PermissionService(this.audit);
+        const permission = await permissionService.create(user.id, data.organization_id);
 
-          if (hasModulePatch(modulesToApply)) {
-            if (actorUserId) {
-              await permissionService.update(user.id, modulesToApply, data.organization_id, {
-                actorUserId,
-              });
-            } else {
-              await permissionService.update(user.id, modulesToApply, data.organization_id);
-            }
-          }
-
-          await prismaClient.user.update({
-            where: { id: user.id },
-            data: { permission_id: permission.id },
-          });
-
-          const createdUser = {
-            ...user,
-            permission_id: permission.id,
-          };
-          if (this.audit && actorUserId) {
-            this.#recordAudit({
+        if (hasModulePatch(modulesToApply)) {
+          if (actorUserId) {
+            await permissionService.update(user.id, modulesToApply, data.organization_id, {
               actorUserId,
-              organizationId: data.organization_id,
-              action: "CREATE",
-              referring: "user",
-              referringId: user.id,
-              changes: { next: pickUserAuditFields(createdUser) },
-              outcome: "success",
             });
+          } else {
+            await permissionService.update(user.id, modulesToApply, data.organization_id);
           }
-
-          return createdUser;
-        } catch (permErr: unknown) {
-          logError("Erro ao criar/atualizar permissao no create de usuario", { err: permErr });
-          throw new ServiceError(500, "Erro ao criar permissao para o usuario.", permErr);
         }
-      }
 
-      return user;
+        await prismaClient.user.update({
+          where: { id: user.id },
+          data: { permission_id: permission.id },
+        });
+
+        const createdUser = {
+          ...user,
+          permission_id: permission.id,
+        };
+        if (this.audit && actorUserId) {
+          this.#recordAudit({
+            actorUserId,
+            organizationId: data.organization_id,
+            action: "CREATE",
+            referring: "user",
+            referringId: user.id,
+            changes: { next: pickUserAuditFields(createdUser) },
+            outcome: "success",
+          });
+        }
+
+        return createdUser;
+      } catch (permErr: unknown) {
+        logError("Erro ao criar/atualizar permissao no create de usuario", { err: permErr });
+        throw new ServiceError(500, "Erro ao criar permissao para o usuario.", permErr);
+      }
     } catch (err: unknown) {
       const isUniqueViolation =
         err &&
@@ -550,7 +534,6 @@ class UserService {
         }
       }
 
-      const normalizedUser = normalizeUserOrganization(user, organizationId);
       if (this.audit && actorUserId) {
         this.#recordAudit({
           actorUserId,
@@ -558,12 +541,12 @@ class UserService {
           action,
           referring: "user",
           referringId: id,
-          changes: buildUserAuditChanges(existingUser, normalizedUser),
+          changes: buildUserAuditChanges(existingUser, user),
           outcome: "success",
         });
       }
 
-      return normalizedUser;
+      return user;
     } catch (err: unknown) {
       if (err instanceof ServiceError) throw err;
       const isUniqueViolation =

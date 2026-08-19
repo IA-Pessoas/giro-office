@@ -71,7 +71,7 @@ Quando `AUDIT_ENABLED=true`, o gateway tambem proxya `/audit` para `AUDIT_SERVIC
 O gateway aplica *default-deny*: toda rota autenticada precisa de uma política explícita antes de
 ser encaminhada ao upstream. `GET` exige nível modular `>=1` e operações de escrita exigem
 `>=2`, exceto políticas declaradas específicas. As únicas rotas HTTP sem sessão são `GET /health`,
-`GET /ready`, `POST /user/session` e `POST /user/start-config`. O transporte `/socket.io` é uma
+`GET /ready` e `POST /user/session`. O transporte `/socket.io` é uma
 exceção de compatibilidade: o gateway apenas encaminha o handshake e o serviço de tempo real
 valida `socket.handshake.auth.token` antes de aceitar a conexão.
 

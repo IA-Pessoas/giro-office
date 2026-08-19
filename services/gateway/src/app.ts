@@ -265,9 +265,12 @@ function mountPublicRoutes(
       siteTitle: "gateway - OpenAPI",
     });
   } else {
-    app.use(["/docs", "/openapi.json", "/__gateway-openapi-static.json"], (_request, _response, next) => {
-      next(new ServiceError(404, "Recurso não encontrado."));
-    });
+    app.use(
+      ["/docs", "/openapi.json", "/__gateway-openapi-static.json"],
+      (_request, _response, next) => {
+        next(new ServiceError(404, "Recurso não encontrado."));
+      },
+    );
   }
 
   app.get("/health", (_request, response) => {
@@ -306,7 +309,6 @@ function mountAuthRateLimits(app: express.Express, env: GatewayEnv): void {
   });
 
   app.use("/user/session", authRateLimit);
-  app.use("/user/start-config", authRateLimit);
 }
 
 function mountPublicBlockedRoutes(app: express.Express, env: GatewayEnv): void {

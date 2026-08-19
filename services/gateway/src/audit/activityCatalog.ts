@@ -43,7 +43,7 @@ const TECHNICAL_RULES = [
   /^\/dashboard(?:\/|$)/,
   /^\/audit(?:\/|$)/,
   /^\/internal(?:\/|$)/,
-  /^\/user\/(?:session|start-config|me)(?:\/|$)/,
+  /^\/user\/(?:session|me)(?:\/|$)/,
   /^\/project\/metrics$/,
   /^\/ti\/dashboard\/?$/,
   /^\/pessoal\/overview\/?$/,

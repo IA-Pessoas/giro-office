@@ -75,35 +75,6 @@ Realiza login e retorna token JWT.
 
 ---
 
-### POST /user/start-config
-
-Cria o primeiro usuário admin do sistema (quando o banco está vazio).
-
-**Autenticação:** Não requerida (rota pública)
-
-**Body:** Nenhum
-
-**Resposta:** `200 OK`
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "uuid",
-      "name": "Admin",
-      "login": "Admin",
-      "permission": 2,
-      "department_id": "uuid"
-    },
-    "service": "user-service"
-  }
-}
-```
-
-**Erros:** `409` - Login já cadastrado; `400` - Execute o seed do banco antes
-
----
-
 ### GET /user/me
 
 Retorna os dados do usuário autenticado.
@@ -296,7 +267,7 @@ Valida o JWT atual contra o usuário e a organização ativos, a associação pe
 
 ---
 
-### PATCH /user/:id
+### PUT /user/:id
 
 Atualiza um usuário existente.
 
@@ -317,7 +288,7 @@ Atualiza um usuário existente.
 | permission      | number  | Nível de permissão |
 | status          | string  | `active` ou `inactive` |
 | photo_url       | string \| null | URL da foto ou `null` para remover |
-| organization_id | string \| null | UUID da organização |
+| organization_id | string | UUID da organização |
 | type            | string \| null | `owner`, `admin` ou `user` |
 | first_owner_flag| boolean | `true` apenas quando `type` é `owner` |
 | modules         | object  | Permissões por módulo |

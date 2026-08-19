@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { getPublicRoute, isPublicRoute } from "../security/publicRoutes.js";
-import { matchesGatewayRouteTemplate, normalizeGatewayPath } from "../security/routeClassification.js";
+import {
+  matchesGatewayRouteTemplate,
+  normalizeGatewayPath,
+} from "../security/routeClassification.js";
 
 describe("route classification", () => {
   it("normalizes a trailing slash and removes the query string", () => {
@@ -25,7 +28,9 @@ describe("route classification", () => {
   });
 
   it("matches static segments with Express's default case-insensitive routing", () => {
-    expect(matchesGatewayRouteTemplate("/ti/passwords/{id}/deactivate", "/TI/PASSWORDS/1/DEACTIVATE")).toBe(true);
+    expect(
+      matchesGatewayRouteTemplate("/ti/passwords/{id}/deactivate", "/TI/PASSWORDS/1/DEACTIVATE"),
+    ).toBe(true);
   });
 
   it("registers the session endpoint as public only for its declared method", () => {
@@ -33,6 +38,10 @@ describe("route classification", () => {
       reason: "Cria uma sessão sem contexto autenticado.",
     });
     expect(getPublicRoute("GET", "/user/session")).toBeNull();
+  });
+
+  it("does not register the removed bootstrap endpoint as public", () => {
+    expect(getPublicRoute("POST", "/user/start-config")).toBeNull();
   });
 
   it("keeps Socket.IO transport public because the upstream validates its auth handshake", () => {

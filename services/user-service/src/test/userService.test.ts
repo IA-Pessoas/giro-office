@@ -47,34 +47,31 @@ describe("UserService", () => {
     vi.clearAllMocks();
   });
 
-  it("getById aceita usuário legado vinculado pela organização do departamento", async () => {
+  it("getById consulta o usuário pela organização obrigatória", async () => {
     prismaMock.user.findFirst.mockResolvedValue({
-      id: "user-legacy",
-      name: "Legacy",
-      login: "legacy",
+      id: "user-1",
+      name: "User",
+      login: "user",
       permission: 2,
       status: "active",
       department_id: "dep-1",
       photo_url: null,
       joined_at: new Date("2025-01-01"),
-      organization_id: null,
+      organization_id: "org-1",
       type: "admin",
       first_owner_flag: false,
       permission_id: "permission-1",
     });
     const service = new UserService();
 
-    const result = await service.getById("user-legacy", "org-1");
+    const result = await service.getById("user-1", "org-1");
 
-    expect(result).toMatchObject({ id: "user-legacy", organization_id: "org-1" });
+    expect(result).toMatchObject({ id: "user-1", organization_id: "org-1" });
     expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          id: "user-legacy",
-          OR: [
-            { organization_id: "org-1" },
-            { organization_id: null, department: { organization_id: "org-1" } },
-          ],
+          id: "user-1",
+          organization_id: "org-1",
         },
       }),
     );
@@ -89,10 +86,7 @@ describe("UserService", () => {
       expect.objectContaining({
         where: {
           id: "user-1",
-          OR: [
-            { organization_id: "org-1" },
-            { organization_id: null, department: { organization_id: "org-1" } },
-          ],
+          organization_id: "org-1",
         },
       }),
     );
@@ -452,10 +446,7 @@ describe("UserService", () => {
       expect.objectContaining({
         where: {
           id: "user-1",
-          OR: [
-            { organization_id: "org-1" },
-            { organization_id: null, department: { organization_id: "org-1" } },
-          ],
+          organization_id: "org-1",
         },
       }),
     );

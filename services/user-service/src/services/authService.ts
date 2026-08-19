@@ -24,8 +24,8 @@ const DUMMY_PASSWORD_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJ
 
 interface PersistedAuthContext {
   status: string;
-  organization_id: string | null;
-  organization: { id: string; status: string } | null;
+  organization_id: string;
+  organization: { id: string; status: string };
   department: {
     organization_id: string;
     organization: { id: string; status: string };
@@ -44,8 +44,8 @@ function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
 }
 
 function getActiveOrganizationId(user: PersistedAuthContext): string | undefined {
-  const organizationId = user.organization_id ?? user.department.organization_id;
-  const organization = user.organization_id ? user.organization : user.department.organization;
+  const organizationId = user.organization_id;
+  const organization = user.organization;
 
   if (
     user.status !== "active" ||
@@ -74,8 +74,8 @@ function getLoginFailureReason(
     return "inactive_user";
   }
 
-  const organizationId = user.organization_id ?? user.department.organization_id;
-  const organization = user.organization_id ? user.organization : user.department.organization;
+  const organizationId = user.organization_id;
+  const organization = user.organization;
   if (
     user.department.organization_id !== organizationId ||
     !organization ||
@@ -105,16 +105,6 @@ export interface LoginResult {
   department_id: string;
   organization_id: string;
   token: string;
-}
-
-export interface FirstCreateResult {
-  user: {
-    id: string;
-    name: string;
-    login: string;
-    permission: number;
-    department_id: string;
-  };
 }
 
 class AuthService {
@@ -183,61 +173,6 @@ class AuthService {
       organization_id: organizationId,
       token,
     };
-  }
-
-  async firstCreate(): Promise<FirstCreateResult> {
-    const userExists = await prismaClient.user.findFirst();
-    if (userExists) {
-      throw new ServiceError(409, "Login já cadastrado");
-    }
-
-    const org = await prismaClient.organization.findFirst();
-    if (!org) {
-      throw new ServiceError(400, "Execute o seed do banco antes de usar o firstCreate.");
-    }
-
-    const dep = await prismaClient.department.findFirst({
-      where: { organization_id: org.id },
-    });
-    if (!dep) {
-      throw new ServiceError(400, "Execute o seed do banco antes de usar o firstCreate.");
-    }
-
-    const { adminPassword } = getUserServiceEnv();
-    const passwordHash = await bcrypt.hash(adminPassword, 8);
-
-    try {
-      const user = await prismaClient.user.create({
-        data: {
-          name: "Admin",
-          login: "Admin",
-          password: passwordHash,
-          permission: 2,
-          type: "owner",
-          status: "active",
-          department_id: dep.id,
-        },
-        select: {
-          id: true,
-          name: true,
-          login: true,
-          permission: true,
-          department_id: true,
-        },
-      });
-
-      return { user };
-    } catch (err: unknown) {
-      const isUniqueViolation =
-        err &&
-        typeof err === "object" &&
-        "code" in err &&
-        (err as { code: string }).code === "P2002";
-      if (isUniqueViolation) {
-        throw new ServiceError(409, "Login já cadastrado");
-      }
-      throw err;
-    }
   }
 
   async validateSession(

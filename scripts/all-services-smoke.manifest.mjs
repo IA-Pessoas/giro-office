@@ -11,14 +11,12 @@ export const EXEMPT_ROUTE_KEYS = new Set([
   "GET|/health",
   "GET|/ready",
   "POST|/user/session",
-  "POST|/user/start-config",
   "GET|/user/session/validate",
 ]);
 
 export const EXEMPT_SPEC_OPERATION_KEYS = new Set(["user-service|GET|/user/session/validate"]);
 
 const GOOD_STATUS_OVERRIDES = new Map([
-  ["userStartConfig", [200, 409]],
   ["userCreate", [201]],
   ["organizationCreate", [201]],
   ["clientCreate", [201]],
@@ -416,14 +414,6 @@ const baseManifest = [
     specOperation: false,
     expectedStatus: [401],
     expectedLabel: "wrong credentials",
-  }),
-  op({
-    service: "user-service",
-    method: "POST",
-    path: "/user/start-config",
-    action: "userStartConfig",
-    target: "gateway",
-    auth: "public",
   }),
   op({
     service: "user-service",

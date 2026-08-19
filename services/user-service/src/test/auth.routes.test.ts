@@ -45,14 +45,12 @@ describe("auth routes", () => {
     expect(response.headers.location).toBeUndefined();
   });
 
-  it("POST /user/start-config executa configuracao inicial", async () => {
-    authServiceMock.firstCreate.mockResolvedValue({ id: "user-1" });
+  it("POST /user/start-config não expõe bootstrap público", async () => {
     const app = createTestApp();
 
     const res = await request(app).post("/user/start-config");
 
-    expect(res.status).toBe(200);
-    expect(authServiceMock.firstCreate).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(404);
   });
 
   it("GET /user/me usa o usuario encaminhado pelo gateway", async () => {

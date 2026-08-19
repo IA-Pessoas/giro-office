@@ -14,7 +14,7 @@ Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `ADM
 
 O encaminhamento para `USER_SERVICE_URL` usa o prefixo público **`/user`** — ver [`gateway/src/config/serviceRegistry.ts`](../gateway/src/config/serviceRegistry.ts) (`USER_SERVICE_PREFIXES`).
 
-Exemplos de caminhos expostos pelo **user-service** (via gateway): `/user/session`, `/user/start-config`, `/user/me`, `/user`, `/user/:id`, `/user/:id/photo`, `/user/permission/:userId`.
+Exemplos de caminhos expostos pelo **user-service** (via gateway): `/user/session`, `/user/me`, `/user`, `/user/:id`, `/user/:id/photo`, `/user/permission/:userId`.
 
 - **`GET /user/:id/photo`:** `200` com envelope padrão e `data.url` (URL pública da foto no storage).
 
