@@ -177,6 +177,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     certificateServiceInternalToken: "certificate-service-token",
     pessoalServiceUrl: "http://127.0.0.1:3042",
     parcelamentoServiceUrl: "http://127.0.0.1:3043",
+    reportsServiceUrl: "http://127.0.0.1:3044",
     databaseUrl: "postgres://test:test@127.0.0.1:5432/gateway_test",
 
     jwtSecret: "test-secret",
@@ -191,6 +192,38 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     ...overrides,
   };
 }
+
+it("proxies reports requests with the authenticated context and no gateway module policy", async () => {
+  const reportsService = createServer((request, response) => {
+    expect(request.headers[FORWARDED_AUTH_USER_ID_HEADER]).toBe("reports-user");
+    expect(request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER]).toBe("reports-org");
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { items: [] } }));
+  });
+  const reportsServiceUrl = await startServer(reportsService);
+  const app = createApp(createEnv({ reportsServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/reports/catalog`, {
+      headers: {
+        Authorization: `Bearer ${createToken({
+          user_id: "reports-user",
+          organization_id: "reports-org",
+          permission: 0,
+          modules: {},
+        })}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(reportsService);
+  }
+});
 
 function createToken(
   claims: {
