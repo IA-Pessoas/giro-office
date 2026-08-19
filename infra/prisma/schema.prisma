@@ -93,6 +93,12 @@ generator parcelamentoServiceClient {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator reportsServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/reports-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }
