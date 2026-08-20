@@ -7,11 +7,11 @@ import {
   normalizeModulePermissions,
   ServiceError,
 } from "@workspace/shared";
-import bcrypt from "bcryptjs";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type { UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
+import { hashPassword } from "../security/passwordHashService.js";
 import { PermissionService } from "./permissionService.js";
 
 const USER_PUBLIC_SELECT = {
@@ -337,7 +337,7 @@ class UserService {
             normalizedPermission,
           );
 
-    const passwordHash = await bcrypt.hash(data.password, 8);
+    const passwordHash = await hashPassword(data.password);
 
     try {
       const user = await prismaClient.user.create({
@@ -475,7 +475,7 @@ class UserService {
     if (data.first_owner_flag !== undefined) updateData.first_owner_flag = data.first_owner_flag;
 
     if (data.password !== undefined) {
-      updateData.password = await bcrypt.hash(data.password, 8);
+      updateData.password = await hashPassword(data.password);
     }
 
     let modulesToApply: ModulePatch | null = null;

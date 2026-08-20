@@ -7,11 +7,15 @@ import {
   type ModulePermissions,
   ServiceError,
 } from "@workspace/shared";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 import { getUserServiceEnv } from "../config/env.js";
 import prismaClient from "../prisma/index.js";
+import {
+  hashPassword,
+  PASSWORD_HASH_VERSION,
+  verifyPassword,
+} from "../security/passwordHashService.js";
 
 interface LoginRequest {
   login: string;
@@ -20,7 +24,8 @@ interface LoginRequest {
 
 const MODULE_PERMISSION_KEYS: readonly ModulePermissionKey[] = ACTIVE_MODULE_KEYS;
 const GENERIC_LOGIN_ERROR_MESSAGE = "Login ou senha inválidos.";
-const DUMMY_PASSWORD_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+const DUMMY_PASSWORD_HASH =
+  "$argon2id$v=19$m=19456,p=1,t=2$lktGNqJmnbIyj6tMoe+a8Q$HRtIIMh3LPpaIs9yyun/WOjqfivhgr4Nt3m9wsIkTsQ";
 
 interface PersistedAuthContext {
   status: string;
@@ -134,14 +139,29 @@ class AuthService {
       },
     });
 
-    const passwordMatch = await bcrypt.compare(password, user?.password ?? DUMMY_PASSWORD_HASH);
-    const failureReason = getLoginFailureReason(user, passwordMatch);
+    const passwordVerification = await verifyPassword(
+      password,
+      user?.password ?? DUMMY_PASSWORD_HASH,
+    );
+    const failureReason = getLoginFailureReason(user, passwordVerification.valid);
     if (failureReason || !user) {
       rejectLogin(failureReason ?? "account_not_found");
     }
     const organizationId = getActiveOrganizationId(user);
     if (!organizationId) {
       rejectLogin("invalid_membership");
+    }
+
+    if (passwordVerification.needsRehash) {
+      const passwordHash = await hashPassword(password);
+      const { count } = await prismaClient.user.updateMany({
+        where: { id: user.id, password: user.password },
+        data: { password: passwordHash },
+      });
+      info("Password hash migration attempted", {
+        event: "auth.password.rehash",
+        data: { from: "bcrypt", to: PASSWORD_HASH_VERSION, migrated: count === 1 },
+      });
     }
 
     const jwtSecret = getUserServiceEnv().jwtSecret;
@@ -204,7 +224,7 @@ class AuthService {
     }
 
     const { adminPassword } = getUserServiceEnv();
-    const passwordHash = await bcrypt.hash(adminPassword, 8);
+    const passwordHash = await hashPassword(adminPassword);
 
     try {
       const user = await prismaClient.user.create({

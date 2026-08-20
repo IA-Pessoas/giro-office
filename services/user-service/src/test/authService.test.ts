@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, bcryptMock, jwtMock } = vi.hoisted(() => ({
+const { prismaMock, passwordHashMock, jwtMock } = vi.hoisted(() => ({
   prismaMock: {
     user: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     organization: {
       findFirst: vi.fn(),
@@ -15,9 +16,9 @@ const { prismaMock, bcryptMock, jwtMock } = vi.hoisted(() => ({
       findFirst: vi.fn(),
     },
   },
-  bcryptMock: {
-    compare: vi.fn(),
-    hash: vi.fn(),
+  passwordHashMock: {
+    verifyPassword: vi.fn(),
+    hashPassword: vi.fn(),
   },
   jwtMock: {
     sign: vi.fn(),
@@ -35,8 +36,9 @@ vi.mock("../config/env.js", () => ({
   }),
 }));
 
-vi.mock("bcryptjs", () => ({
-  default: bcryptMock,
+vi.mock("../security/passwordHashService.js", () => ({
+  PASSWORD_HASH_VERSION: "argon2id-v1",
+  ...passwordHashMock,
 }));
 
 vi.mock("jsonwebtoken", () => ({
@@ -49,6 +51,7 @@ import { UserService } from "../services/userService.js";
 describe("AuthService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    passwordHashMock.verifyPassword.mockResolvedValue({ valid: false, needsRehash: false });
   });
 
   function activeUser(overrides: Record<string, unknown> = {}) {
@@ -100,7 +103,10 @@ describe("AuthService", () => {
 
     for (const testCase of cases) {
       prismaMock.user.findFirst.mockResolvedValueOnce(testCase.user);
-      bcryptMock.compare.mockResolvedValueOnce(testCase.passwordMatches);
+      passwordHashMock.verifyPassword.mockResolvedValueOnce({
+        valid: testCase.passwordMatches,
+        needsRehash: false,
+      });
 
       try {
         await new AuthService().login({ login: "  account  ", password: "secret" });
@@ -120,11 +126,11 @@ describe("AuthService", () => {
       { statusCode: 401, code: "UNAUTHORIZED", message: "Login ou senha inválidos." },
       { statusCode: 401, code: "UNAUTHORIZED", message: "Login ou senha inválidos." },
     ]);
-    expect(bcryptMock.compare).toHaveBeenCalledTimes(5);
-    expect(bcryptMock.compare).toHaveBeenNthCalledWith(
+    expect(passwordHashMock.verifyPassword).toHaveBeenCalledTimes(5);
+    expect(passwordHashMock.verifyPassword).toHaveBeenNthCalledWith(
       1,
       "secret",
-      "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+      "$argon2id$v=19$m=19456,p=1,t=2$lktGNqJmnbIyj6tMoe+a8Q$HRtIIMh3LPpaIs9yyun/WOjqfivhgr4Nt3m9wsIkTsQ",
     );
     expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { login: "account" } }),
@@ -159,7 +165,7 @@ describe("AuthService", () => {
         ],
       }),
     );
-    bcryptMock.compare.mockResolvedValue(true);
+    passwordHashMock.verifyPassword.mockResolvedValue({ valid: true, needsRehash: false });
     jwtMock.sign.mockReturnValue("jwt-token");
     const service = new AuthService();
 
@@ -203,6 +209,39 @@ describe("AuthService", () => {
     );
   });
 
+  it("rehash de bcrypt válido uma única vez sem sobrescrever uma troca concorrente", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(activeUser({ password: "$2b$10$legacy" }));
+    passwordHashMock.verifyPassword.mockResolvedValue({ valid: true, needsRehash: true });
+    passwordHashMock.hashPassword.mockResolvedValue("$argon2id$v=19$new-hash");
+    prismaMock.user.updateMany.mockResolvedValue({ count: 1 });
+    jwtMock.sign.mockReturnValue("jwt-token");
+
+    await expect(
+      new AuthService().login({ login: "account", password: "secret" }),
+    ).resolves.toMatchObject({
+      token: "jwt-token",
+    });
+
+    expect(prismaMock.user.updateMany).toHaveBeenCalledWith({
+      where: { id: "user-1", password: "$2b$10$legacy" },
+      data: { password: "$argon2id$v=19$new-hash" },
+    });
+  });
+
+  it("não rehash senha inválida", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(activeUser({ password: "$2b$10$legacy" }));
+    passwordHashMock.verifyPassword.mockResolvedValue({ valid: false, needsRehash: true });
+
+    await expect(
+      new AuthService().login({ login: "account", password: "wrong" }),
+    ).rejects.toMatchObject({
+      statusCode: 401,
+    });
+
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+    expect(passwordHashMock.hashPassword).not.toHaveBeenCalled();
+  });
+
   it("login carrega somente a permissão da organização ativa", async () => {
     prismaMock.user.findFirst.mockResolvedValue(
       activeUser({
@@ -223,7 +262,7 @@ describe("AuthService", () => {
         ],
       }),
     );
-    bcryptMock.compare.mockResolvedValue(true);
+    passwordHashMock.verifyPassword.mockResolvedValue({ valid: true, needsRehash: false });
     jwtMock.sign.mockReturnValue("jwt-token");
     const service = new AuthService();
 
@@ -254,10 +293,13 @@ describe("AuthService", () => {
         return user;
       },
     );
-    bcryptMock.hash.mockImplementation(async (password: string) => `hash:${password}`);
-    bcryptMock.compare.mockImplementation(
-      async (password: string, hash: string) => hash === `hash:${password}`,
+    passwordHashMock.hashPassword.mockImplementation(
+      async (password: string) => `hash:${password}`,
     );
+    passwordHashMock.verifyPassword.mockImplementation(async (password: string, hash: string) => ({
+      valid: hash === `hash:${password}`,
+      needsRehash: false,
+    }));
     jwtMock.sign.mockReturnValue("jwt-token");
 
     await new UserService().update("user-1", { password: "nova-senha" }, "org-1", "user-1");
@@ -279,7 +321,7 @@ describe("AuthService", () => {
     prismaMock.user.findFirst.mockResolvedValueOnce(null);
     prismaMock.organization.findFirst.mockResolvedValue({ id: "org-1" });
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });
-    bcryptMock.hash.mockResolvedValue("hashed");
+    passwordHashMock.hashPassword.mockResolvedValue("hashed");
     prismaMock.user.create.mockResolvedValue({
       id: "user-1",
       name: "Admin",
@@ -348,7 +390,7 @@ describe("AuthService", () => {
     const legacyUser = activeUser({ organization_id: null, organization: null });
     prismaMock.user.findFirst.mockResolvedValue(legacyUser);
     prismaMock.user.findUnique.mockResolvedValue(legacyUser);
-    bcryptMock.compare.mockResolvedValue(true);
+    passwordHashMock.verifyPassword.mockResolvedValue({ valid: true, needsRehash: false });
     jwtMock.sign.mockReturnValue("jwt-token");
 
     await expect(
