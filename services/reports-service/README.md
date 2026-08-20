@@ -13,6 +13,7 @@ Consulte [`src/config/env.ts`](src/config/env.ts).
 - Banco e autenticação: `DATABASE_URL`, `JWT_SECRET`.
 - Tokens e segredo interno: `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`.
 - URLs upstream: `USER_SERVICE_URL`, `PARCELAMENTO_SERVICE_URL`, `CLIENT_SERVICE_URL`.
+- Timeout de fontes internas: `REPORTS_SOURCE_TIMEOUT_MS`.
 - Worker e CORS: `REPORTS_WORKER_POLL_INTERVAL_MS`, `REPORTS_WORKER_CONCURRENCY`,
   `REPORTS_WORKER_LEASE_SECONDS`, `SERVICE_ALLOWED_ORIGINS`.
 

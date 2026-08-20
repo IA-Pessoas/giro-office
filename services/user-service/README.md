@@ -8,7 +8,7 @@ Por defeito: **3030** (`PORT`).
 
 ## Variáveis de ambiente
 
-Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, logging, etc.
+Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, logging, etc. `REPORTS_INTERNAL_TOKEN` protege `POST /internal/reporting/access-context`; deve ser igual ao valor do reports-service e é obrigatório em produção.
 
 ## Gateway
 

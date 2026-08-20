@@ -83,6 +83,8 @@ const rawEnvSchema = z
 
     auditServiceToken: z.string().optional().default("audit-service-token"),
 
+    reportsInternalToken: z.string().optional().default("reports-service-token"),
+
     allowedOrigins: z
       .string()
       .optional()
@@ -125,6 +127,12 @@ const envSchema = rawEnvSchema.transform((env) => {
     serviceName: "user-service",
     envName: "AUDIT_SERVICE_TOKEN",
     token: rest.auditServiceToken,
+  });
+  validateProductionInternalServiceToken({
+    nodeEnv: rest.nodeEnv,
+    serviceName: "user-service",
+    envName: "REPORTS_INTERNAL_TOKEN",
+    token: rest.reportsInternalToken,
   });
   validateProductionCorsOrigins({
     nodeEnv: rest.nodeEnv,
@@ -170,6 +178,7 @@ export function getUserServiceEnv(): UserServiceEnv {
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
 
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
+    reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
     uploadRateLimitMax: process.env.UPLOAD_RATE_LIMIT_MAX,
     uploadRateLimitWindowMs: process.env.UPLOAD_RATE_LIMIT_WINDOW_MS,
