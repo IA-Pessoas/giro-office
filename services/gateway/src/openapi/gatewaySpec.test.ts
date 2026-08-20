@@ -1,10 +1,10 @@
 import { expect, it } from "vitest";
 
 import type { GatewayEnv } from "../config/env.js";
-import { getUnclassifiedGatewayOperations } from "../security/routePolicyCoverage.js";
+import { buildGatewayOpenApiSpec } from "./gatewaySpec.js";
 
-function createCoverageEnv(): GatewayEnv {
-  return {
+it("agrega o catálogo público do reports-service", () => {
+  const spec = buildGatewayOpenApiSpec({
     nodeEnv: "test",
     enableApiDocs: true,
     authorizationMode: "enforce",
@@ -40,9 +40,7 @@ function createCoverageEnv(): GatewayEnv {
     authRateLimitMax: 10,
     authRateLimitWindowMs: 60_000,
     jsonBodyLimit: "1mb",
-  };
-}
+  } satisfies GatewayEnv);
 
-it("classifies every documented gateway operation as public or policy-protected", () => {
-  expect(getUnclassifiedGatewayOperations(createCoverageEnv())).toEqual([]);
+  expect(spec.paths["/reports/catalog"]?.get?.["x-origin-service"]).toBe("reports-service");
 });

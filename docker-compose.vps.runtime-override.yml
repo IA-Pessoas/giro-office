@@ -49,6 +49,8 @@ services:
         condition: service_started
       parcelamento-service:
         condition: service_started
+      reports-service:
+        condition: service_started
       audit-service:
         condition: service_started
     healthcheck:
@@ -107,6 +109,10 @@ services:
       disable: true
 
   parcelamento-service:
+    healthcheck:
+      disable: true
+
+  reports-service:
     healthcheck:
       disable: true
 

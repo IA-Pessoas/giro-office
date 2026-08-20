@@ -177,8 +177,6 @@ services:
         SERVICE_DIR: services/user-service
     env_file:
       - .env.vps.user-service
-    environment:
-      REPORTS_INTERNAL_TOKEN: ${REPORTS_INTERNAL_TOKEN}
     expose:
       - "3030"
     healthcheck:
@@ -572,8 +570,6 @@ services:
       - .env.vps.reports-service
     environment:
       USER_SERVICE_URL: http://user-service:3030
-      REPORTS_INTERNAL_TOKEN: ${REPORTS_INTERNAL_TOKEN}
-      REPORTS_GRANT_SECRET: ${REPORTS_GRANT_SECRET}
     expose:
       - "3044"
     healthcheck:
@@ -607,8 +603,6 @@ services:
       - .env.vps.reports-service
     environment:
       USER_SERVICE_URL: http://user-service:3030
-      REPORTS_INTERNAL_TOKEN: ${REPORTS_INTERNAL_TOKEN}
-      REPORTS_GRANT_SECRET: ${REPORTS_GRANT_SECRET}
     depends_on:
       reports-service:
         condition: service_healthy

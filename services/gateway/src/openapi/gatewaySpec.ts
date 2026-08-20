@@ -11,6 +11,7 @@ import { buildParcelamentoServiceOpenApiSpec } from "../../../parcelamento-servi
 import { buildPessoalServiceOpenApiSpec } from "../../../pessoal-service/src/openapi/spec.js";
 import { buildProjectServiceOpenApiSpec } from "../../../project-service/src/openapi/spec.js";
 import { buildRegularizeServiceOpenApiSpec } from "../../../regularize-service/src/openapi/spec.js";
+import { buildReportsServiceOpenApiSpec } from "../../../reports-service/src/openapi/spec.js";
 import { buildRhServiceOpenApiSpec } from "../../../rh-service/src/openapi/spec.js";
 import { buildTaskServiceOpenApiSpec } from "../../../task-service/src/openapi/spec.js";
 import { buildTiServiceOpenApiSpec } from "../../../ti-service/src/openapi/spec.js";
@@ -143,7 +144,8 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       key: "ti-service",
       label: "TI Service",
       buildSpec: () => buildTiServiceOpenApiSpec({ port: getPortFromUrl(env.tiServiceUrl) }),
-      includePath: (path) => path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
+      includePath: (path) =>
+        path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
     },
     {
       key: "certificate-service",
@@ -174,6 +176,13 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
         buildParcelamentoServiceOpenApiSpec({
           port: getPortFromUrl(env.parcelamentoServiceUrl),
         } as never),
+      includePath: (path) => path !== "/health" && path !== "/ready",
+    },
+    {
+      key: "reports-service",
+      label: "Reports Service",
+      buildSpec: () =>
+        buildReportsServiceOpenApiSpec({ port: getPortFromUrl(env.reportsServiceUrl) } as never),
       includePath: (path) => path !== "/health" && path !== "/ready",
     },
     {
