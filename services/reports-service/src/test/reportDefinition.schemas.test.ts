@@ -46,6 +46,15 @@ describe("reportDefinitionSchema", () => {
     ).toThrow();
   });
 
+  it("rejeita parâmetros duplicados", () => {
+    expect(() =>
+      reportDefinitionSchema.parse({
+        ...definition,
+        parameters: [...definition.parameters, { name: "status", type: "string" }],
+      }),
+    ).toThrow();
+  });
+
   it("rejeita chave técnica, SQL, tabela, expressão e transformador", () => {
     for (const invalidDefinition of [
       {

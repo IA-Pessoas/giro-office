@@ -44,7 +44,7 @@ const columnSchema = z
 
 const joinSchema = z
   .object({
-    relation: z.enum(["parcelamento.installments.client"]),
+    relation: z.string(),
     type: z.enum(["inner", "left"]),
   })
   .strict();
@@ -108,6 +108,7 @@ export const reportDefinitionSchema = z
   .superRefine((definition, context) => {
     const sourceSet = new Set(definition.sources);
     const aliases = new Set<string>();
+    const parameterNames = new Set(definition.parameters.map((parameter) => parameter.name));
     const parameters = new Map(
       definition.parameters.map((parameter) => [parameter.name, parameter]),
     );
@@ -115,6 +116,9 @@ export const reportDefinitionSchema = z
 
     if (sourceSet.size !== definition.sources.length) {
       context.addIssue({ code: z.ZodIssueCode.custom, message: "As fontes devem ser únicas." });
+    }
+    if (parameterNames.size !== definition.parameters.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "Os parâmetros devem ser únicos." });
     }
 
     for (const [index, column] of definition.columns.entries()) {
