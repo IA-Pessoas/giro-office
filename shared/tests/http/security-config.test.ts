@@ -2,10 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createServiceCorsOptions,
   parseAllowedOrigins,
   validateProductionCorsOrigins,
   validateProductionInternalServiceToken,
 } from "../../src/http/security-config.js";
+
+test("credentialed CORS permits the session-bound CSRF header", () => {
+  const options = createServiceCorsOptions(["https://app.example.com"], "test-service");
+
+  assert.ok(options.allowedHeaders.includes("x-csrf-token"));
+});
 
 test("parseAllowedOrigins parses comma-separated allowed origins", () => {
   assert.deepEqual(parseAllowedOrigins("https://app.example.com, https://admin.example.com"), [

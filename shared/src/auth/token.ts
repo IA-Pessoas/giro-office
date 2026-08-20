@@ -39,6 +39,10 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
       payload.session_version >= 0
         ? payload.session_version
         : undefined,
+    csrf_hash:
+      typeof payload.csrf_hash === "string" && /^[a-f0-9]{64}$/u.test(payload.csrf_hash)
+        ? payload.csrf_hash
+        : undefined,
     type: normalizeAuthUserType(payload.type),
     name: typeof payload.name === "string" ? payload.name : undefined,
     login: typeof payload.login === "string" ? payload.login : undefined,
@@ -68,6 +72,10 @@ export function authenticateFromAuthHeader(
   jwtSecret: string,
 ): AuthContext {
   const token = extractBearerToken(authorizationHeader);
+  return authenticateFromToken(token, jwtSecret);
+}
+
+export function authenticateFromToken(token: string, jwtSecret: string): AuthContext {
   const claims = verifyJwtToken(token, jwtSecret);
 
   const organizationId = typeof claims.organization_id === "string" ? claims.organization_id : "";

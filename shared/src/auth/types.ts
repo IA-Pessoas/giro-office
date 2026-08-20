@@ -10,6 +10,7 @@ export interface AuthIdentity {
   modules?: ModulePermissions;
   modulePermissionsPresent?: boolean;
   session_version?: number;
+  csrf_hash?: string;
   type?: AuthUserType;
   name?: string;
   login?: string;
