@@ -2,9 +2,12 @@ import {
   ACTIVE_MODULE_KEYS,
   type AuthIdentity,
   type AuthUserType,
+  createCsrfToken,
+  hashCsrfToken,
   info,
   type ModulePermissionKey,
   type ModulePermissions,
+  SESSION_MAX_AGE_SECONDS,
   ServiceError,
 } from "@workspace/shared";
 import jwt from "jsonwebtoken";
@@ -35,6 +38,19 @@ interface PersistedAuthContext {
     organization_id: string;
     organization: { id: string; status: string };
   };
+}
+
+interface SessionSource extends PersistedAuthContext {
+  id: string;
+  name: string;
+  login: string;
+  permission: number;
+  type: string | null;
+  session_version: number;
+  department_id: string;
+  permissions: Array<
+    { organization_id: string } & Partial<Record<ModulePermissionKey, number | null>>
+  >;
 }
 
 type LoginFailureReason =
@@ -100,7 +116,7 @@ function rejectLogin(reason: LoginFailureReason): never {
   throw new ServiceError(401, GENERIC_LOGIN_ERROR_MESSAGE);
 }
 
-export interface LoginResult {
+export interface SessionUser {
   id: string;
   name: string;
   login: string;
@@ -109,7 +125,11 @@ export interface LoginResult {
   modules: ModulePermissions;
   department_id: string;
   organization_id: string;
+}
+
+export interface IssuedSession extends SessionUser {
   token: string;
+  csrfToken: string;
 }
 
 export interface FirstCreateResult {
@@ -123,7 +143,50 @@ export interface FirstCreateResult {
 }
 
 class AuthService {
-  async login({ login, password }: LoginRequest): Promise<LoginResult> {
+  private issueSession(user: SessionSource, organizationId: string): IssuedSession {
+    const permissionRecord = user.permissions.find(
+      (permission) => permission.organization_id === organizationId,
+    );
+    const modules = MODULE_PERMISSION_KEYS.reduce<ModulePermissions>((acc, key) => {
+      acc[key] = permissionRecord?.[key] ?? 0;
+      return acc;
+    }, {} as ModulePermissions);
+    const type = normalizeAuthUserType(user.type);
+    const csrfToken = createCsrfToken();
+    const token = jwt.sign(
+      {
+        user_id: user.id,
+        organization_id: organizationId,
+        name: user.name,
+        login: user.login,
+        permission: user.permission,
+        type,
+        session_version: user.session_version,
+        modules,
+        csrf_hash: hashCsrfToken(csrfToken),
+      },
+      getUserServiceEnv().jwtSecret,
+      {
+        subject: user.id,
+        expiresIn: SESSION_MAX_AGE_SECONDS,
+      },
+    );
+
+    return {
+      id: user.id,
+      name: user.name,
+      login: user.login,
+      permission: user.permission,
+      type,
+      modules,
+      department_id: user.department_id,
+      organization_id: organizationId,
+      token,
+      csrfToken,
+    };
+  }
+
+  async login({ login, password }: LoginRequest): Promise<IssuedSession> {
     const normalizedLogin = login.trim();
     const user = await prismaClient.user.findFirst({
       where: { login: normalizedLogin },
@@ -164,45 +227,54 @@ class AuthService {
       });
     }
 
-    const jwtSecret = getUserServiceEnv().jwtSecret;
-    const permissionRecord = user.permissions.find(
-      (permission) => permission.organization_id === organizationId,
-    );
-    const modules = MODULE_PERMISSION_KEYS.reduce<ModulePermissions>((acc, key) => {
-      acc[key] = permissionRecord?.[key] ?? 0;
-      return acc;
-    }, {} as ModulePermissions);
-    const type = normalizeAuthUserType(user.type);
+    return this.issueSession(user, organizationId);
+  }
 
-    const token = jwt.sign(
-      {
-        user_id: user.id,
-        organization_id: organizationId,
-        name: user.name,
-        login: user.login,
-        permission: user.permission,
-        type,
-        session_version: user.session_version,
-        modules,
-      },
-      jwtSecret,
-      {
-        subject: user.id,
-        expiresIn: "1d",
-      },
-    );
+  async refreshSession(
+    identity: Pick<AuthIdentity, "user_id" | "organization_id" | "session_version">,
+  ): Promise<IssuedSession> {
+    if (typeof identity.session_version !== "number" || !identity.organization_id) {
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+    }
 
-    return {
-      id: user.id,
-      name: user.name,
-      login: user.login,
-      permission: user.permission,
-      type,
-      modules,
-      department_id: user.department_id,
-      organization_id: organizationId,
-      token,
-    };
+    const user = await prismaClient.user.findUnique({
+      where: { id: identity.user_id },
+      include: {
+        organization: { select: { id: true, status: true } },
+        department: {
+          select: {
+            organization_id: true,
+            organization: { select: { id: true, status: true } },
+          },
+        },
+        permissions: true,
+      },
+    });
+
+    if (
+      !user ||
+      user.session_version !== identity.session_version ||
+      getActiveOrganizationId(user) !== identity.organization_id
+    ) {
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+    }
+
+    return this.issueSession(user, identity.organization_id);
+  }
+
+  async revokeSession(userId: string, sessionVersion: number): Promise<void> {
+    if (!userId || !Number.isInteger(sessionVersion) || sessionVersion < 0) {
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+    }
+
+    const { count } = await prismaClient.user.updateMany({
+      where: { id: userId, session_version: sessionVersion },
+      data: { session_version: { increment: 1 } },
+    });
+
+    if (count !== 1) {
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+    }
   }
 
   async firstCreate(): Promise<FirstCreateResult> {

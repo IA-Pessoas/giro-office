@@ -195,6 +195,7 @@ describe("AuthService", () => {
       department_id: "dep-1",
       organization_id: "org-1",
       token: "jwt-token",
+      csrfToken: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
     });
     expect(jwtMock.sign).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -207,6 +208,64 @@ describe("AuthService", () => {
       "jwt-secret",
       expect.any(Object),
     );
+  });
+
+  it("login assina sessão de um dia vinculada ao CSRF retornado", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(activeUser());
+    passwordHashMock.verifyPassword.mockResolvedValue({ valid: true, needsRehash: false });
+    jwtMock.sign.mockReturnValue("jwt-token");
+
+    const result = await new AuthService().login({ login: "account", password: "secret" });
+
+    expect(jwtMock.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ csrf_hash: expect.stringMatching(/^[a-f0-9]{64}$/u) }),
+      "jwt-secret",
+      expect.objectContaining({ expiresIn: 86_400, subject: "user-1" }),
+    );
+    expect(result.csrfToken).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+    expect(result.token).toBe("jwt-token");
+  });
+
+  it("refresh rotaciona o vínculo CSRF sem alterar session_version", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(activeUser());
+    jwtMock.sign.mockReturnValue("jwt-token");
+    const service = new AuthService();
+    const identity = {
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_version: 1,
+    };
+
+    const first = await service.refreshSession(identity);
+    const second = await service.refreshSession(identity);
+
+    expect(first.csrfToken).not.toBe(second.csrfToken);
+    expect(jwtMock.sign).toHaveBeenCalledTimes(2);
+    expect(jwtMock.sign).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ session_version: 1 }),
+      "jwt-secret",
+      expect.any(Object),
+    );
+  });
+
+  it("logout incrementa somente a versão ativa correspondente", async () => {
+    prismaMock.user.updateMany.mockResolvedValue({ count: 1 });
+
+    await new AuthService().revokeSession("user-1", 3);
+
+    expect(prismaMock.user.updateMany).toHaveBeenCalledWith({
+      where: { id: "user-1", session_version: 3 },
+      data: { session_version: { increment: 1 } },
+    });
+  });
+
+  it("logout rejeita versão de sessão obsoleta", async () => {
+    prismaMock.user.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(new AuthService().revokeSession("user-1", 3)).rejects.toMatchObject({
+      statusCode: 401,
+    });
   });
 
   it("rehash de bcrypt válido uma única vez sem sobrescrever uma troca concorrente", async () => {
