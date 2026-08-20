@@ -8,12 +8,7 @@ const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 let baseUrl = configuredBaseUrl || `http://localhost:${PLAYWRIGHT_PORT}`;
 const APP_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const pageDiagnostics = new WeakMap();
-
-function createToken(payload) {
-  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${header}.${body}.signature`;
-}
+const csrfToken = "A".repeat(43);
 
 const smokeUser = {
   id: "user-smoke-admin",
@@ -118,13 +113,15 @@ async function assertOrganizationModal(viewport) {
 
   await context.addCookies([
     {
-      name: "cw.token",
-      value: createToken({
-        id: smokeUser.id,
-        permission: smokeUser.permission,
-        type: smokeUser.type,
-        modules: {},
-      }),
+      name: "cw.session",
+      value: "opaque-test-session",
+      url: baseUrl,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+    {
+      name: "cw.csrf",
+      value: csrfToken,
       url: baseUrl,
       httpOnly: false,
       sameSite: "Lax",

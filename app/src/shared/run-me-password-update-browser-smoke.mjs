@@ -9,6 +9,7 @@ const configuredBaseUrl = process.env.ME_PASSWORD_SMOKE_BASE_URL?.replace(/\/$/,
 let baseUrl = configuredBaseUrl || `http://localhost:${PLAYWRIGHT_PORT}`;
 const appRoot = fileURLToPath(new URL("../..", import.meta.url));
 const pageDiagnostics = new WeakMap();
+const csrfToken = "A".repeat(43);
 
 const viewer = {
   id: "user-smoke-viewer",
@@ -32,19 +33,6 @@ const rhAdmin = {
   type: "admin",
 };
 
-function createToken(user, modules) {
-  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
-  const payload = Buffer.from(JSON.stringify({
-    user_id: user.id,
-    organization_id: user.organization_id,
-    permission: user.permission,
-    type: user.type,
-    modules,
-  })).toString("base64url");
-
-  return `${header}.${payload}.signature`;
-}
-
 async function openProfile(user, modules, onPatch) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ baseURL: baseUrl });
@@ -52,8 +40,15 @@ async function openProfile(user, modules, onPatch) {
 
   await context.addCookies([
     {
-      name: "cw.token",
-      value: createToken(user, modules),
+      name: "cw.session",
+      value: "opaque-test-session",
+      url: baseUrl,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+    {
+      name: "cw.csrf",
+      value: csrfToken,
       url: baseUrl,
       httpOnly: false,
       sameSite: "Lax",
@@ -75,12 +70,13 @@ async function openProfile(user, modules, onPatch) {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ success: true, data: user }),
+      body: JSON.stringify({ success: true, data: { ...user, modules } }),
     });
   });
 
   await page.route(`**/user/${user.id}`, async (route) => {
     assert.equal(route.request().method(), "PUT");
+    assert.equal(route.request().headers()["x-csrf-token"], csrfToken);
     onPatch(route.request().postDataJSON());
     await route.fulfill({
       status: 200,
