@@ -116,3 +116,11 @@ await runTest("group detail update failure uses toast feedback instead of alert"
 await runTest("provider value is memoized with the public context type", () => {
   assert.match(source, /const value = useMemo<ChatContextType>\(\(\) => \(\{/);
 });
+
+await runTest("chat HTTP requests use the credentialed API client without bearer tokens", () => {
+  assert.match(source, /api\.get<Chat\[]>\(['"]\/chat['"]\)/);
+  assert.match(source, /api\.post\(`\/chat\/\$\{chatId\}\/read`\)/);
+  assert.match(source, /api\.post\(['"]\/chat\/media['"], formData\)/);
+  assert.doesNotMatch(source, /fetch\(`\$\{SOCKET_URL\}/);
+  assert.doesNotMatch(source, /cw\.token|Authorization|Bearer|createBearerAuthHeaders/);
+});

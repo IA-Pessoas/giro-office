@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import { getSocketClientConfig } from "./socketConfig.ts";
+
+const socketContextSource = await readFile(new URL("./SocketContext.tsx", import.meta.url), "utf8");
 
 async function runTest(name, fn) {
   try {
@@ -46,4 +49,9 @@ await runTest("socket client falls back to the public api url only when enabled"
     enabled: true,
     url: "http://147.93.66.91:8086",
   });
+});
+
+await runTest("socket session uses cookies without exposing a bearer token", () => {
+  assert.match(socketContextSource, /withCredentials:\s*true/);
+  assert.doesNotMatch(socketContextSource, /cw\.token|Authorization|Bearer|auth:\s*\{\s*token/);
 });
