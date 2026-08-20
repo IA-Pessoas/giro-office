@@ -138,6 +138,7 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/project(?:\/|$)/, policy: integracaoEditPolicy },
   { method: "GET", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoModulePolicy },
   { method: "ANY", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoEditPolicy },
+  { method: "ANY", path: /^\/reports(?:\/|$)/, policy: authenticatedPolicy },
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
   { method: "GET", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },

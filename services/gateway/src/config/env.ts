@@ -102,6 +102,7 @@ const gatewayEnvSchema = z
     certificateServiceInternalToken: z.string().optional().default("certificate-service-token"),
     pessoalServiceUrl: z.string().url().default("http://localhost:3042"),
     parcelamentoServiceUrl: z.string().url().default("http://localhost:3043"),
+    reportsServiceUrl: z.string().url().default("http://localhost:3044"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -219,6 +220,7 @@ export interface GatewayEnv {
   certificateServiceInternalToken: string;
   pessoalServiceUrl: string;
   parcelamentoServiceUrl: string;
+  reportsServiceUrl: string;
   websocketUpstreamUrl?: string;
   databaseUrl?: string;
   publicGatewayUrl?: string;
@@ -259,6 +261,7 @@ export function getGatewayEnv(): GatewayEnv {
     certificateServiceInternalToken: process.env.CERTIFICATE_SERVICE_INTERNAL_TOKEN,
     pessoalServiceUrl: process.env.PESSOAL_SERVICE_URL,
     parcelamentoServiceUrl: process.env.PARCELAMENTO_SERVICE_URL,
+    reportsServiceUrl: process.env.REPORTS_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     databaseUrl: process.env.DATABASE_URL,
     publicGatewayUrl: process.env.GATEWAY_PUBLIC_URL,

@@ -89,7 +89,7 @@ cleanup_rollback_images() {
 services=(
   organization-service user-service department-service task-service project-service
   client-service fiscal-service contabil-service regularize-service rh-service ti-service
-  certificate-service pessoal-service parcelamento-service audit-service gateway web
+  certificate-service pessoal-service parcelamento-service reports-service audit-service gateway web
 )
 
 phase build-images-sequentially
