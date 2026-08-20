@@ -129,6 +129,33 @@ type UserPublicRow = Prisma.UserGetPayload<{ select: typeof USER_PUBLIC_SELECT }
 type UserCreateRow = Prisma.UserGetPayload<{ select: typeof USER_CREATE_SELECT }>;
 type UserSessionRow = UserPublicRow & { modules: ModulePermissions };
 
+const REPORTING_ACCESS_CONTEXT_SELECT = {
+  id: true,
+  name: true,
+  login: true,
+  type: true,
+  department: {
+    select: {
+      id: true,
+      name: true,
+      organization: { select: { id: true, name: true } },
+    },
+  },
+} as const;
+
+type ReportingAccessContextRow = Prisma.UserGetPayload<{
+  select: typeof REPORTING_ACCESS_CONTEXT_SELECT;
+}>;
+
+export interface ReportingAccessContext {
+  user: Pick<ReportingAccessContextRow, "id" | "name" | "login">;
+  organization: { id: string; name: string };
+  type: AuthUserType | null;
+  department: { id: string; name: string | null };
+  departmentModule: ModuleField | null;
+  modules: ModulePermissions;
+}
+
 function userOrganizationWhere(id: string, organizationId: string): Prisma.UserWhereInput {
   return {
     id,
@@ -312,6 +339,41 @@ class UserService {
 
     return {
       ...user,
+      modules: normalizeModulePermissions(permission),
+    };
+  }
+
+  async getReportingAccessContext(
+    id: string,
+    organizationId: string,
+  ): Promise<ReportingAccessContext> {
+    const user = await prismaClient.user.findFirst({
+      where: {
+        ...userOrganizationWhere(id, organizationId),
+        department: { organization_id: organizationId },
+      },
+      select: REPORTING_ACCESS_CONTEXT_SELECT,
+    });
+
+    if (!user) {
+      throw new ServiceError(404, "Usuario nao encontrado.");
+    }
+
+    let permission: unknown;
+    try {
+      permission = await new PermissionService().getByUserId(id, undefined, organizationId);
+    } catch (err: unknown) {
+      if (!(err instanceof ServiceError) || err.statusCode !== 404) {
+        throw err;
+      }
+    }
+
+    return {
+      user: { id: user.id, name: user.name, login: user.login },
+      organization: user.department.organization,
+      type: normalizeUserType(user.type),
+      department: { id: user.department.id, name: user.department.name ?? null },
+      departmentModule: resolveDepartmentModuleKey(user.department.name),
       modules: normalizeModulePermissions(permission),
     };
   }

@@ -43,6 +43,7 @@ const reportsServiceEnvSchema = z
     workerConcurrency: z.coerce.number().int().positive().default(2),
     workerLeaseSeconds: z.coerce.number().int().positive().default(120),
     adapterTimeoutMs: z.coerce.number().int().positive().default(10000),
+    sourceTimeoutMs: z.coerce.number().int().positive().default(10000),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
       .string()
@@ -111,6 +112,7 @@ export function parseReportsServiceEnv(
     workerConcurrency: source.REPORTS_WORKER_CONCURRENCY,
     workerLeaseSeconds: source.REPORTS_WORKER_LEASE_SECONDS,
     adapterTimeoutMs: source.REPORTS_ADAPTER_TIMEOUT_MS,
+    sourceTimeoutMs: source.REPORTS_SOURCE_TIMEOUT_MS,
     logLevel: source.LOG_LEVEL,
     logPretty: source.LOG_PRETTY,
     allowedOrigins: source.SERVICE_ALLOWED_ORIGINS,

@@ -13,3 +13,10 @@ test("reports smoke atravessa o gateway sem cabeçalhos de identidade forjados",
   assert.ok(handler);
   assert.doesNotMatch(handler[1], /x-auth-(?:user|organization)-id/);
 });
+
+test("contexto de relatórios do user-service permanece no smoke direto interno", async () => {
+  const manifest = await readFile(path.join(repoRoot, "scripts", "all-services-smoke.manifest.mjs"), "utf8");
+
+  assert.match(manifest, /path: "\/internal\/reporting\/access-context"[\s\S]*?target: "direct"/);
+  assert.doesNotMatch(manifest, /path: "\/reports\/access-context"/);
+});

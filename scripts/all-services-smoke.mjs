@@ -1782,6 +1782,16 @@ const handlers = {
     );
   },
 
+  async reportingAccessContext(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/access-context",
+      json: {
+        userId: requireState("session").id,
+        organizationId: requireState("session").organization_id,
+      },
+    });
+  },
+
   async userStartConfig(op) {
     await httpRequest(op, {
       expectedStatus: [200, 409],
