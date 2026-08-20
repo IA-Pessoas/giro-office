@@ -38,6 +38,11 @@ type AggregatedOpenApiDocument = OpenApiDocument & {
   servers?: Array<{ url: string }>;
 };
 
+const browserAuthentication: Array<Record<string, string[]>> = [
+  { cookieAuth: [] },
+  { bearerAuth: [] },
+];
+
 function cloneDocument<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -264,11 +269,11 @@ function getGatewayOperationSecurity(
   security: Array<Record<string, string[]>> | undefined,
 ): Array<Record<string, string[]>> | undefined {
   if (path === "/user/me") {
-    return [{ bearerAuth: [] }];
+    return browserAuthentication;
   }
 
   if (definition.key === "audit-service" && !definition.isInternalPath?.(path)) {
-    return [{ bearerAuth: [] }];
+    return browserAuthentication;
   }
 
   if (!security) {
@@ -283,7 +288,7 @@ function getGatewayOperationSecurity(
     )
     .filter((entry) => Object.keys(entry).length > 0);
 
-  return filtered.length > 0 ? filtered : undefined;
+  return filtered.length > 0 ? browserAuthentication : undefined;
 }
 
 function mergeSecuritySchemes(
@@ -440,7 +445,7 @@ function addGatewayPaths(aggregateSpec: AggregatedOpenApiDocument): void {
     get: {
       tags: ["Gateway"],
       summary: "Dashboard statistics",
-      security: [{ bearerAuth: [] }],
+      security: browserAuthentication,
       responses: {
         "200": {
           description: "Dashboard statistics loaded from the database",
@@ -536,7 +541,7 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       title: "office-gateway",
       version: "1.0.0",
       description:
-        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service, fiscal-service, contabil-service, ti-service, certificate-service, pessoal-service, parcelamento-service and audit-service. Paths marked with x-internal are intended for internal service-to-service usage.",
+        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service, fiscal-service, contabil-service, ti-service, certificate-service, pessoal-service, parcelamento-service, reports-service and audit-service. Browser authentication uses the cw.session HttpOnly cookie plus x-csrf-token on mutations. Bearer remains a temporary, disabled-by-default rollout compatibility path. Paths marked with x-internal are intended for internal service-to-service usage.",
     },
     servers: [{ url: "http://localhost" }],
     tags: [
@@ -554,10 +559,18 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
         },
       },
       securitySchemes: {
+        cookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "cw.session",
+          description: "Final browser authentication contract; JavaScript cannot read this cookie.",
+        },
         bearerAuth: {
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
+          description:
+            "Temporary rollout compatibility, disabled unless GATEWAY_BEARER_AUTH_COMPATIBILITY=true.",
         },
       },
     },

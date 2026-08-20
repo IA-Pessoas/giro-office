@@ -11,6 +11,7 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
   ServiceError,
+  stripBrowserAuth,
 } from "@workspace/shared";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
@@ -118,6 +119,8 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     FORWARDED_AUTH_TYPE_HEADER,
     FORWARDED_AUTH_MODULES_HEADER,
     FORWARDED_AUTH_SESSION_VERSION_HEADER,
+    "authorization",
+    "cookie",
   ]);
 
   Object.entries(request.headers).forEach(([key, value]) => {
@@ -135,6 +138,14 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
 
     headers.set(key, value);
   });
+
+  const cookieHeader = Array.isArray(request.headers.cookie)
+    ? request.headers.cookie.join("; ")
+    : request.headers.cookie;
+  const forwardedCookie = stripBrowserAuth(cookieHeader);
+  if (forwardedCookie) {
+    headers.set("cookie", forwardedCookie);
+  }
 
   headers.set("x-forwarded-host", request.headers.host ?? "");
   headers.set("x-forwarded-proto", request.protocol);
@@ -196,6 +207,17 @@ function normalizePathForUpstream(originalUrl: string): string {
   return normalizedPath + queryPart;
 }
 
+function getSessionCookieHeaders(request: Request, upstreamHeaders: Headers): string[] {
+  const path = new URL(request.originalUrl, "http://gateway.local").pathname;
+  if (path !== "/user/session" && path !== "/user/session/refresh") {
+    return [];
+  }
+
+  return upstreamHeaders
+    .getSetCookie()
+    .filter((header) => /^(?:cw\.session|cw\.csrf)=/u.test(header));
+}
+
 function createHttpProxy(
   resolveTargetUrl: (request: Request) => string,
   options: HttpProxyOptions = {},
@@ -228,9 +250,13 @@ function createHttpProxy(
       response.status(upstreamResponse.status);
 
       upstreamResponse.headers.forEach((value, key) => {
-        if (key === "transfer-encoding") return;
+        if (key === "transfer-encoding" || key === "set-cookie") return;
         response.setHeader(key, value);
       });
+      const sessionCookieHeaders = getSessionCookieHeaders(request, upstreamResponse.headers);
+      if (sessionCookieHeaders.length > 0) {
+        response.setHeader("set-cookie", sessionCookieHeaders);
+      }
 
       if (!upstreamResponse.body || [204, 205].includes(upstreamResponse.status)) {
         response.end();

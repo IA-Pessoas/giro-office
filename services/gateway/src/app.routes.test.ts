@@ -4,12 +4,14 @@ import { Writable } from "node:stream";
 
 import type { CreateAuditRequestPayload } from "@workspace/shared";
 import {
+  CSRF_HEADER_NAME,
   createLogger,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  hashCsrfToken,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
@@ -156,6 +158,8 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     nodeEnv: "test",
     enableApiDocs: true,
     authorizationMode: "enforce",
+    bearerAuthCompatibility: true,
+    authCookieSecure: false,
     auditEnabled: false,
     auditServiceToken: "audit-service-token",
     auditServiceUrl: "http://127.0.0.1:3020",
@@ -192,6 +196,97 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     ...overrides,
   };
 }
+
+it("enforces bound CSRF on cookie-authenticated mutations", async () => {
+  const csrfToken = "A".repeat(43);
+  const sessionToken = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 3,
+    type: "owner",
+    csrf_hash: hashCsrfToken(csrfToken),
+  });
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.setHeader("set-cookie", "untrusted=value; Path=/; HttpOnly");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const taskServiceUrl = await startServer(upstream);
+  const app = createApp(
+    createEnv({
+      taskServiceUrl,
+      allowedOrigins: ["https://useoffice.com.br"],
+      bearerAuthCompatibility: false,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const headers = {
+      Cookie: `cw.session=${sessionToken}; cw.csrf=${csrfToken}`,
+      Origin: "https://useoffice.com.br",
+      "content-type": "application/json",
+    };
+    const accepted = await fetch(`${gatewayUrl}/task/security-proof`, {
+      method: "POST",
+      headers: { ...headers, [CSRF_HEADER_NAME]: csrfToken },
+      body: JSON.stringify({ safe: true }),
+    });
+    const rejected = await fetch(`${gatewayUrl}/task/security-proof`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ safe: false }),
+    });
+
+    expect(accepted.status).toBe(200);
+    expect(accepted.headers.getSetCookie()).toEqual([]);
+    expect(rejected.status).toBe(403);
+    expect(upstreamHits).toBe(1);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("permits credentialed CORS only for the configured browser origin", async () => {
+  const app = createApp(
+    createEnv({ allowedOrigins: ["https://useoffice.com.br"] }),
+    createTestLogger(),
+  );
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    const preflight = (origin: string) =>
+      fetch(`${baseUrl}/task/security-proof`, {
+        method: "OPTIONS",
+        headers: {
+          Origin: origin,
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": CSRF_HEADER_NAME,
+        },
+      });
+    const allowed = await preflight("https://useoffice.com.br");
+    const nullOrigin = await preflight("null");
+    const hostile = await preflight("https://evil.example");
+
+    expect(allowed.status).toBe(204);
+    expect(allowed.headers.get("access-control-allow-origin")).toBe("https://useoffice.com.br");
+    expect(allowed.headers.get("access-control-allow-credentials")).toBe("true");
+    expect(allowed.headers.get("access-control-allow-headers")).toContain(CSRF_HEADER_NAME);
+    expect(nullOrigin.status).toBe(403);
+    expect(hostile.status).toBe(403);
+    expect(nullOrigin.headers.get("access-control-allow-credentials")).not.toBe("true");
+    expect(hostile.headers.get("access-control-allow-credentials")).not.toBe("true");
+  } finally {
+    await stopServer(server);
+  }
+});
 
 it("proxies reports requests with the authenticated context and no gateway module policy", async () => {
   const reportsService = createServer((request, response) => {
@@ -232,6 +327,7 @@ function createToken(
     permission: number;
     type?: "owner" | "admin" | "user";
     modules?: Record<string, number | null>;
+    csrf_hash?: string;
   },
   secret = "test-secret",
 ): string {
@@ -336,7 +432,7 @@ it("returns shared unauthorized response when token is missing", async () => {
 
     expect(response.status).toBe(401);
     expect(body.success).toBe(false);
-    expect(body.error).toBe("Cabeçalho Authorization não informado.");
+    expect(body.error).toBe("Não autenticado.");
     expect(body.code).toBe("UNAUTHORIZED");
     expect(body.requestId).toBeTruthy();
   } finally {
@@ -715,6 +811,8 @@ it("strips client-supplied internal auth headers before proxying", async () => {
     permission?: string;
     type?: string;
     modules?: string;
+    authorization?: string;
+    cookie?: string;
   } = {};
 
   const upstream = createServer((request, response) => {
@@ -725,6 +823,8 @@ it("strips client-supplied internal auth headers before proxying", async () => {
       permission: request.headers[FORWARDED_AUTH_PERMISSION_HEADER] as string | undefined,
       type: request.headers[FORWARDED_AUTH_TYPE_HEADER] as string | undefined,
       modules: request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined,
+      authorization: request.headers.authorization,
+      cookie: request.headers.cookie,
     };
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
@@ -739,7 +839,8 @@ it("strips client-supplied internal auth headers before proxying", async () => {
   try {
     const response = await fetch(`${gatewayUrl}/task/list`, {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: "Bearer browser-secret",
+        Cookie: `theme=dark; cw.session=${token}; cw.csrf=proof`,
         [INTERNAL_SERVICE_TOKEN_HEADER]: "client-supplied-token",
         [FORWARDED_AUTH_USER_ID_HEADER]: "attacker-user",
         [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "attacker-org",
@@ -756,6 +857,8 @@ it("strips client-supplied internal auth headers before proxying", async () => {
     expect(seenHeaders.permission).toBe("2");
     expect(seenHeaders.type).toBe("owner");
     expect(JSON.parse(seenHeaders.modules ?? "{}")).toMatchObject({ rh: 2 });
+    expect(seenHeaders.authorization).toBeUndefined();
+    expect(seenHeaders.cookie).toBe("theme=dark");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -931,6 +1034,36 @@ it("passes upstream error responses through unchanged", async () => {
 
     expect(response.status).toBe(418);
     expect(body).toEqual({ error: "Teapot upstream" });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("preserves both session Set-Cookie headers from the user-service", async () => {
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.setHeader("set-cookie", [
+      "cw.session=session-value; Path=/; HttpOnly; SameSite=Lax",
+      "cw.csrf=csrf-value; Path=/; SameSite=Lax",
+    ]);
+    response.end(JSON.stringify({ success: true, data: { id: "user-1" } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(createEnv({ userServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/session`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ login: "user", password: "secret" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.getSetCookie()).toHaveLength(2);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
@@ -1282,14 +1415,16 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
 
     expect(response.status).toBe(200);
     expect(body.components?.securitySchemes?.bearerAuth).toBeTruthy();
+    expect(body.components?.securitySchemes?.cookieAuth).toBeTruthy();
     expect(body.components?.securitySchemes?.forwardedAuthUserId).toBe(undefined);
     expect(body.components?.securitySchemes?.internalServiceToken).toBe(undefined);
-    expect(body.paths["/user/me"]?.get?.security).toEqual([{ bearerAuth: [] }]);
-    expect(body.paths["/user/{id}"]?.get?.security).toEqual([{ bearerAuth: [] }]);
-    expect(body.paths["/audit/requests"]?.get?.security).toEqual([{ bearerAuth: [] }]);
-    expect(body.paths["/ti/requests/list"]?.get?.security).toEqual([{ bearerAuth: [] }]);
-    expect(body.paths["/certificate/pj/list"]?.get?.security).toEqual([{ bearerAuth: [] }]);
-    expect(body.paths["/certificate/pj/{id}/file"]?.get?.security).toEqual([{ bearerAuth: [] }]);
+    const browserAuth = [{ cookieAuth: [] }, { bearerAuth: [] }];
+    expect(body.paths["/user/me"]?.get?.security).toEqual(browserAuth);
+    expect(body.paths["/user/{id}"]?.get?.security).toEqual(browserAuth);
+    expect(body.paths["/audit/requests"]?.get?.security).toEqual(browserAuth);
+    expect(body.paths["/ti/requests/list"]?.get?.security).toEqual(browserAuth);
+    expect(body.paths["/certificate/pj/list"]?.get?.security).toEqual(browserAuth);
+    expect(body.paths["/certificate/pj/{id}/file"]?.get?.security).toEqual(browserAuth);
   } finally {
     await stopServer(server);
   }
