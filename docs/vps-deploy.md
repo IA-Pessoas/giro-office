@@ -31,7 +31,7 @@ Para o ambiente single-slot publicado em `useoffice.com.br`, consulte
 
 1. Fill the `.env.vps.*` files with the real VPS values.
 2. If `NGINX_TLS_ENABLED=true`, place the certificate files in `docker/nginx/certs` on the VPS.
-3. Configure o secret **`ENV_VPS_WEB`** (corpo = ficheiro `.env.vps.web`): `NEXT_PUBLIC_API_URL=<URL pública do API para o browser>` (ex.: `https://api.seu-dominio` ou `http://IP:3010`) e `API_INTERNAL_URL=http://gateway:3010` para os rewrites `/api/*` do Next dentro da rede Docker.
+3. Configure o secret **`ENV_VPS_WEB`** (corpo = ficheiro `.env.vps.web`): `NEXT_PUBLIC_API_URL=/api` e `API_INTERNAL_URL=http://gateway:3010` para manter browser e API na mesma origem.
 4. If you keep `NGINX_TLS_ENABLED=false`, use `http://api.seu-dominio` instead.
 5. Start the stable stack:
 
@@ -41,15 +41,15 @@ docker compose -f docker-compose.vps.yml up -d --build
 
 6. `certificate-service`, `pessoal-service` and `audit-service` are part of the default stack. Configure `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` and `PESSOAL_SERVICE_URL=http://pessoal-service:3042` in `.env.vps.gateway`; control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
 
-## Auth cookie em slots HTTP
+## Sessão HttpOnly e slots HTTP
 
-O web build aceita `NEXT_PUBLIC_AUTH_COOKIE_SECURE`.
+`AUTH_COOKIE_SECURE` é uma configuração exclusiva do gateway e do user-service; nunca deve ser exposta como `NEXT_PUBLIC_*`.
 
-- Valor vazio ou ausente: o app usa o default seguro (`secure=true` em `NODE_ENV=production`).
-- `NEXT_PUBLIC_AUTH_COOKIE_SECURE=false`: usar somente em slots HTTP, como develop/testes sem TLS, para permitir que o browser persista `cw.token`.
-- Deploys HTTPS reais devem manter a variavel ausente/vazia ou usar `true`.
+- Produção HTTPS: `AUTH_COOKIE_SECURE=true`, `GATEWAY_ALLOWED_ORIGINS=https://useoffice.com.br` e `GATEWAY_BEARER_AUTH_COMPATIBILITY=false`.
+- Slots locais/develop sem TLS: os overlays Compose definem `AUTH_COOKIE_SECURE=false` somente nos dois serviços que emitem ou expiram cookies.
+- O browser usa `NEXT_PUBLIC_API_URL=/api`; SSR usa `API_INTERNAL_URL=http://gateway:3010`.
 
-Como a variavel e `NEXT_PUBLIC_*`, ela precisa estar presente no build da imagem `web`, nao apenas no runtime do container.
+O procedimento de rollout, validação, telemetria e rollback está em [http-only-session-rollout.md](security/http-only-session-rollout.md).
 
 ## Nginx TLS
 
@@ -134,12 +134,13 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 
 | Segredo | Uso |
 |---------|-----|
-| `ENV_VPS_GATEWAY` | Inclua `REGULARIZE_SERVICE_URL=http://regularize-service:3039`, `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` e `PESSOAL_SERVICE_URL=http://pessoal-service:3042` para as rotas `/regularize`, `/certificate` e `/pessoal` dentro da rede Docker. |
+| `ENV_VPS_GATEWAY` | Inclua `AUTH_COOKIE_SECURE=true`, `GATEWAY_ALLOWED_ORIGINS=https://useoffice.com.br`, `GATEWAY_BEARER_AUTH_COMPATIBILITY=false`, `REGULARIZE_SERVICE_URL=http://regularize-service:3039`, `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` e `PESSOAL_SERVICE_URL=http://pessoal-service:3042`. |
+| `ENV_VPS_USER_SERVICE` | Inclua `AUTH_COOKIE_SECURE=true` além dos segredos existentes do user-service. |
 | `ENV_VPS_CERTIFICATE_SERVICE` | Corpo de `.env.vps.certificate-service`; alem das variaveis base do service, inclua `CERTIFICATE_STORAGE_MODE=supabase`, `CERTIFICATE_STORAGE_BUCKET`, `CERTIFICATE_FILE_MAX_SIZE_BYTES`, `CERTIFICATE_FILE_ENCRYPTION_KEY`, `CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `UPLOAD_RATE_LIMIT_MAX` e `UPLOAD_RATE_LIMIT_WINDOW_MS` para upload/download criptografado de arquivos. |
 | `ENV_VPS_PESSOAL_SERVICE` | Corpo de `.env.vps.pessoal-service`; inclua `DATABASE_URL`, `JWT_SECRET`, `AUDIT_SERVICE_URL=http://audit-service:3020`, `AUDIT_SERVICE_TOKEN`, `INTERNAL_SERVICE_TOKEN`, `PESSOAL_PASSWORD_ENCRYPTION_KEY`, `PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION` e `PESSOAL_DOMAIN_AUDIT_ENABLED`. |
 | `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | URL **com namespace** (ex.: `ghcr.io/meu-org`, `docker.io/meuuser` — não use só `ghcr.io`). Push/pull normalizam em minúsculas. |
 | `ENV_VPS_*` | Igual ao manifest `scripts/ci/vps-secrets.manifest` — `.env.vps.*` copiados para a VPS em cada deploy |
-| `ENV_VPS_WEB` | Corpo do ficheiro **`.env.vps.web`**: pelo menos `NEXT_PUBLIC_API_URL=<URL pública do API para o browser>` e `API_INTERNAL_URL=http://gateway:3010` (rede Docker). O valor de `NEXT_PUBLIC_API_URL` é embutido no bundle no `docker compose build`. |
+| `ENV_VPS_WEB` | Corpo do ficheiro **`.env.vps.web`**: `NEXT_PUBLIC_API_URL=/api` e `API_INTERNAL_URL=http://gateway:3010` (rede Docker). Não inclua flags de cookie no bundle. |
 | `VPS_HOST`, `VPS_USER` | SSH |
 | `VPS_SSH_PRIVATE_KEY` | Preferencial (chave privada PEM) |
 | `VPS_SSH_PASSWORD` | Alternativa (requer `sshpass` no runner — instalado no job) |

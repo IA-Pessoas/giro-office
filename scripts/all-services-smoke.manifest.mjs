@@ -260,6 +260,10 @@ function determineGeneratedNegativeCase(entry) {
     return "unauthorized401";
   }
 
+  if (entry.auth === "session") {
+    return "unauthorized401";
+  }
+
   return null;
 }
 
@@ -420,6 +424,25 @@ const baseManifest = [
   op({
     service: "user-service",
     method: "POST",
+    path: "/user/session/refresh",
+    action: "userSessionRefreshMissingCsrf",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+    expectedStatus: [403],
+    expectedLabel: "missing CSRF",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/session/refresh",
+    action: "userSessionRefresh",
+    target: "gateway",
+    auth: "session",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
     path: "/user/start-config",
     action: "userStartConfig",
     target: "gateway",
@@ -440,7 +463,7 @@ const baseManifest = [
     path: "/user/me",
     action: "userMe",
     target: "gateway",
-    auth: "bearer",
+    auth: "session",
   }),
   op({
     service: "user-service",
@@ -527,7 +550,7 @@ const baseManifest = [
     path: "/user/{id}/photo",
     action: "userPhotoUpload",
     target: "gateway",
-    auth: "bearer",
+    auth: "session",
   }),
   op({
     service: "user-service",
@@ -544,6 +567,14 @@ const baseManifest = [
     action: "userPhotoDelete",
     target: "gateway",
     auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "DELETE",
+    path: "/user/session",
+    action: "userSessionLogout",
+    target: "gateway",
+    auth: "session",
   }),
   op({
     service: "user-service",

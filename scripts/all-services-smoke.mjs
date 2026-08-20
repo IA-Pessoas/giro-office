@@ -155,6 +155,10 @@ for (const envKey of Object.values(INTERNAL_SERVICE_TOKENS)) {
 
 const state = {
   session: null,
+  sessionCookies: {
+    "cw.csrf": "",
+    "cw.session": "",
+  },
   bearerToken: "",
   adminBearerToken: "",
   baselineDepartmentId: env.smokeDepartmentId,
@@ -232,6 +236,7 @@ const actionExecutionRank = {
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
   rhScoreQuestionDelete: 8300,
+  userSessionLogout: 10000,
 };
 
 function log(level, message) {
@@ -315,9 +320,44 @@ function createAdminToken(permission = WorkspacePermissionLevel.Admin, options =
   return `${content}.${signature}`;
 }
 
-function getAuthHeaders(auth, service) {
+function captureSessionCookies(headers) {
+  const values = typeof headers.getSetCookie === "function" ? headers.getSetCookie() : [];
+
+  for (const value of values.slice(0, 8)) {
+    const [pair] = value.split(";", 1);
+    const separator = pair.indexOf("=");
+    if (separator <= 0 || pair.length > 4096) {
+      continue;
+    }
+
+    const name = pair.slice(0, separator);
+    if (name === "cw.session" || name === "cw.csrf") {
+      state.sessionCookies[name] = pair.slice(separator + 1);
+    }
+  }
+}
+
+function getSessionHeaders(method) {
+  const session = state.sessionCookies["cw.session"];
+  const csrf = state.sessionCookies["cw.csrf"];
+  if (!session || !csrf) {
+    throw new Error("Cookie session is not available.");
+  }
+
+  const headers = { Cookie: `cw.session=${session}; cw.csrf=${csrf}` };
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())) {
+    headers["x-csrf-token"] = csrf;
+  }
+  return headers;
+}
+
+function getAuthHeaders(auth, service, method) {
   if (auth === "public") {
     return {};
+  }
+
+  if (auth === "session") {
+    return getSessionHeaders(method);
   }
 
   if (auth === "bearer") {
@@ -562,7 +602,7 @@ async function httpRequest(op, options) {
 
   const url = buildUrl(target, service, requestPath, query);
   const requestHeaders = new Headers({
-    ...getAuthHeaders(auth, service),
+    ...getAuthHeaders(auth, service, method),
     ...optionHeaders,
     ...(opOverrides?.headers ?? {}),
   });
@@ -614,6 +654,8 @@ async function httpRequest(op, options) {
       throw fetchError;
     }
   }
+
+  captureSessionCookies(response.headers);
 
   text = await response.text();
   const artifactPath = await writeArtifact(label, text);
@@ -689,7 +731,13 @@ async function attemptLogin() {
       });
 
       if (response.status === 200) {
-        return response.body?.data;
+        const session = response.body?.data;
+        if (session?.token !== undefined) {
+          throw new Error("Login response exposed a token.");
+        }
+        if (session?.id && state.sessionCookies["cw.session"] && state.sessionCookies["cw.csrf"]) {
+          return session;
+        }
       }
 
       lastFailure = response;
@@ -701,7 +749,7 @@ async function attemptLogin() {
 
 async function bootstrapAndLogin() {
   const firstAttempt = await attemptLogin();
-  if (firstAttempt?.token) {
+  if (firstAttempt?.id) {
     return firstAttempt;
   }
 
@@ -716,7 +764,7 @@ async function bootstrapAndLogin() {
   });
 
   const secondAttempt = await attemptLogin();
-  if (secondAttempt?.token) {
+  if (secondAttempt?.id) {
     return secondAttempt;
   }
 
@@ -1772,14 +1820,43 @@ const handlers = {
   async userSession(_op) {
     const session = await bootstrapAndLogin();
     state.session = session;
-    state.bearerToken = session.token;
+    state.bearerToken = createAdminToken(session.permission);
     state.adminBearerToken =
-      session.permission === WorkspacePermissionLevel.Admin ? session.token : createAdminToken();
+      session.permission === WorkspacePermissionLevel.Admin
+        ? state.bearerToken
+        : createAdminToken();
     state.baselineDepartmentId = session.department_id || state.baselineDepartmentId;
     log(
       "PASS",
       `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`,
     );
+  },
+
+  async userSessionRefreshMissingCsrf(op) {
+    await httpRequest(op, {
+      auth: "public",
+      headers: getSessionHeaders("GET"),
+      expectedStatus: [403],
+      expectEnvelope: false,
+    });
+  },
+
+  async userSessionRefresh(op) {
+    const response = await httpRequest(op, { expectedStatus: [200] });
+    if (response.body?.data?.token !== undefined) {
+      throw new Error("Refresh response exposed a token.");
+    }
+    state.session = response.body?.data ?? state.session;
+  },
+
+  async userSessionLogout(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    if (state.sessionCookies["cw.session"] || state.sessionCookies["cw.csrf"]) {
+      throw new Error("Logout did not expire both session cookies.");
+    }
   },
 
   async userStartConfig(op) {
