@@ -91,6 +91,9 @@ backend_check_url() {
     parcelamento-service)
       printf "%s\n" "http://parcelamento-service:3043/health"
       ;;
+    reports-service)
+      printf "%s\n" "http://reports-service:3044/health"
+      ;;
     audit-service)
       printf "%s\n" "http://audit-service:3020/ready"
       ;;
@@ -115,6 +118,7 @@ ALL_BACKEND_SERVICES=(
   certificate-service
   pessoal-service
   parcelamento-service
+  reports-service
   audit-service
 )
 
@@ -162,6 +166,9 @@ build_check_plan() {
   local need_proxy=0
 
   for svc in "${selected[@]}"; do
+    if [[ "$svc" == "reports-worker" ]]; then
+      continue
+    fi
     if backend_url="$(backend_check_url "$svc")"; then
       CHECKS+=("backend|${backend_url}|$svc")
       need_gateway=1

@@ -107,6 +107,13 @@ describe("gateway env security validation", () => {
     expect(env.parcelamentoServiceUrl).toBe("http://localhost:3043");
   });
 
+  it("uses reports service default URL", () => {
+    setGatewayEnv({});
+    delete process.env.REPORTS_SERVICE_URL;
+
+    expect(getGatewayEnv().reportsServiceUrl).toBe("http://localhost:3044");
+  });
+
   it("parses optional gateway public URL and JSON body limit overrides", () => {
     setGatewayEnv({
       GATEWAY_PUBLIC_URL: "https://api.example.com",

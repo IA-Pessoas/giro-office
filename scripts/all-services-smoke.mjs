@@ -963,14 +963,7 @@ const handlers = {
   },
 
   async reportsCatalog(op) {
-    await httpRequest(op, {
-      headers: isBadExpectation(op)
-        ? {}
-        : {
-            "x-auth-user-id": requireState("session").id,
-            "x-auth-organization-id": requireState("session").organization_id,
-          },
-    });
+    await httpRequest(op);
   },
 
   async certificatePjList(op) {
