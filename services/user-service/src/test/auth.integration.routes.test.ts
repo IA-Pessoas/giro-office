@@ -3,13 +3,13 @@ import { MemoryLogStream } from "@workspace/shared/testUtils";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-const { bcryptMock, prismaMock } = vi.hoisted(() => ({
-  bcryptMock: { compare: vi.fn() },
+const { passwordHashMock, prismaMock } = vi.hoisted(() => ({
+  passwordHashMock: { verifyPassword: vi.fn() },
   prismaMock: { user: { findFirst: vi.fn() } },
 }));
 
 vi.mock("../prisma/index.js", () => ({ default: prismaMock }));
-vi.mock("bcryptjs", () => ({ default: bcryptMock }));
+vi.mock("../security/passwordHashService.js", () => passwordHashMock);
 
 import { createUserApp } from "../app.js";
 import { getUserServiceEnv } from "../config/env.js";
@@ -65,7 +65,10 @@ describe("auth integration routes", () => {
 
     for (const testCase of cases) {
       prismaMock.user.findFirst.mockResolvedValueOnce(testCase.user);
-      bcryptMock.compare.mockResolvedValueOnce(testCase.passwordMatches);
+      passwordHashMock.verifyPassword.mockResolvedValueOnce({
+        valid: testCase.passwordMatches,
+        needsRehash: false,
+      });
 
       const response = await request(app)
         .post("/user/session")

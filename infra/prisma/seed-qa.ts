@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { PrismaPg } from "@prisma/adapter-pg";
-import bcrypt from "bcryptjs";
+import argon2 from "argon2";
 import { PrismaClient } from "../generated/prisma/client.js";
 import {
   INTEGRACAO_QA_FIXTURES,
@@ -99,7 +99,13 @@ async function seedFixture(fixture: (typeof INTEGRACAO_QA_FIXTURES)[number]): Pr
     },
   });
 
-  const password = await bcrypt.hash(INTEGRACAO_QA_PASSWORD, 8);
+  const password = await argon2.hash(INTEGRACAO_QA_PASSWORD, {
+    type: argon2.argon2id as 2,
+    version: 0x13,
+    memoryCost: 19 * 1024,
+    timeCost: 2,
+    parallelism: 1,
+  });
   for (const user of fixture.users) {
     const userType = user.type === "owner" ? "owner" : "user";
     const permissionLevel = user.type === "owner" ? 0 : user.level;

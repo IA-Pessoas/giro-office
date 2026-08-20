@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { PrismaPg } from "@prisma/adapter-pg";
-import bcrypt from "bcryptjs";
+import argon2 from "argon2";
 import { PrismaClient } from "../generated/prisma/client.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -134,7 +134,13 @@ async function main() {
   ];
 
   const users: Record<string, unknown> = {};
-  const hashedPassword = await bcrypt.hash("senha123", 8);
+  const hashedPassword = await argon2.hash("senha123", {
+    type: argon2.argon2id as 2,
+    version: 0x13,
+    memoryCost: 19 * 1024,
+    timeCost: 2,
+    parallelism: 1,
+  });
 
   for (const user of usersData) {
     const created = await prisma.user.upsert({
