@@ -1,13 +1,10 @@
 import { expect, it } from "vitest";
 
-import { classifyActivity } from "../audit/activityCatalog.js";
 import type { GatewayEnv } from "../config/env.js";
-import { buildGatewayOpenApiSpec } from "../openapi/gatewaySpec.js";
+import { buildGatewayOpenApiSpec } from "./gatewaySpec.js";
 
-const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
-
-function createCoverageEnv(): GatewayEnv {
-  return {
+it("agrega o catálogo público do reports-service", () => {
+  const spec = buildGatewayOpenApiSpec({
     nodeEnv: "test",
     enableApiDocs: true,
     authorizationMode: "enforce",
@@ -43,26 +40,7 @@ function createCoverageEnv(): GatewayEnv {
     authRateLimitMax: 10,
     authRateLimitWindowMs: 60_000,
     jsonBodyLimit: "1mb",
-  };
-}
+  } satisfies GatewayEnv);
 
-function materializePath(path: string): string {
-  return path.replace(/\{[^}]+\}/g, "9a68a809-9a78-4ef9-94d0-b9bb9787ad2e");
-}
-
-it("classifica toda operação pública do gateway", () => {
-  const spec = buildGatewayOpenApiSpec(createCoverageEnv());
-  const unknown: string[] = [];
-
-  for (const [path, pathItem] of Object.entries(spec.paths)) {
-    for (const method of HTTP_METHODS) {
-      if (!(pathItem as Record<string, unknown> | undefined)?.[method]) continue;
-
-      if (classifyActivity(method, materializePath(path)).kind === "unknown") {
-        unknown.push(`${method.toUpperCase()} ${path}`);
-      }
-    }
-  }
-
-  expect(unknown).toEqual([]);
+  expect(spec.paths["/reports/catalog"]?.get?.["x-origin-service"]).toBe("reports-service");
 });

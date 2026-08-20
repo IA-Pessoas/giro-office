@@ -51,6 +51,11 @@ const TECHNICAL_RULES = [
 
 const EXPLICIT_RULES: ExplicitRule[] = [
   {
+    methods: ["GET"],
+    pattern: /^\/reports\/catalog$/,
+    description: { action: "consultou", item: "o catálogo de relatórios" },
+  },
+  {
     methods: ["PATCH", "PUT"],
     pattern: /^\/organizations\/[^/]+\/status$/,
     description: { action: "alterou", item: "o status de uma organização" },

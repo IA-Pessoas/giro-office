@@ -107,6 +107,13 @@ test("detect-changed-vps-services emits parcelamento-service for parcelamento ch
   );
 });
 
+test("detect-changed-vps-services emits reports-service for reports changes", async () => {
+  assert.equal(
+    await detectChangedServices("services/reports-service/src/server.ts"),
+    "reports-service",
+  );
+});
+
 test("detect-changed-vps-services emits web for app changes", async () => {
   assert.equal(await detectChangedServices("app/src/app/page.tsx"), "web");
 });
@@ -211,6 +218,40 @@ test("compose-vps-buildx-push plans cached service build for parcelamento-servic
   assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/parcelamento-service:abc1234/);
 });
 
+test("reports-service is wired into VPS build, runtime, wait, and secret materialization", async () => {
+  assert.match(
+    await dryRunBuildxPush("reports-service"),
+    /WORKSPACE_PACKAGE=@workspace\/reports-service/,
+  );
+  assert.equal(await runDeployScopeFunction("vps_validate_service_token", "reports-service"), "");
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const reportsBlock = extractComposeServiceBlock(composeContents, "reports-service");
+  const workerBlock = extractComposeServiceBlock(composeContents, "reports-worker");
+  assert.match(reportsBlock, /\.env\.vps\.reports-service/);
+  assert.doesNotMatch(reportsBlock, /REPORTS_INTERNAL_TOKEN:\s*\$\{/);
+  assert.doesNotMatch(workerBlock, /expose:|healthcheck:/);
+  assert.match(
+    await readFile(vpsSecretsManifest, "utf8"),
+    /^ENV_VPS_REPORTS_SERVICE\|\.env\.vps\.reports-service$/m,
+  );
+  const waitScript = await readFile(vpsWaitEndpointsScript, "utf8");
+  assert.match(
+    waitScript,
+    /reports-service\)\s+printf "%s\\n" "http:\/\/reports-service:3044\/health"/,
+  );
+  assert.match(waitScript, /\[\[ "\$svc" == "reports-worker" \]\]/);
+  assert.match(waitScript, /ALL_BACKEND_SERVICES=\([\s\S]*reports-service[\s\S]*\)/);
+  assert.match(
+    await readFile(composeVpsRuntimeOverrideFile, "utf8"),
+    /reports-service:\s+healthcheck:\s+disable: true/,
+  );
+  assert.match(await readFile(productionDeployScript, "utf8"), /reports-service/);
+  assert.match(
+    await readFile(productionWaitScript, "utf8"),
+    /http:\/\/reports-service:3044\/health/,
+  );
+});
+
 test("compose-vps-buildx-push plans cached web build with Next.js build args", async () => {
   const output = await dryRunBuildxPush("web");
   assert.match(output, /--file docker\/app\.Dockerfile/);
@@ -259,6 +300,13 @@ test("vps-deploy-scope emits compose args only for selective scope", async () =>
   );
 });
 
+test("vps-deploy-scope reinicia o worker junto com reports-service", async () => {
+  assert.equal(
+    await runDeployScopeFunction("vps_compose_service_args", "reports-service"),
+    "reports-service\nreports-worker",
+  );
+});
+
 const pullByTagScript = path.join(
   repoRoot,
   "scripts",
@@ -273,6 +321,8 @@ const composeVpsRuntimeOverrideFile = path.join(
 );
 const vpsSecretsManifest = path.join(repoRoot, "scripts", "ci", "vps-secrets.manifest");
 const vpsWaitEndpointsScript = path.join(repoRoot, "scripts", "ci", "vps-wait-endpoints.sh");
+const productionDeployScript = path.join(repoRoot, "scripts", "ops", "deploy-production.sh");
+const productionWaitScript = path.join(repoRoot, "scripts", "ops", "wait-production-endpoints.sh");
 
 async function writeExecutable(filePath, contents) {
   await writeFile(filePath, contents, "utf8");

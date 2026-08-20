@@ -46,6 +46,13 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
   });
 
+  it("permite usuário autenticado consultar relatórios sem política modular do gateway", () => {
+    const policy = requiredRoutePolicy("GET", "/reports/catalog");
+
+    expect(policy).toEqual({ minPermission: 0 });
+    expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(true);
+  });
+
   it("permite Viewer de Pessoal listar clientes sem ampliar outros acessos de cliente", () => {
     const listPolicy = requiredRoutePolicy("GET", "/client/list");
     const clientDetailPolicy = requiredRoutePolicy("GET", "/client/client-1");
