@@ -1,12 +1,14 @@
 # Plano de Recuperacao Super Admin com Sessoes HTTP-only
 
-**Objetivo:** reconstruir o Super Admin sobre `develop` sem reintroduzir JWT acessivel ao navegador, scripts ofuscados ou dependencias antigas.
+**Objetivo:** reconstruir o Super Admin sobre a linha isolada sem reintroduzir JWT acessivel ao navegador, scripts ofuscados ou dependencias antigas.
 
-**Base:** `develop@2322dc15`. A referencia funcional e a feature sanitizada `b1e04752`; ela e apenas uma fonte semantica, nao uma base Git para merge.
+**Base e destino:** `feature/super-admin-v2-develop@fde381f1`. A referencia funcional e a feature sanitizada `b1e04752`; ela e apenas uma fonte semantica, nao uma base Git para merge.
+
+**Plano executavel:** `docs/superpowers/plans/2026-08-21-super-admin-http-only-implementation.md`.
 
 ## Restricoes globais
 
-- `develop` e a fonte de verdade para lockfile, dependencias, configuracoes, cookies e hardenings.
+- A linha isolada derivada do `develop@2322dc15` e a fonte de verdade para lockfile, dependencias, configuracoes, cookies e hardenings.
 - O navegador recebe somente `cw.session` HttpOnly e `cw.csrf`; respostas JSON nunca retornam JWT ou CSRF secreto.
 - Nenhum codigo da referencia que leia `cw.token`, use `Authorization: Bearer`, `jwt-decode`, `nookies` de token ou `support_mode` como bypass global pode ser portado.
 - Preservar `.husky/pre-commit`, `scripts/supply-chain-security.test.mjs` e `scripts/supply-chain-integrity.mjs` do `develop`.
@@ -47,4 +49,4 @@
 1. Adicionar testes de contrato e regressao para backend, gateway e frontend; incluir afirmacoes de ausencia de `cw.token`, `Bearer`, `jwtDecode`, `setCookie` e `destroyCookie` no fluxo Super Admin.
 2. Executar scanner de supply chain em toda mudanca de configuracao, hook, script e manifest.
 3. Reativar ou criar CI de pull request com `pnpm check`, `pnpm typecheck`, `pnpm test`, `pnpm smoke:coverage`, `prisma validate` e migration em Postgres efemero.
-4. So apos os gates verdes, abrir PR contra `develop`.
+4. So apos os gates verdes, abrir PR contra `feature/super-admin-v2-develop`; nunca contra `develop` nesta issue.
