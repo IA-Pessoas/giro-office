@@ -114,6 +114,7 @@ const moduleCategories: NavigationCategory[] = [
       { path: "/clients", name: "Clientes", icon: ContactRound },
       { path: "/projects", name: "Projetos", icon: FolderKanban },
       { path: "/tasks", name: "Tarefas", icon: SquareCheck },
+      { path: "/relatorios", name: "Relatórios", icon: FileText },
       { path: "/departments", name: "Departamentos", icon: Building2 },
     ],
   },
