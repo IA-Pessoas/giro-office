@@ -362,6 +362,35 @@ model AuthSession {
   @@map("auth_sessions")
 }
 
+model PlatformUser {
+  id              String                @id @default(uuid())
+  name            String
+  email           String                @unique
+  password        String
+  platform_role   PlatformRole          @default(super_admin)
+  status          String                @default("active")
+  session_version Int                   @default(0)
+  created_at      DateTime              @default(now())
+  updated_at      DateTime              @updatedAt
+  authSessions    PlatformAuthSession[]
+
+  @@map("platform_users")
+}
+
+model PlatformAuthSession {
+  id               String       @id @default(uuid())
+  platform_user_id String
+  csrf_hash        String
+  expires_at       DateTime
+  revoked_at       DateTime?
+  created_at       DateTime     @default(now())
+  platformUser     PlatformUser @relation(fields: [platform_user_id], references: [id], onDelete: Cascade)
+
+  @@index([platform_user_id, revoked_at, expires_at], map: "idx_platform_auth_sessions_user_state")
+  @@index([expires_at], map: "idx_platform_auth_sessions_expiry")
+  @@map("platform_auth_sessions")
+}
+
 model Permission {
   id              String       @id @default(uuid())
   user_id         String
@@ -2261,6 +2290,10 @@ enum status {
   active
   suspended
   cancelled
+}
+
+enum PlatformRole {
+  super_admin
 }
 
 enum enumType {

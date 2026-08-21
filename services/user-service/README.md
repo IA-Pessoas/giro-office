@@ -10,6 +10,8 @@ Por defeito: **3030** (`PORT`).
 
 Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, logging e `AUTH_COOKIE_SECURE`. A última variável assume `true` em produção; use `false` apenas em slots HTTP isolados. `REPORTS_INTERNAL_TOKEN` protege `POST /internal/reporting/access-context`; deve ser igual ao valor do reports-service e é obrigatório em produção.
 
+Para criar o único administrador da plataforma, informe explicitamente `PLATFORM_ADMIN_NAME`, `PLATFORM_ADMIN_EMAIL` e `PLATFORM_ADMIN_PASSWORD` e execute `pnpm --filter @workspace/user-service bootstrap:platform-admin`. O comando não substitui uma conta existente e imprime apenas `id`, `email` e `created`.
+
 O endpoint `/internal/reporting/access-context` é chamado diretamente pelo reports-service e não é publicado pelo gateway.
 
 ## Sessão do navegador
