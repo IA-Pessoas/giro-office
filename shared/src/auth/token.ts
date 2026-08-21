@@ -1,10 +1,24 @@
 import jwt, { type JwtPayload } from "jsonwebtoken";
 
 import { normalizeModulePermissions } from "./modules.js";
-import type { AuthContext, AuthIdentity, AuthUserType } from "./types.js";
+import type {
+  AuthContext,
+  AuthIdentity,
+  AuthKind,
+  AuthUserType,
+  PlatformRole,
+} from "./types.js";
 
 function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
   return value === "owner" || value === "admin" || value === "user" ? value : undefined;
+}
+
+function normalizeAuthKind(value: unknown): AuthKind {
+  return value === "platform" ? "platform" : "organization";
+}
+
+function normalizePlatformRole(value: unknown): PlatformRole | undefined {
+  return value === "super_admin" ? value : undefined;
 }
 
 /**
@@ -49,6 +63,8 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
         ? payload.csrf_hash
         : undefined,
     type: normalizeAuthUserType(payload.type),
+    auth_kind: normalizeAuthKind(payload.auth_kind),
+    platform_role: normalizePlatformRole(payload.platform_role),
     name: typeof payload.name === "string" ? payload.name : undefined,
     login: typeof payload.login === "string" ? payload.login : undefined,
   };
@@ -82,13 +98,16 @@ export function authenticateFromAuthHeader(
 
 export function authenticateFromToken(token: string, jwtSecret: string): AuthContext {
   const claims = verifyJwtToken(token, jwtSecret);
-
-  const organizationId = typeof claims.organization_id === "string" ? claims.organization_id : "";
+  const isPlatformAdmin =
+    claims.auth_kind === "platform" && claims.platform_role === "super_admin";
+  const organizationId = isPlatformAdmin ? "" : (claims.organization_id ?? "");
 
   return {
     token,
     userId: claims.user_id,
     organizationId,
+    actorKind: claims.auth_kind ?? "organization",
+    isPlatformAdmin,
     claims,
   };
 }

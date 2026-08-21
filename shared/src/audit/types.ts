@@ -1,3 +1,5 @@
+import type { AuthKind, PlatformRole } from "../auth/types.js";
+
 export type AuditOutcome = "success" | "error" | "aborted";
 export type AuditQueryValue = string | string[];
 export type AuditQuery = Record<string, AuditQueryValue>;
@@ -88,4 +90,6 @@ export interface ForwardedAuditAuthContext {
   userId: string;
   organizationId: string;
   permission?: number;
+  authKind?: AuthKind;
+  platformRole?: PlatformRole;
 }

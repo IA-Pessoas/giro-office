@@ -61,6 +61,14 @@ export function canAccessRoute(context: AuthContext, policy: AuthPolicy): boolea
     return policy.anyOf.some((alternative) => canAccessRoute(context, alternative));
   }
 
+  if (policy.special === "platformOnly") {
+    return context.actorKind === "platform" && context.isPlatformAdmin;
+  }
+
+  if (context.actorKind === "platform") {
+    return false;
+  }
+
   if (policy.special === "ownerOnly") {
     return isExplicitOwner(context);
   }
