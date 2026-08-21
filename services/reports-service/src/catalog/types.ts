@@ -1,11 +1,4 @@
-export const REPORT_SOURCE_KEYS = [
-  "parcelamento.installments",
-  "parcelamento.installment_competencies",
-  "parcelamento.panoramas",
-  "integracao.clients",
-] as const;
-
-export type ReportSourceKey = (typeof REPORT_SOURCE_KEYS)[number];
+export type ReportSourceKey = string;
 
 export const REPORT_VALUE_TYPES = ["string", "number", "boolean", "date"] as const;
 export type ReportValueType = (typeof REPORT_VALUE_TYPES)[number];
@@ -37,12 +30,37 @@ export interface ReportCatalogField {
 export interface ReportCatalogSource {
   key: ReportSourceKey;
   label: string;
-  module: "parcelamento" | "integracao";
+  module: string;
+  minimum_permission: number;
   fields: readonly ReportCatalogField[];
-  internal_keys: readonly string[];
 }
 
 export interface ReportCatalogRelation {
   key: string;
   sources: readonly [ReportSourceKey, ReportSourceKey];
+  cardinality: "one_to_one" | "one_to_many" | "many_to_one";
+}
+
+export interface ReportCatalogGrant {
+  sources: Readonly<Record<ReportSourceKey, readonly string[]>>;
+  relations: readonly string[];
+}
+
+export interface ReportCatalogScope {
+  organization_id: string;
+  modules: Readonly<Record<string, number>>;
+  grant?: ReportCatalogGrant;
+}
+
+export interface ReportPreviewAdapterInput {
+  definition: unknown;
+  organization_id: string;
+  limit: number;
+}
+
+export interface ReportSourceAdapter {
+  readonly sources: readonly ReportCatalogSource[];
+  readonly relations: readonly ReportCatalogRelation[];
+  isEnabled(scope: ReportCatalogScope): boolean;
+  preview(input: ReportPreviewAdapterInput): Promise<readonly Record<string, unknown>[]>;
 }

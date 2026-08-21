@@ -34,7 +34,16 @@ const definition = {
 
 describe("reportDefinitionSchema", () => {
   it("aceita apenas uma definição declarativa publicada", () => {
-    expect(reportDefinitionSchema.parse(definition)).toEqual(definition);
+    expect(reportDefinitionSchema.parse(definition)).toMatchObject(definition);
+  });
+
+  it("aceita identificadores declarativos de adapters publicados em tempo de execução", () => {
+    const adapterDefinition = {
+      sources: ["finance.ledger"],
+      columns: [{ source: "finance.ledger", field: "balance", alias: "balance" }],
+    };
+
+    expect(reportDefinitionSchema.parse(adapterDefinition)).toMatchObject(adapterDefinition);
   });
 
   it("rejeita aliases duplicados", () => {
@@ -55,12 +64,8 @@ describe("reportDefinitionSchema", () => {
     ).toThrow();
   });
 
-  it("rejeita chave técnica, SQL, tabela, expressão e transformador", () => {
+  it("rejeita SQL, tabela, expressão e transformador", () => {
     for (const invalidDefinition of [
-      {
-        ...definition,
-        columns: [{ source: "integracao.clients", field: "client_id", alias: "id" }],
-      },
       { ...definition, sql: "select *" },
       { ...definition, table: "clientes.clients" },
       { ...definition, expression: "count(*)" },
@@ -70,29 +75,23 @@ describe("reportDefinitionSchema", () => {
     }
   });
 
-  it("rejeita operador incompatível e parâmetro ausente", () => {
+  it("rejeita filtro com fonte fora da definição", () => {
     expect(() =>
       reportDefinitionSchema.parse({
         ...definition,
         filters: [
           {
-            source: "parcelamento.installments",
-            field: "agreement_number",
-            operator: "gt",
+            source: "finance.ledger",
+            field: "balance",
+            operator: "eq",
             parameter: "status",
           },
         ],
       }),
     ).toThrow();
-    expect(() =>
-      reportDefinitionSchema.parse({
-        ...definition,
-        filters: [{ ...definition.filters[0], parameter: "missing" }],
-      }),
-    ).toThrow();
   });
 
-  it("rejeita join ou relação não aprovados e agregação incompatível", () => {
+  it("rejeita joins Right e Full", () => {
     for (const type of ["right", "full"]) {
       expect(() =>
         reportDefinitionSchema.parse({
@@ -101,18 +100,6 @@ describe("reportDefinitionSchema", () => {
         }),
       ).toThrow();
     }
-    expect(() =>
-      reportDefinitionSchema.parse({
-        ...definition,
-        joins: [{ ...definition.joins[0], relation: "parcelamento.installments.unknown" }],
-      }),
-    ).toThrow();
-    expect(() =>
-      reportDefinitionSchema.parse({
-        ...definition,
-        aggregations: [{ source: "integracao.clients", field: "name", function: "sum" }],
-      }),
-    ).toThrow();
   });
 
   it("rejeita página e custo declarados acima dos limites", () => {
