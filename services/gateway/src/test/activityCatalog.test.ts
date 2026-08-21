@@ -6,6 +6,7 @@ describe("activityCatalog", () => {
   it.each([
     ["GET", "/task/list", "consultou", "a lista de tarefas"],
     ["GET", "/reports/catalog", "consultou", "o catálogo de relatórios"],
+    ["POST", "/reports/preview", "gerou", "uma prévia de relatório"],
     ["POST", "/user", "cadastrou", "um novo usuário"],
     [
       "PATCH",
