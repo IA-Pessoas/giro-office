@@ -45,4 +45,5 @@ it("agrega o catálogo público do reports-service", () => {
   } satisfies GatewayEnv);
 
   expect(spec.paths["/reports/catalog"]?.get?.["x-origin-service"]).toBe("reports-service");
+  expect(spec.paths["/internal/reporting/access-context"]).toBeUndefined();
 });

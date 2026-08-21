@@ -69,7 +69,8 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "User Service",
       buildSpec: () =>
         buildUserServiceOpenApiSpec({ port: getPortFromUrl(env.userServiceUrl) } as never),
-      includePath: (path) => path !== "/health" && path !== "/user/session/validate",
+      includePath: (path) =>
+        path !== "/health" && path !== "/user/session/validate" && !path.startsWith("/internal/"),
     },
     {
       key: "department-service",
