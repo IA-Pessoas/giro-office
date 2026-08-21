@@ -84,6 +84,31 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           },
         },
       },
+      "/reports/preview": {
+        post: {
+          tags: ["Reports"],
+          summary: "Gerar prévia limitada de relatório",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["definition"],
+                  properties: { definition: { type: "object", additionalProperties: true } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Prévia limitada", ...successResponse },
+            "400": { description: "Definição inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Fonte ou campo não autorizado" },
+          },
+        },
+      },
     },
   };
 }

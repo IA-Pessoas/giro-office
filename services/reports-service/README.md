@@ -21,6 +21,10 @@ Consulte [`src/config/env.ts`](src/config/env.ts).
 
 Prefixo público: `/reports`.
 
+`GET /reports/catalog` expõe somente fontes e campos de adapters internos habilitados para a
+organização e permissões atuais. `POST /reports/preview` valida a mesma definição e devolve uma
+amostra limitada; não cria job, snapshot, arquivo ou registro persistido.
+
 ## Desenvolvimento
 
 ```bash

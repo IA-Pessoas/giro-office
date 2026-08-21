@@ -10,21 +10,33 @@ import cors from "cors";
 import express from "express";
 import "express-async-errors";
 
+import { SourceCatalogService } from "./catalog/sourceCatalogService.js";
+import type { ReportSourceAdapter } from "./catalog/types.js";
 import type { ReportsServiceEnv } from "./config/env.js";
+import { UserAccessContextClient } from "./integrations/userAccessContextClient.js";
 import { buildReportsServiceOpenApiSpec } from "./openapi/spec.js";
 import type { ReportsPrismaClient } from "./prisma/index.js";
+import { createReportPreviewRouter } from "./routes/preview.routes.js";
 import { createReportCatalogRouter } from "./routes/reportCatalog.routes.js";
+import type { ReportingAccessContextClient } from "./routes/reportingContext.js";
+import { ReportDefinitionService } from "./services/reportDefinitionService.js";
+import { ReportPreviewService } from "./services/reportPreviewService.js";
 
 export interface CreateReportsAppOptions {
   env: ReportsServiceEnv;
   logger: Logger;
   prisma: ReportsPrismaClient;
+  reporting?: {
+    adapters?: readonly ReportSourceAdapter[];
+    accessContextClient?: ReportingAccessContextClient;
+  };
 }
 
 export function createReportsApp({
   env,
   logger,
   prisma,
+  reporting,
 }: CreateReportsAppOptions): express.Express {
   const app = express();
 
@@ -56,7 +68,13 @@ export function createReportsApp({
     });
   }
 
-  app.use("/reports", createReportCatalogRouter());
+  const sourceCatalog = new SourceCatalogService(reporting?.adapters ?? []);
+  const definitionService = new ReportDefinitionService(sourceCatalog);
+  const accessContextClient = reporting?.accessContextClient ?? new UserAccessContextClient(env);
+  const previewService = new ReportPreviewService(sourceCatalog, definitionService, 100);
+
+  app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
+  app.use("/reports", createReportPreviewRouter({ previewService, accessContextClient }));
   app.use(
     createExpressErrorHandler({
       logger,

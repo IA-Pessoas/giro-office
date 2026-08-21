@@ -1011,6 +1011,23 @@ const handlers = {
     await httpRequest(op);
   },
 
+  async reportsPreview(op) {
+    await httpRequest(op, {
+      json: {
+        definition: {
+          sources: ["parcelamento.installments"],
+          columns: [
+            {
+              source: "parcelamento.installments",
+              field: "agreement_number",
+              alias: "agreement_number",
+            },
+          ],
+        },
+      },
+    });
+  },
+
   async certificatePjList(op) {
     await httpRequest(op, {
       expectedStatus: [200],

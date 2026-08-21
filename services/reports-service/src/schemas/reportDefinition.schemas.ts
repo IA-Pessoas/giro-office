@@ -1,8 +1,6 @@
 import { z } from "zod";
 
 import {
-  REPORT_CATALOG,
-  REPORT_CATALOG_RELATIONS,
   reportAggregationSchema,
   reportFilterOperatorSchema,
   reportSourceKeySchema,
@@ -80,18 +78,20 @@ const aggregationSchema = z
   })
   .strict();
 
+const orderBySchema = z
+  .object({
+    source: reportSourceKeySchema,
+    field: fieldNameSchema,
+    direction: z.enum(["asc", "desc"]),
+  })
+  .strict();
+
 const declaredCostSchema = z
   .object({
     rows: z.number().int().min(0).max(MAX_DECLARED_REPORT_ROWS),
     bytes: z.number().int().min(0).max(MAX_DECLARED_REPORT_BYTES),
   })
   .strict();
-
-function findField(source: string, field: string) {
-  return REPORT_CATALOG.find((candidate) => candidate.key === source)?.fields.find(
-    (candidate) => candidate.key === field,
-  );
-}
 
 export const reportDefinitionSchema = z
   .object({
@@ -102,6 +102,7 @@ export const reportDefinitionSchema = z
     filter_groups: z.array(filterGroupSchema).default([]),
     parameters: z.array(parameterSchema).default([]),
     aggregations: z.array(aggregationSchema).default([]),
+    order_by: z.array(orderBySchema).max(MAX_REPORT_COLUMNS).default([]),
     declared_cost: declaredCostSchema.optional(),
   })
   .strict()
@@ -109,9 +110,6 @@ export const reportDefinitionSchema = z
     const sourceSet = new Set(definition.sources);
     const aliases = new Set<string>();
     const parameterNames = new Set(definition.parameters.map((parameter) => parameter.name));
-    const parameters = new Map(
-      definition.parameters.map((parameter) => [parameter.name, parameter]),
-    );
     const filters = new Set(definition.filters.map((filter) => filter.parameter));
 
     if (sourceSet.size !== definition.sources.length) {
@@ -122,11 +120,11 @@ export const reportDefinitionSchema = z
     }
 
     for (const [index, column] of definition.columns.entries()) {
-      if (!sourceSet.has(column.source) || !findField(column.source, column.field)) {
+      if (!sourceSet.has(column.source)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["columns", index],
-          message: "A coluna deve ser publicada pela fonte selecionada.",
+          message: "A coluna deve usar uma fonte selecionada.",
         });
       }
       if (aliases.has(column.alias)) {
@@ -139,38 +137,12 @@ export const reportDefinitionSchema = z
       aliases.add(column.alias);
     }
 
-    for (const [index, join] of definition.joins.entries()) {
-      const relation = REPORT_CATALOG_RELATIONS.find(
-        (candidate) => candidate.key === join.relation,
-      );
-      if (!relation || relation.sources.some((source) => !sourceSet.has(source))) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["joins", index],
-          message: "A relação deve usar fontes selecionadas e publicadas.",
-        });
-      }
-    }
-
     for (const [index, filter] of definition.filters.entries()) {
-      const field = findField(filter.source, filter.field);
-      const parameter = parameters.get(filter.parameter);
-      if (
-        !sourceSet.has(filter.source) ||
-        !field ||
-        !field.filter_operators.includes(filter.operator)
-      ) {
+      if (!sourceSet.has(filter.source)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["filters", index],
-          message: "O operador deve ser compatível com um campo publicado.",
-        });
-      }
-      if (!parameter || parameter.type !== field?.value_type) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["filters", index, "parameter"],
-          message: "O filtro deve referenciar um parâmetro compatível.",
+          message: "O filtro deve usar uma fonte selecionada.",
         });
       }
     }
@@ -186,16 +158,11 @@ export const reportDefinitionSchema = z
     }
 
     for (const [index, aggregation] of definition.aggregations.entries()) {
-      const field = findField(aggregation.source, aggregation.field);
-      if (
-        !sourceSet.has(aggregation.source) ||
-        !field ||
-        !field.aggregations.includes(aggregation.function)
-      ) {
+      if (!sourceSet.has(aggregation.source)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["aggregations", index],
-          message: "A agregação deve ser compatível com um campo publicado.",
+          message: "A agregação deve usar uma fonte selecionada.",
         });
       }
     }

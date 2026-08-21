@@ -79,6 +79,14 @@ describe("reports-service app", () => {
       },
       logger: { error: vi.fn() } as never,
       prisma: { $queryRaw: vi.fn() } as never,
+      reporting: {
+        accessContextClient: {
+          getAccessContext: vi.fn().mockResolvedValue({
+            organization: { id: "00000000-0000-4000-8000-000000000002" },
+            modules: {},
+          }),
+        },
+      },
     });
 
     const catalog = await request(app)

@@ -56,6 +56,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "o catálogo de relatórios" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/reports\/preview$/,
+    description: { action: "gerou", item: "uma prévia de relatório" },
+  },
+  {
     methods: ["PATCH", "PUT"],
     pattern: /^\/organizations\/[^/]+\/status$/,
     description: { action: "alterou", item: "o status de uma organização" },

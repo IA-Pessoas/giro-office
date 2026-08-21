@@ -700,6 +700,27 @@ const baseManifest = [
     expectedStatus: [401],
     expectedLabel: "unauthorized",
   }),
+  op({
+    service: "reports-service",
+    method: "POST",
+    path: "/reports/preview",
+    action: "reportsPreview",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "reports-service",
+    method: "POST",
+    path: "/reports/preview",
+    action: "reportsPreviewInvalid",
+    handlerAction: "reportsPreview",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+    expectationKind: "bad",
+    expectedStatus: [401],
+    expectedLabel: "unauthorized",
+  }),
 
   op({
     service: "organization-service",
