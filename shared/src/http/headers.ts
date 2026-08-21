@@ -5,4 +5,7 @@ export const FORWARDED_AUTH_PERMISSION_HEADER = "x-auth-permission";
 export const FORWARDED_AUTH_TYPE_HEADER = "x-auth-type";
 export const FORWARDED_AUTH_MODULES_HEADER = "x-auth-modules";
 export const FORWARDED_AUTH_SESSION_VERSION_HEADER = "x-auth-session-version";
+export const FORWARDED_AUTH_SESSION_ID_HEADER = "x-auth-session-id";
+export const FORWARDED_AUTH_CSRF_HASH_HEADER = "x-auth-csrf-hash";
+export const AUTH_SESSION_TRANSPORT_HEADER = "x-auth-session-transport";
 export const INTERNAL_SERVICE_TOKEN_HEADER = "x-internal-service-token";

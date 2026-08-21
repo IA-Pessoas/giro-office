@@ -21,17 +21,6 @@ const smokeUser = {
   modules: { pessoal: 3, integracao: 3 },
 };
 
-function createToken(user) {
-  const encode = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
-  return `${encode({ alg: "none", typ: "JWT" })}.${encode({
-    user_id: user.id,
-    organization_id: user.organization_id,
-    permission: user.permission,
-    type: user.type,
-    modules: user.modules,
-  })}.signature`;
-}
-
 async function installApiMocks(page) {
   await page.route("**/user/me", async (route) => {
     await route.fulfill({
@@ -114,10 +103,10 @@ async function assertFieldHelp({ viewport, theme, screenshotPath }) {
     }, theme);
     await context.addCookies([
       {
-        name: "cw.token",
-        value: createToken(smokeUser),
+        name: "cw.session",
+        value: "opaque-test-session",
         url: baseUrl,
-        httpOnly: false,
+        httpOnly: true,
         sameSite: "Lax",
       },
     ]);

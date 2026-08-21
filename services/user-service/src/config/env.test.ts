@@ -44,6 +44,20 @@ describe("user-service env security validation", () => {
     expect(() => getUserServiceEnv()).toThrow(/SERVICE_ALLOWED_ORIGINS/);
   });
 
+  it("enables secure auth cookies by default in production", () => {
+    setUserServiceEnv({});
+
+    expect(getUserServiceEnv().authCookieSecure).toBe(true);
+  });
+
+  it("allows an explicit HTTP slot override and rejects ambiguous values", () => {
+    setUserServiceEnv({ AUTH_COOKIE_SECURE: "false" });
+    expect(getUserServiceEnv().authCookieSecure).toBe(false);
+
+    setUserServiceEnv({ AUTH_COOKIE_SECURE: "maybe" });
+    expect(() => getUserServiceEnv()).toThrow();
+  });
+
   it("rejects the reports internal token in production when it is not secure", () => {
     setUserServiceEnv({ REPORTS_INTERNAL_TOKEN: "reports-service-token" });
 

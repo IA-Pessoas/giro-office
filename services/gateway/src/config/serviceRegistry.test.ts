@@ -19,3 +19,21 @@ describe("reports-service gateway registry", () => {
     expect(getGatewayServiceDefinitions(env)).toContainEqual(reportsService);
   });
 });
+
+describe("user-service gateway registry", () => {
+  it("forwards the trusted gateway token with authenticated identity", () => {
+    const env = {
+      userServiceUrl: "http://user-service:3030",
+      auditServiceToken: "gateway-user-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, "/user/me")).toMatchObject({
+      key: "user-service",
+      internalServiceToken: "gateway-user-token",
+      forwardSessionBinding: true,
+    });
+    expect(
+      getGatewayServiceDefinitions(env).filter((service) => service.forwardSessionBinding),
+    ).toHaveLength(1);
+  });
+});

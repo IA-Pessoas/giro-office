@@ -1,45 +1,30 @@
-import { GetServerSideProps, GetServerSidePropsContext, GetServerSidePropsResult } from 'next'
-import { parseCookies, destroyCookie } from 'nookies'
-import { AuthTokenError } from '@shared/services/errors/AuthTokenError'
+import type { GetServerSideProps, GetServerSidePropsContext, GetServerSidePropsResult } from "next";
+import { parseCookies } from "nookies";
 
 export function canSSRAuth<P>(fn: GetServerSideProps<P>) {
   return async (ctx: GetServerSidePropsContext): Promise<GetServerSidePropsResult<P>> => {
     const cookies = parseCookies(ctx);
 
-    const token = cookies['cw.token'];
+    const session = cookies["cw.session"];
 
-    if(!token){
-      return{
-        redirect:{
-          destination: '/login',
-          permanent: false,
-        }
-      }
-    }
-
-    try{
-      return await fn(ctx);
-    }catch(err){
-      // Sempre destrói o cookie em caso de erro para evitar loops
-      destroyCookie(ctx, 'cw.token', { path: '/' });
-      
-      if(err instanceof AuthTokenError || (err instanceof Error && (err.message === 'Unauthorized' || err.message.includes('401')))){
-        return{
-          redirect:{
-            destination: '/login',
-            permanent: false
-          }
-        }
-      }
-      
-      // Qualquer outro erro: redireciona para login
+    if (!session) {
       return {
         redirect: {
-          destination: '/login',
-          permanent: false
-        }
+          destination: "/login",
+          permanent: false,
+        },
       };
     }
 
-  }
+    try {
+      return await fn(ctx);
+    } catch {
+      return {
+        redirect: {
+          destination: "/login",
+          permanent: false,
+        },
+      };
+    }
+  };
 }

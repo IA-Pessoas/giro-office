@@ -1,10 +1,15 @@
+import { randomUUID } from "node:crypto";
+
 import {
   ACTIVE_MODULE_KEYS,
   type AuthIdentity,
   type AuthUserType,
+  createCsrfToken,
+  hashCsrfToken,
   info,
   type ModulePermissionKey,
   type ModulePermissions,
+  SESSION_MAX_AGE_SECONDS,
   ServiceError,
 } from "@workspace/shared";
 import jwt from "jsonwebtoken";
@@ -26,15 +31,45 @@ const MODULE_PERMISSION_KEYS: readonly ModulePermissionKey[] = ACTIVE_MODULE_KEY
 const GENERIC_LOGIN_ERROR_MESSAGE = "Login ou senha inválidos.";
 const DUMMY_PASSWORD_HASH =
   "$argon2id$v=19$m=19456,p=1,t=2$lktGNqJmnbIyj6tMoe+a8Q$HRtIIMh3LPpaIs9yyun/WOjqfivhgr4Nt3m9wsIkTsQ";
+const CSRF_HASH_PATTERN = /^[a-f0-9]{64}$/u;
+const SESSION_VALIDATION_USER_SELECT = {
+  status: true,
+  session_version: true,
+  organization_id: true,
+  organization: { select: { id: true, status: true } },
+  department: {
+    select: {
+      organization_id: true,
+      organization: { select: { id: true, status: true } },
+    },
+  },
+} as const;
+
+function getSessionExpiry(): Date {
+  return new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
+}
 
 interface PersistedAuthContext {
   status: string;
+  session_version: number;
   organization_id: string | null;
   organization: { id: string; status: string } | null;
   department: {
     organization_id: string;
     organization: { id: string; status: string };
   };
+}
+
+interface SessionSource extends PersistedAuthContext {
+  id: string;
+  name: string;
+  login: string;
+  permission: number;
+  type: string | null;
+  department_id: string;
+  permissions: Array<
+    { organization_id: string } & Partial<Record<ModulePermissionKey, number | null>>
+  >;
 }
 
 type LoginFailureReason =
@@ -100,7 +135,7 @@ function rejectLogin(reason: LoginFailureReason): never {
   throw new ServiceError(401, GENERIC_LOGIN_ERROR_MESSAGE);
 }
 
-export interface LoginResult {
+export interface SessionUser {
   id: string;
   name: string;
   login: string;
@@ -109,7 +144,11 @@ export interface LoginResult {
   modules: ModulePermissions;
   department_id: string;
   organization_id: string;
+}
+
+export interface IssuedSession extends SessionUser {
   token: string;
+  csrfToken: string;
 }
 
 export interface FirstCreateResult {
@@ -123,7 +162,55 @@ export interface FirstCreateResult {
 }
 
 class AuthService {
-  async login({ login, password }: LoginRequest): Promise<LoginResult> {
+  private issueSession(
+    user: SessionSource,
+    organizationId: string,
+    sessionId: string,
+    csrfToken: string,
+  ): IssuedSession {
+    const permissionRecord = user.permissions.find(
+      (permission) => permission.organization_id === organizationId,
+    );
+    const modules = MODULE_PERMISSION_KEYS.reduce<ModulePermissions>((acc, key) => {
+      acc[key] = permissionRecord?.[key] ?? 0;
+      return acc;
+    }, {} as ModulePermissions);
+    const type = normalizeAuthUserType(user.type);
+    const token = jwt.sign(
+      {
+        user_id: user.id,
+        organization_id: organizationId,
+        name: user.name,
+        login: user.login,
+        permission: user.permission,
+        type,
+        session_version: user.session_version,
+        session_id: sessionId,
+        modules,
+        csrf_hash: hashCsrfToken(csrfToken),
+      },
+      getUserServiceEnv().jwtSecret,
+      {
+        subject: user.id,
+        expiresIn: SESSION_MAX_AGE_SECONDS,
+      },
+    );
+
+    return {
+      id: user.id,
+      name: user.name,
+      login: user.login,
+      permission: user.permission,
+      type,
+      modules,
+      department_id: user.department_id,
+      organization_id: organizationId,
+      token,
+      csrfToken,
+    };
+  }
+
+  async login({ login, password }: LoginRequest): Promise<IssuedSession> {
     const normalizedLogin = login.trim();
     const user = await prismaClient.user.findFirst({
       where: { login: normalizedLogin },
@@ -164,45 +251,119 @@ class AuthService {
       });
     }
 
-    const jwtSecret = getUserServiceEnv().jwtSecret;
-    const permissionRecord = user.permissions.find(
-      (permission) => permission.organization_id === organizationId,
-    );
-    const modules = MODULE_PERMISSION_KEYS.reduce<ModulePermissions>((acc, key) => {
-      acc[key] = permissionRecord?.[key] ?? 0;
-      return acc;
-    }, {} as ModulePermissions);
-    const type = normalizeAuthUserType(user.type);
-
-    const token = jwt.sign(
-      {
+    const csrfToken = createCsrfToken();
+    const sessionId = randomUUID();
+    await prismaClient.$executeRaw`
+      WITH expired AS (
+        SELECT "id"
+        FROM "auth_sessions"
+        WHERE "expires_at" <= ${new Date()}
+        ORDER BY "expires_at"
+        LIMIT 100
+      )
+      DELETE FROM "auth_sessions"
+      WHERE "id" IN (SELECT "id" FROM expired)
+    `;
+    await prismaClient.authSession.create({
+      data: {
+        id: sessionId,
         user_id: user.id,
-        organization_id: organizationId,
-        name: user.name,
-        login: user.login,
-        permission: user.permission,
-        type,
-        session_version: user.session_version,
-        modules,
+        csrf_hash: hashCsrfToken(csrfToken),
+        expires_at: getSessionExpiry(),
       },
-      jwtSecret,
-      {
-        subject: user.id,
-        expiresIn: "1d",
-      },
-    );
+    });
 
-    return {
-      id: user.id,
-      name: user.name,
-      login: user.login,
-      permission: user.permission,
-      type,
-      modules,
-      department_id: user.department_id,
-      organization_id: organizationId,
-      token,
-    };
+    return this.issueSession(user, organizationId, sessionId, csrfToken);
+  }
+
+  async refreshSession(
+    identity: Pick<
+      AuthIdentity,
+      "user_id" | "organization_id" | "session_version" | "session_id" | "csrf_hash"
+    >,
+  ): Promise<IssuedSession> {
+    const sessionVersion = identity.session_version;
+    if (
+      typeof sessionVersion !== "number" ||
+      !Number.isSafeInteger(sessionVersion) ||
+      sessionVersion < 0 ||
+      !identity.session_id ||
+      !identity.csrf_hash ||
+      !CSRF_HASH_PATTERN.test(identity.csrf_hash) ||
+      !identity.organization_id
+    ) {
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+    }
+
+    const user = await prismaClient.user.findUnique({
+      where: { id: identity.user_id },
+      include: {
+        organization: { select: { id: true, status: true } },
+        department: {
+          select: {
+            organization_id: true,
+            organization: { select: { id: true, status: true } },
+          },
+        },
+        permissions: true,
+      },
+    });
+
+    if (
+      !user ||
+      user.session_version !== sessionVersion ||
+      getActiveOrganizationId(user) !== identity.organization_id
+    ) {
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+    }
+
+    const csrfToken = createCsrfToken();
+    const { count } = await prismaClient.authSession.updateMany({
+      where: {
+        id: identity.session_id,
+        user_id: user.id,
+        csrf_hash: identity.csrf_hash,
+        revoked_at: null,
+        expires_at: { gt: new Date() },
+      },
+      data: {
+        csrf_hash: hashCsrfToken(csrfToken),
+        expires_at: getSessionExpiry(),
+      },
+    });
+
+    if (count !== 1) {
+      const currentSession = await prismaClient.authSession.findFirst({
+        where: {
+          id: identity.session_id,
+          user_id: user.id,
+          revoked_at: null,
+          expires_at: { gt: new Date() },
+        },
+        select: { csrf_hash: true },
+      });
+      if (currentSession && currentSession.csrf_hash !== identity.csrf_hash) {
+        throw new ServiceError(409, "Sessão substituída por uma renovação mais recente.");
+      }
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+    }
+
+    return this.issueSession(user, identity.organization_id, identity.session_id, csrfToken);
+  }
+
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    if (!userId || !sessionId) {
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+    }
+
+    const { count } = await prismaClient.authSession.updateMany({
+      where: { id: sessionId, user_id: userId, revoked_at: null },
+      data: { revoked_at: new Date() },
+    });
+
+    if (count !== 1) {
+      throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+    }
   }
 
   async firstCreate(): Promise<FirstCreateResult> {
@@ -261,27 +422,49 @@ class AuthService {
   }
 
   async validateSession(
-    identity: Pick<AuthIdentity, "user_id" | "organization_id" | "session_version">,
+    identity: Pick<
+      AuthIdentity,
+      "user_id" | "organization_id" | "session_version" | "session_id" | "csrf_hash"
+    >,
+    options: { allowLegacyBearer?: boolean } = {},
   ): Promise<void> {
-    if (typeof identity.session_version !== "number" || !identity.organization_id) {
+    const hasSessionId = Boolean(identity.session_id);
+    const hasCsrfHash = Boolean(identity.csrf_hash);
+    const hasBoundSession = hasSessionId && hasCsrfHash;
+    if (
+      typeof identity.session_version !== "number" ||
+      !identity.organization_id ||
+      hasSessionId !== hasCsrfHash ||
+      (!hasBoundSession && !options.allowLegacyBearer) ||
+      (identity.csrf_hash !== undefined && !CSRF_HASH_PATTERN.test(identity.csrf_hash))
+    ) {
       throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
     }
 
-    const user = await prismaClient.user.findUnique({
-      where: { id: identity.user_id },
-      select: {
-        status: true,
-        session_version: true,
-        organization_id: true,
-        organization: { select: { id: true, status: true } },
-        department: {
-          select: {
-            organization_id: true,
-            organization: { select: { id: true, status: true } },
-          },
+    let user: PersistedAuthContext | null | undefined;
+    if (hasBoundSession) {
+      const session = await prismaClient.authSession.findFirst({
+        where: {
+          id: identity.session_id,
+          user_id: identity.user_id,
+          revoked_at: null,
+          expires_at: { gt: new Date() },
         },
-      },
-    });
+        select: {
+          csrf_hash: true,
+          user: { select: SESSION_VALIDATION_USER_SELECT },
+        },
+      });
+      if (session && session.csrf_hash !== identity.csrf_hash) {
+        throw new ServiceError(409, "Sessão substituída por uma renovação mais recente.");
+      }
+      user = session?.user;
+    } else {
+      user = await prismaClient.user.findUnique({
+        where: { id: identity.user_id },
+        select: SESSION_VALIDATION_USER_SELECT,
+      });
+    }
 
     if (
       !user ||

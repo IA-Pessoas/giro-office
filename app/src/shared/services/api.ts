@@ -1,19 +1,43 @@
 import { createApiClient } from "@workspace/api";
-import { parseCookies } from "nookies";
 import { toast } from "react-toastify";
 
 import { AuthTokenError } from "./errors/AuthTokenError";
 import { notifyServerError } from "./serverErrorToast";
 
-const TOKEN_COOKIE = "cw.token";
+type ApiServerContext = {
+  req?: { headers?: { cookie?: string } };
+};
 
-export function setupAPIClient(ctx = undefined, onUnauthorized?: () => void) {
+export function readBrowserCookie(name: string): string | undefined {
+  if (typeof document === "undefined") {
+    return undefined;
+  }
+
+  const prefix = `${name}=`;
+  const encodedValue = document.cookie
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith(prefix))
+    ?.slice(prefix.length);
+
+  if (!encodedValue || encodedValue.length > 256) {
+    return undefined;
+  }
+
+  try {
+    return decodeURIComponent(encodedValue);
+  } catch {
+    return undefined;
+  }
+}
+
+export function setupAPIClient(ctx?: ApiServerContext, onUnauthorized?: () => void) {
   return createApiClient({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3010",
-    getAccessToken: () => {
-      const cookies = parseCookies(ctx);
-      return cookies[TOKEN_COOKIE];
-    },
+    baseURL: ctx
+      ? process.env.API_INTERNAL_URL || "http://127.0.0.1:3010"
+      : process.env.NEXT_PUBLIC_API_URL || "/api",
+    cookieHeader: ctx?.req?.headers?.cookie,
+    getCsrfToken: () => readBrowserCookie("cw.csrf"),
     onUnauthorized,
     getUnauthorizedErrorForSsr: () => new AuthTokenError(),
     onServerError: () => {

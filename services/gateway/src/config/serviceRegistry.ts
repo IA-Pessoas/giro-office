@@ -49,6 +49,7 @@ export interface GatewayServiceDefinition {
   routePrefixes: string[];
   internalServiceToken?: string;
   permissionModule?: string;
+  forwardSessionBinding?: boolean;
 }
 
 export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDefinition[] {
@@ -71,6 +72,8 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.userServiceUrl,
       auditTarget: "user-service",
       routePrefixes: [...USER_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
+      forwardSessionBinding: true,
     },
     {
       key: "department-service",

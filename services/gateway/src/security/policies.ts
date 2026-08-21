@@ -121,6 +121,8 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /dashboard/stats", authenticatedPolicy],
   ["GET /client/list", clientListPolicy],
   ["GET /user/me", authenticatedPolicy],
+  ["POST /user/session/refresh", authenticatedPolicy],
+  ["DELETE /user/session", authenticatedPolicy],
   ["GET /user", userManagementPolicy],
   ["GET /rh/operational-users", operationalUsersCatalogPolicy],
   ["POST /user", userManagementPolicy],

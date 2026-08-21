@@ -10,6 +10,14 @@ const successJson = {
   },
 } as const;
 const bearer = [{ bearerAuth: [] }] as const;
+const browserSession = [{ cookieAuth: [] }, { bearerAuth: [] }] as const;
+const csrfHeader = {
+  name: "x-csrf-token",
+  in: "header",
+  required: true,
+  description: "Prova CSRF vinculada à sessão, exigida em mutações autenticadas por cookie.",
+  schema: { type: "string" },
+} as const;
 
 export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
@@ -20,7 +28,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       title: "user-service",
       version: "1.0.0",
       description:
-        "Autenticação, usuários e permissões. Rotas autenticadas aceitam Bearer JWT (mesmo segredo que o gateway) ou, em chamadas internas, o token de serviço. O contexto de relatórios usa REPORTS_INTERNAL_TOKEN e não é exposto pelo gateway.",
+        "Autenticação, usuários e permissões. O navegador usa a sessão `cw.session` HttpOnly emitida por este serviço e validada pelo gateway. Chamadas diretas internas ainda aceitam Bearer JWT ou contexto confiável protegido por token de serviço. O contexto de relatórios usa REPORTS_INTERNAL_TOKEN e não é exposto pelo gateway.",
     },
     servers: [{ url: baseUrl }],
     tags: [
@@ -32,6 +40,11 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
     ],
     components: {
       securitySchemes: {
+        cookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "cw.session",
+        },
         bearerAuth: {
           type: "http",
           scheme: "bearer",
@@ -115,8 +128,40 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             },
           },
           responses: {
-            "200": { description: "Sessão", ...successJson },
+            "200": {
+              description:
+                "Usuário autenticado sem token no JSON; emite cw.session HttpOnly e cw.csrf por um dia.",
+              ...successJson,
+            },
             "401": { description: "Credenciais ou contexto da conta inválidos" },
+          },
+        },
+        delete: {
+          tags: ["Auth"],
+          summary: "Encerrar e revogar a sessão atual",
+          security: browserSession,
+          parameters: [csrfHeader],
+          responses: {
+            "200": {
+              description: "Sessão atual revogada e ambos os cookies expirados",
+              ...successJson,
+            },
+            "401": { description: "Sessão inválida, ausente ou já revogada" },
+          },
+        },
+      },
+      "/user/session/refresh": {
+        post: {
+          tags: ["Auth"],
+          summary: "Rotacionar a sessão e a prova CSRF",
+          security: browserSession,
+          parameters: [csrfHeader],
+          responses: {
+            "200": {
+              description: "Novos cookies de sessão e CSRF, sem token no JSON",
+              ...successJson,
+            },
+            "401": { description: "Sessão inválida, obsoleta ou revogada" },
           },
         },
       },

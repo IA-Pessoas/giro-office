@@ -4,6 +4,7 @@ declare global {
   namespace Express {
     interface Request {
       auth?: AuthContext;
+      authTransport?: "cookie" | "bearer";
       log?: Logger;
       requestId?: string;
       auditErrorCode?: string;

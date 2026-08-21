@@ -8,13 +8,23 @@ Por defeito: **3030** (`PORT`).
 
 ## Variáveis de ambiente
 
-Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, logging, etc. `REPORTS_INTERNAL_TOKEN` protege `POST /internal/reporting/access-context`; deve ser igual ao valor do reports-service e é obrigatório em produção.
+Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, logging e `AUTH_COOKIE_SECURE`. A última variável assume `true` em produção; use `false` apenas em slots HTTP isolados. `REPORTS_INTERNAL_TOKEN` protege `POST /internal/reporting/access-context`; deve ser igual ao valor do reports-service e é obrigatório em produção.
+
+O endpoint `/internal/reporting/access-context` é chamado diretamente pelo reports-service e não é publicado pelo gateway.
+
+## Sessão do navegador
+
+- `POST /user/session` emite `cw.session` (`HttpOnly`, `SameSite=Lax`, um dia) e `cw.csrf`, sem retornar o JWT no JSON.
+- `POST /user/session/refresh` rotaciona os dois cookies mantendo a versão ativa da sessão.
+- `DELETE /user/session` revoga a sessão atual no servidor e expira os dois cookies.
+- Mutações autenticadas por cookie exigem `x-csrf-token`; o gateway valida a prova antes de encaminhar a chamada.
+- Validações internas diretas podem usar Bearer, enquanto chamadas vindas do gateway usam os headers `x-auth-*` protegidos pelo token interno.
 
 ## Gateway
 
 O encaminhamento para `USER_SERVICE_URL` usa o prefixo público **`/user`** — ver [`gateway/src/config/serviceRegistry.ts`](../gateway/src/config/serviceRegistry.ts) (`USER_SERVICE_PREFIXES`).
 
-Exemplos de caminhos expostos pelo **user-service** (via gateway): `/user/session`, `/user/start-config`, `/user/me`, `/user`, `/user/:id`, `/user/:id/photo`, `/user/permission/:userId`.
+Exemplos de caminhos expostos pelo **user-service** (via gateway): `/user/session`, `/user/session/refresh`, `/user/start-config`, `/user/me`, `/user`, `/user/:id`, `/user/:id/photo`, `/user/permission/:userId`.
 
 - **`GET /user/:id/photo`:** `200` com envelope padrão e `data.url` (URL pública da foto no storage).
 

@@ -3,6 +3,42 @@ import * as http from "node:http";
 import * as https from "node:https";
 import type { Duplex } from "node:stream";
 
+import {
+  AUTH_SESSION_TRANSPORT_HEADER,
+  CSRF_HEADER_NAME,
+  FORWARDED_AUTH_CSRF_HASH_HEADER,
+  FORWARDED_AUTH_MODULES_HEADER,
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_SESSION_ID_HEADER,
+  FORWARDED_AUTH_SESSION_VERSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+} from "@workspace/shared";
+
+const STRIPPED_BROWSER_HEADERS = new Set([
+  "authorization",
+  "cookie",
+  AUTH_SESSION_TRANSPORT_HEADER,
+  CSRF_HEADER_NAME,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
+  FORWARDED_AUTH_MODULES_HEADER,
+  FORWARDED_AUTH_SESSION_VERSION_HEADER,
+  FORWARDED_AUTH_SESSION_ID_HEADER,
+  FORWARDED_AUTH_CSRF_HASH_HEADER,
+]);
+
+export function buildWebSocketHeaders(headers: IncomingHttpHeaders): IncomingHttpHeaders {
+  return Object.fromEntries(
+    Object.entries(headers).filter(([name]) => !STRIPPED_BROWSER_HEADERS.has(name.toLowerCase())),
+  );
+}
+
 function serializeHeaders(headers: IncomingHttpHeaders): string {
   const lines: string[] = [];
 
@@ -39,7 +75,7 @@ export function proxyWebSocketUpgrade(
     port: target.port ? Number.parseInt(target.port, 10) : defaultPort,
     method: request.method,
     path: request.url,
-    headers: request.headers,
+    headers: buildWebSocketHeaders(request.headers),
   });
 
   upstreamRequest.on("upgrade", (upstreamResponse, upstreamSocket, upstreamHead) => {
