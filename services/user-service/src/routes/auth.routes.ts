@@ -93,8 +93,8 @@ export function createAuthRoutes(
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const { csrf_hash, session_id, user_id } = requireSessionIdentity(request);
-        await authService.revokeSession(user_id, session_id, csrf_hash);
+        const { session_id, user_id } = requireSessionIdentity(request);
+        await authService.revokeSession(user_id, session_id);
         response.append(
           "Set-Cookie",
           createExpiredSessionCookieHeaders({ secure: env.authCookieSecure }),

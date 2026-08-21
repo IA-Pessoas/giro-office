@@ -298,13 +298,12 @@ describe("AuthService", () => {
   it("logout revoga somente a sessão atual", async () => {
     prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
 
-    await new AuthService().revokeSession("user-1", "session-1", "a".repeat(64));
+    await new AuthService().revokeSession("user-1", "session-1");
 
     expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
       where: {
         id: "session-1",
         user_id: "user-1",
-        csrf_hash: "a".repeat(64),
         revoked_at: null,
       },
       data: { revoked_at: expect.any(Date) },
@@ -315,9 +314,20 @@ describe("AuthService", () => {
   it("logout rejeita sessão já revogada", async () => {
     prismaMock.authSession.updateMany.mockResolvedValue({ count: 0 });
 
-    await expect(
-      new AuthService().revokeSession("user-1", "session-1", "a".repeat(64)),
-    ).rejects.toMatchObject({ statusCode: 401 });
+    await expect(new AuthService().revokeSession("user-1", "session-1")).rejects.toMatchObject({
+      statusCode: 401,
+    });
+  });
+
+  it("logout revoga a sessão mesmo após rotação concorrente do CSRF", async () => {
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+
+    await new AuthService().revokeSession("user-1", "session-1");
+
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
+      where: { id: "session-1", user_id: "user-1", revoked_at: null },
+      data: { revoked_at: expect.any(Date) },
+    });
   });
 
   it("rehash de bcrypt válido uma única vez sem sobrescrever uma troca concorrente", async () => {

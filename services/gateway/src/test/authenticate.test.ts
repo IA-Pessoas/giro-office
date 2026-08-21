@@ -38,6 +38,9 @@ function createProtectedApp(options: {
   app.get("/protected", (req, res) => {
     res.json({ transport: req.authTransport });
   });
+  app.delete("/user/session", (req, res) => {
+    res.json({ transport: req.authTransport });
+  });
   app.use(
     (
       error: Error & { statusCode?: number },
@@ -163,6 +166,35 @@ describe("buildAuthenticateMiddleware", () => {
       .set("Cookie", `cw.session=${cookieToken}`);
 
     expect(response.status).toBe(409);
+    expect(response.headers["x-auth-session-state"]).toBe("superseded");
     expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("preserva indisponibilidade do validador sem convertê-la em logout", async () => {
+    const app = createProtectedApp({
+      bearerAuthCompatibility: false,
+      sessionValidator: vi.fn().mockRejectedValue(new ServiceError(503, "Indisponível.")),
+    });
+
+    const response = await request(app)
+      .get("/protected")
+      .set("Cookie", `cw.session=${cookieToken}`);
+
+    expect(response.status).toBe(503);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("permite que logout válido vença uma rotação concorrente", async () => {
+    const app = createProtectedApp({
+      bearerAuthCompatibility: false,
+      sessionValidator: vi.fn().mockRejectedValue(new ServiceError(409, "Sessão substituída.")),
+    });
+
+    const response = await request(app)
+      .delete("/user/session")
+      .set("Cookie", `cw.session=${cookieToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.transport).toBe("cookie");
   });
 });

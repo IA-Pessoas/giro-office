@@ -54,7 +54,18 @@ expiration cookies.
 
 When the session row is still active but its CSRF hash has already rotated, validation returns a
 generic `409` instead of authenticating the old request. This rejects replay without triggering the
-browser's global `401` sign-out handler, so a late request cannot discard the newer UI session.
+browser's global `401` sign-out handler, so a late request cannot discard the newer UI session. The
+gateway marks this response with `x-auth-session-state: superseded`; the client compares the CSRF
+snapshot from the request with the current cookie after any in-flight refresh settles. Browser
+clients coordinate through short-lived random refresh markers that contain no credential or user
+data; waits are bounded to preserve liveness. A changed cookie identifies a harmless stale response,
+while an unchanged cookie identifies a lost refresh response and safely signs the user out. CORS exposes only this non-secret state header
+for approved credentialed origins. `DELETE /user/session` is the sole exception: after signature,
+origin, and CSRF checks, logout
+revokes the user/session pair regardless of a concurrent CSRF rotation, so logout always wins.
+
+Session-validator outages and unexpected upstream failures remain `503`; they never become `401`
+and therefore never trigger the browser's authentication-state cleanup.
 
 ## Request Authentication and CSRF
 

@@ -12,6 +12,7 @@ test("credentialed CORS permits the session-bound CSRF header", () => {
   const options = createServiceCorsOptions(["https://app.example.com"], "test-service");
 
   assert.ok(options.allowedHeaders.includes("x-csrf-token"));
+  assert.ok(options.exposedHeaders.includes("x-auth-session-state"));
 });
 
 test("parseAllowedOrigins parses comma-separated allowed origins", () => {

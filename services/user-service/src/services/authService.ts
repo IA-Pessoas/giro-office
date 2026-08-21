@@ -351,13 +351,13 @@ class AuthService {
     return this.issueSession(user, identity.organization_id, identity.session_id, csrfToken);
   }
 
-  async revokeSession(userId: string, sessionId: string, csrfHash: string): Promise<void> {
-    if (!userId || !sessionId || !CSRF_HASH_PATTERN.test(csrfHash)) {
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    if (!userId || !sessionId) {
       throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
     }
 
     const { count } = await prismaClient.authSession.updateMany({
-      where: { id: sessionId, user_id: userId, csrf_hash: csrfHash, revoked_at: null },
+      where: { id: sessionId, user_id: userId, revoked_at: null },
       data: { revoked_at: new Date() },
     });
 

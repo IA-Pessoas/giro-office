@@ -86,11 +86,7 @@ describe("auth routes", () => {
       .set(gatewayAuthHeaders({ userId: "user-1", organizationId: "org-1", sessionVersion: 1 }));
 
     expect(response.status).toBe(200);
-    expect(authServiceMock.revokeSession).toHaveBeenCalledWith(
-      "user-1",
-      "session-1",
-      "a".repeat(64),
-    );
+    expect(authServiceMock.revokeSession).toHaveBeenCalledWith("user-1", "session-1");
     expect(response.headers["set-cookie"]).toEqual(
       expect.arrayContaining([expect.stringContaining("cw.session=; Max-Age=0")]),
     );

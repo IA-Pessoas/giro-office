@@ -55,7 +55,7 @@ export function buildAuthenticateMiddleware(
 ): RequestHandler {
   return async function authenticate(
     request: Request,
-    _response: Response,
+    response: Response,
     next: NextFunction,
   ): Promise<void> {
     if (isPublicRoute(request.method, request.path)) {
@@ -99,11 +99,29 @@ export function buildAuthenticateMiddleware(
           message: "Cookie session validation failed",
         });
       }
-      const statusCode = error instanceof ServiceError && error.statusCode === 409 ? 409 : 401;
+      const serviceStatus = error instanceof ServiceError ? error.statusCode : undefined;
+      if (
+        serviceStatus === 409 &&
+        usingCookie &&
+        request.method === "DELETE" &&
+        request.path === "/user/session"
+      ) {
+        next();
+        return;
+      }
+
+      const statusCode = serviceStatus === 409 || serviceStatus === 503 ? serviceStatus : 401;
+      if (statusCode === 409) {
+        response.setHeader("x-auth-session-state", "superseded");
+      }
       next(
         new ServiceError(
           statusCode,
-          statusCode === 409 ? "Sessão substituída." : "Não autenticado.",
+          statusCode === 409
+            ? "Sessão substituída."
+            : statusCode === 503
+              ? "Não foi possível validar a sessão."
+              : "Não autenticado.",
           error,
         ),
       );

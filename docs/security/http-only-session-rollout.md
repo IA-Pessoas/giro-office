@@ -29,6 +29,16 @@ Cada login remove no máximo 100 sessões já expiradas antes de criar a nova li
 
 Use um jar local protegido e remova-o ao final. Nunca passe valores de cookie na linha de comando, logs, tickets ou screenshots.
 
+Uma requisição iniciada antes de um refresh pode receber `409` com
+`x-auth-session-state: superseded`. O cliente ignora essa resposta somente quando o cookie CSRF já
+mudou; antes de comparar, aguarda por prazo limitado qualquer refresh já em andamento no cliente ou
+em outra aba. A coordenação usa somente marcadores aleatórios efêmeros no `localStorage`, sem JWT,
+CSRF, usuário ou outro dado de autenticação. Se o cookie continuar igual, encerra o estado local
+porque a resposta do refresh pode ter se perdido. O CORS
+expõe esse header de estado não secreto às origens aprovadas. O logout continua permitido nessa
+corrida e revoga a sessão pelo identificador. Falhas
+transitórias do validador retornam `503` e não devem redirecionar o usuário para login.
+
 ## CORS e origem
 
 Para `https://useoffice.com.br`, um preflight válido deve retornar `Access-Control-Allow-Origin` com a origem exata, `Access-Control-Allow-Credentials: true` e permitir `x-csrf-token`. Repita o preflight com `Origin: null` e `Origin: https://hostil.example`; ambos devem ser rejeitados e nunca receber uma origem permissiva. `Referer` hostil também deve falhar em chamadas mutáveis quando `Origin` estiver ausente.

@@ -25,6 +25,7 @@ export interface ServiceCorsOptions {
   ): void;
   methods: string;
   allowedHeaders: string[];
+  exposedHeaders: string[];
   credentials: boolean;
 }
 
@@ -95,6 +96,7 @@ export function createServiceCorsOptions(
     },
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     allowedHeaders: ["Content-Type", "Authorization", "x-request-id", CSRF_HEADER_NAME],
+    exposedHeaders: ["x-auth-session-state"],
     credentials: true,
   };
 }
