@@ -14,15 +14,18 @@ GATEWAY_BEARER_AUTH_COMPATIBILITY=false
 
 O gateway e o user-service devem receber o mesmo `AUTH_COOKIE_SECURE`. O web recebe somente as duas URLs. `cw.session` usa `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/` e `Max-Age=86400`. `cw.csrf` usa os mesmos atributos, exceto `HttpOnly`, e é vinculado ao hash assinado na sessão. Nenhum cookie define `Domain`.
 
+Cada login remove no máximo 100 sessões já expiradas antes de criar a nova linha. O lote indexado evita uma limpeza global sem limite no caminho crítico e reduz qualquer backlog progressivamente.
+
 ## Sequência de rollout
 
-1. Publique user-service, gateway e web como uma única unidade de release.
-2. Confirme as cinco variáveis acima nos containers efetivos, sem imprimir segredos.
-3. Faça login por HTTPS e verifique dois `Set-Cookie`; a resposta JSON deve conter usuário e não deve conter `token`.
-4. Execute `GET /api/user/me` com o jar de cookies.
-5. Execute `POST /api/user/session/refresh` com `x-csrf-token` igual ao cookie `cw.csrf`; confirme rotação dos dois cookies.
-6. Execute uma mutação representativa com o mesmo cabeçalho CSRF.
-7. Execute `DELETE /api/user/session`; confirme `Max-Age=0` nos dois cookies e `401` ao reutilizar a sessão anterior.
+1. Aplique a migration `20260820230000_add_auth_sessions`; ela apenas adiciona a tabela de sessões e índices, sem alterar dados existentes.
+2. Publique user-service, gateway e web como uma única unidade de release.
+3. Confirme as cinco variáveis acima nos containers efetivos, sem imprimir segredos.
+4. Faça login por HTTPS e verifique dois `Set-Cookie`; a resposta JSON deve conter usuário e não deve conter `token`.
+5. Execute `GET /api/user/me` com o jar de cookies.
+6. Execute `POST /api/user/session/refresh` com `x-csrf-token` igual ao cookie `cw.csrf`; confirme rotação dos dois cookies e rejeição do par anterior.
+7. Execute uma mutação representativa com o mesmo cabeçalho CSRF.
+8. Execute `DELETE /api/user/session`; confirme `Max-Age=0` nos dois cookies e `401` ao reutilizar a sessão anterior.
 
 Use um jar local protegido e remova-o ao final. Nunca passe valores de cookie na linha de comando, logs, tickets ou screenshots.
 
@@ -34,7 +37,7 @@ Para `https://useoffice.com.br`, um preflight válido deve retornar `Access-Cont
 
 Monitore contagens, nunca valores:
 
-- `auth.cookie.accepted`;
+- taxa de sucesso/erro das rotas protegidas por sessão (sem log por requisição no caminho quente);
 - `auth.bearer_compat.accepted`;
 - `auth.session.validation.failed`, razões `invalid_token` ou `session_validation`;
 - `auth.csrf.rejected`, razões `missing`, `mismatch`, `wrong_session`, `invalid_origin` ou `oversized`.
@@ -47,4 +50,4 @@ O padrão e o estado final são `GATEWAY_BEARER_AUTH_COMPATIBILITY=false`. Se um
 
 ## Rollback
 
-Reverta as imagens de web, gateway e user-service em conjunto. Não desative CSRF, não restaure o cookie legível legado e não reduza os atributos dos cookies. Se for indispensável manter um consumidor interno durante o rollback, habilite apenas a compatibilidade Bearer limitada descrita acima; sessões web continuam usando `cw.session` e `cw.csrf`. Após o rollback, repita login, `/user/me`, refresh, mutação, logout e os três testes de origem.
+Reverta as imagens de web, gateway e user-service em conjunto. Mantenha a tabela `auth_sessions` durante o rollback; removê-la não é necessário e tornaria a reversão destrutiva. Não desative CSRF, não restaure o cookie legível legado e não reduza os atributos dos cookies. Se for indispensável manter um consumidor interno durante o rollback, habilite apenas a compatibilidade Bearer limitada descrita acima; sessões web continuam usando `cw.session` e `cw.csrf`. Após o rollback, repita login, `/user/me`, refresh, mutação, logout e os três testes de origem.

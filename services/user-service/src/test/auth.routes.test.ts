@@ -75,6 +75,8 @@ describe("auth routes", () => {
       user_id: "user-1",
       organization_id: "org-1",
       session_version: 1,
+      session_id: "session-1",
+      csrf_hash: "a".repeat(64),
     });
   });
 
@@ -84,7 +86,11 @@ describe("auth routes", () => {
       .set(gatewayAuthHeaders({ userId: "user-1", organizationId: "org-1", sessionVersion: 1 }));
 
     expect(response.status).toBe(200);
-    expect(authServiceMock.revokeSession).toHaveBeenCalledWith("user-1", 1);
+    expect(authServiceMock.revokeSession).toHaveBeenCalledWith(
+      "user-1",
+      "session-1",
+      "a".repeat(64),
+    );
     expect(response.headers["set-cookie"]).toEqual(
       expect.arrayContaining([expect.stringContaining("cw.session=; Max-Age=0")]),
     );

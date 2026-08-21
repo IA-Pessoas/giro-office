@@ -55,11 +55,17 @@ test("browser auth removal preserves unrelated cookies", () => {
   );
 });
 
-test("authenticateFromToken exposes the signed CSRF hash", () => {
+test("authenticateFromToken exposes the signed session binding", () => {
   const token = jwt.sign(
-    { user_id: "user-1", organization_id: "org-1", csrf_hash: "a".repeat(64) },
+    {
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_id: "session-1",
+      csrf_hash: "a".repeat(64),
+    },
     "secret",
   );
 
   assert.equal(authenticateFromToken(token, "secret").claims.csrf_hash, "a".repeat(64));
+  assert.equal(authenticateFromToken(token, "secret").claims.session_id, "session-1");
 });

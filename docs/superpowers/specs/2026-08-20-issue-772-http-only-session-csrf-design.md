@@ -38,15 +38,23 @@ the authenticated user and module permissions, but never the token.
 
 The user-service also generates a cryptographically random CSRF token and sets it in the readable
 `cw.csrf` cookie with `Secure` in production, `SameSite=Lax`, `Path=/`, and the same maximum age. The
-JWT contains `csrf_hash`, the SHA-256 hash of the random CSRF token. Since the JWT signature protects
-that hash, the gateway can prove that the readable CSRF value belongs to the authenticated session
-without adding a session store.
+JWT contains `session_id` and `csrf_hash`, the SHA-256 hash of the random CSRF token. The signature
+lets the gateway bind the readable CSRF value to the JWT, while the `auth_sessions` row lets the
+user-service rotate and revoke one browser session without invalidating the user's other devices.
 
 `POST /user/session/refresh` reloads the active user context, signs a fresh JWT with a new CSRF hash,
-rotates both cookies, and returns the current user data without a token. `DELETE /user/session`
-increments `session_version` and expires both cookies. An invalid, expired, disabled, or revoked
-cookie also causes the gateway to emit expiration cookies before returning `401`, preventing stale
-cookies from trapping the browser in a redirect loop.
+atomically replaces the active session row's CSRF hash, rotates both cookies, and returns the current
+user data without a token. Replay of the previous cookie loses that compare-and-swap race. `DELETE
+/user/session` revokes only the matching session row and expires both cookies. Global
+`session_version` changes remain reserved for user/permission invalidation. An invalid, expired,
+disabled, or revoked cookie returns `401` and clears the browser's in-memory auth state without a
+late `Set-Cookie`: an older in-flight response must never erase a newer rotated session. The login
+route overwrites stale cookies, while explicit logout remains the server boundary that emits
+expiration cookies.
+
+When the session row is still active but its CSRF hash has already rotated, validation returns a
+generic `409` instead of authenticating the old request. This rejects replay without triggering the
+browser's global `401` sign-out handler, so a late request cannot discard the newer UI session.
 
 ## Request Authentication and CSRF
 

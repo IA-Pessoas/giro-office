@@ -135,7 +135,6 @@ async function dryRunBuildxPush(scope) {
       STAGING_DOCKER_TAG: "abc1234",
       VPS_PUSH_SERVICES: scope,
       NEXT_PUBLIC_API_URL: "https://api.example.test",
-      NEXT_PUBLIC_AUTH_COOKIE_SECURE: "false",
       API_INTERNAL_URL: "http://gateway:3010",
       CI_DRY_RUN: "1",
     },
@@ -256,7 +255,7 @@ test("compose-vps-buildx-push plans cached web build with Next.js build args", a
   const output = await dryRunBuildxPush("web");
   assert.match(output, /--file docker\/app\.Dockerfile/);
   assert.match(output, /--build-arg NEXT_PUBLIC_API_URL=https:\/\/api\.example\.test/);
-  assert.match(output, /--build-arg NEXT_PUBLIC_AUTH_COOKIE_SECURE=false/);
+  assert.doesNotMatch(output, /NEXT_PUBLIC_AUTH_COOKIE_SECURE/);
   assert.match(output, /--build-arg API_INTERNAL_URL=http:\/\/gateway:3010/);
   assert.match(
     output,

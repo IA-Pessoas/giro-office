@@ -379,6 +379,7 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
       buildHttpProxyMiddleware(service.targetUrl, {
         internalServiceToken: service.internalServiceToken,
         permissionModule: service.permissionModule,
+        forwardSessionBinding: service.forwardSessionBinding,
       }),
     );
   }

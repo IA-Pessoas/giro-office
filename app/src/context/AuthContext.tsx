@@ -102,10 +102,10 @@ function buildCurrentUser(
     };
 }
 
-export function signOut() {
+export function signOut(message = "Sessão expirada. Faça login novamente.") {
     try {
         invalidateAuthSession();
-        toast.error("Sessão expirada. Faça login novamente.", {
+        toast.error(message, {
             toastId: "auth-session-expired",
         });
         void Router.push("/login");

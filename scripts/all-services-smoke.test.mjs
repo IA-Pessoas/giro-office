@@ -4,6 +4,8 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { manifest } from "./all-services-smoke.manifest.mjs";
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("reports smoke atravessa o gateway sem cabeçalhos de identidade forjados", async () => {
@@ -12,4 +14,27 @@ test("reports smoke atravessa o gateway sem cabeçalhos de identidade forjados",
 
   assert.ok(handler);
   assert.doesNotMatch(handler[1], /x-auth-(?:user|organization)-id/);
+});
+
+test("gateway smoke usa sessão quando a compatibilidade Bearer está desligada", async () => {
+  const legacyGatewayAuth = manifest.filter(
+    (entry) =>
+      entry.target === "gateway" &&
+      (entry.auth === "bearer" || entry.auth === "admin-bearer"),
+  );
+  const smoke = await readFile(path.join(repoRoot, "scripts", "all-services-smoke.mjs"), "utf8");
+
+  assert.deepEqual(legacyGatewayAuth, []);
+  assert.match(smoke, /target === "gateway" && \(auth === "bearer" \|\| auth === "admin-bearer"\)/);
+  assert.doesNotMatch(smoke, /ensureRhTargetUserToken/);
+  assert.doesNotMatch(smoke, /Authorization: `Bearer \$\{targetToken\}`/);
+});
+
+test("gateway smoke limpa dados temporários antes de revogar a sessão", async () => {
+  const smoke = await readFile(path.join(repoRoot, "scripts", "all-services-smoke.mjs"), "utf8");
+  const logoutHandler = smoke.match(/async userSessionLogout\(op\) \{([\s\S]*?)\n {2}\},/);
+
+  assert.ok(logoutHandler);
+  assert.match(logoutHandler[1], /await runCleanupTasks\(\);[\s\S]*httpRequest\(op,/);
+  assert.match(smoke, /finally \{\s*await runCleanupTasks\(\);\s*\}/);
 });

@@ -124,3 +124,8 @@ await runTest("chat HTTP requests use the credentialed API client without bearer
   assert.doesNotMatch(source, /fetch\(`\$\{SOCKET_URL\}/);
   assert.doesNotMatch(source, /cw\.token|Authorization|Bearer|createBearerAuthHeaders/);
 });
+
+await runTest("chat list waits for an authenticated socket instead of calling an unrouted API", () => {
+  assert.match(source, /if \(isAuthenticated && socket\?\.connected\)/);
+  assert.match(source, /\[isAuthenticated, socket\]/);
+});

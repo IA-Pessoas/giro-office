@@ -19,12 +19,16 @@ function requireSessionIdentity(request: Request): {
   user_id: string;
   organization_id: string;
   session_version: number;
+  session_id: string;
+  csrf_hash: string;
 } {
   if (
     !request.user_id ||
     !request.organization_id ||
     !Number.isInteger(request.session_version) ||
-    (request.session_version ?? -1) < 0
+    (request.session_version ?? -1) < 0 ||
+    !request.session_id ||
+    !request.csrf_hash
   ) {
     throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
   }
@@ -33,6 +37,8 @@ function requireSessionIdentity(request: Request): {
     user_id: request.user_id,
     organization_id: request.organization_id,
     session_version: request.session_version as number,
+    session_id: request.session_id,
+    csrf_hash: request.csrf_hash,
   };
 }
 
@@ -87,8 +93,8 @@ export function createAuthRoutes(
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const { session_version, user_id } = requireSessionIdentity(request);
-        await authService.revokeSession(user_id, session_version);
+        const { csrf_hash, session_id, user_id } = requireSessionIdentity(request);
+        await authService.revokeSession(user_id, session_id, csrf_hash);
         response.append(
           "Set-Cookie",
           createExpiredSessionCookieHeaders({ secure: env.authCookieSecure }),

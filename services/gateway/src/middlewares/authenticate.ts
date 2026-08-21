@@ -1,8 +1,8 @@
 import {
   AUTH_SESSION_COOKIE_NAME,
+  AUTH_SESSION_TRANSPORT_HEADER,
   authenticateFromAuthHeader,
   authenticateFromToken,
-  createExpiredSessionCookieHeaders,
   INTERNAL_SERVICE_TOKEN_HEADER,
   readCookie,
   ServiceError,
@@ -12,7 +12,7 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 import { isPublicRoute } from "../security/publicRoutes.js";
 
-export type SessionValidator = (token: string) => Promise<void>;
+export type SessionValidator = (token: string, transport: "cookie" | "bearer") => Promise<void>;
 
 export function createUserServiceSessionValidator(
   userServiceUrl: string,
@@ -20,13 +20,14 @@ export function createUserServiceSessionValidator(
 ): SessionValidator {
   const validationUrl = new URL("/user/session/validate", userServiceUrl);
 
-  return async (token: string): Promise<void> => {
+  return async (token: string, transport: "cookie" | "bearer"): Promise<void> => {
     let response: globalThis.Response;
 
     try {
       response = await fetch(validationUrl, {
         headers: {
           authorization: `Bearer ${token}`,
+          [AUTH_SESSION_TRANSPORT_HEADER]: transport,
           [INTERNAL_SERVICE_TOKEN_HEADER]: internalServiceToken,
         },
       });
@@ -35,7 +36,8 @@ export function createUserServiceSessionValidator(
     }
 
     if (!response.ok) {
-      throw new ServiceError(response.status === 401 ? 401 : 503, "Sessão inválida.");
+      const statusCode = response.status === 401 || response.status === 409 ? response.status : 503;
+      throw new ServiceError(statusCode, "Sessão inválida.");
     }
   };
 }
@@ -53,7 +55,7 @@ export function buildAuthenticateMiddleware(
 ): RequestHandler {
   return async function authenticate(
     request: Request,
-    response: Response,
+    _response: Response,
     next: NextFunction,
   ): Promise<void> {
     if (isPublicRoute(request.method, request.path)) {
@@ -79,27 +81,32 @@ export function buildAuthenticateMiddleware(
 
       if (options.sessionValidator) {
         failureReason = "session_validation";
-        await options.sessionValidator(request.auth.token);
+        await options.sessionValidator(request.auth.token, request.authTransport);
       }
 
-      options.logger.info({
-        event: usingCookie ? "auth.cookie.accepted" : "auth.bearer_compat.accepted",
-        message: usingCookie ? "Cookie session accepted" : "Bearer compatibility accepted",
-      });
+      if (!usingCookie) {
+        options.logger.info({
+          event: "auth.bearer_compat.accepted",
+          message: "Bearer compatibility accepted",
+        });
+      }
       next();
     } catch (error) {
       if (usingCookie) {
-        response.append(
-          "Set-Cookie",
-          createExpiredSessionCookieHeaders({ secure: options.authCookieSecure }),
-        );
         options.logger.warn({
           event: "auth.session.validation.failed",
           reason: failureReason,
           message: "Cookie session validation failed",
         });
       }
-      next(new ServiceError(401, "Não autenticado.", error));
+      const statusCode = error instanceof ServiceError && error.statusCode === 409 ? 409 : 401;
+      next(
+        new ServiceError(
+          statusCode,
+          statusCode === 409 ? "Sessão substituída." : "Não autenticado.",
+          error,
+        ),
+      );
     }
   };
 }

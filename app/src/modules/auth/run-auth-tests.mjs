@@ -694,7 +694,7 @@ await (async () => {
   await runTest("sessão inválida encerra o loading e orienta o retorno ao login", () => {
     assert.match(
       authContextSource,
-      /toast\.error\("Sessão expirada\. Faça login novamente\.",\s*\{\s*toastId: "auth-session-expired"/,
+      /function signOut\(message = "Sessão expirada\. Faça login novamente\."\)[\s\S]*toast\.error\(message,\s*\{\s*toastId: "auth-session-expired"/,
     );
     assert.match(authContextSource, /registerAuthInvalidationHandler/);
     assert.match(authContextSource, /setUser\(null\);/);
@@ -747,7 +747,7 @@ await (async () => {
   });
 
   await runTest(
-    "admin permission updates refresh the authenticated session when editing self",
+    "admin permission updates require a new login when editing self",
     () => {
       assert.match(authContextSource, /refreshSession:\s*\(\)\s*=>\s*Promise<UserProps \| null>/);
       assert.match(authContextSource, /async function refreshSession\(\)/);
@@ -755,11 +755,13 @@ await (async () => {
         authContextSource,
         /<AuthContext\.Provider value=\{\{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading \}\}/,
       );
-      assert.match(administracaoSource, /const \{ user, refreshSession \} = useAuth\(\);/);
+      assert.match(administracaoSource, /import \{ signOut, useAuth \} from "@\/context\/AuthContext";/);
+      assert.match(administracaoSource, /const \{ user \} = useAuth\(\);/);
       assert.match(
         administracaoSource,
-        /if \(selectedPermissionUserId === user\?\.id\) \{[\s\S]*await refreshSession\(\);[\s\S]*\}/,
+        /if \(selectedPermissionUserId === user\?\.id\) \{[\s\S]*signOut\("Permissões atualizadas\. Entre novamente para aplicar os novos acessos\."\);[\s\S]*return;[\s\S]*\}/,
       );
+      assert.doesNotMatch(administracaoSource, /refreshSession/);
       assert.match(
         authContextSource,
         /await queryClient\.invalidateQueries\(\{ queryKey: ME_QUERY_KEY \}\);/,

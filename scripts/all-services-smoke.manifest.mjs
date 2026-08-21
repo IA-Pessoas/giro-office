@@ -207,7 +207,8 @@ const op = ({
   path,
   action,
   target,
-  auth,
+  auth:
+    target === "gateway" && (auth === "bearer" || auth === "admin-bearer") ? "session" : auth,
   specOperation,
   condition,
   handlerAction,

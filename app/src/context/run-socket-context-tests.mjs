@@ -26,7 +26,7 @@ await runTest("socket client is disabled when the public flag is absent", () => 
   });
 });
 
-await runTest("socket client uses explicit socket url when enabled", () => {
+await runTest("legacy socket stays disabled even when the obsolete flag is provided", () => {
   const config = getSocketClientConfig({
     NEXT_PUBLIC_ENABLE_SOCKET: "true",
     NEXT_PUBLIC_SOCKET_URL: "http://chat-service:3334",
@@ -34,24 +34,29 @@ await runTest("socket client uses explicit socket url when enabled", () => {
   });
 
   assert.deepEqual(config, {
-    enabled: true,
-    url: "http://chat-service:3334",
+    enabled: false,
+    url: null,
   });
 });
 
-await runTest("socket client falls back to the public api url only when enabled", () => {
+await runTest("legacy socket does not fall back to the public API", () => {
   const config = getSocketClientConfig({
     NEXT_PUBLIC_ENABLE_SOCKET: "true",
     NEXT_PUBLIC_API_URL: "http://147.93.66.91:8086",
   });
 
   assert.deepEqual(config, {
-    enabled: true,
-    url: "http://147.93.66.91:8086",
+    enabled: false,
+    url: null,
   });
 });
 
-await runTest("socket session uses cookies without exposing a bearer token", () => {
-  assert.match(socketContextSource, /withCredentials:\s*true/);
+await runTest("disabled legacy socket never receives browser credentials or bearer tokens", () => {
+  assert.doesNotMatch(socketContextSource, /withCredentials/);
   assert.doesNotMatch(socketContextSource, /cw\.token|Authorization|Bearer|auth:\s*\{\s*token/);
+});
+
+await runTest("socket is exposed to chat only after a successful connection", () => {
+  assert.match(socketContextSource, /newSocket\.on\("connect", handleConnect\)/);
+  assert.match(socketContextSource, /newSocket\.on\("disconnect", handleDisconnect\)/);
 });

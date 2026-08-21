@@ -12,6 +12,7 @@ const webEnvLoader = path.join(repoRoot, "scripts", "ops", "load-production-web-
 const endpointWaiter = path.join(repoRoot, "scripts", "ops", "wait-production-endpoints.sh");
 const turboConfig = path.join(repoRoot, "turbo.json");
 const serviceDockerfile = path.join(repoRoot, "docker", "service.Dockerfile");
+const appDockerfile = path.join(repoRoot, "docker", "app.Dockerfile");
 
 test("production service image invalidates copied TypeScript incremental state before build", () => {
   const dockerfile = readFileSync(serviceDockerfile, "utf8");
@@ -54,11 +55,11 @@ test("production web env is exported for Docker build arguments", () => {
   const envFile = path.join(dir, ".env.vps.web");
   writeFileSync(
     envFile,
-    "NEXT_PUBLIC_API_URL=/api\nAPI_INTERNAL_URL=http://gateway:3010\nNEXT_PUBLIC_AUTH_COOKIE_SECURE=true\n",
+    "NEXT_PUBLIC_API_URL=/api\nAPI_INTERNAL_URL=http://gateway:3010\n",
   );
   const command = [
     'source "$1" "$2"',
-    'printf "%s|%s|%s" "$NEXT_PUBLIC_API_URL" "$API_INTERNAL_URL" "$NEXT_PUBLIC_AUTH_COOKIE_SECURE"',
+    'printf "%s|%s" "$NEXT_PUBLIC_API_URL" "$API_INTERNAL_URL"',
   ].join("; ");
   const result = spawnSync("bash", ["-c", command, "_", webEnvLoader, envFile], {
     cwd: repoRoot,
@@ -66,7 +67,8 @@ test("production web env is exported for Docker build arguments", () => {
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, "/api|http://gateway:3010|true");
+  assert.equal(result.stdout, "/api|http://gateway:3010");
+  assert.doesNotMatch(readFileSync(appDockerfile, "utf8"), /NEXT_PUBLIC_AUTH_COOKIE_SECURE/);
 });
 
 test("production deploy plans validation and build before replacing containers", () => {

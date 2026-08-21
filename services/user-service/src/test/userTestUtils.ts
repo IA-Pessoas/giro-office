@@ -1,7 +1,9 @@
 import {
+  FORWARDED_AUTH_CSRF_HASH_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_SESSION_ID_HEADER,
   FORWARDED_AUTH_SESSION_VERSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
@@ -124,6 +126,8 @@ export function gatewayAuthHeaders(overrides?: {
   type?: "owner" | "admin" | "user";
   modules?: Record<string, number>;
   sessionVersion?: number;
+  sessionId?: string;
+  csrfHash?: string;
 }): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
@@ -132,6 +136,8 @@ export function gatewayAuthHeaders(overrides?: {
       overrides?.organizationId ?? DEFAULT_TEST_ORGANIZATION_ID,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(overrides?.permission ?? 2),
     [FORWARDED_AUTH_SESSION_VERSION_HEADER]: String(overrides?.sessionVersion ?? 1),
+    [FORWARDED_AUTH_SESSION_ID_HEADER]: overrides?.sessionId ?? "session-1",
+    [FORWARDED_AUTH_CSRF_HASH_HEADER]: overrides?.csrfHash ?? "a".repeat(64),
     [FORWARDED_AUTH_TYPE_HEADER]:
       overrides?.type ??
       (overrides?.permission === 2 || overrides?.permission === undefined ? "owner" : "user"),

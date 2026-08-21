@@ -1,9 +1,13 @@
 import { Readable } from "node:stream";
 
 import {
+  AUTH_SESSION_TRANSPORT_HEADER,
+  CSRF_HEADER_NAME,
+  FORWARDED_AUTH_CSRF_HASH_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_SESSION_ID_HEADER,
   FORWARDED_AUTH_SESSION_VERSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
@@ -36,9 +40,10 @@ function getRequestBody(request: Request): string | ReadableStream | undefined {
   return Readable.toWeb(request) as unknown as ReadableStream;
 }
 
-interface HttpProxyOptions {
+export interface HttpProxyOptions {
   internalServiceToken?: string;
   permissionModule?: string;
+  forwardSessionBinding?: boolean;
 }
 
 const OWNER_MODULE_PERMISSION = 3;
@@ -108,7 +113,7 @@ function resolveForwardedPermission(
   return undefined;
 }
 
-function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): Headers {
+export function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): Headers {
   const headers = new Headers();
   const connectionHeaderTokens = getConnectionHeaderTokens(request);
   const strippedClientHeaders = new Set([
@@ -119,8 +124,12 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
     FORWARDED_AUTH_TYPE_HEADER,
     FORWARDED_AUTH_MODULES_HEADER,
     FORWARDED_AUTH_SESSION_VERSION_HEADER,
+    FORWARDED_AUTH_SESSION_ID_HEADER,
+    FORWARDED_AUTH_CSRF_HASH_HEADER,
     "authorization",
     "cookie",
+    AUTH_SESSION_TRANSPORT_HEADER,
+    CSRF_HEADER_NAME,
   ]);
 
   Object.entries(request.headers).forEach(([key, value]) => {
@@ -186,6 +195,14 @@ function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): 
         FORWARDED_AUTH_SESSION_VERSION_HEADER,
         String(request.auth.claims.session_version),
       );
+    }
+    if (options.forwardSessionBinding) {
+      if (request.auth.claims.session_id) {
+        headers.set(FORWARDED_AUTH_SESSION_ID_HEADER, request.auth.claims.session_id);
+      }
+      if (request.auth.claims.csrf_hash) {
+        headers.set(FORWARDED_AUTH_CSRF_HASH_HEADER, request.auth.claims.csrf_hash);
+      }
     }
   }
 

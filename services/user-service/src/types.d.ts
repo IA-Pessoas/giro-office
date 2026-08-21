@@ -21,6 +21,8 @@ declare global {
       user_type?: "owner" | "admin" | "user";
       modules?: Record<string, number>;
       session_version?: number;
+      session_id?: string;
+      csrf_hash?: string;
       requestId?: string;
       file?: Multer.File;
     }

@@ -1,5 +1,10 @@
 # Issue #772 HttpOnly Session and CSRF Implementation Plan
 
+> Review correction (2026-08-20): the final implementation uses a per-session `auth_sessions` row
+> and compare-and-swap CSRF rotation. References below to incrementing global `session_version` on
+> refresh/logout describe the initial RED/GREEN plan and are superseded; global version changes are
+> retained only for account/permission invalidation.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the browser-readable JWT with server-issued HttpOnly session cookies, enforce session-bound CSRF for authenticated mutations, and preserve SSR, revocation, rollout compatibility, documentation, smoke coverage, and browser evidence.

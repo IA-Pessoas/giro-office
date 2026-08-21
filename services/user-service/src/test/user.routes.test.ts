@@ -28,6 +28,8 @@ function bearerAuthHeaders(overrides?: {
       type: overrides?.type ?? "user",
       modules: overrides?.modules ?? {},
       session_version: 1,
+      session_id: "session-1",
+      csrf_hash: "a".repeat(64),
     },
     getUserServiceEnv().jwtSecret,
     { subject: userId },
@@ -423,6 +425,7 @@ describe("user routes", () => {
         user_id: "user-1",
         organization_id: "a0000000-0000-4000-8000-000000000001",
       }),
+      { allowLegacyBearer: false },
     );
   });
 

@@ -25,6 +25,7 @@ const [apiSource, apiClientSource, authSource, authGuardSource, guestGuardSource
     source("./utils/canSSRAdmin.ts"),
     source("../../../package.json"),
   ]);
+const appPackage = JSON.parse(packageSource);
 
 await runTest("API uses credentials, SSR cookies and browser CSRF without JWT", () => {
   assert.match(apiSource, /API_INTERNAL_URL/);
@@ -60,4 +61,10 @@ await runTest("SSR guards treat the signed cookie as opaque", () => {
 
 await runTest("browser bundle no longer depends on jwt-decode", () => {
   assert.doesNotMatch(packageSource, /jwt-decode/);
+});
+
+await runTest("session security tests belong to the aggregate and build before browser proof", () => {
+  assert.match(appPackage.scripts.test, /test:session-security/);
+  assert.match(appPackage.scripts.test, /test:auth-session/);
+  assert.match(appPackage.scripts["test:auth-session"], /^pnpm run build && /);
 });

@@ -813,6 +813,7 @@ it("strips client-supplied internal auth headers before proxying", async () => {
     modules?: string;
     authorization?: string;
     cookie?: string;
+    csrf?: string;
   } = {};
 
   const upstream = createServer((request, response) => {
@@ -825,6 +826,7 @@ it("strips client-supplied internal auth headers before proxying", async () => {
       modules: request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined,
       authorization: request.headers.authorization,
       cookie: request.headers.cookie,
+      csrf: request.headers["x-csrf-token"] as string | undefined,
     };
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
@@ -847,6 +849,7 @@ it("strips client-supplied internal auth headers before proxying", async () => {
         [FORWARDED_AUTH_PERMISSION_HEADER]: "999",
         [FORWARDED_AUTH_TYPE_HEADER]: "attacker-type",
         [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ rh: 0 }),
+        "x-csrf-token": "browser-proof",
       },
     });
 
@@ -859,6 +862,7 @@ it("strips client-supplied internal auth headers before proxying", async () => {
     expect(JSON.parse(seenHeaders.modules ?? "{}")).toMatchObject({ rh: 2 });
     expect(seenHeaders.authorization).toBeUndefined();
     expect(seenHeaders.cookie).toBe("theme=dark");
+    expect(seenHeaders.csrf).toBeUndefined();
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

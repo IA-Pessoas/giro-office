@@ -1,3 +1,4 @@
+import { ServiceError } from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
 import express from "express";
@@ -21,6 +22,7 @@ function createTestLogger() {
 
 function createProtectedApp(options: {
   bearerAuthCompatibility: boolean;
+  logger?: ReturnType<typeof createTestLogger>;
   sessionValidator?: (token: string) => Promise<void>;
 }) {
   const app = express();
@@ -29,7 +31,7 @@ function createProtectedApp(options: {
       jwtSecret: "test-secret",
       bearerAuthCompatibility: options.bearerAuthCompatibility,
       authCookieSecure: true,
-      logger: createTestLogger(),
+      logger: options.logger ?? createTestLogger(),
       sessionValidator: options.sessionValidator,
     }),
   );
@@ -62,13 +64,14 @@ describe("createUserServiceSessionValidator", () => {
       "internal-token",
     );
 
-    await validate("jwt-token");
+    await validate("jwt-token", "bearer");
 
     expect(fetchMock).toHaveBeenCalledWith(
       new URL("/user/session/validate", "http://user-service.test"),
       expect.objectContaining({
         headers: expect.objectContaining({
           authorization: "Bearer jwt-token",
+          "x-auth-session-transport": "bearer",
           "x-internal-service-token": "internal-token",
         }),
       }),
@@ -82,7 +85,17 @@ describe("createUserServiceSessionValidator", () => {
       "internal-token",
     );
 
-    await expect(validate("revoked-token")).rejects.toMatchObject({ statusCode: 401 });
+    await expect(validate("revoked-token", "cookie")).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it("preserva a resposta de sessão substituída para não derrubar a sessão nova", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 409 })));
+    const validate = createUserServiceSessionValidator(
+      "http://user-service.test",
+      "internal-token",
+    );
+
+    await expect(validate("rotated-token", "cookie")).rejects.toMatchObject({ statusCode: 409 });
   });
 });
 
@@ -106,7 +119,29 @@ describe("buildAuthenticateMiddleware", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.transport).toBe("cookie");
-    expect(validateSession).toHaveBeenCalledWith(cookieToken);
+    expect(validateSession).toHaveBeenCalledWith(cookieToken, "cookie");
+  });
+
+  it("registra somente o uso aceito da compatibilidade Bearer no hot path", async () => {
+    const cookieLogger = createTestLogger();
+    const cookieInfo = vi.spyOn(cookieLogger, "info");
+
+    await request(createProtectedApp({ bearerAuthCompatibility: true, logger: cookieLogger }))
+      .get("/protected")
+      .set("Cookie", `cw.session=${cookieToken}`);
+
+    expect(cookieInfo).not.toHaveBeenCalled();
+
+    const bearerLogger = createTestLogger();
+    const bearerInfo = vi.spyOn(bearerLogger, "info");
+
+    await request(createProtectedApp({ bearerAuthCompatibility: true, logger: bearerLogger }))
+      .get("/protected")
+      .set("Authorization", `Bearer ${cookieToken}`);
+
+    expect(bearerInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "auth.bearer_compat.accepted" }),
+    );
   });
 
   it("rejeita Bearer quando a compatibilidade está desligada", async () => {
@@ -117,19 +152,17 @@ describe("buildAuthenticateMiddleware", () => {
     expect(response.status).toBe(401);
   });
 
-  it("expira cookies quando a validação da sessão falha", async () => {
+  it("não encerra a UI quando uma validação antiga termina após a rotação", async () => {
     const app = createProtectedApp({
       bearerAuthCompatibility: false,
-      sessionValidator: vi.fn().mockRejectedValue(new Error("stale")),
+      sessionValidator: vi.fn().mockRejectedValue(new ServiceError(409, "Sessão substituída.")),
     });
 
     const response = await request(app)
       .get("/protected")
       .set("Cookie", `cw.session=${cookieToken}`);
 
-    expect(response.status).toBe(401);
-    expect(response.headers["set-cookie"]).toEqual(
-      expect.arrayContaining([expect.stringContaining("cw.session=; Max-Age=0")]),
-    );
+    expect(response.status).toBe(409);
+    expect(response.headers["set-cookie"]).toBeUndefined();
   });
 });

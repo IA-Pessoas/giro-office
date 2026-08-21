@@ -31,10 +31,18 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (isAuthenticated) {
-      const newSocket = io(socketClientConfig.url, { withCredentials: true });
-      setSocket(newSocket);
+      const newSocket = io(socketClientConfig.url);
+      const handleConnect = () => setSocket(newSocket);
+      const handleDisconnect = () => {
+        setSocket((currentSocket) => (currentSocket === newSocket ? null : currentSocket));
+      };
+
+      newSocket.on("connect", handleConnect);
+      newSocket.on("disconnect", handleDisconnect);
 
       return () => {
+        newSocket.off("connect", handleConnect);
+        newSocket.off("disconnect", handleDisconnect);
         newSocket.close();
         setSocket((currentSocket) => (currentSocket === newSocket ? null : currentSocket));
       };

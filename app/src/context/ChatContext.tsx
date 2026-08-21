@@ -284,12 +284,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }, [socket]);
 
     useEffect(() => {
-        if (isAuthenticated) {
+        if (isAuthenticated && socket?.connected) {
             api.get<Chat[]>('/chat')
                 .then(response => setChats(response.data))
                 .catch(err => console.error("Falha ao buscar chats:", err));
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, socket]);
 
     useEffect(() => {
         if (!user) {

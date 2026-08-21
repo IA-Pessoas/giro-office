@@ -16,6 +16,7 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
     throw new Error("Token JWT inválido: payload em formato inesperado.");
   }
 
+  // biome-ignore lint/suspicious/noPrototypeBuiltins: shared targets ES2020, before Object.hasOwn.
   const modulePermissionsPresent = Object.prototype.hasOwnProperty.call(payload, "modules");
 
   const user_id =
@@ -38,6 +39,10 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
       Number.isInteger(payload.session_version) &&
       payload.session_version >= 0
         ? payload.session_version
+        : undefined,
+    session_id:
+      typeof payload.session_id === "string" && payload.session_id.length > 0
+        ? payload.session_id
         : undefined,
     csrf_hash:
       typeof payload.csrf_hash === "string" && /^[a-f0-9]{64}$/u.test(payload.csrf_hash)

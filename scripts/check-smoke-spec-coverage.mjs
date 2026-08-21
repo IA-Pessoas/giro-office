@@ -57,6 +57,11 @@ const malformedEntries = manifest.filter(
     typeof entry.expectedLabel !== "string" ||
     entry.expectedLabel.trim() === "",
 );
+const gatewayBearerEntries = manifest.filter(
+  (entry) =>
+    entry.target === "gateway" &&
+    (entry.auth === "bearer" || entry.auth === "admin-bearer"),
+);
 
 const routeGroups = new Map();
 for (const entry of manifest) {
@@ -120,8 +125,15 @@ if (
   missingGood.length > 0 ||
   missingBad.length > 0 ||
   servicesMissingFromRegistry.length > 0 ||
-  specServicesMissingCoverage.length > 0
+  specServicesMissingCoverage.length > 0 ||
+  gatewayBearerEntries.length > 0
 ) {
+  if (gatewayBearerEntries.length > 0) {
+    console.error("Gateway smoke operations still using Bearer compatibility:");
+    for (const entry of gatewayBearerEntries) {
+      console.error(`  - ${entry.id}`);
+    }
+  }
   if (servicesMissingFromRegistry.length > 0) {
     console.error("Workspace services missing from scripts/service-registry.mjs:");
     for (const servicePath of servicesMissingFromRegistry) {
