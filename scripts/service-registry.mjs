@@ -168,8 +168,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3030",
     urlEnvKey: "USER_SERVICE_URL",
     openapiSpecPath: "services/user-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer", "admin-bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "admin-bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/user-service/src/generated/prisma",
   },
 ];

@@ -8,13 +8,15 @@ Por defeito: **3030** (`PORT`).
 
 ## Variáveis de ambiente
 
-Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, logging e `AUTH_COOKIE_SECURE`. A última variável assume `true` em produção; use `false` apenas em slots HTTP isolados.
+Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, logging e `AUTH_COOKIE_SECURE`. A última variável assume `true` em produção; use `false` apenas em slots HTTP isolados. `REPORTS_INTERNAL_TOKEN` protege `POST /internal/reporting/access-context`; deve ser igual ao valor do reports-service e é obrigatório em produção.
+
+O endpoint `/internal/reporting/access-context` é chamado diretamente pelo reports-service e não é publicado pelo gateway.
 
 ## Sessão do navegador
 
 - `POST /user/session` emite `cw.session` (`HttpOnly`, `SameSite=Lax`, um dia) e `cw.csrf`, sem retornar o JWT no JSON.
 - `POST /user/session/refresh` rotaciona os dois cookies mantendo a versão ativa da sessão.
-- `DELETE /user/session` incrementa `session_version` e expira os dois cookies.
+- `DELETE /user/session` revoga a sessão atual no servidor e expira os dois cookies.
 - Mutações autenticadas por cookie exigem `x-csrf-token`; o gateway valida a prova antes de encaminhar a chamada.
 - Validações internas diretas podem usar Bearer, enquanto chamadas vindas do gateway usam os headers `x-auth-*` protegidos pelo token interno.
 

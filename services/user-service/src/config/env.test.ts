@@ -22,6 +22,7 @@ function setUserServiceEnv(overrides: NodeJS.ProcessEnv) {
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
   process.env.AUDIT_SERVICE_TOKEN = "secure-internal-token-with-at-least-32-chars";
+  process.env.REPORTS_INTERNAL_TOKEN = "reports-internal-token-with-at-least-32-chars";
   process.env.SERVICE_ALLOWED_ORIGINS = "https://app.example.com";
   Object.assign(process.env, overrides);
 }
@@ -55,5 +56,11 @@ describe("user-service env security validation", () => {
 
     setUserServiceEnv({ AUTH_COOKIE_SECURE: "maybe" });
     expect(() => getUserServiceEnv()).toThrow();
+  });
+
+  it("rejects the reports internal token in production when it is not secure", () => {
+    setUserServiceEnv({ REPORTS_INTERNAL_TOKEN: "reports-service-token" });
+
+    expect(() => getUserServiceEnv()).toThrow(/REPORTS_INTERNAL_TOKEN/);
   });
 });

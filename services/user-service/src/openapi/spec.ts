@@ -28,7 +28,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       title: "user-service",
       version: "1.0.0",
       description:
-        "Autenticação, usuários e permissões. O navegador usa a sessão `cw.session` HttpOnly emitida por este serviço e validada pelo gateway. Chamadas diretas internas ainda aceitam Bearer JWT ou o contexto confiável encaminhado pelo gateway.",
+        "Autenticação, usuários e permissões. O navegador usa a sessão `cw.session` HttpOnly emitida por este serviço e validada pelo gateway. Chamadas diretas internas ainda aceitam Bearer JWT ou contexto confiável protegido por token de serviço. O contexto de relatórios usa REPORTS_INTERNAL_TOKEN e não é exposto pelo gateway.",
     },
     servers: [{ url: baseUrl }],
     tags: [
@@ -36,6 +36,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       { name: "Auth", description: "Sessão e configuração inicial" },
       { name: "Users", description: "Usuários" },
       { name: "Permission", description: "Permissões por usuário" },
+      { name: "Internal reporting", description: "Contexto autoritativo para relatórios" },
     ],
     components: {
       securitySchemes: {
@@ -49,6 +50,12 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           scheme: "bearer",
           bearerFormat: "JWT",
         },
+        reportsInternalToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
+          description: "Valor igual a REPORTS_INTERNAL_TOKEN.",
+        },
       },
       schemas: {
         SuccessEnvelope: {
@@ -59,6 +66,35 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       },
     },
     paths: {
+      "/internal/reporting/access-context": {
+        post: {
+          tags: ["Internal reporting"],
+          summary: "Consultar contexto atual de acesso a relatórios (interno)",
+          security: [{ reportsInternalToken: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["userId", "organizationId"],
+                  properties: {
+                    userId: { type: "string", format: "uuid" },
+                    organizationId: { type: "string", format: "uuid" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Contexto atual", ...successJson },
+            "400": { description: "Payload inválido" },
+            "403": { description: "Token interno inválido" },
+            "404": { description: "Usuário, departamento ou organização incompatível" },
+          },
+        },
+      },
       "/health": {
         get: {
           tags: ["Health"],
@@ -106,7 +142,10 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           security: browserSession,
           parameters: [csrfHeader],
           responses: {
-            "200": { description: "Versão revogada e ambos os cookies expirados", ...successJson },
+            "200": {
+              description: "Sessão atual revogada e ambos os cookies expirados",
+              ...successJson,
+            },
             "401": { description: "Sessão inválida, ausente ou já revogada" },
           },
         },

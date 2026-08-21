@@ -19,8 +19,7 @@ test("reports smoke atravessa o gateway sem cabeçalhos de identidade forjados",
 test("gateway smoke usa sessão quando a compatibilidade Bearer está desligada", async () => {
   const legacyGatewayAuth = manifest.filter(
     (entry) =>
-      entry.target === "gateway" &&
-      (entry.auth === "bearer" || entry.auth === "admin-bearer"),
+      entry.target === "gateway" && (entry.auth === "bearer" || entry.auth === "admin-bearer"),
   );
   const smoke = await readFile(path.join(repoRoot, "scripts", "all-services-smoke.mjs"), "utf8");
 
@@ -37,4 +36,20 @@ test("gateway smoke limpa dados temporários antes de revogar a sessão", async 
   assert.ok(logoutHandler);
   assert.match(logoutHandler[1], /await runCleanupTasks\(\);[\s\S]*httpRequest\(op,/);
   assert.match(smoke, /finally \{\s*await runCleanupTasks\(\);\s*\}/);
+});
+
+test("contexto de relatórios do user-service permanece no smoke direto interno", async () => {
+  const manifestSource = await readFile(
+    path.join(repoRoot, "scripts", "all-services-smoke.manifest.mjs"),
+    "utf8",
+  );
+  const loginIndex = manifest.findIndex((entry) => entry.action === "userSession");
+  const reportingIndex = manifest.findIndex((entry) => entry.action === "reportingAccessContext");
+
+  assert.match(
+    manifestSource,
+    /path: "\/internal\/reporting\/access-context"[\s\S]*?target: "direct"/,
+  );
+  assert.doesNotMatch(manifestSource, /path: "\/reports\/access-context"/);
+  assert.ok(loginIndex >= 0 && reportingIndex > loginIndex);
 });
