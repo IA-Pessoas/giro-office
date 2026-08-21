@@ -24,12 +24,14 @@ import {
 import type { createCertificateFileCrypto } from "../services/certificateFileCrypto.js";
 import type { CertificateFileStorage } from "../services/certificateFileStorage.js";
 import { validateCertificateUploadFile } from "../services/certificateFileValidation.js";
+import type { CertificatePasswordCrypto } from "../services/certificatePasswordCrypto.js";
 import { CertificatePjService } from "../services/certificatePjService.js";
 
 export interface CreateCertificatePjRoutesOptions {
   prisma: PrismaClient;
   certificateFileStorage?: CertificateFileStorage;
   certificateFileCrypto?: ReturnType<typeof createCertificateFileCrypto>;
+  certificatePasswordCrypto: CertificatePasswordCrypto;
   maxFileSizeBytes: number;
   storageProvider: string;
   storageBucket: string;
@@ -85,6 +87,7 @@ export function createCertificatePjRoutes(options: CreateCertificatePjRoutesOpti
           storageBucket: options.storageBucket,
         }
       : undefined,
+    options.certificatePasswordCrypto,
   );
   const uploadCertificateFile = createCertificateFileUpload(options.maxFileSizeBytes);
   const uploadRateLimit = options.uploadRateLimit ?? ((_request, _response, next) => next());

@@ -1,0 +1,62 @@
+# Supply-chain critical paths for giro-office.
+# Later matches take precedence, so keep every protected surface on the same owner.
+
+/.github/** @IA-Pessoas/security-platform
+
+**/package.json @IA-Pessoas/security-platform
+**/pnpm-lock.yaml @IA-Pessoas/security-platform
+**/pnpm-workspace.yaml @IA-Pessoas/security-platform
+**/.npmrc @IA-Pessoas/security-platform
+**/.pnpmfile.* @IA-Pessoas/security-platform
+**/.node-version @IA-Pessoas/security-platform
+**/.nvmrc @IA-Pessoas/security-platform
+
+**/*.config.* @IA-Pessoas/security-platform
+**/tsconfig*.json @IA-Pessoas/security-platform
+/*config*.* @IA-Pessoas/security-platform
+/app/*config*.* @IA-Pessoas/security-platform
+/services/*/*config*.* @IA-Pessoas/security-platform
+/packages/*/*config*.* @IA-Pessoas/security-platform
+**/turbo.json @IA-Pessoas/security-platform
+**/biome.json @IA-Pessoas/security-platform
+**/.editorconfig @IA-Pessoas/security-platform
+
+/.husky/** @IA-Pessoas/security-platform
+**/scripts/** @IA-Pessoas/security-platform
+
+/.vscode/** @IA-Pessoas/security-platform
+/.cursor/** @IA-Pessoas/security-platform
+/.codex/** @IA-Pessoas/security-platform
+/.claude/** @IA-Pessoas/security-platform
+/.agents/** @IA-Pessoas/security-platform
+**/AGENTS.md @IA-Pessoas/security-platform
+**/CLAUDE.md @IA-Pessoas/security-platform
+
+**/Dockerfile @IA-Pessoas/security-platform
+**/*.Dockerfile @IA-Pessoas/security-platform
+**/docker-compose*.yml @IA-Pessoas/security-platform
+**/docker-compose*.yaml @IA-Pessoas/security-platform
+**/compose*.yml @IA-Pessoas/security-platform
+**/compose*.yaml @IA-Pessoas/security-platform
+**/Caddyfile @IA-Pessoas/security-platform
+**/*caddy*.json @IA-Pessoas/security-platform
+**/*caddy*.conf @IA-Pessoas/security-platform
+**/*nginx*.conf @IA-Pessoas/security-platform
+**/*proxy*.conf @IA-Pessoas/security-platform
+/docker/** @IA-Pessoas/security-platform
+/infra/** @IA-Pessoas/security-platform
+**/*.tf @IA-Pessoas/security-platform
+**/*.tfvars @IA-Pessoas/security-platform
+**/wrangler*.toml @IA-Pessoas/security-platform
+**/wrangler*.json @IA-Pessoas/security-platform
+**/wrangler*.jsonc @IA-Pessoas/security-platform
+
+**/.env* @IA-Pessoas/security-platform
+**/SECURITY.md @IA-Pessoas/security-platform
+**/*allowlist*.json @IA-Pessoas/security-platform
+**/*allowlist*.yaml @IA-Pessoas/security-platform
+**/*allowlist*.yml @IA-Pessoas/security-platform
+**/*policy*.json @IA-Pessoas/security-platform
+**/*policy*.yaml @IA-Pessoas/security-platform
+**/*policy*.yml @IA-Pessoas/security-platform
+**/*policy*.md @IA-Pessoas/security-platform

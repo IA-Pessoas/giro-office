@@ -83,6 +83,7 @@ services:
       - .env.vps.gateway
     environment:
       PARCELAMENTO_SERVICE_URL: http://parcelamento-service:3043
+      REPORTS_SERVICE_URL: http://reports-service:3044
     ports:
       - "3010:3010"
     depends_on:
@@ -113,6 +114,8 @@ services:
       pessoal-service:
         condition: service_healthy
       parcelamento-service:
+        condition: service_healthy
+      reports-service:
         condition: service_healthy
       audit-service:
         condition: service_healthy
@@ -548,6 +551,61 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  reports-service:
+    <<: *service_defaults
+    image: workspace-reports-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    command: ["node", "dist/server.js"]
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/reports-service"
+        SERVICE_DIR: services/reports-service
+    env_file:
+      - .env.vps.reports-service
+    environment:
+      USER_SERVICE_URL: http://user-service:3030
+    expose:
+      - "3044"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3044/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  reports-worker:
+    <<: *service_defaults
+    image: workspace-reports-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/reports-service"
+        SERVICE_DIR: services/reports-service
+    env_file:
+      - .env.vps.reports-service
+    environment:
+      USER_SERVICE_URL: http://user-service:3030
+    depends_on:
+      reports-service:
+        condition: service_healthy
     networks:
       - backend
       - egress

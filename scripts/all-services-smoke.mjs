@@ -962,6 +962,10 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
+  async reportsCatalog(op) {
+    await httpRequest(op);
+  },
+
   async certificatePjList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -1776,6 +1780,16 @@ const handlers = {
       "PASS",
       `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`,
     );
+  },
+
+  async reportingAccessContext(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/access-context",
+      json: {
+        userId: requireState("session").id,
+        organizationId: requireState("session").organization_id,
+      },
+    });
   },
 
   async userStartConfig(op) {

@@ -2,15 +2,20 @@ import {
   ACTIVE_MODULE_KEYS,
   type AuthIdentity,
   type AuthUserType,
-  ServiceError,
+  info,
   type ModulePermissionKey,
   type ModulePermissions,
+  ServiceError,
 } from "@workspace/shared";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 import { getUserServiceEnv } from "../config/env.js";
 import prismaClient from "../prisma/index.js";
+import {
+  hashPassword,
+  PASSWORD_HASH_VERSION,
+  verifyPassword,
+} from "../security/passwordHashService.js";
 
 interface LoginRequest {
   login: string;
@@ -18,9 +23,81 @@ interface LoginRequest {
 }
 
 const MODULE_PERMISSION_KEYS: readonly ModulePermissionKey[] = ACTIVE_MODULE_KEYS;
+const GENERIC_LOGIN_ERROR_MESSAGE = "Login ou senha inválidos.";
+const DUMMY_PASSWORD_HASH =
+  "$argon2id$v=19$m=19456,p=1,t=2$lktGNqJmnbIyj6tMoe+a8Q$HRtIIMh3LPpaIs9yyun/WOjqfivhgr4Nt3m9wsIkTsQ";
+
+interface PersistedAuthContext {
+  status: string;
+  organization_id: string | null;
+  organization: { id: string; status: string } | null;
+  department: {
+    organization_id: string;
+    organization: { id: string; status: string };
+  };
+}
+
+type LoginFailureReason =
+  | "account_not_found"
+  | "invalid_password"
+  | "inactive_user"
+  | "inactive_organization"
+  | "invalid_membership";
 
 function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
   return value === "owner" || value === "admin" || value === "user" ? value : undefined;
+}
+
+function getActiveOrganizationId(user: PersistedAuthContext): string | undefined {
+  const organizationId = user.organization_id ?? user.department.organization_id;
+  const organization = user.organization_id ? user.organization : user.department.organization;
+
+  if (
+    user.status !== "active" ||
+    user.department.organization_id !== organizationId ||
+    !organization ||
+    organization.id !== organizationId ||
+    organization.status !== "active"
+  ) {
+    return undefined;
+  }
+
+  return organizationId;
+}
+
+function getLoginFailureReason(
+  user: PersistedAuthContext | null,
+  passwordMatch: boolean,
+): LoginFailureReason | undefined {
+  if (!user) {
+    return "account_not_found";
+  }
+  if (!passwordMatch) {
+    return "invalid_password";
+  }
+  if (user.status !== "active") {
+    return "inactive_user";
+  }
+
+  const organizationId = user.organization_id ?? user.department.organization_id;
+  const organization = user.organization_id ? user.organization : user.department.organization;
+  if (
+    user.department.organization_id !== organizationId ||
+    !organization ||
+    organization.id !== organizationId
+  ) {
+    return "invalid_membership";
+  }
+  if (organization.status !== "active") {
+    return "inactive_organization";
+  }
+
+  return undefined;
+}
+
+function rejectLogin(reason: LoginFailureReason): never {
+  info("Authentication rejected", { event: "auth.login.rejected", data: { reason } });
+  throw new ServiceError(401, GENERIC_LOGIN_ERROR_MESSAGE);
 }
 
 export interface LoginResult {
@@ -47,26 +124,44 @@ export interface FirstCreateResult {
 
 class AuthService {
   async login({ login, password }: LoginRequest): Promise<LoginResult> {
+    const normalizedLogin = login.trim();
     const user = await prismaClient.user.findFirst({
-      where: { login },
+      where: { login: normalizedLogin },
       include: {
-        department: { select: { organization_id: true } },
+        organization: { select: { id: true, status: true } },
+        department: {
+          select: {
+            organization_id: true,
+            organization: { select: { id: true, status: true } },
+          },
+        },
         permissions: true,
       },
     });
 
-    if (!user) {
-      throw new ServiceError(401, "Usuario nao existe no sistema");
+    const passwordVerification = await verifyPassword(
+      password,
+      user?.password ?? DUMMY_PASSWORD_HASH,
+    );
+    const failureReason = getLoginFailureReason(user, passwordVerification.valid);
+    if (failureReason || !user) {
+      rejectLogin(failureReason ?? "account_not_found");
     }
-
-    const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) {
-      throw new ServiceError(401, "Login/Senha Incorreto!");
-    }
-
-    const organizationId = user.organization_id ?? user.department.organization_id;
+    const organizationId = getActiveOrganizationId(user);
     if (!organizationId) {
-      throw new ServiceError(400, "Usuario sem organizacao vinculada.");
+      rejectLogin("invalid_membership");
+    }
+
+    if (passwordVerification.needsRehash) {
+      const passwordHash = await hashPassword(password);
+      const { count } = await prismaClient.user.updateMany({
+        where: { id: user.id, password: user.password },
+        data: { password: passwordHash },
+      });
+      info("Password hash migration attempted", {
+        event: "auth.password.rehash",
+        data: { from: "bcrypt", to: PASSWORD_HASH_VERSION, migrated: count === 1 },
+      });
     }
 
     const jwtSecret = getUserServiceEnv().jwtSecret;
@@ -129,7 +224,7 @@ class AuthService {
     }
 
     const { adminPassword } = getUserServiceEnv();
-    const passwordHash = await bcrypt.hash(adminPassword, 8);
+    const passwordHash = await hashPassword(adminPassword);
 
     try {
       const user = await prismaClient.user.create({
@@ -166,18 +261,33 @@ class AuthService {
   }
 
   async validateSession(
-    identity: Pick<AuthIdentity, "user_id" | "session_version">,
+    identity: Pick<AuthIdentity, "user_id" | "organization_id" | "session_version">,
   ): Promise<void> {
-    if (typeof identity.session_version !== "number") {
+    if (typeof identity.session_version !== "number" || !identity.organization_id) {
       throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
     }
 
     const user = await prismaClient.user.findUnique({
       where: { id: identity.user_id },
-      select: { session_version: true, status: true },
+      select: {
+        status: true,
+        session_version: true,
+        organization_id: true,
+        organization: { select: { id: true, status: true } },
+        department: {
+          select: {
+            organization_id: true,
+            organization: { select: { id: true, status: true } },
+          },
+        },
+      },
     });
 
-    if (!user || user.status !== "active" || user.session_version !== identity.session_version) {
+    if (
+      !user ||
+      user.session_version !== identity.session_version ||
+      getActiveOrganizationId(user) !== identity.organization_id
+    ) {
       throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
     }
   }

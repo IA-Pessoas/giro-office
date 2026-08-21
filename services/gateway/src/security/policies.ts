@@ -1,8 +1,13 @@
 import type { AuthPolicy } from "@workspace/shared";
 
 const userManagementPolicy: AuthPolicy = { special: "manageUsers" };
+const authenticatedPolicy: AuthPolicy = { minPermission: 0 };
 const moduleAccessPermission = 1;
 const moduleEditPermission = 2;
+
+function createModulePolicy(module: string, minPermission: number): AuthPolicy {
+  return { modulePermission: { module, minPermission } };
+}
 
 const rhModulePolicy: AuthPolicy = {
   modulePermission: {
@@ -10,6 +15,18 @@ const rhModulePolicy: AuthPolicy = {
     minPermission: moduleAccessPermission,
   },
 };
+const rhEditPolicy = createModulePolicy("rh", moduleEditPermission);
+const tiModulePolicy = createModulePolicy("ti", moduleAccessPermission);
+const tiEditPolicy = createModulePolicy("ti", moduleEditPermission);
+const integracaoEditPolicy = createModulePolicy("integracao", moduleEditPermission);
+const regularizeModulePolicy = createModulePolicy("regularize", moduleAccessPermission);
+const regularizeEditPolicy = createModulePolicy("regularize", moduleEditPermission);
+const fiscalModulePolicy = createModulePolicy("fiscal", moduleAccessPermission);
+const fiscalEditPolicy = createModulePolicy("fiscal", moduleEditPermission);
+const contabilModulePolicy = createModulePolicy("contabil", moduleAccessPermission);
+const contabilEditPolicy = createModulePolicy("contabil", moduleEditPermission);
+const certificateModulePolicy = createModulePolicy("certificado", moduleAccessPermission);
+const certificateEditPolicy = createModulePolicy("certificado", moduleEditPermission);
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
@@ -101,7 +118,9 @@ const integracaoClientPath =
   /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
+  ["GET /dashboard/stats", authenticatedPolicy],
   ["GET /client/list", clientListPolicy],
+  ["GET /user/me", authenticatedPolicy],
   ["GET /user", userManagementPolicy],
   ["GET /rh/operational-users", operationalUsersCatalogPolicy],
   ["POST /user", userManagementPolicy],
@@ -115,12 +134,15 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: integracaoClientPath, policy: integracaoClientPolicy },
   { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientEditPolicy },
-  { method: "ANY", path: /^\/project(?:\/|$)/, policy: integracaoProjectPolicy },
+  { method: "GET", path: /^\/project(?:\/|$)/, policy: integracaoProjectPolicy },
+  { method: "ANY", path: /^\/project(?:\/|$)/, policy: integracaoEditPolicy },
   { method: "GET", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoModulePolicy },
   { method: "ANY", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoEditPolicy },
+  { method: "ANY", path: /^\/reports(?:\/|$)/, policy: authenticatedPolicy },
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
-  { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
+  { method: "GET", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
+  { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhEditPolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },
   { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: { special: "ownerOnly" } },
   {
@@ -141,11 +163,28 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "GET", path: /^\/task(?:\/|$)/, policy: integracaoProjectPolicy },
+  { method: "ANY", path: /^\/task(?:\/|$)/, policy: integracaoEditPolicy },
+  { method: "GET", path: /^\/department(?:\/|$)/, policy: tiModulePolicy },
+  { method: "ANY", path: /^\/department(?:\/|$)/, policy: tiEditPolicy },
+  { method: "GET", path: /^\/regularize(?:\/|$)/, policy: regularizeModulePolicy },
+  { method: "ANY", path: /^\/regularize(?:\/|$)/, policy: regularizeEditPolicy },
+  { method: "GET", path: /^\/fiscal(?:\/|$)/, policy: fiscalModulePolicy },
+  { method: "ANY", path: /^\/fiscal(?:\/|$)/, policy: fiscalEditPolicy },
+  { method: "GET", path: /^\/contabil(?:\/|$)/, policy: contabilModulePolicy },
+  { method: "ANY", path: /^\/contabil(?:\/|$)/, policy: contabilEditPolicy },
+  { method: "GET", path: /^\/ti(?:\/|$)/, policy: tiModulePolicy },
+  { method: "ANY", path: /^\/ti(?:\/|$)/, policy: tiEditPolicy },
+  { method: "GET", path: /^\/certificate(?:\/|$)/, policy: certificateModulePolicy },
+  { method: "ANY", path: /^\/certificate(?:\/|$)/, policy: certificateEditPolicy },
+  { method: "ANY", path: /^\/organizations(?:\/|$)/, policy: authenticatedPolicy },
+  { method: "ANY", path: /^\/audit(?:\/|$)/, policy: authenticatedPolicy },
 ];
 
 export function getRoutePolicy(method: string, path: string): AuthPolicy | null {
   const normalizedMethod = method.toUpperCase();
-  const exactKey = `${normalizedMethod} ${path}`;
+  const normalizedPath = path.toLowerCase();
+  const exactKey = `${normalizedMethod} ${normalizedPath}`;
   const exactPolicy = exactRoutePolicies.get(exactKey);
   if (exactPolicy) {
     return exactPolicy;
@@ -153,7 +192,8 @@ export function getRoutePolicy(method: string, path: string): AuthPolicy | null 
 
   const matchedPolicy = routePolicyMatchers.find(
     (matcher) =>
-      (matcher.method === "ANY" || matcher.method === normalizedMethod) && matcher.path.test(path),
+      (matcher.method === "ANY" || matcher.method === normalizedMethod) &&
+      matcher.path.test(normalizedPath),
   );
 
   return matchedPolicy?.policy ?? null;

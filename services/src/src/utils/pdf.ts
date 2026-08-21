@@ -6,7 +6,8 @@ export async function generatePDF(html: string): Promise<Buffer> {
   });
   const page = await browser.newPage();
 
-  await page.setContent(html, { waitUntil: 'networkidle0', timeout: 0 }); // 0 = sem limite
+  await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 0 }); // 0 = sem limite
+  await page.waitForNetworkIdle({ timeout: 0 });
 
   await new Promise(resolve => setTimeout(resolve, 1000));
 

@@ -9,6 +9,8 @@ const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
 function createCoverageEnv(): GatewayEnv {
   return {
     nodeEnv: "test",
+    enableApiDocs: true,
+    authorizationMode: "enforce",
     auditEnabled: false,
     auditServiceToken: "audit-service-token",
     auditServiceUrl: "http://127.0.0.1:3020",
@@ -30,6 +32,7 @@ function createCoverageEnv(): GatewayEnv {
     certificateServiceInternalToken: "certificate-service-token",
     pessoalServiceUrl: "http://127.0.0.1:3042",
     parcelamentoServiceUrl: "http://127.0.0.1:3043",
+    reportsServiceUrl: "http://127.0.0.1:3044",
     databaseUrl: "postgres://test:test@127.0.0.1:5432/gateway_test",
     jwtSecret: "test-secret",
     logLevel: "silent",

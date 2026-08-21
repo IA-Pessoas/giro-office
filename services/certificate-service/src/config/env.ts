@@ -27,6 +27,13 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function isCanonicalBase64(value: string): boolean {
+  return (
+    /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value) &&
+    Buffer.from(value, "base64").toString("base64") === value
+  );
+}
+
 const storageModeSchema = z.enum(["supabase", "local"]);
 
 const certificateServiceEnvSchema = z
@@ -62,6 +69,14 @@ const certificateServiceEnvSchema = z
       .string()
       .min(1, "CERTIFICATE_FILE_ENCRYPTION_KEY nao definida."),
     certificateFileEncryptionKeyVersion: z.string().optional().default("v1"),
+    certificatePasswordEncryptionKey: z
+      .string()
+      .min(1, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY nao definida.")
+      .refine(
+        (value) => isCanonicalBase64(value) && Buffer.from(value, "base64").length === 32,
+        "CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64.",
+      ),
+    certificatePasswordEncryptionKeyVersion: z.string().min(1).default("v1"),
     supabaseUrl: z.string().trim().optional(),
     supabaseServiceRoleKey: z.string().trim().optional(),
     uploadRateLimitMax: z
@@ -166,6 +181,9 @@ export function getCertificateServiceEnv(): CertificateServiceEnv {
     certificateFileMaxSizeBytes: process.env.CERTIFICATE_FILE_MAX_SIZE_BYTES,
     certificateFileEncryptionKey: process.env.CERTIFICATE_FILE_ENCRYPTION_KEY,
     certificateFileEncryptionKeyVersion: process.env.CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION,
+    certificatePasswordEncryptionKey: process.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
+    certificatePasswordEncryptionKeyVersion:
+      process.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION,
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     uploadRateLimitMax: process.env.UPLOAD_RATE_LIMIT_MAX,

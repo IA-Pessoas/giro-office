@@ -68,6 +68,8 @@ const optionalUrlEnvSchema = z
 const gatewayEnvSchema = z
   .object({
     nodeEnv: z.string().optional().default("development"),
+    enableApiDocsEnv: z.string().optional(),
+    authorizationMode: z.enum(["enforce", "observe"]).optional().default("enforce"),
     auditEnabled: z
       .string()
       .optional()
@@ -100,6 +102,7 @@ const gatewayEnvSchema = z
     certificateServiceInternalToken: z.string().optional().default("certificate-service-token"),
     pessoalServiceUrl: z.string().url().default("http://localhost:3042"),
     parcelamentoServiceUrl: z.string().url().default("http://localhost:3043"),
+    reportsServiceUrl: z.string().url().default("http://localhost:3044"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -144,6 +147,10 @@ const gatewayEnvSchema = z
       .transform((value, ctx) => parseJsonBodyLimit(value, ctx)),
   })
   .transform((env) => {
+    const enableApiDocs =
+      env.enableApiDocsEnv === undefined
+        ? env.nodeEnv !== "production"
+        : parseBoolean(env.enableApiDocsEnv);
     const clientServiceInternalToken =
       env.nodeEnv === "production"
         ? env.clientServiceInternalToken
@@ -183,12 +190,15 @@ const gatewayEnvSchema = z
     return {
       ...env,
       clientServiceInternalToken,
+      enableApiDocs,
       logPretty: env.nodeEnv !== "production" && env.logPretty,
     };
   });
 
 export interface GatewayEnv {
   nodeEnv: string;
+  enableApiDocs: boolean;
+  authorizationMode: "enforce" | "observe";
   auditEnabled: boolean;
   auditServiceToken: string;
   auditServiceUrl: string;
@@ -210,6 +220,7 @@ export interface GatewayEnv {
   certificateServiceInternalToken: string;
   pessoalServiceUrl: string;
   parcelamentoServiceUrl: string;
+  reportsServiceUrl: string;
   websocketUpstreamUrl?: string;
   databaseUrl?: string;
   publicGatewayUrl?: string;
@@ -227,6 +238,8 @@ export interface GatewayEnv {
 export function getGatewayEnv(): GatewayEnv {
   return gatewayEnvSchema.parse({
     nodeEnv: process.env.NODE_ENV,
+    enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+    authorizationMode: process.env.GATEWAY_AUTHORIZATION_MODE,
     auditEnabled: process.env.AUDIT_ENABLED,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
@@ -248,6 +261,7 @@ export function getGatewayEnv(): GatewayEnv {
     certificateServiceInternalToken: process.env.CERTIFICATE_SERVICE_INTERNAL_TOKEN,
     pessoalServiceUrl: process.env.PESSOAL_SERVICE_URL,
     parcelamentoServiceUrl: process.env.PARCELAMENTO_SERVICE_URL,
+    reportsServiceUrl: process.env.REPORTS_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     databaseUrl: process.env.DATABASE_URL,
     publicGatewayUrl: process.env.GATEWAY_PUBLIC_URL,

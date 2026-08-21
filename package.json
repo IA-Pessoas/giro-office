@@ -7,7 +7,7 @@
     "dev:reset": "node scripts/dev-reset.mjs",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test && pnpm qa:integracao",
+    "test": "node --test scripts/codeowners-policy.test.mjs scripts/developer-endpoint-audit.test.mjs scripts/git-ref-backup.test.mjs scripts/org-ioc-ref-scan.test.mjs scripts/supply-chain-integrity.test.mjs scripts/supply-chain-security.test.mjs scripts/supply-chain-ci.test.mjs && turbo run test && pnpm qa:integracao",
     "lint": "biome lint .",
     "dev:app": "turbo run dev --filter=@workspace/app",
     "dev:api": "turbo run dev --filter=@workspace/legacy-api",
@@ -41,6 +41,13 @@
     "graphify:refresh": "node scripts/graphify-refresh.mjs",
     "deploy:production": "bash scripts/ops/deploy-production.sh",
     "security:compose": "node scripts/check-compose-security.mjs",
+    "security:supply-chain": "node scripts/supply-chain-integrity.mjs",
+    "security:endpoint-audit": "node scripts/developer-endpoint-audit.mjs",
+    "security:git-ref-backup": "node scripts/git-ref-backup.mjs",
+    "security:org-ioc-ref-scan": "node scripts/org-ioc-ref-scan.mjs --org IA-Pessoas --report org-ioc-ref-scan-report.json --fail-on-findings",
+    "security:pnpm": "node scripts/pnpm-security-policy.mjs --root .",
+    "security:pnpm:fixtures": "node --test scripts/pnpm-security-policy-fixtures.test.mjs",
+    "security:rulesets": "node scripts/github-ruleset-policy.mjs --policy .github/security/rulesets-policy.json --actual scripts/fixtures/rulesets/approved.json",
     "migration:test": "node --test scripts/migration-v2-build-load.test.mjs scripts/migration-v2-phase1-load.test.mjs scripts/migration-v2-phase2-load.test.mjs scripts/migration-v3-docs.test.mjs scripts/fix-rh-request-requesters.test.mjs"
   },
   "devDependencies": {
@@ -51,7 +58,14 @@
     "turbo": "^2.9.14",
     "typescript": "^5.3.3"
   },
-  "packageManager": "pnpm@9.15.0",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "10.26.0",
+      "onFail": "error"
+    }
+  },
+  "packageManager": "pnpm@10.26.0",
   "dependencies": {
     "@prisma/client": "7.9.1"
   },
@@ -61,6 +75,7 @@
       "typescript": "5.3.3",
       "prisma": "7.9.1",
       "@prisma/client": "7.9.1",
+      "deepmerge-ts": "8.0.1",
       "hono": "4.12.25",
       "@hono/node-server": "1.19.13",
       "effect": "3.20.0",

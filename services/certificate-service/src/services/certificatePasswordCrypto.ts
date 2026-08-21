@@ -1,0 +1,115 @@
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+
+import { ServiceError } from "@workspace/shared";
+
+export interface CertificatePasswordCryptoOptions {
+  keyBase64: string;
+  keyVersion: string;
+}
+
+export interface CertificatePasswordCrypto {
+  encrypt(value: string): string;
+  decrypt(value: string): string;
+}
+
+type EncryptedTextPayload = {
+  v: string;
+  iv: string;
+  tag: string;
+  data: string;
+};
+
+const decryptionError = () =>
+  new ServiceError(500, "Erro ao descriptografar senha de certificado.");
+
+function isCanonicalBase64(value: string): boolean {
+  return (
+    /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value) &&
+    Buffer.from(value, "base64").toString("base64") === value
+  );
+}
+
+function decodeBase64(value: string): Buffer {
+  if (!isCanonicalBase64(value)) {
+    throw decryptionError();
+  }
+
+  return Buffer.from(value, "base64");
+}
+
+function parseEncryptedTextPayload(value: string, keyVersion: string): EncryptedTextPayload {
+  try {
+    const payload: unknown = JSON.parse(value);
+
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      Array.isArray(payload) ||
+      Object.keys(payload).length !== 4
+    ) {
+      throw decryptionError();
+    }
+
+    const candidate = payload as Record<string, unknown>;
+    if (
+      typeof candidate.v !== "string" ||
+      typeof candidate.iv !== "string" ||
+      typeof candidate.tag !== "string" ||
+      typeof candidate.data !== "string" ||
+      candidate.v !== keyVersion
+    ) {
+      throw decryptionError();
+    }
+
+    return candidate as EncryptedTextPayload;
+  } catch {
+    throw decryptionError();
+  }
+}
+
+export function createCertificatePasswordCrypto(
+  options: CertificatePasswordCryptoOptions,
+): CertificatePasswordCrypto {
+  const key = isCanonicalBase64(options.keyBase64)
+    ? Buffer.from(options.keyBase64, "base64")
+    : undefined;
+
+  if (!key || key.length !== 32) {
+    throw new ServiceError(500, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64.");
+  }
+
+  return {
+    encrypt(value: string): string {
+      const iv = randomBytes(12);
+      const cipher = createCipheriv("aes-256-gcm", key, iv);
+      const data = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+
+      return JSON.stringify({
+        v: options.keyVersion,
+        iv: iv.toString("base64"),
+        tag: cipher.getAuthTag().toString("base64"),
+        data: data.toString("base64"),
+      } satisfies EncryptedTextPayload);
+    },
+
+    decrypt(value: string): string {
+      try {
+        const payload = parseEncryptedTextPayload(value, options.keyVersion);
+        const iv = decodeBase64(payload.iv);
+        const tag = decodeBase64(payload.tag);
+        const data = decodeBase64(payload.data);
+
+        if (iv.length !== 12 || tag.length !== 16) {
+          throw decryptionError();
+        }
+
+        const decipher = createDecipheriv("aes-256-gcm", key, iv);
+        decipher.setAuthTag(tag);
+
+        return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+      } catch {
+        throw decryptionError();
+      }
+    },
+  };
+}

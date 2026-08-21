@@ -1,7 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, bcryptMock, permissionServiceMock, userAuditMock } = vi.hoisted(() => ({
+const { prismaMock, passwordHashMock, permissionServiceMock, userAuditMock } = vi.hoisted(() => ({
   prismaMock: {
     user: {
       findMany: vi.fn(),
@@ -15,8 +15,8 @@ const { prismaMock, bcryptMock, permissionServiceMock, userAuditMock } = vi.hois
       findFirst: vi.fn(),
     },
   },
-  bcryptMock: {
-    hash: vi.fn(),
+  passwordHashMock: {
+    hashPassword: vi.fn(),
   },
   permissionServiceMock: {
     create: vi.fn(),
@@ -30,8 +30,8 @@ vi.mock("../prisma/index.js", () => ({
   default: prismaMock,
 }));
 
-vi.mock("bcryptjs", () => ({
-  default: bcryptMock,
+vi.mock("../security/passwordHashService.js", () => ({
+  hashPassword: passwordHashMock.hashPassword,
 }));
 
 vi.mock("../services/permissionService.js", () => ({
@@ -179,7 +179,7 @@ describe("UserService", () => {
   });
 
   it("create com organization_id cria permissão do usuário", async () => {
-    bcryptMock.hash.mockResolvedValue("hashed");
+    passwordHashMock.hashPassword.mockResolvedValue("hashed");
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });
     prismaMock.user.create.mockResolvedValue({
       id: "user-1",
@@ -220,11 +220,15 @@ describe("UserService", () => {
       { fiscal: 1, rh: 1, ti: 1 },
       "org-1",
     );
+    expect(passwordHashMock.hashPassword).toHaveBeenCalledWith("secret");
+    expect(prismaMock.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ password: "hashed" }) }),
+    );
     expect(result).toMatchObject({ id: "user-1", permission_id: "permission-1" });
   });
 
   it("create concede RH e TI self-service para usuario elegivel", async () => {
-    bcryptMock.hash.mockResolvedValue("hashed");
+    passwordHashMock.hashPassword.mockResolvedValue("hashed");
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-fiscal", name: "Fiscal" });
     prismaMock.user.create.mockResolvedValue({
       id: "user-self-service",
@@ -262,7 +266,7 @@ describe("UserService", () => {
   });
 
   it("create preserva RH e TI gestao explicitos para usuario elegivel", async () => {
-    bcryptMock.hash.mockResolvedValue("hashed");
+    passwordHashMock.hashPassword.mockResolvedValue("hashed");
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-fiscal", name: "Fiscal" });
     prismaMock.user.create.mockResolvedValue({
       id: "user-management",
@@ -301,7 +305,7 @@ describe("UserService", () => {
   });
 
   it("create nao concede RH ou TI automaticamente para visualizador", async () => {
-    bcryptMock.hash.mockResolvedValue("hashed");
+    passwordHashMock.hashPassword.mockResolvedValue("hashed");
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-fiscal", name: "Fiscal" });
     prismaMock.user.create.mockResolvedValue({
       id: "viewer-1",
@@ -335,7 +339,7 @@ describe("UserService", () => {
   });
 
   it("create normaliza admin departamental para permissao modular do departamento", async () => {
-    bcryptMock.hash.mockResolvedValue("hashed");
+    passwordHashMock.hashPassword.mockResolvedValue("hashed");
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-contabil", name: "Contabil" });
     prismaMock.user.create.mockResolvedValue({
       id: "user-admin-contabil",
@@ -382,7 +386,7 @@ describe("UserService", () => {
   });
 
   it("create de owner concede permissao maxima para o modulo TI", async () => {
-    bcryptMock.hash.mockResolvedValue("hashed");
+    passwordHashMock.hashPassword.mockResolvedValue("hashed");
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });
     prismaMock.user.create.mockResolvedValue({
       id: "owner-1",
@@ -462,6 +466,26 @@ describe("UserService", () => {
     expect(prismaMock.user.update).toHaveBeenCalled();
   });
 
+  it("update armazena uma nova senha usando o hash atual", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      permission: 1,
+      department_id: "dep-1",
+      type: "user",
+    });
+    passwordHashMock.hashPassword.mockResolvedValue("$argon2id$v=19$updated");
+    prismaMock.user.update.mockResolvedValue({ id: "user-1" });
+
+    await new UserService().update("user-1", { password: "nova-senha" }, "org-1");
+
+    expect(passwordHashMock.hashPassword).toHaveBeenCalledWith("nova-senha");
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ password: "$argon2id$v=19$updated" }),
+      }),
+    );
+  });
+
   it("update records a safe administrative audit with actor and diff", async () => {
     prismaMock.user.findFirst.mockResolvedValue({
       id: "user-1",
@@ -512,7 +536,7 @@ describe("UserService", () => {
   });
 
   it("create records the new user without credentials", async () => {
-    bcryptMock.hash.mockResolvedValue("hashed-password");
+    passwordHashMock.hashPassword.mockResolvedValue("hashed-password");
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1", name: "Fiscal" });
     prismaMock.user.create.mockResolvedValue({
       id: "user-created",

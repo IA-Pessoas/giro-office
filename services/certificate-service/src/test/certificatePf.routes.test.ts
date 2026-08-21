@@ -10,11 +10,13 @@ import {
   certificateGatewayHeadersWithoutPermission,
   certificateOrganizationId,
   certificateUserId,
+  createCertificatePasswordCryptoForTest,
   createCertificatePrismaMock,
   createCertificateTestApp,
 } from "./testUtils.js";
 
 const certificateId = "30000000-0000-4000-8000-000000000001";
+const passwordCrypto = createCertificatePasswordCryptoForTest();
 
 function parseBinaryResponse(
   response: IncomingMessage,
@@ -78,7 +80,7 @@ describe("certificate PF routes", () => {
       name: "Joao Silva",
       cpf: "12345678901",
       model: "A1",
-      password: "secret-password",
+      password: passwordCrypto.encrypt("secret-password"),
       expiration_date: new Date("2026-12-31T00:00:00.000Z"),
       client_castelo_status: true,
       client_focus_status: false,
@@ -126,7 +128,7 @@ describe("certificate PF routes", () => {
       name: "Joao Silva",
       cpf: "12345678901",
       model: "A1",
-      password: "secret-password",
+      password: passwordCrypto.encrypt("secret-password"),
       expiration_date: new Date("2026-12-31T00:00:00.000Z"),
       client_castelo_status: true,
       client_focus_status: false,

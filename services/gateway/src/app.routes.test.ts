@@ -154,6 +154,8 @@ function createCapturedTestLogger() {
 function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
   return {
     nodeEnv: "test",
+    enableApiDocs: true,
+    authorizationMode: "enforce",
     auditEnabled: false,
     auditServiceToken: "audit-service-token",
     auditServiceUrl: "http://127.0.0.1:3020",
@@ -175,6 +177,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     certificateServiceInternalToken: "certificate-service-token",
     pessoalServiceUrl: "http://127.0.0.1:3042",
     parcelamentoServiceUrl: "http://127.0.0.1:3043",
+    reportsServiceUrl: "http://127.0.0.1:3044",
     databaseUrl: "postgres://test:test@127.0.0.1:5432/gateway_test",
 
     jwtSecret: "test-secret",
@@ -189,6 +192,38 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     ...overrides,
   };
 }
+
+it("proxies reports requests with the authenticated context and no gateway module policy", async () => {
+  const reportsService = createServer((request, response) => {
+    expect(request.headers[FORWARDED_AUTH_USER_ID_HEADER]).toBe("reports-user");
+    expect(request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER]).toBe("reports-org");
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { items: [] } }));
+  });
+  const reportsServiceUrl = await startServer(reportsService);
+  const app = createApp(createEnv({ reportsServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/reports/catalog`, {
+      headers: {
+        Authorization: `Bearer ${createToken({
+          user_id: "reports-user",
+          organization_id: "reports-org",
+          permission: 0,
+          modules: {},
+        })}`,
+      },
+    });
+
+    expect(response.status).toBe(200);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(reportsService);
+  }
+});
 
 function createToken(
   claims: {
@@ -1302,6 +1337,24 @@ it("serves Swagger UI from the gateway docs endpoint", async () => {
   }
 });
 
+it("returns 404 for gateway docs in production when documentation is disabled", async () => {
+  const app = createApp(
+    createEnv({ nodeEnv: "production", enableApiDocs: false }),
+    createTestLogger(),
+  );
+  const server = createServer(app);
+  const baseUrl = await startServer(server);
+
+  try {
+    for (const route of ["/openapi.json", "/docs", "/docs/swagger-ui-init.js"]) {
+      const response = await fetch(`${baseUrl}${route}`);
+      expect(response.status, route).toBe(404);
+    }
+  } finally {
+    await stopServer(server);
+  }
+});
+
 it("proxies task-service routes mapped in the gateway", async () => {
   const token = createToken({
     user_id: "user-1",
@@ -1949,7 +2002,7 @@ it("forwards elevated certificate permission for global admins without modular c
   }
 });
 
-it("does not forward certificate permission for non-admin users without modular certificate permission", async () => {
+it("denies certificate routes for users without modular certificate permission", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -1975,15 +2028,15 @@ it("does not forward certificate permission for non-admin users without modular 
       },
     });
 
-    expect(response.status).toBe(200);
-    expect(seenPermission).toBe("0");
+    expect(response.status).toBe(403);
+    expect(seenPermission).toBeUndefined();
   } finally {
     await stopServer(gateway);
     await stopServer(certificateService);
   }
 });
 
-it("does not expose certificate internal notification routes through the gateway", async () => {
+it("denies unclassified internal notification routes through the gateway", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -2005,15 +2058,15 @@ it("does not expose certificate internal notification routes through the gateway
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(403);
     expect(body.success).toBe(false);
-    expect(body.error).toBe("Rota não mapeada no gateway.");
+    expect(body.error).toBe("Acesso negado para esta rota.");
   } finally {
     await stopServer(server);
   }
 });
 
-it("returns 404 for routes not mapped to any upstream", async () => {
+it("denies authenticated routes not mapped to an explicit policy", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -2031,9 +2084,9 @@ it("returns 404 for routes not mapped to any upstream", async () => {
     });
     const body = (await response.json()) as Record<string, unknown>;
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(403);
     expect(body.success).toBe(false);
-    expect(body.error).toBe("Rota não mapeada no gateway.");
+    expect(body.error).toBe("Acesso negado para esta rota.");
   } finally {
     await stopServer(server);
   }
@@ -2441,6 +2494,7 @@ it.each([
     user_id: "user-1",
     organization_id: "org-1",
     permission: 2,
+    modules: { ti: 2 },
   });
   const auditService = await startAuditIngestServer();
   const upstream = createServer(async (request, response) => {
@@ -3638,7 +3692,7 @@ it("proxies /regularize to the regularize microservice", async () => {
   }
 });
 
-it("forwards the Fiscal module permission and internal token", async () => {
+it("denies Fiscal routes when the user lacks the module read level", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -3665,16 +3719,16 @@ it("forwards the Fiscal module permission and internal token", async () => {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    expect(response.status).toBe(200);
-    expect(seenPermission).toBe("0");
-    expect(seenInternalToken).toBe("audit-service-token");
+    expect(response.status).toBe(403);
+    expect(seenPermission).toBeUndefined();
+    expect(seenInternalToken).toBeUndefined();
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
   }
 });
 
-it("forwards the Contabil module permission and internal token", async () => {
+it("denies Contabil routes when the user lacks the module read level", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -3701,16 +3755,16 @@ it("forwards the Contabil module permission and internal token", async () => {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    expect(response.status).toBe(200);
-    expect(seenPermission).toBe("0");
-    expect(seenInternalToken).toBe("audit-service-token");
+    expect(response.status).toBe(403);
+    expect(seenPermission).toBeUndefined();
+    expect(seenInternalToken).toBeUndefined();
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
   }
 });
 
-it("does not forward legacy global permission to Contabil when module claims are absent", async () => {
+it("denies Contabil routes when module claims are absent", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -3734,8 +3788,8 @@ it("does not forward legacy global permission to Contabil when module claims are
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    expect(response.status).toBe(200);
-    expect(seenPermission).toBe("0");
+    expect(response.status).toBe(403);
+    expect(seenPermission).toBeUndefined();
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

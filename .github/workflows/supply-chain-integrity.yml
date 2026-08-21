@@ -1,0 +1,43 @@
+name: Supply Chain Integrity
+
+on:
+  pull_request:
+    branches: [develop, main, staging]
+  push:
+    branches: [develop, main, staging]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  supply-chain:
+    name: security/supply-chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout sem credenciais persistentes
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Testes do scanner
+        run: node --test scripts/codeowners-policy.test.mjs scripts/supply-chain-integrity.test.mjs scripts/supply-chain-security.test.mjs scripts/developer-endpoint-audit.test.mjs
+
+      - name: Varredura integral
+        run: node scripts/supply-chain-integrity.mjs --report supply-chain-integrity-report.json
+
+      - name: Publicar apenas o relatório sanitizado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supply-chain-integrity-report
+          path: supply-chain-integrity-report.json
+          if-no-files-found: ignore

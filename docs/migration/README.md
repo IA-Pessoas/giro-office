@@ -205,6 +205,13 @@ Decisoes de Certificados:
   storage, porque o novo servico espera arquivo armazenado e metadados
   criptograficos proprios. Os dados cadastrais e a flag `has_certificate` foram
   preservados.
+- A migracao original copiou `row.senha` sem transformacao. O service protege a
+  senha persistida com AES-256-GCM no envelope `{ v, iv, tag, data }`; a chave
+  base64 de 32 bytes configurada em `CERTIFICATE_PASSWORD_ENCRYPTION_KEY` deve
+  corresponder aos envelopes legados e usa a versao `v1`.
+- Valores JSON invalidos falham fechados. Texto legado nao-JSON e recriptografado
+  na primeira leitura autorizada; nao registrar senha, chave ou payload real em
+  artefatos de migracao.
 
 ## Parcelamento
 
