@@ -12,6 +12,7 @@ interface CreateAuditRecorderOptions {
   maxPending?: number;
   fetchImpl?: typeof fetch;
   sleep?: (delayMs: number) => Promise<void>;
+  random?: () => number;
 }
 
 const DEFAULT_RETRY_MAX_ATTEMPTS = 6;
@@ -32,6 +33,7 @@ export function createAuditRecorder({
   maxPending = DEFAULT_MAX_PENDING,
   fetchImpl = fetch,
   sleep = defaultSleep,
+  random = Math.random,
 }: CreateAuditRecorderOptions): AuditRecorder {
   if (!enabled) {
     return async () => {};
@@ -73,7 +75,13 @@ export function createAuditRecorder({
           failure = error;
         }
 
-        const willRetry = attempt < retryMaxAttempts;
+        const retryableStatus =
+          statusCode === undefined ||
+          statusCode === 408 ||
+          statusCode === 425 ||
+          statusCode === 429 ||
+          statusCode >= 500;
+        const willRetry = retryableStatus && attempt < retryMaxAttempts;
         const failureContext = {
           message: "Audit ingest request failed",
           request: { id: payload.requestId },
@@ -92,15 +100,19 @@ export function createAuditRecorder({
         if (!willRetry) {
           logger.error({
             event: "audit.ingest.discarded",
-            message: "Audit record discarded after retry exhaustion",
-            reason: "retry_exhausted",
+            message: retryableStatus
+              ? "Audit record discarded after retry exhaustion"
+              : "Audit record discarded after a non-retryable response",
+            reason: retryableStatus ? "retry_exhausted" : "non_retryable",
             request: { id: payload.requestId },
             attempts: attempt,
           });
           return;
         }
 
-        await sleep(retryBaseDelayMs * 2 ** (attempt - 1));
+        const exponentialDelay = retryBaseDelayMs * 2 ** (attempt - 1);
+        const jitteredDelay = Math.round(exponentialDelay * (0.5 + random()));
+        await sleep(jitteredDelay);
       }
     } finally {
       pending -= 1;

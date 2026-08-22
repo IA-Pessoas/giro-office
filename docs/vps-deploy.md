@@ -49,6 +49,10 @@ os 16 servicos Prisma, o segundo processo do `reports-worker` e o pool do gatewa
 processos. Com `DATABASE_POOL_MAX=1`, o teto teorico e 18 clientes para um pooler session mode com
 20 slots.
 
+Cada pool tambem usa `DATABASE_POOL_CONNECTION_TIMEOUT_MS=5000` por padrao. Quando todos os slots
+estiverem ocupados, a requisicao falha de forma observavel depois desse prazo, em vez de permanecer
+indefinidamente na fila do cliente.
+
 - `DATABASE_URL`: URL de runtime. Validar primeiro em staging a porta `6543` (transaction mode).
 - `DIRECT_URL`: porta `5432` (session/direct), exclusiva para migrations e operacoes que exijam
   sessao. Nunca registrar a URL completa em logs.
@@ -57,11 +61,15 @@ processos. Com `DATABASE_POOL_MAX=1`, o teto teorico e 18 clientes para um poole
 - Antes de migrar para transaction mode, validar leituras concorrentes de tres modulos, transacao
   interativa e escrita de auditoria. Prepared statements nomeados e estado de sessao nao podem ser
   presumidos compativeis.
-- Durante deploy com sobreposicao de containers, o orcamento pode dobrar temporariamente. Use
-  stop-first ou aumente o pool size de forma controlada antes do rollout.
+- O deploy de producao atual pode sobrepor containers e dobrar o teto para 36 conexoes. Antes do
+  rollout, ajuste o Pool Size do Supabase para `40` e execute o deploy com
+  `DATABASE_POOLER_SIZE=40`. O preflight le todos os `.env.vps.*` reais e interrompe o deploy se a
+  soma dos tetos, multiplicada por dois, exceder essa capacidade declarada.
 
 O ajuste do Pool Size acontece no dashboard Supabase e nao e versionado neste repositorio. Registre
-na issue de operacao o valor anterior, o novo valor e o horario da mudanca.
+na issue de operacao o valor anterior, o novo valor e o horario da mudanca. A variavel
+`DATABASE_POOLER_SIZE` e uma confirmacao operacional; so a defina depois de conferir o valor no
+dashboard.
 
 ### Verificacao depois do deploy
 

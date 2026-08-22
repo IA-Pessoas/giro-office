@@ -56,6 +56,56 @@ test("createAuditRecorder repete falhas HTTP transitorias ate entregar", async (
   );
 });
 
+test("createAuditRecorder nao repete erros HTTP permanentes", async () => {
+  let attempts = 0;
+  const logger = createLogger();
+  const recorder = createAuditRecorder({
+    enabled: true,
+    serviceUrl: "http://audit-service:3020",
+    serviceToken: "test-token",
+    logger,
+    retryMaxAttempts: 6,
+    sleep: async () => {
+      assert.fail("erro 4xx permanente nao deve aguardar retry");
+    },
+    fetchImpl: async () => {
+      attempts += 1;
+      return new Response(null, { status: 422 });
+    },
+  });
+
+  await recorder(createPayload());
+
+  assert.equal(attempts, 1);
+  assert.equal(
+    logger.entries.some(
+      (entry) => entry.event === "audit.ingest.discarded" && entry.reason === "non_retryable",
+    ),
+    true,
+  );
+});
+
+test("createAuditRecorder aplica jitter ao backoff", async () => {
+  const delays: number[] = [];
+  const recorder = createAuditRecorder({
+    enabled: true,
+    serviceUrl: "http://audit-service:3020",
+    serviceToken: "test-token",
+    logger: createLogger(),
+    retryMaxAttempts: 2,
+    retryBaseDelayMs: 1_000,
+    random: () => 0,
+    sleep: async (delayMs) => {
+      delays.push(delayMs);
+    },
+    fetchImpl: async () => new Response(null, { status: 503 }),
+  });
+
+  await recorder(createPayload());
+
+  assert.deepEqual(delays, [500]);
+});
+
 test("createAuditRecorder registra descarte definitivo como error", async () => {
   const logger = createLogger();
   const recorder = createAuditRecorder({
@@ -90,6 +140,7 @@ test("createAuditRecorder cobre uma indisponibilidade de aproximadamente dez seg
     serviceUrl: "http://audit-service:3020",
     serviceToken: "test-token",
     logger,
+    random: () => 0.5,
     sleep: async (delayMs) => {
       delays.push(delayMs);
     },

@@ -13,6 +13,8 @@
 ## Global Constraints
 
 - Default de `DATABASE_POOL_MAX` igual a `1` e rejeicao de valores nao inteiros ou menores que 1.
+- Descoberta automatica de pools, budget aritmetico e preflight sobre os envs reais de producao.
+- Timeout de aquisicao de conexao com default de cinco segundos.
 - Nenhum segredo ou URL completa de banco entra no Git ou nos logs.
 - Auditoria permanece nao bloqueante para a resposta HTTP.
 - Outbox duravel nao faz parte deste patch.
@@ -53,7 +55,7 @@
 - Create: `shared/tests/audit/recorder.test.ts`
 
 - [ ] Escrever testes de sucesso, HTTP nao-OK, rede, backoff, overflow e descarte.
-- [ ] Implementar no maximo seis tentativas em 15,5 segundos e limite de pendencias.
+- [ ] Implementar no maximo seis tentativas transitorias, com jitter, e limite de pendencias.
 - [ ] Garantir que erros definitivos sejam registrados como `error` sem rejeicao nao tratada.
 - [ ] Rodar testes Shared e Gateway.
 

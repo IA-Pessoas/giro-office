@@ -7,7 +7,7 @@
     "dev:reset": "node scripts/dev-reset.mjs",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "test": "node --test scripts/codeowners-policy.test.mjs scripts/developer-endpoint-audit.test.mjs scripts/git-ref-backup.test.mjs scripts/org-ioc-ref-scan.test.mjs scripts/supply-chain-integrity.test.mjs scripts/supply-chain-security.test.mjs scripts/supply-chain-ci.test.mjs && turbo run test && pnpm qa:integracao",
+    "test": "node --test scripts/codeowners-policy.test.mjs scripts/database-pool-policy.test.mjs scripts/developer-endpoint-audit.test.mjs scripts/git-ref-backup.test.mjs scripts/org-ioc-ref-scan.test.mjs scripts/production-deploy.test.mjs scripts/supply-chain-integrity.test.mjs scripts/supply-chain-security.test.mjs scripts/supply-chain-ci.test.mjs && turbo run test && pnpm qa:integracao",
     "lint": "biome lint .",
     "dev:app": "turbo run dev --filter=@workspace/app",
     "dev:api": "turbo run dev --filter=@workspace/legacy-api",

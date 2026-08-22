@@ -1,7 +1,10 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
-import { parseDatabasePoolMax } from "@workspace/shared/database";
+import {
+  parseDatabasePoolConnectionTimeoutMs,
+  parseDatabasePoolMax,
+} from "@workspace/shared/database";
 import { createLogger } from "@workspace/shared/logger";
 
 import { createTiApplication } from "./app.js";
@@ -18,6 +21,9 @@ const logger = createLogger({
 const adapter = new PrismaPg({
   connectionString: env.databaseUrl,
   max: parseDatabasePoolMax(process.env.DATABASE_POOL_MAX),
+  connectionTimeoutMillis: parseDatabasePoolConnectionTimeoutMs(
+    process.env.DATABASE_POOL_CONNECTION_TIMEOUT_MS,
+  ),
 });
 const prisma = new PrismaClient({ adapter });
 
