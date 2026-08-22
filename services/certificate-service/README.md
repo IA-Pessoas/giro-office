@@ -11,6 +11,8 @@ Por padrao: **3041** (`PORT`).
 
 As variaveis sao lidas em `src/config/env.ts`.
 
+`DATABASE_POOL_MAX` limita o pool PostgreSQL por processo e usa default `1`.
+
 Use `.env.example` como base para criar o `.env` local do service. O `.env` real nao deve ser
 versionado.
 

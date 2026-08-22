@@ -1,4 +1,4 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import { error as logError, parseDatabasePoolMax, ServiceError } from "@workspace/shared";
 import pg from "pg";
 
 const { Pool } = pg;
@@ -553,7 +553,7 @@ export class DashboardStatsService {
 
     this.pool ??= new Pool({
       connectionString: this.databaseUrl,
-      max: DASHBOARD_MAX_CONCURRENT_QUERIES,
+      max: parseDatabasePoolMax(process.env.DATABASE_POOL_MAX),
       ssl: this.databaseUrl.includes("supabase.com")
         ? {
             rejectUnauthorized: false,

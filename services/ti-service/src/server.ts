@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
+import { parseDatabasePoolMax } from "@workspace/shared/database";
 import { createLogger } from "@workspace/shared/logger";
 
 import { createTiApplication } from "./app.js";
@@ -16,6 +17,7 @@ const logger = createLogger({
 });
 const adapter = new PrismaPg({
   connectionString: env.databaseUrl,
+  max: parseDatabasePoolMax(process.env.DATABASE_POOL_MAX),
 });
 const prisma = new PrismaClient({ adapter });
 

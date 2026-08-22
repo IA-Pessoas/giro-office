@@ -1,4 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import { parseDatabasePoolMax } from "@workspace/shared/database";
 
 import { getRegularizeServiceEnv } from "../config/env.js";
 import { PrismaClient } from "../generated/prisma/client.js";
@@ -12,6 +13,7 @@ export function getPrismaClient(): PrismaClient {
     const { databaseUrl } = getRegularizeServiceEnv();
     const adapter = new PrismaPg({
       connectionString: databaseUrl,
+      max: parseDatabasePoolMax(process.env.DATABASE_POOL_MAX),
     });
     globalForPrisma.prismaClient = new PrismaClient({ adapter });
   }

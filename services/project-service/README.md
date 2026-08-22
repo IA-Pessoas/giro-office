@@ -11,6 +11,7 @@ Por defeito: **3033** (`PORT`).
 Ver [`src/config/env.ts`](src/config/env.ts):
 
 - `DATABASE_URL`
+- `DATABASE_POOL_MAX` (default `1`)
 - `JWT_SECRET`
 - `AUDIT_*` quando a auditoria estiver ativa
 
