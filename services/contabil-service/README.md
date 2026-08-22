@@ -11,6 +11,7 @@ Por padrão: **3038** (`PORT` em [`src/config/env.ts`](src/config/env.ts)).
 Definição e defaults em [`src/config/env.ts`](src/config/env.ts):
 
 - `DATABASE_URL` — PostgreSQL (Prisma)
+- `DATABASE_POOL_MAX` — teto do pool por processo (default `1`)
 - `JWT_SECRET` — validação do Bearer nas rotas autenticadas
 - `PORT` — porta HTTP (default `3038`)
 - `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN` — auditoria via `integrations/audit.ts`

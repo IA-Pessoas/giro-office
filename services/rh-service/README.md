@@ -9,7 +9,7 @@ Por defeito: **3034** (`PORT`).
 
 ## Variaveis de ambiente
 
-Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX` (inteiro positivo, default 5) e `JWT_SECRET`.
+Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX` (inteiro positivo, default 1) e `JWT_SECRET`.
 
 ## Gateway
 

@@ -29,7 +29,7 @@ const rhEnvSchema = z
     databasePoolMax: z
       .string()
       .optional()
-      .default("5")
+      .default("1")
       .transform((value, ctx) => {
         const parsed = Number(value);
         if (!Number.isInteger(parsed) || parsed < 1) {

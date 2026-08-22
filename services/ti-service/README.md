@@ -13,6 +13,7 @@ As variaveis sao lidas em `src/config/env.ts`.
 - `NODE_ENV`
 - `PORT`
 - `DATABASE_URL`
+- `DATABASE_POOL_MAX` (default `1`)
 - `AUDIT_SERVICE_URL`
 - `AUDIT_SERVICE_TOKEN`
 - `TI_SERVICE_INTERNAL_TOKEN`

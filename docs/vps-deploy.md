@@ -41,6 +41,56 @@ docker compose -f docker-compose.vps.yml up -d --build
 
 6. `certificate-service`, `pessoal-service` and `audit-service` are part of the default stack. Configure `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` and `PESSOAL_SERVICE_URL=http://pessoal-service:3042` in `.env.vps.gateway`; control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
 
+## Orcamento de conexoes e Supabase Pooler
+
+Todos os processos que abrem pool PostgreSQL devem declarar `DATABASE_POOL_MAX`. O default do
+codigo e `1`; valores vazios, fracionarios, zero ou negativos interrompem o bootstrap. Em producao,
+os 16 servicos Prisma, o segundo processo do `reports-worker` e o pool do gateway representam 18
+processos. Com `DATABASE_POOL_MAX=1`, o teto teorico e 18 clientes para um pooler session mode com
+20 slots.
+
+Cada pool tambem usa `DATABASE_POOL_CONNECTION_TIMEOUT_MS=5000` por padrao. Quando todos os slots
+estiverem ocupados, a requisicao falha de forma observavel depois desse prazo, em vez de permanecer
+indefinidamente na fila do cliente.
+
+- `DATABASE_URL`: URL de runtime. Validar primeiro em staging a porta `6543` (transaction mode).
+- `DIRECT_URL`: porta `5432` (session/direct), exclusiva para migrations e operacoes que exijam
+  sessao. Nunca registrar a URL completa em logs.
+- Enquanto runtime permanecer na porta `5432`, manter `DATABASE_POOL_MAX=1` em todos os
+  `.env.vps.*`, inclusive gateway, RH, reports-service e reports-worker.
+- Antes de migrar para transaction mode, validar leituras concorrentes de tres modulos, transacao
+  interativa e escrita de auditoria. Prepared statements nomeados e estado de sessao nao podem ser
+  presumidos compativeis.
+- O deploy de producao atual pode sobrepor containers e dobrar o teto para 36 conexoes. Antes do
+  rollout, ajuste o Pool Size do Supabase para `40` e execute o deploy com
+  `DATABASE_POOLER_SIZE=40`. O preflight le todos os `.env.vps.*` reais e interrompe o deploy se a
+  soma dos tetos, multiplicada por dois, exceder essa capacidade declarada.
+
+O ajuste do Pool Size acontece no dashboard Supabase e nao e versionado neste repositorio. Registre
+na issue de operacao o valor anterior, o novo valor e o horario da mudanca. A variavel
+`DATABASE_POOLER_SIZE` e uma confirmacao operacional; so a defina depois de conferir o valor no
+dashboard.
+
+### Verificacao depois do deploy
+
+```bash
+for container in $(docker ps --format '{{.Names}}' | grep '^giro-office-production-'); do
+  count=$(docker logs --since 24h "$container" 2>&1 | grep -c EMAXCONNSESSION || true)
+  [ "$count" -gt 0 ] && echo "$container $count"
+done
+
+docker logs --since 24h giro-office-production-gateway-1 2>&1 \
+  | grep -E 'audit.ingest.(failed|discarded)' \
+  | wc -l
+
+docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' \
+  | grep '^giro-office-production-'
+```
+
+Meta: zero `EMAXCONNSESSION` por 48 horas, zero `audit.ingest.discarded` e memoria do Giro sem
+crescimento monotono. Configure o coletor de logs para alertar nos dois eventos; o nivel `error`
+permite encaminhamento pelo canal de incidentes existente.
+
 ## Sessão HttpOnly e slots HTTP
 
 `AUTH_COOKIE_SECURE` é uma configuração exclusiva do gateway e do user-service; nunca deve ser exposta como `NEXT_PUBLIC_*`.

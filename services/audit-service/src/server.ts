@@ -4,6 +4,7 @@ import { createLogger } from "@workspace/shared";
 
 import { createApp } from "./app.js";
 import { getAuditServiceEnv } from "./config/env.js";
+import { disconnectPrismaClient } from "./integrations/prisma/prismaClient.js";
 
 const env = getAuditServiceEnv();
 const logger = createLogger({
@@ -33,3 +34,34 @@ server.on("error", (err) => {
     err,
   });
 });
+
+let shuttingDown = false;
+
+async function shutdown(signal: NodeJS.Signals): Promise<void> {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+  logger.info({ event: "server.shutdown", message: "Audit service stopping", signal });
+
+  server.close(async (error) => {
+    try {
+      await disconnectPrismaClient();
+    } catch (disconnectError) {
+      logger.error({
+        event: "database.disconnect.failed",
+        message: "Audit database disconnect failed",
+        err: disconnectError,
+      });
+      process.exitCode = 1;
+    }
+
+    if (error) {
+      logger.error({ event: "server.close.failed", message: "Audit server close failed", error });
+      process.exitCode = 1;
+    }
+  });
+}
+
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
+process.once("SIGINT", () => void shutdown("SIGINT"));

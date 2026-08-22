@@ -27,6 +27,12 @@
       "import": "./dist/datetime/index.js",
       "default": "./dist/datetime/index.js"
     },
+    "./database": {
+      "types": "./dist/database/index.d.ts",
+      "development": "./src/database/index.ts",
+      "import": "./dist/database/index.js",
+      "default": "./dist/database/index.js"
+    },
     "./http": {
       "types": "./dist/http/index.d.ts",
       "development": "./src/http/index.ts",
