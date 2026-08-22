@@ -115,3 +115,14 @@ test("migrations preferem DIRECT_URL e preservam fallback local", () => {
   assert.match(source, /process\.env\.DIRECT_URL\s*\?\?/u);
   assert.match(source, /env\("DATABASE_URL"\)/u);
 });
+
+test("guards de banco e deploy executam em todo pull request", () => {
+  const workflow = fs.readFileSync(
+    path.join(root, ".github/workflows/database-resilience-guard.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /^on:\s*\n\s+pull_request:/mu);
+  assert.match(workflow, /node --test scripts\/database-pool-policy\.test\.mjs/u);
+  assert.match(workflow, /node --test scripts\/production-deploy\.test\.mjs/u);
+  assert.doesNotMatch(workflow, /pnpm install|npm install/u);
+});
