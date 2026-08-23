@@ -10,7 +10,7 @@ Porta padrão: `3044`.
 
 Consulte [`src/config/env.ts`](src/config/env.ts).
 
-- Banco e autenticação: `DATABASE_URL`, `JWT_SECRET`.
+- Banco e autenticação: `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `JWT_SECRET`.
 - Tokens e segredo interno: `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`.
 - URLs upstream: `USER_SERVICE_URL`, `PARCELAMENTO_SERVICE_URL`, `CLIENT_SERVICE_URL`.
 - Timeout de fontes internas: `REPORTS_SOURCE_TIMEOUT_MS`.
@@ -20,6 +20,10 @@ Consulte [`src/config/env.ts`](src/config/env.ts).
 ## Gateway
 
 Prefixo público: `/reports`.
+
+`GET /reports/catalog` expõe somente fontes e campos de adapters internos habilitados para a
+organização e permissões atuais. `POST /reports/preview` valida a mesma definição e devolve uma
+amostra limitada; não cria job, snapshot, arquivo ou registro persistido.
 
 ## Desenvolvimento
 

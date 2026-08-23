@@ -1,7 +1,10 @@
 import {
+  FORWARDED_AUTH_CSRF_HASH_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_SESSION_ID_HEADER,
+  FORWARDED_AUTH_SESSION_VERSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -16,6 +19,8 @@ interface UserRouteMocks {
     login: Mock;
     firstCreate: Mock;
     validateSession: Mock;
+    refreshSession: Mock;
+    revokeSession: Mock;
   };
   userServiceMock: {
     list: Mock;
@@ -43,6 +48,8 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
       login: vi.fn(),
       firstCreate: vi.fn(),
       validateSession: vi.fn(),
+      refreshSession: vi.fn(),
+      revokeSession: vi.fn(),
     },
     userServiceMock: {
       list: vi.fn(),
@@ -120,6 +127,9 @@ export function gatewayAuthHeaders(overrides?: {
   permission?: number;
   type?: "owner" | "admin" | "user";
   modules?: Record<string, number>;
+  sessionVersion?: number;
+  sessionId?: string;
+  csrfHash?: string;
 }): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
@@ -127,6 +137,9 @@ export function gatewayAuthHeaders(overrides?: {
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]:
       overrides?.organizationId ?? DEFAULT_TEST_ORGANIZATION_ID,
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(overrides?.permission ?? 2),
+    [FORWARDED_AUTH_SESSION_VERSION_HEADER]: String(overrides?.sessionVersion ?? 1),
+    [FORWARDED_AUTH_SESSION_ID_HEADER]: overrides?.sessionId ?? "session-1",
+    [FORWARDED_AUTH_CSRF_HASH_HEADER]: overrides?.csrfHash ?? "a".repeat(64),
     [FORWARDED_AUTH_TYPE_HEADER]:
       overrides?.type ??
       (overrides?.permission === 2 || overrides?.permission === undefined ? "owner" : "user"),

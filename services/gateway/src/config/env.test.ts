@@ -84,6 +84,21 @@ describe("gateway env security validation", () => {
     expect(env.jsonBodyLimit).toBe("1mb");
     expect(env.enableApiDocs).toBe(false);
     expect(env.authorizationMode).toBe("enforce");
+    expect(env.bearerAuthCompatibility).toBe(false);
+    expect(env.authCookieSecure).toBe(true);
+  });
+
+  it("parses explicit auth rollout overrides and rejects ambiguous values", () => {
+    setGatewayEnv({
+      GATEWAY_BEARER_AUTH_COMPATIBILITY: "true",
+      AUTH_COOKIE_SECURE: "false",
+    });
+    const env = getGatewayEnv();
+    expect(env.bearerAuthCompatibility).toBe(true);
+    expect(env.authCookieSecure).toBe(false);
+
+    setGatewayEnv({ GATEWAY_BEARER_AUTH_COMPATIBILITY: "maybe" });
+    expect(() => getGatewayEnv()).toThrow();
   });
 
   it("enables gateway API docs outside production when requested", () => {

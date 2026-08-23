@@ -6,8 +6,13 @@ services:
     ports: !override
       - "8087:80"
   gateway:
+    environment:
+      AUTH_COOKIE_SECURE: "false"
     ports: !override
       - "3013:3010"
+  user-service:
+    environment:
+      AUTH_COOKIE_SECURE: "false"
   web:
     ports: !override
       - "3002:3000"

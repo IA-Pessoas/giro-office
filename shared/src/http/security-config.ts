@@ -1,4 +1,5 @@
 import { ServiceError } from "./errors.js";
+import { CSRF_HEADER_NAME } from "./session-security.js";
 
 const DEFAULT_INTERNAL_SERVICE_TOKEN = "audit-service-token";
 const MIN_INTERNAL_SERVICE_TOKEN_LENGTH = 32;
@@ -24,6 +25,7 @@ export interface ServiceCorsOptions {
   ): void;
   methods: string;
   allowedHeaders: string[];
+  exposedHeaders: string[];
   credentials: boolean;
 }
 
@@ -93,7 +95,8 @@ export function createServiceCorsOptions(
       callback(new ServiceError(403, `Origin não permitida pelo ${serviceLabel}.`));
     },
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-    allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-request-id", CSRF_HEADER_NAME],
+    exposedHeaders: ["x-auth-session-state"],
     credentials: true,
   };
 }

@@ -40,7 +40,7 @@ import {
   buildDepartmentPermissionSyncPayload,
   needsDepartmentPermissionSync,
 } from "@modules/users/utils/createUserPayload";
-import { useAuth } from "@/context/AuthContext";
+import { signOut, useAuth } from "@/context/AuthContext";
 import { ConfirmationDialog } from "@shared/components";
 import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
@@ -147,7 +147,7 @@ export function Administracao() {
   const [loadedPermissionUserId, setLoadedPermissionUserId] = useState<string | null>(null);
   const [permissionSaveError, setPermissionSaveError] = useState<string | null>(null);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
-  const { user, refreshSession } = useAuth();
+  const { user } = useAuth();
   const { access: rhAccess, isLoading: isRhAccessLoading } = useModuleAccess("rh");
   const canManageOrganizationOwners = canCreateOrganizationOwner(user);
   const hasAdminAccess = canAccessAdministration(user, { rhAccess });
@@ -635,13 +635,8 @@ export function Administracao() {
       }
 
       if (selectedPermissionUserId === user?.id) {
-        try {
-          await refreshSession();
-        } catch {
-          toast.warn(
-            "Permissões salvas, mas a sessão local não pôde ser atualizada agora. Recarregue a página se o menu não refletir os novos acessos.",
-          );
-        }
+        signOut("Permissões atualizadas. Entre novamente para aplicar os novos acessos.");
+        return;
       }
       toast.success("Permissões atualizadas com sucesso.");
     } catch (error) {

@@ -1,9 +1,4 @@
-import { jwtDecode } from "jwt-decode";
 import type { ModuleAccess, ModuleKey } from "./moduleAccess";
-
-interface SessionTokenPayload {
-  permission?: number;
-}
 
 export type AuthUserType = "owner" | "admin" | "user";
 
@@ -68,17 +63,4 @@ export function canAccessAdministration(
   options: AdministrationAccessOptions = {},
 ): boolean {
   return canCreateUsers(subject, options);
-}
-
-export function getPermissionFromToken(token?: string | null): number | null {
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const payload = jwtDecode<SessionTokenPayload>(token);
-    return typeof payload.permission === "number" ? payload.permission : null;
-  } catch {
-    return null;
-  }
 }

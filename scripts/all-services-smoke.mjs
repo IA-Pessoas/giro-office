@@ -97,12 +97,6 @@ const WorkspacePermissionLevel = Object.freeze({
   Admin: 2,
 });
 
-const TiPermissionLevel = Object.freeze({
-  Requester: 1,
-  Technician: 2,
-  Admin: 3,
-});
-
 const env = {
   gatewayUrl: process.env.GATEWAY_URL?.trim() || "",
   gatewayPort: process.env.GATEWAY_PORT ?? "3010",
@@ -155,6 +149,10 @@ for (const envKey of Object.values(INTERNAL_SERVICE_TOKENS)) {
 
 const state = {
   session: null,
+  sessionCookies: {
+    "cw.csrf": "",
+    "cw.session": "",
+  },
   bearerToken: "",
   adminBearerToken: "",
   baselineDepartmentId: env.smokeDepartmentId,
@@ -190,7 +188,7 @@ const state = {
   rhTimeBankReleaseId: "",
   rhTimeSheetId: "",
   rhTargetUserId: "",
-  rhTargetUserToken: "",
+  rhTargetUserSessionCookies: null,
   rhPointDayAlreadyComplete: false,
   auditRequestId: "",
   contabilControlId: "",
@@ -232,6 +230,7 @@ const actionExecutionRank = {
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
   rhScoreQuestionDelete: 8300,
+  userSessionLogout: 10000,
 };
 
 function log(level, message) {
@@ -315,9 +314,48 @@ function createAdminToken(permission = WorkspacePermissionLevel.Admin, options =
   return `${content}.${signature}`;
 }
 
-function getAuthHeaders(auth, service) {
+function captureSessionCookies(headers) {
+  const values = typeof headers.getSetCookie === "function" ? headers.getSetCookie() : [];
+
+  for (const value of values.slice(0, 8)) {
+    const [pair] = value.split(";", 1);
+    const separator = pair.indexOf("=");
+    if (separator <= 0 || pair.length > 4096) {
+      continue;
+    }
+
+    const name = pair.slice(0, separator);
+    if (name === "cw.session" || name === "cw.csrf") {
+      state.sessionCookies[name] = pair.slice(separator + 1);
+    }
+  }
+}
+
+function getSessionHeaders(method, cookies = state.sessionCookies) {
+  const session = cookies["cw.session"];
+  const csrf = cookies["cw.csrf"];
+  if (!session || !csrf) {
+    throw new Error("Cookie session is not available.");
+  }
+
+  const headers = { Cookie: `cw.session=${session}; cw.csrf=${csrf}` };
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())) {
+    headers["x-csrf-token"] = csrf;
+  }
+  return headers;
+}
+
+function getAuthHeaders(auth, service, method, target) {
   if (auth === "public") {
     return {};
+  }
+
+  if (auth === "session") {
+    return getSessionHeaders(method);
+  }
+
+  if (target === "gateway" && (auth === "bearer" || auth === "admin-bearer")) {
+    return getSessionHeaders(method);
   }
 
   if (auth === "bearer") {
@@ -367,7 +405,7 @@ function getAuthHeaders(auth, service) {
 }
 
 function getTiAdminHeaders() {
-  return { Authorization: `Bearer ${createAdminToken(TiPermissionLevel.Admin)}` };
+  return getSessionHeaders("POST");
 }
 
 function ensureSuccessEnvelope(op, body) {
@@ -452,6 +490,24 @@ function registerCleanup(label, fn) {
   cleanupTasks.push({ label, fn });
 }
 
+async function runCleanupTasks() {
+  const tasks = cleanupTasks.splice(0).reverse();
+  if (tasks.length > 0) {
+    log("INFO", `Running ${tasks.length} cleanup task(s).`);
+  }
+  for (const task of tasks) {
+    try {
+      await task.fn();
+      log("PASS", `cleanup ${task.label}`);
+    } catch (error) {
+      log(
+        "WARN",
+        `cleanup ${task.label} failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+}
+
 async function writeArtifact(opId, responseText) {
   const filePath = path.join(env.tmpDir, `${sanitizeFileName(opId)}.response.txt`);
   await fs.promises.writeFile(filePath, responseText, "utf8");
@@ -486,10 +542,10 @@ async function buildNegativeRequestOverrides(op) {
         expectEnvelope: false,
       };
     case "lowPermission403": {
-      const token = await ensureRhTargetUserToken();
+      const sessionCookies = await ensureRhTargetUserSessionCookies();
       return {
         auth: "public",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getSessionHeaders(op.method, sessionCookies),
         expectedStatus: op.expectedStatus,
         expectEnvelope: false,
       };
@@ -562,7 +618,7 @@ async function httpRequest(op, options) {
 
   const url = buildUrl(target, service, requestPath, query);
   const requestHeaders = new Headers({
-    ...getAuthHeaders(auth, service),
+    ...getAuthHeaders(auth, service, method, target),
     ...optionHeaders,
     ...(opOverrides?.headers ?? {}),
   });
@@ -614,6 +670,8 @@ async function httpRequest(op, options) {
       throw fetchError;
     }
   }
+
+  captureSessionCookies(response.headers);
 
   text = await response.text();
   const artifactPath = await writeArtifact(label, text);
@@ -689,7 +747,13 @@ async function attemptLogin() {
       });
 
       if (response.status === 200) {
-        return response.body?.data;
+        const session = response.body?.data;
+        if (session?.token !== undefined) {
+          throw new Error("Login response exposed a token.");
+        }
+        if (session?.id && state.sessionCookies["cw.session"] && state.sessionCookies["cw.csrf"]) {
+          return session;
+        }
       }
 
       lastFailure = response;
@@ -701,7 +765,7 @@ async function attemptLogin() {
 
 async function bootstrapAndLogin() {
   const firstAttempt = await attemptLogin();
-  if (firstAttempt?.token) {
+  if (firstAttempt?.id) {
     return firstAttempt;
   }
 
@@ -716,7 +780,7 @@ async function bootstrapAndLogin() {
   });
 
   const secondAttempt = await attemptLogin();
-  if (secondAttempt?.token) {
+  if (secondAttempt?.id) {
     return secondAttempt;
   }
 
@@ -897,52 +961,33 @@ async function ensureRhTargetUser() {
   return state.rhTargetUserId;
 }
 
-async function ensureRhTargetUserToken() {
-  if (state.rhTargetUserToken) return state.rhTargetUserToken;
+async function ensureRhTargetUserSessionCookies() {
+  if (state.rhTargetUserSessionCookies) return state.rhTargetUserSessionCookies;
   await ensureRhTargetUser();
-  const loginResp = await helperCall("rh-target-user-login", {
-    method: "POST",
-    path: "/user/session",
-    target: "gateway",
-    service: "user-service",
-    auth: "public",
-    json: {
-      login: uniqueEmail("smoke-rh-target"),
-      password: env.password,
-    },
-    expectedStatus: [200],
-    expectEnvelope: false,
-  });
-  state.rhTargetUserToken = loginResp.body?.data?.token ?? "";
-  return state.rhTargetUserToken;
-}
+  const adminSessionCookies = { ...state.sessionCookies };
+  state.sessionCookies = { "cw.csrf": "", "cw.session": "" };
 
-async function _completeRhPointLifecycle(token) {
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
-  while (true) {
-    const response = await helperCall("rh-point-register-helper", {
+  try {
+    await helperCall("rh-target-user-login", {
       method: "POST",
-      path: "/rh/point/register",
+      path: "/user/session",
       target: "gateway",
-      service: "rh-service",
-      auth: token ? "public" : "bearer",
-      headers: authHeaders,
-      expectedStatus: [200, 400],
+      service: "user-service",
+      auth: "public",
+      json: {
+        login: uniqueEmail("smoke-rh-target"),
+        password: env.password,
+      },
+      expectedStatus: [200],
+      expectEnvelope: false,
     });
-    if (response.status === 400) {
-      state.rhPointDayAlreadyComplete = true;
-      return;
-    }
-    const action = pickFirst(response.body, "data.action");
-    const pointId = pickFirst(response.body, "data.point.id");
-    // Only capture the first point ID (entry punch) — calculate requires the entry point
-    if (pointId && !state.rhPointId) {
-      state.rhPointId = pointId;
-    }
-    if (action === "Saída") {
-      return;
-    }
+    getSessionHeaders("GET");
+    state.rhTargetUserSessionCookies = { ...state.sessionCookies };
+  } finally {
+    state.sessionCookies = adminSessionCookies;
   }
+
+  return state.rhTargetUserSessionCookies;
 }
 
 const handlers = {
@@ -964,6 +1009,23 @@ const handlers = {
 
   async reportsCatalog(op) {
     await httpRequest(op);
+  },
+
+  async reportsPreview(op) {
+    await httpRequest(op, {
+      json: {
+        definition: {
+          sources: ["parcelamento.installments"],
+          columns: [
+            {
+              source: "parcelamento.installments",
+              field: "agreement_number",
+              alias: "agreement_number",
+            },
+          ],
+        },
+      },
+    });
   },
 
   async certificatePjList(op) {
@@ -1693,12 +1755,12 @@ const handlers = {
   },
 
   async tiTermSign(op) {
-    const targetToken = await ensureRhTargetUserToken();
+    const targetToken = await ensureRhTargetUserSessionCookies();
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/ti/terms/${requireState("tiTermId")}/sign`,
       auth: "public",
-      headers: { Authorization: `Bearer ${targetToken}` },
+      headers: getSessionHeaders("POST", targetToken),
       json: {
         reason: "Smoke TI term signed.",
       },
@@ -1772,14 +1834,44 @@ const handlers = {
   async userSession(_op) {
     const session = await bootstrapAndLogin();
     state.session = session;
-    state.bearerToken = session.token;
+    state.bearerToken = createAdminToken(session.permission);
     state.adminBearerToken =
-      session.permission === WorkspacePermissionLevel.Admin ? session.token : createAdminToken();
+      session.permission === WorkspacePermissionLevel.Admin
+        ? state.bearerToken
+        : createAdminToken();
     state.baselineDepartmentId = session.department_id || state.baselineDepartmentId;
     log(
       "PASS",
       `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`,
     );
+  },
+
+  async userSessionRefreshMissingCsrf(op) {
+    await httpRequest(op, {
+      auth: "public",
+      headers: getSessionHeaders("GET"),
+      expectedStatus: [403],
+      expectEnvelope: false,
+    });
+  },
+
+  async userSessionRefresh(op) {
+    const response = await httpRequest(op, { expectedStatus: [200] });
+    if (response.body?.data?.token !== undefined) {
+      throw new Error("Refresh response exposed a token.");
+    }
+    state.session = response.body?.data ?? state.session;
+  },
+
+  async userSessionLogout(op) {
+    await runCleanupTasks();
+    await httpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    if (state.sessionCookies["cw.session"] || state.sessionCookies["cw.csrf"]) {
+      throw new Error("Logout did not expire both session cookies.");
+    }
   },
 
   async reportingAccessContext(op) {
@@ -3461,11 +3553,11 @@ const handlers = {
 
   async rhPointRegister(op) {
     // Use rhTargetUser (fresh each run) so we always get a clean point day
-    const targetToken = await ensureRhTargetUserToken();
+    const targetToken = await ensureRhTargetUserSessionCookies();
     const response = await httpRequest(op, {
       expectedStatus: [200, 400],
       auth: "public",
-      headers: { Authorization: `Bearer ${targetToken}` },
+      headers: getSessionHeaders("POST", targetToken),
     });
     if (isBadExpectation(op)) {
       return;
@@ -3480,7 +3572,7 @@ const handlers = {
   async rhPointCalculate(op) {
     // Runs after rhPointAdjustmentApprove (via actionExecutionRank:500).
     // Approval sets clock_in/lunch_out/lunch_in/clock_out on the point, so calculate succeeds.
-    const targetToken = await ensureRhTargetUserToken();
+    const targetToken = await ensureRhTargetUserSessionCookies();
     if (!state.rhPointId) {
       log("SKIP", `rhPointCalculate — no point ID available`);
       return;
@@ -3489,7 +3581,7 @@ const handlers = {
       expectedStatus: [200],
       path: `/rh/point/${state.rhPointId}/calculate`,
       auth: "public",
-      headers: { Authorization: `Bearer ${targetToken}` },
+      headers: getSessionHeaders("POST", targetToken),
     });
   },
 
@@ -3504,12 +3596,12 @@ const handlers = {
     const clockOut = new Date(now);
     clockOut.setUTCHours(17, 0, 0, 0);
 
-    const targetToken = await ensureRhTargetUserToken();
+    const targetToken = await ensureRhTargetUserSessionCookies();
     const response = await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/point/adjustment/request",
       auth: "public",
-      headers: { Authorization: `Bearer ${targetToken}` },
+      headers: getSessionHeaders("POST", targetToken),
       json: {
         point_id: requireState("rhPointId"),
         clock_in: clockIn.toISOString(),
@@ -3578,12 +3670,12 @@ const handlers = {
     lunchIn.setUTCHours(13, 0, 0, 0);
     const clockOut = new Date(now);
     clockOut.setUTCHours(17, 0, 0, 0);
-    const targetToken = await ensureRhTargetUserToken();
+    const targetToken = await ensureRhTargetUserSessionCookies();
     const createResponse = await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/point/adjustment/request",
       auth: "public",
-      headers: { Authorization: `Bearer ${targetToken}` },
+      headers: getSessionHeaders("POST", targetToken),
       json: {
         point_id: requireState("rhPointId"),
         clock_in: clockIn.toISOString(),
@@ -3761,14 +3853,14 @@ const handlers = {
     }
     // On 409 (score already exists for this user+quarter), recover the ID from the list endpoint
     if (!state.rhScoreId) {
-      const targetToken = await ensureRhTargetUserToken();
+      const targetToken = await ensureRhTargetUserSessionCookies();
       const listResp = await helperCall("rh-score-quarter-recover", {
         method: "GET",
         path: "/rh/score/quarters/me",
         target: "gateway",
         service: "rh-service",
         auth: "public",
-        headers: { Authorization: `Bearer ${targetToken}` },
+        headers: getSessionHeaders("POST", targetToken),
         expectedStatus: [200],
         expectEnvelope: false,
       });
@@ -3804,12 +3896,12 @@ const handlers = {
 
   async rhScoreEvaluationPending(op) {
     // Score was generated for rhTargetUser — fetch pending evals using their token (not admin's)
-    const targetToken = await ensureRhTargetUserToken();
+    const targetToken = await ensureRhTargetUserSessionCookies();
     const response = await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/score/evaluations/pending",
       auth: "public",
-      headers: { Authorization: `Bearer ${targetToken}` },
+      headers: getSessionHeaders("POST", targetToken),
     });
     if (isBadExpectation(op)) {
       return;
@@ -3822,12 +3914,12 @@ const handlers = {
 
   async rhScoreEvaluationSubmit(op) {
     // Submit the SELF evaluation as rhTargetUser (they are the one with pending evals)
-    const targetToken = await ensureRhTargetUserToken();
+    const targetToken = await ensureRhTargetUserSessionCookies();
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/score/evaluations/submit",
       auth: "public",
-      headers: { Authorization: `Bearer ${targetToken}` },
+      headers: getSessionHeaders("POST", targetToken),
       json: {
         evaluation_id: requireState("rhScoreEvaluationId"),
         answers: [{ question_id: requireState("rhScoreQuestionId"), answer: 5 }],
@@ -3994,12 +4086,12 @@ const handlers = {
 
   async rhTimeSheetSign(op) {
     // Timesheet can only be signed by its owner (rhTargetUser), not the admin
-    const targetToken = await ensureRhTargetUserToken();
+    const targetToken = await ensureRhTargetUserSessionCookies();
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/rh/timesheets/sign",
       auth: "public",
-      headers: { Authorization: `Bearer ${targetToken}` },
+      headers: getSessionHeaders("POST", targetToken),
       json: { id: requireState("rhTimeSheetId"), signature: "smoke-signature" },
     });
   },
@@ -4259,11 +4351,11 @@ const handlers = {
   async userCreateForbidden(op) {
     // Gateway policy: POST /user requires minPermission: 2
     // rhTargetUser has permission=1 → 403 from gateway
-    const targetToken = await ensureRhTargetUserToken();
+    const targetToken = await ensureRhTargetUserSessionCookies();
     await httpRequest(op, {
       expectedStatus: [403],
       auth: "public",
-      headers: { Authorization: `Bearer ${targetToken}` },
+      headers: getSessionHeaders("POST", targetToken),
       json: {
         name: uniqueText("Smoke Forbidden User"),
         login: uniqueEmail("smoke-forbidden"),
@@ -4279,11 +4371,11 @@ const handlers = {
   async taskModelDeleteForbidden(op) {
     // TaskModelService.deleteModel checks user.permission < 2 → 403
     // rhTargetUser has permission=1
-    const targetToken = await ensureRhTargetUserToken();
+    const targetToken = await ensureRhTargetUserSessionCookies();
     await httpRequest(op, {
       expectedStatus: [403],
       auth: "public",
-      headers: { Authorization: `Bearer ${targetToken}` },
+      headers: getSessionHeaders("POST", targetToken),
       query: { task_id: requireState("taskModelPrimaryId") },
     });
   },
@@ -4573,20 +4665,7 @@ async function run() {
       }
     }
   } finally {
-    if (cleanupTasks.length > 0) {
-      log("INFO", `Running ${cleanupTasks.length} cleanup task(s).`);
-    }
-    for (const task of cleanupTasks.reverse()) {
-      try {
-        await task.fn();
-        log("PASS", `cleanup ${task.label}`);
-      } catch (error) {
-        log(
-          "WARN",
-          `cleanup ${task.label} failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
+    await runCleanupTasks();
   }
 
   // Structured summary

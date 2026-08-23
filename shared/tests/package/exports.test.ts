@@ -5,6 +5,7 @@ test("package root and subpath exports resolve", async () => {
   const root = await import("@workspace/shared");
   const auth = await import("@workspace/shared/auth");
   const audit = await import("@workspace/shared/audit");
+  const database = await import("@workspace/shared/database");
   const http = await import("@workspace/shared/http");
   const logger = await import("@workspace/shared/logger");
   const schemas = await import("@workspace/shared/schemas");
@@ -14,6 +15,7 @@ test("package root and subpath exports resolve", async () => {
   assert.equal(root.parseWithZod, schemas.parseWithZod);
   assert.equal(root.authenticateFromAuthHeader, auth.authenticateFromAuthHeader);
   assert.equal(root.createAuditRecorder, audit.createAuditRecorder);
+  assert.equal(root.parseDatabasePoolMax, database.parseDatabasePoolMax);
   assert.equal(root.createLogger, logger.createLogger);
   assert.equal(root.EncryptionService, security.EncryptionService);
 });

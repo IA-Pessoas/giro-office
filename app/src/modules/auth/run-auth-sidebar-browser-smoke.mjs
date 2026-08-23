@@ -71,12 +71,6 @@ const noAccessUser = createUser({
   login: "dashboard.no-access@castelo.test",
 });
 
-function createToken(payload) {
-  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${header}.${body}.signature`;
-}
-
 async function installApiMocks(page, currentUser) {
   await page.route("**/user/me", async (route) => {
     await route.fulfill({
@@ -187,16 +181,11 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
 
   await context.addCookies([
     {
-      httpOnly: false,
-      name: "cw.token",
+      httpOnly: true,
+      name: "cw.session",
       sameSite: "Lax",
       url: baseUrl,
-      value: createToken({
-        id: currentUser.id,
-        modules: currentUser.modules,
-        permission: currentUser.permission,
-        type: currentUser.type,
-      }),
+      value: "opaque-test-session",
     },
   ]);
 
@@ -283,16 +272,11 @@ async function assertDashboardIsHiddenWithoutModuleAccess() {
 
   await context.addCookies([
     {
-      httpOnly: false,
-      name: "cw.token",
+      httpOnly: true,
+      name: "cw.session",
       sameSite: "Lax",
       url: baseUrl,
-      value: createToken({
-        id: noAccessUser.id,
-        modules: noAccessUser.modules,
-        permission: noAccessUser.permission,
-        type: noAccessUser.type,
-      }),
+      value: "opaque-test-session",
     },
   ]);
 

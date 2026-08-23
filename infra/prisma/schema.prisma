@@ -339,11 +339,27 @@ model User {
   assigneerRequestsTI         TIRequest[]            @relation("TiAssignee")
   requestsTI                  TIRequest[]            @relation("TiRequester")
   terms                       TermTecnologia[]
+  authSessions                AuthSession[]
   triageMonthlys              TriageMonthly[]
   responsiblesTriage          TriageResponsible[]
   department                  Department             @relation(fields: [department_id], references: [id])
 
   @@map("users")
+}
+
+model AuthSession {
+  id         String    @id @default(uuid())
+  user_id    String
+  csrf_hash  String
+  expires_at DateTime
+  revoked_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("auth_sessions")
 }
 
 model Permission {

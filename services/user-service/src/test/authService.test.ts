@@ -2,11 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, passwordHashMock, jwtMock } = vi.hoisted(() => ({
   prismaMock: {
+    $executeRaw: vi.fn(),
     user: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    authSession: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
     organization: {
@@ -52,6 +58,7 @@ describe("AuthService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     passwordHashMock.verifyPassword.mockResolvedValue({ valid: false, needsRehash: false });
+    prismaMock.authSession.findFirst.mockResolvedValue({ id: "session-1" });
   });
 
   function activeUser(overrides: Record<string, unknown> = {}) {
@@ -195,6 +202,7 @@ describe("AuthService", () => {
       department_id: "dep-1",
       organization_id: "org-1",
       token: "jwt-token",
+      csrfToken: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
     });
     expect(jwtMock.sign).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -203,10 +211,123 @@ describe("AuthService", () => {
         permission: 2,
         type: "admin",
         modules: expect.objectContaining({ ti: 2 }),
+        session_id: expect.any(String),
       }),
       "jwt-secret",
       expect.any(Object),
     );
+  });
+
+  it("login assina sessão de um dia vinculada ao CSRF retornado", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(activeUser());
+    passwordHashMock.verifyPassword.mockResolvedValue({ valid: true, needsRehash: false });
+    jwtMock.sign.mockReturnValue("jwt-token");
+
+    const result = await new AuthService().login({ login: "account", password: "secret" });
+
+    expect(jwtMock.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ csrf_hash: expect.stringMatching(/^[a-f0-9]{64}$/u) }),
+      "jwt-secret",
+      expect.objectContaining({ expiresIn: 86_400, subject: "user-1" }),
+    );
+    expect(result.csrfToken).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+    expect(result.token).toBe("jwt-token");
+    expect(prismaMock.authSession.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        user_id: "user-1",
+        csrf_hash: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        expires_at: expect.any(Date),
+      }),
+    });
+    expect(prismaMock.$executeRaw).toHaveBeenCalledOnce();
+  });
+
+  it("refresh rotaciona apenas a sessão atual com CAS do vínculo CSRF", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(activeUser());
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+    jwtMock.sign.mockReturnValue("jwt-token");
+    const identity = {
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_version: 1,
+      session_id: "session-1",
+      csrf_hash: "a".repeat(64),
+    };
+
+    const refreshed = await new AuthService().refreshSession(identity);
+
+    expect(refreshed.csrfToken).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: "session-1",
+        user_id: "user-1",
+        csrf_hash: "a".repeat(64),
+        revoked_at: null,
+      }),
+      data: expect.objectContaining({
+        csrf_hash: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        expires_at: expect.any(Date),
+      }),
+    });
+    expect(jwtMock.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ session_version: 1, session_id: "session-1" }),
+      "jwt-secret",
+      expect.any(Object),
+    );
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("refresh rejeita replay concorrente da versão já rotacionada", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(activeUser());
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.authSession.findFirst.mockResolvedValue({ csrf_hash: "b".repeat(64) });
+
+    await expect(
+      new AuthService().refreshSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(jwtMock.sign).not.toHaveBeenCalled();
+  });
+
+  it("logout revoga somente a sessão atual", async () => {
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+
+    await new AuthService().revokeSession("user-1", "session-1");
+
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "session-1",
+        user_id: "user-1",
+        revoked_at: null,
+      },
+      data: { revoked_at: expect.any(Date) },
+    });
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("logout rejeita sessão já revogada", async () => {
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(new AuthService().revokeSession("user-1", "session-1")).rejects.toMatchObject({
+      statusCode: 401,
+    });
+  });
+
+  it("logout revoga a sessão mesmo após rotação concorrente do CSRF", async () => {
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+
+    await new AuthService().revokeSession("user-1", "session-1");
+
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
+      where: { id: "session-1", user_id: "user-1", revoked_at: null },
+      data: { revoked_at: expect.any(Date) },
+    });
   });
 
   it("rehash de bcrypt válido uma única vez sem sobrescrever uma troca concorrente", async () => {
@@ -345,14 +466,21 @@ describe("AuthService", () => {
   });
 
   it("rejeita token quando a versão persistida da sessão mudou", async () => {
-    prismaMock.user.findUnique.mockResolvedValue({
-      ...activeUser(),
-      session_version: 2,
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      user: activeUser({ session_version: 2 }),
     });
     const service = new AuthService();
 
     await expect(
-      service.validateSession({ user_id: "user-1", organization_id: "org-1", session_version: 1 }),
+      service.validateSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+      }),
     ).rejects.toMatchObject({
       statusCode: 401,
     });
@@ -363,33 +491,105 @@ describe("AuthService", () => {
     activeUser({ organization: { id: "org-1", status: "inactive" } }),
     activeUser({ department: { organization_id: "org-2" } }),
   ])("rejeita sessão para contexto persistido inválido", async (user) => {
-    prismaMock.user.findUnique.mockResolvedValue(user);
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      user,
+    });
 
     await expect(
       new AuthService().validateSession({
         user_id: "user-1",
         organization_id: "org-1",
         session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
       }),
     ).rejects.toMatchObject({ statusCode: 401 });
   });
 
   it("aceita sessão para usuário e organização ativos com associação compatível", async () => {
-    prismaMock.user.findUnique.mockResolvedValue(activeUser());
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      user: activeUser(),
+    });
 
     await expect(
       new AuthService().validateSession({
         user_id: "user-1",
         organization_id: "org-1",
         session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
       }),
     ).resolves.toBeUndefined();
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("classifica o JWT anterior como sessão substituída sem aceitá-lo", async () => {
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "b".repeat(64),
+      user: activeUser(),
+    });
+
+    await expect(
+      new AuthService().validateSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("aceita token legado somente durante a compatibilidade Bearer explícita", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(activeUser());
+    const legacyIdentity = {
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_version: 1,
+    };
+
+    await expect(new AuthService().validateSession(legacyIdentity)).rejects.toMatchObject({
+      statusCode: 401,
+    });
+    await expect(
+      new AuthService().validateSession(legacyIdentity, { allowLegacyBearer: true }),
+    ).resolves.toBeUndefined();
+    expect(prismaMock.authSession.findFirst).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { session_id: "session-1", csrf_hash: undefined },
+    { session_id: undefined, csrf_hash: "a".repeat(64) },
+  ])("rejeita vínculo de sessão parcial mesmo na compatibilidade Bearer", async (binding) => {
+    prismaMock.user.findUnique.mockResolvedValue(activeUser());
+
+    await expect(
+      new AuthService().validateSession(
+        {
+          user_id: "user-1",
+          organization_id: "org-1",
+          session_version: 1,
+          ...binding,
+        },
+        { allowLegacyBearer: true },
+      ),
+    ).rejects.toMatchObject({ statusCode: 401 });
   });
 
   it("mantém login e sessão de usuário legado vinculados pela organização do departamento", async () => {
     const legacyUser = activeUser({ organization_id: null, organization: null });
     prismaMock.user.findFirst.mockResolvedValue(legacyUser);
     prismaMock.user.findUnique.mockResolvedValue(legacyUser);
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      user: legacyUser,
+    });
     passwordHashMock.verifyPassword.mockResolvedValue({ valid: true, needsRehash: false });
     jwtMock.sign.mockReturnValue("jwt-token");
 
@@ -404,6 +604,8 @@ describe("AuthService", () => {
         user_id: "user-1",
         organization_id: "org-1",
         session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
       }),
     ).resolves.toBeUndefined();
   });
@@ -412,13 +614,19 @@ describe("AuthService", () => {
     undefined,
     "org-2",
   ])("rejeita sessão quando a claim de organização está ausente ou não coincide", async (organization_id) => {
-    prismaMock.user.findUnique.mockResolvedValue(activeUser());
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      user: activeUser(),
+    });
 
     await expect(
       new AuthService().validateSession({
         user_id: "user-1",
         organization_id,
         session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
       }),
     ).rejects.toMatchObject({ statusCode: 401 });
   });

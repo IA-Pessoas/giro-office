@@ -10,8 +10,7 @@ import React, {
 } from 'react';
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
-import { parseCookies } from 'nookies';
-import { createBearerAuthHeaders } from '@modules/auth/utils/authHeaders';
+import { api } from '@shared/services/apiClient';
 import { chatService } from '../modules/chat/services/chatService';
 import { toast } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
@@ -54,16 +53,10 @@ export interface ChatContextType {
 
 export const ChatContext = createContext<ChatContextType | null>(null);
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3334';
 const MESSAGES_PER_PAGE = 30;
 const MAX_CHAT_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_CHAT_UPLOAD_MB = MAX_CHAT_UPLOAD_BYTES / (1024 * 1024);
 const CHAT_UPLOAD_SIZE_ERROR_MESSAGE = `Arquivo excede o limite de ${MAX_CHAT_UPLOAD_MB} MB.`;
-
-function getChatAuthHeaders() {
-    const { 'cw.token': token } = parseCookies();
-    return createBearerAuthHeaders(token);
-}
 
 export function ChatProvider({ children }: { children: ReactNode }) {
     const { user, isAuthenticated } = useAuth(); 
@@ -291,20 +284,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }, [socket]);
 
     useEffect(() => {
-        if (isAuthenticated) {
-            const authHeaders = getChatAuthHeaders();
-
-            if (!authHeaders) {
-                setChats([]);
-                return;
-            }
-
-            fetch(`${SOCKET_URL}/chat`, { headers: authHeaders })
-                .then(res => res.ok ? res.json() : [])
-                .then(data => setChats(data))
+        if (isAuthenticated && socket?.connected) {
+            api.get<Chat[]>('/chat')
+                .then(response => setChats(response.data))
                 .catch(err => console.error("Falha ao buscar chats:", err));
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, socket]);
 
     useEffect(() => {
         if (!user) {
@@ -374,11 +359,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         try {
             const controller = new AbortController();
             fetchControllerRef.current = controller;
-            const authHeaders = getChatAuthHeaders();
-
-            if (!authHeaders) {
-                return;
-            }
 
             let hasMoreInLoop = true;
             let currentPageInLoop = 1;
@@ -386,25 +366,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             let accumulatedMessages: Message[] = [];
 
             // Carga inicial da página 1
-            const initialResponse = await fetch(`${SOCKET_URL}/chat/${chat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${currentPageInLoop}`, {
-                headers: authHeaders,
+            const initialResponse = await api.get(`/chat/${chat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${currentPageInLoop}`, {
                 signal: controller.signal
             });
 
-            if (!initialResponse.ok) throw new Error("Falha ao buscar a primeira página de mensagens.");
-            
-            initialData = await initialResponse.json();
+            initialData = initialResponse.data;
             const initialMessages = initialData.messages.reverse();
             setMessages(initialMessages);
             setTotalMessages(initialData.total);
             
             while (!messageFound && hasMoreInLoop) {
-                const response = await fetch(`${SOCKET_URL}/chat/${chat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${currentPageInLoop}`, {
-                    headers: authHeaders,
+                const response = await api.get(`/chat/${chat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${currentPageInLoop}`, {
                     signal: controller.signal
                 });
-                if (!response.ok) throw new Error("Falha ao buscar página.");
-                const data = await response.json();
+                const data = response.data;
                 
                 if (currentPageInLoop === 1) setTotalMessages(data.total);
 
@@ -439,28 +414,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const currentChat = selectedChatRef.current;
         if (isFetchingMore.current || !hasMoreMessagesRef.current || !currentChat) return;
 
-        const authHeaders = getChatAuthHeaders();
-        if (!authHeaders) return;
-
         isFetchingMore.current = true;
         setIsLoadingMore(true);
         const nextPage = currentPageRef.current + 1;
 
         try {
-            const response = await fetch(`${SOCKET_URL}/chat/${currentChat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${nextPage}`, {
-                headers: authHeaders
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.messages.length > 0) {
-                    const existingMessageIds = new Set(messagesRef.current.map(msg => msg.id));
-                    const uniqueNewMessages = data.messages.reverse().filter(msg => !existingMessageIds.has(msg.id));
-                    setMessages(prevMessages => [...uniqueNewMessages.reverse(), ...prevMessages]);
-                    setCurrentPage(nextPage);
-                } else {
-                    setHasMoreMessages(false);
-                }
+            const response = await api.get(`/chat/${currentChat.id}/messages?limit=${MESSAGES_PER_PAGE}&page=${nextPage}`);
+            const data = response.data;
+            if (data.messages.length > 0) {
+                const existingMessageIds = new Set(messagesRef.current.map(msg => msg.id));
+                const uniqueNewMessages = data.messages.reverse().filter(msg => !existingMessageIds.has(msg.id));
+                setMessages(prevMessages => [...uniqueNewMessages.reverse(), ...prevMessages]);
+                setCurrentPage(nextPage);
+            } else {
+                setHasMoreMessages(false);
             }
         } catch (error) { console.error("Erro ao buscar mais mensagens:", error);
         } finally {
@@ -473,22 +440,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setIsSearching(true)
 
         try {
-            const authHeaders = getChatAuthHeaders()
-
-            if (!authHeaders) {
-                setSearchResults([])
-                setIsSearching(false)
-                return
-            }
-
-            const response = await fetch(`${SOCKET_URL}/messages/search?query=${encodeURIComponent(query)}`, {
-                headers: authHeaders
-            })
-
-            if (response.ok) {
-                const data = await response.json()
-                setSearchResults(data)
-            }
+            const response = await api.get(`/messages/search?query=${encodeURIComponent(query)}`)
+            setSearchResults(response.data)
         } catch (error) {
             console.error('Erro ao buscar mensagens:', error)
             setSearchResults([])
@@ -635,13 +588,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setFirstUnreadId(null);
 
         // 2. Sincronização com o Backend em segundo plano
-        const authHeaders = getChatAuthHeaders();
-        if (!authHeaders) return;
-
-        fetch(`${SOCKET_URL}/chat/${chatId}/read`, {
-            method: 'POST',
-            headers: authHeaders
-        });
+        void api.post(`/chat/${chatId}/read`);
     }, []);
     const uploadFileAndSendMessage = useCallback(async (file: File) => {
         const currentChat = selectedChatRef.current;
@@ -661,9 +608,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        const authHeaders = getChatAuthHeaders();
-        if (!authHeaders) return;
-
         setIsUploading(true);
 
         const formData = new FormData();
@@ -671,15 +615,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         formData.append('file', file);
 
         try {
-            const response = await fetch(`${SOCKET_URL}/chat/media`, {
-                method: 'POST',
-                headers: authHeaders,
-                body: formData
-            });
-
-            if (!response.ok) throw new Error("Falha no upload do arquivo.");
-            
-            const result = await response.json();
+            const response = await api.post('/chat/media', formData);
+            const result = response.data;
             const { fileUrl } = result;
             const messageType = file.type.startsWith('image') ? 'IMAGE' : 'AUDIO';
 

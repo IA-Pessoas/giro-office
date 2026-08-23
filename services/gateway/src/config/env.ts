@@ -70,6 +70,8 @@ const gatewayEnvSchema = z
     nodeEnv: z.string().optional().default("development"),
     enableApiDocsEnv: z.string().optional(),
     authorizationMode: z.enum(["enforce", "observe"]).optional().default("enforce"),
+    bearerAuthCompatibilityEnv: z.enum(["true", "false", "1", "0"]).optional(),
+    authCookieSecureEnv: z.enum(["true", "false", "1", "0"]).optional(),
     auditEnabled: z
       .string()
       .optional()
@@ -155,6 +157,11 @@ const gatewayEnvSchema = z
       env.nodeEnv === "production"
         ? env.clientServiceInternalToken
         : (env.clientServiceInternalToken ?? env.auditServiceToken);
+    const bearerAuthCompatibility = parseBoolean(env.bearerAuthCompatibilityEnv);
+    const authCookieSecure =
+      env.authCookieSecureEnv !== undefined
+        ? parseBoolean(env.authCookieSecureEnv)
+        : env.nodeEnv === "production";
 
     validateProductionInternalServiceToken({
       nodeEnv: env.nodeEnv,
@@ -190,6 +197,8 @@ const gatewayEnvSchema = z
     return {
       ...env,
       clientServiceInternalToken,
+      bearerAuthCompatibility,
+      authCookieSecure,
       enableApiDocs,
       logPretty: env.nodeEnv !== "production" && env.logPretty,
     };
@@ -199,6 +208,8 @@ export interface GatewayEnv {
   nodeEnv: string;
   enableApiDocs: boolean;
   authorizationMode: "enforce" | "observe";
+  bearerAuthCompatibility: boolean;
+  authCookieSecure: boolean;
   auditEnabled: boolean;
   auditServiceToken: string;
   auditServiceUrl: string;
@@ -240,6 +251,8 @@ export function getGatewayEnv(): GatewayEnv {
     nodeEnv: process.env.NODE_ENV,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     authorizationMode: process.env.GATEWAY_AUTHORIZATION_MODE,
+    bearerAuthCompatibilityEnv: process.env.GATEWAY_BEARER_AUTH_COMPATIBILITY,
+    authCookieSecureEnv: process.env.AUTH_COOKIE_SECURE,
     auditEnabled: process.env.AUDIT_ENABLED,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,

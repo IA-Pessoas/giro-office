@@ -2,13 +2,6 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { registerHooks } from "node:module";
 
-import { AuthTokenError } from "../../shared/services/errors/AuthTokenError.ts";
-import {
-  AUTH_COOKIE_MAX_AGE_SECONDS,
-  AUTH_COOKIE_NAME,
-  getAuthCookieOptions,
-} from "./utils/authCookie.ts";
-import { createBearerAuthHeaders, getAuthTokenValue } from "./utils/authHeaders.ts";
 import {
   canAccessAdministration,
   canCreateOrganizationOwner,
@@ -34,14 +27,6 @@ import {
 registerHooks({
   resolve(specifier, context, nextResolve) {
     if (
-      specifier === "./moduleAccess" &&
-      (context.parentURL?.endsWith("/modules/auth/utils/canSSRAdmin.ts") ||
-        context.parentURL?.endsWith("/modules/auth/utils/sessionToken.ts"))
-    ) {
-      return nextResolve(`${specifier}.ts`, context);
-    }
-
-    if (
       specifier === "../utils/moduleAccess" &&
       context.parentURL?.endsWith("/modules/auth/store/accessStore.ts")
     ) {
@@ -52,8 +37,6 @@ registerHooks({
   },
 });
 
-const { canSSRAdmin } = await import("./utils/canSSRAdmin.ts");
-const { getModulePermissionsFromToken } = await import("./utils/sessionToken.ts");
 const {
   getAccessStoreState,
   createAccessStoreUserSnapshot,
@@ -206,32 +189,6 @@ function getFunctionSource(source, functionName) {
   }
 
   assert.fail(`Function ${functionName} was not closed`);
-}
-
-function createToken(payload) {
-  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${header}.${body}.signature`;
-}
-
-function createSsrContext(token) {
-  const headers = {};
-
-  if (token) {
-    headers.cookie = `cw.token=${token}`;
-  }
-
-  return {
-    req: {
-      headers,
-    },
-    res: {
-      getHeader() {
-        return undefined;
-      },
-      setHeader() {},
-    },
-  };
 }
 
 const authContextSource = await readFile(
@@ -520,29 +477,6 @@ await (async () => {
     );
   });
 
-  await runTest("session token preserves the complete 0-3 matrix and drops retired modules", () => {
-    const token = createToken({
-      modules: {
-        certificado: 0,
-        comercial: 1,
-        contabil: 2,
-        fiscal: 3,
-        atendimento: 3,
-        pec: 2,
-        wiki: 1,
-      },
-    });
-    const modules = getModulePermissionsFromToken(token);
-
-    assert.equal(modules.certificado, 0);
-    assert.equal(modules.comercial, 1);
-    assert.equal(modules.contabil, 2);
-    assert.equal(modules.fiscal, 3);
-    assert.equal(Object.hasOwn(modules, "atendimento"), false);
-    assert.equal(Object.hasOwn(modules, "pec"), false);
-    assert.equal(Object.hasOwn(modules, "wiki"), false);
-  });
-
   await runTest("resolveModuleAccess grants additional module access outside department", () => {
     assert.deepEqual(
       resolveModuleAccess({
@@ -728,7 +662,7 @@ await (async () => {
   });
 
   await runTest("canSSRAuth redirects unauthenticated users to login", () => {
-    assert.match(canSSRAuthSource, /if\s*\(\s*!token\s*\)/);
+    assert.match(canSSRAuthSource, /if\s*\(\s*!session\s*\)/);
     assert.match(canSSRAuthSource, /destination:\s*["']\/login["']/);
   });
 
@@ -747,159 +681,6 @@ await (async () => {
     assert.equal(globalStylesSource.includes("translateX(115%)"), false);
   });
 
-  await runTest("canSSRAdmin redirects unauthenticated users to login", async () => {
-    const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
-    const result = await guard(createSsrContext());
-
-    assert.deepEqual(result, {
-      redirect: {
-        destination: "/login",
-        permanent: false,
-      },
-    });
-  });
-
-  await runTest(
-    "canSSRAdmin redirects non-admin users to dashboard without executing the page",
-    async () => {
-      let called = false;
-      const guard = canSSRAdmin(async () => {
-        called = true;
-        return { props: { ok: true } };
-      });
-
-      const result = await guard(createSsrContext(createToken({ permission: 1 })));
-
-      assert.equal(called, false);
-      assert.deepEqual(result, {
-        redirect: {
-          destination: "/dashboard",
-          permanent: false,
-        },
-      });
-    },
-  );
-
-  await runTest("canSSRAdmin can render a forbidden state instead of redirecting", async () => {
-    const guard = canSSRAdmin(async () => ({ props: { ok: true } }), {
-      onForbidden: () => ({ props: { forbidden: true } }),
-    });
-
-    const result = await guard(createSsrContext(createToken({ permission: 1 })));
-
-    assert.deepEqual(result, { props: { forbidden: true } });
-  });
-
-  await runTest("canSSRAdmin allows explicit owners through", async () => {
-    const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
-    const result = await guard(createSsrContext(createToken({ permission: 2, type: "owner" })));
-
-    assert.deepEqual(result, { props: { ok: true } });
-  });
-
-  await runTest("canSSRAdmin allows RH module admins through", async () => {
-    const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
-    const result = await guard(
-      createSsrContext(createToken({ permission: 1, modules: { rh: 3 } })),
-    );
-
-    assert.deepEqual(result, { props: { ok: true } });
-  });
-
-  await runTest("canSSRAdmin rejects legacy global permission without owner scope", async () => {
-    const guard = canSSRAdmin(async () => ({ props: { ok: true } }));
-    const result = await guard(createSsrContext(createToken({ permission: 999 })));
-
-    assert.deepEqual(result, { redirect: { destination: "/dashboard", permanent: false } });
-  });
-
-  await runTest("canSSRAdmin redirects auth-token failures to login", async () => {
-    const guard = canSSRAdmin(async () => {
-      throw new AuthTokenError();
-    });
-
-    const result = await guard(createSsrContext(createToken({ permission: 2, type: "owner" })));
-
-    assert.deepEqual(result, {
-      redirect: {
-        destination: "/login",
-        permanent: false,
-      },
-    });
-  });
-
-  await runTest(
-    "canSSRAdmin redirects unexpected authorization failures to dashboard",
-    async () => {
-      const guard = canSSRAdmin(async () => {
-        throw new Error("403 forbidden");
-      });
-
-      const result = await guard(createSsrContext(createToken({ permission: 2 })));
-
-      assert.deepEqual(result, {
-        redirect: {
-          destination: "/dashboard",
-          permanent: false,
-        },
-      });
-    },
-  );
-
-  await runTest("auth cookie options keep session cookie safe in development", () => {
-    assert.equal(AUTH_COOKIE_NAME, "cw.token");
-    assert.equal(AUTH_COOKIE_MAX_AGE_SECONDS, 60 * 60 * 24 * 7);
-    assert.deepEqual(getAuthCookieOptions("development"), {
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-      sameSite: "lax",
-      secure: false,
-    });
-  });
-
-  await runTest("auth cookie options enable secure flag in production", () => {
-    assert.deepEqual(getAuthCookieOptions("production"), {
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-      sameSite: "lax",
-      secure: true,
-    });
-  });
-
-  await runTest("auth cookie options allow HTTP develop slots to disable secure flag", () => {
-    const previousValue = process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE;
-    process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE = "false";
-
-    try {
-      assert.deepEqual(getAuthCookieOptions("production"), {
-        maxAge: 60 * 60 * 24 * 7,
-        path: "/",
-        sameSite: "lax",
-        secure: false,
-      });
-    } finally {
-      if (previousValue === undefined) {
-        delete process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE;
-      } else {
-        process.env.NEXT_PUBLIC_AUTH_COOKIE_SECURE = previousValue;
-      }
-    }
-  });
-
-  await runTest("auth headers are omitted when token is missing", () => {
-    assert.equal(getAuthTokenValue(undefined), null);
-    assert.equal(getAuthTokenValue(""), null);
-    assert.equal(createBearerAuthHeaders(undefined), null);
-    assert.equal(createBearerAuthHeaders(""), null);
-  });
-
-  await runTest("auth headers include bearer token when token exists", () => {
-    assert.equal(getAuthTokenValue("abc.def.signature"), "abc.def.signature");
-    assert.deepEqual(createBearerAuthHeaders("abc.def.signature"), {
-      Authorization: "Bearer abc.def.signature",
-    });
-  });
-
   await runTest("auth diagnostics are hidden in production", () => {
     assert.match(authContextSource, /process\.env\.NODE_ENV !== "production"/);
     assert.match(authContextSource, /function logAuthError/);
@@ -913,7 +694,7 @@ await (async () => {
   await runTest("sessão inválida encerra o loading e orienta o retorno ao login", () => {
     assert.match(
       authContextSource,
-      /toast\.error\("Sessão expirada\. Faça login novamente\.",\s*\{\s*toastId: "auth-session-expired"/,
+      /function signOut\(message = "Sessão expirada\. Faça login novamente\."\)[\s\S]*toast\.error\(message,\s*\{\s*toastId: "auth-session-expired"/,
     );
     assert.match(authContextSource, /registerAuthInvalidationHandler/);
     assert.match(authContextSource, /setUser\(null\);/);
@@ -966,7 +747,7 @@ await (async () => {
   });
 
   await runTest(
-    "admin permission updates refresh the authenticated session when editing self",
+    "admin permission updates require a new login when editing self",
     () => {
       assert.match(authContextSource, /refreshSession:\s*\(\)\s*=>\s*Promise<UserProps \| null>/);
       assert.match(authContextSource, /async function refreshSession\(\)/);
@@ -974,11 +755,13 @@ await (async () => {
         authContextSource,
         /<AuthContext\.Provider value=\{\{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading \}\}/,
       );
-      assert.match(administracaoSource, /const \{ user, refreshSession \} = useAuth\(\);/);
+      assert.match(administracaoSource, /import \{ signOut, useAuth \} from "@\/context\/AuthContext";/);
+      assert.match(administracaoSource, /const \{ user \} = useAuth\(\);/);
       assert.match(
         administracaoSource,
-        /if \(selectedPermissionUserId === user\?\.id\) \{[\s\S]*await refreshSession\(\);[\s\S]*\}/,
+        /if \(selectedPermissionUserId === user\?\.id\) \{[\s\S]*signOut\("Permissões atualizadas\. Entre novamente para aplicar os novos acessos\."\);[\s\S]*return;[\s\S]*\}/,
       );
+      assert.doesNotMatch(administracaoSource, /refreshSession/);
       assert.match(
         authContextSource,
         /await queryClient\.invalidateQueries\(\{ queryKey: ME_QUERY_KEY \}\);/,

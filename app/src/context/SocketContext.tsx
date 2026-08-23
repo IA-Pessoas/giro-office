@@ -1,5 +1,3 @@
-import { getAuthTokenValue } from "@modules/auth/utils/authHeaders";
-import { parseCookies } from "nookies";
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
 
@@ -33,18 +31,18 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (isAuthenticated) {
-      const { "cw.token": token } = parseCookies();
-      const authToken = getAuthTokenValue(token);
+      const newSocket = io(socketClientConfig.url);
+      const handleConnect = () => setSocket(newSocket);
+      const handleDisconnect = () => {
+        setSocket((currentSocket) => (currentSocket === newSocket ? null : currentSocket));
+      };
 
-      if (!authToken) {
-        closeCurrentSocket();
-        return;
-      }
-
-      const newSocket = io(socketClientConfig.url, { auth: { token: authToken } });
-      setSocket(newSocket);
+      newSocket.on("connect", handleConnect);
+      newSocket.on("disconnect", handleDisconnect);
 
       return () => {
+        newSocket.off("connect", handleConnect);
+        newSocket.off("disconnect", handleDisconnect);
         newSocket.close();
         setSocket((currentSocket) => (currentSocket === newSocket ? null : currentSocket));
       };

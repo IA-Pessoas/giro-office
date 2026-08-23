@@ -7,4 +7,5 @@ export * from "./rate-limit.js";
 export * from "./response.js";
 export * from "./security-config.js";
 export * from "./security-headers.js";
+export * from "./session-security.js";
 export * from "./swaggerUi.js";

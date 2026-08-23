@@ -79,6 +79,8 @@ const rawEnvSchema = z
 
     enableApiDocsEnv: z.string().optional(),
 
+    authCookieSecureEnv: z.enum(["true", "false", "1", "0"]).optional(),
+
     /** Token interno igual ao do gateway (`AUDIT_SERVICE_TOKEN`) para pedidos com headers x-auth-* */
 
     auditServiceToken: z.string().optional().default("audit-service-token"),
@@ -115,12 +117,16 @@ const rawEnvSchema = z
   });
 
 const envSchema = rawEnvSchema.transform((env) => {
-  const { enableApiDocsEnv, ...rest } = env;
+  const { authCookieSecureEnv, enableApiDocsEnv, ...rest } = env;
 
   const enableApiDocs =
     enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
       ? parseBoolean(enableApiDocsEnv)
       : rest.nodeEnv !== "production";
+  const authCookieSecure =
+    authCookieSecureEnv !== undefined
+      ? parseBoolean(authCookieSecureEnv)
+      : rest.nodeEnv === "production";
 
   validateProductionInternalServiceToken({
     nodeEnv: rest.nodeEnv,
@@ -147,6 +153,7 @@ const envSchema = rawEnvSchema.transform((env) => {
     logPretty: rest.nodeEnv !== "production" && rest.logPretty,
 
     enableApiDocs,
+    authCookieSecure,
   };
 });
 
@@ -176,6 +183,8 @@ export function getUserServiceEnv(): UserServiceEnv {
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
 
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+
+    authCookieSecureEnv: process.env.AUTH_COOKIE_SECURE,
 
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,

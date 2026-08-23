@@ -207,7 +207,7 @@ const op = ({
   path,
   action,
   target,
-  auth,
+  auth: target === "gateway" && (auth === "bearer" || auth === "admin-bearer") ? "session" : auth,
   specOperation,
   condition,
   handlerAction,
@@ -257,6 +257,10 @@ function determineGeneratedNegativeCase(entry) {
   }
 
   if (entry.auth === "admin-bearer" || entry.auth === "bearer") {
+    return "unauthorized401";
+  }
+
+  if (entry.auth === "session") {
     return "unauthorized401";
   }
 
@@ -401,6 +405,14 @@ const baseManifest = [
   op({
     service: "user-service",
     method: "POST",
+    path: "/user/session",
+    action: "userSession",
+    target: "gateway",
+    auth: "public",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
     path: "/internal/reporting/access-context",
     action: "reportingAccessContext",
     target: "direct",
@@ -423,20 +435,31 @@ const baseManifest = [
     service: "user-service",
     method: "POST",
     path: "/user/session",
-    action: "userSession",
-    target: "gateway",
-    auth: "public",
-  }),
-  op({
-    service: "user-service",
-    method: "POST",
-    path: "/user/session",
     action: "userSessionInvalid",
     target: "gateway",
     auth: "public",
     specOperation: false,
     expectedStatus: [401],
     expectedLabel: "wrong credentials",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/session/refresh",
+    action: "userSessionRefreshMissingCsrf",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+    expectedStatus: [403],
+    expectedLabel: "missing CSRF",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/session/refresh",
+    action: "userSessionRefresh",
+    target: "gateway",
+    auth: "session",
   }),
   op({
     service: "user-service",
@@ -461,7 +484,7 @@ const baseManifest = [
     path: "/user/me",
     action: "userMe",
     target: "gateway",
-    auth: "bearer",
+    auth: "session",
   }),
   op({
     service: "user-service",
@@ -548,7 +571,7 @@ const baseManifest = [
     path: "/user/{id}/photo",
     action: "userPhotoUpload",
     target: "gateway",
-    auth: "bearer",
+    auth: "session",
   }),
   op({
     service: "user-service",
@@ -565,6 +588,14 @@ const baseManifest = [
     action: "userPhotoDelete",
     target: "gateway",
     auth: "bearer",
+  }),
+  op({
+    service: "user-service",
+    method: "DELETE",
+    path: "/user/session",
+    action: "userSessionLogout",
+    target: "gateway",
+    auth: "session",
   }),
   op({
     service: "user-service",
@@ -662,6 +693,27 @@ const baseManifest = [
     path: "/reports/catalog",
     action: "reportsCatalogUnauthorized",
     handlerAction: "reportsCatalog",
+    target: "gateway",
+    auth: "public",
+    specOperation: false,
+    expectationKind: "bad",
+    expectedStatus: [401],
+    expectedLabel: "unauthorized",
+  }),
+  op({
+    service: "reports-service",
+    method: "POST",
+    path: "/reports/preview",
+    action: "reportsPreview",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "reports-service",
+    method: "POST",
+    path: "/reports/preview",
+    action: "reportsPreviewInvalid",
+    handlerAction: "reportsPreview",
     target: "gateway",
     auth: "public",
     specOperation: false,

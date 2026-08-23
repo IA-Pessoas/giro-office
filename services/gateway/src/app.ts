@@ -26,6 +26,7 @@ import {
   type SessionValidator,
 } from "./middlewares/authenticate.js";
 import { buildAuthorizeMiddleware } from "./middlewares/authorize.js";
+import { buildCsrfProtectionMiddleware } from "./middlewares/csrfProtection.js";
 import { buildRequestContextMiddleware } from "./middlewares/requestContext.js";
 import { buildGatewayOpenApiSpec } from "./openapi/gatewaySpec.js";
 import { buildHttpProxyMiddleware } from "./proxy/httpProxy.js";
@@ -265,9 +266,12 @@ function mountPublicRoutes(
       siteTitle: "gateway - OpenAPI",
     });
   } else {
-    app.use(["/docs", "/openapi.json", "/__gateway-openapi-static.json"], (_request, _response, next) => {
-      next(new ServiceError(404, "Recurso não encontrado."));
-    });
+    app.use(
+      ["/docs", "/openapi.json", "/__gateway-openapi-static.json"],
+      (_request, _response, next) => {
+        next(new ServiceError(404, "Recurso não encontrado."));
+      },
+    );
   }
 
   app.get("/health", (_request, response) => {
@@ -329,7 +333,16 @@ function mountAuthenticationBoundary(
     windowMs: env.rateLimitWindowMs,
   });
 
-  app.use(buildAuthenticateMiddleware(env.jwtSecret, sessionValidator));
+  app.use(
+    buildAuthenticateMiddleware({
+      jwtSecret: env.jwtSecret,
+      sessionValidator,
+      bearerAuthCompatibility: env.bearerAuthCompatibility,
+      authCookieSecure: env.authCookieSecure,
+      logger,
+    }),
+  );
+  app.use(buildCsrfProtectionMiddleware({ allowedOrigins: env.allowedOrigins, logger }));
   app.use(generalRateLimit);
   mountProtectedBlockedRoutes(app);
   app.use(buildAuthorizeMiddleware(env.authorizationMode, logger));
@@ -366,6 +379,7 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
       buildHttpProxyMiddleware(service.targetUrl, {
         internalServiceToken: service.internalServiceToken,
         permissionModule: service.permissionModule,
+        forwardSessionBinding: service.forwardSessionBinding,
       }),
     );
   }

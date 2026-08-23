@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Next.js (app/) — UI na porta 3000.
-# Build args: NEXT_PUBLIC_API_URL (browser), NEXT_PUBLIC_ENABLE_SOCKET, API_INTERNAL_URL (SSR → gateway).
+# Build args: NEXT_PUBLIC_API_URL (browser), API_INTERNAL_URL (SSR → gateway).
 FROM node:22-bookworm-slim AS base
 
 ENV PNPM_HOME=/pnpm
@@ -19,14 +19,8 @@ FROM base AS build
 WORKDIR /workspace
 
 ARG NEXT_PUBLIC_API_URL=http://localhost:3010
-ARG NEXT_PUBLIC_AUTH_COOKIE_SECURE=
-ARG NEXT_PUBLIC_ENABLE_SOCKET=false
-ARG NEXT_PUBLIC_SOCKET_URL=
 ARG API_INTERNAL_URL=http://gateway:3010
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_AUTH_COOKIE_SECURE=$NEXT_PUBLIC_AUTH_COOKIE_SECURE
-ENV NEXT_PUBLIC_ENABLE_SOCKET=$NEXT_PUBLIC_ENABLE_SOCKET
-ENV NEXT_PUBLIC_SOCKET_URL=$NEXT_PUBLIC_SOCKET_URL
 ENV API_INTERNAL_URL=$API_INTERNAL_URL
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json biome.json .npmrc ./

@@ -16,7 +16,7 @@ import type { UserAuditRecorder } from "./integrations/audit.js";
 import { isAuthenticated } from "./middlewares/isAuthenticated.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildUserServiceOpenApiSpec } from "./openapi/spec.js";
-import { authRoutes } from "./routes/auth.routes.js";
+import { createAuthRoutes } from "./routes/auth.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createPermissionRoutes } from "./routes/permission.routes.js";
 import { createUserRoutes } from "./routes/user.routes.js";
@@ -60,7 +60,7 @@ export function createUserApp(
   }
 
   app.use("/internal", createInternalReportingRouter(env));
-  app.use("/user", authRoutes);
+  app.use("/user", createAuthRoutes(env));
   app.post(
     "/user/:id/photo",
     isAuthenticated,

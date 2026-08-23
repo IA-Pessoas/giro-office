@@ -1,16 +1,19 @@
 import {
+  AUTH_SESSION_TRANSPORT_HEADER,
   extractBearerToken,
+  FORWARDED_AUTH_CSRF_HASH_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_SESSION_ID_HEADER,
   FORWARDED_AUTH_SESSION_VERSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
+  normalizeModulePermissions,
   ServiceError,
   verifyJwtToken,
-  normalizeModulePermissions,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 
@@ -69,6 +72,8 @@ export async function isAuthenticated(
     const forwardedSessionVersion = request.get(FORWARDED_AUTH_SESSION_VERSION_HEADER);
     const parsedSessionVersion = Number.parseInt(forwardedSessionVersion ?? "", 10);
     request.session_version = Number.isNaN(parsedSessionVersion) ? undefined : parsedSessionVersion;
+    request.session_id = request.get(FORWARDED_AUTH_SESSION_ID_HEADER);
+    request.csrf_hash = request.get(FORWARDED_AUTH_CSRF_HASH_HEADER);
     next();
     return;
   }
@@ -84,7 +89,10 @@ export async function isAuthenticated(
     const token = extractBearerToken(authorizationHeader);
     const claims = verifyJwtToken(token, jwtSecret);
 
-    await new AuthService().validateSession(claims);
+    const allowLegacyBearer =
+      internalToken === auditServiceToken &&
+      request.get(AUTH_SESSION_TRANSPORT_HEADER) === "bearer";
+    await new AuthService().validateSession(claims, { allowLegacyBearer });
 
     request.user_id = claims.user_id;
     request.organization_id = claims.organization_id ?? "";
@@ -92,6 +100,8 @@ export async function isAuthenticated(
     request.user_type = claims.type;
     request.modules = claims.modules;
     request.session_version = claims.session_version;
+    request.session_id = claims.session_id;
+    request.csrf_hash = claims.csrf_hash;
     next();
   } catch (err) {
     logError("Erro ao validar autenticação", { err });

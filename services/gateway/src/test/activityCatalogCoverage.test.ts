@@ -11,6 +11,8 @@ function createCoverageEnv(): GatewayEnv {
     nodeEnv: "test",
     enableApiDocs: true,
     authorizationMode: "enforce",
+    bearerAuthCompatibility: true,
+    authCookieSecure: false,
     auditEnabled: false,
     auditServiceToken: "audit-service-token",
     auditServiceUrl: "http://127.0.0.1:3020",
