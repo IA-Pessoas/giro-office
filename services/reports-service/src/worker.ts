@@ -14,9 +14,7 @@ const logger = createLogger({
 });
 const prisma = createReportsPrismaClient(env.databaseUrl);
 
-const timer = setInterval(() => {
+setInterval(() => {
   void prisma;
   logger.debug({ event: "worker.idle" }, "reports-service worker sem jobs pendentes");
 }, env.workerPollIntervalMs);
-
-timer.unref();

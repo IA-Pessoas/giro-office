@@ -13,6 +13,7 @@ const endpointWaiter = path.join(repoRoot, "scripts", "ops", "wait-production-en
 const turboConfig = path.join(repoRoot, "turbo.json");
 const serviceDockerfile = path.join(repoRoot, "docker", "service.Dockerfile");
 const appDockerfile = path.join(repoRoot, "docker", "app.Dockerfile");
+const reportsWorker = path.join(repoRoot, "services", "reports-service", "src", "worker.ts");
 const poolBudgetValidator = path.join(
   repoRoot,
   "scripts",
@@ -33,6 +34,7 @@ function createPoolEnvRoot(databasePoolMax = "1") {
 
 test("production service image invalidates copied TypeScript incremental state before build", () => {
   const dockerfile = readFileSync(serviceDockerfile, "utf8");
+  const appDockerfileContents = readFileSync(appDockerfile, "utf8");
   const installIndex = dockerfile.indexOf("RUN pnpm install --frozen-lockfile");
   const buildArgumentIndex = dockerfile.indexOf("ARG WORKSPACE_PACKAGE");
   const cleanupIndex = dockerfile.indexOf(
@@ -41,6 +43,16 @@ test("production service image invalidates copied TypeScript incremental state b
   const buildIndex = dockerfile.indexOf('pnpm turbo run build --filter="${WORKSPACE_PACKAGE}"');
 
   assert.ok(installIndex >= 0, "frozen install must remain present");
+  assert.match(
+    dockerfile,
+    /pnpm install --frozen-lockfile --ignore-scripts/u,
+    "service dependency install must explicitly ignore dependency build scripts",
+  );
+  assert.match(
+    appDockerfileContents,
+    /pnpm install --frozen-lockfile --ignore-scripts/u,
+    "web dependency install must explicitly ignore dependency build scripts",
+  );
   assert.ok(
     buildArgumentIndex > installIndex,
     "service-specific args must not invalidate dependency install cache",
@@ -48,6 +60,12 @@ test("production service image invalidates copied TypeScript incremental state b
   assert.ok(cleanupIndex >= 0, "service build must remove copied incremental state");
   assert.ok(buildIndex >= 0, "service build command must remain present");
   assert.ok(cleanupIndex < buildIndex, "incremental state must be removed before tsc runs");
+});
+
+test("reports worker keeps its polling timer referenced", () => {
+  const worker = readFileSync(reportsWorker, "utf8");
+
+  assert.doesNotMatch(worker, /\.unref\(\)/u);
 });
 
 test("production build forwards the internal API URL through Turbo strict env", () => {
