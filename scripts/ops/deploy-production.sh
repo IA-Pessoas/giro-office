@@ -20,6 +20,7 @@ phase() {
 
 if [[ "${DEPLOY_DRY_RUN:-0}" == "1" ]]; then
   phase validate-env
+  phase internal-service-tokens
   phase database-pool-budget
   phase compose-config
   phase build-images-sequentially
@@ -44,6 +45,9 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     exit 1
   fi
 done <"$MANIFEST"
+
+phase internal-service-tokens
+node "$ROOT/scripts/ops/validate-internal-service-tokens.mjs" "$ENV_ROOT"
 
 phase database-pool-budget
 node "$ROOT/scripts/ops/validate-database-pool-budget.mjs" "$ENV_ROOT"
