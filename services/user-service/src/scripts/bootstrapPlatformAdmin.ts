@@ -1,6 +1,9 @@
 import { pathToFileURL } from "node:url";
 
-import { bootstrapPlatformAdmin } from "../services/platformAdminBootstrapService.js";
+import {
+  bootstrapPlatformAdmin,
+  parsePlatformAdminBootstrapInput,
+} from "../services/platformAdminBootstrapService.js";
 
 export function getPlatformAdminBootstrapInput(environment: NodeJS.ProcessEnv): {
   name: string;
@@ -17,7 +20,7 @@ export function getPlatformAdminBootstrapInput(environment: NodeJS.ProcessEnv): 
     );
   }
 
-  return { name, email, password };
+  return parsePlatformAdminBootstrapInput({ name, email, password });
 }
 
 async function main(): Promise<void> {

@@ -10,7 +10,7 @@ const repository = {
 const validInput = {
   name: "Platform Administrator",
   email: "admin@example.com",
-  password: "safe-password",
+  password: "unique-password-2026",
 };
 
 describe("bootstrapPlatformAdmin", () => {
@@ -43,5 +43,16 @@ describe("bootstrapPlatformAdmin", () => {
       statusCode: 409,
     });
     expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it("normalizes the email before lookup and persistence", async () => {
+    repository.create.mockResolvedValue({ id: "platform-user-1", email: "admin@example.com" });
+
+    await bootstrapPlatformAdmin({ ...validInput, email: " Admin@Example.COM " }, repository);
+
+    expect(repository.findByEmail).toHaveBeenCalledWith("admin@example.com");
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "admin@example.com" }),
+    );
   });
 });
