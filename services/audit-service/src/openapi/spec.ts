@@ -1,3 +1,9 @@
+import {
+  DEFAULT_AUDIT_PAGE_SIZE,
+  MAX_AUDIT_PAGE,
+  MAX_AUDIT_PAGE_SIZE,
+  MAX_AUDIT_TEXT_FILTER_LENGTH,
+} from "@workspace/shared/audit";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { AuditServiceEnv } from "../config/env.js";
@@ -178,12 +184,43 @@ export function buildAuditServiceOpenApiSpec(env: AuditServiceEnv): OpenApiDocum
             {
               name: "page",
               in: "query",
-              schema: { type: "integer", minimum: 1, maximum: 10_001, default: 1 },
+              description: "O offset combinado com pageSize não pode exceder 10000.",
+              schema: { type: "integer", minimum: 1, maximum: MAX_AUDIT_PAGE, default: 1 },
             },
             {
               name: "pageSize",
               in: "query",
-              schema: { type: "integer", minimum: 1, maximum: 200, default: 50 },
+              description: "O offset combinado com page não pode exceder 10000.",
+              schema: {
+                type: "integer",
+                minimum: 1,
+                maximum: MAX_AUDIT_PAGE_SIZE,
+                default: DEFAULT_AUDIT_PAGE_SIZE,
+              },
+            },
+            ...[
+              "requestId",
+              "userId",
+              "method",
+              "path",
+              "referring",
+              "referringId",
+              "department",
+            ].map((name) => ({
+              name,
+              in: "query",
+              schema: { type: "string", maxLength: MAX_AUDIT_TEXT_FILTER_LENGTH },
+            })),
+            { name: "statusCode", in: "query", schema: { type: "integer" } },
+            {
+              name: "dateFrom",
+              in: "query",
+              schema: { type: "string", format: "date-time" },
+            },
+            {
+              name: "dateTo",
+              in: "query",
+              schema: { type: "string", format: "date-time" },
             },
           ],
           responses: {
@@ -195,6 +232,9 @@ export function buildAuditServiceOpenApiSpec(env: AuditServiceEnv): OpenApiDocum
                 },
               },
             },
+            "400": { description: "Filtros ou paginação inválidos" },
+            "401": { description: "Token interno ou identidade ausente/inválida" },
+            "403": { description: "Identidade sem acesso à auditoria solicitada" },
           },
         },
       },

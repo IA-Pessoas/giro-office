@@ -4,7 +4,10 @@ import {
   type AuditSearchResult,
   type CreateAuditRequestPayload,
   DEFAULT_AUDIT_PAGE_SIZE,
+  MAX_AUDIT_OFFSET,
+  MAX_AUDIT_PAGE,
   MAX_AUDIT_PAGE_SIZE,
+  MAX_AUDIT_TEXT_FILTER_LENGTH,
 } from "@workspace/shared/audit";
 import {
   getSingleQueryValue,
@@ -22,10 +25,6 @@ export interface AuditRequestService {
   search(query: Record<string, unknown>, organizationId?: string): Promise<AuditSearchResult>;
   findByRequestId(requestId: string, organizationId: string): Promise<AuditRequestRecord | null>;
 }
-
-const MAX_AUDIT_PAGE = 10_001;
-const MAX_AUDIT_OFFSET = 10_000;
-const MAX_AUDIT_TEXT_FILTER_LENGTH = 200;
 
 function getBoundedTextFilter(
   query: Record<string, unknown>,

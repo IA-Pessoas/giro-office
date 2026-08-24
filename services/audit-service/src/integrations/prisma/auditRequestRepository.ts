@@ -1,9 +1,10 @@
-import type {
-  AuditQuery,
-  AuditRequestRecord,
-  AuditSearchFilters,
-  AuditSearchResult,
-  CreateAuditRequestPayload,
+import {
+  type AuditQuery,
+  type AuditRequestRecord,
+  type AuditSearchFilters,
+  type AuditSearchResult,
+  type CreateAuditRequestPayload,
+  MAX_AUDIT_OFFSET,
 } from "@workspace/shared/audit";
 
 import {
@@ -128,6 +129,36 @@ function toAuditRequest(record: PrismaAuditRequest): AuditRequestRecord {
   };
 }
 
+const platformAuditSelect = {
+  id: true,
+  request_id: true,
+  organization_id: true,
+  method: true,
+  path: true,
+  status_code: true,
+  outcome: true,
+  duration_ms: true,
+  service_source: true,
+  created_at: true,
+} satisfies Prisma.AuditRequestSelect;
+
+type PlatformAuditRow = Prisma.AuditRequestGetPayload<{ select: typeof platformAuditSelect }>;
+
+function toPlatformAuditRequest(record: PlatformAuditRow): AuditRequestRecord {
+  return {
+    id: record.id,
+    requestId: record.request_id,
+    organizationId: record.organization_id,
+    method: record.method,
+    path: record.path,
+    statusCode: record.status_code,
+    outcome: record.outcome as AuditRequestRecord["outcome"],
+    durationMs: record.duration_ms,
+    serviceSource: record.service_source,
+    createdAt: record.created_at.toISOString(),
+  };
+}
+
 function buildWhere(filters: AuditSearchFilters): Prisma.AuditRequestWhereInput {
   const where: Prisma.AuditRequestWhereInput = {};
 
@@ -225,6 +256,28 @@ export function createAuditRequestRepository(
     },
     async search(filters) {
       const where = buildWhere(filters);
+
+      if (!filters.organizationId) {
+        const totalLimit = MAX_AUDIT_OFFSET + filters.pageSize;
+        const [items, total] = await client.$transaction([
+          client.auditRequest.findMany({
+            where,
+            select: platformAuditSelect,
+            orderBy: [{ created_at: "desc" }, { id: "desc" }],
+            skip: (filters.page - 1) * filters.pageSize,
+            take: filters.pageSize,
+          }),
+          client.auditRequest.count({ where, take: totalLimit }),
+        ]);
+
+        return {
+          items: items.map(toPlatformAuditRequest),
+          total: Math.min(total, totalLimit),
+          page: filters.page,
+          pageSize: filters.pageSize,
+        };
+      }
+
       const [items, total] = await client.$transaction([
         client.auditRequest.findMany({
           where,

@@ -96,6 +96,20 @@ describe("platform audit routes", () => {
     expect(filters).not.toHaveProperty("organizationId");
   });
 
+  it.each([
+    ["organizationId", { organizationId: "forged-org" }],
+    ["permission", { permission: "2" }],
+    ["permission invalida", { permission: "not-a-number" }],
+    ["organizationId e permission", { organizationId: "forged-org", permission: "2" }],
+  ])("rejeita busca platform com header organizacional %s", async (_label, overrides) => {
+    const response = await request(createApp({ env, logger: createTestLogger(), repository }))
+      .get("/audit/requests")
+      .set(platformHeaders(overrides));
+
+    expect(response.status).toBe(403);
+    expect(repository.search).not.toHaveBeenCalled();
+  });
+
   it("mantem administradores organizacionais confinados ao tenant encaminhado", async () => {
     const response = await request(createApp({ env, logger: createTestLogger(), repository }))
       .get("/audit/requests")
@@ -184,23 +198,81 @@ describe("platform audit routes", () => {
 });
 
 describe("platform audit persistence", () => {
-  it("omite o filtro de organizacao e usa ordenacao global estavel", async () => {
-    const findMany = vi.fn().mockResolvedValue([]);
-    const count = vi.fn().mockResolvedValue(0);
+  it("limita o total global, anuncia ultima pagina acessivel e retorna DTO por allowlist", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: "audit-1",
+        request_id: "request-1",
+        organization_id: "org-1",
+        user_id: "sensitive-user",
+        permission: 3,
+        method: "GET",
+        path: "/user",
+        query_json: { token: "sensitive-query" },
+        status_code: 200,
+        outcome: "success",
+        duration_ms: 12,
+        ip: "127.0.0.1",
+        user_agent: "sensitive-agent",
+        origin: "sensitive-origin",
+        error_code: null,
+        error_message: "sensitive-error",
+        service_source: "gateway",
+        metadata_json: { secret: true },
+        created_at: new Date("2026-08-24T12:00:00.000Z"),
+        finished_at: new Date("2026-08-24T12:00:00.012Z"),
+        action: "READ",
+        referring: "user",
+        referring_id: "user-1",
+        changes_json: { password: "sensitive-change" },
+        department: "Sensitive",
+      },
+    ]);
+    const count = vi.fn().mockResolvedValue(50_000);
     const repository = createAuditRequestRepository({
       auditRequest: { findMany, count },
       $transaction: (operations: Array<Promise<unknown>>) => Promise.all(operations),
     } as never);
 
-    await repository.search({ page: 1, pageSize: 25 });
+    const result = await repository.search({ page: 401, pageSize: 25 });
 
-    expect(findMany).toHaveBeenCalledWith({
-      where: {},
-      orderBy: [{ created_at: "desc" }, { id: "desc" }],
-      skip: 0,
-      take: 25,
-    });
-    expect(count).toHaveBeenCalledWith({ where: {} });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {},
+        orderBy: [{ created_at: "desc" }, { id: "desc" }],
+        skip: 10_000,
+        take: 25,
+        select: {
+          id: true,
+          request_id: true,
+          organization_id: true,
+          method: true,
+          path: true,
+          status_code: true,
+          outcome: true,
+          duration_ms: true,
+          service_source: true,
+          created_at: true,
+        },
+      }),
+    );
+    expect(count).toHaveBeenCalledWith({ where: {}, take: 10_025 });
+    expect(result.total).toBe(10_025);
+    expect((Math.ceil(result.total / result.pageSize) - 1) * result.pageSize).toBe(10_000);
+    expect(result.items).toEqual([
+      {
+        id: "audit-1",
+        requestId: "request-1",
+        organizationId: "org-1",
+        method: "GET",
+        path: "/user",
+        statusCode: 200,
+        outcome: "success",
+        durationMs: 12,
+        serviceSource: "gateway",
+        createdAt: "2026-08-24T12:00:00.000Z",
+      },
+    ]);
   });
 });
 
@@ -220,5 +292,50 @@ describe("platform audit OpenAPI", () => {
       maximum: 200,
       default: 50,
     });
+  });
+
+  it("documenta filtros, limites e respostas de erro da busca", () => {
+    const spec = buildAuditServiceOpenApiSpec(env);
+    const operation = (spec.paths["/audit/requests"] as { get: unknown }).get as {
+      parameters: Array<{ name: string; in: string; schema: Record<string, unknown> }>;
+      responses: Record<string, unknown>;
+    };
+    const parameters = Object.fromEntries(
+      operation.parameters.map((parameter) => [parameter.name, parameter]),
+    );
+
+    for (const name of [
+      "requestId",
+      "userId",
+      "method",
+      "path",
+      "referring",
+      "referringId",
+      "department",
+    ]) {
+      expect(parameters[name]).toMatchObject({
+        in: "query",
+        schema: { type: "string", maxLength: 200 },
+      });
+    }
+    expect(parameters.statusCode).toMatchObject({
+      in: "query",
+      schema: { type: "integer" },
+    });
+    expect(parameters.dateFrom).toMatchObject({
+      in: "query",
+      schema: { type: "string", format: "date-time" },
+    });
+    expect(parameters.dateTo).toMatchObject({
+      in: "query",
+      schema: { type: "string", format: "date-time" },
+    });
+    expect(operation.responses).toEqual(
+      expect.objectContaining({
+        "400": expect.any(Object),
+        "401": expect.any(Object),
+        "403": expect.any(Object),
+      }),
+    );
   });
 });

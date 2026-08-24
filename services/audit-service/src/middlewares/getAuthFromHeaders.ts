@@ -28,6 +28,7 @@ export function getAuthFromHeaders(request: Request): ForwardedAuditAuthContext 
   const organizationId = request.get(FORWARDED_AUTH_ORGANIZATION_ID_HEADER);
   const authKind = request.get(FORWARDED_AUTH_KIND_HEADER);
   const platformRole = request.get(FORWARDED_AUTH_PLATFORM_ROLE_HEADER);
+  const permission = request.get(FORWARDED_AUTH_PERMISSION_HEADER);
   const isPlatformSuperAdmin = authKind === "platform" && platformRole === "super_admin";
 
   if (
@@ -40,10 +41,14 @@ export function getAuthFromHeaders(request: Request): ForwardedAuditAuthContext 
     throw new ServiceError(401, "Não autenticado.");
   }
 
+  if (isPlatformSuperAdmin && (organizationId || permission !== undefined)) {
+    throw new ServiceError(403, "Acesso negado para esta rota.");
+  }
+
   return {
     userId,
     ...(organizationId ? { organizationId } : {}),
-    permission: parsePermission(request.get(FORWARDED_AUTH_PERMISSION_HEADER) ?? undefined),
+    permission: parsePermission(permission ?? undefined),
     ...(isPlatformSuperAdmin
       ? { authKind: "platform" as const, platformRole: "super_admin" as const }
       : authKind === "organization"
@@ -54,7 +59,11 @@ export function getAuthFromHeaders(request: Request): ForwardedAuditAuthContext 
 
 export function assertAuditSearchAdmin(auth: ForwardedAuditAuthContext): void {
   if (auth.authKind === "platform" && auth.platformRole === "super_admin") {
-    return;
+    if (!auth.organizationId && auth.permission === undefined) {
+      return;
+    }
+
+    throw new ServiceError(403, "Acesso negado para esta rota.");
   }
 
   assertAuditAdmin(auth);

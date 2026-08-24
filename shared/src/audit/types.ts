@@ -41,7 +41,7 @@ export interface AuditRequestRecord {
   permission?: number | null;
   method: string;
   path: string;
-  query: AuditQuery;
+  query?: AuditQuery;
   statusCode?: number | null;
   outcome: AuditOutcome;
   durationMs?: number | null;
