@@ -86,7 +86,7 @@ const rawEnvSchema = z
 
     authCookieSecureEnv: z.enum(["true", "false", "1", "0"]).optional(),
 
-    /** Token interno igual ao do gateway (`AUDIT_SERVICE_TOKEN`) para pedidos com headers x-auth-* */
+    /** Token usado pelo user-service somente para enviar eventos ao audit-service. */
 
     auditServiceToken: z.string().optional().default("audit-service-token"),
 

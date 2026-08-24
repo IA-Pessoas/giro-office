@@ -10,7 +10,7 @@ const repository = {
 const validInput = {
   name: "Platform Administrator",
   email: "admin@example.com",
-  password: "unique-password-2026",
+  password: "mH9VtK2qR7xP4cN8wY5sL1dF6gJ3bA0uE_zI-oQkCrs",
 };
 
 describe("bootstrapPlatformAdmin", () => {
@@ -61,6 +61,9 @@ describe("bootstrapPlatformAdmin", () => {
     "qwertyuiopasdfgh",
     "abcdefghijklmnop",
     "9876543210987654",
+    "admin123admin123",
+    "letmeinletmein12",
+    "iloveyouiloveyou",
   ])("rejects a trivial platform password: %s", async (password) => {
     await expect(bootstrapPlatformAdmin({ ...validInput, password }, repository)).rejects.toThrow(
       /muito comum/i,

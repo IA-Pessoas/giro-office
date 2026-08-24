@@ -10,7 +10,7 @@ Por defeito: **3030** (`PORT`).
 
 Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, logging e `AUTH_COOKIE_SECURE`. A última variável é obrigatoriamente `true` em produção. `USER_SERVICE_INTERNAL_TOKEN` autentica exclusivamente o gateway e deve ter o mesmo valor configurado nele. `PLATFORM_AUTH_RATE_LIMIT_MAX` e `PLATFORM_AUTH_RATE_LIMIT_WINDOW_MS` controlam a segunda barreira local do login (padrões: 10 tentativas por 60 segundos). `REPORTS_INTERNAL_TOKEN` protege `POST /internal/reporting/access-context`; deve ser igual ao valor do reports-service e é obrigatório em produção.
 
-Para criar o único administrador da plataforma, informe explicitamente `PLATFORM_ADMIN_NAME`, `PLATFORM_ADMIN_EMAIL` e `PLATFORM_ADMIN_PASSWORD` (mínimo de 16 caracteres e não comum) e execute `pnpm --filter @workspace/user-service bootstrap:platform-admin`. O comando normaliza o e-mail, não substitui uma conta existente e imprime apenas `id`, `email` e `created`.
+Para criar o único administrador da plataforma, informe explicitamente `PLATFORM_ADMIN_NAME`, `PLATFORM_ADMIN_EMAIL` e `PLATFORM_ADMIN_PASSWORD`. A senha deve ser um segredo de 32 bytes codificado em Base64URL (43 caracteres), gerado por um gerenciador de senhas ou por `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`. Depois execute `pnpm --filter @workspace/user-service bootstrap:platform-admin`. O comando normaliza o e-mail, não substitui uma conta existente e imprime apenas `id`, `email` e `created`.
 
 O endpoint `/internal/reporting/access-context` é chamado diretamente pelo reports-service e não é publicado pelo gateway.
 

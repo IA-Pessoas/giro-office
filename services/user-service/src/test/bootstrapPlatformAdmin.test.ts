@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { getPlatformAdminBootstrapInput } from "../scripts/bootstrapPlatformAdmin.js";
 
+const generatedPassword = "mH9VtK2qR7xP4cN8wY5sL1dF6gJ3bA0uE_zI-oQkCrs";
+
 describe("getPlatformAdminBootstrapInput", () => {
   it("rejects a password made only of whitespace", () => {
     expect(() =>
@@ -15,14 +17,14 @@ describe("getPlatformAdminBootstrapInput", () => {
     );
   });
 
-  it("preserves a valid password without trimming it", () => {
+  it("preserves a generated Base64URL password", () => {
     expect(
       getPlatformAdminBootstrapInput({
         PLATFORM_ADMIN_NAME: "Platform Administrator",
         PLATFORM_ADMIN_EMAIL: "admin@example.com",
-        PLATFORM_ADMIN_PASSWORD: "  safe-password  ",
+        PLATFORM_ADMIN_PASSWORD: generatedPassword,
       }).password,
-    ).toBe("  safe-password  ");
+    ).toBe(generatedPassword);
   });
 
   it("normalizes and validates the administrator email", () => {
@@ -30,7 +32,7 @@ describe("getPlatformAdminBootstrapInput", () => {
       getPlatformAdminBootstrapInput({
         PLATFORM_ADMIN_NAME: "Platform Administrator",
         PLATFORM_ADMIN_EMAIL: " Admin@Example.COM ",
-        PLATFORM_ADMIN_PASSWORD: "unique-password-2026",
+        PLATFORM_ADMIN_PASSWORD: generatedPassword,
       }).email,
     ).toBe("admin@example.com");
 
@@ -38,7 +40,7 @@ describe("getPlatformAdminBootstrapInput", () => {
       getPlatformAdminBootstrapInput({
         PLATFORM_ADMIN_NAME: "Platform Administrator",
         PLATFORM_ADMIN_EMAIL: "not-an-email",
-        PLATFORM_ADMIN_PASSWORD: "unique-password-2026",
+        PLATFORM_ADMIN_PASSWORD: generatedPassword,
       }),
     ).toThrow(/email/i);
   });
