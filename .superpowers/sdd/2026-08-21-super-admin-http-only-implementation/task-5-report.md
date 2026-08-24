@@ -1,5 +1,10 @@
 # Tarefa 5 — Consultas globais de organizações com escopo explícito
 
+## Commits
+
+- `39269353 feat(platform): add organization platform queries`
+- `1d1edc11 fix(platform): isolate organization query contract`
+
 ## Entrega
 
 - Rota somente leitura: `GET /platform/organizations?page=&pageSize=&status=&search=`.
@@ -24,11 +29,15 @@
 
 ## Validações
 
-- Vitest completo de `@workspace/organization-service`: 22 testes passaram.
+- Vitest completo de `@workspace/organization-service`: 22/22 testes passaram.
 - Biome escopado: 8 arquivos passaram.
 - `prisma validate`: schema válido.
 - Typecheck de `@workspace/organization-service`: passou com `DATABASE_URL` sintética, sem conexão ou migration aplicada.
 - `git diff --check`: passou.
+
+## Revisão final
+
+- Sem achados Critical ou Important.
 
 ## Smoke
 
