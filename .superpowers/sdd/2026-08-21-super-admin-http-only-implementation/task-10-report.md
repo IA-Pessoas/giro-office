@@ -15,7 +15,9 @@ Data: 2026-08-24
   integrações diretas, incluindo `packages/api/src/client.ts` e extensões JS/TS executáveis.
   Testes, runners, symlinks, legado e artefatos de build não entram na leitura. O detector cobre
   atribuições, propriedades, setters de `Authorization` e expressões reais de `Bearer`, sem casar
-  menções em prosa.
+  menções em prosa e sem depender de capitalização.
+- O parser de eventos reconhece chaves YAML simples ou citadas, tanto em bloco quanto inline, e
+  rejeita qualquer evento adicional a `pull_request`.
 - Registry completo para `services/src` e smoke pareado dos três DELETE fiscais, preservando os
   contratos atuais de sucesso 200 e baixa permissão 403.
 - Nenhuma dependência adicionada e nenhum serviço iniciado.
@@ -50,6 +52,15 @@ GREEN: 359/361 operações OpenAPI mapeadas com expectativas pareadas
 node --test scripts/all-services-smoke.test.mjs
 RED: 4 pass, 1 fail — DELETE fiscal antes das operações dependentes
 GREEN: 5 pass, 0 fail
+
+review final:
+node --test scripts/super-admin-session-regression.test.mjs
+RED: 3 pass, 2 fail — casing lowercase e chaves YAML citadas
+GREEN: 5 pass, 0 fail
+
+corepack pnpm --filter @workspace/shared check
+RED: 2 erros Biome nos dois arquivos autorizados
+GREEN: 62 arquivos verificados, zero erro
 ```
 
 ## Gates aprovados
@@ -65,8 +76,8 @@ GREEN: 5 pass, 0 fail
 - Regressões do app: session security 6/6, platform session 3/3 e Super Admin 9/9.
 - Typecheck e build de produção do app: aprovados; `/super-admin` e `/super-admin/login`
   constam nas rotas geradas.
-- Build de `shared` aprovado; `packages/api` aprovado em check, typecheck, build e 5/5 testes do
-  client HTTP-only.
+- `shared` aprovado em check, typecheck, build e 54/54 testes; `packages/api` aprovado em check,
+  typecheck, build e 5/5 testes do client HTTP-only.
 - Fiscal-service aprovado em typecheck, build e 71/71 testes, incluindo os contratos DELETE e a
   proteção de permissão administrativa existentes.
 - Dry-run fiscal em modo fail-fast: 37 operações registradas, incluindo sucesso 200 e baixa
@@ -79,10 +90,8 @@ GREEN: 5 pass, 0 fail
 
 ## Falhas basais preservadas
 
-- `corepack pnpm check`: 68 erros, 35 warnings e 3 infos preexistentes, principalmente em
-  `docs/migration/v4`; também há formatação pendente em `shared/src/auth/token.ts` e imports em
-  `shared/tests/module-permissions.test.ts`. O check escopado do workflow reproduz somente esses
-  dois erros de `shared`; não houve supressão nem alteração dessa dívida fora do diff.
+- `corepack pnpm check` global ainda contém dívida fora do escopo, principalmente em
+  `docs/migration/v4`; o check escopado de `shared` está verde sem supressões.
 - `corepack pnpm test`: falha em quatro expectativas de `rh-service` que recebem um argumento
   `undefined` adicional; o build de `services/src` também falha por cliente Prisma legado ausente
   e erros TypeScript. Os testes de política raiz passaram 67/67 antes dessas falhas.

@@ -1,13 +1,7 @@
 import jwt, { type JwtPayload } from "jsonwebtoken";
 
 import { normalizeModulePermissions } from "./modules.js";
-import type {
-  AuthContext,
-  AuthIdentity,
-  AuthKind,
-  AuthUserType,
-  PlatformRole,
-} from "./types.js";
+import type { AuthContext, AuthIdentity, AuthKind, AuthUserType, PlatformRole } from "./types.js";
 
 function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
   return value === "owner" || value === "admin" || value === "user" ? value : undefined;
@@ -98,8 +92,7 @@ export function authenticateFromAuthHeader(
 
 export function authenticateFromToken(token: string, jwtSecret: string): AuthContext {
   const claims = verifyJwtToken(token, jwtSecret);
-  const isPlatformAdmin =
-    claims.auth_kind === "platform" && claims.platform_role === "super_admin";
+  const isPlatformAdmin = claims.auth_kind === "platform" && claims.platform_role === "super_admin";
   const organizationId = isPlatformAdmin ? "" : (claims.organization_id ?? "");
 
   return {

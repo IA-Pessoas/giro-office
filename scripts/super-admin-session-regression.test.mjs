@@ -10,14 +10,15 @@ const browserSourcePattern = /\.(?:js|jsx|mjs|mts|ts|tsx)$/u;
 const testSourcePattern = /\.(?:spec|test)\.[^.]+$/u;
 const runnerSourcePattern = /^run-.*\.(?:js|mjs|mts|ts)$/u;
 const testDirectoryNames = new Set(["__tests__", "test", "tests"]);
+const workflowOnPattern = /^(?:on|"on"|'on'):\s*/u;
 const legacyBrowserAuthPatterns = [
   /cw\.token/u,
   /jwt-decode/u,
   /jwtDecode/u,
-  /(?:\.\s*Authorization|\[\s*["']Authorization["']\s*\])\s*=/u,
-  /(?:^|[{,]\s*)(?:Authorization|["']Authorization["'])\s*:/mu,
-  /\.\s*set\s*\(\s*["']Authorization["']\s*,/u,
-  /(?:["'`]Bearer\s+\$\{|["']Bearer\s+["']\s*\+)/u,
+  /(?:\.\s*Authorization|\[\s*["']Authorization["']\s*\])\s*=/iu,
+  /(?:^|[{,]\s*)(?:Authorization|["']Authorization["'])\s*:/imu,
+  /\.\s*set\s*\(\s*["']Authorization["']\s*,/iu,
+  /(?:["'`]Bearer\s+\$\{|["']Bearer\s+["']\s*\+)/iu,
   /support_mode/u,
   /support_session/u,
 ];
@@ -105,12 +106,12 @@ function pullRequestBranches(workflow) {
 
 function workflowEvents(workflow) {
   const lines = workflow.split(/\r?\n/u);
-  const onIndex = lines.findIndex((line) => /^on:\s*/u.test(line));
+  const onIndex = lines.findIndex((line) => workflowOnPattern.test(line));
   if (onIndex < 0) {
     return [];
   }
 
-  const inlineValue = lines[onIndex].replace(/^on:\s*/u, "").trim();
+  const inlineValue = lines[onIndex].replace(workflowOnPattern, "").trim();
   if (inlineValue.startsWith("[") && inlineValue.endsWith("]")) {
     return inlineValue
       .slice(1, -1)
@@ -119,7 +120,36 @@ function workflowEvents(workflow) {
       .filter(Boolean);
   }
   if (inlineValue.startsWith("{") && inlineValue.endsWith("}")) {
-    return [...inlineValue.matchAll(/(?:^|[,{}]\s*)([\w-]+)\s*:/gu)].map((match) => match[1]);
+    const events = [];
+    const source = inlineValue.slice(1, -1);
+    let entryStart = 0;
+    let depth = 0;
+    let quote = "";
+
+    for (let index = 0; index <= source.length; index += 1) {
+      const character = source[index] ?? ",";
+      if (quote) {
+        if (character === quote && source[index - 1] !== "\\") {
+          quote = "";
+        }
+        continue;
+      }
+      if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === "{" || character === "[") {
+        depth += 1;
+      } else if (character === "}" || character === "]") {
+        depth -= 1;
+      } else if (character === "," && depth === 0) {
+        const entry = source.slice(entryStart, index).trim();
+        const match = entry.match(/^(?:"([\w-]+)"|'([\w-]+)'|([\w-]+))\s*:/u);
+        if (match) {
+          events.push(match[1] ?? match[2] ?? match[3]);
+        }
+        entryStart = index + 1;
+      }
+    }
+    return events;
   }
   if (inlineValue) {
     return [inlineValue.replace(/^["']|["']$/gu, "")];
@@ -131,9 +161,9 @@ function workflowEvents(workflow) {
     if (/^\S/u.test(line)) {
       break;
     }
-    const match = line.match(/^ {2}([\w-]+)\s*:/u);
+    const match = line.match(/^ {2}(?:"([\w-]+)"|'([\w-]+)'|([\w-]+))\s*:/u);
     if (match) {
-      events.push(match[1]);
+      events.push(match[1] ?? match[2] ?? match[3]);
     }
   }
   return events;
@@ -197,10 +227,13 @@ test("browser source discovery includes executable modules and excludes test run
 test("legacy auth detection covers Authorization properties and setters without prose matches", () => {
   for (const source of [
     "headers.Authorization = token;",
+    "headers.authorization = token;",
     'headers["Authorization"] = token;',
     "const headers = { Authorization: token };",
     'headers.set("Authorization", token);',
+    'headers.set("authorization", token);',
     "const authHeader = `Bearer $" + "{token}`;",
+    "const authHeader = `bearer $" + "{token}`;",
     'const authHeader = "Bearer " + token;',
   ]) {
     assert.ok(hasLegacyBrowserAuth(source), `expected legacy auth marker in: ${source}`);
@@ -231,12 +264,26 @@ test("workflow event discovery recognizes inline triggers and rejects every extr
     "pull_request",
     "push",
   ]);
+  assert.deepEqual(workflowEvents("on: { \"pull_request\": {}, 'push': {} }\n"), [
+    "pull_request",
+    "push",
+  ]);
+  assert.deepEqual(workflowEvents('"on": { "pull_request": {} }\n'), ["pull_request"]);
+  assert.deepEqual(workflowEvents("on:\n  \"pull_request\":\n  'push': {}\n"), [
+    "pull_request",
+    "push",
+  ]);
+  assert.deepEqual(workflowEvents("'on':\n  'pull_request': {}\n"), ["pull_request"]);
   assert.throws(
     () => assertOnlyPullRequestEvent("on: [pull_request, push]\n"),
     /only pull_request/u,
   );
   assert.throws(
     () => assertOnlyPullRequestEvent("on:\n  pull_request:\n  schedule:\n"),
+    /only pull_request/u,
+  );
+  assert.throws(
+    () => assertOnlyPullRequestEvent('on: { "pull_request": {}, "schedule": {} }\n'),
     /only pull_request/u,
   );
 });
