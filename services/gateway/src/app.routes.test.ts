@@ -614,6 +614,47 @@ it("aplica rate limit ao login público da plataforma", async () => {
   }
 });
 
+it("bloqueia self-PUT de ator de plataforma antes do proxy", async () => {
+  const csrfToken = "P".repeat(43);
+  let upstreamHits = 0;
+  const userService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const userServiceUrl = await startServer(userService);
+  const app = createApp(
+    createEnv({
+      userServiceUrl,
+      allowedOrigins: ["https://useoffice.com.br"],
+      bearerAuthCompatibility: false,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/platform-user-1`, {
+      method: "PUT",
+      headers: {
+        Cookie: `cw.session=${createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) })}; cw.csrf=${csrfToken}`,
+        Origin: "https://useoffice.com.br",
+        [CSRF_HEADER_NAME]: csrfToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "forbidden" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(userService);
+  }
+});
+
 it("audita principal de plataforma sem usar id estrangeiro organizacional", async () => {
   const auditService = await startAuditIngestServer();
   const organizationService = createServer((_request, response) => {
