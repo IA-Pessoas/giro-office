@@ -180,6 +180,36 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/platform/organizations/{organizationId}/users": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Listar usuários de uma organização pela plataforma",
+          description:
+            "Consulta somente leitura, restrita à sessão HTTP-only de um super administrador da plataforma. Não retorna credenciais ou dados pessoais sensíveis.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            { name: "skip", in: "query", schema: { type: "integer", minimum: 0, default: 0 } },
+            {
+              name: "take",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+            { name: "search", in: "query", schema: { type: "string", maxLength: 100 } },
+          ],
+          responses: {
+            "200": { description: "Página de usuários da organização", ...successJson },
+            "400": { description: "Parâmetros inválidos" },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador da plataforma" },
+          },
+        },
+      },
       "/platform/session/validate": {
         post: {
           tags: ["Platform auth"],

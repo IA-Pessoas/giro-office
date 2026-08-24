@@ -21,6 +21,7 @@ export const EXEMPT_SPEC_OPERATION_KEYS = new Set([
   "user-service|DELETE|/platform/session",
   "user-service|POST|/platform/session/refresh",
   "user-service|GET|/platform/me",
+  "user-service|GET|/platform/organizations/{organizationId}/users",
   "user-service|POST|/platform/session/validate",
 ]);
 
