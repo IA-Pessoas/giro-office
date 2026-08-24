@@ -5,7 +5,34 @@ import type { PlatformRole } from "../generated/prisma/enums.js";
 import { hashPassword } from "../security/passwordHashService.js";
 
 const PLATFORM_ROLE: PlatformRole = "super_admin";
-const COMMON_ADMIN_PASSWORDS = new Set(["passwordpassword", "1234567890123456"]);
+const COMMON_ADMIN_PASSWORDS = new Set([
+  "adminadminadminadmin",
+  "changemechangeme",
+  "passwordpassword",
+  "password12345678",
+  "qwertyuiopasdfgh",
+  "1234567890123456",
+]);
+
+function isTrivialPlatformPassword(password: string): boolean {
+  const normalized = password.toLowerCase();
+  if (
+    COMMON_ADMIN_PASSWORDS.has(normalized) ||
+    /^(.)\1+$/.test(normalized) ||
+    /^\d+$/.test(normalized)
+  ) {
+    return true;
+  }
+
+  const direction = normalized.charCodeAt(1) - normalized.charCodeAt(0);
+  return (
+    (direction === 1 || direction === -1) &&
+    [...normalized].every(
+      (character, index) =>
+        index === 0 || character.charCodeAt(0) - normalized.charCodeAt(index - 1) === direction,
+    )
+  );
+}
 
 const platformAdminBootstrapInputSchema = z
   .object({
@@ -15,7 +42,7 @@ const platformAdminBootstrapInputSchema = z
       .string()
       .min(16, "PLATFORM_ADMIN_PASSWORD deve ter no mínimo 16 caracteres.")
       .refine(
-        (password) => !COMMON_ADMIN_PASSWORDS.has(password.toLowerCase()),
+        (password) => !isTrivialPlatformPassword(password),
         "PLATFORM_ADMIN_PASSWORD é muito comum.",
       ),
   })

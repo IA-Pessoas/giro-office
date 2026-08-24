@@ -58,6 +58,29 @@ networks:
   assert.match(result.errors.join("\n"), /gateway.*loopback/);
 });
 
+test("checkComposeSecurity rejects public plaintext edge ports", async () => {
+  const file = await writeFixture(`
+services:
+  reverse-proxy:
+    ports:
+      - "8085:80"
+  web:
+    ports:
+      - "3000:3000"
+networks:
+  backend:
+    internal: true
+`);
+
+  const result = await checkComposeSecurity({
+    composeFiles: [file],
+    registry: [],
+  });
+
+  assert.match(result.errors.join("\n"), /reverse-proxy.*loopback/);
+  assert.match(result.errors.join("\n"), /web.*loopback/);
+});
+
 test("checkComposeSecurity rejects insecure auth cookies in VPS compose", async () => {
   const file = await writeFixture(`
 services:

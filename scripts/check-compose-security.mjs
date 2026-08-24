@@ -197,13 +197,12 @@ export async function checkComposeSecurity({ composeFiles, registry = serviceReg
       }
 
       if (
-        serviceName === "gateway" &&
-        (service.publishedPorts.length === 0 ||
-          service.publishedPorts.some(
-            (port) => !port.startsWith("127.0.0.1:") && !port.startsWith("[::1]:"),
-          ))
+        ["gateway", "reverse-proxy", "web"].includes(serviceName) &&
+        service.publishedPorts.some(
+          (port) => !port.startsWith("127.0.0.1:") && !port.startsWith("[::1]:"),
+        )
       ) {
-        errors.push(`${displayPath}: service "gateway" host ports must bind to loopback.`);
+        errors.push(`${displayPath}: service "${serviceName}" host ports must bind to loopback.`);
       }
     }
 

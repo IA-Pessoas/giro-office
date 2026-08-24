@@ -30,9 +30,9 @@ Para o ambiente single-slot publicado em `useoffice.com.br`, consulte
 ## First start
 
 1. Fill the `.env.vps.*` files with the real VPS values.
-2. If `NGINX_TLS_ENABLED=true`, place the certificate files in `docker/nginx/certs` on the VPS.
+2. Termine TLS no Caddy compartilhado do host ou, com `NGINX_TLS_ENABLED=true`, monte os certificados em `docker/nginx/certs`.
 3. Configure o secret **`ENV_VPS_WEB`** (corpo = ficheiro `.env.vps.web`): `NEXT_PUBLIC_API_URL=/api` e `API_INTERNAL_URL=http://gateway:3010` para manter browser e API na mesma origem.
-4. If you keep `NGINX_TLS_ENABLED=false`, use `http://api.seu-dominio` instead.
+4. Com `NGINX_TLS_ENABLED=false`, as portas HTTP permanecem vinculadas apenas ao loopback e devem ficar atrás do terminador TLS do host; nunca publique login de plataforma em HTTP.
 5. Start the stable stack:
 
 ```bash
@@ -56,7 +56,7 @@ O procedimento de rollout, validação, telemetria e rollback está em [http-onl
 Nginx in this stack does not provision certificates automatically.
 
 - `NGINX_TLS_ENABLED=true`: listens on `80` and `443`, redirects HTTP to HTTPS and requires mounted cert files.
-- `NGINX_TLS_ENABLED=false`: serves the API only over plain HTTP on port `80`.
+- `NGINX_TLS_ENABLED=false`: serve HTTP somente no bind de loopback do host, para uso atrás de um terminador TLS externo.
 
 ## Update one service without touching the others
 

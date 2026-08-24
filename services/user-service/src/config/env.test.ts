@@ -72,6 +72,14 @@ describe("user-service env security validation", () => {
     expect(() => getUserServiceEnv()).toThrow(/USER_SERVICE_INTERNAL_TOKEN/);
   });
 
+  it("rejects reusing the audit token for gateway authentication in production", () => {
+    setUserServiceEnv({
+      USER_SERVICE_INTERNAL_TOKEN: "secure-internal-token-with-at-least-32-chars",
+    });
+
+    expect(() => getUserServiceEnv()).toThrow(/USER_SERVICE_INTERNAL_TOKEN.*AUDIT_SERVICE_TOKEN/);
+  });
+
   it("rejects the reports internal token in production when it is not secure", () => {
     setUserServiceEnv({ REPORTS_INTERNAL_TOKEN: "reports-service-token" });
 

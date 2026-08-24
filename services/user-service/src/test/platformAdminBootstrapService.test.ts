@@ -55,4 +55,16 @@ describe("bootstrapPlatformAdmin", () => {
       expect.objectContaining({ email: "admin@example.com" }),
     );
   });
+
+  it.each([
+    "aaaaaaaaaaaaaaaa",
+    "qwertyuiopasdfgh",
+    "abcdefghijklmnop",
+    "9876543210987654",
+  ])("rejects a trivial platform password: %s", async (password) => {
+    await expect(bootstrapPlatformAdmin({ ...validInput, password }, repository)).rejects.toThrow(
+      /muito comum/i,
+    );
+    expect(repository.create).not.toHaveBeenCalled();
+  });
 });

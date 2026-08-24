@@ -178,6 +178,11 @@ const gatewayEnvSchema = z
       envName: "USER_SERVICE_INTERNAL_TOKEN",
       token: userServiceInternalToken,
     });
+    if (env.nodeEnv === "production" && userServiceInternalToken === env.auditServiceToken) {
+      throw new Error(
+        "USER_SERVICE_INTERNAL_TOKEN deve ser diferente de AUDIT_SERVICE_TOKEN em produção.",
+      );
+    }
     validateProductionInternalServiceToken({
       nodeEnv: env.nodeEnv,
       serviceName: "gateway",

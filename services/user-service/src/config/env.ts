@@ -163,6 +163,11 @@ const envSchema = rawEnvSchema.transform((env) => {
     envName: "USER_SERVICE_INTERNAL_TOKEN",
     token: userServiceInternalToken,
   });
+  if (rest.nodeEnv === "production" && userServiceInternalToken === rest.auditServiceToken) {
+    throw new Error(
+      "USER_SERVICE_INTERNAL_TOKEN deve ser diferente de AUDIT_SERVICE_TOKEN em produção.",
+    );
+  }
   validateProductionInternalServiceToken({
     nodeEnv: rest.nodeEnv,
     serviceName: "user-service",

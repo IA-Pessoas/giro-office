@@ -23,7 +23,7 @@ services:
     env_file:
       - .env.vps.reverse-proxy
     ports:
-      - "8085:80"
+      - "127.0.0.1:8085:80"
       # - "443:443"
     volumes:
       - ./docker/nginx/generate-nginx-config.sh:/opt/generate-nginx-config.sh:ro
@@ -45,7 +45,7 @@ services:
     env_file:
       - .env.vps.web
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     healthcheck:
       test:
         [

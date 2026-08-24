@@ -58,6 +58,14 @@ describe("gateway env security validation", () => {
     expect(() => getGatewayEnv()).toThrow(/USER_SERVICE_INTERNAL_TOKEN/);
   });
 
+  it("rejects reusing the audit token for user-service in production", () => {
+    setGatewayEnv({
+      USER_SERVICE_INTERNAL_TOKEN: "secure-internal-token-with-at-least-32-chars",
+    });
+
+    expect(() => getGatewayEnv()).toThrow(/USER_SERVICE_INTERNAL_TOKEN.*AUDIT_SERVICE_TOKEN/);
+  });
+
   it("rejects insecure auth cookies in production", () => {
     setGatewayEnv({ AUTH_COOKIE_SECURE: "false" });
 
