@@ -20,6 +20,7 @@ interface BuildAuditLifecycleMiddlewareOptions {
 
 const TI_PASSWORD_DEACTIVATION_PATH = /^\/ti\/passwords\/[^/]+\/deactivate\/?$/i;
 const TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS = new Set(["password", "reason"]);
+const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
 
 function getResponseSizeBytes(response: Response): number | undefined {
   const header = response.getHeader("content-length");
@@ -110,6 +111,11 @@ export function buildAuditLifecycleMiddleware({
     const startedAt = process.hrtime.bigint();
     const createdAt = new Date();
     const publicPath = getPublicPath(request.originalUrl, request.path);
+    if (AUDIT_EXCLUDED_PATHS.has(publicPath)) {
+      next();
+      return;
+    }
+
     const activity = describeActivity(request.method, publicPath);
     const requestLogger = request.log ?? logger;
     let recorded = false;

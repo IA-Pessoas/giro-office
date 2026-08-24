@@ -58,12 +58,42 @@ test("createAuditRecorder drops work when its in-flight limit is reached", async
     },
   });
 
-  const first = recorder({ requestId: "request-1" } as never);
+  const first = recorder({ requestId: "request-1", method: "GET" } as never);
   await Promise.resolve();
-  await recorder({ requestId: "request-2" } as never);
+  await recorder({ requestId: "request-2", method: "GET" } as never);
 
   assert.equal(fetchCalls, 1);
   assert.equal(warnings.length, 1);
   releaseFirst?.(new Response(null, { status: 204 }));
   await first;
+});
+
+test("createAuditRecorder preserves authenticated and unsafe events at its public limit", async () => {
+  const releases: Array<(response: Response) => void> = [];
+  let fetchCalls = 0;
+  const recorder = createAuditRecorder({
+    enabled: true,
+    serviceUrl: "http://audit-service:3020",
+    serviceToken: "test-token",
+    logger: { error() {}, warn() {} } as never,
+    maxInFlight: 1,
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return await new Promise<Response>((resolve) => releases.push(resolve));
+    },
+  });
+
+  const publicRead = recorder({ requestId: "request-1", method: "GET" } as never);
+  await Promise.resolve();
+  const authenticatedRead = recorder({
+    requestId: "request-2",
+    method: "GET",
+    userId: "user-1",
+  } as never);
+  const publicMutation = recorder({ requestId: "request-3", method: "POST" } as never);
+  await Promise.resolve();
+
+  assert.equal(fetchCalls, 3);
+  for (const release of releases) release(new Response(null, { status: 204 }));
+  await Promise.all([publicRead, authenticatedRead, publicMutation]);
 });

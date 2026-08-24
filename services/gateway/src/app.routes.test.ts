@@ -3525,6 +3525,26 @@ it("does not change responses when audit ingestion fails", async () => {
   }
 });
 
+it("does not send health probes to the audit service", async () => {
+  const auditService = await startAuditIngestServer();
+  const app = createApp(
+    createEnv({ auditEnabled: true, auditServiceUrl: auditService.url }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    expect((await fetch(`${gatewayUrl}/health`)).status).toBe(200);
+    expect((await fetch(`${gatewayUrl}/ready`)).status).toBe(200);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(auditService.records).toHaveLength(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(auditService.server);
+  }
+});
+
 it("proxies /user/me to the user service with forwarded auth headers", async () => {
   const token = createToken({
     user_id: "user-1",
