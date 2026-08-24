@@ -111,6 +111,25 @@ test("isolated Super Admin CI runs the repository supply-chain gates", async () 
   }
 });
 
+test("isolated Super Admin CI provides Prisma's non-secret generation environment", async () => {
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github", "workflows", "super-admin-v2-ci.yml"),
+    "utf8",
+  );
+  const gatesIndex = workflow.indexOf("\n  gates:");
+  const envIndex = workflow.indexOf("\n    env:", gatesIndex);
+  const stepsIndex = workflow.indexOf("\n    steps:", gatesIndex);
+
+  assert.ok(
+    envIndex > gatesIndex && envIndex < stepsIndex,
+    "DATABASE_URL must cover every gate step",
+  );
+  assert.match(
+    workflow.slice(envIndex, stepsIndex),
+    /DATABASE_URL:\s*postgresql:\/\/ci:ci@127\.0\.0\.1:5432\/giro_ci/u,
+  );
+});
+
 test("isolated Super Admin CI pins trusted actions and prepares API packages before the app", async () => {
   const workflow = await readFile(
     path.join(repositoryRoot, ".github", "workflows", "super-admin-v2-ci.yml"),

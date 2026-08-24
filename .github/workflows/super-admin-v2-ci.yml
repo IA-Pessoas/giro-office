@@ -17,6 +17,8 @@ jobs:
     name: super-admin-v2/gates
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/giro_ci
     steps:
       - name: Checkout without persisted credentials
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -74,8 +76,6 @@ jobs:
           --filter @workspace/audit-service test
 
       - name: Validate smoke coverage and Prisma schema
-        env:
-          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/giro_ci
         run: |
           corepack pnpm smoke:coverage
           corepack pnpm --filter @workspace/infra exec prisma validate --schema prisma/schema.prisma

@@ -154,7 +154,7 @@ ficam com o controlador. Nenhuma imagem foi fabricada.
   proxy aborta upstream após 30s.
 - Gates frescos: shared 60/60, gateway 289/289, user-service 158/158,
   organization-service 22/22, audit-service 23/23 (+1 opt-in skip), Compose/Nginx 10/10,
-  regressão/supply-chain 19/19, scanner 4.305 arquivos/0 achados, política pnpm 0 achados e
+  regressão/supply-chain 20/20, scanner 4.306 arquivos/0 achados, política pnpm 0 achados e
   `pnpm audit` sem vulnerabilidades conhecidas.
 
 A limitação da prova visual permanece explícita: este host não possui Docker, PostgreSQL, WSL ou
