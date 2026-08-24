@@ -48,9 +48,12 @@ await runTest("API uses credentials, SSR cookies and browser CSRF without JWT", 
 });
 
 await runTest("AuthContext lifecycle is server-driven and token-free", () => {
-  assert.match(authSource, /api\.get\("\/user\/me"\)/);
+  assert.match(authSource, /platformApi\.get\("\/user\/me"\)/);
+  assert.match(authSource, /platformApi\.get\("\/platform\/me"\)/);
   assert.match(authSource, /api\.post\("\/user\/session\/refresh"\)/);
+  assert.match(authSource, /platformApi\.post\("\/platform\/session\/refresh"\)/);
   assert.match(authSource, /api\.delete\("\/user\/session"\)/);
+  assert.match(authSource, /platformApi\.delete\("\/platform\/session"\)/);
   assert.doesNotMatch(
     authSource,
     /cw\.token|jwtDecode|getModulePermissionsFromToken|setCookie|destroyCookie|Authorization|Bearer/,

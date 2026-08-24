@@ -7,6 +7,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { MODULE_KEYS } from "@modules/auth/utils/moduleAccess";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
+import { platformApi } from "@shared/services/api";
 import { ME_QUERY_KEY } from "@shared/hooks";
 import {
     createAuthInvalidationHandler,
@@ -228,7 +229,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const requestVersion = beginAuthTransition();
 
         try {
-            const response = await api.post("/platform/session/refresh");
+            const response = await platformApi.post("/platform/session/refresh");
 
             if (!isCurrentAuthTransition(requestVersion)) {
                 return null;
@@ -260,7 +261,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         void (async () => {
             try {
-                const response = await api.get("/user/me");
+                const response = await platformApi.get("/user/me");
                 const userData = response.data?.data;
 
                 if (isCurrentAuthTransition(requestVersion) && isValidAuthUser(userData)) {
@@ -273,7 +274,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 }
 
                 try {
-                    const response = await api.get("/platform/me");
+                    const response = await platformApi.get("/platform/me");
                     const userData = response.data?.data;
 
                     if (isCurrentAuthTransition(requestVersion) && isValidPlatformUser(userData)) {
@@ -359,7 +360,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     async function signInPlatform({ email, password }: PlatformSignInProps) {
         const requestVersion = beginAuthTransition();
-        const response = await api.post("/platform/session", { email, password });
+        const response = await platformApi.post("/platform/session", { email, password });
         const userData = response.data?.data;
 
         if (!isValidPlatformUser(userData)) {
@@ -402,7 +403,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         beginAuthTransition();
 
         try {
-            await api.delete("/platform/session");
+            await platformApi.delete("/platform/session");
             toast.success("Sessão encerrada!");
         } catch (err) {
             toast.error("Erro ao sair!");

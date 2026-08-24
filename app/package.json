@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit && pnpm run typecheck:usefetch",
     "test:auth": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/auth/run-auth-tests.mjs",
     "test:session-security": "node src/modules/auth/run-session-transport-tests.mjs",
-    "test:platform-session": "node src/modules/auth/run-platform-session-tests.mjs",
+    "test:platform-session": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/auth/run-platform-session-tests.mjs",
     "test:auth-sidebar": "node src/modules/auth/run-auth-sidebar-browser-smoke.mjs",
     "test:auth-session": "pnpm run build && node src/modules/auth/run-auth-session-browser-smoke.mjs",
     "test:users": "node --experimental-strip-types src/modules/users/run-users-tests.mjs",
