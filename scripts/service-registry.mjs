@@ -118,8 +118,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3033",
     urlEnvKey: "PROJECT_SERVICE_URL",
     openapiSpecPath: "services/project-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer", "admin-bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "admin-bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/project-service/src/generated/prisma",
   },
   {
