@@ -1,20 +1,21 @@
-import assert from 'node:assert/strict';
-import { readdir, readFile } from 'node:fs/promises';
-import path from 'node:path';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import assert from "node:assert/strict";
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ignoredDirectories = new Set([
-  '.git',
-  '.next',
-  '.turbo',
-  'dist',
-  'graphify-out',
-  'node_modules',
+  ".git",
+  ".next",
+  ".turbo",
+  "dist",
+  "graphify-out",
+  "node_modules",
 ]);
-const executableConfigPattern = /^(?:postcss|tailwind|eslint|next|babel|vite)\.config\.(?:js|cjs|mjs|ts)$/;
-const additionalConfigNames = new Set(['lint-staged.config.mjs', 'tasks.json']);
+const executableConfigPattern =
+  /^(?:postcss|tailwind|eslint|next|babel|vite)\.config\.(?:js|cjs|mjs|ts)$/;
+const additionalConfigNames = new Set(["lint-staged.config.mjs", "tasks.json"]);
 const maliciousMarkers = [
   /For only test/,
   /global\.[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*['"][A-Za-z0-9-]+['"]/,
@@ -48,12 +49,12 @@ async function findExecutableConfigs(directory) {
   return files;
 }
 
-test('executable project configs contain no PolinRider indicators', async () => {
+test("executable project configs contain no PolinRider indicators", async () => {
   const configs = await findExecutableConfigs(repositoryRoot);
-  assert.ok(configs.length > 0, 'expected executable project configs to be scanned');
+  assert.ok(configs.length > 0, "expected executable project configs to be scanned");
 
   for (const config of configs) {
-    const source = await readFile(config, 'utf8');
+    const source = await readFile(config, "utf8");
     const relativePath = path.relative(repositoryRoot, config);
 
     for (const marker of maliciousMarkers) {
@@ -65,12 +66,47 @@ test('executable project configs contain no PolinRider indicators', async () => 
   }
 });
 
-test('pre-commit scans for supply-chain payloads before loading lint-staged config', async () => {
-  const hook = await readFile(path.join(repositoryRoot, '.husky', 'pre-commit'), 'utf8');
-  const scannerIndex = hook.indexOf('node scripts/supply-chain-integrity.mjs');
-  const lintStagedIndex = hook.indexOf('pnpm lint-staged');
+test("pre-commit scans for supply-chain payloads before loading lint-staged config", async () => {
+  const hook = await readFile(path.join(repositoryRoot, ".husky", "pre-commit"), "utf8");
+  const scannerIndex = hook.indexOf("node scripts/supply-chain-integrity.mjs");
+  const lintStagedIndex = hook.indexOf("pnpm lint-staged");
 
-  assert.ok(scannerIndex >= 0, 'pre-commit must execute the supply-chain scanner');
-  assert.ok(lintStagedIndex >= 0, 'pre-commit must retain lint-staged');
-  assert.ok(scannerIndex < lintStagedIndex, 'scanner must run before lint-staged loads its config');
+  assert.ok(scannerIndex >= 0, "pre-commit must execute the supply-chain scanner");
+  assert.ok(lintStagedIndex >= 0, "pre-commit must retain lint-staged");
+  assert.ok(scannerIndex < lintStagedIndex, "scanner must run before lint-staged loads its config");
+});
+
+test("isolated Super Admin CI installs the pinned dependency graph without lifecycle scripts", async () => {
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github", "workflows", "super-admin-v2-ci.yml"),
+    "utf8",
+  );
+  const installCommands = workflow
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => /\bpnpm install\b/u.test(line));
+
+  assert.deepEqual(installCommands, [
+    "run: corepack pnpm install --frozen-lockfile --ignore-scripts",
+  ]);
+  assert.match(workflow, /node-version:\s*["']?22["']?/u);
+  assert.match(workflow, /corepack pnpm --version\)" = "10\.26\.0"/u);
+  assert.doesNotMatch(workflow, /\b(?:npm|npx|yarn)\s+(?:add|ci|install)\b/u);
+});
+
+test("isolated Super Admin CI runs the repository supply-chain gates", async () => {
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github", "workflows", "super-admin-v2-ci.yml"),
+    "utf8",
+  );
+
+  for (const requiredGate of [
+    "node scripts/supply-chain-integrity.mjs",
+    "node scripts/pnpm-security-policy.mjs --root .",
+    "corepack pnpm audit --audit-level moderate",
+    "scripts/super-admin-session-regression.test.mjs",
+    "corepack pnpm smoke:coverage",
+  ]) {
+    assert.ok(workflow.includes(requiredGate), `workflow must run: ${requiredGate}`);
+  }
 });

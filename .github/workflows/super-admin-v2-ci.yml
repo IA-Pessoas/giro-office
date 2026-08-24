@@ -1,0 +1,79 @@
+name: Super Admin V2 CI
+
+on:
+  pull_request:
+    branches:
+      - feature/super-admin-v2-develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: super-admin-v2-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: super-admin-v2/gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          test "$(corepack pnpm --version)" = "10.26.0"
+
+      - name: Install frozen dependencies without lifecycle scripts
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run supply-chain gates
+        run: |
+          node --test scripts/super-admin-session-regression.test.mjs \
+            scripts/supply-chain-security.test.mjs \
+            scripts/supply-chain-integrity.test.mjs
+          node scripts/supply-chain-integrity.mjs
+          node scripts/pnpm-security-policy.mjs --root .
+          corepack pnpm audit --audit-level moderate
+
+      - name: Check shared and Super Admin services
+        run: >-
+          corepack pnpm --filter @workspace/shared --filter @workspace/gateway
+          --filter @workspace/user-service --filter @workspace/organization-service
+          --filter @workspace/audit-service check
+
+      - name: Typecheck shared and Super Admin services
+        run: >-
+          corepack pnpm --filter @workspace/shared --filter @workspace/gateway
+          --filter @workspace/user-service --filter @workspace/organization-service
+          --filter @workspace/audit-service typecheck
+
+      - name: Test shared and Super Admin services
+        run: >-
+          corepack pnpm --filter @workspace/shared --filter @workspace/gateway
+          --filter @workspace/user-service --filter @workspace/organization-service
+          --filter @workspace/audit-service test
+
+      - name: Validate smoke coverage and Prisma schema
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/giro_ci
+        run: |
+          corepack pnpm smoke:coverage
+          corepack pnpm --filter @workspace/infra exec prisma validate --schema prisma/schema.prisma
+
+      - name: Verify the browser application
+        run: |
+          corepack pnpm --filter @workspace/app typecheck
+          corepack pnpm --filter @workspace/app test:session-security
+          corepack pnpm --filter @workspace/app test:platform-session
+          corepack pnpm --filter @workspace/app test:super-admin
+          corepack pnpm --filter @workspace/app build
