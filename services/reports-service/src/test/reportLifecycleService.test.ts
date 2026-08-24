@@ -3,6 +3,7 @@ import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { reportJobStatusSchema } from "../schemas/reportJob.schemas.js";
+import { MAX_SNAPSHOT_BYTES, MAX_SNAPSHOT_ROWS } from "../schemas/reportSnapshot.schemas.js";
 import { REPORT_AUDIT_EVENT_TYPES, ReportAuditService } from "../services/reportAuditService.js";
 import { ReportLifecycleService } from "../services/reportLifecycleService.js";
 
@@ -140,6 +141,29 @@ describe("ReportLifecycleService", () => {
     expect(recorder.mock.calls[0]?.[0].metadata).not.toHaveProperty("upstream_url");
   });
 
+  it.each([
+    ["linhas", Array.from({ length: MAX_SNAPSHOT_ROWS + 1 }, () => ({ balance: 1 }))],
+    ["bytes", [{ balance: "x".repeat(MAX_SNAPSHOT_BYTES) }]],
+  ] as const)("rejeita snapshot acima do limite de %s antes de persistir", async (_limit, rows) => {
+    const { prisma, transaction } = createPersistence();
+    const audit = new ReportAuditService(prisma as never, vi.fn());
+    const service = new ReportLifecycleService(prisma as never, audit, () => now);
+
+    await expect(
+      service.complete({
+        job_id: "job-1",
+        organization_id: "org-1",
+        actor_id: "user-1",
+        lease_token: "lease-b",
+        rows,
+      }),
+    ).rejects.toBeInstanceOf(ServiceError);
+
+    expect(transaction.reportJob.updateMany).not.toHaveBeenCalled();
+    expect(transaction.reportSnapshot.create).not.toHaveBeenCalled();
+    expect(transaction.reportSnapshotRow.createMany).not.toHaveBeenCalled();
+  });
+
   it("impede retorno de estado terminal para processing", async () => {
     const { prisma, transaction } = createPersistence("completed");
     const audit = new ReportAuditService(prisma as never, vi.fn());
@@ -227,11 +251,59 @@ describe("ReportLifecycleService", () => {
       organization_id: "org-1",
       actor_id: "user-1",
       status,
-      ...(status === "failed" ? { lease_token: "lease-b" } : {}),
+      lease_token: "lease-b",
     });
 
     expect(transaction.reportSnapshot.create).not.toHaveBeenCalled();
     expect(transaction.reportSnapshotRow.createMany).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia queued → processing fora do claim atômico", async () => {
+    const { prisma, transaction } = createPersistence("queued");
+    const audit = new ReportAuditService(prisma as never, vi.fn());
+    const service = new ReportLifecycleService(prisma as never, audit, () => now);
+
+    await expect(
+      service.transition({
+        job_id: "job-1",
+        organization_id: "org-1",
+        actor_id: "user-1",
+        status: "processing",
+      }),
+    ).rejects.toBeInstanceOf(ServiceError);
+
+    expect(transaction.reportJob.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("impede worker com lease expirado de cancelar job recapturado", async () => {
+    const { prisma, transaction } = createPersistence();
+    transaction.reportJob.updateMany.mockImplementation(async ({ where }) => ({
+      count: where.lease_token === "lease-b" ? 1 : 0,
+    }));
+    const audit = new ReportAuditService(prisma as never, vi.fn());
+    const service = new ReportLifecycleService(prisma as never, audit, () => now);
+    const baseInput = {
+      job_id: "job-1",
+      organization_id: "org-1",
+      actor_id: "user-1",
+      status: "cancelled" as const,
+    };
+
+    const [expiredWorker, currentWorker] = await Promise.allSettled([
+      service.transition({ ...baseInput, lease_token: "lease-a" }),
+      service.transition({ ...baseInput, lease_token: "lease-b" }),
+    ]);
+
+    expect(expiredWorker.status).toBe("rejected");
+    expect(currentWorker.status).toBe("fulfilled");
+    expect(transaction.reportJob.updateMany).toHaveBeenCalledWith({
+      where: { id: "job-1", status: "processing", lease_token: "lease-a" },
+      data: { status: "cancelled", finished_at: now },
+    });
+    expect(transaction.reportJob.updateMany).toHaveBeenCalledWith({
+      where: { id: "job-1", status: "processing", lease_token: "lease-b" },
+      data: { status: "cancelled", finished_at: now },
+    });
   });
 
   it("impede worker com lease expirado de falhar job recapturado", async () => {

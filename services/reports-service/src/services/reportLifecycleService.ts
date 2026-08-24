@@ -1,5 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 
+import { MAX_SNAPSHOT_BYTES, MAX_SNAPSHOT_ROWS } from "../schemas/reportSnapshot.schemas.js";
 import type {
   ReportAuditEventInput,
   ReportAuditEventType,
@@ -74,7 +75,7 @@ interface ReportLifecycleInput {
 }
 
 export interface TransitionReportJobInput extends ReportLifecycleInput {
-  status: Exclude<ReportLifecycleStatus, "completed" | "expired" | "deleted">;
+  status: Exclude<ReportLifecycleStatus, "processing" | "completed" | "expired" | "deleted">;
   lease_token?: string;
 }
 
@@ -121,7 +122,7 @@ export class ReportLifecycleService {
       const job = await this.getJob(transaction, input.job_id);
       this.assertOrganization(job, input.organization_id);
       assertTransition(job.status, input.status);
-      const leaseToken = this.leaseForWorkerTransition(job.status, input);
+      const leaseToken = this.leaseForProcessingTransition(job.status, input);
 
       const occurredAt = this.clock();
       const result = await transaction.reportJob.updateMany({
@@ -151,6 +152,7 @@ export class ReportLifecycleService {
     const event = await this.prisma.$transaction(async (transaction) => {
       const job = await this.getJob(transaction, input.job_id);
       this.assertOrganization(job, input.organization_id);
+      this.assertSnapshotLimits(input.rows);
       assertTransition(job.status, "completed");
 
       const occurredAt = this.clock();
@@ -256,13 +258,26 @@ export class ReportLifecycleService {
     }
   }
 
-  private leaseForWorkerTransition(
+  private assertSnapshotLimits(rows: ReadonlyArray<Record<string, unknown>>): void {
+    if (rows.length > MAX_SNAPSHOT_ROWS) {
+      throw new ServiceError(400, "O snapshot excede o limite de linhas.");
+    }
+
+    if (Buffer.byteLength(JSON.stringify(rows), "utf8") > MAX_SNAPSHOT_BYTES) {
+      throw new ServiceError(400, "O snapshot excede o limite de bytes.");
+    }
+  }
+
+  private leaseForProcessingTransition(
     currentStatus: string,
     input: TransitionReportJobInput,
   ): string | undefined {
-    if (currentStatus !== "processing" || input.status !== "failed") return undefined;
+    if (currentStatus === "queued" && input.status === "processing") {
+      throw new ServiceError(409, "O claim atômico é o único caminho para iniciar processamento.");
+    }
+    if (currentStatus !== "processing") return undefined;
     if (!input.lease_token) {
-      throw new ServiceError(400, "A falha de um job em processamento exige lease_token.");
+      throw new ServiceError(400, "A transição de um job em processamento exige lease_token.");
     }
     return input.lease_token;
   }
