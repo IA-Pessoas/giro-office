@@ -23,6 +23,7 @@ export const EXEMPT_SPEC_OPERATION_KEYS = new Set([
   "user-service|GET|/platform/me",
   "user-service|GET|/platform/organizations/{organizationId}/users",
   "user-service|POST|/platform/session/validate",
+  "organization-service|GET|/platform/organizations",
 ]);
 
 const GOOD_STATUS_OVERRIDES = new Map([

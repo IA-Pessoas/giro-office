@@ -209,6 +209,7 @@ model Organization {
   triageMonthlys                TriageMonthly[]
   triageResponsibles            TriageResponsible[]
 
+  @@index([name, id], map: "idx_organizations_name_id")
   @@map("organizations")
 }
 

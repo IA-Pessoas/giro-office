@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { status as statusEnum } from "../generated/prisma/client.js";
 
+const MAX_PLATFORM_OFFSET = 10_000;
+
 export const createOrganizationBodySchema = z
   .object({
     name: zNonEmptyText("name"),
@@ -47,7 +49,11 @@ export const listOrganizationsQuerySchema = z
         }
         return Number(raw);
       },
-      z.number().int().min(1, "page deve ser um inteiro maior ou igual a 1."),
+      z
+        .number()
+        .int()
+        .min(1, "page deve ser um inteiro maior ou igual a 1.")
+        .max(10_001, "page excede a janela administrativa permitida."),
     ),
     pageSize: z.preprocess(
       (v) => {
@@ -70,5 +76,15 @@ export const listOrganizationsQuerySchema = z
       }
       return raw;
     }, z.nativeEnum(statusEnum).optional()),
+    search: z.preprocess((v) => getSingleQueryValue(v), z.string().trim().max(100).optional()),
   })
-  .strict();
+  .strict()
+  .superRefine(({ page, pageSize }, context) => {
+    if ((page - 1) * pageSize > MAX_PLATFORM_OFFSET) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["page"],
+        message: "A combinação de page e pageSize excede a janela administrativa permitida.",
+      });
+    }
+  });

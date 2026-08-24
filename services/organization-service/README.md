@@ -14,6 +14,7 @@ Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET` (alin
 
 - URL upstream: `ORGANIZATION_SERVICE_URL` (ex.: `http://localhost:3031`), definida no [env do gateway](../gateway/src/config/env.ts).
 - O cliente chama o gateway em caminhos como `GET /organizations/organizations` (o micro expõe rotas sob `/organizations`).
+- A consulta global somente leitura `GET /platform/organizations` usa apenas a sessão `cw.session` HttpOnly de um `super_admin`; a publicação e auditoria no gateway são tratadas separadamente.
 
 ## Desenvolvimento
 
