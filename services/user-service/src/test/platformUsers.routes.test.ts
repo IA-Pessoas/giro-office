@@ -145,4 +145,13 @@ describe("platform users routes", () => {
     expect(response.status).toBe(400);
     expect(platformUsersMock.list).not.toHaveBeenCalled();
   });
+
+  it("returns 400 when skip exceeds the bounded administrative window", async () => {
+    const response = await request(createApp())
+      .get("/platform/organizations/org-2/users?skip=10001")
+      .set(platformSessionHeaders());
+
+    expect(response.status).toBe(400);
+    expect(platformUsersMock.list).not.toHaveBeenCalled();
+  });
 });

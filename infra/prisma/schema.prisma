@@ -344,6 +344,7 @@ model User {
   responsiblesTriage          TriageResponsible[]
   department                  Department             @relation(fields: [department_id], references: [id])
 
+  @@index([organization_id, name, id])
   @@map("users")
 }
 

@@ -52,7 +52,7 @@ describe("PlatformUsersService", () => {
       },
       skip: 0,
       take: 20,
-      orderBy: { name: "asc" },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
     });
     expect(prismaMock.user.count).toHaveBeenCalledWith({ where: expectedWhere });
     expect(result).toEqual({ users: [{ id: "user-1", name: "Ana" }], total: 21, hasMore: true });

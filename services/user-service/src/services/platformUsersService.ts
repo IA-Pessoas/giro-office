@@ -46,7 +46,7 @@ export class PlatformUsersService {
         select: PLATFORM_USER_LIST_SELECT,
         skip,
         take: pageSize,
-        orderBy: { name: "asc" },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
       }),
       prismaClient.user.count({ where }),
     ]);
