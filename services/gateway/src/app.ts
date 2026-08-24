@@ -469,6 +469,7 @@ export function createApp(
     serviceUrl: env.auditServiceUrl,
     serviceToken: env.auditServiceToken,
     logger,
+    protectedCapacity: 75,
   });
 
   configureExpress(app, env);

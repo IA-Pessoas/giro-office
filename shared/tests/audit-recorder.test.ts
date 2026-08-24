@@ -77,6 +77,7 @@ test("createAuditRecorder reserves bounded capacity before sensitive work", asyn
     serviceToken: "test-token",
     logger: { error() {}, warn() {} } as never,
     maxInFlight: 1,
+    protectedCapacity: 1,
     fetchImpl: async () => {
       fetchCalls += 1;
       return await new Promise<Response>((resolve) => {
@@ -85,13 +86,70 @@ test("createAuditRecorder reserves bounded capacity before sensitive work", asyn
     },
   });
 
-  assert.equal(recorder.reserve(), true);
-  assert.equal(recorder.reserve(), false);
-  const reserved = recorder({ requestId: "request-1", method: "POST" } as never, true);
+  const reservation = recorder.reserve("protected");
+  assert.equal(reservation, "protected");
+  assert.equal(recorder.reserve("protected"), undefined);
+  const reserved = recorder({ requestId: "request-1", method: "POST" } as never, reservation);
   await Promise.resolve();
 
   assert.equal(fetchCalls, 1);
   release?.(new Response(null, { status: 204 }));
   await reserved;
-  assert.equal(recorder.reserve(), true);
+  assert.equal(recorder.reserve("protected"), "protected");
+});
+
+test("createAuditRecorder keeps public traffic out of protected capacity", async () => {
+  let releasePublic: ((response: Response) => void) | undefined;
+  let fetchCalls = 0;
+  const recorder = createAuditRecorder({
+    enabled: true,
+    serviceUrl: "http://audit-service:3020",
+    serviceToken: "test-token",
+    logger: { error() {}, warn() {} } as never,
+    maxInFlight: 4,
+    protectedCapacity: 3,
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return await new Promise<Response>((resolve) => {
+        releasePublic = resolve;
+      });
+    },
+  });
+
+  const publicRead = recorder({ requestId: "public-1", method: "GET" } as never);
+  await Promise.resolve();
+  await recorder({ requestId: "public-2", method: "GET" } as never);
+
+  assert.equal(fetchCalls, 1);
+  assert.equal(recorder.reserve("protected"), "protected");
+  assert.equal(recorder.reserve("protected"), "protected");
+  assert.equal(recorder.reserve("protected"), "protected");
+  assert.equal(recorder.reserve("protected"), undefined);
+  releasePublic?.(new Response(null, { status: 204 }));
+  await publicRead;
+});
+
+test("createAuditRecorder never treats a dropped entity change as success", async () => {
+  let releaseFirst: ((response: Response) => void) | undefined;
+  const recorder = createAuditRecorder({
+    enabled: true,
+    serviceUrl: "http://audit-service:3020",
+    serviceToken: "test-token",
+    logger: { error() {}, warn() {} } as never,
+    maxInFlight: 1,
+    fetchImpl: async () =>
+      await new Promise<Response>((resolve) => {
+        releaseFirst = resolve;
+      }),
+  });
+
+  const first = recorder({ requestId: "request-1", method: "GET" } as never);
+  await Promise.resolve();
+
+  await assert.rejects(
+    recorder({ requestId: "request-2", method: "ENTITY_CHANGE" } as never),
+    /auditoria indisponível/i,
+  );
+  releaseFirst?.(new Response(null, { status: 204 }));
+  await first;
 });

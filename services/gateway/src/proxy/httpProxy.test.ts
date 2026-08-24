@@ -11,9 +11,13 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
 import type { Request } from "express";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildForwardHeaders } from "./httpProxy.js";
+import { buildForwardHeaders, buildHttpProxyMiddleware } from "./httpProxy.js";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const authenticatedRequest = {
   headers: {},
@@ -154,5 +158,35 @@ describe("buildForwardHeaders", () => {
     expect(headers.get("cookie")).toBe(
       entry.expectedCookie ? "cw.session=verified-platform-token" : null,
     );
+  });
+});
+
+describe("buildHttpProxyMiddleware", () => {
+  it("applies an abort deadline to upstream requests", async () => {
+    let capturedSignal: AbortSignal | null | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        capturedSignal = init?.signal;
+        throw new Error("upstream unavailable");
+      }),
+    );
+    const next = vi.fn();
+    const proxy = buildHttpProxyMiddleware("http://upstream.test", { upstreamTimeoutMs: 25 });
+
+    await proxy(
+      {
+        headers: {},
+        ip: "127.0.0.1",
+        method: "GET",
+        originalUrl: "/test",
+        protocol: "http",
+      } as Request,
+      {} as never,
+      next,
+    );
+
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 502 }));
   });
 });

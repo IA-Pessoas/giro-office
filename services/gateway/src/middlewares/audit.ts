@@ -2,6 +2,7 @@ import type {
   AuditOutcome,
   AuditQuery,
   AuditRecorder,
+  AuditReservation,
   CreateAuditRequestPayload,
   Logger,
 } from "@workspace/shared";
@@ -23,7 +24,7 @@ const TI_PASSWORD_DEACTIVATION_PATH = /^\/ti\/passwords\/[^/]+\/deactivate\/?$/i
 const TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS = new Set(["password", "reason"]);
 const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const RESERVED_AUDIT_REQUESTS = new WeakSet<Request>();
+const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
 
 interface BuildAuditCapacityGuardOptions {
   enabled: boolean;
@@ -47,12 +48,15 @@ export function buildAuditCapacityGuard({
       return;
     }
 
-    if (!recordAuditRequest.reserve()) {
+    const reservation = recordAuditRequest.reserve(
+      request.auth === undefined ? "public" : "protected",
+    );
+    if (!reservation) {
       next(new ServiceError(503, "Auditoria indisponível; operação não iniciada."));
       return;
     }
 
-    RESERVED_AUDIT_REQUESTS.add(request);
+    RESERVED_AUDIT_REQUESTS.set(request, reservation);
     next();
   };
 }
@@ -205,7 +209,9 @@ export function buildAuditLifecycleMiddleware({
         referring: activity?.item,
       };
 
-      void recordAuditRequest(payload, RESERVED_AUDIT_REQUESTS.delete(request));
+      const reservation = RESERVED_AUDIT_REQUESTS.get(request);
+      RESERVED_AUDIT_REQUESTS.delete(request);
+      void recordAuditRequest(payload, reservation);
       requestLogger.debug({
         event: "audit.record.queued",
         message: "Audit record queued",

@@ -53,9 +53,11 @@ export interface HttpProxyOptions {
   forwardSessionBinding?: boolean;
   forwardPlatformSessionCredentials?: boolean;
   stripPathPrefix?: string;
+  upstreamTimeoutMs?: number;
 }
 
 const OWNER_MODULE_PERMISSION = 3;
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
 
 type SessionCookieName = typeof AUTH_SESSION_COOKIE_NAME | typeof CSRF_COOKIE_NAME;
 
@@ -432,6 +434,9 @@ function createHttpProxy(
         method: request.method,
         headers: buildForwardHeaders(request, options, normalizedPath),
         body: body as RequestInit["body"],
+        signal: AbortSignal.timeout(
+          Math.max(1, options.upstreamTimeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS),
+        ),
       };
 
       if (body !== undefined && typeof body !== "string") {
