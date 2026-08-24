@@ -33,4 +33,5 @@ pnpm --filter @workspace/reports-service worker
 pnpm --filter @workspace/reports-service test
 ```
 
-Esta issue não cria fonte de dados, catálogo populado, job, migration nem adapter.
+O bootstrap registra o adapter interno de Parcelamento. Ele consulta somente as rotas internas
+governadas do parcelamento-service e assina grants HMAC de curta duração.

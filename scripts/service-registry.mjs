@@ -88,8 +88,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3043",
     urlEnvKey: "PARCELAMENTO_SERVICE_URL",
     openapiSpecPath: "services/parcelamento-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/parcelamento-service/src/generated/prisma",
   },
   {

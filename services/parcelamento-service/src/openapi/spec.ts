@@ -101,6 +101,7 @@ export function buildParcelamentoServiceOpenApiSpec(env: ParcelamentoServiceEnv)
       { name: "Installments", description: "Parcelamentos" },
       { name: "InstallmentCompetencies", description: "Competencias de parcelamento" },
       { name: "Panoramas", description: "Panoramas mensais de parcelamento" },
+      { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     paths: {
       "/health": {
@@ -120,6 +121,46 @@ export function buildParcelamentoServiceOpenApiSpec(env: ParcelamentoServiceEnv)
           operationId: "getParcelamentoReadiness",
           responses: {
             "200": { description: "Ready", ...successJson },
+          },
+        },
+      },
+      "/internal/reporting/catalog": {
+        get: {
+          tags: ["InternalReporting"],
+          summary: "Consultar catálogo interno de Parcelamento",
+          security: [{ internalServiceToken: [] }],
+          responses: {
+            "200": { description: "Catálogo governado", ...successJson },
+            "403": { description: "Grant ou token interno inválido" },
+          },
+        },
+      },
+      "/internal/reporting/extract": {
+        post: {
+          tags: ["InternalReporting"],
+          summary: "Extrair campos governados para relatórios",
+          security: [{ internalServiceToken: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["source", "fields", "limit"],
+                  additionalProperties: false,
+                  properties: {
+                    source: text,
+                    fields: { type: "array", minItems: 1, items: text },
+                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Linhas extraídas", ...successJson },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Grant, token ou campo inválido" },
           },
         },
       },
@@ -331,6 +372,11 @@ export function buildParcelamentoServiceOpenApiSpec(env: ParcelamentoServiceEnv)
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
+        },
+        internalServiceToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
         },
       },
       schemas: {

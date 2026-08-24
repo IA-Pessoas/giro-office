@@ -797,6 +797,43 @@ function requireState(key) {
   return value;
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function createParcelamentoReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for Parcelamento reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "parcelamento-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
 function resolveDepartmentIdFromResponse(responseBody) {
   return pickFirst(
     responseBody,
@@ -1881,6 +1918,36 @@ const handlers = {
         userId: requireState("session").id,
         organizationId: requireState("session").organization_id,
       },
+    });
+  },
+
+  async parcelamentoReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createParcelamentoReportingGrant({
+            operation: "catalog",
+            source: "parcelamento.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async parcelamentoReportingExtract(op) {
+    const body = { source: "parcelamento.installments", fields: ["status"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createParcelamentoReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
     });
   },
 
