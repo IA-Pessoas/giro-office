@@ -194,7 +194,11 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
               required: true,
               schema: { type: "string", minLength: 1 },
             },
-            { name: "skip", in: "query", schema: { type: "integer", minimum: 0, default: 0 } },
+            {
+              name: "skip",
+              in: "query",
+              schema: { type: "integer", minimum: 0, maximum: 10_000, default: 0 },
+            },
             {
               name: "take",
               in: "query",

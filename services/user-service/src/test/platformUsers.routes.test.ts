@@ -47,6 +47,7 @@ vi.mock("../services/platformUsersService.js", () => ({
 
 import { createUserApp } from "../app.js";
 import { getUserServiceEnv } from "../config/env.js";
+import { buildUserServiceOpenApiSpec } from "../openapi/spec.js";
 
 const csrfToken = "A".repeat(43);
 const platformIdentity = {
@@ -153,5 +154,16 @@ describe("platform users routes", () => {
 
     expect(response.status).toBe(400);
     expect(platformUsersMock.list).not.toHaveBeenCalled();
+  });
+});
+
+describe("platform users OpenAPI", () => {
+  it("documents the bounded administrative skip window", () => {
+    const spec = buildUserServiceOpenApiSpec(testEnv);
+
+    expect(spec.paths).toHaveProperty(
+      ["/platform/organizations/{organizationId}/users", "get", "parameters", 1, "schema"],
+      { type: "integer", minimum: 0, maximum: 10_000, default: 0 },
+    );
   });
 });
