@@ -27,7 +27,10 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 const app = createApp(env, logger, {
-  sessionValidator: createUserServiceSessionValidator(env.userServiceUrl, env.auditServiceToken),
+  sessionValidator: createUserServiceSessionValidator(
+    env.userServiceUrl,
+    env.userServiceInternalToken,
+  ),
 });
 const server = createServer(app);
 

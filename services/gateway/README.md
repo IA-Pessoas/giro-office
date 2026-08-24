@@ -19,7 +19,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN`
 - `ORGANIZATION_SERVICE_URL`
 - `RH_SERVICE_URL`
-- `USER_SERVICE_URL`
+- `USER_SERVICE_URL`, `USER_SERVICE_INTERNAL_TOKEN` (token exclusivo do contexto gateway -> user-service; obrigatório em produção)
 - `DEPARTMENT_SERVICE_URL`
 - `TASK_SERVICE_URL`
 - `PROJECT_SERVICE_URL`
@@ -62,8 +62,8 @@ upstream genérico:
 - `GET /platform/audit/requests` -> `AUDIT_SERVICE_URL` (quando a auditoria está habilitada).
 
 O gateway remove todos os headers `x-auth-*` recebidos do cliente e reconstrói somente a
-identidade verificada. Os serviços protegidos aceitam essa identidade apenas junto do
-`AUDIT_SERVICE_TOKEN` injetado pelo gateway. Cookies da plataforma também são encaminhados por
+identidade verificada. O user-service aceita essa identidade apenas junto do
+`USER_SERVICE_INTERNAL_TOKEN` injetado pelo gateway. Cookies da plataforma também são encaminhados por
 allowlist de rota e nome: somente `cw.session`, acrescido de `cw.csrf` nas operações de refresh e
 logout. `Set-Cookie` de upstream só é publicado nos endpoints de criação/rotação de sessão.
 

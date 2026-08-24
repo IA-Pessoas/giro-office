@@ -28,6 +28,11 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function parseOptionalString(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
 const rawEnvSchema = z
 
   .object({
@@ -85,6 +90,8 @@ const rawEnvSchema = z
 
     auditServiceToken: z.string().optional().default("audit-service-token"),
 
+    userServiceInternalToken: z.string().optional().transform(parseOptionalString),
+
     reportsInternalToken: z.string().optional().default("reports-service-token"),
 
     allowedOrigins: z
@@ -102,6 +109,16 @@ const rawEnvSchema = z
       .string()
       .optional()
       .transform((value) => parsePositiveInteger(value, 600_000)),
+
+    platformAuthRateLimitMax: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 10)),
+
+    platformAuthRateLimitWindowMs: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 60_000)),
   })
 
   .superRefine((env, ctx) => {
@@ -127,7 +144,25 @@ const envSchema = rawEnvSchema.transform((env) => {
     authCookieSecureEnv !== undefined
       ? parseBoolean(authCookieSecureEnv)
       : rest.nodeEnv === "production";
+  const userServiceInternalToken =
+    rest.nodeEnv === "production"
+      ? rest.userServiceInternalToken
+      : (rest.userServiceInternalToken ?? rest.auditServiceToken);
 
+  if (!userServiceInternalToken) {
+    throw new Error("USER_SERVICE_INTERNAL_TOKEN não definido para o user-service.");
+  }
+
+  if (rest.nodeEnv === "production" && !authCookieSecure) {
+    throw new Error("AUTH_COOKIE_SECURE deve permanecer true em produção.");
+  }
+
+  validateProductionInternalServiceToken({
+    nodeEnv: rest.nodeEnv,
+    serviceName: "user-service",
+    envName: "USER_SERVICE_INTERNAL_TOKEN",
+    token: userServiceInternalToken,
+  });
   validateProductionInternalServiceToken({
     nodeEnv: rest.nodeEnv,
     serviceName: "user-service",
@@ -154,6 +189,7 @@ const envSchema = rawEnvSchema.transform((env) => {
 
     enableApiDocs,
     authCookieSecure,
+    userServiceInternalToken,
   };
 });
 
@@ -187,9 +223,12 @@ export function getUserServiceEnv(): UserServiceEnv {
     authCookieSecureEnv: process.env.AUTH_COOKIE_SECURE,
 
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
+    userServiceInternalToken: process.env.USER_SERVICE_INTERNAL_TOKEN,
     reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
     uploadRateLimitMax: process.env.UPLOAD_RATE_LIMIT_MAX,
     uploadRateLimitWindowMs: process.env.UPLOAD_RATE_LIMIT_WINDOW_MS,
+    platformAuthRateLimitMax: process.env.PLATFORM_AUTH_RATE_LIMIT_MAX,
+    platformAuthRateLimitWindowMs: process.env.PLATFORM_AUTH_RATE_LIMIT_WINDOW_MS,
   });
 }

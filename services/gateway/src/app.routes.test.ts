@@ -164,6 +164,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     authCookieSecure: false,
     auditEnabled: false,
     auditServiceToken: "audit-service-token",
+    userServiceInternalToken: "user-service-internal-token",
     auditServiceUrl: "http://127.0.0.1:3020",
     port: 0,
     organizationServiceUrl: "http://127.0.0.1:3031",
@@ -452,7 +453,10 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
         userId: "platform-user-1",
         authKind: "platform",
         platformRole: "super_admin",
-        internalToken: "audit-service-token",
+        internalToken:
+          forwarded.service === "user-service"
+            ? "user-service-internal-token"
+            : "audit-service-token",
       });
       expect(forwarded.organizationId).toBeUndefined();
     }
@@ -584,8 +588,10 @@ it("exige CSRF e limita credenciais encaminhadas em refresh e logout da platafor
 
 it("aplica rate limit ao login público da plataforma", async () => {
   let upstreamHits = 0;
-  const userService = createServer((_request, response) => {
+  let upstreamInternalToken: string | undefined;
+  const userService = createServer((request, response) => {
     upstreamHits += 1;
+    upstreamInternalToken = request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined;
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ success: true, data: { id: "platform-user-1" } }));
@@ -608,6 +614,7 @@ it("aplica rate limit ao login público da plataforma", async () => {
     expect(accepted.status).toBe(200);
     expect(limited.status).toBe(429);
     expect(upstreamHits).toBe(1);
+    expect(upstreamInternalToken).toBe("user-service-internal-token");
   } finally {
     await stopServer(gateway);
     await stopServer(userService);

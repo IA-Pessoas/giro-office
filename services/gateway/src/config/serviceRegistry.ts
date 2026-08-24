@@ -71,7 +71,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.userServiceUrl,
       auditTarget: "user-service",
       routePrefixes: [...USER_SERVICE_PREFIXES],
-      internalServiceToken: env.auditServiceToken,
+      internalServiceToken: env.userServiceInternalToken,
       forwardSessionBinding: true,
       forwardPlatformSessionCredentials: true,
       routeMatchers: [

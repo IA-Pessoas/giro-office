@@ -90,6 +90,7 @@ const gatewayEnvSchema = z
     organizationServiceUrl: z.string().url().default("http://localhost:3031"),
     rhServiceUrl: z.string().url().default("http://localhost:3034"),
     userServiceUrl: z.string().url().default("http://localhost:3030"),
+    userServiceInternalToken: z.string().optional().transform(parseOptionalString),
     departmentServiceUrl: z.string().url().default("http://localhost:3036"),
     taskServiceUrl: z.string().url().default("http://localhost:3032"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
@@ -157,12 +158,26 @@ const gatewayEnvSchema = z
       env.nodeEnv === "production"
         ? env.clientServiceInternalToken
         : (env.clientServiceInternalToken ?? env.auditServiceToken);
+    const userServiceInternalToken =
+      env.nodeEnv === "production"
+        ? env.userServiceInternalToken
+        : (env.userServiceInternalToken ?? env.auditServiceToken);
     const bearerAuthCompatibility = parseBoolean(env.bearerAuthCompatibilityEnv);
     const authCookieSecure =
       env.authCookieSecureEnv !== undefined
         ? parseBoolean(env.authCookieSecureEnv)
         : env.nodeEnv === "production";
 
+    if (env.nodeEnv === "production" && !authCookieSecure) {
+      throw new Error("AUTH_COOKIE_SECURE deve permanecer true em produção.");
+    }
+
+    validateProductionInternalServiceToken({
+      nodeEnv: env.nodeEnv,
+      serviceName: "gateway",
+      envName: "USER_SERVICE_INTERNAL_TOKEN",
+      token: userServiceInternalToken,
+    });
     validateProductionInternalServiceToken({
       nodeEnv: env.nodeEnv,
       serviceName: "gateway",
@@ -196,6 +211,7 @@ const gatewayEnvSchema = z
 
     return {
       ...env,
+      userServiceInternalToken,
       clientServiceInternalToken,
       bearerAuthCompatibility,
       authCookieSecure,
@@ -217,6 +233,7 @@ export interface GatewayEnv {
   organizationServiceUrl: string;
   rhServiceUrl: string;
   userServiceUrl: string;
+  userServiceInternalToken: string;
   departmentServiceUrl: string;
   taskServiceUrl: string;
   projectServiceUrl: string;
@@ -260,6 +277,7 @@ export function getGatewayEnv(): GatewayEnv {
     organizationServiceUrl: process.env.ORGANIZATION_SERVICE_URL,
     rhServiceUrl: process.env.RH_SERVICE_URL,
     userServiceUrl: process.env.USER_SERVICE_URL,
+    userServiceInternalToken: process.env.USER_SERVICE_INTERNAL_TOKEN,
     departmentServiceUrl: process.env.DEPARTMENT_SERVICE_URL,
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,

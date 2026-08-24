@@ -473,7 +473,7 @@ export function createApp(
     deps.sessionValidator ??
     (env.nodeEnv === "test"
       ? undefined
-      : createUserServiceSessionValidator(env.userServiceUrl, env.auditServiceToken));
+      : createUserServiceSessionValidator(env.userServiceUrl, env.userServiceInternalToken));
   mountAuthenticationBoundary(app, env, logger, sessionValidator);
   mountDashboardRoutes(app, dashboardStatsService);
   mountServiceRoutes(app, env);

@@ -8,11 +8,12 @@ Este runbook cobre a ativação da sessão por cookie da issue #772. O JWT assin
 NEXT_PUBLIC_API_URL=/api
 API_INTERNAL_URL=http://gateway:3010
 AUTH_COOKIE_SECURE=true
+USER_SERVICE_INTERNAL_TOKEN=<segredo aleatório exclusivo de gateway e user-service>
 GATEWAY_ALLOWED_ORIGINS=https://useoffice.com.br
 GATEWAY_BEARER_AUTH_COMPATIBILITY=false
 ```
 
-O gateway e o user-service devem receber o mesmo `AUTH_COOKIE_SECURE`. O web recebe somente as duas URLs. `cw.session` usa `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/` e `Max-Age=86400`. `cw.csrf` usa os mesmos atributos, exceto `HttpOnly`, e é vinculado ao hash assinado na sessão. Nenhum cookie define `Domain`.
+O gateway e o user-service devem receber `AUTH_COOKIE_SECURE=true` e o mesmo `USER_SERVICE_INTERNAL_TOKEN`; produção falha fechada com cookie inseguro. O web recebe somente as duas URLs. `cw.session` usa `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/` e `Max-Age=86400`. `cw.csrf` usa os mesmos atributos, exceto `HttpOnly`, e é vinculado ao hash assinado na sessão. Nenhum cookie define `Domain`.
 
 Cada login remove no máximo 100 sessões já expiradas antes de criar a nova linha. O lote indexado evita uma limpeza global sem limite no caminho crítico e reduz qualquer backlog progressivamente.
 

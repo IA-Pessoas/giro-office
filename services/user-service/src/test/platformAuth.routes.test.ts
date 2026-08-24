@@ -34,6 +34,9 @@ const { testEnv } = vi.hoisted(() => ({
     enableApiDocs: false,
     authCookieSecure: true,
     auditServiceToken: "audit-service-token",
+    userServiceInternalToken: "user-service-internal-token",
+    platformAuthRateLimitMax: 2,
+    platformAuthRateLimitWindowMs: 60_000,
     reportsInternalToken: "reports-service-token",
     allowedOrigins: ["*"],
     uploadRateLimitMax: 30,
@@ -96,7 +99,7 @@ function platformSessionHeaders(token = platformSessionToken()): Record<string, 
   return {
     Cookie: `cw.session=${token}; cw.csrf=${csrfToken}`,
     [CSRF_HEADER_NAME]: csrfToken,
-    [INTERNAL_SERVICE_TOKEN_HEADER]: getUserServiceEnv().auditServiceToken,
+    [INTERNAL_SERVICE_TOKEN_HEADER]: getUserServiceEnv().userServiceInternalToken,
     [FORWARDED_AUTH_USER_ID_HEADER]: platformIdentity.id,
     [FORWARDED_AUTH_KIND_HEADER]: "platform",
     [FORWARDED_AUTH_PLATFORM_ROLE_HEADER]: "super_admin",
@@ -121,10 +124,10 @@ describe("platform auth routes", () => {
   });
 
   it("sets HTTP-only cookies and omits credentials from JSON", async () => {
-    const response = await request(createApp()).post("/platform/session").send({
-      email: platformIdentity.email,
-      password: "safe-password",
-    });
+    const response = await request(createApp())
+      .post("/platform/session")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, getUserServiceEnv().userServiceInternalToken)
+      .send({ email: platformIdentity.email, password: "safe-password" });
 
     expect(response.status).toBe(200);
     expect(response.headers["set-cookie"][0]).toContain("cw.session=platform.jwt");
@@ -141,13 +144,37 @@ describe("platform auth routes", () => {
   it("returns a generic 401 for invalid platform credentials", async () => {
     platformAuthMock.login.mockRejectedValue(new ServiceError(401, "Login ou senha inválidos."));
 
-    const response = await request(createApp()).post("/platform/session").send({
-      email: platformIdentity.email,
-      password: "wrong-password",
-    });
+    const response = await request(createApp())
+      .post("/platform/session")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, getUserServiceEnv().userServiceInternalToken)
+      .send({ email: platformIdentity.email, password: "wrong-password" });
 
     expect(response.status).toBe(401);
     expect(response.body.error).toBe("Login ou senha inválidos.");
+  });
+
+  it("rejects platform login without the dedicated gateway token", async () => {
+    const response = await request(createApp())
+      .post("/platform/session")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, getUserServiceEnv().auditServiceToken)
+      .send({ email: platformIdentity.email, password: "safe-password" });
+
+    expect(response.status).toBe(403);
+    expect(platformAuthMock.login).not.toHaveBeenCalled();
+  });
+
+  it("rate limits platform login again inside user-service", async () => {
+    const app = createApp();
+    const login = () =>
+      request(app)
+        .post("/platform/session")
+        .set(INTERNAL_SERVICE_TOKEN_HEADER, getUserServiceEnv().userServiceInternalToken)
+        .send({ email: platformIdentity.email, password: "safe-password" });
+
+    expect((await login()).status).toBe(200);
+    expect((await login()).status).toBe(200);
+    expect((await login()).status).toBe(429);
+    expect(platformAuthMock.login).toHaveBeenCalledTimes(2);
   });
 
   it("rejects an organizational identity", async () => {
@@ -210,7 +237,7 @@ describe("platform auth routes", () => {
     const token = platformSessionToken();
     const allowed = await request(createApp())
       .post("/platform/session/validate")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, getUserServiceEnv().auditServiceToken)
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, getUserServiceEnv().userServiceInternalToken)
       .set("Authorization", `Bearer ${token}`);
     const denied = await request(createApp())
       .post("/platform/session/validate")

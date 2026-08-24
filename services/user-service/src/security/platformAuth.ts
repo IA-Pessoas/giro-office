@@ -30,7 +30,7 @@ export function requirePlatformGatewayAuth(
   _response: Response,
   next: NextFunction,
 ): void {
-  if (request.get(INTERNAL_SERVICE_TOKEN_HEADER) !== getUserServiceEnv().auditServiceToken) {
+  if (request.get(INTERNAL_SERVICE_TOKEN_HEADER) !== getUserServiceEnv().userServiceInternalToken) {
     next(unauthenticated());
     return;
   }
@@ -45,6 +45,19 @@ export function requirePlatformGatewayAuth(
 
   if (!request.get(FORWARDED_AUTH_USER_ID_HEADER)) {
     next(unauthenticated());
+    return;
+  }
+
+  next();
+}
+
+export function requireUserServiceGatewayToken(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  if (request.get(INTERNAL_SERVICE_TOKEN_HEADER) !== getUserServiceEnv().userServiceInternalToken) {
+    next(new ServiceError(403, "Acesso negado."));
     return;
   }
 

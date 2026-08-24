@@ -11,7 +11,8 @@ const successJson = {
 } as const;
 const bearer = [{ bearerAuth: [] }] as const;
 const browserSession = [{ cookieAuth: [] }, { bearerAuth: [] }] as const;
-const platformBrowserSession = [{ cookieAuth: [] }] as const;
+const platformBrowserSession = [{ cookieAuth: [], gatewayInternalToken: [] }] as const;
+const platformGateway = [{ gatewayInternalToken: [] }] as const;
 const csrfHeader = {
   name: "x-csrf-token",
   in: "header",
@@ -58,11 +59,11 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           name: "x-internal-service-token",
           description: "Valor igual a REPORTS_INTERNAL_TOKEN.",
         },
-        serviceInternalToken: {
+        gatewayInternalToken: {
           type: "apiKey",
           in: "header",
           name: "x-internal-service-token",
-          description: "Valor igual a AUDIT_SERVICE_TOKEN.",
+          description: "Valor igual a USER_SERVICE_INTERNAL_TOKEN; uso exclusivo do gateway.",
         },
       },
       schemas: {
@@ -116,6 +117,8 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         post: {
           tags: ["Platform auth"],
           summary: "Login do administrador da plataforma",
+          description: "Contrato interno: o navegador deve chamar esta rota pelo gateway.",
+          security: platformGateway,
           requestBody: {
             required: true,
             content: {
@@ -140,6 +143,8 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             },
             "400": { description: "Payload inválido" },
             "401": { description: "Credenciais inválidas" },
+            "403": { description: "Token interno do gateway inválido" },
+            "429": { description: "Limite local de tentativas excedido" },
           },
         },
         delete: {
@@ -218,7 +223,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
         post: {
           tags: ["Platform auth"],
           summary: "Validar internamente uma sessão da plataforma",
-          security: [{ serviceInternalToken: [], bearerAuth: [] }],
+          security: [{ gatewayInternalToken: [], bearerAuth: [] }],
           responses: {
             "200": { description: "Sessão válida", ...successJson },
             "401": { description: "Sessão ausente, inválida ou revogada" },

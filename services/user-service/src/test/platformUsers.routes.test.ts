@@ -31,6 +31,9 @@ const { testEnv } = vi.hoisted(() => ({
     enableApiDocs: false,
     authCookieSecure: true,
     auditServiceToken: "audit-service-token",
+    userServiceInternalToken: "user-service-internal-token",
+    platformAuthRateLimitMax: 10,
+    platformAuthRateLimitWindowMs: 60_000,
     reportsInternalToken: "reports-service-token",
     allowedOrigins: ["*"],
     uploadRateLimitMax: 30,
@@ -101,7 +104,7 @@ function platformGatewayHeaders(
     [FORWARDED_AUTH_KIND_HEADER]: overrides.authKind ?? "platform",
     [FORWARDED_AUTH_PLATFORM_ROLE_HEADER]: overrides.platformRole ?? "super_admin",
     [INTERNAL_SERVICE_TOKEN_HEADER]:
-      overrides.internalToken ?? getUserServiceEnv().auditServiceToken,
+      overrides.internalToken ?? getUserServiceEnv().userServiceInternalToken,
   };
 }
 
@@ -186,6 +189,28 @@ describe("platform users OpenAPI", () => {
     expect(spec.paths).toHaveProperty(
       ["/platform/organizations/{organizationId}/users", "get", "parameters", 1, "schema"],
       { type: "integer", minimum: 0, maximum: 10_000, default: 0 },
+    );
+  });
+
+  it("documents the gateway-only token on direct platform routes", () => {
+    const spec = buildUserServiceOpenApiSpec(testEnv);
+
+    expect(spec).toHaveProperty(
+      ["components", "securitySchemes", "gatewayInternalToken"],
+      expect.objectContaining({
+        type: "apiKey",
+        in: "header",
+        name: INTERNAL_SERVICE_TOKEN_HEADER,
+        description: expect.stringContaining("USER_SERVICE_INTERNAL_TOKEN"),
+      }),
+    );
+    expect(spec).toHaveProperty(
+      ["paths", "/platform/session", "post", "security"],
+      [{ gatewayInternalToken: [] }],
+    );
+    expect(spec).toHaveProperty(
+      ["paths", "/platform/me", "get", "security"],
+      [{ cookieAuth: [], gatewayInternalToken: [] }],
     );
   });
 });

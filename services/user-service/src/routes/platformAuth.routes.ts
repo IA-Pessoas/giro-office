@@ -1,8 +1,8 @@
 import {
   createExpiredSessionCookieHeaders,
+  createRateLimitMiddleware,
   createSessionCookieHeaders,
   createSuccessResponse,
-  INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
   parseWithZod,
   ServiceError,
@@ -17,6 +17,7 @@ import {
   requirePlatformCsrf,
   requirePlatformGatewayAuth,
   requirePlatformSession,
+  requireUserServiceGatewayToken,
 } from "../security/platformAuth.js";
 import { PlatformAuthService } from "../services/platformAuthService.js";
 
@@ -28,28 +29,49 @@ function requirePlatformSessionClaims(request: Request) {
 }
 
 export function createPlatformAuthRoutes(
-  env: Pick<UserServiceEnv, "authCookieSecure" | "auditServiceToken">,
+  env: Pick<
+    UserServiceEnv,
+    "authCookieSecure" | "platformAuthRateLimitMax" | "platformAuthRateLimitWindowMs"
+  >,
 ): ReturnType<typeof Router> {
   const router = Router();
   const platformAuthService = new PlatformAuthService();
-
-  router.post("/session", async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const issued = await platformAuthService.login(
-        parseWithZod(platformLoginBodySchema, request.body),
-      );
-      response.append(
-        "Set-Cookie",
-        createSessionCookieHeaders(issued.token, issued.csrfToken, {
-          secure: env.authCookieSecure,
-        }),
-      );
-      response.json(createSuccessResponse(issued.identity));
-    } catch (err) {
-      logError("Erro no login da plataforma", { err });
-      next(err);
-    }
+  const platformLoginRateLimit = createRateLimitMiddleware({
+    key: "user-service:platform-auth",
+    max: env.platformAuthRateLimitMax,
+    windowMs: env.platformAuthRateLimitWindowMs,
+    methods: ["POST"],
+    keyGenerator: (request) => {
+      const email =
+        typeof request.body?.email === "string"
+          ? request.body.email.trim().toLowerCase()
+          : "invalid";
+      return `${request.socket.remoteAddress ?? "unknown"}:${email}`;
+    },
   });
+
+  router.post(
+    "/session",
+    requireUserServiceGatewayToken,
+    platformLoginRateLimit,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const issued = await platformAuthService.login(
+          parseWithZod(platformLoginBodySchema, request.body),
+        );
+        response.append(
+          "Set-Cookie",
+          createSessionCookieHeaders(issued.token, issued.csrfToken, {
+            secure: env.authCookieSecure,
+          }),
+        );
+        response.json(createSuccessResponse(issued.identity));
+      } catch (err) {
+        logError("Erro no login da plataforma", { err });
+        next(err);
+      }
+    },
+  );
 
   router.post(
     "/session/refresh",
@@ -110,11 +132,8 @@ export function createPlatformAuthRoutes(
 
   router.post(
     "/session/validate",
+    requireUserServiceGatewayToken,
     async (request: Request, response: Response, next: NextFunction) => {
-      if (request.get(INTERNAL_SERVICE_TOKEN_HEADER) !== env.auditServiceToken) {
-        next(new ServiceError(403, "Acesso negado."));
-        return;
-      }
       try {
         await platformAuthService.validateSession(extractPlatformBearerClaims(request));
         response.json(createSuccessResponse({ valid: true }));
