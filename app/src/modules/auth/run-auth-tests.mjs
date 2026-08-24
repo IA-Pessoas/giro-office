@@ -326,7 +326,10 @@ await (async () => {
   });
 
   await runTest("app shell checks full user access for administration navigation", () => {
-    assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user;/);
+    assert.match(
+      appShellSource,
+      /const accessUser = isPlatformSuperAdmin \? user : meQuery\.data \?\? user;/,
+    );
     assert.match(appShellSource, /canAccessAdministration\(accessUser, \{ rhAccess \}\)/);
   });
 
@@ -572,7 +575,10 @@ await (async () => {
     () => {
       assert.match(appShellSource, /useModuleAccessMap\(MODULE_KEYS\)/);
       assert.equal(appShellSource.includes("useAccessStore("), false);
-      assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user/);
+      assert.match(
+        appShellSource,
+        /const accessUser = isPlatformSuperAdmin \? user : meQuery\.data \?\? user/,
+      );
       assert.match(appShellSource, /canAccessAdministration\(accessUser,\s*\{\s*rhAccess\s*\}\)/);
       assert.match(appShellSource, /const rhAccess = moduleAccessMap\.rh/);
       assert.match(appShellSource, /getNavigationModuleName\(module, moduleAccessUser\)/);

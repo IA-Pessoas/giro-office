@@ -98,6 +98,7 @@ type NavigationModule = {
   name: string;
   icon: typeof LayoutDashboard;
   moduleKey?: ModuleKey;
+  platformOnly?: boolean;
 };
 
 type NavigationCategory = {
@@ -153,7 +154,10 @@ const moduleCategories: NavigationCategory[] = [
   },
   {
     name: "Admin",
-    modules: [{ path: "/administracao", name: "Administração", icon: Shield }],
+    modules: [
+      { path: "/super-admin", name: "Super Admin", icon: ShieldCheck, platformOnly: true },
+      { path: "/administracao", name: "Administração", icon: Shield },
+    ],
   },
 ];
 
@@ -308,7 +312,9 @@ export function AppShell({
 }) {
   const router = useRouter();
   const { user, logoutUser } = useAuth();
-  const meQuery = useMe();
+  const isPlatformSuperAdmin =
+    user?.auth_kind === "platform" && user.platform_role === "super_admin";
+  const meQuery = useMe({ enabled: !isPlatformSuperAdmin });
   const {
     accessMap: moduleAccessMap,
     isLoading: isModuleAccessLoading,
@@ -342,9 +348,11 @@ export function AppShell({
   const pathname = router.asPath.split("?")[0] ?? "";
   const displayUserName = user?.name ?? meQuery.data?.name ?? "Admin";
   const displayUserLogin = user?.email ?? user?.login ?? meQuery.data?.login ?? "";
-  const displayUserPhoto = resolvePhotoUrl(meQuery.data?.photo_url ?? null);
+  const displayUserPhoto = resolvePhotoUrl(
+    isPlatformSuperAdmin ? null : meQuery.data?.photo_url ?? null,
+  );
   const displayUserInitials = getInitials(displayUserName);
-  const accessUser = meQuery.data ?? user;
+  const accessUser = isPlatformSuperAdmin ? user : meQuery.data ?? user;
   const rhAccess = moduleAccessMap.rh;
   const canManageOrganization = canCreateOrganizationOwner(accessUser);
   const canManageUsers = canAccessAdministration(accessUser, { rhAccess });
@@ -422,6 +430,14 @@ export function AppShell({
       return {
         ...category,
         modules: category.modules.filter((module) => {
+          if (isPlatformSuperAdmin) {
+            return module.platformOnly === true;
+          }
+
+          if (module.platformOnly) {
+            return false;
+          }
+
           return canViewModuleFromPath(module.path);
         }),
       };
@@ -720,53 +736,66 @@ export function AppShell({
         <header className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 py-3 sticky top-0 z-40">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 max-w-2xl">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-slate-400" />
-                <input
-                  value={aiQuery}
-                  onChange={(e) => setAiQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleHeaderAiSubmit();
-                    }
-                  }}
-                  placeholder="Pergunte qualquer coisa ao Assistente IA..."
-                  className="w-full pl-9 pr-10 py-2 rounded-xl border border-gray-200 dark:border-slate-800 bg-white/70 dark:bg-slate-800/60 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                />
-                <button
-                  onClick={(event) => {
-                    if (aiQuery.trim()) {
-                      handleHeaderAiSubmit(event.currentTarget);
-                    } else {
-                      openAiChat(event.currentTarget);
-                    }
-                  }}
-                  type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-                  title="Abrir Assistente IA"
-                >
-                  <Bot className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                </button>
-              </div>
+              {isPlatformSuperAdmin ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700 dark:text-blue-300">
+                    Ambiente isolado
+                  </p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                    Administração da plataforma
+                  </p>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-slate-400" />
+                  <input
+                    value={aiQuery}
+                    onChange={(e) => setAiQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleHeaderAiSubmit();
+                      }
+                    }}
+                    placeholder="Pergunte qualquer coisa ao Assistente IA..."
+                    className="w-full pl-9 pr-10 py-2 rounded-xl border border-gray-200 dark:border-slate-800 bg-white/70 dark:bg-slate-800/60 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  />
+                  <button
+                    onClick={(event) => {
+                      if (aiQuery.trim()) {
+                        handleHeaderAiSubmit(event.currentTarget);
+                      } else {
+                        openAiChat(event.currentTarget);
+                      }
+                    }}
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Abrir Assistente IA"
+                  >
+                    <Bot className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowNotifications((v) => !v)}
-                className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                type="button"
-                aria-expanded={showNotifications}
-                aria-controls={NOTIFICATIONS_PANEL_ID}
-                aria-label="Abrir notificações"
-              >
-                <Bell className="w-5 h-5 text-gray-600 dark:text-slate-300" />
-                {hasUnreadNotifications ? (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-                ) : null}
-              </button>
+              {!isPlatformSuperAdmin ? (
+                <button
+                  onClick={() => setShowNotifications((v) => !v)}
+                  className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  type="button"
+                  aria-expanded={showNotifications}
+                  aria-controls={NOTIFICATIONS_PANEL_ID}
+                  aria-label="Abrir notificações"
+                >
+                  <Bell className="w-5 h-5 text-gray-600 dark:text-slate-300" />
+                  {hasUnreadNotifications ? (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                  ) : null}
+                </button>
+              ) : null}
 
-              {showNotifications ? (
+              {!isPlatformSuperAdmin && showNotifications ? (
                 <>
                   <div
                     aria-hidden="true"
