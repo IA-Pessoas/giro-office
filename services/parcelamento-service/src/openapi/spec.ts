@@ -67,6 +67,34 @@ const paginationParameters = [
   queryParameter("page_size", { type: "integer", minimum: 1, maximum: 100 }),
 ] as const;
 
+const internalReportingGrantParameters = [
+  {
+    name: "x-internal-service-token",
+    in: "header",
+    required: true,
+    schema: { type: "string" },
+  },
+  {
+    name: "x-request-id",
+    in: "header",
+    required: true,
+    schema: { type: "string" },
+  },
+  {
+    name: "x-reports-grant",
+    in: "header",
+    required: true,
+    description: "Grant v1: JSON canônico codificado em base64url.",
+    schema: { type: "string" },
+  },
+  {
+    name: "x-reports-grant-signature",
+    in: "header",
+    required: true,
+    schema: { type: "string" },
+  },
+] as const;
+
 const requestBody = (schema: string) =>
   ({
     requestBody: {
@@ -129,6 +157,7 @@ export function buildParcelamentoServiceOpenApiSpec(env: ParcelamentoServiceEnv)
           tags: ["InternalReporting"],
           summary: "Consultar catálogo interno de Parcelamento",
           security: [{ internalServiceToken: [] }],
+          parameters: internalReportingGrantParameters,
           responses: {
             "200": { description: "Catálogo governado", ...successJson },
             "403": { description: "Grant ou token interno inválido" },
@@ -140,6 +169,7 @@ export function buildParcelamentoServiceOpenApiSpec(env: ParcelamentoServiceEnv)
           tags: ["InternalReporting"],
           summary: "Extrair campos governados para relatórios",
           security: [{ internalServiceToken: [] }],
+          parameters: internalReportingGrantParameters,
           requestBody: {
             required: true,
             content: {
@@ -380,6 +410,34 @@ export function buildParcelamentoServiceOpenApiSpec(env: ParcelamentoServiceEnv)
         },
       },
       schemas: {
+        ReportingGrantV1: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "version",
+            "audience",
+            "operation",
+            "source",
+            "organization_id",
+            "fields",
+            "request_id",
+            "issued_at",
+            "expires_at",
+            "body_sha256",
+          ],
+          properties: {
+            version: { type: "integer", enum: [1] },
+            audience: { type: "string", enum: ["parcelamento-service"] },
+            operation: { type: "string", enum: ["catalog", "extract"] },
+            source: text,
+            organization_id: uuid,
+            fields: { type: "array", uniqueItems: true, items: text },
+            request_id: text,
+            issued_at: { type: "integer", minimum: 0 },
+            expires_at: { type: "integer", minimum: 0 },
+            body_sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+          },
+        },
         SuccessEnvelope: {
           type: "object",
           required: ["success", "data"],

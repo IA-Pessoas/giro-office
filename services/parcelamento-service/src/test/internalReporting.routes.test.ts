@@ -22,7 +22,13 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function grant(operation: "catalog" | "extract", source: string, fields: string[], body: unknown) {
+function grant(
+  operation: "catalog" | "extract",
+  source: string,
+  fields: string[],
+  body: unknown,
+  encoding: "canonical" | "reordered" | "spaced" = "canonical",
+) {
   const issuedAt = Math.floor(Date.now() / 1000);
   const payload = {
     audience: "parcelamento-service",
@@ -36,7 +42,15 @@ function grant(operation: "catalog" | "extract", source: string, fields: string[
     source,
     version: 1,
   };
-  const encoded = Buffer.from(canonicalJson(payload)).toString("base64url");
+  const encoded = Buffer.from(
+    encoding === "canonical"
+      ? canonicalJson(payload)
+      : JSON.stringify(
+          encoding === "reordered" ? { version: payload.version, ...payload } : payload,
+          null,
+          2,
+        ),
+  ).toString("base64url");
   return {
     encoded,
     signature: createHmac("sha256", grantSecret).update(encoded).digest("hex"),
@@ -80,5 +94,19 @@ describe("internal reporting routes", () => {
 
     expect(missing.body.success).toBe(false);
     expect(valid.body.data.sources).toHaveLength(3);
+  });
+
+  it("recusa grant assinado com JSON não canônico", async () => {
+    for (const encoding of ["reordered", "spaced"] as const) {
+      const signed = grant("catalog", "parcelamento.catalog", [], {}, encoding);
+
+      await request(createApp())
+        .get("/internal/reporting/catalog")
+        .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
+        .set("x-request-id", requestId)
+        .set("x-reports-grant", signed.encoded)
+        .set("x-reports-grant-signature", signed.signature)
+        .expect(403);
+    }
   });
 });

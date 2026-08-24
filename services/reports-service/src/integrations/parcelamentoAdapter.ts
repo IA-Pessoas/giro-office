@@ -3,6 +3,7 @@ import { createHash, createHmac, randomUUID } from "node:crypto";
 import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
+  parcelamentoReportingCatalog,
   REQUEST_ID_HEADER,
   ServiceError,
 } from "@workspace/shared";
@@ -18,117 +19,13 @@ import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
 
-const sources = [
-  {
-    key: "parcelamento.installments",
-    label: "Parcelamentos",
-    module: "parcelamento",
-    minimum_permission: 1,
-    fields: [
-      field("client_id", "Cliente", "string", ["eq", "in"], []),
-      field("type", "Tipo", "string", ["eq", "neq", "contains", "in"], []),
-      field("legal_nature", "Natureza jurídica", "string", ["eq", "neq", "contains", "in"], []),
-      field("jurisdiction", "Jurisdição", "string", ["eq", "neq", "contains", "in"], []),
-      field("status", "Status", "string", ["eq", "neq", "contains", "in"], []),
-      field("is_automatic_debit", "Débito automático", "boolean", ["eq", "neq"], []),
-      field(
-        "consolidated_total_amount",
-        "Total consolidado",
-        "number",
-        ["eq", "gt", "gte", "lt", "lte", "between"],
-        ["sum", "avg", "min", "max"],
-      ),
-      field(
-        "outstanding_balance",
-        "Saldo devedor",
-        "number",
-        ["eq", "gt", "gte", "lt", "lte", "between"],
-        ["sum", "avg", "min", "max"],
-      ),
-      field(
-        "paid_installments_count",
-        "Parcelas pagas",
-        "number",
-        ["eq", "gt", "gte", "lt", "lte", "between"],
-        ["sum", "avg", "min", "max"],
-      ),
-      field(
-        "overdue_installments_count",
-        "Parcelas vencidas",
-        "number",
-        ["eq", "gt", "gte", "lt", "lte", "between"],
-        ["sum", "avg", "min", "max"],
-      ),
-      field(
-        "enrollment_date",
-        "Data de adesão",
-        "date",
-        ["eq", "gt", "gte", "lt", "lte", "between"],
-        [],
-      ),
-    ],
-  },
-  {
-    key: "parcelamento.installment_competencies",
-    label: "Competências de parcelamento",
-    module: "parcelamento",
-    minimum_permission: 1,
-    fields: [
-      field("installment_id", "Parcelamento", "string", ["eq", "in"], []),
-      field(
-        "how_many_paid",
-        "Quantidade paga",
-        "number",
-        ["eq", "gt", "gte", "lt", "lte", "between"],
-        ["sum", "avg", "min", "max"],
-      ),
-      field(
-        "how_many_overdue",
-        "Quantidade vencida",
-        "number",
-        ["eq", "gt", "gte", "lt", "lte", "between"],
-        ["sum", "avg", "min", "max"],
-      ),
-      field("download", "Baixa realizada", "boolean", ["eq", "neq"], []),
-      field("is_sent", "Enviado", "boolean", ["eq", "neq"], []),
-      field("submission_type", "Tipo de envio", "string", ["eq", "neq", "contains", "in"], []),
-      field(
-        "installment_amount",
-        "Valor da parcela",
-        "number",
-        ["eq", "gt", "gte", "lt", "lte", "between"],
-        ["sum", "avg", "min", "max"],
-      ),
-      field("competence", "Competência", "string", ["eq", "neq", "contains", "in"], []),
-    ],
-  },
-  {
-    key: "parcelamento.panoramas",
-    label: "Panoramas de parcelamento",
-    module: "parcelamento",
-    minimum_permission: 1,
-    fields: [
-      field("client_id", "Cliente", "string", ["eq", "in"], []),
-      field("competence", "Competência", "string", ["eq", "neq", "contains", "in"], []),
-      field("cnd_municipal", "CND municipal", "boolean", ["eq", "neq"], []),
-      field("cnd_state", "CND estadual", "boolean", ["eq", "neq"], []),
-      field("cnd_federal", "CND federal", "boolean", ["eq", "neq"], []),
-      field("cnd_fgts", "CND FGTS", "boolean", ["eq", "neq"], []),
-      field("cnd_labor", "CND trabalhista", "boolean", ["eq", "neq"], []),
-      field("protests", "Protestos", "boolean", ["eq", "neq"], []),
-    ],
-  },
-] as const satisfies readonly ReportCatalogSource[];
-
-function field(
-  key: string,
-  label: string,
-  value_type: ReportCatalogSource["fields"][number]["value_type"],
-  filter_operators: ReportCatalogSource["fields"][number]["filter_operators"],
-  aggregations: ReportCatalogSource["fields"][number]["aggregations"],
-) {
-  return { key, label, value_type, filter_operators, aggregations };
-}
+const sources = parcelamentoReportingCatalog.sources.map(
+  ({ keys: _keys, ...source }) => source,
+) as readonly ReportCatalogSource[];
+const relations = parcelamentoReportingCatalog.relations.map((relation) => ({
+  ...relation,
+  sources: [...relation.sources] as [string, string],
+}));
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -179,7 +76,7 @@ function isExtractResponse(
 
 export class ParcelamentoAdapter implements ReportSourceAdapter {
   readonly sources = sources;
-  readonly relations = [];
+  readonly relations = relations;
 
   constructor(
     private readonly env: Pick<

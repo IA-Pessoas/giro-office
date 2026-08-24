@@ -47,9 +47,13 @@ function decodeGrant(value: string | undefined): InternalReportingGrant {
   if (!value) throw new ServiceError(403, "Grant de relatórios inválido.");
 
   try {
-    return internalReportingGrantSchema.parse(
+    const payload = internalReportingGrantSchema.parse(
       JSON.parse(Buffer.from(value, "base64url").toString("utf8")),
     );
+    if (Buffer.from(canonicalJson(payload)).toString("base64url") !== value) {
+      throw new ServiceError(403, "Grant de relatórios inválido.");
+    }
+    return payload;
   } catch {
     throw new ServiceError(403, "Grant de relatórios inválido.");
   }

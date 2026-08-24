@@ -5,17 +5,21 @@ import { InternalReportingService } from "../services/internalReportingService.j
 
 describe("InternalReportingService", () => {
   it("publica somente fontes e campos governados de parcelamento", () => {
+    const fields = internalReportingCatalog.sources.flatMap((source) =>
+      source.fields.map((field) => field.key),
+    );
     expect(internalReportingCatalog.sources.map((source) => source.key)).toEqual([
       "parcelamento.installments",
       "parcelamento.installment_competencies",
       "parcelamento.panoramas",
     ]);
-    expect(internalReportingCatalog.sources.flatMap((source) => source.fields)).not.toContain(
-      "document_url",
-    );
-    expect(internalReportingCatalog.sources.flatMap((source) => source.fields)).not.toContain(
-      "organization_id",
-    );
+    expect(fields).not.toContain("document_url");
+    expect(fields).not.toContain("organization_id");
+    expect(fields).not.toContain("client_id");
+    expect(fields).not.toContain("installment_id");
+    expect(
+      internalReportingCatalog.sources.map((source) => source.keys.map((key) => key.key)),
+    ).toEqual([["client_id"], ["installment_id"], ["client_id"]]);
   });
 
   it("extrai apenas campos permitidos no escopo da organizacao", async () => {
