@@ -24,6 +24,8 @@ interface UserProps {
     organization_id?: string | null;
     type?: "owner" | "admin" | "user" | null;
     modules?: Record<string, number>;
+    auth_kind?: "organization" | "platform";
+    platform_role?: "super_admin";
 }
 
 interface SignInProps {
@@ -31,12 +33,20 @@ interface SignInProps {
     password: string;
 }
 
+interface PlatformSignInProps {
+    email: string;
+    password: string;
+}
+
 interface AuthContextData {
     user: UserProps | null;
     isAuthenticated: boolean;
     signIn: (credentials: SignInProps) => Promise<void>;
+    signInPlatform: (credentials: PlatformSignInProps) => Promise<void>;
     logoutUser: () => Promise<void>;
+    logoutPlatform: () => Promise<void>;
     refreshSession: () => Promise<UserProps | null>;
+    refreshPlatformSession: () => Promise<UserProps | null>;
     loading: boolean;
 }
 
@@ -76,6 +86,16 @@ function isValidAuthUser(data: unknown): data is UserProps {
         typeof (data as UserProps).permission === "number";
 }
 
+function isValidPlatformUser(data: unknown): data is UserProps {
+    return !!data &&
+        typeof data === "object" &&
+        typeof (data as UserProps).id === "string" &&
+        typeof (data as UserProps).name === "string" &&
+        typeof (data as UserProps).email === "string" &&
+        (data as UserProps).auth_kind === "platform" &&
+        (data as UserProps).platform_role === "super_admin";
+}
+
 function buildCurrentUser(
     data: UserProps,
     fallbackModules?: Record<string, number> | null,
@@ -99,7 +119,32 @@ function buildCurrentUser(
                 ? data.type
                 : null,
         modules,
+        auth_kind: "organization",
     };
+}
+
+function buildPlatformUser(data: UserProps): UserProps {
+    return {
+        id: data.id,
+        name: data.name,
+        login: data.email ?? "",
+        email: data.email,
+        permission: 0,
+        organization_id: null,
+        type: null,
+        modules: {},
+        auth_kind: "platform",
+        platform_role: "super_admin",
+    };
+}
+
+function isAccessDenied(error: unknown): boolean {
+    if (!error || typeof error !== "object") {
+        return false;
+    }
+
+    const status = (error as { response?: { status?: unknown } }).response?.status;
+    return status === 401 || status === 403;
 }
 
 export function signOut(message = "Sessão expirada. Faça login novamente.") {
@@ -144,6 +189,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }, [queryClient]);
 
     async function refreshSession(): Promise<UserProps | null> {
+        if (user?.auth_kind === "platform") {
+            return refreshPlatformSession();
+        }
+
         const requestVersion = beginAuthTransition();
 
         try {
@@ -175,35 +224,72 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
     }
 
-    useEffect(() => {
+    async function refreshPlatformSession(): Promise<UserProps | null> {
         const requestVersion = beginAuthTransition();
 
-        api.get("/user/me").then((response) => {
+        try {
+            const response = await api.post("/platform/session/refresh");
+
             if (!isCurrentAuthTransition(requestVersion)) {
-                return;
+                return null;
             }
 
             const userData = response.data?.data;
 
-            if (isValidAuthUser(userData)) {
-                setUser(buildCurrentUser(userData));
-            } else {
+            if (!isValidPlatformUser(userData)) {
                 setUser(null);
                 queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
-            }
-        }).catch((error) => {
-            if (!isCurrentAuthTransition(requestVersion)) {
-                return;
+                return null;
             }
 
-            logAuthError("Erro ao verificar sessão:", error);
-            setUser(null);
-            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
-        }).finally(() => {
+            const currentUser = buildPlatformUser(userData);
+            setUser(currentUser);
+            await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
+            return currentUser;
+        } catch (error) {
             if (isCurrentAuthTransition(requestVersion)) {
-                setLoading(false);
+                logAuthError("Erro ao atualizar sessão da plataforma:", error);
             }
-        });
+
+            throw error;
+        }
+    }
+
+    useEffect(() => {
+        const requestVersion = beginAuthTransition();
+
+        void (async () => {
+            try {
+                const response = await api.get("/user/me");
+                const userData = response.data?.data;
+
+                if (isCurrentAuthTransition(requestVersion) && isValidAuthUser(userData)) {
+                    setUser(buildCurrentUser(userData));
+                }
+            } catch (error) {
+                if (!isAccessDenied(error)) {
+                    logAuthError("Erro ao verificar sessão:", error);
+                    return;
+                }
+
+                try {
+                    const response = await api.get("/platform/me");
+                    const userData = response.data?.data;
+
+                    if (isCurrentAuthTransition(requestVersion) && isValidPlatformUser(userData)) {
+                        setUser(buildPlatformUser(userData));
+                    }
+                } catch (platformError) {
+                    if (!isAccessDenied(platformError)) {
+                        logAuthError("Erro ao verificar sessão da plataforma:", platformError);
+                    }
+                }
+            } finally {
+                if (isCurrentAuthTransition(requestVersion)) {
+                    setLoading(false);
+                }
+            }
+        })();
     }, []);
 
     async function signIn({ login, password }: SignInProps) {
@@ -271,7 +357,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
     }
 
+    async function signInPlatform({ email, password }: PlatformSignInProps) {
+        const requestVersion = beginAuthTransition();
+        const response = await api.post("/platform/session", { email, password });
+        const userData = response.data?.data;
+
+        if (!isValidPlatformUser(userData)) {
+            setUser(null);
+            throw new Error("Invalid platform authentication response");
+        }
+
+        if (!isCurrentAuthTransition(requestVersion)) {
+            return;
+        }
+
+        setUser(buildPlatformUser(userData));
+        queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+        await Router.push("/super-admin");
+    }
+
     async function logoutUser() {
+        if (user?.auth_kind === "platform") {
+            await logoutPlatform();
+            return;
+        }
+
         beginAuthTransition();
 
         try {
@@ -288,6 +398,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
     }
 
+    async function logoutPlatform() {
+        beginAuthTransition();
+
+        try {
+            await api.delete("/platform/session");
+            toast.success("Sessão encerrada!");
+        } catch (err) {
+            toast.error("Erro ao sair!");
+            logAuthError("Erro ao sair da plataforma:", err);
+        } finally {
+            setUser(null);
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            await wait(SESSION_TRANSITION_MIN_DURATION_MS);
+            await Router.push("/super-admin/login");
+        }
+    }
+
     if (loading) {
         return (
             <SessionTransitionScreen
@@ -298,7 +425,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading }}>
+        <AuthContext.Provider value={{
+            user,
+            isAuthenticated,
+            signIn,
+            signInPlatform,
+            logoutUser,
+            logoutPlatform,
+            refreshSession,
+            refreshPlatformSession,
+            loading,
+        }}>
             {children}
         </AuthContext.Provider>
     );

@@ -751,10 +751,9 @@ await (async () => {
     () => {
       assert.match(authContextSource, /refreshSession:\s*\(\)\s*=>\s*Promise<UserProps \| null>/);
       assert.match(authContextSource, /async function refreshSession\(\)/);
-      assert.match(
-        authContextSource,
-        /<AuthContext\.Provider value=\{\{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading \}\}/,
-      );
+      assert.match(authContextSource, /<AuthContext\.Provider value=\{\{/);
+      assert.match(authContextSource, /signIn,\s*signInPlatform,\s*logoutUser,\s*logoutPlatform/);
+      assert.match(authContextSource, /refreshSession,\s*refreshPlatformSession,\s*loading/);
       assert.match(administracaoSource, /import \{ signOut, useAuth \} from "@\/context\/AuthContext";/);
       assert.match(administracaoSource, /const \{ user \} = useAuth\(\);/);
       assert.match(
