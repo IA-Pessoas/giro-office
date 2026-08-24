@@ -146,3 +146,36 @@ await runTest("platform client survives organizational 401 and platform refresh/
     await server.close();
   }
 });
+
+await runTest("principal switch removes every cached platform query", async () => {
+  const [{ QueryClient }, { clearPlatformQueryCache }] = await Promise.all([
+    import("@tanstack/react-query"),
+    import(new URL("../../context/platformQueryCache.ts", import.meta.url)),
+  ]);
+  const queryClient = new QueryClient();
+  const previousPlatformData = { organizations: ["tenant-a"] };
+  const organizationData = { id: "organization-user" };
+
+  queryClient.setQueryData(["platform", "organizations"], previousPlatformData);
+  queryClient.setQueryData(["platform", "audit"], { items: ["old-event"] });
+  queryClient.setQueryData(["me"], organizationData);
+
+  await clearPlatformQueryCache(queryClient);
+
+  assert.equal(queryClient.getQueryData(["platform", "organizations"]), undefined);
+  assert.equal(queryClient.getQueryData(["platform", "audit"]), undefined);
+  assert.deepEqual(queryClient.getQueryData(["me"]), organizationData);
+  assert.match(authContextSource, /import \{ clearPlatformQueryCache \}/);
+  assert.ok(
+    (authContextSource.match(/clearPlatformQueryCache\(queryClient\)/g) ?? []).length >= 4,
+    "invalidation, refresh, sign-in and logout must clear the platform query prefix",
+  );
+  assert.match(
+    authContextSource,
+    /async function signInPlatform[\s\S]*?clearPlatformQueryCache\(queryClient\)[\s\S]*?async function logoutUser/,
+  );
+  assert.match(
+    authContextSource,
+    /async function logoutPlatform[\s\S]*?clearPlatformQueryCache\(queryClient\)[\s\S]*?Router\.push\("\/super-admin\/login"\)/,
+  );
+});

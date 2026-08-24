@@ -87,25 +87,19 @@ export function SuperAdminPage() {
 
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="border-b border-slate-200 p-2 dark:border-slate-800">
-            <div aria-label="Dados administrativos" className="flex gap-1" role="tablist">
+            <div className="flex gap-1">
               <button
-                aria-controls="platform-users-panel"
-                aria-selected={activePanel === "users"}
+                aria-pressed={activePanel === "users"}
                 className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${activePanel === "users" ? "bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
-                id="platform-users-tab"
                 onClick={() => setActivePanel("users")}
-                role="tab"
                 type="button"
               >
                 <Users aria-hidden="true" className="h-4 w-4" /> Usuários
               </button>
               <button
-                aria-controls="platform-audit-panel"
-                aria-selected={activePanel === "audit"}
+                aria-pressed={activePanel === "audit"}
                 className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${activePanel === "audit" ? "bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
-                id="platform-audit-tab"
                 onClick={() => setActivePanel("audit")}
-                role="tab"
                 type="button"
               >
                 <Activity aria-hidden="true" className="h-4 w-4" /> Auditoria global
@@ -113,7 +107,7 @@ export function SuperAdminPage() {
             </div>
           </div>
 
-          <div aria-labelledby="platform-users-tab" hidden={activePanel !== "users"} id="platform-users-panel" role="tabpanel">
+          <div hidden={activePanel !== "users"}>
             {selectedOrganization ? (
               <PlatformUsersPanel
                 key={selectedOrganization.id}
@@ -127,7 +121,7 @@ export function SuperAdminPage() {
               </div>
             )}
           </div>
-          <div aria-labelledby="platform-audit-tab" hidden={activePanel !== "audit"} id="platform-audit-panel" role="tabpanel">
+          <div hidden={activePanel !== "audit"}>
             {activePanel === "audit" ? <PlatformAuditPanel /> : null}
           </div>
         </div>

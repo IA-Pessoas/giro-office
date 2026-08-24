@@ -14,7 +14,7 @@ function getProfileLabel(user: PlatformOrganizationUser): string {
   if (user.type === "owner") return "Proprietário";
   if (user.type === "admin") return "Administrador";
   if (user.type === "user") return "Usuário";
-  return `Nível ${user.permission}`;
+  return "Sem perfil";
 }
 
 export function PlatformUsersPanel({ organization }: { organization: PlatformOrganization }) {
@@ -91,7 +91,6 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                 <th className="px-4 py-3 font-semibold" scope="col">Pessoa</th>
                 <th className="px-4 py-3 font-semibold" scope="col">Perfil</th>
                 <th className="px-4 py-3 font-semibold" scope="col">Status</th>
-                <th className="px-4 py-3 text-right font-semibold" scope="col">Entrada</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -106,9 +105,6 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold dark:bg-slate-800">
                       {user.status === "active" ? "Ativo" : user.status || "Sem status"}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                    {user.joined_at ? new Date(user.joined_at).toLocaleDateString("pt-BR") : "—"}
                   </td>
                 </tr>
               ))}

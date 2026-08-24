@@ -14,6 +14,7 @@ import {
     invalidateAuthSession,
     registerAuthInvalidationHandler,
 } from "./authInvalidation";
+import { clearPlatformQueryCache } from "./platformQueryCache";
 
 interface UserProps {
     id: string;
@@ -184,7 +185,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 },
                 clearUser: () => setUser(null),
                 stopLoading: () => setLoading(false),
-                clearCache: () => queryClient.removeQueries({ queryKey: ME_QUERY_KEY }),
+                clearCache: () => {
+                    queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+                    void clearPlatformQueryCache(queryClient);
+                },
             }),
         );
     }, [queryClient]);
@@ -240,6 +244,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (!isValidPlatformUser(userData)) {
                 setUser(null);
                 queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+                await clearPlatformQueryCache(queryClient);
                 return null;
             }
 
@@ -249,6 +254,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
             return currentUser;
         } catch (error) {
             if (isCurrentAuthTransition(requestVersion)) {
+                if (isAccessDenied(error)) {
+                    setUser(null);
+                    queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+                    await clearPlatformQueryCache(queryClient);
+                }
                 logAuthError("Erro ao atualizar sessão da plataforma:", error);
             }
 
@@ -374,6 +384,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         setUser(buildPlatformUser(userData));
         queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+        await clearPlatformQueryCache(queryClient);
         await Router.push("/super-admin");
     }
 
@@ -394,6 +405,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } finally {
             setUser(null);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            await clearPlatformQueryCache(queryClient);
             await wait(SESSION_TRANSITION_MIN_DURATION_MS);
             await Router.push("/login");
         }
@@ -411,6 +423,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } finally {
             setUser(null);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            await clearPlatformQueryCache(queryClient);
             await wait(SESSION_TRANSITION_MIN_DURATION_MS);
             await Router.push("/super-admin/login");
         }

@@ -21,15 +21,10 @@ export interface PlatformOrganizationUser {
   id: string;
   name: string;
   login: string;
-  department_id: string;
-  permission: number;
-  type: "owner" | "admin" | "user" | null;
   status: string;
+  department_id: string;
   photo_url: string | null;
-  joined_at: string | null;
-  organization_id: string;
-  first_owner_flag: boolean | null;
-  permission_id: string | null;
+  type: "owner" | "admin" | "user" | null;
 }
 
 export interface PlatformUsersListResponse {

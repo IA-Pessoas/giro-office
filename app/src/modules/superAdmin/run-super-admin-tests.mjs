@@ -34,6 +34,9 @@ const [
   superAdminPageSource,
   pageSource,
   appShellSource,
+  appSource,
+  platformGuardSource,
+  typesSource,
 ] = await Promise.all([
   source("./services/platformService.ts"),
   source("./hooks/usePlatformOrganizations.ts"),
@@ -45,6 +48,9 @@ const [
   source("./components/SuperAdminPage.tsx"),
   source("../../pages/super-admin/index.tsx"),
   source("../../shared/components/newLayout/AppShell.tsx"),
+  source("../../pages/_app.tsx"),
+  source("../auth/utils/canSSRPlatformAdmin.ts"),
+  source("./types.ts"),
 ]);
 
 const allSuperAdminSources = [
@@ -123,5 +129,35 @@ await runTest("protege a rota pelo servidor e separa a navegação por identidad
   assert.match(
     appShellSource,
     /\{ path: "\/super-admin", name: "Super Admin", icon: ShieldCheck, platformOnly: true \}/,
+  );
+});
+
+await runTest("mantém público o destino de login usado pelo guard da plataforma", () => {
+  assert.match(platformGuardSource, /destination:\s*["']\/super-admin\/login["']/);
+  assert.match(appSource, /router\.pathname === ["']\/super-admin\/login["']/);
+});
+
+await runTest("renderiza somente o contrato real de usuário da plataforma", () => {
+  const userContract = typesSource.match(
+    /export interface PlatformOrganizationUser \{[\s\S]*?\n\}/,
+  )?.[0] ?? "";
+
+  for (const field of ["id", "name", "login", "status", "department_id", "photo_url", "type"]) {
+    assert.match(userContract, new RegExp(`\\b${field}:`));
+  }
+  assert.match(userContract, /type: "owner" \| "admin" \| "user" \| null/);
+  assert.doesNotMatch(
+    userContract,
+    /permission:|joined_at:|organization_id:|first_owner_flag:|permission_id:/,
+  );
+  assert.match(usersPanelSource, /return "Sem perfil"/);
+  assert.doesNotMatch(usersPanelSource, /Nível|Entrada|joined_at|user\.permission/);
+});
+
+await runTest("usa botões nativos simples para alternar painéis", () => {
+  assert.doesNotMatch(superAdminPageSource, /role="tab(?:list|panel)?"/);
+  assert.doesNotMatch(
+    superAdminPageSource,
+    /aria-controls=|aria-selected=|aria-labelledby="platform-(?:users|audit)-tab"/,
   );
 });
