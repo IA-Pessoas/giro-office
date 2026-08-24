@@ -141,16 +141,17 @@ ficam com o controlador. Nenhuma imagem foi fabricada.
   rate limit.
 - Gateway, web e reverse proxy só publicam portas no loopback nos manifests VPS/slots. Cookies
   inseguros falham no bootstrap de produção e a documentação proíbe login de plataforma em HTTP.
-- O bootstrap normaliza/valida e-mail e exige um segredo gerado de 32 bytes em Base64URL, em vez
-  de aceitar senhas humanas comuns ou previsíveis.
+- O bootstrap normaliza/valida e-mail, recusa senha fornecida pelo operador, gera internamente
+  32 bytes aleatórios e só revela o segredo inicial uma vez em terminal interativo.
 - O OpenAPI agregado não expõe o token interno e mantém `POST /platform/session` público, enquanto
   refresh/logout continuam protegidos.
 - O limitador em memória remove a chave mais antiga em O(1). A busca de rota de auditoria usa GIN
   trigram criado com `CONCURRENTLY`; o recorder aborta chamadas indisponíveis após 5 segundos e
-  limita a 100 ingestões simultâneas por processo.
-- Gates frescos: shared 57/57, gateway 284/284, user-service 164/164,
+  limita a 100 leituras públicas anônimas simultâneas, sem descartar eventos autenticados ou
+  mutações; probes de saúde não entram na trilha.
+- Gates frescos: shared 58/58, gateway 285/285, user-service 158/158,
   organization-service 22/22, audit-service 23/23 (+1 opt-in skip), Compose/Nginx 10/10,
-  regressão/supply-chain 15/15, scanner 4.304 arquivos/0 achados, política pnpm 0 achados e
+  regressão/supply-chain 15/15, scanner 4.305 arquivos/0 achados, política pnpm 0 achados e
   `pnpm audit` sem vulnerabilidades conhecidas.
 
 A limitação da prova visual permanece explícita: este host não possui Docker, PostgreSQL, WSL ou
