@@ -133,3 +133,27 @@ ficam com o controlador. Nenhuma imagem foi fabricada.
 - Screenshots com dados exclusivamente fictícios:
   `docs/evidence/issue-869/super-admin-login.png` e
   `docs/evidence/issue-869/super-admin-console.png`.
+
+## Hardening pós-revisão final
+
+- O token gateway → user-service tornou-se exclusivo, obrigatório em produção e diferente do
+  `AUDIT_SERVICE_TOKEN`; o login direto exige esse token e possui uma segunda barreira local de
+  rate limit.
+- Gateway, web e reverse proxy só publicam portas no loopback nos manifests VPS/slots. Cookies
+  inseguros falham no bootstrap de produção e a documentação proíbe login de plataforma em HTTP.
+- O bootstrap normaliza/valida e-mail, exige senha de pelo menos 16 caracteres e rejeita padrões
+  comuns, repetidos, sequenciais e exclusivamente numéricos.
+- O OpenAPI agregado não expõe o token interno e mantém `POST /platform/session` público, enquanto
+  refresh/logout continuam protegidos.
+- O limitador em memória remove a chave mais antiga em O(1). A busca de rota de auditoria usa GIN
+  trigram criado com `CONCURRENTLY`, e o recorder aborta chamadas indisponíveis após 5 segundos.
+- Gates frescos: shared 56/56, gateway 284/284, user-service 161/161,
+  organization-service 22/22, audit-service 23/23 (+1 opt-in skip), Compose/Nginx 10/10,
+  regressão/supply-chain 15/15, scanner 4.304 arquivos/0 achados, política pnpm 0 achados e
+  `pnpm audit` sem vulnerabilidades conhecidas.
+
+A limitação da prova visual permanece explícita: este host não possui Docker, PostgreSQL, WSL ou
+arquivos de ambiente. Instalar infraestrutura ou executar código externo só para a screenshot
+ampliaria a superfície de supply chain; por isso a integração real fica coberta pelas suítes dos
+serviços/contratos e o navegador usa apenas o mock efêmero documentado, sem ser chamado de E2E de
+banco.
