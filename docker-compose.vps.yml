@@ -84,7 +84,7 @@ services:
       PARCELAMENTO_SERVICE_URL: http://parcelamento-service:3043
       REPORTS_SERVICE_URL: http://reports-service:3044
     ports:
-      - "3010:3010"
+      - "127.0.0.1:3010:3010"
     depends_on:
       organization-service:
         condition: service_healthy
