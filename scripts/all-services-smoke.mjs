@@ -1948,6 +1948,13 @@ const handlers = {
     });
   },
 
+  async platformAuditList(op) {
+    await platformHttpRequest(op, {
+      query: { page: 1, pageSize: 10 },
+      expectedStatus: [200],
+    });
+  },
+
   async platformSessionLogout(op) {
     await platformHttpRequest(op, { expectedStatus: [200] });
     if (isBadExpectation(op)) {

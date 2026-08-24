@@ -175,8 +175,16 @@ export function buildAuditServiceOpenApiSpec(env: AuditServiceEnv): OpenApiDocum
           summary: "Buscar requisições de auditoria (paginação / filtros via query)",
           security: [{ internalServiceToken: [] }],
           parameters: [
-            { name: "page", in: "query", schema: { type: "integer" } },
-            { name: "pageSize", in: "query", schema: { type: "integer" } },
+            {
+              name: "page",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 10_001, default: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 200, default: 50 },
+            },
           ],
           responses: {
             "200": {

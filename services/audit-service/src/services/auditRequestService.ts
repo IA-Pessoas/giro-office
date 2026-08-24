@@ -19,8 +19,23 @@ import type { AuditRequestRepository } from "../integrations/prisma/auditRequest
 
 export interface AuditRequestService {
   create(body: unknown): Promise<string>;
-  search(query: Record<string, unknown>, organizationId: string): Promise<AuditSearchResult>;
+  search(query: Record<string, unknown>, organizationId?: string): Promise<AuditSearchResult>;
   findByRequestId(requestId: string, organizationId: string): Promise<AuditRequestRecord | null>;
+}
+
+const MAX_AUDIT_PAGE = 10_001;
+const MAX_AUDIT_OFFSET = 10_000;
+const MAX_AUDIT_TEXT_FILTER_LENGTH = 200;
+
+function getBoundedTextFilter(
+  query: Record<string, unknown>,
+  fieldName: string,
+): string | undefined {
+  const value = getSingleQueryValue(query[fieldName]);
+  if (value && value.length > MAX_AUDIT_TEXT_FILTER_LENGTH) {
+    throw new ServiceError(400, `Parâmetro '${fieldName}' inválido.`);
+  }
+  return value;
 }
 
 const createAuditRequestPayloadSchema = z.object({
@@ -63,7 +78,7 @@ function parseCreateAuditRequestPayload(body: unknown): CreateAuditRequestPayloa
 
 function buildAuditSearchFilters(
   query: Record<string, unknown>,
-  organizationId: string,
+  organizationId?: string,
 ): AuditSearchFilters {
   const dateFrom = parseOptionalDate(query.dateFrom, "dateFrom");
   const dateTo = parseOptionalDate(query.dateTo, "dateTo");
@@ -72,25 +87,32 @@ function buildAuditSearchFilters(
     throw new ServiceError(400, "Parâmetros de data inválidos.");
   }
 
+  const page = parsePositiveInteger(query.page, "page", 1, MAX_AUDIT_PAGE);
+  const pageSize = parsePositiveInteger(
+    query.pageSize,
+    "pageSize",
+    DEFAULT_AUDIT_PAGE_SIZE,
+    MAX_AUDIT_PAGE_SIZE,
+  );
+
+  if ((page - 1) * pageSize > MAX_AUDIT_OFFSET) {
+    throw new ServiceError(400, "Janela de paginação inválida.");
+  }
+
   return {
-    organizationId,
-    requestId: getSingleQueryValue(query.requestId),
-    userId: getSingleQueryValue(query.userId),
-    method: getSingleQueryValue(query.method)?.toUpperCase(),
-    path: getSingleQueryValue(query.path),
+    ...(organizationId ? { organizationId } : {}),
+    requestId: getBoundedTextFilter(query, "requestId"),
+    userId: getBoundedTextFilter(query, "userId"),
+    method: getBoundedTextFilter(query, "method")?.toUpperCase(),
+    path: getBoundedTextFilter(query, "path"),
     statusCode: parseOptionalInteger(query.statusCode, "statusCode"),
     dateFrom,
     dateTo,
-    referring: getSingleQueryValue(query.referring),
-    referringId: getSingleQueryValue(query.referringId),
-    department: getSingleQueryValue(query.department),
-    page: parsePositiveInteger(query.page, "page", 1),
-    pageSize: parsePositiveInteger(
-      query.pageSize,
-      "pageSize",
-      DEFAULT_AUDIT_PAGE_SIZE,
-      MAX_AUDIT_PAGE_SIZE,
-    ),
+    referring: getBoundedTextFilter(query, "referring"),
+    referringId: getBoundedTextFilter(query, "referringId"),
+    department: getBoundedTextFilter(query, "department"),
+    page,
+    pageSize,
   };
 }
 
@@ -103,7 +125,7 @@ export function createAuditRequestService(repository: AuditRequestRepository): A
     },
     async search(
       query: Record<string, unknown>,
-      organizationId: string,
+      organizationId?: string,
     ): Promise<AuditSearchResult> {
       const filters = buildAuditSearchFilters(query, organizationId);
       return repository.search(filters);

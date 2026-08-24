@@ -487,6 +487,7 @@ model AuditRequest {
   @@index([path, created_at(sort: Desc)])
   @@index([status_code, created_at(sort: Desc)])
   @@index([organization_id, referring, referring_id, created_at(sort: Desc)])
+  @@index([created_at(sort: Desc), id(sort: Desc)], map: "idx_audit_requests_created_id_desc")
   @@map("audit_requests")
 }
 

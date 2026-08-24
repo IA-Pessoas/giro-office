@@ -63,7 +63,7 @@ export interface AuditRequestRecord {
 }
 
 export interface AuditSearchFilters {
-  organizationId: string;
+  organizationId?: string;
   requestId?: string;
   userId?: string;
   method?: string;
@@ -88,7 +88,7 @@ export interface AuditSearchResult {
 
 export interface ForwardedAuditAuthContext {
   userId: string;
-  organizationId: string;
+  organizationId?: string;
   permission?: number;
   authKind?: AuthKind;
   platformRole?: PlatformRole;

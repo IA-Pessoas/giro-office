@@ -477,6 +477,17 @@ const baseManifest = [
     auth: "session",
   }),
   op({
+    service: "audit-service",
+    method: "GET",
+    path: "/platform/audit/requests",
+    action: "platformAuditList",
+    target: "gateway",
+    auth: "session",
+    specOperation: false,
+    expectationKind: "good",
+    condition: "auditEnabled",
+  }),
+  op({
     service: "user-service",
     method: "DELETE",
     path: "/platform/session",

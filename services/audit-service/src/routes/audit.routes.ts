@@ -14,7 +14,11 @@ import {
   createAuditRequestRepository,
 } from "../integrations/prisma/auditRequestRepository.js";
 import { createAuditEnabledMiddleware } from "../middlewares/auditEnabled.js";
-import { assertAuditAdmin, getAuthFromHeaders } from "../middlewares/getAuthFromHeaders.js";
+import {
+  assertAuditAdmin,
+  assertAuditSearchAdmin,
+  getAuthFromHeaders,
+} from "../middlewares/getAuthFromHeaders.js";
 import { createInternalServiceTokenMiddleware } from "../middlewares/internalServiceToken.js";
 import { createAuditRequestService } from "../services/auditRequestService.js";
 
@@ -28,9 +32,10 @@ function assertAuditAdminOrLog(
   logger: Logger,
   request: Parameters<RequestHandler>[0],
   auth: ForwardedAuditAuthContext,
+  assertAccess: (context: ForwardedAuditAuthContext) => void = assertAuditAdmin,
 ): void {
   try {
-    assertAuditAdmin(auth);
+    assertAccess(auth);
   } catch (error) {
     if (isServiceError(error) && error.statusCode === 403) {
       logger.warn({
@@ -105,7 +110,7 @@ export function createAuditPublicRouter(options: CreateAuditRouterOptions): Rout
     requireInternalToken,
     asyncRoute(async (request, response) => {
       const auth = getAuthFromHeaders(request);
-      assertAuditAdminOrLog(options.logger, request, auth);
+      assertAuditAdminOrLog(options.logger, request, auth, assertAuditSearchAdmin);
       const result = await auditRequestService.search(
         request.query as Record<string, unknown>,
         auth.organizationId,
@@ -138,6 +143,9 @@ export function createAuditPublicRouter(options: CreateAuditRouterOptions): Rout
     asyncRoute(async (request, response) => {
       const auth = getAuthFromHeaders(request);
       assertAuditAdminOrLog(options.logger, request, auth);
+      if (!auth.organizationId) {
+        throw new ServiceError(403, "Acesso negado para esta rota.");
+      }
       const item = await auditRequestService.findByRequestId(
         request.params.requestId,
         auth.organizationId,

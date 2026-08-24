@@ -129,9 +129,11 @@ function toAuditRequest(record: PrismaAuditRequest): AuditRequestRecord {
 }
 
 function buildWhere(filters: AuditSearchFilters): Prisma.AuditRequestWhereInput {
-  const where: Prisma.AuditRequestWhereInput = {
-    organization_id: filters.organizationId,
-  };
+  const where: Prisma.AuditRequestWhereInput = {};
+
+  if (filters.organizationId) {
+    where.organization_id = filters.organizationId;
+  }
 
   if (filters.requestId) {
     where.request_id = filters.requestId;
@@ -226,9 +228,7 @@ export function createAuditRequestRepository(
       const [items, total] = await client.$transaction([
         client.auditRequest.findMany({
           where,
-          orderBy: {
-            created_at: "desc",
-          },
+          orderBy: [{ created_at: "desc" }, { id: "desc" }],
           skip: (filters.page - 1) * filters.pageSize,
           take: filters.pageSize,
         }),
