@@ -112,6 +112,9 @@ const env = {
   clientReportingSmokeEnabled:
     process.env.CLIENT_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.CLIENT_REPORTING_SMOKE_ENABLED === "1",
+  projectReportingSmokeEnabled:
+    process.env.PROJECT_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.PROJECT_REPORTING_SMOKE_ENABLED === "1",
   namespace:
     process.env.SMOKE_NAMESPACE?.trim() ||
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -4759,6 +4762,10 @@ function disabledConditionReason(condition) {
 
   if (condition === "clientReportingSmokeEnabled" && !env.clientReportingSmokeEnabled) {
     return "CLIENT_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "projectReportingSmokeEnabled" && !env.projectReportingSmokeEnabled) {
+    return "PROJECT_REPORTING_SMOKE_ENABLED is false";
   }
 
   return "";

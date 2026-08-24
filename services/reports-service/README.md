@@ -35,3 +35,6 @@ pnpm --filter @workspace/reports-service test
 
 O bootstrap registra adapters internos de Parcelamento, Clientes e Projetos. Eles consultam somente
 rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
+
+O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
+`REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.

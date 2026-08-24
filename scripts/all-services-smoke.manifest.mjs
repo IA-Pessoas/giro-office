@@ -1189,6 +1189,7 @@ const baseManifest = [
     action: "projectReportingCatalog",
     target: "direct",
     auth: "internal-token",
+    condition: "projectReportingSmokeEnabled",
   }),
   op({
     service: "project-service",
@@ -1198,6 +1199,7 @@ const baseManifest = [
     handlerAction: "projectReportingCatalog",
     target: "direct",
     auth: "internal-token",
+    condition: "projectReportingSmokeEnabled",
     specOperation: false,
     expectationKind: "bad",
     expectedStatus: [403],
@@ -1210,6 +1212,7 @@ const baseManifest = [
     action: "projectReportingExtract",
     target: "direct",
     auth: "internal-token",
+    condition: "projectReportingSmokeEnabled",
   }),
   op({
     service: "project-service",
@@ -1219,6 +1222,7 @@ const baseManifest = [
     handlerAction: "projectReportingExtract",
     target: "direct",
     auth: "internal-token",
+    condition: "projectReportingSmokeEnabled",
     specOperation: false,
     expectationKind: "bad",
     expectedStatus: [403],
