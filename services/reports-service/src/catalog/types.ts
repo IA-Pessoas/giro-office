@@ -56,6 +56,7 @@ export interface ReportPreviewAdapterInput {
   definition: unknown;
   organization_id: string;
   limit: number;
+  request_id: string;
 }
 
 export interface ReportSourceAdapter {

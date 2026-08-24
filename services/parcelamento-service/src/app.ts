@@ -19,9 +19,11 @@ import {
   createInstallmentCompetencyCollectionRouter,
   createInstallmentCompetencyItemRouter,
 } from "./routes/installmentCompetency.routes.js";
+import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createPanoramaRouter } from "./routes/panorama.routes.js";
 import { InstallmentCompetencyService } from "./services/installmentCompetencyService.js";
 import { InstallmentService } from "./services/installmentService.js";
+import { InternalReportingService } from "./services/internalReportingService.js";
 import { PanoramaService } from "./services/panoramaService.js";
 import type { RecordParcelamentoChangeInput } from "./services/parcelamentoAuditService.js";
 
@@ -63,6 +65,7 @@ export function createParcelamentoApp({
     auditService,
   });
   const panoramaService = new PanoramaService({ prisma, auditService });
+  const internalReportingService = new InternalReportingService(prisma);
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -108,6 +111,10 @@ export function createParcelamentoApp({
     createInstallmentCompetencyItemRouter({ competencyService }),
   );
   app.use("/parcelamento/panoramas", createPanoramaRouter({ panoramaService }));
+  app.use(
+    "/internal",
+    createInternalReportingRouter({ env, reportingService: internalReportingService }),
+  );
 
   app.use(
     createExpressErrorHandler({

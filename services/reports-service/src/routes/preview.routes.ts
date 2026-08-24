@@ -33,7 +33,13 @@ export function createReportPreviewRouter(options: {
     });
 
     response.json(
-      createSuccessResponse(await options.previewService.preview(body.definition, scope)),
+      createSuccessResponse(
+        await options.previewService.preview(
+          body.definition,
+          scope,
+          request.get(REQUEST_ID_HEADER) ?? "reports-preview",
+        ),
+      ),
     );
   });
 

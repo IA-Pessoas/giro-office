@@ -14,6 +14,8 @@ function createEnv(): ParcelamentoServiceEnv {
     auditEnabled: true,
     auditServiceUrl: "http://localhost:3020",
     auditServiceToken: "test-audit-token",
+    reportsInternalToken: "test-reports-internal-token",
+    reportsGrantSecret: "test-reports-grant-secret",
     logLevel: "silent",
     logPretty: false,
     allowedOrigins: ["*"],
@@ -89,6 +91,35 @@ describe("parcelamento-service OpenAPI", () => {
         expect(operation).toMatchObject({ security: [{ bearerAuth: [] }] });
       }
     }
+  });
+
+  it("documenta os headers obrigatórios do grant interno v1", () => {
+    const spec = buildParcelamentoServiceOpenApiSpec(createEnv());
+    const operations = [
+      spec.paths["/internal/reporting/catalog"]?.get,
+      spec.paths["/internal/reporting/extract"]?.post,
+    ];
+
+    for (const operation of operations) {
+      expect(operation?.parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "x-internal-service-token",
+            in: "header",
+            required: true,
+          }),
+          expect.objectContaining({ name: "x-request-id", in: "header", required: true }),
+          expect.objectContaining({ name: "x-reports-grant", in: "header", required: true }),
+          expect.objectContaining({
+            name: "x-reports-grant-signature",
+            in: "header",
+            required: true,
+          }),
+        ]),
+      );
+      expect(operation?.responses).toHaveProperty("403");
+    }
+    expect(spec.components?.schemas).toHaveProperty("ReportingGrantV1");
   });
 
   it("declara schemas principais do contrato de dominio", () => {

@@ -15,6 +15,7 @@ export class ReportPreviewService {
   async preview(
     definition: ReportDefinition,
     scope: ReportCatalogScope,
+    requestId = "reports-preview",
   ): Promise<{
     rows: readonly Record<string, unknown>[];
     hasMore: boolean;
@@ -28,6 +29,7 @@ export class ReportPreviewService {
       definition: validated.definition,
       organization_id: scope.organization_id,
       limit: this.previewRowLimit + 1,
+      request_id: requestId,
     });
     return {
       rows: rows.slice(0, this.previewRowLimit),

@@ -36,6 +36,8 @@ const parcelamentoServiceEnvSchema = z
       .transform((value) => parseBoolean(value)),
     auditServiceUrl: z.string().url("AUDIT_SERVICE_URL invalida.").default("http://localhost:3020"),
     auditServiceToken: z.string().optional().default("audit-service-token"),
+    reportsInternalToken: z.string().optional().default("reports-service-token"),
+    reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
       .string()
@@ -61,6 +63,18 @@ const parcelamentoServiceEnvSchema = z
       serviceName: "parcelamento-service",
       envName: "AUDIT_SERVICE_TOKEN",
       token: rest.auditServiceToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "parcelamento-service",
+      envName: "REPORTS_INTERNAL_TOKEN",
+      token: rest.reportsInternalToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "parcelamento-service",
+      envName: "REPORTS_GRANT_SECRET",
+      token: rest.reportsGrantSecret,
     });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
@@ -92,6 +106,8 @@ export function parseParcelamentoServiceEnv(
     auditEnabled: source.AUDIT_ENABLED,
     auditServiceUrl: source.AUDIT_SERVICE_URL,
     auditServiceToken: source.AUDIT_SERVICE_TOKEN,
+    reportsInternalToken: source.REPORTS_INTERNAL_TOKEN,
+    reportsGrantSecret: source.REPORTS_GRANT_SECRET,
     logLevel: source.LOG_LEVEL,
     logPretty: source.LOG_PRETTY,
     allowedOrigins: source.SERVICE_ALLOWED_ORIGINS,
