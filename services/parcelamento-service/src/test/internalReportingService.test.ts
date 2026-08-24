@@ -17,6 +17,9 @@ describe("InternalReportingService", () => {
     expect(fields).not.toContain("organization_id");
     expect(fields).not.toContain("client_id");
     expect(fields).not.toContain("installment_id");
+    expect(fields).not.toContain("responsavel_id");
+    expect(fields).toContain("agreement_number");
+    expect(internalReportingCatalog.relations).toEqual([]);
     expect(
       internalReportingCatalog.sources.map((source) => source.keys.map((key) => key.key)),
     ).toEqual([["client_id"], ["installment_id"], ["client_id"]]);

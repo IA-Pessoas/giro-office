@@ -25,6 +25,7 @@ describe("ParcelamentoAdapter", () => {
         "agreed_installments_count",
         "remaining_installments_count",
         "completion_date",
+        "agreement_number",
       ]),
     );
     expect(competencies?.fields.map((field) => field.key)).toContain("upload_file");
@@ -33,7 +34,10 @@ describe("ParcelamentoAdapter", () => {
     );
     expect(
       adapter.sources.flatMap((source) => source.fields).map((field) => field.key),
-    ).not.toEqual(expect.arrayContaining(["client_id", "installment_id", "document_url"]));
+    ).not.toEqual(
+      expect.arrayContaining(["client_id", "installment_id", "responsavel_id", "document_url"]),
+    );
+    expect(adapter.relations).toEqual([]);
   });
 
   it("propaga request id e usa exclusivamente o extract interno", async () => {

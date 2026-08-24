@@ -31,6 +31,7 @@ export const parcelamentoReportingCatalog = {
       minimum_permission: 1,
       keys: [field("client_id", "Cliente", "string", keyOperators, [])],
       fields: [
+        field("agreement_number", "Número do acordo", "string", stringOperators, []),
         field("type", "Tipo", "string", stringOperators, []),
         field("legal_nature", "Natureza jurídica", "string", stringOperators, []),
         field("jurisdiction", "Jurisdição", "string", stringOperators, []),
@@ -153,22 +154,10 @@ export const parcelamentoReportingCatalog = {
           booleanOperators,
           [],
         ),
-        field("responsavel_id", "Responsável", "string", keyOperators, []),
       ],
     },
   ],
-  relations: [
-    {
-      key: "parcelamento.installments_competencies",
-      sources: ["parcelamento.installments", "parcelamento.installment_competencies"],
-      cardinality: "one_to_many",
-    },
-    {
-      key: "parcelamento.installments_panoramas",
-      sources: ["parcelamento.installments", "parcelamento.panoramas"],
-      cardinality: "one_to_many",
-    },
-  ],
+  relations: [],
 } as const;
 
 export function getParcelamentoReportingFields(
