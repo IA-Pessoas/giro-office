@@ -24,6 +24,8 @@ import {
 } from "@workspace/shared";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
+import { normalizeGatewayPath } from "../security/routeClassification.js";
+
 function hasRequestBody(method: string): boolean {
   const upperMethod = method.toUpperCase();
   return upperMethod !== "GET" && upperMethod !== "HEAD";
@@ -54,6 +56,72 @@ export interface HttpProxyOptions {
 }
 
 const OWNER_MODULE_PERMISSION = 3;
+
+type SessionCookieName = typeof AUTH_SESSION_COOKIE_NAME | typeof CSRF_COOKIE_NAME;
+
+interface SessionCookieRule {
+  method: string;
+  path: string | RegExp;
+  inbound: SessionCookieName[];
+  outbound: SessionCookieName[];
+}
+
+const SESSION_COOKIE_RULES: SessionCookieRule[] = [
+  {
+    method: "POST",
+    path: "/user/session",
+    inbound: [],
+    outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+  },
+  {
+    method: "POST",
+    path: "/user/session/refresh",
+    inbound: [],
+    outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+  },
+  {
+    method: "DELETE",
+    path: "/user/session",
+    inbound: [],
+    outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+  },
+  {
+    method: "POST",
+    path: "/platform/session",
+    inbound: [],
+    outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+  },
+  {
+    method: "POST",
+    path: "/platform/session/refresh",
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+  },
+  {
+    method: "DELETE",
+    path: "/platform/session",
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+  },
+  {
+    method: "GET",
+    path: "/platform/me",
+    inbound: [AUTH_SESSION_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "GET",
+    path: "/platform/organizations",
+    inbound: [AUTH_SESSION_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "GET",
+    path: /^\/platform\/organizations\/[^/]+\/users$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME],
+    outbound: [],
+  },
+];
 
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -120,7 +188,30 @@ function resolveForwardedPermission(
   return undefined;
 }
 
-export function buildForwardHeaders(request: Request, options: HttpProxyOptions = {}): Headers {
+function getSessionCookieRule(
+  method: string,
+  normalizedPath: string | null,
+): SessionCookieRule | null {
+  if (!normalizedPath) {
+    return null;
+  }
+
+  const normalizedMethod = method.toUpperCase();
+  const matchingPath = normalizedPath.toLowerCase();
+  return (
+    SESSION_COOKIE_RULES.find(
+      (rule) =>
+        rule.method === normalizedMethod &&
+        (typeof rule.path === "string" ? rule.path === matchingPath : rule.path.test(matchingPath)),
+    ) ?? null
+  );
+}
+
+export function buildForwardHeaders(
+  request: Request,
+  options: HttpProxyOptions = {},
+  normalizedPath = normalizeGatewayPath(request.originalUrl),
+): Headers {
   const headers = new Headers();
   const connectionHeaderTokens = getConnectionHeaderTokens(request);
   const strippedClientHeaders = new Set([
@@ -157,12 +248,13 @@ export function buildForwardHeaders(request: Request, options: HttpProxyOptions 
     headers.set(key, value);
   });
 
-  const forwardedCookie = getForwardedCookie(request, options);
+  const sessionCookieRule = getSessionCookieRule(request.method, normalizedPath);
+  const forwardedCookie = getForwardedCookie(request, options, normalizedPath, sessionCookieRule);
   if (forwardedCookie) {
     headers.set("cookie", forwardedCookie);
   }
 
-  if (shouldForwardPlatformCsrf(request, options)) {
+  if (sessionCookieRule?.inbound.includes(CSRF_COOKIE_NAME)) {
     const csrfToken = request.get(CSRF_HEADER_NAME);
     if (csrfToken) {
       headers.set(CSRF_HEADER_NAME, csrfToken);
@@ -237,59 +329,47 @@ export function buildForwardHeaders(request: Request, options: HttpProxyOptions 
 export type UpstreamResolver = (method: string, path: string) => string;
 
 /** Colapsa barras consecutivas no path (ex.: /rh//holidays/ → /rh/holidays/), preservando query string. */
-function normalizePathForUpstream(originalUrl: string, stripPathPrefix?: string): string {
+function normalizePathForUpstream(
+  originalUrl: string,
+  normalizedPath: string,
+  stripPathPrefix?: string,
+): string {
   const queryIndex = originalUrl.indexOf("?");
-  const pathPart = queryIndex === -1 ? originalUrl : originalUrl.slice(0, queryIndex);
   const queryPart = queryIndex === -1 ? "" : originalUrl.slice(queryIndex);
-  let normalizedPath = pathPart.replace(/\/{2,}/g, "/");
+  let upstreamPath = normalizedPath.replace(/\/{2,}/g, "/");
   if (
     stripPathPrefix &&
-    (normalizedPath === stripPathPrefix || normalizedPath.startsWith(`${stripPathPrefix}/`))
+    (upstreamPath === stripPathPrefix || upstreamPath.startsWith(`${stripPathPrefix}/`))
   ) {
-    normalizedPath = normalizedPath.slice(stripPathPrefix.length) || "/";
+    upstreamPath = upstreamPath.slice(stripPathPrefix.length) || "/";
   }
-  return normalizedPath + queryPart;
+  return upstreamPath + queryPart;
 }
 
-function shouldForwardPlatformSession(request: Request, options: HttpProxyOptions): boolean {
-  if (!options.forwardPlatformSessionCredentials || request.auth?.actorKind !== "platform") {
-    return false;
-  }
-
-  const path = new URL(request.originalUrl, "http://gateway.local").pathname;
-  const method = request.method.toUpperCase();
-  return (
-    (method === "GET" && path === "/platform/me") ||
-    (method === "GET" && path === "/platform/organizations") ||
-    (method === "GET" && /^\/platform\/organizations\/[^/]+\/users\/?$/u.test(path)) ||
-    (method === "POST" && path === "/platform/session/refresh") ||
-    (method === "DELETE" && path === "/platform/session")
-  );
-}
-
-function shouldForwardPlatformCsrf(request: Request, options: HttpProxyOptions): boolean {
-  if (!shouldForwardPlatformSession(request, options)) {
-    return false;
-  }
-
-  return request.method.toUpperCase() !== "GET";
-}
-
-function getForwardedCookie(request: Request, options: HttpProxyOptions): string | undefined {
+function getForwardedCookie(
+  request: Request,
+  options: HttpProxyOptions,
+  normalizedPath: string | null,
+  rule: SessionCookieRule | null,
+): string | undefined {
   const cookieHeader = Array.isArray(request.headers.cookie)
     ? request.headers.cookie.join("; ")
     : request.headers.cookie;
-  const path = new URL(request.originalUrl, "http://gateway.local").pathname;
+  const isPlatformPath = normalizedPath?.toLowerCase().startsWith("/platform/") ?? false;
 
   if (
     (request.auth?.actorKind === "platform" ||
-      (options.forwardPlatformSessionCredentials && path.startsWith("/platform/"))) &&
-    !shouldForwardPlatformSession(request, options)
+      (options.forwardPlatformSessionCredentials && isPlatformPath)) &&
+    (!rule || rule.inbound.length === 0)
   ) {
     return undefined;
   }
 
-  if (!shouldForwardPlatformSession(request, options)) {
+  if (
+    !options.forwardPlatformSessionCredentials ||
+    request.auth?.actorKind !== "platform" ||
+    !rule
+  ) {
     return stripBrowserAuth(cookieHeader);
   }
 
@@ -298,8 +378,10 @@ function getForwardedCookie(request: Request, options: HttpProxyOptions): string
     return undefined;
   }
 
-  const cookies = [`${AUTH_SESSION_COOKIE_NAME}=${encodeURIComponent(sessionToken)}`];
-  if (shouldForwardPlatformCsrf(request, options)) {
+  const cookies = rule.inbound.includes(AUTH_SESSION_COOKIE_NAME)
+    ? [`${AUTH_SESSION_COOKIE_NAME}=${encodeURIComponent(sessionToken)}`]
+    : [];
+  if (rule.inbound.includes(CSRF_COOKIE_NAME)) {
     const csrfToken = readCookie(cookieHeader, CSRF_COOKIE_NAME);
     if (csrfToken) {
       cookies.push(`${CSRF_COOKIE_NAME}=${encodeURIComponent(csrfToken)}`);
@@ -309,20 +391,19 @@ function getForwardedCookie(request: Request, options: HttpProxyOptions): string
   return cookies.join("; ");
 }
 
-function getSessionCookieHeaders(request: Request, upstreamHeaders: Headers): string[] {
-  const path = new URL(request.originalUrl, "http://gateway.local").pathname;
-  if (
-    path !== "/user/session" &&
-    path !== "/user/session/refresh" &&
-    path !== "/platform/session" &&
-    path !== "/platform/session/refresh"
-  ) {
+function getSessionCookieHeaders(
+  method: string,
+  normalizedPath: string,
+  upstreamHeaders: Headers,
+): string[] {
+  const allowedCookies = getSessionCookieRule(method, normalizedPath)?.outbound ?? [];
+  if (allowedCookies.length === 0) {
     return [];
   }
 
   return upstreamHeaders
     .getSetCookie()
-    .filter((header) => /^(?:cw\.session|cw\.csrf)=/u.test(header));
+    .filter((header) => allowedCookies.some((cookie) => header.startsWith(`${cookie}=`)));
 }
 
 function createHttpProxy(
@@ -334,9 +415,14 @@ function createHttpProxy(
     response: Response,
     next: NextFunction,
   ): Promise<void> {
+    const normalizedPath = normalizeGatewayPath(request.originalUrl);
+    if (!normalizedPath) {
+      next(new ServiceError(400, "Caminho de requisição inválido."));
+      return;
+    }
     const targetUrl = resolveTargetUrl(request);
     const upstreamUrl = new URL(
-      normalizePathForUpstream(request.originalUrl, options.stripPathPrefix),
+      normalizePathForUpstream(request.originalUrl, normalizedPath, options.stripPathPrefix),
       targetUrl,
     ).toString();
     const body = getRequestBody(request);
@@ -344,7 +430,7 @@ function createHttpProxy(
     try {
       const fetchOptions: RequestInit = {
         method: request.method,
-        headers: buildForwardHeaders(request, options),
+        headers: buildForwardHeaders(request, options, normalizedPath),
         body: body as RequestInit["body"],
       };
 
@@ -360,7 +446,11 @@ function createHttpProxy(
         if (key === "transfer-encoding" || key === "set-cookie") return;
         response.setHeader(key, value);
       });
-      const sessionCookieHeaders = getSessionCookieHeaders(request, upstreamResponse.headers);
+      const sessionCookieHeaders = getSessionCookieHeaders(
+        request.method,
+        normalizedPath,
+        upstreamResponse.headers,
+      );
       if (sessionCookieHeaders.length > 0) {
         response.setHeader("set-cookie", sessionCookieHeaders);
       }

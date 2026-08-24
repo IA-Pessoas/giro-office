@@ -1,3 +1,4 @@
+import { normalizeGatewayPath } from "../security/routeClassification.js";
 import type { GatewayEnv } from "./env.js";
 
 const ORGANIZATION_SERVICE_PREFIXES = ["/organizations"] as const;
@@ -29,14 +30,6 @@ const PESSOAL_SERVICE_PREFIXES = ["/pessoal"] as const;
 const PARCELAMENTO_SERVICE_PREFIXES = ["/parcelamento"] as const;
 
 const REPORTS_SERVICE_PREFIXES = ["/reports"] as const;
-
-function getNormalizedPath(path: string): string {
-  try {
-    return new URL(path, "http://localhost").pathname;
-  } catch {
-    return path;
-  }
-}
 
 function matchesPrefix(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
@@ -194,7 +187,10 @@ export function resolveGatewayService(
   path: string,
   method?: string,
 ): GatewayServiceDefinition | null {
-  const normalizedPath = getNormalizedPath(path);
+  const normalizedPath = normalizeGatewayPath(path)?.toLowerCase();
+  if (!normalizedPath) {
+    return null;
+  }
   const normalizedMethod = method?.toUpperCase();
   const services = getGatewayServiceDefinitions(env);
 

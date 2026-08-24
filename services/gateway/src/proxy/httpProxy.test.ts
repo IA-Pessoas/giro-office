@@ -17,6 +17,8 @@ import { buildForwardHeaders } from "./httpProxy.js";
 
 const authenticatedRequest = {
   headers: {},
+  method: "GET",
+  originalUrl: "/user/me",
   protocol: "https",
   ip: "127.0.0.1",
   auth: {
@@ -127,5 +129,30 @@ describe("buildForwardHeaders", () => {
     const headers = buildForwardHeaders(request, { forwardPlatformSessionCredentials: true });
 
     expect(headers.get("cookie")).toBeNull();
+  });
+
+  it.each([
+    { label: "path canônico", path: "/platform/me", method: "GET", expectedCookie: true },
+    { label: "trailing slash", path: "/platform/me/", method: "GET", expectedCookie: true },
+    { label: "método errado", path: "/platform/me", method: "POST", expectedCookie: false },
+  ])("aplica a allowlist inbound por método e path normalizado: $label", (entry) => {
+    const request = {
+      ...authenticatedRequest,
+      method: entry.method,
+      originalUrl: entry.path,
+      headers: { cookie: "theme=dark; cw.session=forged; cw.csrf=forged" },
+      auth: {
+        ...authenticatedRequest.auth,
+        token: "verified-platform-token",
+        actorKind: "platform",
+        isPlatformAdmin: true,
+      },
+    } as unknown as Request;
+
+    const headers = buildForwardHeaders(request, { forwardPlatformSessionCredentials: true });
+
+    expect(headers.get("cookie")).toBe(
+      entry.expectedCookie ? "cw.session=verified-platform-token" : null,
+    );
   });
 });

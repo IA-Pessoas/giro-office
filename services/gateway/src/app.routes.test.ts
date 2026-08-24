@@ -539,15 +539,32 @@ it("exige CSRF e limita credenciais encaminhadas em refresh e logout da platafor
       method: "POST",
       headers,
     });
+    const trailingSlashRefresh = await fetch(`${gatewayUrl}/platform/session/refresh/`, {
+      method: "POST",
+      headers,
+    });
+    const wrongMethod = await fetch(`${gatewayUrl}/platform/session/refresh`, {
+      method: "GET",
+      headers,
+    });
     const logout = await fetch(`${gatewayUrl}/platform/session`, { method: "DELETE", headers });
 
     expect(missingRefreshCsrf.status).toBe(403);
     expect(missingLogoutCsrf.status).toBe(403);
     expect(refresh.status).toBe(200);
+    expect(trailingSlashRefresh.status).toBe(200);
+    expect(wrongMethod.status).toBe(403);
     expect(logout.status).toBe(200);
     expect(refresh.headers.getSetCookie()).toHaveLength(2);
+    expect(trailingSlashRefresh.headers.getSetCookie()).toHaveLength(2);
+    expect(wrongMethod.headers.getSetCookie()).toHaveLength(0);
     expect(logout.headers.getSetCookie()).toHaveLength(2);
     expect(upstreamRequests).toEqual([
+      {
+        url: "/platform/session/refresh",
+        cookie: `cw.session=${platformToken}; cw.csrf=${csrfToken}`,
+        csrf: csrfToken,
+      },
       {
         url: "/platform/session/refresh",
         cookie: `cw.session=${platformToken}; cw.csrf=${csrfToken}`,
