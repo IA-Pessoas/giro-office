@@ -488,6 +488,7 @@ model AuditRequest {
   @@index([status_code, created_at(sort: Desc)])
   @@index([organization_id, referring, referring_id, created_at(sort: Desc)])
   @@index([created_at(sort: Desc), id(sort: Desc)], map: "idx_audit_requests_created_id_desc")
+  @@index([path(ops: raw("gin_trgm_ops"))], type: Gin, map: "idx_audit_requests_path_trgm")
   @@map("audit_requests")
 }
 
