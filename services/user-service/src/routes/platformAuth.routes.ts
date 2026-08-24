@@ -15,6 +15,7 @@ import { platformLoginBodySchema } from "../schemas/platformAuth.schemas.js";
 import {
   extractPlatformBearerClaims,
   requirePlatformCsrf,
+  requirePlatformGatewayAuth,
   requirePlatformSession,
 } from "../security/platformAuth.js";
 import { PlatformAuthService } from "../services/platformAuthService.js";
@@ -52,6 +53,7 @@ export function createPlatformAuthRoutes(
 
   router.post(
     "/session/refresh",
+    requirePlatformGatewayAuth,
     requirePlatformSession,
     requirePlatformCsrf,
     async (request: Request, response: Response, next: NextFunction) => {
@@ -75,6 +77,7 @@ export function createPlatformAuthRoutes(
 
   router.delete(
     "/session",
+    requirePlatformGatewayAuth,
     requirePlatformSession,
     requirePlatformCsrf,
     async (request: Request, response: Response, next: NextFunction) => {
@@ -94,6 +97,7 @@ export function createPlatformAuthRoutes(
 
   router.get(
     "/me",
+    requirePlatformGatewayAuth,
     requirePlatformSession,
     (request: Request, response: Response, next: NextFunction): void => {
       if (!request.platform_identity) {

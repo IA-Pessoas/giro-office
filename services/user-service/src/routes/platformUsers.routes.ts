@@ -6,7 +6,7 @@ import {
   listPlatformUsersQuerySchema,
   platformOrganizationUsersParamsSchema,
 } from "../schemas/platformUsers.schemas.js";
-import { requirePlatformSession } from "../security/platformAuth.js";
+import { requirePlatformGatewayAuth, requirePlatformSession } from "../security/platformAuth.js";
 import { PlatformUsersService } from "../services/platformUsersService.js";
 
 export function createPlatformUsersRoutes(): ReturnType<typeof Router> {
@@ -15,6 +15,7 @@ export function createPlatformUsersRoutes(): ReturnType<typeof Router> {
 
   router.get(
     "/organizations/:organizationId/users",
+    requirePlatformGatewayAuth,
     requirePlatformSession,
     async (request: Request, response: Response, next: NextFunction) => {
       try {

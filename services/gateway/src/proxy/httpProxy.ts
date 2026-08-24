@@ -1,12 +1,16 @@
 import { Readable } from "node:stream";
 
 import {
+  AUTH_SESSION_COOKIE_NAME,
   AUTH_SESSION_TRANSPORT_HEADER,
+  CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
   FORWARDED_AUTH_CSRF_HASH_HEADER,
+  FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
   FORWARDED_AUTH_SESSION_ID_HEADER,
   FORWARDED_AUTH_SESSION_VERSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
@@ -14,6 +18,7 @@ import {
   INTEGRACAO_PERMISSION_LEVEL,
   INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
+  readCookie,
   ServiceError,
   stripBrowserAuth,
 } from "@workspace/shared";
@@ -44,6 +49,8 @@ export interface HttpProxyOptions {
   internalServiceToken?: string;
   permissionModule?: string;
   forwardSessionBinding?: boolean;
+  forwardPlatformSessionCredentials?: boolean;
+  stripPathPrefix?: string;
 }
 
 const OWNER_MODULE_PERMISSION = 3;
@@ -126,6 +133,8 @@ export function buildForwardHeaders(request: Request, options: HttpProxyOptions 
     FORWARDED_AUTH_SESSION_VERSION_HEADER,
     FORWARDED_AUTH_SESSION_ID_HEADER,
     FORWARDED_AUTH_CSRF_HASH_HEADER,
+    FORWARDED_AUTH_KIND_HEADER,
+    FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
     "authorization",
     "cookie",
     AUTH_SESSION_TRANSPORT_HEADER,
@@ -148,12 +157,16 @@ export function buildForwardHeaders(request: Request, options: HttpProxyOptions 
     headers.set(key, value);
   });
 
-  const cookieHeader = Array.isArray(request.headers.cookie)
-    ? request.headers.cookie.join("; ")
-    : request.headers.cookie;
-  const forwardedCookie = stripBrowserAuth(cookieHeader);
+  const forwardedCookie = getForwardedCookie(request, options);
   if (forwardedCookie) {
     headers.set("cookie", forwardedCookie);
+  }
+
+  if (shouldForwardPlatformCsrf(request, options)) {
+    const csrfToken = request.get(CSRF_HEADER_NAME);
+    if (csrfToken) {
+      headers.set(CSRF_HEADER_NAME, csrfToken);
+    }
   }
 
   headers.set("x-forwarded-host", request.headers.host ?? "");
@@ -166,28 +179,36 @@ export function buildForwardHeaders(request: Request, options: HttpProxyOptions 
 
   if (request.auth) {
     headers.set(FORWARDED_AUTH_USER_ID_HEADER, request.auth.userId);
-    headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
+    headers.set(FORWARDED_AUTH_KIND_HEADER, request.auth.actorKind);
 
-    const modules = request.auth.claims.modules as Record<string, number> | undefined;
-    const forwardedPermission = resolveForwardedPermission(
-      request.auth.claims.permission,
-      modules,
-      request.auth.claims.modulePermissionsPresent,
-      request.auth.claims.type,
-      options.permissionModule,
-    );
+    if (request.auth.actorKind === "platform") {
+      if (request.auth.isPlatformAdmin) {
+        headers.set(FORWARDED_AUTH_PLATFORM_ROLE_HEADER, "super_admin");
+      }
+    } else {
+      headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
 
-    if (typeof forwardedPermission === "number") {
-      headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(forwardedPermission));
-    }
+      const modules = request.auth.claims.modules as Record<string, number> | undefined;
+      const forwardedPermission = resolveForwardedPermission(
+        request.auth.claims.permission,
+        modules,
+        request.auth.claims.modulePermissionsPresent,
+        request.auth.claims.type,
+        options.permissionModule,
+      );
 
-    const authType = request.auth.claims.type;
-    if (typeof authType === "string") {
-      headers.set(FORWARDED_AUTH_TYPE_HEADER, authType);
-    }
+      if (typeof forwardedPermission === "number") {
+        headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(forwardedPermission));
+      }
 
-    if (modules) {
-      headers.set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify(modules));
+      const authType = request.auth.claims.type;
+      if (typeof authType === "string") {
+        headers.set(FORWARDED_AUTH_TYPE_HEADER, authType);
+      }
+
+      if (modules) {
+        headers.set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify(modules));
+      }
     }
 
     if (typeof request.auth.claims.session_version === "number") {
@@ -216,17 +237,86 @@ export function buildForwardHeaders(request: Request, options: HttpProxyOptions 
 export type UpstreamResolver = (method: string, path: string) => string;
 
 /** Colapsa barras consecutivas no path (ex.: /rh//holidays/ → /rh/holidays/), preservando query string. */
-function normalizePathForUpstream(originalUrl: string): string {
+function normalizePathForUpstream(originalUrl: string, stripPathPrefix?: string): string {
   const queryIndex = originalUrl.indexOf("?");
   const pathPart = queryIndex === -1 ? originalUrl : originalUrl.slice(0, queryIndex);
   const queryPart = queryIndex === -1 ? "" : originalUrl.slice(queryIndex);
-  const normalizedPath = pathPart.replace(/\/{2,}/g, "/");
+  let normalizedPath = pathPart.replace(/\/{2,}/g, "/");
+  if (
+    stripPathPrefix &&
+    (normalizedPath === stripPathPrefix || normalizedPath.startsWith(`${stripPathPrefix}/`))
+  ) {
+    normalizedPath = normalizedPath.slice(stripPathPrefix.length) || "/";
+  }
   return normalizedPath + queryPart;
+}
+
+function shouldForwardPlatformSession(request: Request, options: HttpProxyOptions): boolean {
+  if (!options.forwardPlatformSessionCredentials || request.auth?.actorKind !== "platform") {
+    return false;
+  }
+
+  const path = new URL(request.originalUrl, "http://gateway.local").pathname;
+  const method = request.method.toUpperCase();
+  return (
+    (method === "GET" && path === "/platform/me") ||
+    (method === "GET" && path === "/platform/organizations") ||
+    (method === "GET" && /^\/platform\/organizations\/[^/]+\/users\/?$/u.test(path)) ||
+    (method === "POST" && path === "/platform/session/refresh") ||
+    (method === "DELETE" && path === "/platform/session")
+  );
+}
+
+function shouldForwardPlatformCsrf(request: Request, options: HttpProxyOptions): boolean {
+  if (!shouldForwardPlatformSession(request, options)) {
+    return false;
+  }
+
+  return request.method.toUpperCase() !== "GET";
+}
+
+function getForwardedCookie(request: Request, options: HttpProxyOptions): string | undefined {
+  const cookieHeader = Array.isArray(request.headers.cookie)
+    ? request.headers.cookie.join("; ")
+    : request.headers.cookie;
+  const path = new URL(request.originalUrl, "http://gateway.local").pathname;
+
+  if (
+    (request.auth?.actorKind === "platform" ||
+      (options.forwardPlatformSessionCredentials && path.startsWith("/platform/"))) &&
+    !shouldForwardPlatformSession(request, options)
+  ) {
+    return undefined;
+  }
+
+  if (!shouldForwardPlatformSession(request, options)) {
+    return stripBrowserAuth(cookieHeader);
+  }
+
+  const sessionToken = request.auth?.token;
+  if (!sessionToken) {
+    return undefined;
+  }
+
+  const cookies = [`${AUTH_SESSION_COOKIE_NAME}=${encodeURIComponent(sessionToken)}`];
+  if (shouldForwardPlatformCsrf(request, options)) {
+    const csrfToken = readCookie(cookieHeader, CSRF_COOKIE_NAME);
+    if (csrfToken) {
+      cookies.push(`${CSRF_COOKIE_NAME}=${encodeURIComponent(csrfToken)}`);
+    }
+  }
+
+  return cookies.join("; ");
 }
 
 function getSessionCookieHeaders(request: Request, upstreamHeaders: Headers): string[] {
   const path = new URL(request.originalUrl, "http://gateway.local").pathname;
-  if (path !== "/user/session" && path !== "/user/session/refresh") {
+  if (
+    path !== "/user/session" &&
+    path !== "/user/session/refresh" &&
+    path !== "/platform/session" &&
+    path !== "/platform/session/refresh"
+  ) {
     return [];
   }
 
@@ -246,7 +336,7 @@ function createHttpProxy(
   ): Promise<void> {
     const targetUrl = resolveTargetUrl(request);
     const upstreamUrl = new URL(
-      normalizePathForUpstream(request.originalUrl),
+      normalizePathForUpstream(request.originalUrl, options.stripPathPrefix),
       targetUrl,
     ).toString();
     const body = getRequestBody(request);

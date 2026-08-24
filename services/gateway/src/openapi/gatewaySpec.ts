@@ -42,6 +42,7 @@ const browserAuthentication: Array<Record<string, string[]>> = [
   { cookieAuth: [] },
   { bearerAuth: [] },
 ];
+const platformBrowserAuthentication: Array<Record<string, string[]>> = [{ cookieAuth: [] }];
 
 function cloneDocument<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -70,7 +71,10 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       buildSpec: () =>
         buildUserServiceOpenApiSpec({ port: getPortFromUrl(env.userServiceUrl) } as never),
       includePath: (path) =>
-        path !== "/health" && path !== "/user/session/validate" && !path.startsWith("/internal/"),
+        path !== "/health" &&
+        path !== "/user/session/validate" &&
+        path !== "/platform/session/validate" &&
+        !path.startsWith("/internal/"),
     },
     {
       key: "department-service",
@@ -269,6 +273,10 @@ function getGatewayOperationSecurity(
   definition: ServiceSpecDefinition,
   security: Array<Record<string, string[]>> | undefined,
 ): Array<Record<string, string[]>> | undefined {
+  if (path.startsWith("/platform/") && security) {
+    return platformBrowserAuthentication;
+  }
+
   if (path === "/user/me") {
     return browserAuthentication;
   }
@@ -290,6 +298,23 @@ function getGatewayOperationSecurity(
     .filter((entry) => Object.keys(entry).length > 0);
 
   return filtered.length > 0 ? browserAuthentication : undefined;
+}
+
+function addPlatformAuditPath(aggregateSpec: AggregatedOpenApiDocument): void {
+  const auditRequests = aggregateSpec.paths["/audit/requests"] as JsonObject | undefined;
+  const getOperation = auditRequests?.get;
+  if (!getOperation || typeof getOperation !== "object") {
+    return;
+  }
+
+  aggregateSpec.paths["/platform/audit/requests"] = {
+    get: {
+      ...(getOperation as JsonObject),
+      summary: "Consultar auditoria global da plataforma",
+      security: platformBrowserAuthentication,
+      "x-origin-service": "audit-service",
+    },
+  };
 }
 
 function mergeSecuritySchemes(
@@ -600,6 +625,8 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       tagNameMap,
     );
   }
+
+  addPlatformAuditPath(aggregateSpec);
 
   return aggregateSpec;
 }

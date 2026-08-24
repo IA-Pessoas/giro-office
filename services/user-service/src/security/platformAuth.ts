@@ -3,7 +3,11 @@ import {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
   extractBearerToken,
+  FORWARDED_AUTH_KIND_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
   hashCsrfToken,
+  INTERNAL_SERVICE_TOKEN_HEADER,
   readCookie,
   ServiceError,
   verifyCsrfToken,
@@ -19,6 +23,32 @@ import {
 
 function unauthenticated(): ServiceError {
   return new ServiceError(401, "Não autenticado.");
+}
+
+export function requirePlatformGatewayAuth(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  if (request.get(INTERNAL_SERVICE_TOKEN_HEADER) !== getUserServiceEnv().auditServiceToken) {
+    next(unauthenticated());
+    return;
+  }
+
+  if (
+    request.get(FORWARDED_AUTH_KIND_HEADER) !== "platform" ||
+    request.get(FORWARDED_AUTH_PLATFORM_ROLE_HEADER) !== "super_admin"
+  ) {
+    next(new ServiceError(403, "Acesso negado."));
+    return;
+  }
+
+  if (!request.get(FORWARDED_AUTH_USER_ID_HEADER)) {
+    next(unauthenticated());
+    return;
+  }
+
+  next();
 }
 
 function requirePlatformClaims(token: string): PlatformSessionClaims {

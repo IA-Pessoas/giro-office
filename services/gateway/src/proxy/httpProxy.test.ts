@@ -1,6 +1,13 @@
 import {
   FORWARDED_AUTH_CSRF_HASH_HEADER,
+  FORWARDED_AUTH_KIND_HEADER,
+  FORWARDED_AUTH_MODULES_HEADER,
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
   FORWARDED_AUTH_SESSION_ID_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
 import type { Request } from "express";
@@ -13,9 +20,15 @@ const authenticatedRequest = {
   protocol: "https",
   ip: "127.0.0.1",
   auth: {
+    token: "verified-token",
     userId: "user-1",
     organizationId: "org-1",
+    actorKind: "organization",
+    isPlatformAdmin: false,
     claims: {
+      user_id: "user-1",
+      organization_id: "org-1",
+      auth_kind: "organization",
       session_id: "session-1",
       csrf_hash: "a".repeat(64),
       session_version: 1,
@@ -41,5 +54,78 @@ describe("buildForwardHeaders", () => {
 
     expect(headers.get(FORWARDED_AUTH_SESSION_ID_HEADER)).toBe("session-1");
     expect(headers.get(FORWARDED_AUTH_CSRF_HASH_HEADER)).toBe("a".repeat(64));
+  });
+
+  it("substitui todos os headers de plataforma forjados por identidade verificada", () => {
+    const request = {
+      ...authenticatedRequest,
+      headers: {
+        [FORWARDED_AUTH_USER_ID_HEADER]: "attacker-user",
+        [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "attacker-org",
+        [FORWARDED_AUTH_PERMISSION_HEADER]: "999",
+        [FORWARDED_AUTH_TYPE_HEADER]: "owner",
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ rh: 3 }),
+        [FORWARDED_AUTH_KIND_HEADER]: "organization",
+        [FORWARDED_AUTH_PLATFORM_ROLE_HEADER]: "super_admin",
+      },
+      auth: {
+        token: "verified-platform-token",
+        userId: "real-platform-user",
+        organizationId: "",
+        actorKind: "platform",
+        isPlatformAdmin: true,
+        claims: {
+          user_id: "real-platform-user",
+          auth_kind: "platform",
+          platform_role: "super_admin",
+          organization_id: "forged-claim-org",
+          permission: 3,
+          type: "owner",
+          modules: { rh: 3 },
+        },
+      },
+    } as unknown as Request;
+
+    const headers = buildForwardHeaders(request, { internalServiceToken: "internal" });
+
+    expect(headers.get(FORWARDED_AUTH_KIND_HEADER)).toBe("platform");
+    expect(headers.get(FORWARDED_AUTH_PLATFORM_ROLE_HEADER)).toBe("super_admin");
+    expect(headers.get(FORWARDED_AUTH_USER_ID_HEADER)).toBe("real-platform-user");
+    expect(headers.get(FORWARDED_AUTH_ORGANIZATION_ID_HEADER)).toBeNull();
+    expect(headers.get(FORWARDED_AUTH_PERMISSION_HEADER)).toBeNull();
+    expect(headers.get(FORWARDED_AUTH_TYPE_HEADER)).toBeNull();
+    expect(headers.get(FORWARDED_AUTH_MODULES_HEADER)).toBeNull();
+  });
+
+  it("não encaminha cookies fora da allowlist de sessão da plataforma", () => {
+    const request = {
+      ...authenticatedRequest,
+      method: "GET",
+      originalUrl: "/platform/audit/requests",
+      headers: { cookie: "theme=dark; cw.session=forged; cw.csrf=forged" },
+      auth: {
+        ...authenticatedRequest.auth,
+        actorKind: "platform",
+        isPlatformAdmin: true,
+      },
+    } as unknown as Request;
+
+    const headers = buildForwardHeaders(request, { internalServiceToken: "internal" });
+
+    expect(headers.get("cookie")).toBeNull();
+  });
+
+  it("não encaminha cookies ao login público da plataforma", () => {
+    const request = {
+      headers: { cookie: "theme=dark; cw.session=forged; cw.csrf=forged" },
+      method: "POST",
+      originalUrl: "/platform/session",
+      protocol: "https",
+      ip: "127.0.0.1",
+    } as unknown as Request;
+
+    const headers = buildForwardHeaders(request, { forwardPlatformSessionCredentials: true });
+
+    expect(headers.get("cookie")).toBeNull();
   });
 });

@@ -1,5 +1,8 @@
 import {
   CSRF_HEADER_NAME,
+  FORWARDED_AUTH_KIND_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
   hashCsrfToken,
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
@@ -93,6 +96,10 @@ function platformSessionHeaders(token = platformSessionToken()): Record<string, 
   return {
     Cookie: `cw.session=${token}; cw.csrf=${csrfToken}`,
     [CSRF_HEADER_NAME]: csrfToken,
+    [INTERNAL_SERVICE_TOKEN_HEADER]: getUserServiceEnv().auditServiceToken,
+    [FORWARDED_AUTH_USER_ID_HEADER]: platformIdentity.id,
+    [FORWARDED_AUTH_KIND_HEADER]: "platform",
+    [FORWARDED_AUTH_PLATFORM_ROLE_HEADER]: "super_admin",
   };
 }
 
@@ -153,6 +160,16 @@ describe("platform auth routes", () => {
     expect(platformAuthMock.validateSession).not.toHaveBeenCalled();
   });
 
+  it("rejeita cookie e identidade forjada sem o token interno do gateway", async () => {
+    const headers = platformSessionHeaders();
+    delete headers[INTERNAL_SERVICE_TOKEN_HEADER];
+
+    const response = await request(createApp()).get("/platform/me").set(headers);
+
+    expect(response.status).toBe(401);
+    expect(platformAuthMock.validateSession).not.toHaveBeenCalled();
+  });
+
   it("returns 409 when a concurrent refresh already rotated the session", async () => {
     platformAuthMock.refreshSession.mockRejectedValue(
       new ServiceError(409, "Sessão substituída por uma renovação mais recente."),
@@ -166,9 +183,9 @@ describe("platform auth routes", () => {
   });
 
   it("requires the CSRF proof before rotating a cookie session", async () => {
-    const response = await request(createApp())
-      .post("/platform/session/refresh")
-      .set("Cookie", `cw.session=${platformSessionToken()}; cw.csrf=${csrfToken}`);
+    const headers = platformSessionHeaders();
+    delete headers[CSRF_HEADER_NAME];
+    const response = await request(createApp()).post("/platform/session/refresh").set(headers);
 
     expect(response.status).toBe(403);
     expect(response.body.error).toBe("Requisição não autorizada.");

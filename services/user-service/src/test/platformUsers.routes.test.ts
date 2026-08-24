@@ -1,4 +1,11 @@
-import { CSRF_HEADER_NAME, hashCsrfToken } from "@workspace/shared";
+import {
+  CSRF_HEADER_NAME,
+  FORWARDED_AUTH_KIND_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  hashCsrfToken,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+} from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
 import jwt from "jsonwebtoken";
@@ -17,7 +24,7 @@ const { testEnv } = vi.hoisted(() => ({
     jwtSecret: "jwt-secret",
     adminPassword: "admin-password",
     nodeEnv: "test",
-    logLevel: "silent",
+    logLevel: "silent" as const,
     logPretty: false,
     auditEnabled: false,
     auditServiceUrl: "http://localhost:3020",
@@ -49,7 +56,6 @@ import { createUserApp } from "../app.js";
 import { getUserServiceEnv } from "../config/env.js";
 import { buildUserServiceOpenApiSpec } from "../openapi/spec.js";
 
-const csrfToken = "A".repeat(43);
 const platformIdentity = {
   id: "platform-user-1",
   name: "Platform Administrator",
@@ -57,6 +63,21 @@ const platformIdentity = {
   auth_kind: "platform" as const,
   platform_role: "super_admin" as const,
 };
+const csrfToken = "A".repeat(43);
+
+function platformSessionToken(): string {
+  return jwt.sign(
+    {
+      user_id: platformIdentity.id,
+      auth_kind: "platform",
+      platform_role: "super_admin",
+      session_version: 1,
+      session_id: "platform-session-1",
+      csrf_hash: hashCsrfToken(csrfToken),
+    },
+    getUserServiceEnv().jwtSecret,
+  );
+}
 
 function createApp() {
   return createUserApp(
@@ -70,25 +91,17 @@ function createApp() {
   );
 }
 
-function platformSessionToken(overrides: Record<string, unknown> = {}) {
-  return jwt.sign(
-    {
-      user_id: platformIdentity.id,
-      auth_kind: "platform",
-      platform_role: "super_admin",
-      session_version: 1,
-      session_id: "platform-session-1",
-      csrf_hash: hashCsrfToken(csrfToken),
-      ...overrides,
-    },
-    getUserServiceEnv().jwtSecret,
-  );
-}
-
-function platformSessionHeaders(token = platformSessionToken()): Record<string, string> {
+function platformGatewayHeaders(
+  overrides: Partial<Record<"userId" | "authKind" | "platformRole" | "internalToken", string>> = {},
+): Record<string, string> {
   return {
-    Cookie: `cw.session=${token}; cw.csrf=${csrfToken}`,
+    Cookie: `cw.session=${platformSessionToken()}; cw.csrf=${csrfToken}`,
     [CSRF_HEADER_NAME]: csrfToken,
+    [FORWARDED_AUTH_USER_ID_HEADER]: overrides.userId ?? platformIdentity.id,
+    [FORWARDED_AUTH_KIND_HEADER]: overrides.authKind ?? "platform",
+    [FORWARDED_AUTH_PLATFORM_ROLE_HEADER]: overrides.platformRole ?? "super_admin",
+    [INTERNAL_SERVICE_TOKEN_HEADER]:
+      overrides.internalToken ?? getUserServiceEnv().auditServiceToken,
   };
 }
 
@@ -106,7 +119,7 @@ describe("platform users routes", () => {
   it("lists only the organization requested by a platform super admin", async () => {
     const response = await request(createApp())
       .get("/platform/organizations/org-2/users?skip=5&take=20&search=ana")
-      .set(platformSessionHeaders());
+      .set(platformGatewayHeaders());
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual({
@@ -132,16 +145,25 @@ describe("platform users routes", () => {
   it("returns 403 for an organizational identity", async () => {
     const response = await request(createApp())
       .get("/platform/organizations/org-2/users")
-      .set(platformSessionHeaders(platformSessionToken({ auth_kind: "organization" })));
+      .set(platformGatewayHeaders({ authKind: "organization", platformRole: "" }));
 
     expect(response.status).toBe(403);
+    expect(platformUsersMock.list).not.toHaveBeenCalled();
+  });
+
+  it("rejeita headers de plataforma forjados sem o token interno do gateway", async () => {
+    const response = await request(createApp())
+      .get("/platform/organizations/org-2/users")
+      .set(platformGatewayHeaders({ internalToken: "attacker-token" }));
+
+    expect(response.status).toBe(401);
     expect(platformUsersMock.list).not.toHaveBeenCalled();
   });
 
   it("returns 400 for an invalid page size", async () => {
     const response = await request(createApp())
       .get("/platform/organizations/org-2/users?take=101")
-      .set(platformSessionHeaders());
+      .set(platformGatewayHeaders());
 
     expect(response.status).toBe(400);
     expect(platformUsersMock.list).not.toHaveBeenCalled();
@@ -150,7 +172,7 @@ describe("platform users routes", () => {
   it("returns 400 when skip exceeds the bounded administrative window", async () => {
     const response = await request(createApp())
       .get("/platform/organizations/org-2/users?skip=10001")
-      .set(platformSessionHeaders());
+      .set(platformGatewayHeaders());
 
     expect(response.status).toBe(400);
     expect(platformUsersMock.list).not.toHaveBeenCalled();

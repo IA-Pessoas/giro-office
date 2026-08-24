@@ -1,5 +1,9 @@
 import {
   AUTH_SESSION_COOKIE_NAME,
+  FORWARDED_AUTH_KIND_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
   readCookie,
   ServiceError,
   verifyJwtToken,
@@ -52,6 +56,24 @@ export async function requirePlatformSession(
   _response: Response,
   next: NextFunction,
 ): Promise<void> {
+  const env = getOrganizationEnv();
+  if (request.get(INTERNAL_SERVICE_TOKEN_HEADER) !== env.auditServiceToken) {
+    next(unauthenticated());
+    return;
+  }
+  if (
+    request.get(FORWARDED_AUTH_KIND_HEADER) !== "platform" ||
+    request.get(FORWARDED_AUTH_PLATFORM_ROLE_HEADER) !== PLATFORM_ROLE
+  ) {
+    next(new ServiceError(403, "Acesso negado."));
+    return;
+  }
+  const forwardedUserId = request.get(FORWARDED_AUTH_USER_ID_HEADER);
+  if (!forwardedUserId) {
+    next(unauthenticated());
+    return;
+  }
+
   const token = readCookie(request.headers.cookie, AUTH_SESSION_COOKIE_NAME);
   if (!token) {
     next(unauthenticated());
@@ -63,6 +85,10 @@ export async function requirePlatformSession(
     claims = requirePlatformClaims(token);
   } catch (err: unknown) {
     next(err instanceof ServiceError ? err : unauthenticated());
+    return;
+  }
+  if (claims.userId !== forwardedUserId) {
+    next(unauthenticated());
     return;
   }
 

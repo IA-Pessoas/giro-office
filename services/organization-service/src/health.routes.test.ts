@@ -11,6 +11,7 @@ describe("organization-service", () => {
       port: 3031,
       databaseUrl: "https://example.com/db",
       jwtSecret: "test-secret",
+      auditServiceToken: "audit-service-token",
       nodeEnv: "test",
       logLevel: "silent",
       logPretty: false,

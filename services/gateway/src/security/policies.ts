@@ -2,6 +2,7 @@ import type { AuthPolicy } from "@workspace/shared";
 
 const userManagementPolicy: AuthPolicy = { special: "manageUsers" };
 const authenticatedPolicy: AuthPolicy = { minPermission: 0 };
+const platformOnlyPolicy: AuthPolicy = { special: "platformOnly" };
 const moduleAccessPermission = 1;
 const moduleEditPermission = 2;
 
@@ -126,6 +127,11 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /user", userManagementPolicy],
   ["GET /rh/operational-users", operationalUsersCatalogPolicy],
   ["POST /user", userManagementPolicy],
+  ["POST /platform/session/refresh", platformOnlyPolicy],
+  ["DELETE /platform/session", platformOnlyPolicy],
+  ["GET /platform/me", platformOnlyPolicy],
+  ["GET /platform/organizations", platformOnlyPolicy],
+  ["GET /platform/audit/requests", platformOnlyPolicy],
 ]);
 
 const routePolicyMatchers: Array<{
@@ -181,6 +187,11 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/certificate(?:\/|$)/, policy: certificateEditPolicy },
   { method: "ANY", path: /^\/organizations(?:\/|$)/, policy: authenticatedPolicy },
   { method: "ANY", path: /^\/audit(?:\/|$)/, policy: authenticatedPolicy },
+  {
+    method: "GET",
+    path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+    policy: platformOnlyPolicy,
+  },
 ];
 
 export function getRoutePolicy(method: string, path: string): AuthPolicy | null {

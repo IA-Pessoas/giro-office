@@ -1,6 +1,9 @@
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { GatewayEnv } from "../config/env.js";
+import { buildGatewayOpenApiSpec } from "../openapi/gatewaySpec.js";
+import { getRoutePolicy } from "../security/policies.js";
+import { isPublicRoute } from "../security/publicRoutes.js";
 import { getUnclassifiedGatewayOperations } from "../security/routePolicyCoverage.js";
 
 function createCoverageEnv(): GatewayEnv {
@@ -47,4 +50,33 @@ function createCoverageEnv(): GatewayEnv {
 
 it("classifies every documented gateway operation as public or policy-protected", () => {
   expect(getUnclassifiedGatewayOperations(createCoverageEnv())).toEqual([]);
+});
+
+describe("platform default deny", () => {
+  it("deixa público somente o login e exige platformOnly nas demais rotas", () => {
+    expect(isPublicRoute("POST", "/platform/session")).toBe(true);
+    expect(isPublicRoute("POST", "/platform/session/refresh")).toBe(false);
+    expect(isPublicRoute("DELETE", "/platform/session")).toBe(false);
+
+    for (const [method, path] of [
+      ["POST", "/platform/session/refresh"],
+      ["DELETE", "/platform/session"],
+      ["GET", "/platform/me"],
+      ["GET", "/platform/organizations"],
+      ["GET", "/platform/organizations/org-1/users"],
+      ["GET", "/platform/audit/requests"],
+    ]) {
+      expect(getRoutePolicy(method, path), `${method} ${path}`).toEqual({
+        special: "platformOnly",
+      });
+    }
+  });
+
+  it("não publica o endpoint interno de validação da sessão", () => {
+    const spec = buildGatewayOpenApiSpec(createCoverageEnv());
+
+    expect(spec.paths["/platform/session/validate"]).toBeUndefined();
+    expect(getRoutePolicy("POST", "/platform/session/validate")).toBeNull();
+    expect(isPublicRoute("POST", "/platform/session/validate")).toBe(false);
+  });
 });

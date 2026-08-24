@@ -54,6 +54,19 @@ O gateway encaminha estes prefixos para os servicos configurados no env:
 - `/parcelamento` -> `PARCELAMENTO_SERVICE_URL`
 - `/reports` -> `REPORTS_SERVICE_URL`
 
+As rotas administrativas globais sob `/platform` são resolvidas por método e caminho, sem um
+upstream genérico:
+
+- sessão, identidade e usuários de organização -> `USER_SERVICE_URL`;
+- organizações globais -> `ORGANIZATION_SERVICE_URL`;
+- `GET /platform/audit/requests` -> `AUDIT_SERVICE_URL` (quando a auditoria está habilitada).
+
+O gateway remove todos os headers `x-auth-*` recebidos do cliente e reconstrói somente a
+identidade verificada. Os serviços protegidos aceitam essa identidade apenas junto do
+`AUDIT_SERVICE_TOKEN` injetado pelo gateway. Cookies da plataforma também são encaminhados por
+allowlist de rota e nome: somente `cw.session`, acrescido de `cw.csrf` nas operações de refresh e
+logout. `Set-Cookie` de upstream só é publicado nos endpoints de criação/rotação de sessão.
+
 ### Parcelamento
 
 - Public prefix: `/parcelamento`
@@ -72,14 +85,20 @@ Para servicos que validam contexto autenticado encaminhado internamente, o gatew
 - `/certificate` usa `CERTIFICATE_SERVICE_INTERNAL_TOKEN`.
 - `/client` usa `CLIENT_SERVICE_INTERNAL_TOKEN` para autenticação do contexto encaminhado.
 
-Quando `AUDIT_ENABLED=true`, o gateway tambem proxya `/audit` para `AUDIT_SERVICE_URL` e injeta o header interno com `AUDIT_SERVICE_TOKEN`.
+Quando `AUDIT_ENABLED=true`, o gateway proxya `/audit` e `GET /platform/audit/requests` para
+`AUDIT_SERVICE_URL` e injeta o header interno com `AUDIT_SERVICE_TOKEN`.
 
 ## Autorização de rotas
 
 O gateway aplica *default-deny*: toda rota autenticada precisa de uma política explícita antes de
 ser encaminhada ao upstream. `GET` exige nível modular `>=1` e operações de escrita exigem
 `>=2`, exceto políticas declaradas específicas. As únicas rotas HTTP sem sessão são `GET /health`,
-`GET /ready`, `POST /user/session` e `POST /user/start-config`. O transporte `/socket.io` é uma
+`GET /ready`, `POST /user/session`, `POST /platform/session` e `POST /user/start-config`. Rotas
+`/platform` protegidas aceitam apenas a sessão HttpOnly de `super_admin`; Bearer de navegador é
+recusado. Rotas organizacionais recusam identidade de plataforma, e rotas `/platform` recusam
+identidade organizacional. Login tem rate limit dedicado; refresh e logout exigem double-submit
+CSRF. `POST /platform/session/validate` é exclusivamente interno no user-service e responde 404
+quando tentado pelo gateway público. O transporte `/socket.io` é uma
 exceção de compatibilidade: o gateway apenas encaminha o handshake e o serviço de tempo real
 valida `socket.handshake.auth.token` antes de aceitar a conexão.
 

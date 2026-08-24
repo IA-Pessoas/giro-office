@@ -309,13 +309,18 @@ function mountAuthRateLimits(app: express.Express, env: GatewayEnv): void {
     methods: ["POST"],
   });
 
-  app.use("/user/session", authRateLimit);
-  app.use("/user/start-config", authRateLimit);
+  app.post("/user/session", authRateLimit);
+  app.post("/platform/session", authRateLimit);
+  app.post("/user/start-config", authRateLimit);
 }
 
 function mountPublicBlockedRoutes(app: express.Express, env: GatewayEnv): void {
+  app.use("/platform/session/validate", (_request, _response, next) => {
+    next(new ServiceError(404, "Recurso não encontrado."));
+  });
+
   if (!env.auditEnabled) {
-    app.use("/audit", (_request, _response, next) => {
+    app.use(["/audit", "/platform/audit"], (_request, _response, next) => {
       next(new ServiceError(404, "Recurso não encontrado."));
     });
   }
@@ -380,6 +385,8 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
         internalServiceToken: service.internalServiceToken,
         permissionModule: service.permissionModule,
         forwardSessionBinding: service.forwardSessionBinding,
+        forwardPlatformSessionCredentials: service.forwardPlatformSessionCredentials,
+        stripPathPrefix: service.stripPathPrefix,
       }),
     );
   }
@@ -404,14 +411,16 @@ function mountServiceRoutes(app: express.Express, env: GatewayEnv): void {
     }
   }
 
-  if (env.auditEnabled) {
-    app.use(
-      "/audit",
-      buildHttpProxyMiddleware(env.auditServiceUrl, {
-        internalServiceToken: env.auditServiceToken,
-      }),
-    );
-  }
+  app.use("/platform", (request, response, next) => {
+    const service = resolveGatewayService(env, request.originalUrl, request.method);
+    const proxy = service ? proxyByServiceKey.get(service.key) : undefined;
+    if (!proxy) {
+      next(new ServiceError(404, "Rota não mapeada no gateway."));
+      return;
+    }
+
+    proxy(request, response, next);
+  });
 }
 
 function mountFallbackRoute(app: express.Express): void {
@@ -428,7 +437,7 @@ function mountErrorHandlers(app: express.Express, env: GatewayEnv, logger: Logge
       event: "gateway.error",
       fallbackMessage: "Erro interno no gateway.",
       getContext: (request) => {
-        const service = resolveGatewayService(env, request.originalUrl);
+        const service = resolveGatewayService(env, request.originalUrl, request.method);
         return {
           auth: getAuthLogContext(request),
           upstream: service ? getUpstreamContext(service.targetUrl, request) : undefined,

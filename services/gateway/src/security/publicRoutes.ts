@@ -8,6 +8,7 @@ const publicRoutes = new Map<string, PublicRoute>([
   ["GET /health", { reason: "Expõe a verificação de saúde do gateway." }],
   ["GET /ready", { reason: "Expõe a verificação de prontidão do gateway." }],
   ["POST /user/session", { reason: "Cria uma sessão sem contexto autenticado." }],
+  ["POST /platform/session", { reason: "Cria uma sessão de plataforma sem contexto autenticado." }],
   ["POST /user/start-config", { reason: "Inicializa a configuração sem contexto autenticado." }],
 ]);
 

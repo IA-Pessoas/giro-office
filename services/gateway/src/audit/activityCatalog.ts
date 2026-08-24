@@ -44,12 +44,23 @@ const TECHNICAL_RULES = [
   /^\/audit(?:\/|$)/,
   /^\/internal(?:\/|$)/,
   /^\/user\/(?:session|start-config|me)(?:\/|$)/,
+  /^\/platform\/(?:session|me|audit)(?:\/|$)/,
   /^\/project\/metrics$/,
   /^\/ti\/dashboard\/?$/,
   /^\/pessoal\/overview\/?$/,
 ] as const;
 
 const EXPLICIT_RULES: ExplicitRule[] = [
+  {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations$/,
+    description: { action: "consultou", item: "a lista global de organizações" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users$/,
+    description: { action: "consultou", item: "a lista global de usuários da organização" },
+  },
   {
     methods: ["GET"],
     pattern: /^\/reports\/catalog$/,

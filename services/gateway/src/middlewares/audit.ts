@@ -88,8 +88,7 @@ function getOutcome(statusCode: number): AuditOutcome {
 }
 
 function getRouteTarget(env: GatewayEnv, request: Request): string {
-  if (request.originalUrl.startsWith("/audit")) return "audit-service";
-  const service = resolveGatewayService(env, request.originalUrl);
+  const service = resolveGatewayService(env, request.originalUrl, request.method);
   if (service) {
     return service.auditTarget;
   }
@@ -126,10 +125,12 @@ export function buildAuditLifecycleMiddleware({
         return;
       }
 
+      const isPlatform = request.auth?.actorKind === "platform";
+
       const payload: CreateAuditRequestPayload = {
         requestId: request.requestId,
-        organizationId: normalizeOptionalString(request.auth?.organizationId),
-        userId: normalizeOptionalString(request.auth?.userId),
+        organizationId: isPlatform ? null : normalizeOptionalString(request.auth?.organizationId),
+        userId: isPlatform ? null : normalizeOptionalString(request.auth?.userId),
         permission:
           typeof request.auth?.claims.permission === "number"
             ? request.auth.claims.permission
@@ -152,6 +153,12 @@ export function buildAuditLifecycleMiddleware({
           responseSizeBytes: getResponseSizeBytes(response) ?? null,
           routeTarget: getRouteTarget(env, request),
           activityVisible: activity !== null,
+          ...(isPlatform
+            ? {
+                auth_kind: "platform",
+                platform_user_id: request.auth?.userId,
+              }
+            : {}),
         },
         action: activity?.action,
         referring: activity?.item,

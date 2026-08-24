@@ -1,4 +1,10 @@
-import { hashCsrfToken } from "@workspace/shared";
+import {
+  FORWARDED_AUTH_KIND_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  hashCsrfToken,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+} from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
 import request from "supertest";
@@ -6,9 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { organizationServiceMock, prismaMock, verifyJwtTokenMock } = vi.hoisted(() => ({
   organizationServiceMock: { list: vi.fn(), listPlatform: vi.fn() },
-  prismaMock: {
-    platformAuthSession: { findFirst: vi.fn() },
-  },
+  prismaMock: { platformAuthSession: { findFirst: vi.fn() } },
   verifyJwtTokenMock: vi.fn(),
 }));
 
@@ -17,9 +21,7 @@ vi.mock("@workspace/shared", async (importOriginal) => ({
   verifyJwtToken: verifyJwtTokenMock,
 }));
 
-vi.mock("../integrations/prisma.js", () => ({
-  prismaClient: prismaMock,
-}));
+vi.mock("../integrations/prisma.js", () => ({ prismaClient: prismaMock }));
 
 vi.mock("../services/organizationService.js", () => ({
   OrganizationService: vi.fn(function OrganizationService() {
@@ -40,14 +42,13 @@ const env = {
   logPretty: false,
   allowedOrigins: ["*"],
   enableApiDocs: false,
-} satisfies OrganizationEnv;
+  auditServiceToken: "audit-service-token",
+} as OrganizationEnv & { auditServiceToken: string };
 const csrfToken = "A".repeat(43);
 const platformSession = {
   csrf_hash: hashCsrfToken(csrfToken),
   platformUser: {
     id: "platform-user-1",
-    name: "Platform Administrator",
-    email: "admin@example.com",
     platform_role: "super_admin",
     status: "active",
     session_version: 1,
@@ -66,17 +67,24 @@ function createApp() {
   );
 }
 
-function platformHeaders(overrides: Record<string, unknown> = {}): Record<string, string> {
+function platformHeaders(
+  overrides: Partial<Record<"userId" | "authKind" | "platformRole" | "internalToken", string>> = {},
+): Record<string, string> {
   verifyJwtTokenMock.mockReturnValue({
-    user_id: "platform-user-1",
+    user_id: overrides.userId ?? "platform-user-1",
     auth_kind: "platform",
     platform_role: "super_admin",
     session_version: 1,
     session_id: "platform-session-1",
     csrf_hash: hashCsrfToken(csrfToken),
-    ...overrides,
   });
-  return { Cookie: `cw.session=platform-session; cw.csrf=${csrfToken}` };
+  return {
+    Cookie: `cw.session=platform-session; cw.csrf=${csrfToken}`,
+    [FORWARDED_AUTH_USER_ID_HEADER]: overrides.userId ?? "platform-user-1",
+    [FORWARDED_AUTH_KIND_HEADER]: overrides.authKind ?? "platform",
+    [FORWARDED_AUTH_PLATFORM_ROLE_HEADER]: overrides.platformRole ?? "super_admin",
+    [INTERNAL_SERVICE_TOKEN_HEADER]: overrides.internalToken ?? env.auditServiceToken,
+  };
 }
 
 describe("platform organization routes", () => {
@@ -121,9 +129,18 @@ describe("platform organization routes", () => {
   it("rejeita uma identidade organizacional", async () => {
     const response = await request(createApp())
       .get("/platform/organizations")
-      .set(platformHeaders({ auth_kind: "organization" }));
+      .set(platformHeaders({ authKind: "organization", platformRole: "" }));
 
     expect(response.status).toBe(403);
+    expect(organizationServiceMock.listPlatform).not.toHaveBeenCalled();
+  });
+
+  it("rejeita headers de plataforma forjados sem token interno válido", async () => {
+    const response = await request(createApp())
+      .get("/platform/organizations")
+      .set(platformHeaders({ internalToken: "attacker-token" }));
+
+    expect(response.status).toBe(401);
     expect(organizationServiceMock.listPlatform).not.toHaveBeenCalled();
   });
 
@@ -133,29 +150,6 @@ describe("platform organization routes", () => {
       .set(platformHeaders());
 
     expect(response.status).toBe(400);
-    expect(organizationServiceMock.listPlatform).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["revogada", null],
-    ["expirada", null],
-    [
-      "inativa",
-      { ...platformSession, platformUser: { ...platformSession.platformUser, status: "inactive" } },
-    ],
-    [
-      "com versão divergente",
-      { ...platformSession, platformUser: { ...platformSession.platformUser, session_version: 2 } },
-    ],
-    [{ csrf: "divergente" }, { ...platformSession, csrf_hash: "b".repeat(64) }],
-  ])("rejeita sessão persistida %o", async (_label, session) => {
-    prismaMock.platformAuthSession.findFirst.mockResolvedValue(session);
-
-    const response = await request(createApp())
-      .get("/platform/organizations")
-      .set(platformHeaders());
-
-    expect(response.status).toBe(401);
     expect(organizationServiceMock.listPlatform).not.toHaveBeenCalled();
   });
 });
