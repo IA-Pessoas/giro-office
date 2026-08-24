@@ -15,14 +15,17 @@ type ReportJobFixture = {
 
 function createPrisma(job: ReportJobFixture) {
   let claimed = false;
-  const queryRaw = vi.fn(async (_query: TemplateStringsArray, leaseToken: string) => {
+  const queryRaw = vi.fn(async (_query: TemplateStringsArray, ...values: unknown[]) => {
     if (claimed) return [];
 
     claimed = true;
+    const leaseToken = values.find(
+      (value): value is string => typeof value === "string" && /^[0-9a-f-]{36}$/i.test(value),
+    );
     return [
       {
         ...job,
-        status: "running",
+        status: "processing",
         lease_token: leaseToken,
         lease_expires_at: new Date("2026-08-19T12:02:00.000Z"),
       },
@@ -39,12 +42,12 @@ function createPrisma(job: ReportJobFixture) {
 }
 
 describe("ReportJobRepository.claimNext", () => {
-  it("claims one pending job across concurrent workers with a new lease token", async () => {
+  it("claims one queued job across concurrent workers with a new lease token", async () => {
     const { prisma, queryRaw } = createPrisma({
       id: "job-1",
       organization_id: "org-1",
       requester_id: "user-1",
-      status: "pending",
+      status: "queued",
       requested_at: new Date("2026-08-19T12:00:00.000Z"),
       started_at: null,
       lease_token: null,
@@ -55,11 +58,14 @@ describe("ReportJobRepository.claimNext", () => {
     const [first, second] = await Promise.all([repository.claimNext(), repository.claimNext()]);
     const claim = [first, second].find(Boolean);
     const sql = (queryRaw.mock.calls[0]?.[0] as TemplateStringsArray).join("?");
+    const values = queryRaw.mock.calls[0]?.slice(1);
 
     expect([first, second].filter(Boolean)).toHaveLength(1);
-    expect(claim).toMatchObject({ id: "job-1", status: "running" });
+    expect(claim).toMatchObject({ id: "job-1", status: "processing" });
     expect(claim?.lease_token).toMatch(/^[0-9a-f-]{36}$/i);
     expect(sql).toContain("FOR UPDATE SKIP LOCKED");
+    expect(sql).toContain("WHERE status = ?");
+    expect(values).toEqual(expect.arrayContaining(["queued", "processing"]));
   });
 
   it("reclaims an expired lease without replacing its original start time", async () => {
@@ -68,7 +74,7 @@ describe("ReportJobRepository.claimNext", () => {
       id: "job-2",
       organization_id: "org-1",
       requester_id: "user-1",
-      status: "running",
+      status: "processing",
       requested_at: new Date("2026-08-19T10:00:00.000Z"),
       started_at: originalStartedAt,
       lease_token: "expired-lease",

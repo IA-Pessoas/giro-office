@@ -8,6 +8,12 @@ import {
 } from "@workspace/shared";
 
 export const REPORT_AUDIT_EVENT_TYPES = [
+  "report.model",
+  "report.job",
+  "report.open",
+  "report.export",
+  "report.retention",
+  "report.delete",
   "report.queued",
   "report.processing",
   "report.completed",

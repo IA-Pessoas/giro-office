@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
 
+import {
+  REPORT_LIFECYCLE_STATUSES,
+  REPORT_LIFECYCLE_TRANSITIONS,
+} from "../services/reportLifecycleService.js";
 import type { ReportsPrismaClient } from "./index.js";
 
 export type ClaimedReportJob = {
@@ -12,6 +16,9 @@ export type ClaimedReportJob = {
   lease_token: string | null;
   lease_expires_at: Date | null;
 };
+
+const QUEUED = REPORT_LIFECYCLE_STATUSES[0];
+const PROCESSING = REPORT_LIFECYCLE_TRANSITIONS.queued[0];
 
 export class ReportJobRepository {
   constructor(
@@ -27,14 +34,14 @@ export class ReportJobRepository {
         WITH candidate AS (
           SELECT id
           FROM "reports.jobs"
-          WHERE status = 'pending'
-            OR (status = 'running' AND lease_expires_at < NOW())
+          WHERE status = ${QUEUED}
+            OR (status = ${PROCESSING} AND lease_expires_at < NOW())
           ORDER BY requested_at ASC
           FOR UPDATE SKIP LOCKED
           LIMIT 1
         )
         UPDATE "reports.jobs" AS job
-        SET status = 'running',
+        SET status = ${PROCESSING},
             lease_token = ${leaseToken},
             lease_expires_at = NOW() + (${this.leaseSeconds} * INTERVAL '1 second'),
             started_at = COALESCE(started_at, NOW()),

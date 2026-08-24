@@ -1,14 +1,9 @@
 import { z } from "zod";
 
+import { REPORT_LIFECYCLE_STATUSES } from "../services/reportLifecycleService.js";
 import { reportDefinitionSchema } from "./reportDefinition.schemas.js";
 
-export const reportJobStatusSchema = z.enum([
-  "pending",
-  "running",
-  "completed",
-  "failed",
-  "expired",
-]);
+export const reportJobStatusSchema = z.enum(REPORT_LIFECYCLE_STATUSES);
 
 export const createReportJobSchema = z
   .object({

@@ -1,7 +1,8 @@
 import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
-import { ReportAuditService } from "../services/reportAuditService.js";
+import { reportJobStatusSchema } from "../schemas/reportJob.schemas.js";
+import { REPORT_AUDIT_EVENT_TYPES, ReportAuditService } from "../services/reportAuditService.js";
 import { ReportLifecycleService } from "../services/reportLifecycleService.js";
 
 const now = new Date("2026-08-24T12:00:00.000Z");
@@ -9,10 +10,17 @@ const now = new Date("2026-08-24T12:00:00.000Z");
 function createPersistence(status = "processing") {
   const transaction = {
     reportJob: {
-      update: vi.fn(),
+      findUnique: vi.fn(async () => ({
+        id: "job-1",
+        organization_id: "org-1",
+        report_model_version_id: "model-version-1",
+        status,
+      })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     reportSnapshot: {
       create: vi.fn(async () => ({ id: "snapshot-1" })),
+      findMany: vi.fn(async () => [{ id: "snapshot-1" }]),
     },
     reportSnapshotRow: {
       createMany: vi.fn(),
@@ -23,14 +31,6 @@ function createPersistence(status = "processing") {
     },
   };
   const prisma = {
-    reportJob: {
-      findUnique: vi.fn(async () => ({
-        id: "job-1",
-        organization_id: "org-1",
-        report_model_version_id: "model-version-1",
-        status,
-      })),
-    },
     $transaction: vi.fn(async (callback: (client: typeof transaction) => Promise<unknown>) =>
       callback(transaction),
     ),
@@ -40,6 +40,31 @@ function createPersistence(status = "processing") {
 }
 
 describe("ReportLifecycleService", () => {
+  it("define eventos seguros para modelo, job, abertura, exportação, retenção e exclusão", () => {
+    expect(REPORT_AUDIT_EVENT_TYPES).toEqual(
+      expect.arrayContaining([
+        "report.model",
+        "report.job",
+        "report.open",
+        "report.export",
+        "report.retention",
+        "report.delete",
+      ]),
+    );
+  });
+
+  it("aceita somente os estados nomeados do lifecycle nos contratos de job", () => {
+    expect(reportJobStatusSchema.options).toEqual([
+      "queued",
+      "processing",
+      "completed",
+      "cancelled",
+      "failed",
+      "expired",
+      "deleted",
+    ]);
+  });
+
   it("conclui o job e grava snapshot, linhas e auditoria local na mesma transação", async () => {
     const { prisma, transaction } = createPersistence();
     const recorder = vi.fn();
@@ -59,8 +84,8 @@ describe("ReportLifecycleService", () => {
     } as never);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(transaction.reportJob.update).toHaveBeenCalledWith({
-      where: { id: "job-1" },
+    expect(transaction.reportJob.updateMany).toHaveBeenCalledWith({
+      where: { id: "job-1", status: "processing" },
       data: { status: "completed", finished_at: now },
     });
     expect(transaction.reportSnapshot.create).toHaveBeenCalledWith({
@@ -128,8 +153,33 @@ describe("ReportLifecycleService", () => {
     ).rejects.toBeInstanceOf(ServiceError);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(transaction.reportJob.update).not.toHaveBeenCalled();
+    expect(transaction.reportJob.updateMany).not.toHaveBeenCalled();
     expect(transaction.reportSnapshot.create).not.toHaveBeenCalled();
+  });
+
+  it("persiste conteúdo para apenas uma entre duas conclusões concorrentes", async () => {
+    const { prisma, transaction } = createPersistence();
+    transaction.reportJob.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    const audit = new ReportAuditService(prisma as never, vi.fn());
+    const service = new ReportLifecycleService(prisma as never, audit, () => now);
+    const input = {
+      job_id: "job-1",
+      organization_id: "org-1",
+      actor_id: "user-1",
+      rows: [{ balance: 42 }],
+    };
+
+    const [first, second] = await Promise.allSettled([
+      service.complete(input),
+      service.complete(input),
+    ]);
+
+    expect([first, second].filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect([first, second].filter((result) => result.status === "rejected")).toHaveLength(1);
+    expect(transaction.reportSnapshot.create).toHaveBeenCalledTimes(1);
+    expect(transaction.reportSnapshotRow.createMany).toHaveBeenCalledTimes(1);
   });
 
   it.each(["cancelled", "failed"] as const)("não cria conteúdo ao marcar %s", async (status) => {
@@ -160,8 +210,12 @@ describe("ReportLifecycleService", () => {
       reason: "retention",
     });
 
+    expect(transaction.reportSnapshot.findMany).toHaveBeenCalledWith({
+      where: { report_job_id: "job-1" },
+      select: { id: true },
+    });
     expect(transaction.reportSnapshotRow.deleteMany).toHaveBeenCalledWith({
-      where: { snapshot: { report_job_id: "job-1" } },
+      where: { snapshot_id: { in: ["snapshot-1"] } },
     });
     expect(transaction.reportSnapshot.create).not.toHaveBeenCalled();
     expect(transaction.reportAuditEvent.create).toHaveBeenCalledWith(

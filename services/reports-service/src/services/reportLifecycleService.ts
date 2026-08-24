@@ -28,10 +28,11 @@ type ReportJob = {
 
 type LifecycleTransaction = ReportAuditStore & {
   reportJob: {
-    update(args: {
-      where: { id: string };
+    findUnique(args: { where: { id: string } }): Promise<ReportJob | null>;
+    updateMany(args: {
+      where: { id: string; status: ReportLifecycleStatus };
       data: { status: ReportLifecycleStatus; started_at?: Date; finished_at?: Date };
-    }): Promise<unknown>;
+    }): Promise<{ count: number }>;
   };
   reportSnapshot: {
     create(args: {
@@ -41,6 +42,10 @@ type LifecycleTransaction = ReportAuditStore & {
         report_job_id: string;
       };
     }): Promise<{ id: string }>;
+    findMany(args: {
+      where: { report_job_id: string };
+      select: { id: true };
+    }): Promise<Array<{ id: string }>>;
   };
   reportSnapshotRow: {
     createMany(args: {
@@ -56,9 +61,6 @@ type LifecycleTransaction = ReportAuditStore & {
 };
 
 interface ReportLifecycleStore {
-  reportJob: {
-    findUnique(args: { where: { id: string } }): Promise<ReportJob | null>;
-  };
   $transaction<T>(callback: (transaction: LifecycleTransaction) => Promise<T>): Promise<T>;
 }
 
@@ -82,13 +84,16 @@ export interface RemoveReportSnapshotInput extends ReportLifecycleInput {
   reason: "retention" | "requested";
 }
 
-const ALLOWED_TRANSITIONS: Record<ReportLifecycleStatus, readonly ReportLifecycleStatus[]> = {
+export const REPORT_LIFECYCLE_TRANSITIONS: Record<
+  ReportLifecycleStatus,
+  readonly ReportLifecycleStatus[]
+> = {
   queued: ["processing", "cancelled"],
   processing: ["completed", "cancelled", "failed"],
-  completed: [],
+  completed: ["expired", "deleted"],
   cancelled: [],
   failed: [],
-  expired: [],
+  expired: ["deleted"],
   deleted: [],
 };
 
@@ -96,7 +101,7 @@ function assertTransition(from: string, to: ReportLifecycleStatus): void {
   if (!REPORT_LIFECYCLE_STATUSES.includes(from as ReportLifecycleStatus)) {
     throw new ServiceError(409, "O job está em um estado de lifecycle desconhecido.");
   }
-  if (!ALLOWED_TRANSITIONS[from as ReportLifecycleStatus].includes(to)) {
+  if (!REPORT_LIFECYCLE_TRANSITIONS[from as ReportLifecycleStatus].includes(to)) {
     throw new ServiceError(409, "A transição de lifecycle do job não é permitida.");
   }
 }
@@ -110,13 +115,13 @@ export class ReportLifecycleService {
 
   async transition(input: TransitionReportJobInput): Promise<void> {
     const event = await this.prisma.$transaction(async (transaction) => {
-      const job = await this.getJob(input.job_id);
+      const job = await this.getJob(transaction, input.job_id);
       this.assertOrganization(job, input.organization_id);
       assertTransition(job.status, input.status);
 
       const occurredAt = this.clock();
-      await transaction.reportJob.update({
-        where: { id: job.id },
+      const result = await transaction.reportJob.updateMany({
+        where: { id: job.id, status: job.status as ReportLifecycleStatus },
         data: {
           status: input.status,
           ...(input.status === "processing"
@@ -124,6 +129,7 @@ export class ReportLifecycleService {
             : { finished_at: occurredAt }),
         },
       });
+      this.assertUpdated(result.count);
 
       const auditEvent = this.auditEvent(job, input, `report.${input.status}`, occurredAt);
       await this.audit.recordLocal(transaction, auditEvent);
@@ -135,15 +141,16 @@ export class ReportLifecycleService {
 
   async complete(input: CompleteReportJobInput): Promise<void> {
     const event = await this.prisma.$transaction(async (transaction) => {
-      const job = await this.getJob(input.job_id);
+      const job = await this.getJob(transaction, input.job_id);
       this.assertOrganization(job, input.organization_id);
       assertTransition(job.status, "completed");
 
       const occurredAt = this.clock();
-      await transaction.reportJob.update({
-        where: { id: job.id },
+      const result = await transaction.reportJob.updateMany({
+        where: { id: job.id, status: "processing" },
         data: { status: "completed", finished_at: occurredAt },
       });
+      this.assertUpdated(result.count);
       const snapshot = await transaction.reportSnapshot.create({
         data: {
           organization_id: job.organization_id,
@@ -194,20 +201,26 @@ export class ReportLifecycleService {
     >,
   ): Promise<void> {
     const event = await this.prisma.$transaction(async (transaction) => {
-      const job = await this.getJob(input.job_id);
+      const job = await this.getJob(transaction, input.job_id);
       this.assertOrganization(job, input.organization_id);
-      if (job.status !== "completed" && (status !== "deleted" || job.status !== "expired")) {
-        throw new ServiceError(409, "Somente snapshots concluídos podem ser removidos.");
-      }
+      const nextStatus = status === "completed" ? "expired" : "deleted";
+      assertTransition(job.status, nextStatus);
 
       const occurredAt = this.clock();
-      await transaction.reportSnapshotRow.deleteMany({
-        where: { snapshot: { report_job_id: job.id } },
+      const result = await transaction.reportJob.updateMany({
+        where: { id: job.id, status: job.status as ReportLifecycleStatus },
+        data: { status: nextStatus, finished_at: occurredAt },
       });
-      await transaction.reportJob.update({
-        where: { id: job.id },
-        data: { status: status === "completed" ? "expired" : "deleted", finished_at: occurredAt },
+      this.assertUpdated(result.count);
+      const snapshots = await transaction.reportSnapshot.findMany({
+        where: { report_job_id: job.id },
+        select: { id: true },
       });
+      if (snapshots.length > 0) {
+        await transaction.reportSnapshotRow.deleteMany({
+          where: { snapshot_id: { in: snapshots.map((snapshot) => snapshot.id) } },
+        });
+      }
 
       const auditEvent = this.auditEvent(job, input, eventType, occurredAt);
       await this.audit.recordLocal(transaction, auditEvent);
@@ -217,8 +230,8 @@ export class ReportLifecycleService {
     await this.audit.recordExternal(event);
   }
 
-  private async getJob(jobId: string): Promise<ReportJob> {
-    const job = await this.prisma.reportJob.findUnique({ where: { id: jobId } });
+  private async getJob(transaction: LifecycleTransaction, jobId: string): Promise<ReportJob> {
+    const job = await transaction.reportJob.findUnique({ where: { id: jobId } });
     if (!job) throw new ServiceError(404, "Job de relatório não encontrado.");
     return job;
   }
@@ -226,6 +239,12 @@ export class ReportLifecycleService {
   private assertOrganization(job: ReportJob, organizationId: string): void {
     if (job.organization_id !== organizationId) {
       throw new ServiceError(403, "O job não pertence à organização informada.");
+    }
+  }
+
+  private assertUpdated(count: number): void {
+    if (count !== 1) {
+      throw new ServiceError(409, "O job foi alterado por outra operação.");
     }
   }
 
