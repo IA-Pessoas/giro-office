@@ -9,6 +9,7 @@ import {
 } from "@workspace/shared";
 
 import type {
+  ReportCatalogRelation,
   ReportCatalogSource,
   ReportPreviewAdapterInput,
   ReportSourceAdapter,
@@ -22,10 +23,7 @@ const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
 const sources = parcelamentoReportingCatalog.sources.map(
   ({ keys: _keys, ...source }) => source,
 ) as readonly ReportCatalogSource[];
-const relations = parcelamentoReportingCatalog.relations.map((relation) => ({
-  ...relation,
-  sources: [...relation.sources] as [string, string],
-}));
+const relations: readonly ReportCatalogRelation[] = [];
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
