@@ -13,7 +13,7 @@ describe("buildAuditCapacityGuard", () => {
 
     guard({ method: "POST", requestId: "request-1" } as never, {} as never, next);
 
-    expect(reserve).toHaveBeenCalledWith("public");
+    expect(reserve).toHaveBeenCalledWith("protected");
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 503 }));
   });
 

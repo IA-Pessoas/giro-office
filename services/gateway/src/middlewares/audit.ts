@@ -48,9 +48,7 @@ export function buildAuditCapacityGuard({
       return;
     }
 
-    const reservation = recordAuditRequest.reserve(
-      request.auth === undefined ? "public" : "protected",
-    );
+    const reservation = recordAuditRequest.reserve("protected");
     if (!reservation) {
       next(new ServiceError(503, "Auditoria indisponível; operação não iniciada."));
       return;
