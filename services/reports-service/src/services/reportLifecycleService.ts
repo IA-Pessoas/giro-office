@@ -122,7 +122,11 @@ export class ReportLifecycleService {
       const job = await this.getJob(transaction, input.job_id);
       this.assertOrganization(job, input.organization_id);
       assertTransition(job.status, input.status);
-      const leaseToken = this.leaseForProcessingTransition(job.status, input);
+      const leaseToken = this.leaseForProcessingTransition(
+        job.status,
+        input.status as ReportLifecycleStatus,
+        input.lease_token,
+      );
 
       const occurredAt = this.clock();
       const result = await transaction.reportJob.updateMany({
@@ -133,9 +137,7 @@ export class ReportLifecycleService {
         },
         data: {
           status: input.status,
-          ...(input.status === "processing"
-            ? { started_at: occurredAt }
-            : { finished_at: occurredAt }),
+          finished_at: occurredAt,
         },
       });
       this.assertUpdated(result.count);
@@ -281,16 +283,17 @@ export class ReportLifecycleService {
 
   private leaseForProcessingTransition(
     currentStatus: string,
-    input: TransitionReportJobInput,
+    nextStatus: ReportLifecycleStatus,
+    leaseToken?: string,
   ): string | undefined {
-    if (currentStatus === "queued" && input.status === "processing") {
+    if (currentStatus === "queued" && nextStatus === "processing") {
       throw new ServiceError(409, "O claim atômico é o único caminho para iniciar processamento.");
     }
     if (currentStatus !== "processing") return undefined;
-    if (!input.lease_token) {
+    if (!leaseToken) {
       throw new ServiceError(400, "A transição de um job em processamento exige lease_token.");
     }
-    return input.lease_token;
+    return leaseToken;
   }
 
   private auditEvent(

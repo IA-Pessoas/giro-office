@@ -236,7 +236,7 @@ describe("ReportLifecycleService", () => {
         organization_id: "org-1",
         actor_id: "user-1",
         status: "processing",
-      }),
+      } as never),
     ).rejects.toBeInstanceOf(ServiceError);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
