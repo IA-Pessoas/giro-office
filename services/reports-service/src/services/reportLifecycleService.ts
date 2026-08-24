@@ -149,10 +149,11 @@ export class ReportLifecycleService {
   }
 
   async complete(input: CompleteReportJobInput): Promise<void> {
+    const snapshotRows = this.materializeSnapshotRows(input.rows);
+    const snapshotBytes = this.assertSnapshotLimits(snapshotRows);
     const event = await this.prisma.$transaction(async (transaction) => {
       const job = await this.getJob(transaction, input.job_id);
       this.assertOrganization(job, input.organization_id);
-      const snapshotBytes = this.assertSnapshotLimits(input.rows);
       assertTransition(job.status, "completed");
 
       const occurredAt = this.clock();
@@ -169,7 +170,7 @@ export class ReportLifecycleService {
         },
       });
       await transaction.reportSnapshotRow.createMany({
-        data: input.rows.map((data_json, index) => ({
+        data: snapshotRows.map((data_json, index) => ({
           organization_id: job.organization_id,
           snapshot_id: snapshot.id,
           row_number: index + 1,
@@ -179,7 +180,7 @@ export class ReportLifecycleService {
 
       const auditEvent = this.auditEvent(job, input, "report.completed", occurredAt, {
         ...input.counts,
-        rows: input.rows.length,
+        rows: snapshotRows.length,
         bytes: snapshotBytes,
       });
       await this.audit.recordLocal(transaction, auditEvent);
@@ -257,6 +258,12 @@ export class ReportLifecycleService {
     if (count !== 1) {
       throw new ServiceError(409, "O job foi alterado por outra operação.");
     }
+  }
+
+  private materializeSnapshotRows(
+    rows: ReadonlyArray<Record<string, unknown>>,
+  ): ReadonlyArray<Record<string, unknown>> {
+    return JSON.parse(JSON.stringify(rows)) as ReadonlyArray<Record<string, unknown>>;
   }
 
   private assertSnapshotLimits(rows: ReadonlyArray<Record<string, unknown>>): number {

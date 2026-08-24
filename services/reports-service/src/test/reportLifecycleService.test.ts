@@ -164,6 +164,44 @@ describe("ReportLifecycleService", () => {
     });
   });
 
+  it("persiste e audita a cópia materializada antes de aguardar o update do job", async () => {
+    const { prisma, transaction } = createPersistence();
+    const rows = [{ balance: 42 }];
+    transaction.reportJob.updateMany.mockImplementation(() =>
+      Promise.resolve().then(() => {
+        rows[0].balance = 0;
+        rows.push({ balance: 100 });
+        return { count: 1 };
+      }),
+    );
+    const audit = new ReportAuditService(prisma as never, vi.fn());
+    const service = new ReportLifecycleService(prisma as never, audit, () => now);
+
+    await service.complete({
+      job_id: "job-1",
+      organization_id: "org-1",
+      actor_id: "user-1",
+      lease_token: "lease-b",
+      rows,
+    });
+
+    expect(transaction.reportSnapshotRow.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organization_id: "org-1",
+          snapshot_id: "snapshot-1",
+          row_number: 1,
+          data_json: { balance: 42 },
+        },
+      ],
+    });
+    expect(transaction.reportAuditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        payload_json: expect.objectContaining({ counts: { rows: 1, bytes: 16 } }),
+      }),
+    });
+  });
+
   it.each([
     ["linhas", Array.from({ length: MAX_SNAPSHOT_ROWS + 1 }, () => ({ balance: 1 }))],
     ["bytes", [{ balance: "x".repeat(MAX_SNAPSHOT_BYTES) }]],
