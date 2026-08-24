@@ -4,6 +4,7 @@ import { createLogger } from "@workspace/shared/logger";
 
 import { createReportsApp } from "./app.js";
 import { getReportsServiceEnv } from "./config/env.js";
+import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
 
@@ -19,7 +20,7 @@ const app = createReportsApp({
   env,
   logger,
   prisma,
-  reporting: { adapters: [new ParcelamentoAdapter(env)] },
+  reporting: { adapters: [new ParcelamentoAdapter(env), new ClientIntegrationAdapter(env)] },
 });
 
 app.listen(env.port, () => {
