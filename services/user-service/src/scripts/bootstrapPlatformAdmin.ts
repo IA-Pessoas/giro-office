@@ -8,22 +8,29 @@ import {
 export function getPlatformAdminBootstrapInput(environment: NodeJS.ProcessEnv): {
   name: string;
   email: string;
-  password: string;
 } {
   const name = environment.PLATFORM_ADMIN_NAME?.trim();
   const email = environment.PLATFORM_ADMIN_EMAIL?.trim();
-  const password = environment.PLATFORM_ADMIN_PASSWORD;
 
-  if (!name || !email || !password || !password.trim()) {
-    throw new Error(
-      "PLATFORM_ADMIN_NAME, PLATFORM_ADMIN_EMAIL e PLATFORM_ADMIN_PASSWORD são obrigatórias.",
-    );
+  if (!name || !email) {
+    throw new Error("PLATFORM_ADMIN_NAME e PLATFORM_ADMIN_EMAIL são obrigatórias.");
   }
 
-  return parsePlatformAdminBootstrapInput({ name, email, password });
+  if (environment.PLATFORM_ADMIN_PASSWORD !== undefined) {
+    throw new Error("PLATFORM_ADMIN_PASSWORD não é aceita; a senha é gerada pelo próprio comando.");
+  }
+
+  return parsePlatformAdminBootstrapInput({ name, email });
+}
+
+export function assertInteractiveSecretOutput(isTTY: boolean | undefined): void {
+  if (isTTY !== true) {
+    throw new Error("Execute o bootstrap em um terminal interativo para receber o segredo.");
+  }
 }
 
 async function main(): Promise<void> {
+  assertInteractiveSecretOutput(process.stdout.isTTY);
   const input = getPlatformAdminBootstrapInput(process.env);
   const { prismaClient } = await import("../prisma/index.js");
 

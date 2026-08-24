@@ -10,7 +10,6 @@ const repository = {
 const validInput = {
   name: "Platform Administrator",
   email: "admin@example.com",
-  password: "mH9VtK2qR7xP4cN8wY5sL1dF6gJ3bA0uE_zI-oQkCrs",
 };
 
 describe("bootstrapPlatformAdmin", () => {
@@ -23,7 +22,13 @@ describe("bootstrapPlatformAdmin", () => {
   it("creates one active Argon2id super admin", async () => {
     const result = await bootstrapPlatformAdmin(validInput, repository);
 
-    expect(result).toEqual({ id: "platform-user-1", email: validInput.email, created: true });
+    expect(result).toEqual({
+      id: "platform-user-1",
+      email: validInput.email,
+      created: true,
+      temporaryPassword: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+    });
+    expect(Buffer.from(result.temporaryPassword, "base64url")).toHaveLength(32);
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         name: validInput.name,
@@ -56,18 +61,10 @@ describe("bootstrapPlatformAdmin", () => {
     );
   });
 
-  it.each([
-    "aaaaaaaaaaaaaaaa",
-    "qwertyuiopasdfgh",
-    "abcdefghijklmnop",
-    "9876543210987654",
-    "admin123admin123",
-    "letmeinletmein12",
-    "iloveyouiloveyou",
-  ])("rejects a trivial platform password: %s", async (password) => {
-    await expect(bootstrapPlatformAdmin({ ...validInput, password }, repository)).rejects.toThrow(
-      /muito comum/i,
-    );
-    expect(repository.create).not.toHaveBeenCalled();
+  it("generates a new secret instead of accepting operator-chosen material", async () => {
+    const first = await bootstrapPlatformAdmin(validInput, repository);
+    const second = await bootstrapPlatformAdmin(validInput, repository);
+
+    expect(first.temporaryPassword).not.toBe(second.temporaryPassword);
   });
 });
