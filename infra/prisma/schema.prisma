@@ -2194,7 +2194,7 @@ model ReportJob {
   organization_id         String
   requester_id            String
   report_model_version_id String
-  status                  String   @default("pending")
+  status                  String   @default("queued")
   payload_json            Json?
   requested_at            DateTime @default(now())
   started_at              DateTime?
