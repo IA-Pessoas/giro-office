@@ -147,9 +147,10 @@ ficam com o controlador. Nenhuma imagem foi fabricada.
   refresh/logout continuam protegidos.
 - O limitador em memória remove a chave mais antiga em O(1). A busca de rota de auditoria usa GIN
   trigram criado com `CONCURRENTLY`; o recorder aborta chamadas indisponíveis após 5 segundos e
-  limita a 100 leituras públicas anônimas simultâneas, sem descartar eventos autenticados ou
-  mutações; probes de saúde não entram na trilha.
-- Gates frescos: shared 58/58, gateway 285/285, user-service 158/158,
+  mantém um teto global de 100 ingestões. Mutações e requisições autenticadas reservam capacidade
+  antes do processamento e falham com 503 sem executar se a auditoria estiver saturada; leituras
+  públicas podem ser descartadas, e probes de saúde não entram na trilha.
+- Gates frescos: shared 58/58, gateway 287/287, user-service 158/158,
   organization-service 22/22, audit-service 23/23 (+1 opt-in skip), Compose/Nginx 10/10,
   regressão/supply-chain 15/15, scanner 4.305 arquivos/0 achados, política pnpm 0 achados e
   `pnpm audit` sem vulnerabilidades conhecidas.
