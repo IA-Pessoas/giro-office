@@ -2620,6 +2620,13 @@ const handlers = {
     });
   },
 
+  async fiscalNcmDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncm_id: requireState("fiscalNcmId") },
+    });
+  },
+
   async fiscalIcmsCreate(op) {
     const icmsCode = uniqueText("Smoke Fiscal ICMS");
     const response = await httpRequest(op, {
@@ -2685,6 +2692,13 @@ const handlers = {
     });
   },
 
+  async fiscalIcmsDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { icms_id: requireState("fiscalIcmsId") },
+    });
+  },
+
   async fiscalIpiCreate(op) {
     const ncm = uniqueDigits(8);
     const response = await httpRequest(op, {
@@ -2739,6 +2753,13 @@ const handlers = {
         description: uniqueText("Smoke Fiscal IPI Updated"),
         aliquot: "12.00",
       },
+    });
+  },
+
+  async fiscalIpiDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ipi_id: requireState("fiscalIpiId") },
     });
   },
 

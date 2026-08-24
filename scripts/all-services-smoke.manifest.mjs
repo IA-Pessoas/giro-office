@@ -84,6 +84,9 @@ const ROUTE_NEGATIVE_CASE_OVERRIDES = new Map([
   ["client-service|DELETE|/client/{id}", "lowPermission403"],
   ["client-service|DELETE|/client/histories/pending/{pendingId}", "lowPermission403"],
   ["project-service|DELETE|/project", "lowPermission403"],
+  ["fiscal-service|DELETE|/fiscal/ncm", "lowPermission403"],
+  ["fiscal-service|DELETE|/fiscal/icms", "lowPermission403"],
+  ["fiscal-service|DELETE|/fiscal/ipi", "lowPermission403"],
   ["task-service|PUT|/task/model", "lowPermission403"],
   ["task-service|PUT|/task/complete-request", "lowPermission403"],
   ["task-service|DELETE|/task", "lowPermission403"],
@@ -1336,6 +1339,14 @@ const baseManifest = [
   }),
   op({
     service: "fiscal-service",
+    method: "DELETE",
+    path: "/fiscal/ncm",
+    action: "fiscalNcmDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "fiscal-service",
     method: "POST",
     path: "/fiscal/icms",
     action: "fiscalIcmsCreate",
@@ -1379,6 +1390,14 @@ const baseManifest = [
   }),
   op({
     service: "fiscal-service",
+    method: "DELETE",
+    path: "/fiscal/icms",
+    action: "fiscalIcmsDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "fiscal-service",
     method: "POST",
     path: "/fiscal/ipi",
     action: "fiscalIpiCreate",
@@ -1419,6 +1438,14 @@ const baseManifest = [
     action: "fiscalIpiPut",
     target: "gateway",
     auth: "bearer",
+  }),
+  op({
+    service: "fiscal-service",
+    method: "DELETE",
+    path: "/fiscal/ipi",
+    action: "fiscalIpiDelete",
+    target: "gateway",
+    auth: "admin-bearer",
   }),
 
   op({

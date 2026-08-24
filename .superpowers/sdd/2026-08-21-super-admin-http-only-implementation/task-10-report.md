@@ -5,13 +5,19 @@ Data: 2026-08-24
 ## Entrega
 
 - Workflow dedicado a `pull_request` somente para `feature/super-admin-v2-develop`.
+- `checkout` e `setup-node` fixados nos SHAs completos já confiados pelo repositório.
 - Node.js 22, pnpm 10.26.0 verificado pelo Corepack e instalação com
   `--frozen-lockfile --ignore-scripts`.
-- Gates de supply chain, `shared`, gateway, user-service, organization-service,
-  audit-service, smoke coverage, Prisma e app.
+- Build explícito de `shared` e check, typecheck, build e testes de `packages/api` antes do app,
+  além dos gates de gateway, user-service, organization-service, audit-service, smoke coverage e
+  Prisma.
 - Regressão que percorre apenas fontes executáveis de browser do Super Admin e suas
-  integrações diretas. Testes, runners `.mjs`, symlinks e artefatos de build não entram na
-  leitura.
+  integrações diretas, incluindo `packages/api/src/client.ts` e extensões JS/TS executáveis.
+  Testes, runners, symlinks, legado e artefatos de build não entram na leitura. O detector cobre
+  atribuições, propriedades, setters de `Authorization` e expressões reais de `Bearer`, sem casar
+  menções em prosa.
+- Registry completo para `services/src` e smoke pareado dos três DELETE fiscais, preservando os
+  contratos atuais de sucesso 200 e baixa permissão 403.
 - Nenhuma dependência adicionada e nenhum serviço iniciado.
 
 ## TDD
@@ -30,10 +36,26 @@ node --test scripts/super-admin-session-regression.test.mjs scripts/supply-chain
 11 pass, 0 fail
 ```
 
+Follow-up RED/GREEN confirmado com:
+
+```text
+node --test scripts/super-admin-session-regression.test.mjs scripts/supply-chain-security.test.mjs
+RED: 6 pass, 4 fail
+GREEN: 10 pass, 0 fail
+
+corepack pnpm smoke:coverage
+RED: services/src + 3 operações DELETE fiscais ausentes
+GREEN: 359/361 operações OpenAPI mapeadas com expectativas pareadas
+
+node --test scripts/all-services-smoke.test.mjs
+RED: 4 pass, 1 fail — DELETE fiscal antes das operações dependentes
+GREEN: 5 pass, 0 fail
+```
+
 ## Gates aprovados
 
 - `corepack pnpm install --frozen-lockfile --ignore-scripts`: lockfile atual, pnpm 10.26.0.
-- `node scripts/supply-chain-integrity.mjs`: 4.298 arquivos, zero finding.
+- `node scripts/supply-chain-integrity.mjs`: 4.300 arquivos, zero finding.
 - `node scripts/pnpm-security-policy.mjs --root .`: zero finding.
 - `corepack pnpm audit --audit-level moderate`: nenhuma vulnerabilidade conhecida.
 - `corepack pnpm typecheck`: 22/22 pacotes.
@@ -43,17 +65,24 @@ node --test scripts/super-admin-session-regression.test.mjs scripts/supply-chain
 - Regressões do app: session security 6/6, platform session 3/3 e Super Admin 9/9.
 - Typecheck e build de produção do app: aprovados; `/super-admin` e `/super-admin/login`
   constam nas rotas geradas.
+- Build de `shared` aprovado; `packages/api` aprovado em check, typecheck, build e 5/5 testes do
+  client HTTP-only.
+- Fiscal-service aprovado em typecheck, build e 71/71 testes, incluindo os contratos DELETE e a
+  proteção de permissão administrativa existentes.
+- Dry-run fiscal em modo fail-fast: 37 operações registradas, incluindo sucesso 200 e baixa
+  permissão 403 para cada DELETE; nenhum serviço iniciado.
+- Smoke coverage: 359/361 operações OpenAPI mapeadas com expectativas pareadas.
+- Harness/compose security: 16/16 testes aprovados após a inclusão do legacy-api no registry.
 - Schema Prisma: válido por execução direta do binário local.
-- Biome escopado aos dois scripts alterados: aprovado.
+- Biome escopado aos scripts alterados: aprovado.
 - Graphify UI e services atualizados; os artefatos permanecem ignorados.
 
 ## Falhas basais preservadas
 
 - `corepack pnpm check`: 68 erros, 35 warnings e 3 infos preexistentes, principalmente em
   `docs/migration/v4`; também há formatação pendente em `shared/src/auth/token.ts` e imports em
-  `shared/tests/module-permissions.test.ts`.
-- `corepack pnpm smoke:coverage`: `services/src` ausente do registry e operações fiscais
-  `DELETE /fiscal/ncm`, `DELETE /fiscal/icms` e `DELETE /fiscal/ipi` ausentes do manifesto.
+  `shared/tests/module-permissions.test.ts`. O check escopado do workflow reproduz somente esses
+  dois erros de `shared`; não houve supressão nem alteração dessa dívida fora do diff.
 - `corepack pnpm test`: falha em quatro expectativas de `rh-service` que recebem um argumento
   `undefined` adicional; o build de `services/src` também falha por cliente Prisma legado ausente
   e erros TypeScript. Os testes de política raiz passaram 67/67 antes dessas falhas.
