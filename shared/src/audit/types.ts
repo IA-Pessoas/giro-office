@@ -3,7 +3,10 @@ import type { AuthKind, PlatformRole } from "../auth/types.js";
 export type AuditOutcome = "success" | "error" | "aborted";
 export type AuditQueryValue = string | string[];
 export type AuditQuery = Record<string, AuditQueryValue>;
-export type AuditRecorder = (payload: CreateAuditRequestPayload) => Promise<void>;
+export interface AuditRecorder {
+  (payload: CreateAuditRequestPayload, reserved?: boolean): Promise<void>;
+  reserve(): boolean;
+}
 
 export interface CreateAuditRequestPayload {
   requestId: string;

@@ -68,8 +68,8 @@ test("createAuditRecorder drops work when its in-flight limit is reached", async
   await first;
 });
 
-test("createAuditRecorder preserves authenticated and unsafe events at its public limit", async () => {
-  const releases: Array<(response: Response) => void> = [];
+test("createAuditRecorder reserves bounded capacity before sensitive work", async () => {
+  let release: ((response: Response) => void) | undefined;
   let fetchCalls = 0;
   const recorder = createAuditRecorder({
     enabled: true,
@@ -79,21 +79,19 @@ test("createAuditRecorder preserves authenticated and unsafe events at its publi
     maxInFlight: 1,
     fetchImpl: async () => {
       fetchCalls += 1;
-      return await new Promise<Response>((resolve) => releases.push(resolve));
+      return await new Promise<Response>((resolve) => {
+        release = resolve;
+      });
     },
   });
 
-  const publicRead = recorder({ requestId: "request-1", method: "GET" } as never);
-  await Promise.resolve();
-  const authenticatedRead = recorder({
-    requestId: "request-2",
-    method: "GET",
-    userId: "user-1",
-  } as never);
-  const publicMutation = recorder({ requestId: "request-3", method: "POST" } as never);
+  assert.equal(recorder.reserve(), true);
+  assert.equal(recorder.reserve(), false);
+  const reserved = recorder({ requestId: "request-1", method: "POST" } as never, true);
   await Promise.resolve();
 
-  assert.equal(fetchCalls, 3);
-  for (const release of releases) release(new Response(null, { status: 204 }));
-  await Promise.all([publicRead, authenticatedRead, publicMutation]);
+  assert.equal(fetchCalls, 1);
+  release?.(new Response(null, { status: 204 }));
+  await reserved;
+  assert.equal(recorder.reserve(), true);
 });

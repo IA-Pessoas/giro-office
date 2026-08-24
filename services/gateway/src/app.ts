@@ -17,6 +17,7 @@ import { isGatewayRouteDisabled } from "./config/disabledRoutes.js";
 import type { GatewayEnv } from "./config/env.js";
 import { getGatewayServiceDefinitions, resolveGatewayService } from "./config/serviceRegistry.js";
 import {
+  buildAuditCapacityGuard,
   buildAuditErrorCaptureMiddleware,
   buildAuditLifecycleMiddleware,
 } from "./middlewares/audit.js";
@@ -330,6 +331,7 @@ function mountAuthenticationBoundary(
   app: express.Express,
   env: GatewayEnv,
   logger: Logger,
+  recordAuditRequest: AuditRecorder,
   sessionValidator?: SessionValidator,
 ): void {
   const generalRateLimit = createRateLimitMiddleware({
@@ -345,6 +347,12 @@ function mountAuthenticationBoundary(
       bearerAuthCompatibility: env.bearerAuthCompatibility,
       authCookieSecure: env.authCookieSecure,
       logger,
+    }),
+  );
+  app.use(
+    buildAuditCapacityGuard({
+      enabled: env.auditEnabled,
+      recordAuditRequest,
     }),
   );
   app.use(buildCsrfProtectionMiddleware({ allowedOrigins: env.allowedOrigins, logger }));
@@ -474,7 +482,7 @@ export function createApp(
     (env.nodeEnv === "test"
       ? undefined
       : createUserServiceSessionValidator(env.userServiceUrl, env.userServiceInternalToken));
-  mountAuthenticationBoundary(app, env, logger, sessionValidator);
+  mountAuthenticationBoundary(app, env, logger, recordAuditRequest, sessionValidator);
   mountDashboardRoutes(app, dashboardStatsService);
   mountServiceRoutes(app, env);
   mountFallbackRoute(app);

@@ -5,6 +5,7 @@ import type {
   CreateAuditRequestPayload,
   Logger,
 } from "@workspace/shared";
+import { ServiceError } from "@workspace/shared";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
 import { describeActivity } from "../audit/activityCatalog.js";
@@ -21,6 +22,40 @@ interface BuildAuditLifecycleMiddlewareOptions {
 const TI_PASSWORD_DEACTIVATION_PATH = /^\/ti\/passwords\/[^/]+\/deactivate\/?$/i;
 const TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS = new Set(["password", "reason"]);
 const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const RESERVED_AUDIT_REQUESTS = new WeakSet<Request>();
+
+interface BuildAuditCapacityGuardOptions {
+  enabled: boolean;
+  recordAuditRequest: AuditRecorder;
+}
+
+export function buildAuditCapacityGuard({
+  enabled,
+  recordAuditRequest,
+}: BuildAuditCapacityGuardOptions) {
+  return function auditCapacityGuard(
+    request: Request,
+    _response: Response,
+    next: NextFunction,
+  ): void {
+    const mustReserve =
+      request.auth !== undefined || !SAFE_METHODS.has(request.method.toUpperCase());
+
+    if (!enabled || !mustReserve || !request.requestId) {
+      next();
+      return;
+    }
+
+    if (!recordAuditRequest.reserve()) {
+      next(new ServiceError(503, "Auditoria indisponível; operação não iniciada."));
+      return;
+    }
+
+    RESERVED_AUDIT_REQUESTS.add(request);
+    next();
+  };
+}
 
 function getResponseSizeBytes(response: Response): number | undefined {
   const header = response.getHeader("content-length");
@@ -170,7 +205,7 @@ export function buildAuditLifecycleMiddleware({
         referring: activity?.item,
       };
 
-      void recordAuditRequest(payload);
+      void recordAuditRequest(payload, RESERVED_AUDIT_REQUESTS.delete(request));
       requestLogger.debug({
         event: "audit.record.queued",
         message: "Audit record queued",

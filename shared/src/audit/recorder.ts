@@ -12,17 +12,6 @@ interface CreateAuditRecorderOptions {
   fetchImpl?: typeof fetch;
 }
 
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-
-function canDropAtCapacity(payload: CreateAuditRequestPayload): boolean {
-  const isAuthenticated =
-    typeof payload.userId === "string" ||
-    typeof payload.organizationId === "string" ||
-    payload.metadata?.auth_kind === "platform";
-
-  return !isAuthenticated && SAFE_METHODS.has(payload.method.toUpperCase());
-}
-
 export function createAuditRecorder({
   enabled,
   serviceUrl,
@@ -33,15 +22,15 @@ export function createAuditRecorder({
   fetchImpl = fetch,
 }: CreateAuditRecorderOptions): AuditRecorder {
   if (!enabled) {
-    return async () => {};
+    return Object.assign(async () => {}, { reserve: () => true });
   }
 
   const url = new URL("/internal/audit/requests", serviceUrl);
   const safeMaxInFlight = Math.max(1, Math.floor(maxInFlight));
   let inFlight = 0;
 
-  return async (payload: CreateAuditRequestPayload) => {
-    if (inFlight >= safeMaxInFlight && canDropAtCapacity(payload)) {
+  const record: AuditRecorder = async (payload: CreateAuditRequestPayload, reserved = false) => {
+    if (!reserved && inFlight >= safeMaxInFlight) {
       logger.warn({
         event: "audit.ingest.dropped",
         message: "Audit ingest concurrency limit reached",
@@ -50,7 +39,10 @@ export function createAuditRecorder({
       return;
     }
 
-    inFlight += 1;
+    if (!reserved) {
+      inFlight += 1;
+    }
+
     try {
       const response = await fetchImpl(url, {
         method: "POST",
@@ -89,4 +81,15 @@ export function createAuditRecorder({
       inFlight -= 1;
     }
   };
+
+  record.reserve = (): boolean => {
+    if (inFlight >= safeMaxInFlight) {
+      return false;
+    }
+
+    inFlight += 1;
+    return true;
+  };
+
+  return record;
 }
