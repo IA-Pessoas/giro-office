@@ -264,15 +264,23 @@ function transformSecurity(
 
 function isGatewayVisibleSecurityScheme(name: string): boolean {
   return (
-    name !== "forwardedAuthUserId" && name !== "internalServiceToken" && name !== "internalToken"
+    name !== "forwardedAuthUserId" &&
+    name !== "internalServiceToken" &&
+    name !== "internalToken" &&
+    name !== "gatewayInternalToken"
   );
 }
 
 function getGatewayOperationSecurity(
   path: string,
+  method: string,
   definition: ServiceSpecDefinition,
   security: Array<Record<string, string[]>> | undefined,
 ): Array<Record<string, string[]>> | undefined {
+  if (path === "/platform/session" && method.toLowerCase() === "post") {
+    return undefined;
+  }
+
   if (path.startsWith("/platform/") && security) {
     return platformBrowserAuthentication;
   }
@@ -536,7 +544,12 @@ function mergeServicePaths(
           operationRecord.security,
           securitySchemeNameMap,
         );
-        const gatewaySecurity = getGatewayOperationSecurity(path, definition, transformedSecurity);
+        const gatewaySecurity = getGatewayOperationSecurity(
+          path,
+          method,
+          definition,
+          transformedSecurity,
+        );
         if (gatewaySecurity) {
           operationRecord.security = gatewaySecurity;
         } else {

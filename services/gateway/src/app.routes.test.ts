@@ -1831,6 +1831,7 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
     expect(body.components?.securitySchemes?.cookieAuth).toBeTruthy();
     expect(body.components?.securitySchemes?.forwardedAuthUserId).toBe(undefined);
     expect(body.components?.securitySchemes?.internalServiceToken).toBe(undefined);
+    expect(body.components?.securitySchemes?.gatewayInternalToken).toBe(undefined);
     const browserAuth = [{ cookieAuth: [] }, { bearerAuth: [] }];
     expect(body.paths["/user/me"]?.get?.security).toEqual(browserAuth);
     expect(body.paths["/user/{id}"]?.get?.security).toEqual(browserAuth);
@@ -1838,6 +1839,13 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
     expect(body.paths["/ti/requests/list"]?.get?.security).toEqual(browserAuth);
     expect(body.paths["/certificate/pj/list"]?.get?.security).toEqual(browserAuth);
     expect(body.paths["/certificate/pj/{id}/file"]?.get?.security).toEqual(browserAuth);
+    expect(
+      (
+        body.paths["/platform/session"] as unknown as {
+          post?: { security?: Array<Record<string, string[]>> };
+        }
+      )?.post?.security,
+    ).toBe(undefined);
   } finally {
     await stopServer(server);
   }
