@@ -152,7 +152,7 @@ ficam com o controlador. Nenhuma imagem foi fabricada.
   públicas podem ser descartadas, e probes de saúde não entram na trilha.
 - Gates frescos: shared 58/58, gateway 287/287, user-service 158/158,
   organization-service 22/22, audit-service 23/23 (+1 opt-in skip), Compose/Nginx 10/10,
-  regressão/supply-chain 15/15, scanner 4.305 arquivos/0 achados, política pnpm 0 achados e
+  regressão/supply-chain 15/15, scanner 4.306 arquivos/0 achados, política pnpm 0 achados e
   `pnpm audit` sem vulnerabilidades conhecidas.
 
 A limitação da prova visual permanece explícita: este host não possui Docker, PostgreSQL, WSL ou
