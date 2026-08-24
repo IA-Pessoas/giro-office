@@ -214,7 +214,7 @@ function normalizeJsonBodyError(
 }
 
 function configureExpress(app: express.Express, env: GatewayEnv): void {
-  app.set("trust proxy", true);
+  app.set("trust proxy", env.nodeEnv === "production" ? 1 : false);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
 }
 

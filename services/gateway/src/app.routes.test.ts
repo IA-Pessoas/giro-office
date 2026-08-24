@@ -1584,6 +1584,49 @@ it("does not apply the general rate limit to gateway infrastructure routes", asy
   }
 });
 
+it("trusts exactly the production edge hop and no proxy in direct local execution", () => {
+  expect(createApp(createEnv(), createTestLogger()).get("trust proxy")).toBe(false);
+  expect(
+    createApp(createEnv({ nodeEnv: "production" }), createTestLogger()).get("trust proxy"),
+  ).toBe(1);
+});
+
+it("does not let a direct client spoof X-Forwarded-For to evade the login rate limit", async () => {
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(
+    createEnv({ userServiceUrl, authRateLimitMax: 1, authRateLimitWindowMs: 60_000 }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const login = (forwardedFor: string) =>
+      fetch(`${gatewayUrl}/user/session`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": forwardedFor,
+        },
+        body: JSON.stringify({ login: "user", password: "secret" }),
+      });
+
+    expect((await login("198.51.100.10")).status).toBe(200);
+    expect((await login("203.0.113.20")).status).toBe(429);
+    expect(upstreamHits).toBe(1);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("does not let unauthenticated attempts exhaust authenticated route rate limits", async () => {
   const token = createToken({
     user_id: "user-1",

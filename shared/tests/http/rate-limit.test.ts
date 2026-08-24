@@ -81,3 +81,41 @@ test("createRateLimitMiddleware uses auth context before IP when generating defa
   assert(error instanceof ServiceError);
   assert.equal(error.statusCode, 429);
 });
+
+test("createRateLimitMiddleware bounds distinct in-memory keys", async () => {
+  const middleware = createRateLimitMiddleware({
+    key: "bounded-limit",
+    max: 1,
+    maxEntries: 2,
+    windowMs: 60_000,
+    now: () => 1_000,
+    keyGenerator: (request) => String((request as unknown as { client: string }).client),
+  });
+
+  assert.equal(await runMiddleware(middleware, { client: "a" }), undefined);
+  assert.equal(await runMiddleware(middleware, { client: "b" }), undefined);
+  assert.equal(await runMiddleware(middleware, { client: "c" }), undefined);
+  assert.equal(await runMiddleware(middleware, { client: "a" }), undefined);
+});
+
+test("createRateLimitMiddleware expurges expirados antes de remover uma chave ativa", async () => {
+  let now = 1_000;
+  const middleware = createRateLimitMiddleware({
+    key: "expiring-limit",
+    max: 1,
+    maxEntries: 2,
+    windowMs: 1_000,
+    now: () => now,
+    keyGenerator: (request) => String((request as unknown as { client: string }).client),
+  });
+
+  assert.equal(await runMiddleware(middleware, { client: "a" }), undefined);
+  assert.equal(await runMiddleware(middleware, { client: "b" }), undefined);
+  now += 1_001;
+  assert.equal(await runMiddleware(middleware, { client: "a" }), undefined);
+  assert.equal(await runMiddleware(middleware, { client: "c" }), undefined);
+
+  const activeKeyError = await runMiddleware(middleware, { client: "a" });
+  assert(activeKeyError instanceof ServiceError);
+  assert.equal(activeKeyError.statusCode, 429);
+});
