@@ -31,7 +31,7 @@ type LifecycleTransaction = ReportAuditStore & {
   reportJob: {
     findUnique(args: { where: { id: string } }): Promise<ReportJob | null>;
     updateMany(args: {
-      where: { id: string; status: ReportLifecycleStatus };
+      where: { id: string; status: ReportLifecycleStatus; lease_token?: string };
       data: { status: ReportLifecycleStatus; started_at?: Date; finished_at?: Date };
     }): Promise<{ count: number }>;
   };
@@ -78,6 +78,7 @@ export interface TransitionReportJobInput extends ReportLifecycleInput {
 }
 
 export interface CompleteReportJobInput extends ReportLifecycleInput {
+  lease_token: string;
   rows: ReadonlyArray<Record<string, unknown>>;
 }
 
@@ -148,7 +149,7 @@ export class ReportLifecycleService {
 
       const occurredAt = this.clock();
       const result = await transaction.reportJob.updateMany({
-        where: { id: job.id, status: "processing" },
+        where: { id: job.id, status: "processing", lease_token: input.lease_token },
         data: { status: "completed", finished_at: occurredAt },
       });
       this.assertUpdated(result.count);
