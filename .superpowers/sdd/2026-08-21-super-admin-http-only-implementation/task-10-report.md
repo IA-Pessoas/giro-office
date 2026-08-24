@@ -114,3 +114,22 @@ As dívidas acima não foram alteradas porque não pertencem ao diff da Tarefa 1
 
 Browser autenticado, inspeção de cookies/rede/console, screenshots, revisão final e publicação
 ficam com o controlador. Nenhuma imagem foi fabricada.
+
+## Prova de navegador do controlador
+
+- O app Next real foi reconstruído e iniciado em modo produção com a topologia same-origin `/api` e
+  CSP intacta. Como o host não possui Docker, PostgreSQL ou arquivos `.env`, um gateway HTTP local
+  mínimo forneceu apenas respostas e dados fictícios; as implementações reais dos serviços seguem
+  cobertas pelas suítes de integração acima. Esta evidência visual não é apresentada como E2E de
+  banco.
+- Fluxo Playwright: login de plataforma `200`, organizações `200`, usuários do tenant `200`,
+  auditoria global `200` e logout `200`. Os únicos `401` foram as sondagens esperadas de `/user/me`
+  e `/platform/me` antes da autenticação; não houve `403`, `500` ou `502` inesperado.
+- O navegador confirmou `cw.session` com `httpOnly: true` e `SameSite=Lax`; `document.cookie`
+  retornou somente `cw.csrf`. Nenhum token apareceu em localStorage ou sessionStorage. O logout
+  enviou `x-csrf-token`, retornou ao login e removeu ambos os cookies.
+- A bancada HTTP local não marca cookies como `Secure`; os atributos de produção continuam
+  verificados pelas suítes de cookie/gateway e pelo código configurado para produção.
+- Screenshots com dados exclusivamente fictícios:
+  `docs/evidence/issue-869/super-admin-login.png` e
+  `docs/evidence/issue-869/super-admin-console.png`.
