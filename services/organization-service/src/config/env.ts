@@ -1,6 +1,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseAllowedOrigins, validateProductionCorsOrigins } from "@workspace/shared";
+import {
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
 import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -56,6 +60,12 @@ const organizationEnvSchema = z
       serviceName: "organization-service",
       envName: "SERVICE_ALLOWED_ORIGINS",
       allowedOrigins: rest.allowedOrigins,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "organization-service",
+      envName: "AUDIT_SERVICE_TOKEN",
+      token: rest.auditServiceToken,
     });
 
     return {
