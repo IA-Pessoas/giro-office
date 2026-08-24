@@ -98,6 +98,31 @@ test("createRateLimitMiddleware bounds distinct in-memory keys", async () => {
   assert.equal(await runMiddleware(middleware, { client: "a" }), undefined);
 });
 
+test("createRateLimitMiddleware evicts at capacity without traversing all entries", async () => {
+  const middleware = createRateLimitMiddleware({
+    key: "constant-time-limit",
+    max: 1,
+    maxEntries: 2,
+    windowMs: 60_000,
+    now: () => 1_000,
+    keyGenerator: (request) => String((request as unknown as { client: string }).client),
+  });
+
+  assert.equal(await runMiddleware(middleware, { client: "a" }), undefined);
+  assert.equal(await runMiddleware(middleware, { client: "b" }), undefined);
+
+  const originalIterator = Map.prototype[Symbol.iterator];
+  Map.prototype[Symbol.iterator] = function throwOnFullMapTraversal() {
+    throw new Error("rate limiter traversed every entry");
+  };
+
+  try {
+    assert.equal(await runMiddleware(middleware, { client: "c" }), undefined);
+  } finally {
+    Map.prototype[Symbol.iterator] = originalIterator;
+  }
+});
+
 test("createRateLimitMiddleware expurges expirados antes de remover uma chave ativa", async () => {
   let now = 1_000;
   const middleware = createRateLimitMiddleware({

@@ -93,26 +93,18 @@ export function createRateLimitMiddleware({
 
     const currentTime = now();
     const requestKey = `${key}:${keyGenerator(request)}`;
-    const current = hits.get(requestKey);
+    let current = hits.get(requestKey);
+    if (current && current.resetAt <= currentTime) {
+      hits.delete(requestKey);
+      current = undefined;
+    }
     if (!current && hits.size >= safeMaxEntries) {
-      for (const [entryKey, entry] of hits) {
-        if (entry.resetAt <= currentTime) {
-          hits.delete(entryKey);
-        }
-      }
-
-      while (hits.size >= safeMaxEntries) {
-        const oldestKey = hits.keys().next().value;
-        if (oldestKey === undefined) {
-          break;
-        }
+      const oldestKey = hits.keys().next().value;
+      if (oldestKey !== undefined) {
         hits.delete(oldestKey);
       }
     }
-    const entry =
-      current && current.resetAt > currentTime
-        ? current
-        : { count: 0, resetAt: currentTime + safeWindowMs };
+    const entry = current ?? { count: 0, resetAt: currentTime + safeWindowMs };
 
     if (entry.count >= safeMax) {
       const retryAfterSeconds = Math.max(1, Math.ceil((entry.resetAt - currentTime) / 1000));
