@@ -75,6 +75,7 @@ interface ReportLifecycleInput {
 
 export interface TransitionReportJobInput extends ReportLifecycleInput {
   status: Exclude<ReportLifecycleStatus, "completed" | "expired" | "deleted">;
+  lease_token?: string;
 }
 
 export interface CompleteReportJobInput extends ReportLifecycleInput {
@@ -120,10 +121,15 @@ export class ReportLifecycleService {
       const job = await this.getJob(transaction, input.job_id);
       this.assertOrganization(job, input.organization_id);
       assertTransition(job.status, input.status);
+      const leaseToken = this.leaseForWorkerTransition(job.status, input);
 
       const occurredAt = this.clock();
       const result = await transaction.reportJob.updateMany({
-        where: { id: job.id, status: job.status as ReportLifecycleStatus },
+        where: {
+          id: job.id,
+          status: job.status as ReportLifecycleStatus,
+          ...(leaseToken ? { lease_token: leaseToken } : {}),
+        },
         data: {
           status: input.status,
           ...(input.status === "processing"
@@ -248,6 +254,17 @@ export class ReportLifecycleService {
     if (count !== 1) {
       throw new ServiceError(409, "O job foi alterado por outra operação.");
     }
+  }
+
+  private leaseForWorkerTransition(
+    currentStatus: string,
+    input: TransitionReportJobInput,
+  ): string | undefined {
+    if (currentStatus !== "processing" || input.status !== "failed") return undefined;
+    if (!input.lease_token) {
+      throw new ServiceError(400, "A falha de um job em processamento exige lease_token.");
+    }
+    return input.lease_token;
   }
 
   private auditEvent(

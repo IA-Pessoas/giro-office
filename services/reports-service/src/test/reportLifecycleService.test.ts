@@ -227,10 +227,43 @@ describe("ReportLifecycleService", () => {
       organization_id: "org-1",
       actor_id: "user-1",
       status,
+      ...(status === "failed" ? { lease_token: "lease-b" } : {}),
     });
 
     expect(transaction.reportSnapshot.create).not.toHaveBeenCalled();
     expect(transaction.reportSnapshotRow.createMany).not.toHaveBeenCalled();
+  });
+
+  it("impede worker com lease expirado de falhar job recapturado", async () => {
+    const { prisma, transaction } = createPersistence();
+    transaction.reportJob.updateMany.mockImplementation(async ({ where }) => ({
+      count: where.lease_token === "lease-b" ? 1 : 0,
+    }));
+    const audit = new ReportAuditService(prisma as never, vi.fn());
+    const service = new ReportLifecycleService(prisma as never, audit, () => now);
+    const baseInput = {
+      job_id: "job-1",
+      organization_id: "org-1",
+      actor_id: "user-1",
+      status: "failed" as const,
+    };
+
+    const [expiredWorker, currentWorker] = await Promise.allSettled([
+      service.transition({ ...baseInput, lease_token: "lease-a" }),
+      service.transition({ ...baseInput, lease_token: "lease-b" }),
+    ]);
+
+    expect(expiredWorker.status).toBe("rejected");
+    expect(currentWorker.status).toBe("fulfilled");
+    expect(transaction.reportJob.updateMany).toHaveBeenCalledWith({
+      where: { id: "job-1", status: "processing", lease_token: "lease-a" },
+      data: { status: "failed", finished_at: now },
+    });
+    expect(transaction.reportJob.updateMany).toHaveBeenCalledWith({
+      where: { id: "job-1", status: "processing", lease_token: "lease-b" },
+      data: { status: "failed", finished_at: now },
+    });
+    expect(transaction.reportSnapshot.create).not.toHaveBeenCalled();
   });
 
   it("expira removendo só as linhas e registra a justificativa no tipo do evento", async () => {
