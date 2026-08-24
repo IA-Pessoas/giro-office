@@ -34,3 +34,36 @@ test("createAuditRecorder bounds an unavailable audit request with a timeout", a
   assert.equal(capturedSignal.aborted, true);
   assert.equal(errors.length, 1);
 });
+
+test("createAuditRecorder drops work when its in-flight limit is reached", async () => {
+  let releaseFirst: ((response: Response) => void) | undefined;
+  let fetchCalls = 0;
+  const warnings: unknown[] = [];
+  const recorder = createAuditRecorder({
+    enabled: true,
+    serviceUrl: "http://audit-service:3020",
+    serviceToken: "test-token",
+    logger: {
+      error() {},
+      warn(value: unknown) {
+        warnings.push(value);
+      },
+    } as never,
+    maxInFlight: 1,
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return await new Promise<Response>((resolve) => {
+        releaseFirst = resolve;
+      });
+    },
+  });
+
+  const first = recorder({ requestId: "request-1" } as never);
+  await Promise.resolve();
+  await recorder({ requestId: "request-2" } as never);
+
+  assert.equal(fetchCalls, 1);
+  assert.equal(warnings.length, 1);
+  releaseFirst?.(new Response(null, { status: 204 }));
+  await first;
+});

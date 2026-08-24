@@ -8,6 +8,7 @@ interface CreateAuditRecorderOptions {
   serviceToken: string;
   logger: Logger;
   timeoutMs?: number;
+  maxInFlight?: number;
   fetchImpl?: typeof fetch;
 }
 
@@ -17,6 +18,7 @@ export function createAuditRecorder({
   serviceToken,
   logger,
   timeoutMs = 5_000,
+  maxInFlight = 100,
   fetchImpl = fetch,
 }: CreateAuditRecorderOptions): AuditRecorder {
   if (!enabled) {
@@ -24,8 +26,20 @@ export function createAuditRecorder({
   }
 
   const url = new URL("/internal/audit/requests", serviceUrl);
+  const safeMaxInFlight = Math.max(1, Math.floor(maxInFlight));
+  let inFlight = 0;
 
   return async (payload: CreateAuditRequestPayload) => {
+    if (inFlight >= safeMaxInFlight) {
+      logger.warn({
+        event: "audit.ingest.dropped",
+        message: "Audit ingest concurrency limit reached",
+        request: { id: payload.requestId },
+      });
+      return;
+    }
+
+    inFlight += 1;
     try {
       const response = await fetchImpl(url, {
         method: "POST",
@@ -60,6 +74,8 @@ export function createAuditRecorder({
         },
         err: error,
       });
+    } finally {
+      inFlight -= 1;
     }
   };
 }
