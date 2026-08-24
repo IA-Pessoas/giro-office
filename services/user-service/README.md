@@ -22,9 +22,17 @@ O endpoint `/internal/reporting/access-context` é chamado diretamente pelo repo
 - Mutações autenticadas por cookie exigem `x-csrf-token`; o gateway valida a prova antes de encaminhar a chamada.
 - Validações internas diretas podem usar Bearer, enquanto chamadas vindas do gateway usam os headers `x-auth-*` protegidos pelo token interno.
 
+## Sessão da plataforma
+
+- `POST /platform/session` autentica o administrador da plataforma e emite `cw.session` como cookie `HttpOnly`; `cw.csrf` não autentica a requisição, servindo somente como prova CSRF para refresh e logout.
+- `POST /platform/session/refresh`, `DELETE /platform/session` e `GET /platform/me` usam a sessão de plataforma. Nenhum endpoint retorna o JWT ou a prova CSRF no JSON.
+- `POST /platform/session/validate` é interno: exige o token de serviço e não deve ser chamado pelo navegador.
+
 ## Gateway
 
 O encaminhamento para `USER_SERVICE_URL` usa o prefixo público **`/user`** — ver [`gateway/src/config/serviceRegistry.ts`](../gateway/src/config/serviceRegistry.ts) (`USER_SERVICE_PREFIXES`).
+
+O prefixo público `/platform` será adicionado ao gateway na Tarefa 6; até então, os endpoints de plataforma permanecem contrato direto do user-service.
 
 Exemplos de caminhos expostos pelo **user-service** (via gateway): `/user/session`, `/user/session/refresh`, `/user/start-config`, `/user/me`, `/user`, `/user/:id`, `/user/:id/photo`, `/user/permission/:userId`.
 
