@@ -6,6 +6,8 @@ export type AuditQuery = Record<string, AuditQueryValue>;
 export type AuditReservation = "protected" | "public";
 export interface AuditRecorder {
   (payload: CreateAuditRequestPayload, reservation?: AuditReservation): Promise<void>;
+}
+export interface ReservableAuditRecorder extends AuditRecorder {
   reserve(kind: AuditReservation): AuditReservation | undefined;
 }
 

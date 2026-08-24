@@ -1,10 +1,10 @@
 import type {
   AuditOutcome,
   AuditQuery,
-  AuditRecorder,
   AuditReservation,
   CreateAuditRequestPayload,
   Logger,
+  ReservableAuditRecorder,
 } from "@workspace/shared";
 import { ServiceError } from "@workspace/shared";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
@@ -17,7 +17,7 @@ interface BuildAuditLifecycleMiddlewareOptions {
   enabled: boolean;
   env: GatewayEnv;
   logger: Logger;
-  recordAuditRequest: AuditRecorder;
+  recordAuditRequest: ReservableAuditRecorder;
 }
 
 const TI_PASSWORD_DEACTIVATION_PATH = /^\/ti\/passwords\/[^/]+\/deactivate\/?$/i;
@@ -28,7 +28,7 @@ const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
 
 interface BuildAuditCapacityGuardOptions {
   enabled: boolean;
-  recordAuditRequest: AuditRecorder;
+  recordAuditRequest: ReservableAuditRecorder;
 }
 
 export function buildAuditCapacityGuard({

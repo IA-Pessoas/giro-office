@@ -129,27 +129,28 @@ test("createAuditRecorder keeps public traffic out of protected capacity", async
   await publicRead;
 });
 
-test("createAuditRecorder never treats a dropped entity change as success", async () => {
-  let releaseFirst: ((response: Response) => void) | undefined;
+test("createAuditRecorder preserves unlimited legacy concurrency unless configured", async () => {
+  const releases: Array<(response: Response) => void> = [];
+  let fetchCalls = 0;
   const recorder = createAuditRecorder({
     enabled: true,
     serviceUrl: "http://audit-service:3020",
     serviceToken: "test-token",
     logger: { error() {}, warn() {} } as never,
-    maxInFlight: 1,
-    fetchImpl: async () =>
-      await new Promise<Response>((resolve) => {
-        releaseFirst = resolve;
-      }),
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return await new Promise<Response>((resolve) => releases.push(resolve));
+    },
   });
 
-  const first = recorder({ requestId: "request-1", method: "GET" } as never);
+  const requests = Array.from({ length: 101 }, (_, index) =>
+    recorder({ requestId: `request-${index + 1}`, method: "ENTITY_CHANGE" } as never),
+  );
   await Promise.resolve();
 
-  await assert.rejects(
-    recorder({ requestId: "request-2", method: "ENTITY_CHANGE" } as never),
-    /auditoria indisponível/i,
-  );
-  releaseFirst?.(new Response(null, { status: 204 }));
-  await first;
+  assert.equal(fetchCalls, 101);
+  for (const release of releases) {
+    release(new Response(null, { status: 204 }));
+  }
+  await Promise.all(requests);
 });

@@ -469,6 +469,7 @@ export function createApp(
     serviceUrl: env.auditServiceUrl,
     serviceToken: env.auditServiceToken,
     logger,
+    maxInFlight: 100,
     protectedCapacity: 75,
   });
 

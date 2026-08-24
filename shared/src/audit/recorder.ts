@@ -1,7 +1,10 @@
-import { ServiceError } from "../http/errors.js";
 import { INTERNAL_SERVICE_TOKEN_HEADER } from "../http/headers.js";
 import type { Logger } from "../logger/index.js";
-import type { AuditRecorder, AuditReservation, CreateAuditRequestPayload } from "./types.js";
+import type {
+  AuditReservation,
+  CreateAuditRequestPayload,
+  ReservableAuditRecorder,
+} from "./types.js";
 
 interface CreateAuditRecorderOptions {
   enabled: boolean;
@@ -20,10 +23,10 @@ export function createAuditRecorder({
   serviceToken,
   logger,
   timeoutMs = 5_000,
-  maxInFlight = 100,
+  maxInFlight = Number.POSITIVE_INFINITY,
   protectedCapacity = 0,
   fetchImpl = fetch,
-}: CreateAuditRecorderOptions): AuditRecorder {
+}: CreateAuditRecorderOptions): ReservableAuditRecorder {
   if (!enabled) {
     return Object.assign(async () => {}, { reserve: (kind: AuditReservation) => kind });
   }
@@ -38,7 +41,7 @@ export function createAuditRecorder({
   let inFlight = 0;
   let publicInFlight = 0;
 
-  const record: AuditRecorder = async (
+  const record: ReservableAuditRecorder = async (
     payload: CreateAuditRequestPayload,
     reservation?: AuditReservation,
   ) => {
@@ -46,10 +49,6 @@ export function createAuditRecorder({
     const atCapacity = inFlight >= safeMaxInFlight || (isPublic && publicInFlight >= publicLimit);
 
     if (!reservation && atCapacity) {
-      if (payload.method === "ENTITY_CHANGE") {
-        throw new ServiceError(503, "Auditoria indisponível; alteração não confirmada.");
-      }
-
       logger.warn({
         event: "audit.ingest.dropped",
         message: "Audit ingest concurrency limit reached",
