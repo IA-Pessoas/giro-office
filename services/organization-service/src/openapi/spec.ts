@@ -65,7 +65,14 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
               in: "query",
               schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
             },
-            { name: "status", in: "query", schema: { type: "string" } },
+            {
+              name: "status",
+              in: "query",
+              schema: {
+                type: "string",
+                enum: ["trial", "past_due", "active", "suspended", "cancelled"],
+              },
+            },
             { name: "search", in: "query", schema: { type: "string", maxLength: 100 } },
           ],
           responses: {

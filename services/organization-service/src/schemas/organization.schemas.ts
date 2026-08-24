@@ -3,8 +3,6 @@ import { z } from "zod";
 
 import { status as statusEnum } from "../generated/prisma/client.js";
 
-const MAX_PLATFORM_OFFSET = 10_000;
-
 export const createOrganizationBodySchema = z
   .object({
     name: zNonEmptyText("name"),
@@ -40,6 +38,44 @@ export const updateOrganizationLogoUrlBodySchema = z
   .strict();
 
 export const listOrganizationsQuerySchema = z
+  .object({
+    page: z.preprocess(
+      (v) => {
+        const raw = getSingleQueryValue(v);
+        if (raw === undefined || raw === "") {
+          return 1;
+        }
+        return Number(raw);
+      },
+      z.number().int().min(1, "page deve ser um inteiro maior ou igual a 1."),
+    ),
+    pageSize: z.preprocess(
+      (v) => {
+        const raw = getSingleQueryValue(v);
+        if (raw === undefined || raw === "") {
+          return 20;
+        }
+        return Number(raw);
+      },
+      z
+        .number()
+        .int()
+        .min(1, "pageSize deve ser um inteiro entre 1 e 100.")
+        .max(100, "pageSize deve ser um inteiro entre 1 e 100."),
+    ),
+    status: z.preprocess((v) => {
+      const raw = getSingleQueryValue(v);
+      if (raw === undefined || raw === "") {
+        return undefined;
+      }
+      return raw;
+    }, z.nativeEnum(statusEnum).optional()),
+  })
+  .strict();
+
+const MAX_PLATFORM_OFFSET = 10_000;
+
+export const listPlatformOrganizationsQuerySchema = z
   .object({
     page: z.preprocess(
       (v) => {

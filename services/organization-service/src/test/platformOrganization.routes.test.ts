@@ -5,7 +5,7 @@ import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { organizationServiceMock, prismaMock, verifyJwtTokenMock } = vi.hoisted(() => ({
-  organizationServiceMock: { list: vi.fn() },
+  organizationServiceMock: { list: vi.fn(), listPlatform: vi.fn() },
   prismaMock: {
     platformAuthSession: { findFirst: vi.fn() },
   },
@@ -83,7 +83,7 @@ describe("platform organization routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.platformAuthSession.findFirst.mockResolvedValue(platformSession);
-    organizationServiceMock.list.mockResolvedValue({
+    organizationServiceMock.listPlatform.mockResolvedValue({
       organizations: [{ id: "org-1", name: "Castelo", status: "active" }],
       total: 1,
       page: 2,
@@ -103,7 +103,7 @@ describe("platform organization routes", () => {
       page: 2,
       pageSize: 20,
     });
-    expect(organizationServiceMock.list).toHaveBeenCalledWith({
+    expect(organizationServiceMock.listPlatform).toHaveBeenCalledWith({
       page: 2,
       pageSize: 20,
       status: "active",
@@ -115,7 +115,7 @@ describe("platform organization routes", () => {
     const response = await request(createApp()).get("/platform/organizations");
 
     expect(response.status).toBe(401);
-    expect(organizationServiceMock.list).not.toHaveBeenCalled();
+    expect(organizationServiceMock.listPlatform).not.toHaveBeenCalled();
   });
 
   it("rejeita uma identidade organizacional", async () => {
@@ -124,7 +124,7 @@ describe("platform organization routes", () => {
       .set(platformHeaders({ auth_kind: "organization" }));
 
     expect(response.status).toBe(403);
-    expect(organizationServiceMock.list).not.toHaveBeenCalled();
+    expect(organizationServiceMock.listPlatform).not.toHaveBeenCalled();
   });
 
   it("rejeita uma página cujo offset excede a janela administrativa", async () => {
@@ -133,7 +133,30 @@ describe("platform organization routes", () => {
       .set(platformHeaders());
 
     expect(response.status).toBe(400);
-    expect(organizationServiceMock.list).not.toHaveBeenCalled();
+    expect(organizationServiceMock.listPlatform).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["revogada", null],
+    ["expirada", null],
+    [
+      "inativa",
+      { ...platformSession, platformUser: { ...platformSession.platformUser, status: "inactive" } },
+    ],
+    [
+      "com versão divergente",
+      { ...platformSession, platformUser: { ...platformSession.platformUser, session_version: 2 } },
+    ],
+    [{ csrf: "divergente" }, { ...platformSession, csrf_hash: "b".repeat(64) }],
+  ])("rejeita sessão persistida %o", async (_label, session) => {
+    prismaMock.platformAuthSession.findFirst.mockResolvedValue(session);
+
+    const response = await request(createApp())
+      .get("/platform/organizations")
+      .set(platformHeaders());
+
+    expect(response.status).toBe(401);
+    expect(organizationServiceMock.listPlatform).not.toHaveBeenCalled();
   });
 });
 
@@ -144,6 +167,10 @@ describe("platform organization OpenAPI", () => {
     expect(spec.paths).toHaveProperty(
       ["/platform/organizations", "get", "parameters", 0, "schema"],
       { type: "integer", minimum: 1, maximum: 10_001, default: 1 },
+    );
+    expect(spec.paths).toHaveProperty(
+      ["/platform/organizations", "get", "parameters", 2, "schema"],
+      { type: "string", enum: ["trial", "past_due", "active", "suspended", "cancelled"] },
     );
   });
 });

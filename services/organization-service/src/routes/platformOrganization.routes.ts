@@ -2,7 +2,7 @@ import { createSuccessResponse, error as logError, parseWithZod } from "@workspa
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { listOrganizationsQuerySchema } from "../schemas/organization.schemas.js";
+import { listPlatformOrganizationsQuerySchema } from "../schemas/organization.schemas.js";
 import { requirePlatformSession } from "../security/platformAuth.js";
 import { OrganizationService } from "../services/organizationService.js";
 
@@ -15,8 +15,8 @@ export function createPlatformOrganizationRoutes(): ReturnType<typeof Router> {
     requirePlatformSession,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        const query = parseWithZod(listOrganizationsQuerySchema, request.query);
-        const result = await organizationService.list(query);
+        const query = parseWithZod(listPlatformOrganizationsQuerySchema, request.query);
+        const result = await organizationService.listPlatform(query);
 
         response.json(createSuccessResponse(result));
       } catch (err) {
