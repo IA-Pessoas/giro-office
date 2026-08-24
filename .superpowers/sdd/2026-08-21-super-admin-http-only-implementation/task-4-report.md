@@ -4,6 +4,7 @@
 
 - `95aaaa86 feat(platform): add scoped global user queries`
 - `aac7bd3e fix(platform): harden global user pagination`
+- `984d1319 fix(platform): align skip limit in OpenAPI`
 
 ## Arquivos
 
@@ -47,3 +48,11 @@
 - Vitest focado bloqueado: `'vitest' não é reconhecido como um comando interno ou externo, um programa operável ou um arquivo em lotes.`
 - `prisma validate` com URL sintética bloqueado: `'prisma' não é reconhecido como um comando interno ou externo, um programa operável ou um arquivo em lotes.`
 - Typecheck bloqueado: `EPERM: operation not permitted, mkdir 'C:\Users\Davi.Araujo.173CASTELO.000\Desktop\Repositorios\GIROOFFICE-issue-869\.turbo\prisma\generate.lock'`.
+
+## Correção OpenAPI
+
+- O parâmetro `skip` agora documenta `maximum: 10_000`, alinhado ao schema Zod do runtime.
+- RED: o teste de spec falhou com `Expected maximum: 10000` ausente no schema recebido.
+- GREEN: 6 testes passaram em `platformUsers.routes.test.ts`.
+- Biome escopado: 2 arquivos passaram.
+- `git diff --cached --check`: passou antes do commit.
