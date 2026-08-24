@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ReportJobRepository } from "../prisma/reportJobRepository.js";
+import { ReportAuditService } from "../services/reportAuditService.js";
 
 type ReportJobFixture = {
   id: string;
   organization_id: string;
   requester_id: string;
+  report_model_version_id: string;
   status: string;
   requested_at: Date;
   started_at: Date | null;
@@ -15,6 +17,7 @@ type ReportJobFixture = {
 
 function createPrisma(job: ReportJobFixture) {
   let claimed = false;
+  const auditEventCreate = vi.fn();
   const queryRaw = vi.fn(async (_query: TemplateStringsArray, ...values: unknown[]) => {
     if (claimed) return [];
 
@@ -32,13 +35,16 @@ function createPrisma(job: ReportJobFixture) {
     ];
   });
   const prisma = {
-    $transaction: vi.fn(
-      async (callback: (transaction: { $queryRaw: typeof queryRaw }) => unknown) =>
-        callback({ $queryRaw: queryRaw }),
+    $transaction: vi.fn(async (callback: (transaction: typeof transaction) => unknown) =>
+      callback(transaction),
     ),
   };
+  const transaction = {
+    $queryRaw: queryRaw,
+    reportAuditEvent: { create: auditEventCreate },
+  };
 
-  return { prisma, queryRaw };
+  return { prisma, queryRaw, auditEventCreate };
 }
 
 describe("ReportJobRepository.claimNext", () => {
@@ -47,13 +53,18 @@ describe("ReportJobRepository.claimNext", () => {
       id: "job-1",
       organization_id: "org-1",
       requester_id: "user-1",
+      report_model_version_id: "model-version-1",
       status: "queued",
       requested_at: new Date("2026-08-19T12:00:00.000Z"),
       started_at: null,
       lease_token: null,
       lease_expires_at: null,
     });
-    const repository = new ReportJobRepository(prisma as never, 120);
+    const repository = new ReportJobRepository(
+      prisma as never,
+      120,
+      new ReportAuditService(prisma as never, vi.fn()),
+    );
 
     const [first, second] = await Promise.all([repository.claimNext(), repository.claimNext()]);
     const claim = [first, second].find(Boolean);
@@ -68,19 +79,63 @@ describe("ReportJobRepository.claimNext", () => {
     expect(values).toEqual(expect.arrayContaining(["queued", "processing"]));
   });
 
+  it("registra auditoria segura quando o claim move o job para processing", async () => {
+    const { prisma, auditEventCreate } = createPrisma({
+      id: "job-1",
+      organization_id: "org-1",
+      requester_id: "user-1",
+      report_model_version_id: "model-version-1",
+      status: "queued",
+      requested_at: new Date("2026-08-19T12:00:00.000Z"),
+      started_at: null,
+      lease_token: null,
+      lease_expires_at: null,
+    });
+    const recorder = vi.fn();
+    const audit = new ReportAuditService(prisma as never, recorder);
+    const repository = new ReportJobRepository(
+      prisma as never,
+      120,
+      audit,
+      () => new Date("2026-08-24T12:00:00.000Z"),
+    );
+
+    await repository.claimNext();
+
+    expect(auditEventCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ event_type: "report.processing" }),
+      }),
+    );
+    expect(recorder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "report.processing",
+        metadata: expect.objectContaining({
+          report_job_id: "job-1",
+          report_model_version_id: "model-version-1",
+        }),
+      }),
+    );
+  });
+
   it("reclaims an expired lease without replacing its original start time", async () => {
     const originalStartedAt = new Date("2026-08-19T11:00:00.000Z");
     const { prisma, queryRaw } = createPrisma({
       id: "job-2",
       organization_id: "org-1",
       requester_id: "user-1",
+      report_model_version_id: "model-version-1",
       status: "processing",
       requested_at: new Date("2026-08-19T10:00:00.000Z"),
       started_at: originalStartedAt,
       lease_token: "expired-lease",
       lease_expires_at: new Date("2026-08-19T11:59:59.000Z"),
     });
-    const repository = new ReportJobRepository(prisma as never, 120);
+    const repository = new ReportJobRepository(
+      prisma as never,
+      120,
+      new ReportAuditService(prisma as never, vi.fn()),
+    );
 
     const claim = await repository.claimNext();
     const sql = (queryRaw.mock.calls[0]?.[0] as TemplateStringsArray).join("?");

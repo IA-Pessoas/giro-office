@@ -39,6 +39,19 @@ export interface ReportAuditEventInput {
   };
 }
 
+export function createReportAuditEvent(input: ReportAuditEventInput): ReportAuditEventInput {
+  return {
+    actor_id: input.actor_id,
+    organization_id: input.organization_id,
+    ...(input.department_id ? { department_id: input.department_id } : {}),
+    job_id: input.job_id,
+    report_model_version_id: input.report_model_version_id,
+    event_type: input.event_type,
+    occurred_at: input.occurred_at,
+    ...(input.counts ? { counts: input.counts } : {}),
+  };
+}
+
 export interface ReportAuditStore {
   reportAuditEvent: {
     create(args: {

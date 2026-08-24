@@ -6,6 +6,7 @@ import type {
   ReportAuditService,
   ReportAuditStore,
 } from "./reportAuditService.js";
+import { createReportAuditEvent } from "./reportAuditService.js";
 
 export const REPORT_LIFECYCLE_STATUSES = [
   "queued",
@@ -56,7 +57,7 @@ type LifecycleTransaction = ReportAuditStore & {
         data_json: Record<string, unknown>;
       }>;
     }): Promise<unknown>;
-    deleteMany(args: { where: { snapshot: { report_job_id: string } } }): Promise<unknown>;
+    deleteMany(args: { where: { snapshot_id: { in: string[] } } }): Promise<unknown>;
   };
 };
 
@@ -255,7 +256,7 @@ export class ReportLifecycleService {
     occurredAt: Date,
     counts: ReportAuditEventInput["counts"] = input.counts,
   ): ReportAuditEventInput {
-    return {
+    return createReportAuditEvent({
       actor_id: input.actor_id,
       organization_id: job.organization_id,
       ...(input.department_id ? { department_id: input.department_id } : {}),
@@ -264,6 +265,6 @@ export class ReportLifecycleService {
       event_type: eventType,
       occurred_at: occurredAt,
       counts,
-    };
+    });
   }
 }

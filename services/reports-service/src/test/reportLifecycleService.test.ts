@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
@@ -223,5 +224,19 @@ describe("ReportLifecycleService", () => {
         data: expect.objectContaining({ event_type: "report.expired.retention" }),
       }),
     );
+  });
+
+  it("mantém a migration de lifecycle que atualiza default e estados legados", async () => {
+    const migration = await readFile(
+      new URL(
+        "../../../../infra/prisma/migrations/20260824123000_reports_lifecycle_statuses/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain("ALTER COLUMN \"status\" SET DEFAULT 'queued'");
+    expect(migration).toContain("WHEN 'pending' THEN 'queued'");
+    expect(migration).toContain("WHEN 'running' THEN 'processing'");
   });
 });
