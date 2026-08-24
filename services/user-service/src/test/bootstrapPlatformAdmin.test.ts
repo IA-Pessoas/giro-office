@@ -10,7 +10,9 @@ describe("getPlatformAdminBootstrapInput", () => {
         PLATFORM_ADMIN_EMAIL: "admin@example.com",
         PLATFORM_ADMIN_PASSWORD: "   \t ",
       }),
-    ).toThrow("PLATFORM_ADMIN_NAME, PLATFORM_ADMIN_EMAIL e PLATFORM_ADMIN_PASSWORD são obrigatórias.");
+    ).toThrow(
+      "PLATFORM_ADMIN_NAME, PLATFORM_ADMIN_EMAIL e PLATFORM_ADMIN_PASSWORD são obrigatórias.",
+    );
   });
 
   it("preserves a valid password without trimming it", () => {

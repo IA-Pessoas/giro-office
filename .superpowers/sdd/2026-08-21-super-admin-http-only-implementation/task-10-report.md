@@ -61,6 +61,11 @@ GREEN: 5 pass, 0 fail
 corepack pnpm --filter @workspace/shared check
 RED: 2 erros Biome nos dois arquivos autorizados
 GREEN: 62 arquivos verificados, zero erro
+
+review formatter final:
+check conjunto de shared, user, organization, audit e gateway
+RED: 6 erros mecânicos no user-service e 1 no gateway
+GREEN: 204 arquivos verificados nos cinco pacotes, zero erro
 ```
 
 ## Gates aprovados
@@ -71,8 +76,11 @@ GREEN: 62 arquivos verificados, zero erro
 - `corepack pnpm audit --audit-level moderate`: nenhuma vulnerabilidade conhecida.
 - `corepack pnpm typecheck`: 22/22 pacotes.
 - Typecheck escopado a `shared` e aos quatro serviços: aprovado.
+- Checks completos de `shared`, user-service, organization-service, audit-service e gateway:
+  aprovados após formatação/organização de imports estritamente mecânica em sete arquivos.
 - Testes escopados a `shared` e aos quatro serviços: aprovados fora do sandbox; a primeira
   tentativa foi bloqueada pela descoberta de configuração do esbuild no perfil do Windows.
+- Suítes completas pós-formatação: user-service 148/148 e gateway 281/281.
 - Regressões do app: session security 6/6, platform session 3/3 e Super Admin 9/9.
 - Typecheck e build de produção do app: aprovados; `/super-admin` e `/super-admin/login`
   constam nas rotas geradas.

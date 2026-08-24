@@ -25,21 +25,18 @@ async function main(): Promise<void> {
   const { prismaClient } = await import("../prisma/index.js");
 
   try {
-    const result = await bootstrapPlatformAdmin(
-      input,
-      {
-        findByEmail: (platformEmail) =>
-          prismaClient.platformUser.findUnique({
-            where: { email: platformEmail },
-            select: { id: true, email: true },
-          }),
-        create: (data) =>
-          prismaClient.platformUser.create({
-            data,
-            select: { id: true, email: true },
-          }),
-      },
-    );
+    const result = await bootstrapPlatformAdmin(input, {
+      findByEmail: (platformEmail) =>
+        prismaClient.platformUser.findUnique({
+          where: { email: platformEmail },
+          select: { id: true, email: true },
+        }),
+      create: (data) =>
+        prismaClient.platformUser.create({
+          data,
+          select: { id: true, email: true },
+        }),
+    });
 
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } finally {
@@ -47,10 +44,7 @@ async function main(): Promise<void> {
   }
 }
 
-if (
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(() => {
     process.stderr.write("Não foi possível criar o administrador da plataforma.\n");
     process.exitCode = 1;

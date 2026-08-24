@@ -1,6 +1,5 @@
-import { z } from "zod";
-
 import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
+import { z } from "zod";
 
 export const permissionModuleValueSchema = z.number().int().min(0).max(3);
 

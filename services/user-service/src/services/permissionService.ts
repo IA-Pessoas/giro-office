@@ -1,9 +1,9 @@
 import {
   ACTIVE_MODULE_KEYS,
   error as logError,
-  ServiceError,
   type ModulePermissionKey,
   type ModulePermissions,
+  ServiceError,
 } from "@workspace/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
