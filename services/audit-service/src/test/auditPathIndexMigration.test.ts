@@ -13,7 +13,7 @@ describe("audit path search migration", () => {
 
     expect(migration).toMatch(/CREATE EXTENSION IF NOT EXISTS "?pg_trgm"?/i);
     expect(migration).toMatch(
-      /CREATE INDEX "idx_audit_requests_path_trgm"[\s\S]*USING GIN \("path" gin_trgm_ops\)/i,
+      /CREATE INDEX CONCURRENTLY "idx_audit_requests_path_trgm"[\s\S]*USING GIN \("path" gin_trgm_ops\)/i,
     );
   });
 });

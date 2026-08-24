@@ -7,6 +7,8 @@ interface CreateAuditRecorderOptions {
   serviceUrl: string;
   serviceToken: string;
   logger: Logger;
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
 }
 
 export function createAuditRecorder({
@@ -14,6 +16,8 @@ export function createAuditRecorder({
   serviceUrl,
   serviceToken,
   logger,
+  timeoutMs = 5_000,
+  fetchImpl = fetch,
 }: CreateAuditRecorderOptions): AuditRecorder {
   if (!enabled) {
     return async () => {};
@@ -23,13 +27,14 @@ export function createAuditRecorder({
 
   return async (payload: CreateAuditRequestPayload) => {
     try {
-      const response = await fetch(url, {
+      const response = await fetchImpl(url, {
         method: "POST",
         headers: {
           "content-type": "application/json",
           [INTERNAL_SERVICE_TOKEN_HEADER]: serviceToken,
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(Math.max(1, timeoutMs)),
       });
 
       if (response.ok) {
