@@ -110,3 +110,29 @@ test("isolated Super Admin CI runs the repository supply-chain gates", async () 
     assert.ok(workflow.includes(requiredGate), `workflow must run: ${requiredGate}`);
   }
 });
+
+test("isolated Super Admin CI pins trusted actions and prepares API packages before the app", async () => {
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github", "workflows", "super-admin-v2-ci.yml"),
+    "utf8",
+  );
+  const requiredInOrder = [
+    "corepack pnpm --filter @workspace/shared build",
+    "corepack pnpm --filter @workspace/api check",
+    "corepack pnpm --filter @workspace/api typecheck",
+    "corepack pnpm --filter @workspace/api build",
+    "corepack pnpm --filter @workspace/api test",
+    "corepack pnpm --filter @workspace/app typecheck",
+  ];
+
+  assert.match(workflow, /actions\/checkout@11bd71901bbe5b1630ceea73d27597364c9af683/u);
+  assert.match(workflow, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/u);
+
+  let previousIndex = -1;
+  for (const command of requiredInOrder) {
+    const commandIndex = workflow.indexOf(command);
+    assert.ok(commandIndex >= 0, `workflow must run: ${command}`);
+    assert.ok(commandIndex > previousIndex, `${command} must run after its package prerequisite`);
+    previousIndex = commandIndex;
+  }
+});
