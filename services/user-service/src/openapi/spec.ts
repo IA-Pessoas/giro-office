@@ -11,6 +11,7 @@ const successJson = {
 } as const;
 const bearer = [{ bearerAuth: [] }] as const;
 const browserSession = [{ cookieAuth: [] }, { bearerAuth: [] }] as const;
+const platformBrowserSession = [{ cookieAuth: [] }] as const;
 const csrfHeader = {
   name: "x-csrf-token",
   in: "header",
@@ -34,6 +35,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
     tags: [
       { name: "Health", description: "Saúde do serviço" },
       { name: "Auth", description: "Sessão e configuração inicial" },
+      { name: "Platform auth", description: "Sessão HTTP-only do administrador da plataforma" },
       { name: "Users", description: "Usuários" },
       { name: "Permission", description: "Permissões por usuário" },
       { name: "Internal reporting", description: "Contexto autoritativo para relatórios" },
@@ -55,6 +57,12 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           in: "header",
           name: "x-internal-service-token",
           description: "Valor igual a REPORTS_INTERNAL_TOKEN.",
+        },
+        serviceInternalToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
+          description: "Valor igual a AUDIT_SERVICE_TOKEN.",
         },
       },
       schemas: {
@@ -101,6 +109,86 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           summary: "Health check",
           responses: {
             "200": { description: "Serviço disponível", ...successJson },
+          },
+        },
+      },
+      "/platform/session": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Login do administrador da plataforma",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["email", "password"],
+                  properties: {
+                    email: { type: "string", format: "email" },
+                    password: { type: "string", format: "password" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description:
+                "Identidade do administrador sem credenciais no JSON; emite cw.session HttpOnly e cw.csrf.",
+              ...successJson,
+            },
+            "400": { description: "Payload inválido" },
+            "401": { description: "Credenciais inválidas" },
+          },
+        },
+        delete: {
+          tags: ["Platform auth"],
+          summary: "Revogar a sessão atual do administrador da plataforma",
+          security: platformBrowserSession,
+          parameters: [csrfHeader],
+          responses: {
+            "200": { description: "Sessão revogada e cookies expirados", ...successJson },
+            "401": { description: "Sessão ausente, inválida ou revogada" },
+            "403": { description: "Identidade ou prova CSRF inválida" },
+          },
+        },
+      },
+      "/platform/session/refresh": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Rotacionar a sessão e a prova CSRF da plataforma",
+          security: platformBrowserSession,
+          parameters: [csrfHeader],
+          responses: {
+            "200": { description: "Novos cookies, sem token no JSON", ...successJson },
+            "401": { description: "Sessão ausente, inválida ou revogada" },
+            "403": { description: "Identidade ou prova CSRF inválida" },
+            "409": { description: "Sessão já rotacionada concorrentemente" },
+          },
+        },
+      },
+      "/platform/me": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Identidade autenticada da plataforma",
+          security: platformBrowserSession,
+          responses: {
+            "200": { description: "Identidade server-side", ...successJson },
+            "401": { description: "Sessão ausente, inválida ou revogada" },
+            "403": { description: "Identidade organizacional não permitida" },
+          },
+        },
+      },
+      "/platform/session/validate": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Validar internamente uma sessão da plataforma",
+          security: [{ serviceInternalToken: [], bearerAuth: [] }],
+          responses: {
+            "200": { description: "Sessão válida", ...successJson },
+            "401": { description: "Sessão ausente, inválida ou revogada" },
+            "403": { description: "Token de serviço ou identidade não permitidos" },
           },
         },
       },

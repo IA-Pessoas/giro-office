@@ -15,7 +15,14 @@ export const EXEMPT_ROUTE_KEYS = new Set([
   "GET|/user/session/validate",
 ]);
 
-export const EXEMPT_SPEC_OPERATION_KEYS = new Set(["user-service|GET|/user/session/validate"]);
+export const EXEMPT_SPEC_OPERATION_KEYS = new Set([
+  "user-service|GET|/user/session/validate",
+  "user-service|POST|/platform/session",
+  "user-service|DELETE|/platform/session",
+  "user-service|POST|/platform/session/refresh",
+  "user-service|GET|/platform/me",
+  "user-service|POST|/platform/session/validate",
+]);
 
 const GOOD_STATUS_OVERRIDES = new Map([
   ["userStartConfig", [200, 409]],
