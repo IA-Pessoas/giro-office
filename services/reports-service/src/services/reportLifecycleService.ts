@@ -152,7 +152,7 @@ export class ReportLifecycleService {
     const event = await this.prisma.$transaction(async (transaction) => {
       const job = await this.getJob(transaction, input.job_id);
       this.assertOrganization(job, input.organization_id);
-      this.assertSnapshotLimits(input.rows);
+      const snapshotBytes = this.assertSnapshotLimits(input.rows);
       assertTransition(job.status, "completed");
 
       const occurredAt = this.clock();
@@ -178,8 +178,9 @@ export class ReportLifecycleService {
       });
 
       const auditEvent = this.auditEvent(job, input, "report.completed", occurredAt, {
-        rows: input.rows.length,
         ...input.counts,
+        rows: input.rows.length,
+        bytes: snapshotBytes,
       });
       await this.audit.recordLocal(transaction, auditEvent);
       return auditEvent;
@@ -258,14 +259,17 @@ export class ReportLifecycleService {
     }
   }
 
-  private assertSnapshotLimits(rows: ReadonlyArray<Record<string, unknown>>): void {
+  private assertSnapshotLimits(rows: ReadonlyArray<Record<string, unknown>>): number {
     if (rows.length > MAX_SNAPSHOT_ROWS) {
       throw new ServiceError(400, "O snapshot excede o limite de linhas.");
     }
 
-    if (Buffer.byteLength(JSON.stringify(rows), "utf8") > MAX_SNAPSHOT_BYTES) {
+    const byteSize = Buffer.byteLength(JSON.stringify(rows), "utf8");
+    if (byteSize > MAX_SNAPSHOT_BYTES) {
       throw new ServiceError(400, "O snapshot excede o limite de bytes.");
     }
+
+    return byteSize;
   }
 
   private leaseForProcessingTransition(

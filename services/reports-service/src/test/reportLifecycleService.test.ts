@@ -119,7 +119,7 @@ describe("ReportLifecycleService", () => {
           report_model_version_id: "model-version-1",
           event_type: "report.completed",
           occurred_at: now.toISOString(),
-          counts: { rows: 1, bytes: 14 },
+          counts: { rows: 1, bytes: 16 },
         },
       },
     });
@@ -132,13 +132,36 @@ describe("ReportLifecycleService", () => {
           report_model_version_id: "model-version-1",
           event_type: "report.completed",
           occurred_at: now.toISOString(),
-          counts: { rows: 1, bytes: 14 },
+          counts: { rows: 1, bytes: 16 },
         },
       }),
     );
     expect(recorder.mock.calls[0]?.[0]).not.toHaveProperty("raw_values");
     expect(recorder.mock.calls[0]?.[0].metadata).not.toHaveProperty("filters");
     expect(recorder.mock.calls[0]?.[0].metadata).not.toHaveProperty("upstream_url");
+  });
+
+  it("deriva as contagens de auditoria do snapshot em vez da entrada", async () => {
+    const { prisma, transaction } = createPersistence();
+    const audit = new ReportAuditService(prisma as never, vi.fn());
+    const service = new ReportLifecycleService(prisma as never, audit, () => now);
+
+    await service.complete({
+      job_id: "job-1",
+      organization_id: "org-1",
+      actor_id: "user-1",
+      lease_token: "lease-b",
+      rows: [{ balance: 42 }],
+      counts: { rows: 999, bytes: 999, matched: 3 },
+    });
+
+    expect(transaction.reportAuditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        payload_json: expect.objectContaining({
+          counts: { rows: 1, bytes: 16, matched: 3 },
+        }),
+      }),
+    });
   });
 
   it.each([
