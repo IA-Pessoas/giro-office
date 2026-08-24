@@ -860,7 +860,7 @@ it("strips client-supplied internal auth headers before proxying", async () => {
     expect(seenHeaders.permission).toBe("2");
     expect(seenHeaders.type).toBe("owner");
     expect(JSON.parse(seenHeaders.modules ?? "{}")).toMatchObject({ rh: 2 });
-    expect(seenHeaders.authorization).toBeUndefined();
+    expect(seenHeaders.authorization).toBe(`Bearer ${token}`);
     expect(seenHeaders.cookie).toBe("theme=dark");
     expect(seenHeaders.csrf).toBeUndefined();
   } finally {

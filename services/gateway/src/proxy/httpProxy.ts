@@ -44,6 +44,7 @@ export interface HttpProxyOptions {
   internalServiceToken?: string;
   permissionModule?: string;
   forwardSessionBinding?: boolean;
+  forwardValidatedAuthorization?: boolean;
 }
 
 const OWNER_MODULE_PERMISSION = 3;
@@ -165,6 +166,10 @@ export function buildForwardHeaders(request: Request, options: HttpProxyOptions 
   }
 
   if (request.auth) {
+    if (options.forwardValidatedAuthorization) {
+      headers.set("authorization", `Bearer ${request.auth.token}`);
+    }
+
     headers.set(FORWARDED_AUTH_USER_ID_HEADER, request.auth.userId);
     headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
 

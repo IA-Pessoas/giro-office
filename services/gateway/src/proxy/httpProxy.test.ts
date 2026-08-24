@@ -9,10 +9,13 @@ import { describe, expect, it } from "vitest";
 import { buildForwardHeaders } from "./httpProxy.js";
 
 const authenticatedRequest = {
-  headers: {},
+  headers: {
+    authorization: "Bearer untrusted-browser-token",
+  },
   protocol: "https",
   ip: "127.0.0.1",
   auth: {
+    token: "validated-session-token",
     userId: "user-1",
     organizationId: "org-1",
     claims: {
@@ -41,5 +44,15 @@ describe("buildForwardHeaders", () => {
 
     expect(headers.get(FORWARDED_AUTH_SESSION_ID_HEADER)).toBe("session-1");
     expect(headers.get(FORWARDED_AUTH_CSRF_HASH_HEADER)).toBe("a".repeat(64));
+  });
+
+  it("sintetiza bearer validado somente para upstream legado explicitamente marcado", () => {
+    const legacyHeaders = buildForwardHeaders(authenticatedRequest, {
+      forwardValidatedAuthorization: true,
+    });
+    const migratedHeaders = buildForwardHeaders(authenticatedRequest);
+
+    expect(legacyHeaders.get("authorization")).toBe("Bearer validated-session-token");
+    expect(migratedHeaders.get("authorization")).toBeNull();
   });
 });

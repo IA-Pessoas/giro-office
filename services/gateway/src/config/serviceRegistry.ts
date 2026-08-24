@@ -50,6 +50,7 @@ export interface GatewayServiceDefinition {
   internalServiceToken?: string;
   permissionModule?: string;
   forwardSessionBinding?: boolean;
+  forwardValidatedAuthorization?: boolean;
 }
 
 export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDefinition[] {
@@ -59,6 +60,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.organizationServiceUrl,
       auditTarget: "organization-service",
       routePrefixes: [...ORGANIZATION_SERVICE_PREFIXES],
+      forwardValidatedAuthorization: true,
     },
     {
       key: "rh-service",
@@ -66,6 +68,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       auditTarget: "rh-service",
       routePrefixes: [...RH_SERVICE_PREFIXES],
       permissionModule: "rh",
+      forwardValidatedAuthorization: true,
     },
     {
       key: "user-service",
@@ -80,18 +83,21 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.departmentServiceUrl,
       auditTarget: "department-service",
       routePrefixes: [...DEPARTMENT_SERVICE_PREFIXES],
+      forwardValidatedAuthorization: true,
     },
     {
       key: "task-service",
       targetUrl: env.taskServiceUrl,
       auditTarget: "task-service",
       routePrefixes: [...TASK_SERVICE_PREFIXES],
+      forwardValidatedAuthorization: true,
     },
     {
       key: "project-service",
       targetUrl: env.projectServiceUrl,
       auditTarget: "project-service",
       routePrefixes: [...PROJECT_SERVICE_PREFIXES],
+      forwardValidatedAuthorization: true,
     },
     {
       key: "client-service",
@@ -105,6 +111,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.regularizeServiceUrl,
       auditTarget: "regularize-service",
       routePrefixes: [...REGULARIZE_SERVICE_PREFIXES],
+      forwardValidatedAuthorization: true,
     },
     {
       key: "fiscal-service",

@@ -37,3 +37,22 @@ describe("user-service gateway registry", () => {
     ).toHaveLength(1);
   });
 });
+
+describe("legacy bearer compatibility registry", () => {
+  it("limits validated bearer forwarding to services that still require JWT headers", () => {
+    const env = {} as GatewayEnv;
+
+    const compatibilityServices = getGatewayServiceDefinitions(env)
+      .filter((service) => service.forwardValidatedAuthorization)
+      .map((service) => service.key);
+
+    expect(compatibilityServices).toEqual([
+      "organization-service",
+      "rh-service",
+      "department-service",
+      "task-service",
+      "project-service",
+      "regularize-service",
+    ]);
+  });
+});
