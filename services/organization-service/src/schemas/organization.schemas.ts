@@ -45,8 +45,8 @@ const expectedUpdatedAtSchema = z.string().datetime({
 
 const platformCnpjSchema = z
   .string()
-  .transform(normalizeCnpj)
-  .refine(isValidCnpj, { message: "cnpj inválido." });
+  .refine(isValidCnpj, { message: "cnpj inválido." })
+  .transform(normalizeCnpj);
 
 const httpsLogoUrlSchema = z
   .string()

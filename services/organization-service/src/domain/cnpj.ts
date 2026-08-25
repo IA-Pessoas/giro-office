@@ -1,5 +1,8 @@
+const RAW_CNPJ_PATTERN = /^\d{14}$/u;
+const FORMATTED_CNPJ_PATTERN = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/u;
+
 export function normalizeCnpj(value: string): string {
-  return value.replace(/[./-]/gu, "");
+  return FORMATTED_CNPJ_PATTERN.test(value) ? value.replace(/[./-]/gu, "") : value;
 }
 
 function calculateCheckDigit(digits: string, weights: readonly number[]): number {
@@ -9,8 +12,12 @@ function calculateCheckDigit(digits: string, weights: readonly number[]): number
 }
 
 export function isValidCnpj(value: string): boolean {
+  if (!RAW_CNPJ_PATTERN.test(value) && !FORMATTED_CNPJ_PATTERN.test(value)) {
+    return false;
+  }
+
   const digits = normalizeCnpj(value);
-  if (!/^\d{14}$/u.test(digits) || /^(\d)\1{13}$/u.test(digits)) {
+  if (/^(\d)\1{13}$/u.test(digits)) {
     return false;
   }
 

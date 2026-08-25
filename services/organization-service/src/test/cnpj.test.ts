@@ -28,6 +28,12 @@ describe("CNPJ", () => {
     expect(isValidCnpj("A11.222.333/0001-81")).toBe(false);
   });
 
+  // Break: pontuação excedente ou mal posicionada é removida e um CNPJ inválido acaba aceito.
+  it("rejeita máscara malformada mesmo quando os 14 dígitos são válidos", () => {
+    expect(isValidCnpj("11.222.333/0001-81.")).toBe(false);
+    expect(isValidCnpj("....11222333000181----")).toBe(false);
+  });
+
   // Break: o cálculo dos dígitos verificadores rejeita um CNPJ válido conhecido.
   it("aceita CNPJ com dígitos verificadores válidos", () => {
     expect(isValidCnpj("11222333000181")).toBe(true);
