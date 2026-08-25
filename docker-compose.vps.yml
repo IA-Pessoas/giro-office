@@ -573,6 +573,7 @@ services:
       USER_SERVICE_URL: http://user-service:3030
       CONTABIL_SERVICE_URL: http://contabil-service:3038
       PROJECT_SERVICE_URL: http://project-service:3033
+      TASK_SERVICE_URL: http://task-service:3032
     expose:
       - "3044"
     healthcheck:

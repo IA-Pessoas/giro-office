@@ -8,6 +8,7 @@ import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapte
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
+import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
 
 const env = getReportsServiceEnv();
@@ -27,6 +28,7 @@ const app = createReportsApp({
       new ParcelamentoAdapter(env),
       new ClientIntegrationAdapter(env),
       new ContabilControlAdapter(env),
+      new TaskAdapter(env),
       new ProjectAdapter(env),
     ],
   },

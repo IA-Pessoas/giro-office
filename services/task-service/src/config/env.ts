@@ -46,6 +46,8 @@ const envSchema = z
     auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
+    reportsInternalToken: z.string().optional().default("reports-service-token"),
+    reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     enableApiDocsEnv: z.string().optional(),
     allowedOrigins: z
       .string()
@@ -64,6 +66,18 @@ const envSchema = z
       serviceName: "task-service",
       envName: "AUDIT_SERVICE_TOKEN",
       token: rest.auditServiceToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "task-service",
+      envName: "REPORTS_INTERNAL_TOKEN",
+      token: rest.reportsInternalToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "task-service",
+      envName: "REPORTS_GRANT_SECRET",
+      token: rest.reportsGrantSecret,
     });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
@@ -90,6 +104,8 @@ export function getTaskServiceEnv(): TaskServiceEnv {
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
+    reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,
+    reportsGrantSecret: process.env.REPORTS_GRANT_SECRET,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
