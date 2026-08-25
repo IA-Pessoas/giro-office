@@ -2187,6 +2187,7 @@ model ReportModelVersion {
   definition_json Json
   created_at      DateTime @default(now())
 
+  @@unique([report_model_id, version])
   @@map("reports.model_versions")
 }
 

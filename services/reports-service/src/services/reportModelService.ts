@@ -28,6 +28,11 @@ export interface UpdatePersonalReportModelInput extends ReportModelActor {
 }
 
 const MODEL_NOT_FOUND = "Modelo de relatório não encontrado.";
+const UPDATE_RETRY_LIMIT = 3;
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
 
 export class ReportModelService {
   constructor(private readonly prisma: ReportsPrismaClient) {}
@@ -60,6 +65,7 @@ export class ReportModelService {
       where: {
         organization_id: input.organizationId,
         created_by_user_id: input.userId,
+        department_id: null,
       },
       orderBy: { updated_at: "desc" },
     });
@@ -75,40 +81,49 @@ export class ReportModelService {
   }
 
   async update(input: UpdatePersonalReportModelInput): Promise<PersonalReportModel> {
-    return this.prisma.$transaction(async (transaction) => {
-      const model = await transaction.reportModel.findFirst({
-        where: {
-          id: input.id,
-          organization_id: input.organizationId,
-          created_by_user_id: input.userId,
-        },
-      });
-      if (!model) throw new ServiceError(404, MODEL_NOT_FOUND);
+    for (let attempt = 0; attempt < UPDATE_RETRY_LIMIT; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (transaction) => {
+          const model = await transaction.reportModel.findFirst({
+            where: {
+              id: input.id,
+              organization_id: input.organizationId,
+              created_by_user_id: input.userId,
+              department_id: null,
+            },
+          });
+          if (!model) throw new ServiceError(404, MODEL_NOT_FOUND);
 
-      const currentVersion = await transaction.reportModelVersion.findFirst({
-        where: {
-          organization_id: input.organizationId,
-          report_model_id: model.id,
-        },
-        orderBy: { version: "desc" },
-      });
-      if (!currentVersion) throw new ServiceError(404, MODEL_NOT_FOUND);
+          const currentVersion = await transaction.reportModelVersion.findFirst({
+            where: {
+              organization_id: input.organizationId,
+              report_model_id: model.id,
+            },
+            orderBy: { version: "desc" },
+          });
+          if (!currentVersion) throw new ServiceError(404, MODEL_NOT_FOUND);
 
-      const updatedModel = await transaction.reportModel.update({
-        where: { id: model.id },
-        data: input.name === undefined ? {} : { name: input.name },
-      });
-      const version = await transaction.reportModelVersion.create({
-        data: {
-          organization_id: input.organizationId,
-          report_model_id: model.id,
-          version: currentVersion.version + 1,
-          definition_json: input.definition,
-        },
-      });
+          const updatedModel = await transaction.reportModel.update({
+            where: { id: model.id },
+            data: input.name === undefined ? {} : { name: input.name },
+          });
+          const version = await transaction.reportModelVersion.create({
+            data: {
+              organization_id: input.organizationId,
+              report_model_id: model.id,
+              version: currentVersion.version + 1,
+              definition_json: input.definition,
+            },
+          });
 
-      return this.toModel(updatedModel, version);
-    });
+          return this.toModel(updatedModel, version);
+        });
+      } catch (error) {
+        if (!isUniqueConstraintError(error)) throw error;
+      }
+    }
+
+    throw new ServiceError(409, "O modelo foi atualizado simultaneamente. Tente novamente.");
   }
 
   async delete(input: ReportModelActor & { id: string }): Promise<void> {
@@ -118,6 +133,7 @@ export class ReportModelService {
           id: input.id,
           organization_id: input.organizationId,
           created_by_user_id: input.userId,
+          department_id: null,
         },
       });
       if (!model) throw new ServiceError(404, MODEL_NOT_FOUND);
@@ -140,6 +156,7 @@ export class ReportModelService {
         id: input.id,
         organization_id: input.organizationId,
         created_by_user_id: input.userId,
+        department_id: null,
       },
     });
     if (!model) throw new ServiceError(404, MODEL_NOT_FOUND);

@@ -71,7 +71,32 @@ describe("ReportModelService", () => {
       expect.objectContaining<ServiceError>({ statusCode: 404 }),
     );
     expect(prisma.reportModel.findFirst).toHaveBeenCalledWith({
-      where: { id: "model-1", organization_id: organizationId, created_by_user_id: userId },
+      where: {
+        id: "model-1",
+        organization_id: organizationId,
+        created_by_user_id: userId,
+        department_id: null,
+      },
+    });
+  });
+
+  it("lista somente modelos pessoais sem departamento", async () => {
+    const prisma = {
+      reportModel: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+    };
+    const service = new ReportModelService(prisma as never);
+
+    await expect(service.list({ organizationId, userId })).resolves.toEqual([]);
+
+    expect(prisma.reportModel.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: organizationId,
+        created_by_user_id: userId,
+        department_id: null,
+      },
+      orderBy: { updated_at: "desc" },
     });
   });
 
@@ -103,9 +128,38 @@ describe("ReportModelService", () => {
     );
 
     expect(transaction.reportModel.findFirst).toHaveBeenCalledWith({
-      where: { id: "model-1", organization_id: organizationId, created_by_user_id: userId },
+      where: {
+        id: "model-1",
+        organization_id: organizationId,
+        created_by_user_id: userId,
+        department_id: null,
+      },
     });
     expect(transaction.reportModel.update).not.toHaveBeenCalled();
     expect(transaction.reportModel.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejeita atualização concorrente após esgotar as tentativas", async () => {
+    const transaction = {
+      reportModel: {
+        findFirst: vi.fn().mockResolvedValue({ id: "model-1", organization_id: organizationId }),
+        update: vi.fn(),
+      },
+      reportModelVersion: {
+        findFirst: vi.fn().mockResolvedValue({ version: 1 }),
+        create: vi.fn().mockRejectedValue({ code: "P2002" }),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof transaction) => unknown) =>
+        callback(transaction),
+      ),
+    };
+    const service = new ReportModelService(prisma as never);
+
+    await expect(
+      service.update({ id: "model-1", organizationId, userId, definition }),
+    ).rejects.toEqual(expect.objectContaining<ServiceError>({ statusCode: 409 }));
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3);
   });
 });
