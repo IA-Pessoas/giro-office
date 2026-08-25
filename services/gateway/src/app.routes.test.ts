@@ -695,15 +695,22 @@ it("audita somente queries allowlisted nas leituras de organização da platafor
       "/platform/organizations?page=1&page=page-secret&pageSize=5&status=active&search=SecretCorp&search=11222333000181&cnpj=query-cnpj&email=query-email&token=query-token-1&token=query-token-2&cookie=query-cookie",
       "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e?token=detail-token&email=detail-email",
       "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=0&skip=skip-secret&take=5&search=user-secret&token=users-token-1&token=users-token-2",
+      "/platform/organizations?page=10001&pageSize=1&status=cancelled",
+      "/platform/organizations?page=10002&pageSize=101",
+      "/platform/organizations?page=11222333000181",
+      "/platform/organizations?page=102&pageSize=100&status=active",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=10000&take=100",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=10001&take=101",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=11222333000181",
     ];
     const responses = [];
     for (const url of urls) {
       responses.push(await fetch(`${gatewayUrl}${url}`, { headers }));
     }
 
-    expect(responses.map(({ status }) => status)).toEqual([200, 200, 200]);
+    expect(responses.map(({ status }) => status)).toEqual(Array(10).fill(200));
     expect(upstreamUrls).toEqual(urls);
-    await waitForRecords(auditService.records, 3);
+    await waitForRecords(auditService.records, 10);
     expect(auditService.records[0]).toMatchObject({
       organizationId: null,
       userId: null,
@@ -719,6 +726,15 @@ it("audita somente queries allowlisted nas leituras de organização da platafor
       query: { take: "5" },
       metadata: { routeTarget: "user-service" },
     });
+    expect(auditService.records.slice(3).map(({ query }) => query)).toEqual([
+      { page: "10001", pageSize: "1", status: "cancelled" },
+      {},
+      {},
+      { status: "active" },
+      { skip: "10000", take: "100" },
+      {},
+      {},
+    ]);
     const serializedAudit = JSON.stringify(auditService.records);
     for (const sensitive of [
       "SecretCorp",

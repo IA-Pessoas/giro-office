@@ -34,16 +34,25 @@ const PLATFORM_ORGANIZATION_STATUSES = new Set([
   "suspended",
   "cancelled",
 ]);
-const POSITIVE_INTEGER_QUERY = /^[1-9]\d*$/u;
 const NON_NEGATIVE_INTEGER_QUERY = /^(?:0|[1-9]\d*)$/u;
+
+function isIntegerInRange(value: string, minimum: number, maximum: number): boolean {
+  if (!NON_NEGATIVE_INTEGER_QUERY.test(value)) {
+    return false;
+  }
+
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= minimum && parsed <= maximum;
+}
+
 const PLATFORM_ORGANIZATION_LIST_QUERY_VALIDATORS = {
-  page: (value: string) => POSITIVE_INTEGER_QUERY.test(value),
-  pageSize: (value: string) => POSITIVE_INTEGER_QUERY.test(value),
+  page: (value: string) => isIntegerInRange(value, 1, 10_001),
+  pageSize: (value: string) => isIntegerInRange(value, 1, 100),
   status: (value: string) => PLATFORM_ORGANIZATION_STATUSES.has(value),
 };
 const PLATFORM_ORGANIZATION_USERS_QUERY_VALIDATORS = {
-  skip: (value: string) => NON_NEGATIVE_INTEGER_QUERY.test(value),
-  take: (value: string) => POSITIVE_INTEGER_QUERY.test(value),
+  skip: (value: string) => isIntegerInRange(value, 0, 10_000),
+  take: (value: string) => isIntegerInRange(value, 1, 100),
 };
 
 function requiresOrganizationMutationAudit(request: Request): boolean {
@@ -157,7 +166,14 @@ function buildPlatformOrganizationQuery(
   }
 
   if (method === "GET" && normalizedPath === PLATFORM_ORGANIZATIONS_PATH) {
-    return buildValidatedQuery(searchParams, PLATFORM_ORGANIZATION_LIST_QUERY_VALIDATORS);
+    const query = buildValidatedQuery(searchParams, PLATFORM_ORGANIZATION_LIST_QUERY_VALIDATORS);
+    const page = typeof query.page === "string" ? Number(query.page) : 1;
+    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : 20;
+    if ((page - 1) * pageSize > 10_000) {
+      delete query.page;
+      delete query.pageSize;
+    }
+    return query;
   }
 
   if (method === "GET" && /^\/platform\/organizations\/[^/]+\/users$/u.test(normalizedPath)) {
