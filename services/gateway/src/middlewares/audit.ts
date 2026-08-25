@@ -26,6 +26,25 @@ const TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS = new Set(["password", "reas
 const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
+const PLATFORM_ORGANIZATIONS_PATH = "/platform/organizations";
+const PLATFORM_ORGANIZATION_STATUSES = new Set([
+  "trial",
+  "past_due",
+  "active",
+  "suspended",
+  "cancelled",
+]);
+const POSITIVE_INTEGER_QUERY = /^[1-9]\d*$/u;
+const NON_NEGATIVE_INTEGER_QUERY = /^(?:0|[1-9]\d*)$/u;
+const PLATFORM_ORGANIZATION_LIST_QUERY_VALIDATORS = {
+  page: (value: string) => POSITIVE_INTEGER_QUERY.test(value),
+  pageSize: (value: string) => POSITIVE_INTEGER_QUERY.test(value),
+  status: (value: string) => PLATFORM_ORGANIZATION_STATUSES.has(value),
+};
+const PLATFORM_ORGANIZATION_USERS_QUERY_VALIDATORS = {
+  skip: (value: string) => NON_NEGATIVE_INTEGER_QUERY.test(value),
+  take: (value: string) => POSITIVE_INTEGER_QUERY.test(value),
+};
 
 function requiresOrganizationMutationAudit(request: Request): boolean {
   const path = normalizeGatewayPath(request.originalUrl ?? "");
@@ -110,9 +129,56 @@ function normalizeOptionalString(value: string | undefined): string | undefined 
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function buildQueryFromUrl(url: string, method: string, path: string): AuditQuery {
+function buildValidatedQuery(
+  searchParams: URLSearchParams,
+  validators: Record<string, (value: string) => boolean>,
+): AuditQuery {
   const query: AuditQuery = {};
+  for (const [key, isValid] of Object.entries(validators)) {
+    const values = searchParams.getAll(key);
+    if (values.length === 1 && isValid(values[0] ?? "")) {
+      query[key] = values[0];
+    }
+  }
+  return query;
+}
+
+function buildPlatformOrganizationQuery(
+  searchParams: URLSearchParams,
+  method: string,
+  path: string,
+): AuditQuery | null {
+  const normalizedPath = path.replace(/\/+$/u, "").toLowerCase();
+  if (
+    normalizedPath !== PLATFORM_ORGANIZATIONS_PATH &&
+    !normalizedPath.startsWith(`${PLATFORM_ORGANIZATIONS_PATH}/`)
+  ) {
+    return null;
+  }
+
+  if (method === "GET" && normalizedPath === PLATFORM_ORGANIZATIONS_PATH) {
+    return buildValidatedQuery(searchParams, PLATFORM_ORGANIZATION_LIST_QUERY_VALIDATORS);
+  }
+
+  if (method === "GET" && /^\/platform\/organizations\/[^/]+\/users$/u.test(normalizedPath)) {
+    return buildValidatedQuery(searchParams, PLATFORM_ORGANIZATION_USERS_QUERY_VALIDATORS);
+  }
+
+  return {};
+}
+
+function buildQueryFromUrl(url: string, method: string, path: string): AuditQuery {
   const parsedUrl = new URL(url, "http://localhost");
+  const platformOrganizationQuery = buildPlatformOrganizationQuery(
+    parsedUrl.searchParams,
+    method,
+    path,
+  );
+  if (platformOrganizationQuery) {
+    return platformOrganizationQuery;
+  }
+
+  const query: AuditQuery = {};
   const isTiPasswordDeactivation = method === "POST" && TI_PASSWORD_DEACTIVATION_PATH.test(path);
 
   parsedUrl.searchParams.forEach((value, key) => {

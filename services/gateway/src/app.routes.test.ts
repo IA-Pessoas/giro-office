@@ -665,19 +665,22 @@ it("bloqueia self-PUT de ator de plataforma antes do proxy", async () => {
   }
 });
 
-it("audita principal de plataforma sem usar id estrangeiro organizacional", async () => {
+it("audita somente queries allowlisted nas leituras de organização da plataforma", async () => {
+  const upstreamUrls: string[] = [];
   const auditService = await startAuditIngestServer();
-  const organizationService = createServer((_request, response) => {
+  const platformServices = createServer((request, response) => {
+    upstreamUrls.push(request.url ?? "");
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ success: true, data: { organizations: [] } }));
   });
-  const organizationServiceUrl = await startServer(organizationService);
+  const platformServicesUrl = await startServer(platformServices);
   const app = createApp(
     createEnv({
       auditEnabled: true,
       auditServiceUrl: auditService.url,
-      organizationServiceUrl,
+      organizationServiceUrl: platformServicesUrl,
+      userServiceUrl: platformServicesUrl,
       bearerAuthCompatibility: false,
     }),
     createTestLogger(),
@@ -687,24 +690,57 @@ it("audita principal de plataforma sem usar id estrangeiro organizacional", asyn
   const gatewayUrl = await startServer(gateway);
 
   try {
-    const response = await fetch(`${gatewayUrl}/platform/organizations`, {
-      headers: { Cookie: `cw.session=${createPlatformToken()}` },
-    });
+    const headers = { Cookie: `cw.session=${createPlatformToken()}` };
+    const urls = [
+      "/platform/organizations?page=1&page=page-secret&pageSize=5&status=active&search=SecretCorp&search=11222333000181&cnpj=query-cnpj&email=query-email&token=query-token-1&token=query-token-2&cookie=query-cookie",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e?token=detail-token&email=detail-email",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=0&skip=skip-secret&take=5&search=user-secret&token=users-token-1&token=users-token-2",
+    ];
+    const responses = [];
+    for (const url of urls) {
+      responses.push(await fetch(`${gatewayUrl}${url}`, { headers }));
+    }
 
-    expect(response.status).toBe(200);
-    await waitForRecords(auditService.records, 1);
+    expect(responses.map(({ status }) => status)).toEqual([200, 200, 200]);
+    expect(upstreamUrls).toEqual(urls);
+    await waitForRecords(auditService.records, 3);
     expect(auditService.records[0]).toMatchObject({
       organizationId: null,
       userId: null,
+      query: { pageSize: "5", status: "active" },
       metadata: {
         auth_kind: "platform",
         platform_user_id: "platform-user-1",
         routeTarget: "organization-service",
       },
     });
+    expect(auditService.records[1]?.query).toEqual({});
+    expect(auditService.records[2]).toMatchObject({
+      query: { take: "5" },
+      metadata: { routeTarget: "user-service" },
+    });
+    const serializedAudit = JSON.stringify(auditService.records);
+    for (const sensitive of [
+      "SecretCorp",
+      "page-secret",
+      "11222333000181",
+      "query-cnpj",
+      "query-email",
+      "query-token-1",
+      "query-token-2",
+      "query-cookie",
+      "detail-token",
+      "detail-email",
+      "user-secret",
+      "skip-secret",
+      "users-token-1",
+      "users-token-2",
+    ]) {
+      expect(serializedAudit).not.toContain(sensitive);
+    }
   } finally {
     await stopServer(gateway);
-    await stopServer(organizationService);
+    await stopServer(platformServices);
     await stopServer(auditService.server);
   }
 });
@@ -768,12 +804,14 @@ it("protege e audita uma única vez cada mutação de organização da plataform
       method: "POST",
       path: "/platform/organizations",
       body: { name: "Smoke secret name", cnpj: "11222333000181" },
+      query: "?token=mutation-token&cnpj=mutation-cnpj&email=mutation-email",
       status: 201,
     },
     {
       method: "PATCH",
       path: "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/subscription-plan",
       body: { subscription_plan: "pro", expected_updated_at: "2026-08-25T12:00:00.000Z" },
+      query: "?token=mutation-token&cnpj=mutation-cnpj&email=mutation-email",
       status: 200,
     },
     {
@@ -783,19 +821,21 @@ it("protege e audita uma única vez cada mutação de organização da plataform
         logo_url: "https://cdn.example.com/private-logo.png",
         expected_updated_at: "2026-08-25T12:00:00.000Z",
       },
+      query: "?token=mutation-token&cnpj=mutation-cnpj&email=mutation-email",
       status: 200,
     },
     {
       method: "PATCH",
       path: "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/status",
       body: { status: "cancelled", expected_updated_at: "2026-08-25T12:00:00.000Z" },
+      query: "?token=mutation-token&cnpj=mutation-cnpj&email=mutation-email",
       status: 200,
     },
   ];
 
   try {
     for (const operation of operations) {
-      const response = await fetch(`${gatewayUrl}${operation.path}`, {
+      const response = await fetch(`${gatewayUrl}${operation.path}${operation.query}`, {
         method: operation.method,
         headers,
         body: JSON.stringify(operation.body),
@@ -806,6 +846,7 @@ it("protege e audita uma única vez cada mutação de organização da plataform
     await waitForRecords(auditService.records, operations.length);
     expect(upstreamRequests).toHaveLength(operations.length);
     for (const request of upstreamRequests) {
+      expect(request.url).toContain("mutation-token");
       expect(request.cookie).toBe(`cw.session=${platformToken}; cw.csrf=${csrfToken}`);
       expect(request.csrf).toBe(csrfToken);
       expect(request.authorization).toBeUndefined();
@@ -830,6 +871,9 @@ it("protege e audita uma única vez cada mutação de organização da plataform
     expect(serializedAudit).not.toContain("private-logo.png");
     expect(serializedAudit).not.toContain(platformToken);
     expect(serializedAudit).not.toContain(csrfToken);
+    expect(serializedAudit).not.toContain("mutation-token");
+    expect(serializedAudit).not.toContain("mutation-cnpj");
+    expect(serializedAudit).not.toContain("mutation-email");
   } finally {
     await stopServer(gateway);
     await stopServer(organizationService);
