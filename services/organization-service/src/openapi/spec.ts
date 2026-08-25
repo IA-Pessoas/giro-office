@@ -21,6 +21,7 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
     tags: [
       { name: "Health", description: "Saúde do serviço" },
       { name: "Organizações", description: "Listagem e gestão" },
+      { name: "Platform", description: "Consultas globais da plataforma" },
     ],
     components: {
       securitySchemes: {
@@ -28,6 +29,11 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
+        },
+        cookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "cw.session",
         },
       },
       schemas: {
@@ -39,6 +45,51 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
       },
     },
     paths: {
+      "/platform/organizations": {
+        get: {
+          tags: ["Platform"],
+          summary: "Listar organizações pela plataforma",
+          description:
+            "Consulta somente leitura, restrita à sessão HTTP-only de um super administrador da plataforma. Não retorna credenciais ou e-mail do criador.",
+          security: [{ cookieAuth: [] }],
+          parameters: [
+            {
+              name: "page",
+              in: "query",
+              description:
+                "Página iniciada em 1. A combinação com pageSize não pode produzir offset superior a 10.000.",
+              schema: { type: "integer", minimum: 1, maximum: 10_001, default: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+            {
+              name: "status",
+              in: "query",
+              schema: {
+                type: "string",
+                enum: ["trial", "past_due", "active", "suspended", "cancelled"],
+              },
+            },
+            { name: "search", in: "query", schema: { type: "string", maxLength: 100 } },
+          ],
+          responses: {
+            "200": {
+              description: "Página de organizações",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "400": { description: "Parâmetros inválidos" },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador da plataforma" },
+          },
+        },
+      },
       "/health": {
         get: {
           tags: ["Health"],

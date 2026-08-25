@@ -19,6 +19,8 @@ import { buildUserServiceOpenApiSpec } from "./openapi/spec.js";
 import { createAuthRoutes } from "./routes/auth.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createPermissionRoutes } from "./routes/permission.routes.js";
+import { createPlatformAuthRoutes } from "./routes/platformAuth.routes.js";
+import { createPlatformUsersRoutes } from "./routes/platformUsers.routes.js";
 import { createUserRoutes } from "./routes/user.routes.js";
 
 function userServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -60,6 +62,8 @@ export function createUserApp(
   }
 
   app.use("/internal", createInternalReportingRouter(env));
+  app.use("/platform", createPlatformAuthRoutes(env));
+  app.use("/platform", createPlatformUsersRoutes());
   app.use("/user", createAuthRoutes(env));
   app.post(
     "/user/:id/photo",

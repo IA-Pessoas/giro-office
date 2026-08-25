@@ -31,14 +31,17 @@ Testes do pacote: `pnpm --filter @workspace/audit-service test`.
 
 ## Consulta operacional
 
-Os registros ficam na tabela `audit_requests` e podem ser consultados, sempre
-limitados à organização enviada na autenticação encaminhada, por:
+Os registros ficam na tabela `audit_requests` e podem ser consultados por:
 
 - `GET /audit/requests` para pesquisa paginada;
 - `GET /audit/requests/:requestId` para consultar um evento específico.
 
 As consultas exigem o token interno do serviço e uma permissão de administrador
-de auditoria. A pesquisa aceita filtros de `requestId`, `userId`, `method`,
+de auditoria. Administradores organizacionais permanecem limitados à organização
+encaminhada. A rota pública `GET /platform/audit/requests`, reescrita pelo gateway
+para `GET /audit/requests`, permite omitir a organização somente quando o gateway
+encaminha a identidade validada `platform/super_admin`; o detalhe continua
+restrito a uma organização. A pesquisa aceita filtros de `requestId`, `userId`, `method`,
 `path`, `statusCode`, intervalo de datas, `referring`, `referringId` e
 `department`. Alterações de entidade preservam `action`, `referring`,
 `referringId` e `changes_json`, permitindo investigar quem alterou o recurso,

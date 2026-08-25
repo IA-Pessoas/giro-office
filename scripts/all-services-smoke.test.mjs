@@ -53,3 +53,23 @@ test("contexto de relatórios do user-service permanece no smoke direto interno"
   assert.doesNotMatch(manifestSource, /path: "\/reports\/access-context"/);
   assert.ok(loginIndex >= 0 && reportingIndex > loginIndex);
 });
+
+test("smoke fiscal exclui cada fixture somente depois das operações que dependem dela", () => {
+  for (const [deleteAction, prerequisiteActions] of [
+    ["fiscalNcmDelete", ["fiscalNcmGet", "fiscalNcmList", "fiscalNcmPut", "fiscalNcmSearch"]],
+    ["fiscalIcmsDelete", ["fiscalIcmsGet", "fiscalIcmsList", "fiscalIcmsPut"]],
+    ["fiscalIpiDelete", ["fiscalIpiGet", "fiscalIpiList", "fiscalIpiPut"]],
+  ]) {
+    const deleteIndex = manifest.findIndex((entry) => entry.action === deleteAction);
+    assert.ok(deleteIndex >= 0, `${deleteAction} deve existir no manifest`);
+
+    for (const prerequisiteAction of prerequisiteActions) {
+      const prerequisiteIndex = manifest.findIndex((entry) => entry.action === prerequisiteAction);
+      assert.ok(prerequisiteIndex >= 0, `${prerequisiteAction} deve existir no manifest`);
+      assert.ok(
+        deleteIndex > prerequisiteIndex,
+        `${deleteAction} deve executar depois de ${prerequisiteAction}`,
+      );
+    }
+  }
+});

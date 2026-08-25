@@ -140,6 +140,13 @@ describe("activityCatalog", () => {
       "gerou",
       "obrigações da competência",
     ],
+    ["GET", "/platform/organizations", "consultou", "a lista global de organizações"],
+    [
+      "GET",
+      "/platform/organizations/org-1/users",
+      "consultou",
+      "a lista global de usuários da organização",
+    ],
   ])("traduz %s %s", (method, path, action, item) => {
     expect(describeActivity(method, path)).toEqual({ action, item });
   });
@@ -153,6 +160,11 @@ describe("activityCatalog", () => {
     ["GET", "/audit/requests"],
     ["POST", "/user/session"],
     ["GET", "/user/me"],
+    ["POST", "/platform/session"],
+    ["DELETE", "/platform/session"],
+    ["POST", "/platform/session/refresh"],
+    ["GET", "/platform/me"],
+    ["GET", "/platform/audit/requests"],
   ])("classifica %s %s como técnico", (method, path) => {
     expect(classifyActivity(method, path)).toEqual({ kind: "technical" });
     expect(describeActivity(method, path)).toBeNull();

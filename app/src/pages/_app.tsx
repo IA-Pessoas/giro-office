@@ -19,6 +19,7 @@ function AppLayout({ children, isIframeView = false }) {
   useAccessStoreSync();
   const isPublicRoute =
     router.pathname === "/login" ||
+    router.pathname === "/super-admin/login" ||
     router.pathname === "/" ||
     router.pathname === "/solicitar-acesso";
 

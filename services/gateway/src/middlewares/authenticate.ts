@@ -1,6 +1,7 @@
 import {
   AUTH_SESSION_COOKIE_NAME,
   AUTH_SESSION_TRANSPORT_HEADER,
+  type AuthContext,
   authenticateFromAuthHeader,
   authenticateFromToken,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -12,21 +13,24 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 import { isPublicRoute } from "../security/publicRoutes.js";
 
-export type SessionValidator = (token: string, transport: "cookie" | "bearer") => Promise<void>;
+export type SessionValidator = (auth: AuthContext, transport: "cookie" | "bearer") => Promise<void>;
 
 export function createUserServiceSessionValidator(
   userServiceUrl: string,
   internalServiceToken: string,
 ): SessionValidator {
-  const validationUrl = new URL("/user/session/validate", userServiceUrl);
+  const organizationValidationUrl = new URL("/user/session/validate", userServiceUrl);
+  const platformValidationUrl = new URL("/platform/session/validate", userServiceUrl);
 
-  return async (token: string, transport: "cookie" | "bearer"): Promise<void> => {
+  return async (auth: AuthContext, transport: "cookie" | "bearer"): Promise<void> => {
     let response: globalThis.Response;
+    const isPlatform = auth.actorKind === "platform";
 
     try {
-      response = await fetch(validationUrl, {
+      response = await fetch(isPlatform ? platformValidationUrl : organizationValidationUrl, {
+        method: isPlatform ? "POST" : "GET",
         headers: {
-          authorization: `Bearer ${token}`,
+          authorization: `Bearer ${auth.token}`,
           [AUTH_SESSION_TRANSPORT_HEADER]: transport,
           [INTERNAL_SERVICE_TOKEN_HEADER]: internalServiceToken,
         },
@@ -77,11 +81,14 @@ export function buildAuthenticateMiddleware(
         }
         request.auth = authenticateFromAuthHeader(request.headers.authorization, options.jwtSecret);
         request.authTransport = "bearer";
+        if (request.auth.actorKind === "platform") {
+          throw new ServiceError(401, "Sessão de autenticação não informada.");
+        }
       }
 
       if (options.sessionValidator) {
         failureReason = "session_validation";
-        await options.sessionValidator(request.auth.token, request.authTransport);
+        await options.sessionValidator(request.auth, request.authTransport);
       }
 
       if (!usingCookie) {
@@ -104,7 +111,7 @@ export function buildAuthenticateMiddleware(
         serviceStatus === 409 &&
         usingCookie &&
         request.method === "DELETE" &&
-        request.path === "/user/session"
+        (request.path === "/user/session" || request.path === "/platform/session")
       ) {
         next();
         return;

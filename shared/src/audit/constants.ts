@@ -1,3 +1,6 @@
 export const DEFAULT_AUDIT_PAGE_SIZE = 50;
 export const MAX_AUDIT_PAGE_SIZE = 200;
+export const MAX_AUDIT_OFFSET = 10_000;
+export const MAX_AUDIT_PAGE = MAX_AUDIT_OFFSET + 1;
+export const MAX_AUDIT_TEXT_FILTER_LENGTH = 200;
 export const AUDIT_ADMIN_PERMISSION = 2;

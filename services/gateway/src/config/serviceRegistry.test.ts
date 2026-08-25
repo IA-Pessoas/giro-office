@@ -24,7 +24,7 @@ describe("user-service gateway registry", () => {
   it("forwards the trusted gateway token with authenticated identity", () => {
     const env = {
       userServiceUrl: "http://user-service:3030",
-      auditServiceToken: "gateway-user-token",
+      userServiceInternalToken: "gateway-user-token",
     } as GatewayEnv;
 
     expect(resolveGatewayService(env, "/user/me")).toMatchObject({
@@ -35,5 +35,15 @@ describe("user-service gateway registry", () => {
     expect(
       getGatewayServiceDefinitions(env).filter((service) => service.forwardSessionBinding),
     ).toHaveLength(1);
+  });
+
+  it("normaliza trailing slash e rejeita dot-segment antes de resolver o upstream", () => {
+    const env = {
+      userServiceUrl: "http://user-service:3030",
+      userServiceInternalToken: "gateway-user-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, "/platform/me/", "GET")?.key).toBe("user-service");
+    expect(resolveGatewayService(env, "/platform/../user/me", "GET")).toBeNull();
   });
 });

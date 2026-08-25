@@ -102,6 +102,8 @@ const env = {
   gatewayPort: process.env.GATEWAY_PORT ?? "3010",
   login: process.env.LOGIN ?? "Admin",
   password: process.env.PASSWORD ?? process.env.ADMIN_PASSWORD ?? "senha123",
+  platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL?.trim() || "",
+  platformAdminPassword: process.env.PLATFORM_ADMIN_PASSWORD ?? "",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -153,6 +155,7 @@ const state = {
     "cw.csrf": "",
     "cw.session": "",
   },
+  platformSessionCookies: null,
   bearerToken: "",
   adminBearerToken: "",
   baselineDepartmentId: env.smokeDepartmentId,
@@ -230,6 +233,7 @@ const actionExecutionRank = {
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
   rhScoreQuestionDelete: 8300,
+  platformSessionLogout: 9900,
   userSessionLogout: 10000,
 };
 
@@ -988,6 +992,27 @@ async function ensureRhTargetUserSessionCookies() {
   }
 
   return state.rhTargetUserSessionCookies;
+}
+
+async function withPlatformSession(fn) {
+  const organizationSessionCookies = state.sessionCookies;
+  state.sessionCookies = { ...requireState("platformSessionCookies") };
+
+  try {
+    const result = await fn();
+    state.platformSessionCookies = { ...state.sessionCookies };
+    return result;
+  } finally {
+    state.sessionCookies = organizationSessionCookies;
+  }
+}
+
+async function platformHttpRequest(op, options = {}) {
+  if (isBadExpectation(op)) {
+    return httpRequest(op, { ...options, auth: "public" });
+  }
+
+  return withPlatformSession(() => httpRequest(op, { ...options, auth: "session" }));
 }
 
 const handlers = {
@@ -1846,6 +1871,101 @@ const handlers = {
     );
   },
 
+  async platformSession(op) {
+    if (isBadExpectation(op)) {
+      await httpRequest(op, {
+        json: {
+          email: env.platformAdminEmail || "platform-smoke-invalid@example.com",
+          password: `${env.namespace}-invalid-password`,
+        },
+        expectEnvelope: false,
+      });
+      return;
+    }
+
+    if (!env.platformAdminEmail || !env.platformAdminPassword.trim()) {
+      throw new Error(
+        "PLATFORM_ADMIN_EMAIL and PLATFORM_ADMIN_PASSWORD are required for the platform smoke.",
+      );
+    }
+
+    const organizationSessionCookies = state.sessionCookies;
+    state.sessionCookies = { "cw.csrf": "", "cw.session": "" };
+
+    try {
+      const response = await httpRequest(op, {
+        json: {
+          email: env.platformAdminEmail,
+          password: env.platformAdminPassword,
+        },
+      });
+      if (
+        response.body?.data?.token !== undefined ||
+        response.body?.data?.csrfToken !== undefined
+      ) {
+        throw new Error("Platform login response exposed session credentials.");
+      }
+      getSessionHeaders("GET");
+      state.platformSessionCookies = { ...state.sessionCookies };
+    } finally {
+      state.sessionCookies = organizationSessionCookies;
+    }
+  },
+
+  async platformSessionRefreshMissingCsrf(op) {
+    await withPlatformSession(() =>
+      httpRequest(op, {
+        headers: getSessionHeaders("GET"),
+        expectedStatus: [403],
+        expectEnvelope: false,
+      }),
+    );
+  },
+
+  async platformSessionRefresh(op) {
+    const response = await platformHttpRequest(op, { expectedStatus: [200] });
+    if (!isBadExpectation(op) && response.body?.data?.token !== undefined) {
+      throw new Error("Platform refresh response exposed a token.");
+    }
+  },
+
+  async platformMe(op) {
+    await platformHttpRequest(op, { expectedStatus: [200] });
+  },
+
+  async platformUsers(op) {
+    await platformHttpRequest(op, {
+      path: `/platform/organizations/${requireState("session").organization_id}/users`,
+      query: { skip: 0, take: 5 },
+      expectedStatus: [200],
+    });
+  },
+
+  async platformOrganizations(op) {
+    await platformHttpRequest(op, {
+      query: { page: 1, pageSize: 5 },
+      expectedStatus: [200],
+    });
+  },
+
+  async platformAuditList(op) {
+    await platformHttpRequest(op, {
+      query: { page: 1, pageSize: 10 },
+      expectedStatus: [200],
+    });
+  },
+
+  async platformSessionLogout(op) {
+    await platformHttpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    const cookies = requireState("platformSessionCookies");
+    if (cookies["cw.session"] || cookies["cw.csrf"]) {
+      throw new Error("Platform logout did not expire both session cookies.");
+    }
+  },
+
   async userSessionRefreshMissingCsrf(op) {
     await httpRequest(op, {
       auth: "public",
@@ -2500,6 +2620,13 @@ const handlers = {
     });
   },
 
+  async fiscalNcmDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ncm_id: requireState("fiscalNcmId") },
+    });
+  },
+
   async fiscalIcmsCreate(op) {
     const icmsCode = uniqueText("Smoke Fiscal ICMS");
     const response = await httpRequest(op, {
@@ -2565,6 +2692,13 @@ const handlers = {
     });
   },
 
+  async fiscalIcmsDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { icms_id: requireState("fiscalIcmsId") },
+    });
+  },
+
   async fiscalIpiCreate(op) {
     const ncm = uniqueDigits(8);
     const response = await httpRequest(op, {
@@ -2619,6 +2753,13 @@ const handlers = {
         description: uniqueText("Smoke Fiscal IPI Updated"),
         aliquot: "12.00",
       },
+    });
+  },
+
+  async fiscalIpiDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { ipi_id: requireState("fiscalIpiId") },
     });
   },
 

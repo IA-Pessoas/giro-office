@@ -1,6 +1,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseAllowedOrigins, validateProductionCorsOrigins } from "@workspace/shared";
+import {
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
 import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -27,6 +31,9 @@ const organizationEnvSchema = z
       }),
     databaseUrl: z.string().min(1, "DATABASE_URL não definido para o organization-service."),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o organization-service."),
+    auditServiceToken: z
+      .string()
+      .min(1, "AUDIT_SERVICE_TOKEN não definido para o organization-service."),
     nodeEnv: z.string().optional().default("development"),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
@@ -54,6 +61,12 @@ const organizationEnvSchema = z
       envName: "SERVICE_ALLOWED_ORIGINS",
       allowedOrigins: rest.allowedOrigins,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "organization-service",
+      envName: "AUDIT_SERVICE_TOKEN",
+      token: rest.auditServiceToken,
+    });
 
     return {
       ...rest,
@@ -69,6 +82,7 @@ export function getOrganizationEnv(): OrganizationEnv {
     port: process.env.PORT,
     databaseUrl: process.env.DATABASE_URL,
     jwtSecret: process.env.JWT_SECRET,
+    auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     nodeEnv: process.env.NODE_ENV,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,

@@ -49,6 +49,7 @@ export function createTestApp() {
     port: 3031,
     databaseUrl: "postgresql://localhost/organization_test",
     jwtSecret: "test-secret",
+    auditServiceToken: "audit-service-token",
     nodeEnv: "test",
     logLevel: "silent",
     logPretty: false,

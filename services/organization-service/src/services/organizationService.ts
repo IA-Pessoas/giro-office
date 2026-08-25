@@ -24,6 +24,10 @@ export interface ListOrganizationsParams {
   status?: status;
 }
 
+export interface ListPlatformOrganizationsParams extends ListOrganizationsParams {
+  search?: string;
+}
+
 const ORGANIZATION_SELECT = {
   id: true,
   name: true,
@@ -33,6 +37,18 @@ const ORGANIZATION_SELECT = {
   logo_url: true,
   cnpj: true,
   email_created_by: true,
+  created_at: true,
+  updated_at: true,
+} as const;
+
+const PLATFORM_ORGANIZATION_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  status: true,
+  subscription_plan: true,
+  logo_url: true,
+  cnpj: true,
   created_at: true,
   updated_at: true,
 } as const;
@@ -74,6 +90,9 @@ const ORGANIZATION_LOGO_UPDATE_SELECT = {
 } as const;
 
 export type OrganizationRow = Prisma.OrganizationGetPayload<{ select: typeof ORGANIZATION_SELECT }>;
+export type PlatformOrganizationRow = Prisma.OrganizationGetPayload<{
+  select: typeof PLATFORM_ORGANIZATION_SELECT;
+}>;
 export type OrganizationCreatedRow = Prisma.OrganizationGetPayload<{
   select: typeof ORGANIZATION_CREATE_SELECT;
 }>;
@@ -88,7 +107,12 @@ export type OrganizationLogoUpdatedRow = Prisma.OrganizationGetPayload<{
 }>;
 
 class OrganizationService {
-  async list(params: ListOrganizationsParams) {
+  async list(params: ListOrganizationsParams): Promise<{
+    organizations: OrganizationRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
     try {
       const { page, pageSize, status: statusFilter } = params;
       const where = statusFilter !== undefined ? { status: statusFilter } : {};
@@ -107,6 +131,48 @@ class OrganizationService {
       return { organizations, total, page, pageSize };
     } catch (err: unknown) {
       logError("Erro ao listar organizações", { err });
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao listar organizações. ${msg}`, err);
+    }
+  }
+
+  async listPlatform(params: ListPlatformOrganizationsParams): Promise<{
+    organizations: PlatformOrganizationRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    try {
+      const { page, pageSize, status: statusFilter, search = "" } = params;
+      const normalizedSearch = search.trim();
+      const where: Prisma.OrganizationWhereInput = {
+        ...(statusFilter !== undefined ? { status: statusFilter } : {}),
+        ...(normalizedSearch
+          ? {
+              OR: [
+                { name: { contains: normalizedSearch, mode: "insensitive" } },
+                { slug: { contains: normalizedSearch, mode: "insensitive" } },
+                { cnpj: { contains: normalizedSearch, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      };
+
+      const [organizations, total] = await Promise.all([
+        prismaClient.organization.findMany({
+          where,
+          select: PLATFORM_ORGANIZATION_SELECT,
+          orderBy: [{ name: "asc" }, { id: "asc" }],
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
+        prismaClient.organization.count({ where }),
+      ]);
+
+      return { organizations, total, page, pageSize };
+    } catch (err: unknown) {
+      logError("Erro ao listar organizações pela plataforma", { err });
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao listar organizações. ${msg}`, err);

@@ -37,6 +37,7 @@ export function parseComposeSecurityMetadata(contents) {
   const networks = new Map();
   let topLevelSection = null;
   let currentService = null;
+  let currentServiceProperty = null;
   let currentNetwork = null;
 
   for (const rawLine of contents.split(/\r?\n/)) {
@@ -52,6 +53,7 @@ export function parseComposeSecurityMetadata(contents) {
       const topLevelMatch = /^([A-Za-z0-9_.-]+):/.exec(trimmed);
       topLevelSection = topLevelMatch?.[1] ?? null;
       currentService = null;
+      currentServiceProperty = null;
       currentNetwork = null;
       continue;
     }
@@ -62,16 +64,37 @@ export function parseComposeSecurityMetadata(contents) {
         if (serviceMatch) {
           currentService = serviceMatch[1];
           if (!services.has(currentService)) {
-            services.set(currentService, { hasPorts: false });
+            services.set(currentService, {
+              hasPorts: false,
+              publishedPorts: [],
+              authCookieSecure: undefined,
+            });
           }
+          currentServiceProperty = null;
         }
         continue;
       }
 
       if (indent === 4 && currentService) {
         const propertyMatch = /^([A-Za-z0-9_.-]+):/.exec(trimmed);
+        currentServiceProperty = propertyMatch?.[1] ?? null;
         if (propertyMatch?.[1] === "ports") {
           services.get(currentService).hasPorts = true;
+        }
+        continue;
+      }
+
+      if (indent === 6 && currentService && currentServiceProperty === "ports") {
+        const portMatch = /^-\s*["']?([^"']+)["']?$/.exec(trimmed);
+        if (portMatch) {
+          services.get(currentService).publishedPorts.push(portMatch[1]);
+        }
+      }
+
+      if (indent === 6 && currentService && currentServiceProperty === "environment") {
+        const envMatch = /^AUTH_COOKIE_SECURE:\s*(.*)$/.exec(trimmed);
+        if (envMatch) {
+          services.get(currentService).authCookieSecure = parseScalarBoolean(envMatch[1]);
         }
       }
     }
@@ -155,6 +178,10 @@ export async function checkComposeSecurity({ composeFiles, registry = serviceReg
     const displayPath = path.relative(rootDir, file) || file;
 
     for (const [serviceName, service] of metadata.services) {
+      if (service.authCookieSecure === false) {
+        errors.push(`${displayPath}: service "${serviceName}" must not disable AUTH_COOKIE_SECURE.`);
+      }
+
       if (!service.hasPorts) {
         continue;
       }
@@ -167,6 +194,15 @@ export async function checkComposeSecurity({ composeFiles, registry = serviceReg
         errors.push(
           `${displayPath}: workspace service "${serviceName}" must use expose, not ports.`,
         );
+      }
+
+      if (
+        ["gateway", "reverse-proxy", "web"].includes(serviceName) &&
+        service.publishedPorts.some(
+          (port) => !port.startsWith("127.0.0.1:") && !port.startsWith("[::1]:"),
+        )
+      ) {
+        errors.push(`${displayPath}: service "${serviceName}" host ports must bind to loopback.`);
       }
     }
 

@@ -1,7 +1,16 @@
+import type { AuthKind, PlatformRole } from "../auth/types.js";
+
 export type AuditOutcome = "success" | "error" | "aborted";
 export type AuditQueryValue = string | string[];
 export type AuditQuery = Record<string, AuditQueryValue>;
-export type AuditRecorder = (payload: CreateAuditRequestPayload) => Promise<void>;
+export type AuditReservation = "protected" | "public";
+export type AuditRecorder = (
+  payload: CreateAuditRequestPayload,
+  reservation?: AuditReservation,
+) => Promise<void>;
+export type ReservableAuditRecorder = AuditRecorder & {
+  reserve(kind: AuditReservation): AuditReservation | undefined;
+};
 
 export interface CreateAuditRequestPayload {
   requestId: string;
@@ -39,7 +48,7 @@ export interface AuditRequestRecord {
   permission?: number | null;
   method: string;
   path: string;
-  query: AuditQuery;
+  query?: AuditQuery;
   statusCode?: number | null;
   outcome: AuditOutcome;
   durationMs?: number | null;
@@ -61,7 +70,7 @@ export interface AuditRequestRecord {
 }
 
 export interface AuditSearchFilters {
-  organizationId: string;
+  organizationId?: string;
   requestId?: string;
   userId?: string;
   method?: string;
@@ -86,6 +95,8 @@ export interface AuditSearchResult {
 
 export interface ForwardedAuditAuthContext {
   userId: string;
-  organizationId: string;
+  organizationId?: string;
   permission?: number;
+  authKind?: AuthKind;
+  platformRole?: PlatformRole;
 }

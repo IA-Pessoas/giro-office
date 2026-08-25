@@ -209,6 +209,7 @@ model Organization {
   triageMonthlys                TriageMonthly[]
   triageResponsibles            TriageResponsible[]
 
+  @@index([name, id], map: "idx_organizations_name_id")
   @@map("organizations")
 }
 
@@ -344,6 +345,7 @@ model User {
   responsiblesTriage          TriageResponsible[]
   department                  Department             @relation(fields: [department_id], references: [id])
 
+  @@index([organization_id, name, id])
   @@map("users")
 }
 
@@ -360,6 +362,35 @@ model AuthSession {
   @@index([user_id])
   @@index([expires_at])
   @@map("auth_sessions")
+}
+
+model PlatformUser {
+  id              String                @id @default(uuid())
+  name            String
+  email           String                @unique
+  password        String
+  platform_role   PlatformRole          @default(super_admin)
+  status          String                @default("active")
+  session_version Int                   @default(0)
+  created_at      DateTime              @default(now())
+  updated_at      DateTime              @updatedAt
+  authSessions    PlatformAuthSession[]
+
+  @@map("platform_users")
+}
+
+model PlatformAuthSession {
+  id               String       @id @default(uuid())
+  platform_user_id String
+  csrf_hash        String
+  expires_at       DateTime
+  revoked_at       DateTime?
+  created_at       DateTime     @default(now())
+  platformUser     PlatformUser @relation(fields: [platform_user_id], references: [id], onDelete: Cascade)
+
+  @@index([platform_user_id, revoked_at, expires_at], map: "idx_platform_auth_sessions_user_state")
+  @@index([expires_at], map: "idx_platform_auth_sessions_expiry")
+  @@map("platform_auth_sessions")
 }
 
 model Permission {
@@ -456,6 +487,8 @@ model AuditRequest {
   @@index([path, created_at(sort: Desc)])
   @@index([status_code, created_at(sort: Desc)])
   @@index([organization_id, referring, referring_id, created_at(sort: Desc)])
+  @@index([created_at(sort: Desc), id(sort: Desc)], map: "idx_audit_requests_created_id_desc")
+  @@index([path(ops: raw("gin_trgm_ops"))], type: Gin, map: "idx_audit_requests_path_trgm")
   @@map("audit_requests")
 }
 
@@ -2261,6 +2294,10 @@ enum status {
   active
   suspended
   cancelled
+}
+
+enum PlatformRole {
+  super_admin
 }
 
 enum enumType {

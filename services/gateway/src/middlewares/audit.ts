@@ -1,10 +1,12 @@
 import type {
   AuditOutcome,
   AuditQuery,
-  AuditRecorder,
+  AuditReservation,
   CreateAuditRequestPayload,
   Logger,
+  ReservableAuditRecorder,
 } from "@workspace/shared";
+import { ServiceError } from "@workspace/shared";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
 import { describeActivity } from "../audit/activityCatalog.js";
@@ -15,11 +17,47 @@ interface BuildAuditLifecycleMiddlewareOptions {
   enabled: boolean;
   env: GatewayEnv;
   logger: Logger;
-  recordAuditRequest: AuditRecorder;
+  recordAuditRequest: ReservableAuditRecorder;
 }
 
 const TI_PASSWORD_DEACTIVATION_PATH = /^\/ti\/passwords\/[^/]+\/deactivate\/?$/i;
 const TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS = new Set(["password", "reason"]);
+const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
+
+interface BuildAuditCapacityGuardOptions {
+  enabled: boolean;
+  recordAuditRequest: ReservableAuditRecorder;
+}
+
+export function buildAuditCapacityGuard({
+  enabled,
+  recordAuditRequest,
+}: BuildAuditCapacityGuardOptions) {
+  return function auditCapacityGuard(
+    request: Request,
+    _response: Response,
+    next: NextFunction,
+  ): void {
+    const mustReserve =
+      request.auth !== undefined || !SAFE_METHODS.has(request.method.toUpperCase());
+
+    if (!enabled || !mustReserve || !request.requestId) {
+      next();
+      return;
+    }
+
+    const reservation = recordAuditRequest.reserve("protected");
+    if (!reservation) {
+      next(new ServiceError(503, "Auditoria indisponível; operação não iniciada."));
+      return;
+    }
+
+    RESERVED_AUDIT_REQUESTS.set(request, reservation);
+    next();
+  };
+}
 
 function getResponseSizeBytes(response: Response): number | undefined {
   const header = response.getHeader("content-length");
@@ -88,8 +126,7 @@ function getOutcome(statusCode: number): AuditOutcome {
 }
 
 function getRouteTarget(env: GatewayEnv, request: Request): string {
-  if (request.originalUrl.startsWith("/audit")) return "audit-service";
-  const service = resolveGatewayService(env, request.originalUrl);
+  const service = resolveGatewayService(env, request.originalUrl, request.method);
   if (service) {
     return service.auditTarget;
   }
@@ -111,6 +148,11 @@ export function buildAuditLifecycleMiddleware({
     const startedAt = process.hrtime.bigint();
     const createdAt = new Date();
     const publicPath = getPublicPath(request.originalUrl, request.path);
+    if (AUDIT_EXCLUDED_PATHS.has(publicPath)) {
+      next();
+      return;
+    }
+
     const activity = describeActivity(request.method, publicPath);
     const requestLogger = request.log ?? logger;
     let recorded = false;
@@ -126,10 +168,12 @@ export function buildAuditLifecycleMiddleware({
         return;
       }
 
+      const isPlatform = request.auth?.actorKind === "platform";
+
       const payload: CreateAuditRequestPayload = {
         requestId: request.requestId,
-        organizationId: normalizeOptionalString(request.auth?.organizationId),
-        userId: normalizeOptionalString(request.auth?.userId),
+        organizationId: isPlatform ? null : normalizeOptionalString(request.auth?.organizationId),
+        userId: isPlatform ? null : normalizeOptionalString(request.auth?.userId),
         permission:
           typeof request.auth?.claims.permission === "number"
             ? request.auth.claims.permission
@@ -152,12 +196,20 @@ export function buildAuditLifecycleMiddleware({
           responseSizeBytes: getResponseSizeBytes(response) ?? null,
           routeTarget: getRouteTarget(env, request),
           activityVisible: activity !== null,
+          ...(isPlatform
+            ? {
+                auth_kind: "platform",
+                platform_user_id: request.auth?.userId,
+              }
+            : {}),
         },
         action: activity?.action,
         referring: activity?.item,
       };
 
-      void recordAuditRequest(payload);
+      const reservation = RESERVED_AUDIT_REQUESTS.get(request);
+      RESERVED_AUDIT_REQUESTS.delete(request);
+      void recordAuditRequest(payload, reservation);
       requestLogger.debug({
         event: "audit.record.queued",
         message: "Audit record queued",

@@ -1,3 +1,4 @@
+import { normalizeGatewayPath } from "../security/routeClassification.js";
 import type { GatewayEnv } from "./env.js";
 
 const ORGANIZATION_SERVICE_PREFIXES = ["/organizations"] as const;
@@ -30,14 +31,6 @@ const PARCELAMENTO_SERVICE_PREFIXES = ["/parcelamento"] as const;
 
 const REPORTS_SERVICE_PREFIXES = ["/reports"] as const;
 
-function getNormalizedPath(path: string): string {
-  try {
-    return new URL(path, "http://localhost").pathname;
-  } catch {
-    return path;
-  }
-}
-
 function matchesPrefix(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
 }
@@ -50,6 +43,9 @@ export interface GatewayServiceDefinition {
   internalServiceToken?: string;
   permissionModule?: string;
   forwardSessionBinding?: boolean;
+  forwardPlatformSessionCredentials?: boolean;
+  stripPathPrefix?: string;
+  routeMatchers?: Array<{ methods: string[]; path: RegExp }>;
 }
 
 export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDefinition[] {
@@ -59,6 +55,9 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.organizationServiceUrl,
       auditTarget: "organization-service",
       routePrefixes: [...ORGANIZATION_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
+      forwardPlatformSessionCredentials: true,
+      routeMatchers: [{ methods: ["GET"], path: /^\/platform\/organizations\/?$/ }],
     },
     {
       key: "rh-service",
@@ -72,8 +71,21 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.userServiceUrl,
       auditTarget: "user-service",
       routePrefixes: [...USER_SERVICE_PREFIXES],
-      internalServiceToken: env.auditServiceToken,
+      internalServiceToken: env.userServiceInternalToken,
       forwardSessionBinding: true,
+      forwardPlatformSessionCredentials: true,
+      routeMatchers: [
+        {
+          methods: ["POST", "DELETE"],
+          path: /^\/platform\/session\/?$/,
+        },
+        { methods: ["POST"], path: /^\/platform\/session\/refresh\/?$/ },
+        { methods: ["GET"], path: /^\/platform\/me\/?$/ },
+        {
+          methods: ["GET"],
+          path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+        },
+      ],
     },
     {
       key: "department-service",
@@ -158,17 +170,43 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       auditTarget: "reports-service",
       routePrefixes: [...REPORTS_SERVICE_PREFIXES],
     },
+    {
+      key: "audit-service",
+      targetUrl: env.auditServiceUrl,
+      auditTarget: "audit-service",
+      routePrefixes: ["/audit"],
+      internalServiceToken: env.auditServiceToken,
+      stripPathPrefix: "/platform",
+      routeMatchers: [{ methods: ["GET"], path: /^\/platform\/audit\/requests\/?$/ }],
+    },
   ];
 }
 
 export function resolveGatewayService(
   env: GatewayEnv,
   path: string,
+  method?: string,
 ): GatewayServiceDefinition | null {
-  const normalizedPath = getNormalizedPath(path);
+  const normalizedPath = normalizeGatewayPath(path)?.toLowerCase();
+  if (!normalizedPath) {
+    return null;
+  }
+  const normalizedMethod = method?.toUpperCase();
+  const services = getGatewayServiceDefinitions(env);
+
+  const matchedRoute = services.find((service) =>
+    service.routeMatchers?.some(
+      (matcher) =>
+        (!normalizedMethod || matcher.methods.includes(normalizedMethod)) &&
+        matcher.path.test(normalizedPath),
+    ),
+  );
+  if (matchedRoute) {
+    return matchedRoute;
+  }
 
   return (
-    getGatewayServiceDefinitions(env).find((service) =>
+    services.find((service) =>
       service.routePrefixes.some((prefix) => matchesPrefix(normalizedPath, prefix)),
     ) ?? null
   );

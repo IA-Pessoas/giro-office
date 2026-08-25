@@ -6,9 +6,11 @@ import type { CreateAuditRequestPayload } from "@workspace/shared";
 import {
   CSRF_HEADER_NAME,
   createLogger,
+  FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   hashCsrfToken,
@@ -162,6 +164,7 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     authCookieSecure: false,
     auditEnabled: false,
     auditServiceToken: "audit-service-token",
+    userServiceInternalToken: "user-service-internal-token",
     auditServiceUrl: "http://127.0.0.1:3020",
     port: 0,
     organizationServiceUrl: "http://127.0.0.1:3031",
@@ -339,6 +342,369 @@ function createToken(
     secret,
   );
 }
+
+function createPlatformToken(
+  claims: {
+    user_id?: string;
+    session_id?: string;
+    session_version?: number;
+    csrf_hash?: string;
+  } = {},
+  secret = "test-secret",
+): string {
+  return jwt.sign(
+    {
+      user_id: "platform-user-1",
+      auth_kind: "platform",
+      platform_role: "super_admin",
+      session_id: "platform-session-1",
+      session_version: 1,
+      csrf_hash: "a".repeat(64),
+      ...claims,
+    },
+    secret,
+  );
+}
+
+it("roteia cada contrato de plataforma ao upstream correto com identidade antiforja", async () => {
+  const seen: Array<{
+    service: string;
+    url: string;
+    userId?: string;
+    organizationId?: string;
+    authKind?: string;
+    platformRole?: string;
+    internalToken?: string;
+    cookie?: string;
+  }> = [];
+  const upstream = (service: string) =>
+    createServer((request, response) => {
+      seen.push({
+        service,
+        url: request.url ?? "",
+        userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+        organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as
+          | string
+          | undefined,
+        authKind: request.headers[FORWARDED_AUTH_KIND_HEADER] as string | undefined,
+        platformRole: request.headers[FORWARDED_AUTH_PLATFORM_ROLE_HEADER] as string | undefined,
+        internalToken: request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined,
+        cookie: request.headers.cookie,
+      });
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ success: true, data: { service } }));
+    });
+  const userService = upstream("user-service");
+  const organizationService = upstream("organization-service");
+  const auditService = upstream("audit-service");
+  const userServiceUrl = await startServer(userService);
+  const organizationServiceUrl = await startServer(organizationService);
+  const auditServiceUrl = await startServer(auditService);
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      userServiceUrl,
+      organizationServiceUrl,
+      auditServiceUrl,
+      bearerAuthCompatibility: true,
+    }),
+    createTestLogger(),
+    { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const platformToken = createPlatformToken();
+  const organizationToken = createToken({
+    user_id: "organization-user-1",
+    organization_id: "org-1",
+    permission: 3,
+  });
+
+  try {
+    const forgedHeaders = {
+      Cookie: `theme=dark; cw.session=${platformToken}; cw.csrf=browser-only-proof`,
+      [FORWARDED_AUTH_USER_ID_HEADER]: "attacker",
+      [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "attacker-org",
+      [FORWARDED_AUTH_KIND_HEADER]: "organization",
+      [FORWARDED_AUTH_PLATFORM_ROLE_HEADER]: "super_admin",
+      [INTERNAL_SERVICE_TOKEN_HEADER]: "attacker-token",
+    };
+    const requests = [];
+    for (const path of [
+      "/platform/me",
+      "/platform/organizations",
+      "/platform/organizations/org-1/users",
+      "/platform/audit/requests",
+    ]) {
+      requests.push(await fetch(`${gatewayUrl}${path}`, { headers: forgedHeaders }));
+    }
+
+    expect(requests.map((response) => response.status)).toEqual([200, 200, 200, 200]);
+    const proxiedRequests = seen.filter(({ url }) => url !== "/internal/audit/requests");
+    expect(proxiedRequests.map(({ service, url }) => ({ service, url }))).toEqual([
+      { service: "user-service", url: "/platform/me" },
+      { service: "organization-service", url: "/platform/organizations" },
+      { service: "user-service", url: "/platform/organizations/org-1/users" },
+      { service: "audit-service", url: "/audit/requests" },
+    ]);
+    for (const forwarded of proxiedRequests) {
+      expect(forwarded).toMatchObject({
+        userId: "platform-user-1",
+        authKind: "platform",
+        platformRole: "super_admin",
+        internalToken:
+          forwarded.service === "user-service"
+            ? "user-service-internal-token"
+            : "audit-service-token",
+      });
+      expect(forwarded.organizationId).toBeUndefined();
+    }
+    expect(proxiedRequests.slice(0, 3).map(({ cookie }) => cookie)).toEqual([
+      `cw.session=${platformToken}`,
+      `cw.session=${platformToken}`,
+      `cw.session=${platformToken}`,
+    ]);
+    expect(proxiedRequests[3]?.cookie).toBeUndefined();
+
+    const platformOnOrganizationRoute = await fetch(`${gatewayUrl}/organizations`, {
+      headers: { Cookie: `cw.session=${platformToken}` },
+    });
+    const organizationOnPlatformRoute = await fetch(`${gatewayUrl}/platform/organizations`, {
+      headers: { Cookie: `cw.session=${organizationToken}` },
+    });
+    const browserBearer = await fetch(`${gatewayUrl}/platform/me`, {
+      headers: { Authorization: `Bearer ${platformToken}` },
+    });
+    const internalValidation = await fetch(`${gatewayUrl}/platform/session/validate`, {
+      method: "POST",
+      headers: { Cookie: `cw.session=${platformToken}` },
+    });
+
+    expect(platformOnOrganizationRoute.status).toBe(403);
+    expect(organizationOnPlatformRoute.status).toBe(403);
+    expect(browserBearer.status).toBe(401);
+    expect(internalValidation.status).toBe(404);
+    expect(proxiedRequests).toHaveLength(4);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(userService);
+    await stopServer(organizationService);
+    await stopServer(auditService);
+  }
+});
+
+it("exige CSRF e limita credenciais encaminhadas em refresh e logout da plataforma", async () => {
+  const csrfToken = "P".repeat(43);
+  const platformToken = createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) });
+  const upstreamRequests: Array<{ url: string; cookie?: string; csrf?: string }> = [];
+  const userService = createServer((request, response) => {
+    upstreamRequests.push({
+      url: request.url ?? "",
+      cookie: request.headers.cookie,
+      csrf: request.headers[CSRF_HEADER_NAME] as string | undefined,
+    });
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.setHeader("set-cookie", [
+      "cw.session=rotated; Path=/; HttpOnly; SameSite=Lax",
+      "cw.csrf=rotated-csrf; Path=/; SameSite=Lax",
+    ]);
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const userServiceUrl = await startServer(userService);
+  const app = createApp(
+    createEnv({
+      userServiceUrl,
+      bearerAuthCompatibility: false,
+      allowedOrigins: ["https://useoffice.com.br"],
+    }),
+    createTestLogger(),
+    { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const headers = {
+    Cookie: `theme=dark; cw.session=${platformToken}; cw.csrf=${csrfToken}`,
+    Origin: "https://useoffice.com.br",
+    [CSRF_HEADER_NAME]: csrfToken,
+  };
+
+  try {
+    const missingRefreshCsrf = await fetch(`${gatewayUrl}/platform/session/refresh`, {
+      method: "POST",
+      headers: { Cookie: headers.Cookie, Origin: headers.Origin },
+    });
+    const missingLogoutCsrf = await fetch(`${gatewayUrl}/platform/session`, {
+      method: "DELETE",
+      headers: { Cookie: headers.Cookie, Origin: headers.Origin },
+    });
+    const refresh = await fetch(`${gatewayUrl}/platform/session/refresh`, {
+      method: "POST",
+      headers,
+    });
+    const trailingSlashRefresh = await fetch(`${gatewayUrl}/platform/session/refresh/`, {
+      method: "POST",
+      headers,
+    });
+    const wrongMethod = await fetch(`${gatewayUrl}/platform/session/refresh`, {
+      method: "GET",
+      headers,
+    });
+    const logout = await fetch(`${gatewayUrl}/platform/session`, { method: "DELETE", headers });
+
+    expect(missingRefreshCsrf.status).toBe(403);
+    expect(missingLogoutCsrf.status).toBe(403);
+    expect(refresh.status).toBe(200);
+    expect(trailingSlashRefresh.status).toBe(200);
+    expect(wrongMethod.status).toBe(403);
+    expect(logout.status).toBe(200);
+    expect(refresh.headers.getSetCookie()).toHaveLength(2);
+    expect(trailingSlashRefresh.headers.getSetCookie()).toHaveLength(2);
+    expect(wrongMethod.headers.getSetCookie()).toHaveLength(0);
+    expect(logout.headers.getSetCookie()).toHaveLength(2);
+    expect(upstreamRequests).toEqual([
+      {
+        url: "/platform/session/refresh",
+        cookie: `cw.session=${platformToken}; cw.csrf=${csrfToken}`,
+        csrf: csrfToken,
+      },
+      {
+        url: "/platform/session/refresh",
+        cookie: `cw.session=${platformToken}; cw.csrf=${csrfToken}`,
+        csrf: csrfToken,
+      },
+      {
+        url: "/platform/session",
+        cookie: `cw.session=${platformToken}; cw.csrf=${csrfToken}`,
+        csrf: csrfToken,
+      },
+    ]);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(userService);
+  }
+});
+
+it("aplica rate limit ao login público da plataforma", async () => {
+  let upstreamHits = 0;
+  let upstreamInternalToken: string | undefined;
+  const userService = createServer((request, response) => {
+    upstreamHits += 1;
+    upstreamInternalToken = request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { id: "platform-user-1" } }));
+  });
+  const userServiceUrl = await startServer(userService);
+  const app = createApp(createEnv({ userServiceUrl, authRateLimitMax: 1 }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const login = () =>
+      fetch(`${gatewayUrl}/platform/session`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "admin@example.com", password: "secret" }),
+      });
+    const accepted = await login();
+    const limited = await login();
+
+    expect(accepted.status).toBe(200);
+    expect(limited.status).toBe(429);
+    expect(upstreamHits).toBe(1);
+    expect(upstreamInternalToken).toBe("user-service-internal-token");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(userService);
+  }
+});
+
+it("bloqueia self-PUT de ator de plataforma antes do proxy", async () => {
+  const csrfToken = "P".repeat(43);
+  let upstreamHits = 0;
+  const userService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const userServiceUrl = await startServer(userService);
+  const app = createApp(
+    createEnv({
+      userServiceUrl,
+      allowedOrigins: ["https://useoffice.com.br"],
+      bearerAuthCompatibility: false,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/user/platform-user-1`, {
+      method: "PUT",
+      headers: {
+        Cookie: `cw.session=${createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) })}; cw.csrf=${csrfToken}`,
+        Origin: "https://useoffice.com.br",
+        [CSRF_HEADER_NAME]: csrfToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "forbidden" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(userService);
+  }
+});
+
+it("audita principal de plataforma sem usar id estrangeiro organizacional", async () => {
+  const auditService = await startAuditIngestServer();
+  const organizationService = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { organizations: [] } }));
+  });
+  const organizationServiceUrl = await startServer(organizationService);
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      organizationServiceUrl,
+      bearerAuthCompatibility: false,
+    }),
+    createTestLogger(),
+    { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/platform/organizations`, {
+      headers: { Cookie: `cw.session=${createPlatformToken()}` },
+    });
+
+    expect(response.status).toBe(200);
+    await waitForRecords(auditService.records, 1);
+    expect(auditService.records[0]).toMatchObject({
+      organizationId: null,
+      userId: null,
+      metadata: {
+        auth_kind: "platform",
+        platform_user_id: "platform-user-1",
+        routeTarget: "organization-service",
+      },
+    });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(organizationService);
+    await stopServer(auditService.server);
+  }
+});
 
 it("returns real dashboard stats for the authenticated organization", async () => {
   const getStats = vi.fn(async (_organizationId: string) => ({
@@ -1266,6 +1632,49 @@ it("does not apply the general rate limit to gateway infrastructure routes", asy
   }
 });
 
+it("trusts exactly the production edge hop and no proxy in direct local execution", () => {
+  expect(createApp(createEnv(), createTestLogger()).get("trust proxy")).toBe(false);
+  expect(
+    createApp(createEnv({ nodeEnv: "production" }), createTestLogger()).get("trust proxy"),
+  ).toBe(1);
+});
+
+it("does not let a direct client spoof X-Forwarded-For to evade the login rate limit", async () => {
+  let upstreamHits = 0;
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { ok: true } }));
+  });
+  const userServiceUrl = await startServer(upstream);
+  const app = createApp(
+    createEnv({ userServiceUrl, authRateLimitMax: 1, authRateLimitWindowMs: 60_000 }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const login = (forwardedFor: string) =>
+      fetch(`${gatewayUrl}/user/session`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": forwardedFor,
+        },
+        body: JSON.stringify({ login: "user", password: "secret" }),
+      });
+
+    expect((await login("198.51.100.10")).status).toBe(200);
+    expect((await login("203.0.113.20")).status).toBe(429);
+    expect(upstreamHits).toBe(1);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("does not let unauthenticated attempts exhaust authenticated route rate limits", async () => {
   const token = createToken({
     user_id: "user-1",
@@ -1422,6 +1831,7 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
     expect(body.components?.securitySchemes?.cookieAuth).toBeTruthy();
     expect(body.components?.securitySchemes?.forwardedAuthUserId).toBe(undefined);
     expect(body.components?.securitySchemes?.internalServiceToken).toBe(undefined);
+    expect(body.components?.securitySchemes?.gatewayInternalToken).toBe(undefined);
     const browserAuth = [{ cookieAuth: [] }, { bearerAuth: [] }];
     expect(body.paths["/user/me"]?.get?.security).toEqual(browserAuth);
     expect(body.paths["/user/{id}"]?.get?.security).toEqual(browserAuth);
@@ -1429,6 +1839,13 @@ it("exposes only gateway-relevant auth schemes in the aggregated OpenAPI JSON", 
     expect(body.paths["/ti/requests/list"]?.get?.security).toEqual(browserAuth);
     expect(body.paths["/certificate/pj/list"]?.get?.security).toEqual(browserAuth);
     expect(body.paths["/certificate/pj/{id}/file"]?.get?.security).toEqual(browserAuth);
+    expect(
+      (
+        body.paths["/platform/session"] as unknown as {
+          post?: { security?: Array<Record<string, string[]>> };
+        }
+      )?.post?.security,
+    ).toBe(undefined);
   } finally {
     await stopServer(server);
   }
@@ -3105,6 +3522,26 @@ it("does not change responses when audit ingestion fails", async () => {
     expect(body.success).toBe(true);
   } finally {
     await stopServer(gateway);
+  }
+});
+
+it("does not send health probes to the audit service", async () => {
+  const auditService = await startAuditIngestServer();
+  const app = createApp(
+    createEnv({ auditEnabled: true, auditServiceUrl: auditService.url }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    expect((await fetch(`${gatewayUrl}/health`)).status).toBe(200);
+    expect((await fetch(`${gatewayUrl}/ready`)).status).toBe(200);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(auditService.records).toHaveLength(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(auditService.server);
   }
 });
 

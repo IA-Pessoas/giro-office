@@ -73,6 +73,16 @@ export const serviceRegistry = [
     prismaOutputPath: "services/fiscal-service/src/generated/prisma",
   },
   {
+    name: "legacy-api",
+    packagePath: "services/src",
+    defaultUrl: "http://localhost:3333",
+    urlEnvKey: "LEGACY_API_URL",
+    openapiSpecPath: null,
+    authModes: ["public", "bearer"],
+    internalTokenEnvKey: null,
+    prismaOutputPath: null,
+  },
+  {
     name: "pessoal-service",
     packagePath: "services/pessoal-service",
     defaultUrl: "http://localhost:3042",

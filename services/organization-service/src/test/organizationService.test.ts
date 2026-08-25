@@ -38,6 +38,69 @@ describe("OrganizationService", () => {
     });
   });
 
+  it("list legado preserva projeção, filtro e ordenação originais", async () => {
+    prismaMock.organization.findMany.mockResolvedValue([{ id: "org-1" }]);
+    prismaMock.organization.count.mockResolvedValue(1);
+    const service = new OrganizationService();
+
+    await service.list({ page: 2, pageSize: 10, status: "active" });
+
+    const expectedWhere = { status: "active" };
+    expect(prismaMock.organization.findMany).toHaveBeenCalledWith({
+      where: expectedWhere,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        subscription_plan: true,
+        logo_url: true,
+        cnpj: true,
+        email_created_by: true,
+        created_at: true,
+        updated_at: true,
+      },
+      orderBy: { created_at: "desc" },
+      skip: 10,
+      take: 10,
+    });
+    expect(prismaMock.organization.count).toHaveBeenCalledWith({ where: expectedWhere });
+  });
+
+  it("listPlatform filtra antes da paginação e ordena organizações de forma estável", async () => {
+    prismaMock.organization.findMany.mockResolvedValue([{ id: "org-2", name: "Castelo" }]);
+    prismaMock.organization.count.mockResolvedValue(1);
+    const service = new OrganizationService();
+
+    await service.listPlatform({ page: 2, pageSize: 20, search: "Castelo" });
+
+    const expectedWhere = {
+      OR: [
+        { name: { contains: "Castelo", mode: "insensitive" } },
+        { slug: { contains: "Castelo", mode: "insensitive" } },
+        { cnpj: { contains: "Castelo", mode: "insensitive" } },
+      ],
+    };
+    expect(prismaMock.organization.findMany).toHaveBeenCalledWith({
+      where: expectedWhere,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        subscription_plan: true,
+        logo_url: true,
+        cnpj: true,
+        created_at: true,
+        updated_at: true,
+      },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      skip: 20,
+      take: 20,
+    });
+    expect(prismaMock.organization.count).toHaveBeenCalledWith({ where: expectedWhere });
+  });
+
   it("create lança 409 quando slug já existe", async () => {
     prismaMock.organization.findUnique.mockResolvedValue({ id: "org-1" });
     const service = new OrganizationService();
