@@ -24,6 +24,17 @@ para validação JWT), `AUDIT_SERVICE_TOKEN`, `AUDIT_SERVICE_URL` (por defeito,
   definidos pelo servidor. Alterações de status, plano e logo usam `expected_updated_at` para
   impedir sobrescrita concorrente e geram auditoria de domínio após o commit.
 
+## Unicidade de CNPJ
+
+As criações legada e de plataforma aceitam CNPJ com dígitos verificadores válidos, em 14 dígitos
+ou máscara oficial (`11.222.333/0001-81`), e persistem somente os dígitos. Antes da gravação,
+uma consulta indexada verifica as duas grafias; conflito existente ou concorrente retorna `409`.
+O smoke usa CNPJs válidos distintos por namespace e caminho de criação.
+
+Não há migração nem reescrita de dados históricos. Grafias antigas fora dessas duas formas não
+são reconciliadas. O deploy deve substituir todas as instâncias antigas que ainda gravam CNPJ
+mascarado para manter a garantia de unicidade entre novas criações concorrentes.
+
 ## Desenvolvimento
 
 ```bash

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createOrganizationBodySchema,
   createPlatformOrganizationBodySchema,
   platformOrganizationIdParamsSchema,
   updatePlatformOrganizationLogoUrlBodySchema,
@@ -9,6 +10,24 @@ import {
 } from "../schemas/organization.schemas.js";
 
 const expectedUpdatedAt = "2026-08-25T12:00:00.000Z";
+
+describe.each([
+  ["legacy", createOrganizationBodySchema, { email_created_by: "admin@example.com" }],
+  ["platform", createPlatformOrganizationBodySchema, {}],
+] as const)("CNPJ na criação %s", (_writer, schema, extra) => {
+  it.each(["11222333000181", "11.222.333/0001-81"])("normaliza entrada válida %s", (cnpj) => {
+    expect(schema.parse({ name: "Empresa Teste", cnpj, ...extra }).cnpj).toBe("11222333000181");
+  });
+
+  it.each([
+    "11.222.333/0001-82",
+    "11222333000182",
+    "11-222-333/0001.81",
+    "11111111111111",
+  ])("rejeita dígitos ou máscara inválida %s", (cnpj) => {
+    expect(schema.safeParse({ name: "Empresa Teste", cnpj, ...extra }).success).toBe(false);
+  });
+});
 
 describe("platform organization schemas", () => {
   // Break: a criação volta a persistir a máscara do CNPJ recebido.

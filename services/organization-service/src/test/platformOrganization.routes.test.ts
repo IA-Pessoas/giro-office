@@ -365,7 +365,7 @@ describe("platform organization OpenAPI", () => {
         properties: {
           name: { type: "string" },
           cnpj: {
-            description: "CNPJ válido com 14 dígitos ou máscara oficial.",
+            description: expect.any(String),
             oneOf: [
               { type: "string", pattern: "^[0-9]{14}$", example: "11222333000181" },
               {

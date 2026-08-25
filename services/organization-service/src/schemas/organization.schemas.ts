@@ -4,11 +4,16 @@ import { z } from "zod";
 import { isValidCnpj, normalizeCnpj } from "../domain/cnpj.js";
 import { status as statusEnum } from "../generated/prisma/client.js";
 
+const cnpjSchema = z
+  .string()
+  .refine(isValidCnpj, { message: "cnpj inválido." })
+  .transform(normalizeCnpj);
+
 export const createOrganizationBodySchema = z
   .object({
     name: zNonEmptyText("name"),
     email_created_by: zNonEmptyText("email_created_by"),
-    cnpj: zNonEmptyText("cnpj"),
+    cnpj: cnpjSchema,
   })
   .strict();
 
@@ -43,11 +48,6 @@ const expectedUpdatedAtSchema = z.string().datetime({
   message: "expected_updated_at deve ser uma data ISO válida.",
 });
 
-const platformCnpjSchema = z
-  .string()
-  .refine(isValidCnpj, { message: "cnpj inválido." })
-  .transform(normalizeCnpj);
-
 const httpsLogoUrlSchema = z
   .string()
   .max(2_048, "logo_url deve ter no máximo 2.048 caracteres.")
@@ -71,7 +71,7 @@ const httpsLogoUrlSchema = z
 export const createPlatformOrganizationBodySchema = z
   .object({
     name: zNonEmptyText("name"),
-    cnpj: platformCnpjSchema,
+    cnpj: cnpjSchema,
   })
   .strict();
 

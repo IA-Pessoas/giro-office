@@ -1,4 +1,5 @@
 import { error as logError, ServiceError } from "@workspace/shared";
+import { normalizeCnpj } from "../domain/cnpj.js";
 import type { Prisma, status } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 
@@ -159,6 +160,19 @@ class OrganizationService {
     private readonly recordOrganizationAudit: OrganizationDomainAuditRecorder = async () => {},
   ) {}
 
+  private async prepareCnpjForCreation(value: string): Promise<string> {
+    const cnpj = normalizeCnpj(value);
+    const formatted = cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/u, "$1.$2.$3/$4-$5");
+    const existing = await prismaClient.organization.findFirst({
+      where: { cnpj: { in: [cnpj, formatted] } },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ServiceError(409, "Já existe uma organização com esse CNPJ.");
+    }
+    return cnpj;
+  }
+
   private async emitOrganizationAudit(event: OrganizationDomainAuditEvent): Promise<void> {
     try {
       await this.recordOrganizationAudit(event);
@@ -271,12 +285,13 @@ class OrganizationService {
 
   async createPlatform(data: CreatePlatformOrganizationInput): Promise<PlatformOrganizationRow> {
     try {
+      const cnpj = await this.prepareCnpjForCreation(data.cnpj);
       const organization = await prismaClient.organization.create({
         data: {
           name: data.name,
           slug: generateSlug(data.name),
           email_created_by: data.emailCreatedBy,
-          cnpj: data.cnpj,
+          cnpj,
           status: "active",
           subscription_plan: "trial",
         },
@@ -380,9 +395,9 @@ class OrganizationService {
     }
   }
 
-  async create(data: CreateOrganizationInput) {
+  async create(data: CreateOrganizationInput): Promise<OrganizationCreatedRow> {
     try {
-      const { name, email_created_by, cnpj } = data;
+      const { name, email_created_by } = data;
       const slug = generateSlug(name);
 
       const slugExists = await prismaClient.organization.findUnique({
@@ -393,6 +408,7 @@ class OrganizationService {
         throw new ServiceError(409, "Já existe uma organização com esse nome/slug.");
       }
 
+      const cnpj = await this.prepareCnpjForCreation(data.cnpj);
       const organization = await prismaClient.organization.create({
         data: {
           name,
@@ -407,6 +423,9 @@ class OrganizationService {
     } catch (err: unknown) {
       logError("Erro ao criar organização", { err });
       if (err instanceof ServiceError) throw err;
+      if (isPrismaUniqueConflict(err)) {
+        throw new ServiceError(409, "Já existe uma organização com esse nome/slug ou CNPJ.", err);
+      }
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao criar organização. ${msg}`, err);
     }

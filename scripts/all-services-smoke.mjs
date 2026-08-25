@@ -492,10 +492,10 @@ function uniqueDigits(length) {
   return source.slice(0, length);
 }
 
-function uniqueCnpj() {
-  const base = [...crypto.createHash("sha256").update(env.namespace).digest().subarray(0, 12)].map(
-    (value) => value % 10,
-  );
+function uniqueCnpj(scope) {
+  const base = [
+    ...crypto.createHash("sha256").update(`${env.namespace}:${scope}`).digest().subarray(0, 12),
+  ].map((value) => value % 10);
   base[0] = 9;
 
   const checkDigit = (digits, weights) => {
@@ -1970,7 +1970,7 @@ const handlers = {
     const response = await platformHttpRequest(op, {
       json: {
         name: uniqueText("Smoke Platform Organization"),
-        cnpj: uniqueCnpj(),
+        cnpj: uniqueCnpj("platform"),
       },
       expectedStatus: isBadExpectation(op) ? op.expectedStatus : [201],
     });
@@ -2220,7 +2220,7 @@ const handlers = {
       json: {
         name: uniqueText("Smoke Organization"),
         email_created_by: uniqueEmail("smoke-org"),
-        cnpj: uniqueDigits(14),
+        cnpj: uniqueCnpj("legacy"),
       },
     });
     if (isBadExpectation(op)) {

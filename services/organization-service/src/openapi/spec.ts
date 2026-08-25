@@ -7,7 +7,19 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
   const createOrganizationExample = {
     name: "Castelo Tecnologia",
     email_created_by: "admin@castelo.com",
-    cnpj: "12345678000190",
+    cnpj: "11222333000181",
+  };
+  const cnpjSchema = {
+    description:
+      "CNPJ com dígitos verificadores válidos, em 14 dígitos ou máscara oficial. Persistido sem máscara; duplicidade considera ambas as grafias.",
+    oneOf: [
+      { type: "string", pattern: "^[0-9]{14}$", example: "11222333000181" },
+      {
+        type: "string",
+        pattern: "^[0-9]{2}\\.[0-9]{3}\\.[0-9]{3}/[0-9]{4}-[0-9]{2}$",
+        example: "11.222.333/0001-81",
+      },
+    ],
   };
 
   return {
@@ -111,21 +123,7 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
                   type: "object",
                   properties: {
                     name: { type: "string" },
-                    cnpj: {
-                      description: "CNPJ válido com 14 dígitos ou máscara oficial.",
-                      oneOf: [
-                        {
-                          type: "string",
-                          pattern: "^[0-9]{14}$",
-                          example: "11222333000181",
-                        },
-                        {
-                          type: "string",
-                          pattern: "^[0-9]{2}\\.[0-9]{3}\\.[0-9]{3}/[0-9]{4}-[0-9]{2}$",
-                          example: "11.222.333/0001-81",
-                        },
-                      ],
-                    },
+                    cnpj: cnpjSchema,
                   },
                   required: ["name", "cnpj"],
                   additionalProperties: false,
@@ -355,10 +353,10 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
                   properties: {
                     name: { type: "string" },
                     email_created_by: { type: "string" },
-                    cnpj: { type: "string" },
+                    cnpj: cnpjSchema,
                   },
                   required: ["name", "email_created_by", "cnpj"],
-                  additionalProperties: true,
+                  additionalProperties: false,
                   example: createOrganizationExample,
                 },
               },
@@ -373,6 +371,8 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
                 },
               },
             },
+            "400": { description: "Body ou CNPJ inválido" },
+            "409": { description: "Slug ou CNPJ já existe" },
           },
         },
       },
