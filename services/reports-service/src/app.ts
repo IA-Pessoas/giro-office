@@ -74,7 +74,11 @@ export function createReportsApp({
   const sourceCatalog = new SourceCatalogService(reporting?.adapters ?? []);
   const definitionService = new ReportDefinitionService(sourceCatalog);
   const accessContextClient = reporting?.accessContextClient ?? new UserAccessContextClient(env);
-  const previewService = new ReportPreviewService(sourceCatalog, definitionService, 100);
+  const previewService = new ReportPreviewService(
+    sourceCatalog,
+    definitionService,
+    env.previewRowLimit,
+  );
   const authorizationService = new ReportAuthorizationService(
     accessContextClient,
     definitionService,

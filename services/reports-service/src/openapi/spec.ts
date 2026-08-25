@@ -96,13 +96,20 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                 schema: {
                   type: "object",
                   required: ["definition"],
-                  properties: { definition: { type: "object", additionalProperties: true } },
+                  additionalProperties: false,
+                  properties: {
+                    definition: { type: "object", additionalProperties: true },
+                    parameterValues: { type: "object", additionalProperties: true },
+                  },
                 },
               },
             },
           },
           responses: {
-            "200": { description: "Prévia limitada", ...successResponse },
+            "200": {
+              description: "Prévia limitada com linhas, apresentação e hasMore",
+              ...successResponse,
+            },
             "400": { description: "Definição inválida" },
             "401": { description: "Contexto autenticado ausente" },
             "403": { description: "Fonte ou campo não autorizado" },

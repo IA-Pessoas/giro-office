@@ -1181,6 +1181,10 @@ const handlers = {
     });
   },
 
+  async reportsPreviewInvalidDefinition(op) {
+    await httpRequest(op, { json: { definition: { sources: [] } } });
+  },
+
   async reportsModelCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: op.expectedStatus,

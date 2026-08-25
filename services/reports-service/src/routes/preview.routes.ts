@@ -38,6 +38,7 @@ export function createReportPreviewRouter(options: {
           body.definition,
           scope,
           request.get(REQUEST_ID_HEADER) ?? "reports-preview",
+          body.parameterValues,
         ),
       ),
     );
