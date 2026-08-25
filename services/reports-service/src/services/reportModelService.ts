@@ -1,5 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 
+import { deriveReportCatalogGrant, type ReportCatalogGrant } from "../catalog/types.js";
 import type { ReportsPrismaClient } from "../prisma/index.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 
@@ -21,6 +22,29 @@ export interface CreatePersonalReportModelInput extends ReportModelActor {
   definition: ReportDefinition;
 }
 
+export interface CreateSharedReportModelInput {
+  organizationId: string;
+  departmentId: string;
+  name: string;
+  definition: ReportDefinition;
+}
+
+export interface SharedReportModel extends PersonalReportModel {
+  department_id: string;
+  grant: ReportCatalogGrant;
+}
+
+export interface SharedReportModelActor {
+  organizationId: string;
+  departmentId: string;
+}
+
+export interface UpdateSharedReportModelInput extends SharedReportModelActor {
+  id: string;
+  name?: string;
+  definition: ReportDefinition;
+}
+
 export interface UpdatePersonalReportModelInput extends ReportModelActor {
   id: string;
   name?: string;
@@ -36,6 +60,108 @@ function isUniqueConstraintError(error: unknown): boolean {
 
 export class ReportModelService {
   constructor(private readonly prisma: ReportsPrismaClient) {}
+
+  async createShared(input: CreateSharedReportModelInput): Promise<SharedReportModel> {
+    return this.prisma.$transaction(async (transaction) => {
+      const model = await transaction.reportModel.create({
+        data: {
+          organization_id: input.organizationId,
+          department_id: input.departmentId,
+          name: input.name,
+        },
+      });
+      const version = await transaction.reportModelVersion.create({
+        data: {
+          organization_id: input.organizationId,
+          report_model_id: model.id,
+          version: 1,
+          definition_json: input.definition,
+        },
+      });
+
+      return this.toSharedModel(
+        { id: model.id, organization_id: input.organizationId, name: input.name },
+        input.departmentId,
+        version,
+      );
+    });
+  }
+
+  async listShared(input: SharedReportModelActor): Promise<SharedReportModel[]> {
+    const models = await this.prisma.reportModel.findMany({
+      where: {
+        organization_id: input.organizationId,
+        department_id: input.departmentId,
+      },
+      orderBy: { updated_at: "desc" },
+    });
+
+    const sharedModels: SharedReportModel[] = [];
+    for (const model of models) {
+      const version = await this.latestVersion(model.id, input);
+      if (!model.department_id) continue;
+      sharedModels.push(this.toSharedModel(model, model.department_id, version));
+    }
+    return sharedModels;
+  }
+
+  async getShared(input: SharedReportModelActor & { id: string }): Promise<SharedReportModel> {
+    const model = await this.prisma.reportModel.findFirst({
+      where: {
+        id: input.id,
+        organization_id: input.organizationId,
+        department_id: input.departmentId,
+      },
+    });
+    if (!model || !model.department_id) throw new ServiceError(404, MODEL_NOT_FOUND);
+    const version = await this.latestVersion(model.id, input);
+    return this.toSharedModel(model, model.department_id, version);
+  }
+
+  async updateShared(input: UpdateSharedReportModelInput): Promise<SharedReportModel> {
+    for (let attempt = 0; attempt < UPDATE_RETRY_LIMIT; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (transaction) => {
+          const model = await transaction.reportModel.findFirst({
+            where: {
+              id: input.id,
+              organization_id: input.organizationId,
+              department_id: input.departmentId,
+            },
+          });
+          if (!model || !model.department_id) throw new ServiceError(404, MODEL_NOT_FOUND);
+
+          const currentVersion = await transaction.reportModelVersion.findFirst({
+            where: {
+              organization_id: input.organizationId,
+              report_model_id: model.id,
+            },
+            orderBy: { version: "desc" },
+          });
+          if (!currentVersion) throw new ServiceError(404, MODEL_NOT_FOUND);
+
+          const updatedModel = await transaction.reportModel.update({
+            where: { id: model.id },
+            data: input.name === undefined ? {} : { name: input.name },
+          });
+          const version = await transaction.reportModelVersion.create({
+            data: {
+              organization_id: input.organizationId,
+              report_model_id: model.id,
+              version: currentVersion.version + 1,
+              definition_json: input.definition,
+            },
+          });
+
+          return this.toSharedModel(updatedModel, model.department_id, version);
+        });
+      } catch (error) {
+        if (!isUniqueConstraintError(error)) throw error;
+      }
+    }
+
+    throw new ServiceError(409, "O modelo foi atualizado simultaneamente. Tente novamente.");
+  }
 
   async create(input: CreatePersonalReportModelInput): Promise<PersonalReportModel> {
     return this.prisma.$transaction(async (transaction) => {
@@ -163,7 +289,7 @@ export class ReportModelService {
     return model;
   }
 
-  private async latestVersion(id: string, input: ReportModelActor) {
+  private async latestVersion(id: string, input: { organizationId: string }) {
     const version = await this.prisma.reportModelVersion.findFirst({
       where: {
         organization_id: input.organizationId,
@@ -185,6 +311,19 @@ export class ReportModelService {
       name: model.name,
       version: version.version,
       definition: version.definition_json as ReportDefinition,
+    };
+  }
+
+  private toSharedModel(
+    model: { id: string; organization_id: string; name: string },
+    departmentId: string,
+    version: { version: number; definition_json: unknown },
+  ): SharedReportModel {
+    const personal = this.toModel(model, version);
+    return {
+      ...personal,
+      department_id: departmentId,
+      grant: deriveReportCatalogGrant(personal.definition),
     };
   }
 }

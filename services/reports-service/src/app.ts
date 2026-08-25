@@ -83,7 +83,10 @@ export function createReportsApp({
 
   app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
   app.use("/reports", createReportPreviewRouter({ previewService, accessContextClient }));
-  app.use("/reports", createReportModelRouter({ modelService, authorizationService }));
+  app.use(
+    "/reports",
+    createReportModelRouter({ modelService, authorizationService, previewService }),
+  );
   app.use(
     createExpressErrorHandler({
       logger,

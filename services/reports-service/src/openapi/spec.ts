@@ -109,6 +109,110 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           },
         },
       },
+      "/reports/models/shared": {
+        post: {
+          tags: ["Reports"],
+          summary: "Criar modelo compartilhado do departamento",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name", "definition"],
+                  properties: {
+                    name: { type: "string" },
+                    definition: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Modelo compartilhado criado", ...successResponse },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Permissão departamental insuficiente" },
+          },
+        },
+      },
+      "/reports/models/shared/list": {
+        get: {
+          tags: ["Reports"],
+          summary: "Listar acervo compartilhado do departamento atual",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Acervo compartilhado", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Departamento atual indisponível" },
+          },
+        },
+      },
+      "/reports/models/shared/{id}": {
+        patch: {
+          tags: ["Reports"],
+          summary: "Criar nova versão de modelo compartilhado",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["definition"],
+                  properties: {
+                    name: { type: "string" },
+                    definition: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Nova versão compartilhada", ...successResponse },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Permissão departamental insuficiente" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+      },
+      "/reports/models/shared/{id}/copy": {
+        post: {
+          tags: ["Reports"],
+          summary: "Copiar modelo compartilhado como modelo pessoal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "201": { description: "Modelo pessoal copiado", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Departamento atual indisponível" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+      },
+      "/reports/models/shared/{id}/preview": {
+        post: {
+          tags: ["Reports"],
+          summary: "Gerar prévia com a concessão do modelo compartilhado",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Prévia limitada", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Concessão ou departamento indisponível" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+      },
       "/reports/models": {
         post: {
           tags: ["Reports"],

@@ -14,6 +14,13 @@ export class SourceCatalogService {
   constructor(private readonly adapters: readonly ReportSourceAdapter[]) {}
 
   getAuthorizedCatalog(scope: ReportCatalogScope): AuthorizedReportCatalog {
+    const relationSourceKeys = new Set(
+      this.adapters.flatMap((adapter) =>
+        adapter.relations
+          .filter((relation) => scope.grant?.relations.includes(relation.key))
+          .flatMap((relation) => relation.sources),
+      ),
+    );
     const sources = this.adapters.flatMap((adapter) => {
       if (!adapter.isEnabled(scope)) return [];
 
@@ -27,7 +34,9 @@ export class SourceCatalogService {
           ? source.fields.filter((field) => grantedFields.includes(field.key))
           : source.fields;
 
-        return fields.length > 0 ? [{ ...source, fields }] : [];
+        return fields.length > 0 || relationSourceKeys.has(source.key)
+          ? [{ ...source, fields }]
+          : [];
       });
     });
     const sourceKeys = new Set(sources.map((source) => source.key));

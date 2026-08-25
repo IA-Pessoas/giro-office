@@ -54,6 +54,11 @@ describe("reports-service app", () => {
     });
     expect(openapi.body.paths["/reports/catalog"]).toBeDefined();
     expect(openapi.body.paths["/reports/models"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models/shared"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models/shared/list"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models/shared/{id}"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models/shared/{id}/copy"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models/shared/{id}/preview"]).toBeDefined();
     expect(catalog.body.success).toBe(false);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
