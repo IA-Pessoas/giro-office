@@ -95,6 +95,13 @@ test("certificate-service registry entry exposes OpenAPI and internal smoke meta
   });
 });
 
+test("contabil-service registry entry exposes reports internal smoke metadata", () => {
+  const entry = getServiceRegistryEntry("contabil-service");
+
+  assert.deepEqual(entry?.authModes, ["public", "bearer", "internal-token"]);
+  assert.equal(entry?.internalTokenEnvKey, "REPORTS_INTERNAL_TOKEN");
+});
+
 test("extractOpenApiOperationsFromSource discovers path operations from spec source", () => {
   const operations = extractOpenApiOperationsFromSource(`
     export const spec = {

@@ -112,6 +112,9 @@ const env = {
   clientReportingSmokeEnabled:
     process.env.CLIENT_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.CLIENT_REPORTING_SMOKE_ENABLED === "1",
+  contabilReportingSmokeEnabled:
+    process.env.CONTABIL_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.CONTABIL_REPORTING_SMOKE_ENABLED === "1",
   projectReportingSmokeEnabled:
     process.env.PROJECT_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.PROJECT_REPORTING_SMOKE_ENABLED === "1",
@@ -851,6 +854,32 @@ function createClientIntegrationReportingGrant({ operation, source, fields, body
   const requestId = crypto.randomUUID();
   const payload = {
     audience: "client-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createContabilReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for contabil reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "contabil-service",
     body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
     expires_at: issuedAt + 60,
     fields,
@@ -2120,6 +2149,36 @@ const handlers = {
       headers: isBadExpectation(op)
         ? {}
         : createTaskReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
+  },
+
+  async contabilReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createContabilReportingGrant({
+            operation: "catalog",
+            source: "contabil.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async contabilReportingExtract(op) {
+    const body = { source: "contabil.control", fields: ["competence"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createContabilReportingGrant({
             operation: "extract",
             source: body.source,
             fields: body.fields,
@@ -4821,6 +4880,10 @@ function disabledConditionReason(condition) {
 
   if (condition === "clientReportingSmokeEnabled" && !env.clientReportingSmokeEnabled) {
     return "CLIENT_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "contabilReportingSmokeEnabled" && !env.contabilReportingSmokeEnabled) {
+    return "CONTABIL_REPORTING_SMOKE_ENABLED is false";
   }
 
   if (condition === "projectReportingSmokeEnabled" && !env.projectReportingSmokeEnabled) {

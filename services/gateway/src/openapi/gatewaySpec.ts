@@ -144,7 +144,7 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "Contabil Service",
       buildSpec: () =>
         buildContabilServiceOpenApiSpec({ port: getPortFromUrl(env.contabilServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "ti-service",
