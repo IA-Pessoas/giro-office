@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import type { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { ReportModelService } from "../services/reportModelService.js";
@@ -73,5 +73,39 @@ describe("ReportModelService", () => {
     expect(prisma.reportModel.findFirst).toHaveBeenCalledWith({
       where: { id: "model-1", organization_id: organizationId, created_by_user_id: userId },
     });
+  });
+
+  it("não atualiza nem exclui modelo de outro autor", async () => {
+    const transaction = {
+      reportModel: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        update: vi.fn(),
+        delete: vi.fn(),
+      },
+      reportModelVersion: {
+        findFirst: vi.fn(),
+        create: vi.fn(),
+        deleteMany: vi.fn(),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof transaction) => unknown) =>
+        callback(transaction),
+      ),
+    };
+    const service = new ReportModelService(prisma as never);
+
+    await expect(
+      service.update({ id: "model-1", organizationId, userId, definition }),
+    ).rejects.toEqual(expect.objectContaining<ServiceError>({ statusCode: 404 }));
+    await expect(service.delete({ id: "model-1", organizationId, userId })).rejects.toEqual(
+      expect.objectContaining<ServiceError>({ statusCode: 404 }),
+    );
+
+    expect(transaction.reportModel.findFirst).toHaveBeenCalledWith({
+      where: { id: "model-1", organization_id: organizationId, created_by_user_id: userId },
+    });
+    expect(transaction.reportModel.update).not.toHaveBeenCalled();
+    expect(transaction.reportModel.delete).not.toHaveBeenCalled();
   });
 });

@@ -53,6 +53,7 @@ describe("reports-service app", () => {
       data: { status: "ready", service: "reports-service" },
     });
     expect(openapi.body.paths["/reports/catalog"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models"]).toBeDefined();
     expect(catalog.body.success).toBe(false);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });

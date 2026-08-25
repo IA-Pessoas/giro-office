@@ -1181,6 +1181,69 @@ const handlers = {
     });
   },
 
+  async reportsModelCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      json: {
+        name: uniqueText("Smoke Report Model"),
+        definition: {
+          sources: ["parcelamento.installments"],
+          columns: [
+            {
+              source: "parcelamento.installments",
+              field: "agreement_number",
+              alias: "agreement_number",
+            },
+          ],
+        },
+      },
+    });
+    if (op.expectationKind === "good") {
+      state.reportsModelId =
+        pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+      registerCleanup("reports-model", async () => {
+        if (!state.reportsModelId) return;
+        await helperCall("reports-model-cleanup", {
+          method: "DELETE",
+          path: `/reports/models/${state.reportsModelId}`,
+          target: "gateway",
+          service: "reports-service",
+          auth: "bearer",
+          expectedStatus: [204, 404],
+          expectEnvelope: false,
+        });
+      });
+    }
+  },
+
+  async reportsModelList(op) {
+    await httpRequest(op);
+  },
+
+  async reportsModelGet(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/models/${requireState("reportsModelId")}`,
+    });
+  },
+
+  async reportsModelPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/models/${requireState("reportsModelId")}`,
+      json: { name: uniqueText("Smoke Report Model Updated") },
+    });
+  },
+
+  async reportsModelDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/models/${requireState("reportsModelId")}`,
+      expectEnvelope: false,
+    });
+    if (op.expectationKind === "good") state.reportsModelId = null;
+  },
+
   async certificatePjList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -2124,7 +2187,7 @@ const handlers = {
             fields: body.fields,
             body,
           }),
-      });
+    });
   },
 
   async taskReportingCatalog(op) {

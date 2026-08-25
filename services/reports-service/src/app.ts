@@ -19,7 +19,10 @@ import type { ReportsPrismaClient } from "./prisma/index.js";
 import { createReportPreviewRouter } from "./routes/preview.routes.js";
 import { createReportCatalogRouter } from "./routes/reportCatalog.routes.js";
 import type { ReportingAccessContextClient } from "./routes/reportingContext.js";
+import { createReportModelRouter } from "./routes/reportModel.routes.js";
+import { ReportAuthorizationService } from "./services/reportAuthorizationService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
+import { ReportModelService } from "./services/reportModelService.js";
 import { ReportPreviewService } from "./services/reportPreviewService.js";
 
 export interface CreateReportsAppOptions {
@@ -72,9 +75,15 @@ export function createReportsApp({
   const definitionService = new ReportDefinitionService(sourceCatalog);
   const accessContextClient = reporting?.accessContextClient ?? new UserAccessContextClient(env);
   const previewService = new ReportPreviewService(sourceCatalog, definitionService, 100);
+  const authorizationService = new ReportAuthorizationService(
+    accessContextClient,
+    definitionService,
+  );
+  const modelService = new ReportModelService(prisma);
 
   app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
   app.use("/reports", createReportPreviewRouter({ previewService, accessContextClient }));
+  app.use("/reports", createReportModelRouter({ modelService, authorizationService }));
   app.use(
     createExpressErrorHandler({
       logger,

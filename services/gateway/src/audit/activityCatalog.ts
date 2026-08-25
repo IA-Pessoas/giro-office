@@ -472,6 +472,12 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 
 const RESOURCE_RULES: ResourceRule[] = [
   {
+    pattern: /^\/reports\/models(?:\/|$)/,
+    singular: "um modelo pessoal de relatório",
+    newSingular: "um novo modelo pessoal de relatório",
+    plural: "modelos pessoais de relatório",
+  },
+  {
     pattern: /^\/task\/project-plan\/task(?:\/|$)/,
     singular: "uma tarefa do plano de projeto",
     newSingular: "uma nova tarefa no plano de projeto",

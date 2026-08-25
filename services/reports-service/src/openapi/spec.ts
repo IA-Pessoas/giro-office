@@ -109,6 +109,104 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           },
         },
       },
+      "/reports/models": {
+        post: {
+          tags: ["Reports"],
+          summary: "Criar modelo pessoal de relatório",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name", "definition"],
+                  properties: {
+                    name: { type: "string", example: "Saldo mensal" },
+                    definition: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Modelo pessoal criado", ...successResponse },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Fonte ou campo não autorizado" },
+          },
+        },
+      },
+      "/reports/models/list": {
+        get: {
+          tags: ["Reports"],
+          summary: "Listar modelos pessoais autorizados",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Modelos pessoais", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "503": { description: "Contexto de acesso indisponível" },
+          },
+        },
+      },
+      "/reports/models/{id}": {
+        get: {
+          tags: ["Reports"],
+          summary: "Consultar modelo pessoal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Modelo pessoal", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Fonte ou campo não autorizado" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+        patch: {
+          tags: ["Reports"],
+          summary: "Criar nova versão de modelo pessoal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    definition: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Nova versão criada", ...successResponse },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Fonte ou campo não autorizado" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+        delete: {
+          tags: ["Reports"],
+          summary: "Excluir modelo pessoal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "204": { description: "Modelo excluído" },
+            "401": { description: "Contexto autenticado ausente" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+      },
     },
   };
 }

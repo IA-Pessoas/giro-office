@@ -1,11 +1,11 @@
-import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import {
   getReportingCatalogScope,
   type ReportingAccessContextClient,
 } from "../routes/reportingContext.js";
-import {
-  type ReportDefinitionService,
-  type ValidatedReportDefinition,
+import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
+import type {
+  ReportDefinitionService,
+  ValidatedReportDefinition,
 } from "./reportDefinitionService.js";
 
 export interface ValidateReportDefinitionInput {

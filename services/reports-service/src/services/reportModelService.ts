@@ -134,7 +134,7 @@ export class ReportModelService {
 
   private async findOwnedModel(
     input: ReportModelActor & { id: string },
-  ): Promise<Awaited<ReturnType<ReportsPrismaClient["reportModel"]["findFirst"]>>> {
+  ): Promise<NonNullable<Awaited<ReturnType<ReportsPrismaClient["reportModel"]["findFirst"]>>>> {
     const model = await this.prisma.reportModel.findFirst({
       where: {
         id: input.id,

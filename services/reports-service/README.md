@@ -26,6 +26,11 @@ Prefixo público: `/reports`.
 organização e permissões atuais. `POST /reports/preview` valida a mesma definição e devolve uma
 amostra limitada; não cria job, snapshot, arquivo ou registro persistido.
 
+`POST /reports/models` cria um modelo pessoal. `GET /reports/models/list`,
+`GET /reports/models/:id`, `PATCH /reports/models/:id` e `DELETE /reports/models/:id` atendem
+somente o autor. Cada criação ou edição revalida a definição declarativa contra o catálogo e as
+permissões atuais; a edição cria uma nova versão e nunca compartilha o modelo com departamento.
+
 ## Desenvolvimento
 
 ```bash
