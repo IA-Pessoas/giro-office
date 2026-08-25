@@ -148,8 +148,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3032",
     urlEnvKey: "TASK_SERVICE_URL",
     openapiSpecPath: "services/task-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer", "admin-bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "admin-bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/task-service/src/generated/prisma",
   },
   {

@@ -39,6 +39,7 @@ const reportsServiceEnvSchema = z
       .string()
       .url("CLIENT_SERVICE_URL invalida.")
       .default("http://localhost:3000"),
+    taskServiceUrl: z.string().url("TASK_SERVICE_URL invalida.").default("http://localhost:3032"),
     projectServiceUrl: z
       .string()
       .url("PROJECT_SERVICE_URL invalida.")
@@ -112,6 +113,7 @@ export function parseReportsServiceEnv(
     userServiceUrl: source.USER_SERVICE_URL,
     parcelamentoServiceUrl: source.PARCELAMENTO_SERVICE_URL,
     clientServiceUrl: source.CLIENT_SERVICE_URL,
+    taskServiceUrl: source.TASK_SERVICE_URL,
     projectServiceUrl: source.PROJECT_SERVICE_URL,
     workerPollIntervalMs: source.REPORTS_WORKER_POLL_INTERVAL_MS,
     workerConcurrency: source.REPORTS_WORKER_CONCURRENCY,
