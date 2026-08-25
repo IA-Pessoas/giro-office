@@ -18,6 +18,7 @@ import {
   type PrismaClient,
 } from "../../../generated/prisma/client.js";
 
+import { getOwnDataProperty } from "../../security/ownDataProperty.js";
 import { getPrismaClient } from "./prismaClient.js";
 
 export interface AuditRequestRepository {
@@ -179,7 +180,7 @@ function getPlatformActor(value: unknown): string | undefined {
     return undefined;
   }
 
-  const actor = Object.getOwnPropertyDescriptor(value, "actorPlatformUserId")?.value;
+  const actor = getOwnDataProperty(value, "actorPlatformUserId");
   if (typeof actor !== "string" || actor.length > 200) {
     return undefined;
   }
@@ -219,33 +220,39 @@ function getPlatformChanges(
   }
 
   const changes: PlatformOrganizationAuditChanges = {};
-  const status = record.changes_json.status;
+  const status = getOwnDataProperty(record.changes_json, "status");
+  const statusFrom = getOwnDataProperty(status, "from");
+  const statusTo = getOwnDataProperty(status, "to");
   if (
     isRecord(status) &&
-    (status.from === null || organizationStatuses.has(status.from as OrganizationAuditStatus)) &&
-    (status.to === null || organizationStatuses.has(status.to as OrganizationAuditStatus))
+    (statusFrom === null || organizationStatuses.has(statusFrom as OrganizationAuditStatus)) &&
+    (statusTo === null || organizationStatuses.has(statusTo as OrganizationAuditStatus))
   ) {
     changes.status = {
-      from: status.from as OrganizationAuditStatus | null,
-      to: status.to as OrganizationAuditStatus | null,
+      from: statusFrom as OrganizationAuditStatus | null,
+      to: statusTo as OrganizationAuditStatus | null,
     };
   }
 
-  const plan = record.changes_json.subscription_plan;
+  const plan = getOwnDataProperty(record.changes_json, "subscription_plan");
+  const planFrom = getOwnDataProperty(plan, "from");
+  const planTo = getOwnDataProperty(plan, "to");
   if (
     isRecord(plan) &&
-    (plan.from === null || organizationPlans.has(plan.from as OrganizationAuditPlan)) &&
-    (plan.to === null || organizationPlans.has(plan.to as OrganizationAuditPlan))
+    (planFrom === null || organizationPlans.has(planFrom as OrganizationAuditPlan)) &&
+    (planTo === null || organizationPlans.has(planTo as OrganizationAuditPlan))
   ) {
     changes.subscription_plan = {
-      from: plan.from as OrganizationAuditPlan | null,
-      to: plan.to as OrganizationAuditPlan | null,
+      from: planFrom as OrganizationAuditPlan | null,
+      to: planTo as OrganizationAuditPlan | null,
     };
   }
 
-  const logo = record.changes_json.logo_url;
-  if (isRecord(logo) && isSafeLogoUrl(logo.from) && isSafeLogoUrl(logo.to)) {
-    changes.logo_url = { from: logo.from, to: logo.to };
+  const logo = getOwnDataProperty(record.changes_json, "logo_url");
+  const logoFrom = getOwnDataProperty(logo, "from");
+  const logoTo = getOwnDataProperty(logo, "to");
+  if (isRecord(logo) && isSafeLogoUrl(logoFrom) && isSafeLogoUrl(logoTo)) {
+    changes.logo_url = { from: logoFrom, to: logoTo };
   }
 
   return Object.keys(changes).length > 0 ? changes : undefined;

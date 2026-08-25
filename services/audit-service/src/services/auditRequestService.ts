@@ -20,6 +20,7 @@ import {
 import { z } from "zod";
 
 import type { AuditRequestRepository } from "../integrations/prisma/auditRequestRepository.js";
+import { getOwnDataProperty } from "../security/ownDataProperty.js";
 
 export interface AuditRequestService {
   create(body: unknown): Promise<string>;
@@ -118,7 +119,7 @@ function buildAuditSearchFilters(
 }
 
 function getPlatformOrganizationId(query: Record<string, unknown>): string | undefined {
-  const value = query.organizationId;
+  const value = getOwnDataProperty(query, "organizationId");
   if (value === undefined) {
     return undefined;
   }

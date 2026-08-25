@@ -18,6 +18,7 @@ import {
   createAuditRequestRepository,
 } from "../integrations/prisma/auditRequestRepository.js";
 import { buildAuditServiceOpenApiSpec } from "../openapi/spec.js";
+import { createAuditRequestService } from "../services/auditRequestService.js";
 
 const env: AuditServiceEnv = {
   nodeEnv: "test",
@@ -45,17 +46,7 @@ function createRepository(): AuditRequestRepository {
     search: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 50 }),
     searchPlatform: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 50 }),
     findByRequestId: vi.fn().mockResolvedValue(null),
-  } as unknown as AuditRequestRepository;
-}
-
-function getSearchPlatformMock(repository: AuditRequestRepository) {
-  return vi.mocked(
-    (
-      repository as AuditRequestRepository & {
-        searchPlatform: AuditRequestRepository["search"];
-      }
-    ).searchPlatform,
-  );
+  } satisfies AuditRequestRepository;
 }
 
 function platformHeaders(
@@ -102,7 +93,7 @@ describe("platform audit routes", () => {
 
     expect(response.status).toBe(200);
     expect(repository.search).not.toHaveBeenCalled();
-    const searchPlatform = getSearchPlatformMock(repository);
+    const searchPlatform = vi.mocked(repository.searchPlatform);
     expect(searchPlatform).toHaveBeenCalledOnce();
     const [filters] = searchPlatform.mock.calls[0];
     expect(filters).toMatchObject({ page: 1, pageSize: 25 });
@@ -118,7 +109,7 @@ describe("platform audit routes", () => {
 
     expect(response.status).toBe(200);
     expect(repository.search).not.toHaveBeenCalled();
-    expect(getSearchPlatformMock(repository)).toHaveBeenCalledWith(
+    expect(vi.mocked(repository.searchPlatform)).toHaveBeenCalledWith(
       expect.objectContaining({ organizationId }),
     );
   });
@@ -137,7 +128,7 @@ describe("platform audit routes", () => {
 
     expect(response.status).toBe(400);
     expect(repository.search).not.toHaveBeenCalled();
-    expect(getSearchPlatformMock(repository)).not.toHaveBeenCalled();
+    expect(repository.searchPlatform).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -163,7 +154,32 @@ describe("platform audit routes", () => {
     expect(repository.search).toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: "org-2" }),
     );
-    expect(getSearchPlatformMock(repository)).not.toHaveBeenCalled();
+    expect(repository.searchPlatform).not.toHaveBeenCalled();
+  });
+
+  it("ignora organizationId herdado na busca de plataforma", async () => {
+    const query = Object.create({
+      organizationId: "918eeaf9-82db-4e46-930b-b2d8b50b2776",
+    }) as Record<string, unknown>;
+
+    await createAuditRequestService(repository).searchPlatform(query);
+
+    expect(repository.searchPlatform).toHaveBeenCalledWith(
+      expect.not.objectContaining({ organizationId: expect.anything() }),
+    );
+  });
+
+  it("ignora organizationId accessor sem executar getter", async () => {
+    const getter = vi.fn(() => "918eeaf9-82db-4e46-930b-b2d8b50b2776");
+    const query = {} as Record<string, unknown>;
+    Object.defineProperty(query, "organizationId", { get: getter });
+
+    await createAuditRequestService(repository).searchPlatform(query);
+
+    expect(getter).not.toHaveBeenCalled();
+    expect(repository.searchPlatform).toHaveBeenCalledWith(
+      expect.not.objectContaining({ organizationId: expect.anything() }),
+    );
   });
 
   it("rejeita headers de plataforma sem o token interno do gateway", async () => {
@@ -419,7 +435,45 @@ describe("platform audit persistence", () => {
       referring: "organization",
       referring_id: organizationId,
     };
+    const subscriptionPlanGetter = vi.fn(() => ({ from: "trial", to: "pro" }));
+    const changesWithAccessor = {};
+    Object.defineProperty(changesWithAccessor, "subscription_plan", {
+      get: subscriptionPlanGetter,
+    });
+    const fromGetter = vi.fn(() => "trial");
+    const statusWithAccessor = { to: "active" };
+    Object.defineProperty(statusWithAccessor, "from", { get: fromGetter });
     const findMany = vi.fn().mockResolvedValue([
+      {
+        ...baseRow,
+        id: "inherited-change-key",
+        service_source: "organization-service",
+        metadata_json: null,
+        changes_json: Object.create({ status: { from: "trial", to: "active" } }),
+      },
+      {
+        ...baseRow,
+        id: "accessor-change-key",
+        service_source: "organization-service",
+        metadata_json: null,
+        changes_json: changesWithAccessor,
+      },
+      {
+        ...baseRow,
+        id: "inherited-pair-values",
+        service_source: "organization-service",
+        metadata_json: null,
+        changes_json: {
+          logo_url: Object.create({ from: null, to: "https://cdn.example.com/logo.png" }),
+        },
+      },
+      {
+        ...baseRow,
+        id: "accessor-pair-value",
+        service_source: "organization-service",
+        metadata_json: null,
+        changes_json: { status: statusWithAccessor },
+      },
       {
         ...baseRow,
         id: "wrong-service",
@@ -482,6 +536,8 @@ describe("platform audit persistence", () => {
       expect(item).not.toHaveProperty("changes");
       expect(item).not.toHaveProperty("metadata");
     }
+    expect(subscriptionPlanGetter).not.toHaveBeenCalled();
+    expect(fromGetter).not.toHaveBeenCalled();
   });
 });
 

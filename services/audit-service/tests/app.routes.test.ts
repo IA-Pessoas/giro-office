@@ -6,6 +6,7 @@ import type {
   AuditSearchFilters,
   AuditSearchResult,
   CreateAuditRequestPayload,
+  PlatformAuditSearchResult,
 } from "@workspace/shared/audit";
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -76,6 +77,9 @@ function createTestRepository(): AuditRequestRepository {
         page: filters.page,
         pageSize: filters.pageSize,
       };
+    },
+    async searchPlatform(filters: AuditSearchFilters): Promise<PlatformAuditSearchResult> {
+      return { items: [], total: 0, page: filters.page, pageSize: filters.pageSize };
     },
     async findByRequestId(
       requestId: string,
