@@ -8,6 +8,7 @@ const { prismaMock } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -119,5 +120,207 @@ describe("OrganizationService", () => {
     const service = new OrganizationService();
 
     await expect(service.findById("org-1")).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("createPlatform persiste defaults seguros e audita sem CNPJ ou e-mail", async () => {
+    // Falha detectada: criação aceita defaults implícitos ou vaza identidade/CNPJ na auditoria.
+    const createdAt = new Date("2026-08-25T12:00:00.000Z");
+    const organization = {
+      id: "org-1",
+      name: "Empresa Teste",
+      slug: "empresa-teste",
+      status: "active",
+      subscription_plan: "trial",
+      logo_url: null,
+      cnpj: "11222333000181",
+      created_at: createdAt,
+      updated_at: createdAt,
+    };
+    const audit = vi.fn().mockResolvedValue(undefined);
+    prismaMock.organization.create.mockResolvedValue(organization);
+    const service = new OrganizationService(audit);
+
+    const result = await service.createPlatform({
+      name: "Empresa Teste",
+      cnpj: "11222333000181",
+      emailCreatedBy: "admin@example.com",
+      actorPlatformUserId: "platform-user-1",
+    });
+
+    expect(result).toEqual(organization);
+    expect(result).not.toHaveProperty("email_created_by");
+    expect(prismaMock.organization.create).toHaveBeenCalledWith({
+      data: {
+        name: "Empresa Teste",
+        slug: "empresa-teste",
+        email_created_by: "admin@example.com",
+        cnpj: "11222333000181",
+        status: "active",
+        subscription_plan: "trial",
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        subscription_plan: true,
+        logo_url: true,
+        cnpj: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+    expect(audit).toHaveBeenCalledWith({
+      actorPlatformUserId: "platform-user-1",
+      organizationId: "org-1",
+      action: "organization.created",
+      changes: {
+        status: { from: null, to: "active" },
+        subscription_plan: { from: null, to: "trial" },
+      },
+    });
+  });
+
+  it("createPlatform converte corrida de unicidade P2002 em 409", async () => {
+    // Falha detectada: slug ou CNPJ duplicado em corrida retorna 500.
+    prismaMock.organization.create.mockRejectedValue({ code: "P2002" });
+    const service = new OrganizationService();
+
+    await expect(
+      service.createPlatform({
+        name: "Empresa Teste",
+        cnpj: "11222333000181",
+        emailCreatedBy: "admin@example.com",
+        actorPlatformUserId: "platform-user-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("findPlatformById retorna 404 sem expor a projeção legada", async () => {
+    // Falha detectada: detalhe inexistente retorna 500 ou consulta campos privados.
+    prismaMock.organization.findUnique.mockResolvedValue(null);
+    const service = new OrganizationService();
+
+    await expect(service.findPlatformById("org-1")).rejects.toMatchObject({ statusCode: 404 });
+    expect(prismaMock.organization.findUnique).toHaveBeenCalledWith({
+      where: { id: "org-1" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        subscription_plan: true,
+        logo_url: true,
+        cnpj: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+  });
+
+  it("updatePlatformStatus usa id e timestamp no write e audita somente status", async () => {
+    // Falha detectada: uma edição concorrente é sobrescrita ou campos fora da allowlist são auditados.
+    const beforeUpdatedAt = new Date("2026-08-25T12:00:00.000Z");
+    const afterUpdatedAt = new Date("2026-08-25T12:01:00.000Z");
+    const before = {
+      id: "org-1",
+      name: "Empresa Teste",
+      slug: "empresa-teste",
+      status: "active",
+      subscription_plan: "trial",
+      logo_url: null,
+      cnpj: "11222333000181",
+      created_at: beforeUpdatedAt,
+      updated_at: beforeUpdatedAt,
+    };
+    const after = { ...before, status: "suspended", updated_at: afterUpdatedAt };
+    const audit = vi.fn().mockResolvedValue(undefined);
+    prismaMock.organization.findUnique.mockResolvedValueOnce(before).mockResolvedValueOnce(after);
+    prismaMock.organization.updateMany.mockResolvedValue({ count: 1 });
+    const service = new OrganizationService(audit);
+
+    const result = await service.updatePlatformStatus({
+      id: "org-1",
+      status: "suspended",
+      expectedUpdatedAt: beforeUpdatedAt.toISOString(),
+      actorPlatformUserId: "platform-user-1",
+    });
+
+    expect(result).toEqual(after);
+    expect(prismaMock.organization.updateMany).toHaveBeenCalledWith({
+      where: { id: "org-1", updated_at: beforeUpdatedAt },
+      data: { status: "suspended" },
+    });
+    expect(audit).toHaveBeenCalledWith({
+      actorPlatformUserId: "platform-user-1",
+      organizationId: "org-1",
+      action: "organization.status.updated",
+      changes: { status: { from: "active", to: "suspended" } },
+    });
+  });
+
+  it("updatePlatformSubscriptionPlan retorna 409 para timestamp obsoleto", async () => {
+    // Falha detectada: update com expected_updated_at obsoleto sobrescreve a alteração mais recente.
+    const updatedAt = new Date("2026-08-25T12:00:00.000Z");
+    prismaMock.organization.findUnique.mockResolvedValue({
+      id: "org-1",
+      subscription_plan: "trial",
+      updated_at: updatedAt,
+    });
+    prismaMock.organization.updateMany.mockResolvedValue({ count: 0 });
+    const service = new OrganizationService();
+
+    await expect(
+      service.updatePlatformSubscriptionPlan({
+        id: "org-1",
+        subscriptionPlan: "pro",
+        expectedUpdatedAt: updatedAt.toISOString(),
+        actorPlatformUserId: "platform-user-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prismaMock.organization.findUnique).toHaveBeenCalledTimes(1);
+  });
+
+  it("updatePlatformLogoUrl mantém sucesso quando a auditoria pós-commit falha", async () => {
+    // Falha detectada: indisponibilidade da auditoria desfaz ou converte uma mutação já persistida em erro.
+    const beforeUpdatedAt = new Date("2026-08-25T12:00:00.000Z");
+    const afterUpdatedAt = new Date("2026-08-25T12:01:00.000Z");
+    const before = {
+      id: "org-1",
+      name: "Empresa Teste",
+      slug: "empresa-teste",
+      status: "active",
+      subscription_plan: "trial",
+      logo_url: null,
+      cnpj: "11222333000181",
+      created_at: beforeUpdatedAt,
+      updated_at: beforeUpdatedAt,
+    };
+    const after = {
+      ...before,
+      logo_url: "https://cdn.example.com/logo.png",
+      updated_at: afterUpdatedAt,
+    };
+    const audit = vi.fn().mockRejectedValue(new Error("audit unavailable"));
+    prismaMock.organization.findUnique.mockResolvedValueOnce(before).mockResolvedValueOnce(after);
+    prismaMock.organization.updateMany.mockResolvedValue({ count: 1 });
+    const service = new OrganizationService(audit);
+
+    await expect(
+      service.updatePlatformLogoUrl({
+        id: "org-1",
+        logoUrl: "https://cdn.example.com/logo.png",
+        expectedUpdatedAt: beforeUpdatedAt.toISOString(),
+        actorPlatformUserId: "platform-user-1",
+      }),
+    ).resolves.toEqual(after);
+    expect(audit).toHaveBeenCalledWith({
+      actorPlatformUserId: "platform-user-1",
+      organizationId: "org-1",
+      action: "organization.logo_url.updated",
+      changes: {
+        logo_url: { from: null, to: "https://cdn.example.com/logo.png" },
+      },
+    });
   });
 });

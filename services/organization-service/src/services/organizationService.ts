@@ -18,6 +18,50 @@ interface CreateOrganizationInput {
   cnpj: string;
 }
 
+interface CreatePlatformOrganizationInput {
+  name: string;
+  cnpj: string;
+  emailCreatedBy: string;
+  actorPlatformUserId: string;
+}
+
+interface UpdatePlatformOrganizationInput {
+  id: string;
+  expectedUpdatedAt: string;
+  actorPlatformUserId: string;
+}
+
+interface UpdatePlatformStatusInput extends UpdatePlatformOrganizationInput {
+  status: status;
+}
+
+interface UpdatePlatformSubscriptionPlanInput extends UpdatePlatformOrganizationInput {
+  subscriptionPlan: "trial" | "pro" | "enterprise";
+}
+
+interface UpdatePlatformLogoUrlInput extends UpdatePlatformOrganizationInput {
+  logoUrl: string | null;
+}
+
+export interface OrganizationDomainAuditEvent {
+  actorPlatformUserId: string;
+  organizationId: string;
+  action:
+    | "organization.created"
+    | "organization.status.updated"
+    | "organization.subscription_plan.updated"
+    | "organization.logo_url.updated";
+  changes: Record<string, { from: unknown; to: unknown }>;
+}
+
+export type OrganizationDomainAuditRecorder = (
+  event: OrganizationDomainAuditEvent,
+) => Promise<void>;
+
+function isPrismaUniqueConflict(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && err.code === "P2002";
+}
+
 export interface ListOrganizationsParams {
   page: number;
   pageSize: number;
@@ -107,6 +151,44 @@ export type OrganizationLogoUpdatedRow = Prisma.OrganizationGetPayload<{
 }>;
 
 class OrganizationService {
+  constructor(
+    private readonly recordOrganizationAudit: OrganizationDomainAuditRecorder = async () => {},
+  ) {}
+
+  private async emitOrganizationAudit(event: OrganizationDomainAuditEvent): Promise<void> {
+    try {
+      await this.recordOrganizationAudit(event);
+    } catch (err: unknown) {
+      logError("Erro ao registrar auditoria de organização após commit", { err });
+    }
+  }
+
+  private async findPlatformSnapshot(id: string): Promise<PlatformOrganizationRow> {
+    const organization = await prismaClient.organization.findUnique({
+      where: { id },
+      select: PLATFORM_ORGANIZATION_SELECT,
+    });
+    if (!organization) {
+      throw new ServiceError(404, "Organização não encontrada.");
+    }
+    return organization;
+  }
+
+  private async commitPlatformUpdate(
+    id: string,
+    expectedUpdatedAt: string,
+    data: Prisma.OrganizationUpdateManyMutationInput,
+  ): Promise<PlatformOrganizationRow> {
+    const result = await prismaClient.organization.updateMany({
+      where: { id, updated_at: new Date(expectedUpdatedAt) },
+      data,
+    });
+    if (result.count !== 1) {
+      throw new ServiceError(409, "A organização foi alterada por outra operação.");
+    }
+    return this.findPlatformSnapshot(id);
+  }
+
   async list(params: ListOrganizationsParams): Promise<{
     organizations: OrganizationRow[];
     total: number;
@@ -176,6 +258,117 @@ class OrganizationService {
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao listar organizações. ${msg}`, err);
+    }
+  }
+
+  async createPlatform(data: CreatePlatformOrganizationInput): Promise<PlatformOrganizationRow> {
+    try {
+      const organization = await prismaClient.organization.create({
+        data: {
+          name: data.name,
+          slug: generateSlug(data.name),
+          email_created_by: data.emailCreatedBy,
+          cnpj: data.cnpj,
+          status: "active",
+          subscription_plan: "trial",
+        },
+        select: PLATFORM_ORGANIZATION_SELECT,
+      });
+
+      await this.emitOrganizationAudit({
+        actorPlatformUserId: data.actorPlatformUserId,
+        organizationId: organization.id,
+        action: "organization.created",
+        changes: {
+          status: { from: null, to: organization.status },
+          subscription_plan: { from: null, to: organization.subscription_plan },
+        },
+      });
+      return organization;
+    } catch (err: unknown) {
+      logError("Erro ao criar organização pela plataforma", { err });
+      if (err instanceof ServiceError) throw err;
+      if (isPrismaUniqueConflict(err)) {
+        throw new ServiceError(409, "Já existe uma organização com esse nome/slug ou CNPJ.", err);
+      }
+      throw new ServiceError(500, "Erro interno ao criar organização.", err);
+    }
+  }
+
+  async findPlatformById(id: string): Promise<PlatformOrganizationRow> {
+    try {
+      return await this.findPlatformSnapshot(id);
+    } catch (err: unknown) {
+      logError("Erro ao buscar organização pela plataforma", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao buscar organização.", err);
+    }
+  }
+
+  async updatePlatformStatus(data: UpdatePlatformStatusInput): Promise<PlatformOrganizationRow> {
+    try {
+      const before = await this.findPlatformSnapshot(data.id);
+      const updated = await this.commitPlatformUpdate(data.id, data.expectedUpdatedAt, {
+        status: data.status,
+      });
+      await this.emitOrganizationAudit({
+        actorPlatformUserId: data.actorPlatformUserId,
+        organizationId: data.id,
+        action: "organization.status.updated",
+        changes: { status: { from: before.status, to: updated.status } },
+      });
+      return updated;
+    } catch (err: unknown) {
+      logError("Erro ao atualizar status da organização pela plataforma", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao atualizar status.", err);
+    }
+  }
+
+  async updatePlatformSubscriptionPlan(
+    data: UpdatePlatformSubscriptionPlanInput,
+  ): Promise<PlatformOrganizationRow> {
+    try {
+      const before = await this.findPlatformSnapshot(data.id);
+      const updated = await this.commitPlatformUpdate(data.id, data.expectedUpdatedAt, {
+        subscription_plan: data.subscriptionPlan,
+      });
+      await this.emitOrganizationAudit({
+        actorPlatformUserId: data.actorPlatformUserId,
+        organizationId: data.id,
+        action: "organization.subscription_plan.updated",
+        changes: {
+          subscription_plan: {
+            from: before.subscription_plan,
+            to: updated.subscription_plan,
+          },
+        },
+      });
+      return updated;
+    } catch (err: unknown) {
+      logError("Erro ao atualizar plano da organização pela plataforma", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao atualizar plano de assinatura.", err);
+    }
+  }
+
+  async updatePlatformLogoUrl(data: UpdatePlatformLogoUrlInput): Promise<PlatformOrganizationRow> {
+    try {
+      const before = await this.findPlatformSnapshot(data.id);
+      const updated = await this.commitPlatformUpdate(data.id, data.expectedUpdatedAt, {
+        logo_url: data.logoUrl,
+      });
+      await this.emitOrganizationAudit({
+        actorPlatformUserId: data.actorPlatformUserId,
+        organizationId: data.id,
+        action: "organization.logo_url.updated",
+        changes: { logo_url: { from: before.logo_url, to: updated.logo_url } },
+      });
+      return updated;
+    } catch (err: unknown) {
+      logError("Erro ao atualizar logo da organização pela plataforma", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Erro interno ao atualizar logo.", err);
     }
   }
 
