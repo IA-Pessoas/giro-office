@@ -241,6 +241,15 @@ test("all-services smoke dry-run still exits successfully", () => {
   assert.match(output, /Smoke run completed successfully/);
 });
 
+test("project reporting smoke stays disabled without its explicit gate", () => {
+  const result = runSmoke(["--dry-run", "--filter=projectReporting"]);
+  const output = `${result.stdout}\n${result.stderr}`;
+
+  assert.equal(result.status, 0);
+  assert.match(output, /PROJECT_REPORTING_SMOKE_ENABLED is false/);
+  assert.doesNotMatch(output, /Missing REPORTS_GRANT_SECRET for project reporting smoke/);
+});
+
 test("task reporting smoke stays disabled without its explicit gate", () => {
   const result = runSmoke(["--dry-run", "--filter=taskReporting"]);
   const output = `${result.stdout}\n${result.stderr}`;
