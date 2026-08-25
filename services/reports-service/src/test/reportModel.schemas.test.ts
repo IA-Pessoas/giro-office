@@ -23,9 +23,10 @@ describe("reportModelSchema", () => {
   });
 
   it("aceita atualização parcial e rejeita corpo vazio", () => {
-    const schema = (reportModelSchemas as Record<string, unknown>).updateReportModelSchema;
+    const schema = reportModelSchemas.updateReportModelSchema;
 
-    expect(schema).toBeDefined();
+    expect(schema.parse({ name: "Saldo atualizado" })).toEqual({ name: "Saldo atualizado" });
+    expect(() => schema.parse({})).toThrow("Informe nome ou definição para atualizar o modelo.");
   });
 
   it("mantém coluna de autor na migration de modelos pessoais", () => {
