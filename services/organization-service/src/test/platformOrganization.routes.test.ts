@@ -49,6 +49,8 @@ const platformSession = {
   csrf_hash: hashCsrfToken(csrfToken),
   platformUser: {
     id: "platform-user-1",
+    name: "Platform Administrator",
+    email: "admin@example.com",
     platform_role: "super_admin",
     status: "active",
     session_version: 1,
