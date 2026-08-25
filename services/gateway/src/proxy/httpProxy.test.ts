@@ -159,6 +159,67 @@ describe("buildForwardHeaders", () => {
       entry.expectedCookie ? "cw.session=verified-platform-token" : null,
     );
   });
+
+  it.each([
+    {
+      method: "GET",
+      path: "/platform/organizations/org-1",
+      expectedCookie: "cw.session=verified-platform-token",
+      expectedCsrf: null,
+    },
+    {
+      method: "POST",
+      path: "/platform/organizations",
+      expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
+      expectedCsrf: "proof",
+    },
+    {
+      method: "PATCH",
+      path: "/platform/organizations/org-1/status",
+      expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
+      expectedCsrf: "proof",
+    },
+    {
+      method: "PATCH",
+      path: "/platform/organizations/org-1/subscription-plan",
+      expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
+      expectedCsrf: "proof",
+    },
+    {
+      method: "PATCH",
+      path: "/platform/organizations/org-1/logo-url",
+      expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
+      expectedCsrf: "proof",
+    },
+  ])("encaminha somente as credenciais allowlisted em $method $path", (entry) => {
+    const request = {
+      ...authenticatedRequest,
+      method: entry.method,
+      originalUrl: entry.path,
+      get: (name: string) => (name === "x-csrf-token" ? "proof" : undefined),
+      headers: {
+        authorization: "Bearer browser-secret",
+        cookie: "theme=dark; cw.session=forged; cw.csrf=proof",
+        "x-csrf-token": "proof",
+      },
+      auth: {
+        ...authenticatedRequest.auth,
+        token: "verified-platform-token",
+        actorKind: "platform",
+        isPlatformAdmin: true,
+      },
+    } as unknown as Request;
+
+    const headers = buildForwardHeaders(request, {
+      forwardPlatformSessionCredentials: true,
+      internalServiceToken: "trusted-internal-token",
+    });
+
+    expect(headers.get("cookie")).toBe(entry.expectedCookie);
+    expect(headers.get("x-csrf-token")).toBe(entry.expectedCsrf);
+    expect(headers.get("authorization")).toBeNull();
+    expect(headers.get(INTERNAL_SERVICE_TOKEN_HEADER)).toBe("trusted-internal-token");
+  });
 });
 
 describe("buildHttpProxyMiddleware", () => {

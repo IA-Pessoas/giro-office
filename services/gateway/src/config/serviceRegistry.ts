@@ -57,7 +57,14 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       routePrefixes: [...ORGANIZATION_SERVICE_PREFIXES],
       internalServiceToken: env.auditServiceToken,
       forwardPlatformSessionCredentials: true,
-      routeMatchers: [{ methods: ["GET"], path: /^\/platform\/organizations\/?$/ }],
+      routeMatchers: [
+        { methods: ["GET", "POST"], path: /^\/platform\/organizations\/?$/ },
+        { methods: ["GET"], path: /^\/platform\/organizations\/[^/]+\/?$/ },
+        {
+          methods: ["PATCH"],
+          path: /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)\/?$/,
+        },
+      ],
     },
     {
       key: "rh-service",

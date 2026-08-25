@@ -156,6 +156,8 @@ const state = {
     "cw.session": "",
   },
   platformSessionCookies: null,
+  platformOrganizationId: "",
+  platformOrganizationUpdatedAt: "",
   bearerToken: "",
   adminBearerToken: "",
   baselineDepartmentId: env.smokeDepartmentId,
@@ -488,6 +490,22 @@ function uniqueDigits(length) {
     .replace(/\D/g, "")
     .padEnd(length, "0");
   return source.slice(0, length);
+}
+
+function uniqueCnpj() {
+  const base = [...crypto.createHash("sha256").update(env.namespace).digest().subarray(0, 12)].map(
+    (value) => value % 10,
+  );
+  base[0] = 9;
+
+  const checkDigit = (digits, weights) => {
+    const remainder = digits.reduce((sum, digit, index) => sum + digit * weights[index], 0) % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+  const first = checkDigit(base, [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const second = checkDigit([...base, first], [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+
+  return [...base, first, second].join("");
 }
 
 function registerCleanup(label, fn) {
@@ -1946,6 +1964,76 @@ const handlers = {
       query: { page: 1, pageSize: 5 },
       expectedStatus: [200],
     });
+  },
+
+  async platformOrganizationCreate(op) {
+    const response = await platformHttpRequest(op, {
+      json: {
+        name: uniqueText("Smoke Platform Organization"),
+        cnpj: uniqueCnpj(),
+      },
+      expectedStatus: isBadExpectation(op) ? op.expectedStatus : [201],
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+
+    state.platformOrganizationId = pickFirst(response.body, "data.id") ?? "";
+    state.platformOrganizationUpdatedAt = pickFirst(response.body, "data.updated_at") ?? "";
+    requireState("platformOrganizationId");
+    requireState("platformOrganizationUpdatedAt");
+  },
+
+  async platformOrganizationGet(op) {
+    await platformHttpRequest(op, {
+      path: `/platform/organizations/${requireState("platformOrganizationId")}`,
+      expectedStatus: op.expectedStatus,
+    });
+  },
+
+  async platformOrganizationPlanUpdate(op) {
+    const response = await platformHttpRequest(op, {
+      path: `/platform/organizations/${requireState("platformOrganizationId")}/subscription-plan`,
+      json: {
+        subscription_plan: "pro",
+        expected_updated_at: requireState("platformOrganizationUpdatedAt"),
+      },
+      expectedStatus: op.expectedStatus,
+    });
+    if (!isBadExpectation(op)) {
+      state.platformOrganizationUpdatedAt = pickFirst(response.body, "data.updated_at") ?? "";
+      requireState("platformOrganizationUpdatedAt");
+    }
+  },
+
+  async platformOrganizationLogoUpdate(op) {
+    const response = await platformHttpRequest(op, {
+      path: `/platform/organizations/${requireState("platformOrganizationId")}/logo-url`,
+      json: {
+        logo_url: `https://example.com/smoke/${encodeURIComponent(env.namespace)}.png`,
+        expected_updated_at: requireState("platformOrganizationUpdatedAt"),
+      },
+      expectedStatus: op.expectedStatus,
+    });
+    if (!isBadExpectation(op)) {
+      state.platformOrganizationUpdatedAt = pickFirst(response.body, "data.updated_at") ?? "";
+      requireState("platformOrganizationUpdatedAt");
+    }
+  },
+
+  async platformOrganizationStatusUpdate(op) {
+    const response = await platformHttpRequest(op, {
+      path: `/platform/organizations/${requireState("platformOrganizationId")}/status`,
+      json: {
+        status: "cancelled",
+        expected_updated_at: requireState("platformOrganizationUpdatedAt"),
+      },
+      expectedStatus: op.expectedStatus,
+    });
+    if (!isBadExpectation(op)) {
+      state.platformOrganizationUpdatedAt = pickFirst(response.body, "data.updated_at") ?? "";
+      requireState("platformOrganizationUpdatedAt");
+    }
   },
 
   async platformAuditList(op) {

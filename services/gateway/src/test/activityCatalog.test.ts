@@ -141,6 +141,16 @@ describe("activityCatalog", () => {
       "obrigações da competência",
     ],
     ["GET", "/platform/organizations", "consultou", "a lista global de organizações"],
+    ["POST", "/platform/organizations", "criou", "uma organização"],
+    ["GET", "/platform/organizations/org-1", "consultou", "uma organização"],
+    ["PATCH", "/platform/organizations/org-1/status", "alterou", "o status de uma organização"],
+    [
+      "PATCH",
+      "/platform/organizations/org-1/subscription-plan",
+      "alterou",
+      "o plano de uma organização",
+    ],
+    ["PATCH", "/platform/organizations/org-1/logo-url", "atualizou", "a marca de uma organização"],
     [
       "GET",
       "/platform/organizations/org-1/users",

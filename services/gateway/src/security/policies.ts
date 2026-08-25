@@ -131,6 +131,7 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["DELETE /platform/session", platformOnlyPolicy],
   ["GET /platform/me", platformOnlyPolicy],
   ["GET /platform/organizations", platformOnlyPolicy],
+  ["POST /platform/organizations", platformOnlyPolicy],
   ["GET /platform/audit/requests", platformOnlyPolicy],
 ]);
 
@@ -190,6 +191,16 @@ const routePolicyMatchers: Array<{
   {
     method: "GET",
     path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "GET",
+    path: /^\/platform\/organizations\/[^/]+\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "PATCH",
+    path: /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)\/?$/,
     policy: platformOnlyPolicy,
   },
 ];

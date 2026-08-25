@@ -52,9 +52,34 @@ const TECHNICAL_RULES = [
 
 const EXPLICIT_RULES: ExplicitRule[] = [
   {
+    methods: ["POST"],
+    pattern: /^\/platform\/organizations$/,
+    description: { action: "criou", item: "uma organização" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "consultou", item: "a lista global de organizações" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+$/,
+    description: { action: "consultou", item: "uma organização" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/organizations\/[^/]+\/status$/,
+    description: { action: "alterou", item: "o status de uma organização" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/organizations\/[^/]+\/subscription-plan$/,
+    description: { action: "alterou", item: "o plano de uma organização" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/organizations\/[^/]+\/logo-url$/,
+    description: { action: "atualizou", item: "a marca de uma organização" },
   },
   {
     methods: ["GET"],

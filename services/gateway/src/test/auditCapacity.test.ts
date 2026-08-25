@@ -11,7 +11,15 @@ describe("buildAuditCapacityGuard", () => {
       recordAuditRequest: Object.assign(async () => {}, { reserve }),
     });
 
-    guard({ method: "POST", requestId: "request-1" } as never, {} as never, next);
+    guard(
+      {
+        method: "POST",
+        originalUrl: "/platform/organizations",
+        requestId: "request-1",
+      } as never,
+      {} as never,
+      next,
+    );
 
     expect(reserve).toHaveBeenCalledWith("protected");
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 503 }));
@@ -46,6 +54,61 @@ describe("buildAuditCapacityGuard", () => {
     );
 
     expect(reserve).toHaveBeenCalledWith("protected");
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it.each([
+    ["POST", "/platform/organizations"],
+    ["PATCH", "/platform/organizations/org-1/status"],
+    ["PATCH", "/platform/organizations/org-1/subscription-plan"],
+    ["PATCH", "/platform/organizations/org-1/logo-url"],
+  ])("fails closed when audit is disabled for %s %s", (method, originalUrl) => {
+    const reserve = vi.fn(() => "protected" as const);
+    const next = vi.fn();
+    const guard = buildAuditCapacityGuard({
+      enabled: false,
+      recordAuditRequest: Object.assign(async () => {}, { reserve }),
+    });
+
+    guard({ method, originalUrl, requestId: "request-1" } as never, {} as never, next);
+
+    expect(reserve).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 503 }));
+  });
+
+  it("fails closed when a required organization mutation has no request id", () => {
+    const reserve = vi.fn(() => "protected" as const);
+    const next = vi.fn();
+    const guard = buildAuditCapacityGuard({
+      enabled: true,
+      recordAuditRequest: Object.assign(async () => {}, { reserve }),
+    });
+
+    guard({ method: "POST", originalUrl: "/platform/organizations" } as never, {} as never, next);
+
+    expect(reserve).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 503 }));
+  });
+
+  it("keeps disabled audit permissive outside exact organization mutations", () => {
+    const reserve = vi.fn(() => undefined);
+    const next = vi.fn();
+    const guard = buildAuditCapacityGuard({
+      enabled: false,
+      recordAuditRequest: Object.assign(async () => {}, { reserve }),
+    });
+
+    guard(
+      {
+        method: "POST",
+        originalUrl: "/platform/organizations/org-1/status/extra",
+        requestId: "request-1",
+      } as never,
+      {} as never,
+      next,
+    );
+
+    expect(reserve).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledWith();
   });
 });

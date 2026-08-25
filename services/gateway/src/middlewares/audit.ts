@@ -12,6 +12,7 @@ import type { ErrorRequestHandler, NextFunction, Request, Response } from "expre
 import { describeActivity } from "../audit/activityCatalog.js";
 import type { GatewayEnv } from "../config/env.js";
 import { resolveGatewayService } from "../config/serviceRegistry.js";
+import { normalizeGatewayPath } from "../security/routeClassification.js";
 
 interface BuildAuditLifecycleMiddlewareOptions {
   enabled: boolean;
@@ -25,6 +26,20 @@ const TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS = new Set(["password", "reas
 const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
+
+function requiresOrganizationMutationAudit(request: Request): boolean {
+  const path = normalizeGatewayPath(request.originalUrl ?? "");
+  if (!path) {
+    return false;
+  }
+
+  const method = request.method.toUpperCase();
+  return (
+    (method === "POST" && path.toLowerCase() === "/platform/organizations") ||
+    (method === "PATCH" &&
+      /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i.test(path))
+  );
+}
 
 interface BuildAuditCapacityGuardOptions {
   enabled: boolean;
@@ -40,8 +55,16 @@ export function buildAuditCapacityGuard({
     _response: Response,
     next: NextFunction,
   ): void {
+    const requiresAudit = requiresOrganizationMutationAudit(request);
     const mustReserve =
-      request.auth !== undefined || !SAFE_METHODS.has(request.method.toUpperCase());
+      requiresAudit ||
+      request.auth !== undefined ||
+      !SAFE_METHODS.has(request.method.toUpperCase());
+
+    if (requiresAudit && (!enabled || !request.requestId)) {
+      next(new ServiceError(503, "Auditoria indisponível; operação não iniciada."));
+      return;
+    }
 
     if (!enabled || !mustReserve || !request.requestId) {
       next();

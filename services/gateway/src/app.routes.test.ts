@@ -434,17 +434,19 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
     for (const path of [
       "/platform/me",
       "/platform/organizations",
+      "/platform/organizations/org-1",
       "/platform/organizations/org-1/users",
       "/platform/audit/requests",
     ]) {
       requests.push(await fetch(`${gatewayUrl}${path}`, { headers: forgedHeaders }));
     }
 
-    expect(requests.map((response) => response.status)).toEqual([200, 200, 200, 200]);
+    expect(requests.map((response) => response.status)).toEqual([200, 200, 200, 200, 200]);
     const proxiedRequests = seen.filter(({ url }) => url !== "/internal/audit/requests");
     expect(proxiedRequests.map(({ service, url }) => ({ service, url }))).toEqual([
       { service: "user-service", url: "/platform/me" },
       { service: "organization-service", url: "/platform/organizations" },
+      { service: "organization-service", url: "/platform/organizations/org-1" },
       { service: "user-service", url: "/platform/organizations/org-1/users" },
       { service: "audit-service", url: "/audit/requests" },
     ]);
@@ -460,12 +462,13 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
       });
       expect(forwarded.organizationId).toBeUndefined();
     }
-    expect(proxiedRequests.slice(0, 3).map(({ cookie }) => cookie)).toEqual([
+    expect(proxiedRequests.slice(0, 4).map(({ cookie }) => cookie)).toEqual([
+      `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
     ]);
-    expect(proxiedRequests[3]?.cookie).toBeUndefined();
+    expect(proxiedRequests[4]?.cookie).toBeUndefined();
 
     const platformOnOrganizationRoute = await fetch(`${gatewayUrl}/organizations`, {
       headers: { Cookie: `cw.session=${platformToken}` },
@@ -485,7 +488,7 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
     expect(organizationOnPlatformRoute.status).toBe(403);
     expect(browserBearer.status).toBe(401);
     expect(internalValidation.status).toBe(404);
-    expect(proxiedRequests).toHaveLength(4);
+    expect(proxiedRequests).toHaveLength(5);
   } finally {
     await stopServer(gateway);
     await stopServer(userService);
@@ -703,6 +706,175 @@ it("audita principal de plataforma sem usar id estrangeiro organizacional", asyn
     await stopServer(gateway);
     await stopServer(organizationService);
     await stopServer(auditService.server);
+  }
+});
+
+it("protege e audita uma única vez cada mutação de organização da plataforma", async () => {
+  const csrfToken = "P".repeat(43);
+  const platformToken = createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) });
+  const upstreamRequests: Array<{
+    method?: string;
+    url?: string;
+    cookie?: string;
+    csrf?: string;
+    authorization?: string;
+    body: unknown;
+  }> = [];
+  const auditService = await startAuditIngestServer();
+  const organizationService = createServer(async (request, response) => {
+    upstreamRequests.push({
+      method: request.method,
+      url: request.url,
+      cookie: request.headers.cookie,
+      csrf: request.headers[CSRF_HEADER_NAME] as string | undefined,
+      authorization: request.headers.authorization,
+      body: await readJsonBody(request),
+    });
+    response.statusCode = request.method === "POST" ? 201 : 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: {
+          id: "9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+          updated_at: "2026-08-25T12:00:00.000Z",
+        },
+      }),
+    );
+  });
+  const organizationServiceUrl = await startServer(organizationService);
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      organizationServiceUrl,
+      allowedOrigins: ["https://useoffice.com.br"],
+      bearerAuthCompatibility: true,
+    }),
+    createTestLogger(),
+    { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const headers = {
+    Authorization: "Bearer browser-secret",
+    Cookie: `theme=dark; cw.session=${platformToken}; cw.csrf=${csrfToken}`,
+    Origin: "https://useoffice.com.br",
+    [CSRF_HEADER_NAME]: csrfToken,
+    "content-type": "application/json",
+  };
+  const operations = [
+    {
+      method: "POST",
+      path: "/platform/organizations",
+      body: { name: "Smoke secret name", cnpj: "11222333000181" },
+      status: 201,
+    },
+    {
+      method: "PATCH",
+      path: "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/subscription-plan",
+      body: { subscription_plan: "pro", expected_updated_at: "2026-08-25T12:00:00.000Z" },
+      status: 200,
+    },
+    {
+      method: "PATCH",
+      path: "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/logo-url",
+      body: {
+        logo_url: "https://cdn.example.com/private-logo.png",
+        expected_updated_at: "2026-08-25T12:00:00.000Z",
+      },
+      status: 200,
+    },
+    {
+      method: "PATCH",
+      path: "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/status",
+      body: { status: "cancelled", expected_updated_at: "2026-08-25T12:00:00.000Z" },
+      status: 200,
+    },
+  ];
+
+  try {
+    for (const operation of operations) {
+      const response = await fetch(`${gatewayUrl}${operation.path}`, {
+        method: operation.method,
+        headers,
+        body: JSON.stringify(operation.body),
+      });
+      expect(response.status, `${operation.method} ${operation.path}`).toBe(operation.status);
+    }
+
+    await waitForRecords(auditService.records, operations.length);
+    expect(upstreamRequests).toHaveLength(operations.length);
+    for (const request of upstreamRequests) {
+      expect(request.cookie).toBe(`cw.session=${platformToken}; cw.csrf=${csrfToken}`);
+      expect(request.csrf).toBe(csrfToken);
+      expect(request.authorization).toBeUndefined();
+    }
+
+    expect(
+      auditService.records.map(({ method, path, metadata }) => ({ method, path, metadata })),
+    ).toEqual(
+      operations.map(({ method, path }) => ({
+        method,
+        path,
+        metadata: expect.objectContaining({
+          routeTarget: "organization-service",
+          auth_kind: "platform",
+          platform_user_id: "platform-user-1",
+        }),
+      })),
+    );
+    const serializedAudit = JSON.stringify(auditService.records);
+    expect(serializedAudit).not.toContain("11222333000181");
+    expect(serializedAudit).not.toContain("Smoke secret name");
+    expect(serializedAudit).not.toContain("private-logo.png");
+    expect(serializedAudit).not.toContain(platformToken);
+    expect(serializedAudit).not.toContain(csrfToken);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(organizationService);
+    await stopServer(auditService.server);
+  }
+});
+
+it("não chama o organization-service quando a auditoria obrigatória está desabilitada", async () => {
+  const csrfToken = "P".repeat(43);
+  let upstreamHits = 0;
+  const organizationService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 201;
+    response.end();
+  });
+  const organizationServiceUrl = await startServer(organizationService);
+  const app = createApp(
+    createEnv({
+      auditEnabled: false,
+      organizationServiceUrl,
+      allowedOrigins: ["https://useoffice.com.br"],
+    }),
+    createTestLogger(),
+    { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/platform/organizations`, {
+      method: "POST",
+      headers: {
+        Cookie: `cw.session=${createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) })}; cw.csrf=${csrfToken}`,
+        Origin: "https://useoffice.com.br",
+        [CSRF_HEADER_NAME]: csrfToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Blocked", cnpj: "11222333000181" }),
+    });
+
+    expect(response.status).toBe(503);
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(organizationService);
   }
 });
 
