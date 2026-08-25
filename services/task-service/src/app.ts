@@ -13,11 +13,13 @@ import "express-async-errors";
 import type { TaskServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
+import prismaClient from "./prisma/index.js";
 import {
   createDepsTasksRoutes,
   type DepsTasksRouteDeps,
   depsTasksRoutes,
 } from "./routes/depsTasks.routes.js";
+import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import {
   createProjectPlanRoutes,
   type ProjectPlanRouteDeps,
@@ -30,6 +32,7 @@ import { taskFinanceiroRoutes } from "./routes/taskFinanceiro.routes.js";
 import { taskIntegrationRegularizeRoutes } from "./routes/taskIntegrationRegularize.routes.js";
 import { taskLifecycleRoutes } from "./routes/taskLifecycle.routes.js";
 import { taskModelRoutes } from "./routes/taskModel.routes.js";
+import { TaskReportingService } from "./services/taskReportingService.js";
 
 function taskServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -50,6 +53,7 @@ export function createTaskApp(
   options?: {
     projectPlanService?: ProjectPlanRouteDeps;
     depsTasksService?: DepsTasksRouteDeps;
+    internalReportingService?: TaskReportingService;
   },
 ): Express {
   const app = express();
@@ -59,6 +63,8 @@ export function createTaskApp(
   const resolvedDepsTasksRoutes = options?.depsTasksService
     ? createDepsTasksRoutes(options.depsTasksService)
     : depsTasksRoutes;
+  const internalReportingService =
+    options?.internalReportingService ?? new TaskReportingService(prismaClient);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "task-service")));
@@ -89,6 +95,10 @@ export function createTaskApp(
   app.use("/task", taskCrudRoutes);
   app.use("/task", resolvedProjectPlanRoutes);
   app.use("/task", resolvedDepsTasksRoutes);
+  app.use(
+    "/internal",
+    createInternalReportingRouter({ env, reportingService: internalReportingService }),
+  );
 
   app.use(
     createExpressErrorHandler({

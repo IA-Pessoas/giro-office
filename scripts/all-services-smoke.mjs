@@ -112,6 +112,9 @@ const env = {
   clientReportingSmokeEnabled:
     process.env.CLIENT_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.CLIENT_REPORTING_SMOKE_ENABLED === "1",
+  taskReportingSmokeEnabled:
+    process.env.TASK_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.TASK_REPORTING_SMOKE_ENABLED === "1",
   namespace:
     process.env.SMOKE_NAMESPACE?.trim() ||
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -845,6 +848,32 @@ function createClientIntegrationReportingGrant({ operation, source, fields, body
   const requestId = crypto.randomUUID();
   const payload = {
     audience: "client-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createTaskReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for task reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "task-service",
     body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
     expires_at: issuedAt + 60,
     fields,
@@ -2002,6 +2031,36 @@ const handlers = {
       headers: isBadExpectation(op)
         ? {}
         : createClientIntegrationReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
+  },
+
+  async taskReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createTaskReportingGrant({
+            operation: "catalog",
+            source: "integracao.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async taskReportingExtract(op) {
+    const body = { source: "integracao.tasks", fields: ["name"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createTaskReportingGrant({
             operation: "extract",
             source: body.source,
             fields: body.fields,
@@ -4703,6 +4762,10 @@ function disabledConditionReason(condition) {
 
   if (condition === "clientReportingSmokeEnabled" && !env.clientReportingSmokeEnabled) {
     return "CLIENT_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "taskReportingSmokeEnabled" && !env.taskReportingSmokeEnabled) {
+    return "TASK_REPORTING_SMOKE_ENABLED is false";
   }
 
   return "";
