@@ -7,6 +7,8 @@ describe("activityCatalog", () => {
     ["GET", "/task/list", "consultou", "a lista de tarefas"],
     ["GET", "/reports/catalog", "consultou", "o catálogo de relatórios"],
     ["POST", "/reports/preview", "gerou", "uma prévia de relatório"],
+    ["GET", "/reports/models/list", "consultou", "a lista de modelos pessoais de relatório"],
+    ["POST", "/reports/models", "cadastrou", "um novo modelo pessoal de relatório"],
     ["POST", "/user", "cadastrou", "um novo usuário"],
     [
       "PATCH",

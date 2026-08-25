@@ -2166,14 +2166,15 @@ model TriageResponsible {
 }
 
 model ReportModel {
-  id              String   @id @default(uuid())
-  organization_id String
-  department_id   String?
-  name            String
-  description     String?
-  active          Boolean  @default(true)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  organization_id    String
+  created_by_user_id String?
+  department_id      String?
+  name               String
+  description        String?
+  active             Boolean  @default(true)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
 
   @@map("reports.models")
 }
@@ -2186,6 +2187,7 @@ model ReportModelVersion {
   definition_json Json
   created_at      DateTime @default(now())
 
+  @@unique([report_model_id, version])
   @@map("reports.model_versions")
 }
 
