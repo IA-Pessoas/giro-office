@@ -48,8 +48,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3038",
     urlEnvKey: "CONTABIL_SERVICE_URL",
     openapiSpecPath: "services/contabil-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/contabil-service/src/generated/prisma",
   },
   {

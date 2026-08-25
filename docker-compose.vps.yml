@@ -571,6 +571,7 @@ services:
       - .env.vps.reports-service
     environment:
       USER_SERVICE_URL: http://user-service:3030
+      CONTABIL_SERVICE_URL: http://contabil-service:3038
     expose:
       - "3044"
     healthcheck:
@@ -604,6 +605,7 @@ services:
       - .env.vps.reports-service
     environment:
       USER_SERVICE_URL: http://user-service:3030
+      CONTABIL_SERVICE_URL: http://contabil-service:3038
     depends_on:
       reports-service:
         condition: service_healthy

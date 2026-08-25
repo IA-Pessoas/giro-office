@@ -39,6 +39,10 @@ const reportsServiceEnvSchema = z
       .string()
       .url("CLIENT_SERVICE_URL invalida.")
       .default("http://localhost:3000"),
+    contabilServiceUrl: z
+      .string()
+      .url("CONTABIL_SERVICE_URL invalida.")
+      .default("http://localhost:3038"),
     workerPollIntervalMs: z.coerce.number().int().positive().default(5000),
     workerConcurrency: z.coerce.number().int().positive().default(2),
     workerLeaseSeconds: z.coerce.number().int().positive().default(120),
@@ -108,6 +112,7 @@ export function parseReportsServiceEnv(
     userServiceUrl: source.USER_SERVICE_URL,
     parcelamentoServiceUrl: source.PARCELAMENTO_SERVICE_URL,
     clientServiceUrl: source.CLIENT_SERVICE_URL,
+    contabilServiceUrl: source.CONTABIL_SERVICE_URL,
     workerPollIntervalMs: source.REPORTS_WORKER_POLL_INTERVAL_MS,
     workerConcurrency: source.REPORTS_WORKER_CONCURRENCY,
     workerLeaseSeconds: source.REPORTS_WORKER_LEASE_SECONDS,
