@@ -8,6 +8,7 @@ import {
   MAX_AUDIT_PAGE,
   MAX_AUDIT_PAGE_SIZE,
   MAX_AUDIT_TEXT_FILTER_LENGTH,
+  type PlatformAuditSearchResult,
 } from "@workspace/shared/audit";
 import {
   getSingleQueryValue,
@@ -22,7 +23,8 @@ import type { AuditRequestRepository } from "../integrations/prisma/auditRequest
 
 export interface AuditRequestService {
   create(body: unknown): Promise<string>;
-  search(query: Record<string, unknown>, organizationId?: string): Promise<AuditSearchResult>;
+  search(query: Record<string, unknown>, organizationId: string): Promise<AuditSearchResult>;
+  searchPlatform(query: Record<string, unknown>): Promise<PlatformAuditSearchResult>;
   findByRequestId(requestId: string, organizationId: string): Promise<AuditRequestRecord | null>;
 }
 
@@ -115,6 +117,20 @@ function buildAuditSearchFilters(
   };
 }
 
+function getPlatformOrganizationId(query: Record<string, unknown>): string | undefined {
+  const value = query.organizationId;
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = z.string().uuid().safeParse(value);
+  if (!parsed.success) {
+    throw new ServiceError(400, "Parâmetro 'organizationId' inválido.");
+  }
+
+  return parsed.data;
+}
+
 export function createAuditRequestService(repository: AuditRequestRepository): AuditRequestService {
   return {
     async create(body: unknown): Promise<string> {
@@ -124,10 +140,14 @@ export function createAuditRequestService(repository: AuditRequestRepository): A
     },
     async search(
       query: Record<string, unknown>,
-      organizationId?: string,
+      organizationId: string,
     ): Promise<AuditSearchResult> {
       const filters = buildAuditSearchFilters(query, organizationId);
       return repository.search(filters);
+    },
+    async searchPlatform(query: Record<string, unknown>): Promise<PlatformAuditSearchResult> {
+      const filters = buildAuditSearchFilters(query, getPlatformOrganizationId(query));
+      return repository.searchPlatform(filters);
     },
     async findByRequestId(
       requestId: string,

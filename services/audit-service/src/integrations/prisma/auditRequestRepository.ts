@@ -5,6 +5,11 @@ import {
   type AuditSearchResult,
   type CreateAuditRequestPayload,
   MAX_AUDIT_OFFSET,
+  type OrganizationAuditPlan,
+  type OrganizationAuditStatus,
+  type PlatformAuditRequestRecord,
+  type PlatformAuditSearchResult,
+  type PlatformOrganizationAuditChanges,
 } from "@workspace/shared/audit";
 
 import {
@@ -18,6 +23,7 @@ import { getPrismaClient } from "./prismaClient.js";
 export interface AuditRequestRepository {
   create(payload: CreateAuditRequestPayload): Promise<void>;
   search(filters: AuditSearchFilters): Promise<AuditSearchResult>;
+  searchPlatform(filters: AuditSearchFilters): Promise<PlatformAuditSearchResult>;
   findByRequestId(requestId: string, organizationId: string): Promise<AuditRequestRecord | null>;
 }
 
@@ -140,11 +146,115 @@ const platformAuditSelect = {
   duration_ms: true,
   service_source: true,
   created_at: true,
+  metadata_json: true,
+  action: true,
+  referring: true,
+  referring_id: true,
+  changes_json: true,
 } satisfies Prisma.AuditRequestSelect;
 
 type PlatformAuditRow = Prisma.AuditRequestGetPayload<{ select: typeof platformAuditSelect }>;
 
-function toPlatformAuditRequest(record: PlatformAuditRow): AuditRequestRecord {
+const platformAuditActions = new Set([
+  "organization.created",
+  "organization.status.updated",
+  "organization.subscription_plan.updated",
+  "organization.logo_url.updated",
+]);
+const organizationStatuses = new Set<OrganizationAuditStatus>([
+  "trial",
+  "past_due",
+  "active",
+  "suspended",
+  "cancelled",
+]);
+const organizationPlans = new Set<OrganizationAuditPlan>(["trial", "pro", "enterprise"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function getPlatformActor(value: unknown): string | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const actor = Object.getOwnPropertyDescriptor(value, "actorPlatformUserId")?.value;
+  if (typeof actor !== "string" || actor.length > 200) {
+    return undefined;
+  }
+
+  return actor.trim() || undefined;
+}
+
+function isSafeLogoUrl(value: unknown): value is string | null {
+  if (value === null) {
+    return true;
+  }
+  if (typeof value !== "string" || value.length > 2048) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.username === "" && url.password === "";
+  } catch {
+    return false;
+  }
+}
+
+function getPlatformChanges(
+  record: PlatformAuditRow,
+): PlatformOrganizationAuditChanges | undefined {
+  if (
+    record.service_source !== "organization-service" ||
+    record.referring !== "organization" ||
+    typeof record.organization_id !== "string" ||
+    record.referring_id !== record.organization_id ||
+    typeof record.action !== "string" ||
+    !platformAuditActions.has(record.action) ||
+    !isRecord(record.changes_json)
+  ) {
+    return undefined;
+  }
+
+  const changes: PlatformOrganizationAuditChanges = {};
+  const status = record.changes_json.status;
+  if (
+    isRecord(status) &&
+    (status.from === null || organizationStatuses.has(status.from as OrganizationAuditStatus)) &&
+    (status.to === null || organizationStatuses.has(status.to as OrganizationAuditStatus))
+  ) {
+    changes.status = {
+      from: status.from as OrganizationAuditStatus | null,
+      to: status.to as OrganizationAuditStatus | null,
+    };
+  }
+
+  const plan = record.changes_json.subscription_plan;
+  if (
+    isRecord(plan) &&
+    (plan.from === null || organizationPlans.has(plan.from as OrganizationAuditPlan)) &&
+    (plan.to === null || organizationPlans.has(plan.to as OrganizationAuditPlan))
+  ) {
+    changes.subscription_plan = {
+      from: plan.from as OrganizationAuditPlan | null,
+      to: plan.to as OrganizationAuditPlan | null,
+    };
+  }
+
+  const logo = record.changes_json.logo_url;
+  if (isRecord(logo) && isSafeLogoUrl(logo.from) && isSafeLogoUrl(logo.to)) {
+    changes.logo_url = { from: logo.from, to: logo.to };
+  }
+
+  return Object.keys(changes).length > 0 ? changes : undefined;
+}
+
+function toPlatformAuditRequest(record: PlatformAuditRow): PlatformAuditRequestRecord {
+  const actorPlatformUserId = getPlatformActor(record.metadata_json);
+  const changes = getPlatformChanges(record);
+
   return {
     id: record.id,
     requestId: record.request_id,
@@ -156,6 +266,11 @@ function toPlatformAuditRequest(record: PlatformAuditRow): AuditRequestRecord {
     durationMs: record.duration_ms,
     serviceSource: record.service_source,
     createdAt: record.created_at.toISOString(),
+    ...(record.action ? { action: record.action } : {}),
+    ...(record.referring ? { referring: record.referring } : {}),
+    ...(record.referring_id ? { referringId: record.referring_id } : {}),
+    ...(actorPlatformUserId ? { actorPlatformUserId } : {}),
+    ...(changes ? { changes } : {}),
   };
 }
 
@@ -256,28 +371,6 @@ export function createAuditRequestRepository(
     },
     async search(filters) {
       const where = buildWhere(filters);
-
-      if (!filters.organizationId) {
-        const totalLimit = MAX_AUDIT_OFFSET + filters.pageSize;
-        const [items, total] = await client.$transaction([
-          client.auditRequest.findMany({
-            where,
-            select: platformAuditSelect,
-            orderBy: [{ created_at: "desc" }, { id: "desc" }],
-            skip: (filters.page - 1) * filters.pageSize,
-            take: filters.pageSize,
-          }),
-          client.auditRequest.count({ where, take: totalLimit }),
-        ]);
-
-        return {
-          items: items.map(toPlatformAuditRequest),
-          total: Math.min(total, totalLimit),
-          page: filters.page,
-          pageSize: filters.pageSize,
-        };
-      }
-
       const [items, total] = await client.$transaction([
         client.auditRequest.findMany({
           where,
@@ -291,6 +384,27 @@ export function createAuditRequestRepository(
       return {
         items: items.map(toAuditRequest),
         total,
+        page: filters.page,
+        pageSize: filters.pageSize,
+      };
+    },
+    async searchPlatform(filters) {
+      const where = buildWhere(filters);
+      const totalLimit = MAX_AUDIT_OFFSET + filters.pageSize;
+      const [items, total] = await client.$transaction([
+        client.auditRequest.findMany({
+          where,
+          select: platformAuditSelect,
+          orderBy: [{ created_at: "desc" }, { id: "desc" }],
+          skip: (filters.page - 1) * filters.pageSize,
+          take: filters.pageSize,
+        }),
+        client.auditRequest.count({ where, take: totalLimit }),
+      ]);
+
+      return {
+        items: items.map(toPlatformAuditRequest),
+        total: Math.min(total, totalLimit),
         page: filters.page,
         pageSize: filters.pageSize,
       };
