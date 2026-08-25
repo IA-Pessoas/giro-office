@@ -16,6 +16,8 @@ Para o ambiente single-slot publicado em `useoffice.com.br`, consulte
 - `.env.vps.task-service`
 - `.env.vps.project-service`
 - `.env.vps.client-service`
+- `.env.vps.parcelamento-service`
+- `.env.vps.reports-service`
 - `.env.vps.rh-service`
 - `.env.vps.department-service`
 - `.env.vps.fiscal-service`
@@ -40,6 +42,9 @@ docker compose -f docker-compose.vps.yml up -d --build
 ```
 
 6. `certificate-service`, `pessoal-service` and `audit-service` are part of the default stack. Configure `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` and `PESSOAL_SERVICE_URL=http://pessoal-service:3042` in `.env.vps.gateway`; control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
+7. Configure `PROJECT_SERVICE_URL=http://project-service:3033` for `reports-service`. Keep
+   `REPORTS_INTERNAL_TOKEN` and `REPORTS_GRANT_SECRET` equal in `.env.vps.project-service` and
+   `.env.vps.reports-service`; do not place their values in Compose or versioned files.
 
 ## Orcamento de conexoes e Supabase Pooler
 

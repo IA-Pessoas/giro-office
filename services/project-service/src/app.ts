@@ -11,8 +11,10 @@ import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { ProjectServiceEnv } from "./config/env.js";
+import prismaClient from "./integrations/prisma.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildProjectServiceOpenApiSpec } from "./openapi/spec.js";
+import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createProjectCrudRoutes, type ProjectCrudRouteDeps } from "./routes/projectCrud.routes.js";
 import {
   createProjectMetricsRoutes,
@@ -22,6 +24,7 @@ import {
   createProjectProgressRoutes,
   type ProjectProgressRouteDeps,
 } from "./routes/projectProgress.routes.js";
+import { InternalReportingService } from "./services/internalReportingService.js";
 import { ProjectCrudService } from "./services/projectCrudService.js";
 import { ProjectMetricsService } from "./services/projectMetricsService.js";
 import { ProjectProgressService } from "./services/projectProgressService.js";
@@ -49,11 +52,14 @@ export function createProjectApplication(options: {
   projectCrudService?: ProjectCrudRouteDeps;
   projectMetricsService?: ProjectMetricsRouteDeps;
   projectProgressService?: ProjectProgressRouteDeps;
+  internalReportingService?: InternalReportingService;
 }): express.Express {
   const { env, logger } = options;
   const projectCrudService = options?.projectCrudService ?? new ProjectCrudService();
   const projectMetricsService = options?.projectMetricsService ?? new ProjectMetricsService();
   const projectProgressService = options?.projectProgressService ?? new ProjectProgressService();
+  const internalReportingService =
+    options.internalReportingService ?? new InternalReportingService(prismaClient);
 
   const app = express();
 
@@ -76,6 +82,10 @@ export function createProjectApplication(options: {
   app.use("/project", createProjectCrudRoutes(projectCrudService));
   app.use("/project", createProjectMetricsRoutes(projectMetricsService));
   app.use("/project", createProjectProgressRoutes(projectProgressService));
+  app.use(
+    "/internal",
+    createInternalReportingRouter({ env, reportingService: internalReportingService }),
+  );
 
   app.use(
     createExpressErrorHandler({
