@@ -46,4 +46,6 @@ it("agrega o catálogo público do reports-service", () => {
 
   expect(spec.paths["/reports/catalog"]?.get?.["x-origin-service"]).toBe("reports-service");
   expect(spec.paths["/internal/reporting/access-context"]).toBeUndefined();
+  expect(spec.paths["/internal/reporting/catalog"]).toBeUndefined();
+  expect(spec.paths["/internal/reporting/extract"]).toBeUndefined();
 });

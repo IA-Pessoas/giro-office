@@ -6,6 +6,7 @@ import { createReportsApp } from "./app.js";
 import { getReportsServiceEnv } from "./config/env.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
+import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
 
 const env = getReportsServiceEnv();
@@ -20,7 +21,13 @@ const app = createReportsApp({
   env,
   logger,
   prisma,
-  reporting: { adapters: [new ParcelamentoAdapter(env), new ClientIntegrationAdapter(env)] },
+  reporting: {
+    adapters: [
+      new ParcelamentoAdapter(env),
+      new ClientIntegrationAdapter(env),
+      new ProjectAdapter(env),
+    ],
+  },
 });
 
 app.listen(env.port, () => {

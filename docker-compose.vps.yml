@@ -571,6 +571,7 @@ services:
       - .env.vps.reports-service
     environment:
       USER_SERVICE_URL: http://user-service:3030
+      PROJECT_SERVICE_URL: http://project-service:3033
     expose:
       - "3044"
     healthcheck:
