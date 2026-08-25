@@ -8,7 +8,6 @@ const { prismaMock } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
-      updateMany: vi.fn(),
     },
   },
 }));
@@ -235,8 +234,8 @@ describe("OrganizationService", () => {
     };
     const after = { ...before, status: "suspended", updated_at: afterUpdatedAt };
     const audit = vi.fn().mockResolvedValue(undefined);
-    prismaMock.organization.findUnique.mockResolvedValueOnce(before).mockResolvedValueOnce(after);
-    prismaMock.organization.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.organization.findUnique.mockResolvedValueOnce(before);
+    prismaMock.organization.update.mockResolvedValue(after);
     const service = new OrganizationService(audit);
 
     const result = await service.updatePlatformStatus({
@@ -247,10 +246,22 @@ describe("OrganizationService", () => {
     });
 
     expect(result).toEqual(after);
-    expect(prismaMock.organization.updateMany).toHaveBeenCalledWith({
+    expect(prismaMock.organization.update).toHaveBeenCalledWith({
       where: { id: "org-1", updated_at: beforeUpdatedAt },
       data: { status: "suspended" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        subscription_plan: true,
+        logo_url: true,
+        cnpj: true,
+        created_at: true,
+        updated_at: true,
+      },
     });
+    expect(prismaMock.organization.findUnique).toHaveBeenCalledTimes(1);
     expect(audit).toHaveBeenCalledWith({
       actorPlatformUserId: "platform-user-1",
       organizationId: "org-1",
@@ -267,7 +278,7 @@ describe("OrganizationService", () => {
       subscription_plan: "trial",
       updated_at: updatedAt,
     });
-    prismaMock.organization.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.organization.update.mockRejectedValue({ code: "P2025" });
     const service = new OrganizationService();
 
     await expect(
@@ -302,8 +313,8 @@ describe("OrganizationService", () => {
       updated_at: afterUpdatedAt,
     };
     const audit = vi.fn().mockRejectedValue(new Error("audit unavailable"));
-    prismaMock.organization.findUnique.mockResolvedValueOnce(before).mockResolvedValueOnce(after);
-    prismaMock.organization.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.organization.findUnique.mockResolvedValueOnce(before);
+    prismaMock.organization.update.mockResolvedValue(after);
     const service = new OrganizationService(audit);
 
     await expect(
@@ -314,6 +325,7 @@ describe("OrganizationService", () => {
         actorPlatformUserId: "platform-user-1",
       }),
     ).resolves.toEqual(after);
+    expect(prismaMock.organization.findUnique).toHaveBeenCalledTimes(1);
     expect(audit).toHaveBeenCalledWith({
       actorPlatformUserId: "platform-user-1",
       organizationId: "org-1",

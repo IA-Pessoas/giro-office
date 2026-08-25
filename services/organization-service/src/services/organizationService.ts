@@ -62,6 +62,10 @@ function isPrismaUniqueConflict(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && err.code === "P2002";
 }
 
+function isPrismaRecordNotFound(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && err.code === "P2025";
+}
+
 export interface ListOrganizationsParams {
   page: number;
   pageSize: number;
@@ -177,16 +181,20 @@ class OrganizationService {
   private async commitPlatformUpdate(
     id: string,
     expectedUpdatedAt: string,
-    data: Prisma.OrganizationUpdateManyMutationInput,
+    data: Prisma.OrganizationUpdateInput,
   ): Promise<PlatformOrganizationRow> {
-    const result = await prismaClient.organization.updateMany({
-      where: { id, updated_at: new Date(expectedUpdatedAt) },
-      data,
-    });
-    if (result.count !== 1) {
-      throw new ServiceError(409, "A organização foi alterada por outra operação.");
+    try {
+      return await prismaClient.organization.update({
+        where: { id, updated_at: new Date(expectedUpdatedAt) },
+        data,
+        select: PLATFORM_ORGANIZATION_SELECT,
+      });
+    } catch (err: unknown) {
+      if (isPrismaRecordNotFound(err)) {
+        throw new ServiceError(409, "A organização foi alterada por outra operação.", err);
+      }
+      throw err;
     }
-    return this.findPlatformSnapshot(id);
   }
 
   async list(params: ListOrganizationsParams): Promise<{

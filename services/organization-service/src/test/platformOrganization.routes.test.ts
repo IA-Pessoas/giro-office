@@ -364,7 +364,17 @@ describe("platform organization OpenAPI", () => {
         type: "object",
         properties: {
           name: { type: "string" },
-          cnpj: { type: "string", pattern: "^[0-9]{14}$" },
+          cnpj: {
+            description: "CNPJ válido com 14 dígitos ou máscara oficial.",
+            oneOf: [
+              { type: "string", pattern: "^[0-9]{14}$", example: "11222333000181" },
+              {
+                type: "string",
+                pattern: "^[0-9]{2}\\.[0-9]{3}\\.[0-9]{3}/[0-9]{4}-[0-9]{2}$",
+                example: "11.222.333/0001-81",
+              },
+            ],
+          },
         },
         required: ["name", "cnpj"],
         additionalProperties: false,
@@ -414,5 +424,25 @@ describe("platform organization OpenAPI", () => {
         "409",
       ]);
     }
+    expect(spec.paths).toHaveProperty(
+      [
+        "/platform/organizations/{id}/logo-url",
+        "patch",
+        "requestBody",
+        "content",
+        "application/json",
+        "schema",
+        "properties",
+        "logo_url",
+      ],
+      {
+        type: "string",
+        format: "uri",
+        pattern: "^https://(?![^/?#]*@).+$",
+        maxLength: 2_048,
+        nullable: true,
+        description: "URL HTTPS sem credenciais embutidas, ou null para remover a logo.",
+      },
+    );
   });
 });
