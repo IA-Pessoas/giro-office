@@ -784,7 +784,7 @@ it("audita somente queries allowlisted nas leituras de organização da platafor
   }
 });
 
-it("protege e audita uma única vez cada mutação de organização da plataforma", async () => {
+it("persiste uma tentativa e audita o resultado de cada mutação de organização da plataforma", async () => {
   const csrfToken = "P".repeat(43);
   const platformToken = createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) });
   const upstreamRequests: Array<{
@@ -882,7 +882,7 @@ it("protege e audita uma única vez cada mutação de organização da plataform
       expect(response.status, `${operation.method} ${operation.path}`).toBe(operation.status);
     }
 
-    await waitForRecords(auditService.records, operations.length);
+    await waitForRecords(auditService.records, operations.length * 2);
     expect(upstreamRequests).toHaveLength(operations.length);
     for (const request of upstreamRequests) {
       expect(request.url).toContain("mutation-token");
@@ -892,7 +892,9 @@ it("protege e audita uma única vez cada mutação de organização da plataform
     }
 
     expect(
-      auditService.records.map(({ method, path, metadata }) => ({ method, path, metadata })),
+      auditService.records
+        .filter((record) => record.action !== "organization.mutation.attempt")
+        .map(({ method, path, metadata }) => ({ method, path, metadata })),
     ).toEqual(
       operations.map(({ method, path }) => ({
         method,
@@ -903,6 +905,12 @@ it("protege e audita uma única vez cada mutação de organização da plataform
           platform_user_id: "platform-user-1",
         }),
       })),
+    );
+    expect(
+      auditService.records.filter((record) => record.action === "organization.mutation.attempt"),
+    ).toHaveLength(operations.length);
+    expect(new Set(auditService.records.map((record) => record.requestId)).size).toBe(
+      operations.length * 2,
     );
     const serializedAudit = JSON.stringify(auditService.records);
     expect(serializedAudit).not.toContain("11222333000181");
@@ -956,6 +964,146 @@ it("não chama o organization-service quando a auditoria obrigatória está desa
     expect(response.status).toBe(503);
     expect(upstreamHits).toBe(0);
   } finally {
+    await stopServer(gateway);
+    await stopServer(organizationService);
+  }
+});
+
+it.each([
+  "network",
+  "http",
+  "timeout",
+])("barreira HTTP não despacha organização quando ACK de auditoria falha: %s", async (failure) => {
+  const realFetch = globalThis.fetch;
+  const csrfToken = "P".repeat(43);
+  let upstreamHits = 0;
+  const organizationService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.writeHead(201).end();
+  });
+  const organizationServiceUrl = await startServer(organizationService);
+  const auditServiceUrl = "http://audit-service.test";
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    if (!String(input).startsWith(auditServiceUrl)) return realFetch(input, init);
+    const payload = JSON.parse(String(init?.body)) as CreateAuditRequestPayload;
+    if (payload.action !== "organization.mutation.attempt")
+      return new Response(null, { status: 201 });
+    if (failure === "http") return new Response("private-audit-error", { status: 500 });
+    if (failure === "timeout") {
+      await new Promise((_, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+      });
+    }
+    throw new Error("private-audit-error");
+  });
+  const gateway = createServer(
+    createApp(
+      createEnv({ auditEnabled: true, auditServiceUrl, organizationServiceUrl }),
+      createTestLogger(),
+      { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+    ),
+  );
+  const gatewayUrl = await startServer(gateway);
+  try {
+    const response = await realFetch(`${gatewayUrl}/platform/organizations`, {
+      method: "POST",
+      headers: {
+        Cookie: `cw.session=${createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) })}; cw.csrf=${csrfToken}`,
+        [CSRF_HEADER_NAME]: csrfToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Blocked", cnpj: "11222333000181" }),
+    });
+    expect(response.status).toBe(503);
+    expect(await response.text()).not.toContain("private-audit-error");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    fetchSpy.mockRestore();
+    await stopServer(gateway);
+    await stopServer(organizationService);
+  }
+}, 15_000);
+
+it("nega auth/CSRF antes do ACK e só despacha a organização após confirmação", async () => {
+  const realFetch = globalThis.fetch;
+  const csrfToken = "P".repeat(43);
+  let upstreamHits = 0;
+  const organizationService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.writeHead(201).end();
+  });
+  const organizationServiceUrl = await startServer(organizationService);
+  const auditServiceUrl = "http://audit-service.test";
+  const attempts: CreateAuditRequestPayload[] = [];
+  let release!: () => void;
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    if (!String(input).startsWith(auditServiceUrl)) return realFetch(input, init);
+    const payload = JSON.parse(String(init?.body)) as CreateAuditRequestPayload;
+    if (payload.action === "organization.mutation.attempt") {
+      attempts.push(payload);
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    }
+    return new Response(null, { status: 201 });
+  });
+  const gateway = createServer(
+    createApp(
+      createEnv({ auditEnabled: true, auditServiceUrl, organizationServiceUrl }),
+      createTestLogger(),
+      { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+    ),
+  );
+  const gatewayUrl = await startServer(gateway);
+  const headers = {
+    Cookie: `cw.session=${createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) })}; cw.csrf=${csrfToken}`,
+    [CSRF_HEADER_NAME]: csrfToken,
+    "content-type": "application/json",
+  };
+  const url = `${gatewayUrl}/platform/organizations`;
+  const body = JSON.stringify({ name: "Allowed", cnpj: "11222333000181" });
+  try {
+    expect(
+      (
+        await realFetch(url, {
+          method: "POST",
+          body,
+          headers: { "content-type": "application/json" },
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await realFetch(url, {
+          method: "POST",
+          body,
+          headers: { ...headers, [CSRF_HEADER_NAME]: "wrong" },
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await realFetch(url, {
+          method: "POST",
+          body,
+          headers: {
+            ...headers,
+            Cookie: `cw.session=${createToken({ user_id: "org-user", organization_id: "org-1", permission: 3, type: "owner", csrf_hash: hashCsrfToken(csrfToken) })}; cw.csrf=${csrfToken}`,
+          },
+        })
+      ).status,
+    ).toBe(403);
+    expect(attempts).toHaveLength(0);
+    expect(upstreamHits).toBe(0);
+    const operation = realFetch(url, { method: "POST", body, headers });
+    await vi.waitFor(() => expect(attempts).toHaveLength(1));
+    expect(upstreamHits).toBe(0);
+    release();
+    expect((await operation).status).toBe(201);
+    expect(upstreamHits).toBe(1);
+  } finally {
+    release?.();
+    fetchSpy.mockRestore();
     await stopServer(gateway);
     await stopServer(organizationService);
   }

@@ -28,7 +28,12 @@ export function createAuditRecorder({
   fetchImpl = fetch,
 }: CreateAuditRecorderOptions): ReservableAuditRecorder {
   if (!enabled) {
-    return Object.assign(async () => {}, { reserve: (kind: AuditReservation) => kind });
+    return Object.assign(async () => {}, {
+      reserve: (kind: AuditReservation) => kind,
+      recordRequired: async () => {
+        throw new Error("Audit persistence unavailable");
+      },
+    });
   }
 
   const url = new URL("/internal/audit/requests", serviceUrl);
@@ -41,11 +46,13 @@ export function createAuditRecorder({
   let inFlight = 0;
   let publicInFlight = 0;
 
-  const record: ReservableAuditRecorder = async (
+  const send = async (
     payload: CreateAuditRequestPayload,
     reservation?: AuditReservation,
-  ) => {
-    const isPublic = reservation !== "protected";
+    required = false,
+    signal?: AbortSignal,
+  ): Promise<void> => {
+    const isPublic = reservation ? reservation === "public" : !required;
     const atCapacity = inFlight >= safeMaxInFlight || (isPublic && publicInFlight >= publicLimit);
 
     if (!reservation && atCapacity) {
@@ -54,6 +61,7 @@ export function createAuditRecorder({
         message: "Audit ingest concurrency limit reached",
         request: { id: payload.requestId },
       });
+      if (required) throw new Error("Audit persistence unavailable");
       return;
     }
 
@@ -65,6 +73,9 @@ export function createAuditRecorder({
     }
 
     try {
+      const timeout = AbortSignal.timeout(Math.max(1, timeoutMs));
+      const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+      requestSignal.throwIfAborted();
       const response = await fetchImpl(url, {
         method: "POST",
         headers: {
@@ -72,12 +83,15 @@ export function createAuditRecorder({
           [INTERNAL_SERVICE_TOKEN_HEADER]: serviceToken,
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(Math.max(1, timeoutMs)),
+        signal: requestSignal,
       });
+      requestSignal.throwIfAborted();
 
       if (response.ok) {
         return;
       }
+
+      if (required) throw new Error("Audit persistence unavailable");
 
       logger.warn({
         event: "audit.ingest.failed",
@@ -96,8 +110,9 @@ export function createAuditRecorder({
         request: {
           id: payload.requestId,
         },
-        err: error,
+        err: required ? new Error("Audit persistence unavailable") : error,
       });
+      if (required) throw new Error("Audit persistence unavailable");
     } finally {
       inFlight -= 1;
       if (isPublic) {
@@ -105,6 +120,10 @@ export function createAuditRecorder({
       }
     }
   };
+
+  const record: ReservableAuditRecorder = (payload, reservation) => send(payload, reservation);
+  record.recordRequired = (payload, reservation, signal) =>
+    send(payload, reservation, true, signal);
 
   record.reserve = (kind: AuditReservation): AuditReservation | undefined => {
     if (inFlight >= safeMaxInFlight || (kind === "public" && publicInFlight >= publicLimit)) {

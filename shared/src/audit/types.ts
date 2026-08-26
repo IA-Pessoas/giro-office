@@ -10,6 +10,12 @@ export type AuditRecorder = (
 ) => Promise<void>;
 export type ReservableAuditRecorder = AuditRecorder & {
   reserve(kind: AuditReservation): AuditReservation | undefined;
+  /** Resolves only after persistence ACK; consumes and releases any supplied reservation. */
+  recordRequired(
+    payload: CreateAuditRequestPayload,
+    reservation?: AuditReservation,
+    signal?: AbortSignal,
+  ): Promise<void>;
 };
 
 export interface CreateAuditRequestPayload {

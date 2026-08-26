@@ -349,16 +349,16 @@ function mountAuthenticationBoundary(
       logger,
     }),
   );
+  app.use(buildCsrfProtectionMiddleware({ allowedOrigins: env.allowedOrigins, logger }));
+  app.use(generalRateLimit);
+  mountProtectedBlockedRoutes(app);
+  app.use(buildAuthorizeMiddleware(env.authorizationMode, logger));
   app.use(
     buildAuditCapacityGuard({
       enabled: env.auditEnabled,
       recordAuditRequest,
     }),
   );
-  app.use(buildCsrfProtectionMiddleware({ allowedOrigins: env.allowedOrigins, logger }));
-  app.use(generalRateLimit);
-  mountProtectedBlockedRoutes(app);
-  app.use(buildAuthorizeMiddleware(env.authorizationMode, logger));
 }
 
 function mountProtectedBlockedRoutes(app: express.Express): void {

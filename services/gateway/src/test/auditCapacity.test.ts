@@ -8,7 +8,10 @@ describe("buildAuditCapacityGuard", () => {
     const next = vi.fn();
     const guard = buildAuditCapacityGuard({
       enabled: true,
-      recordAuditRequest: Object.assign(async () => {}, { reserve }),
+      recordAuditRequest: Object.assign(async () => {}, {
+        reserve,
+        recordRequired: async () => {},
+      }),
     });
 
     guard(
@@ -30,7 +33,10 @@ describe("buildAuditCapacityGuard", () => {
     const next = vi.fn();
     const guard = buildAuditCapacityGuard({
       enabled: true,
-      recordAuditRequest: Object.assign(async () => {}, { reserve }),
+      recordAuditRequest: Object.assign(async () => {}, {
+        reserve,
+        recordRequired: async () => {},
+      }),
     });
 
     guard({ method: "GET", requestId: "request-1" } as never, {} as never, next);
@@ -44,7 +50,10 @@ describe("buildAuditCapacityGuard", () => {
     const next = vi.fn();
     const guard = buildAuditCapacityGuard({
       enabled: true,
-      recordAuditRequest: Object.assign(async () => {}, { reserve }),
+      recordAuditRequest: Object.assign(async () => {}, {
+        reserve,
+        recordRequired: async () => {},
+      }),
     });
 
     guard(
@@ -67,7 +76,10 @@ describe("buildAuditCapacityGuard", () => {
     const next = vi.fn();
     const guard = buildAuditCapacityGuard({
       enabled: false,
-      recordAuditRequest: Object.assign(async () => {}, { reserve }),
+      recordAuditRequest: Object.assign(async () => {}, {
+        reserve,
+        recordRequired: async () => {},
+      }),
     });
 
     guard({ method, originalUrl, requestId: "request-1" } as never, {} as never, next);
@@ -81,7 +93,10 @@ describe("buildAuditCapacityGuard", () => {
     const next = vi.fn();
     const guard = buildAuditCapacityGuard({
       enabled: true,
-      recordAuditRequest: Object.assign(async () => {}, { reserve }),
+      recordAuditRequest: Object.assign(async () => {}, {
+        reserve,
+        recordRequired: async () => {},
+      }),
     });
 
     guard({ method: "POST", originalUrl: "/platform/organizations" } as never, {} as never, next);
@@ -95,7 +110,10 @@ describe("buildAuditCapacityGuard", () => {
     const next = vi.fn();
     const guard = buildAuditCapacityGuard({
       enabled: false,
-      recordAuditRequest: Object.assign(async () => {}, { reserve }),
+      recordAuditRequest: Object.assign(async () => {}, {
+        reserve,
+        recordRequired: async () => {},
+      }),
     });
 
     guard(

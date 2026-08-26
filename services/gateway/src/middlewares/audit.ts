@@ -1,3 +1,5 @@
+import { createHash, randomUUID } from "node:crypto";
+
 import type {
   AuditOutcome,
   AuditQuery,
@@ -78,11 +80,11 @@ export function buildAuditCapacityGuard({
   enabled,
   recordAuditRequest,
 }: BuildAuditCapacityGuardOptions) {
-  return function auditCapacityGuard(
+  return async function auditCapacityGuard(
     request: Request,
-    _response: Response,
+    response: Response,
     next: NextFunction,
-  ): void {
+  ): Promise<void> {
     const requiresAudit = requiresOrganizationMutationAudit(request);
     const mustReserve =
       requiresAudit ||
@@ -105,7 +107,55 @@ export function buildAuditCapacityGuard({
       return;
     }
 
-    RESERVED_AUDIT_REQUESTS.set(request, reservation);
+    if (requiresAudit) {
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      response.once("close", abort);
+      if (request.aborted || response.destroyed) abort();
+      try {
+        await recordAuditRequest.recordRequired(
+          {
+            requestId: randomUUID(),
+            organizationId: null,
+            userId: null,
+            method: request.method,
+            path: getPublicPath(request.originalUrl, request.path),
+            query: {},
+            statusCode: null,
+            // Success means the attempt was recorded, not that the business mutation succeeded.
+            outcome: "success",
+            serviceSource: "gateway",
+            createdAt: new Date().toISOString(),
+            action: "organization.mutation.attempt",
+            referring: "organization",
+            metadata: {
+              auth_kind: "platform",
+              platform_user_id: request.auth?.userId,
+              business_outcome: "unknown",
+              source_request_id_sha256: createHash("sha256")
+                .update(request.requestId)
+                .digest("hex"),
+            },
+          },
+          reservation,
+          controller.signal,
+        );
+      } catch {
+        request.log?.error({
+          event: "audit.required.failed",
+          message: "Required audit persistence unavailable",
+        });
+        if (!controller.signal.aborted && !response.destroyed) {
+          next(new ServiceError(503, "Auditoria indisponível; operação não iniciada."));
+        }
+        return;
+      } finally {
+        response.off("close", abort);
+      }
+      if (controller.signal.aborted || request.aborted || response.destroyed) return;
+    } else {
+      RESERVED_AUDIT_REQUESTS.set(request, reservation);
+    }
     next();
   };
 }
@@ -312,7 +362,11 @@ export function buildAuditLifecycleMiddleware({
         referring: activity?.item,
       };
 
-      const reservation = RESERVED_AUDIT_REQUESTS.get(request);
+      const reservation =
+        RESERVED_AUDIT_REQUESTS.get(request) ??
+        (isPlatform && requiresOrganizationMutationAudit(request)
+          ? recordAuditRequest.reserve("protected")
+          : undefined);
       RESERVED_AUDIT_REQUESTS.delete(request);
       void recordAuditRequest(payload, reservation);
       requestLogger.debug({
