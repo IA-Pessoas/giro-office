@@ -237,6 +237,7 @@ describe("ReportModelService", () => {
         organization_id: organizationId,
         created_by_user_id: userId,
         department_id: null,
+        is_ephemeral: false,
       },
       orderBy: { updated_at: "desc" },
     });

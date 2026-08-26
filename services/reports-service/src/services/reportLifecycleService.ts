@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { ServiceError } from "@workspace/shared";
 
 import { MAX_SNAPSHOT_BYTES, MAX_SNAPSHOT_ROWS } from "../schemas/reportSnapshot.schemas.js";
@@ -21,19 +22,34 @@ export const REPORT_LIFECYCLE_STATUSES = [
 
 export type ReportLifecycleStatus = (typeof REPORT_LIFECYCLE_STATUSES)[number];
 
+const SNAPSHOT_WRITE_CHUNK_SIZE = 500;
+
 type ReportJob = {
   id: string;
   organization_id: string;
   report_model_version_id: string;
   status: string;
+  cancel_requested_at?: Date | null;
+  materialization_token?: string | null;
 };
 
 type LifecycleTransaction = ReportAuditStore & {
   reportJob: {
     findUnique(args: { where: { id: string } }): Promise<ReportJob | null>;
     updateMany(args: {
-      where: { id: string; status: ReportLifecycleStatus; lease_token?: string };
-      data: { status: ReportLifecycleStatus; started_at?: Date; finished_at?: Date };
+      where: {
+        id: string;
+        status: ReportLifecycleStatus;
+        lease_token?: string;
+        cancel_requested_at?: null;
+        materialization_token?: string | null;
+      };
+      data: {
+        status?: ReportLifecycleStatus;
+        started_at?: Date;
+        finished_at?: Date;
+        materialization_token?: string | null;
+      };
     }): Promise<{ count: number }>;
   };
   reportSnapshot: {
@@ -42,12 +58,14 @@ type LifecycleTransaction = ReportAuditStore & {
         organization_id: string;
         report_model_version_id: string;
         report_job_id: string;
+        expires_at?: Date;
       };
     }): Promise<{ id: string }>;
     findMany(args: {
       where: { report_job_id: string };
       select: { id: true };
     }): Promise<Array<{ id: string }>>;
+    deleteMany(args: { where: { report_job_id: string } }): Promise<unknown>;
   };
   reportSnapshotRow: {
     createMany(args: {
@@ -59,6 +77,16 @@ type LifecycleTransaction = ReportAuditStore & {
       }>;
     }): Promise<unknown>;
     deleteMany(args: { where: { snapshot_id: { in: string[] } } }): Promise<unknown>;
+  };
+  reportModelVersion: {
+    findFirst(args: { where: { id: string } }): Promise<{ report_model_id: string } | null>;
+    deleteMany(args: { where: { report_model_id: string } }): Promise<unknown>;
+  };
+  reportModel: {
+    findFirst(args: {
+      where: { id: string; is_ephemeral: boolean };
+    }): Promise<{ id: string } | null>;
+    delete(args: { where: { id: string } }): Promise<unknown>;
   };
 };
 
@@ -82,6 +110,7 @@ export interface TransitionReportJobInput extends ReportLifecycleInput {
 export interface CompleteReportJobInput extends ReportLifecycleInput {
   lease_token: string;
   rows: ReadonlyArray<Record<string, unknown>>;
+  expires_at?: Date;
 }
 
 export interface RemoveReportSnapshotInput extends ReportLifecycleInput {
@@ -141,6 +170,9 @@ export class ReportLifecycleService {
         },
       });
       this.assertUpdated(result.count);
+      if (input.status === "cancelled" || input.status === "failed") {
+        await this.removeEphemeralDefinition(transaction, job.report_model_version_id);
+      }
 
       const auditEvent = this.auditEvent(job, input, `report.${input.status}`, occurredAt);
       await this.audit.recordLocal(transaction, auditEvent);
@@ -153,32 +185,67 @@ export class ReportLifecycleService {
   async complete(input: CompleteReportJobInput): Promise<void> {
     const snapshotRows = this.materializeSnapshotRows(input.rows);
     const snapshotBytes = this.assertSnapshotLimits(snapshotRows);
+    const materializationToken = randomUUID();
+    await this.prisma.$transaction(async (transaction) => {
+      const job = await this.getJob(transaction, input.job_id);
+      this.assertOrganization(job, input.organization_id);
+      assertTransition(job.status, "completed");
+      this.assertNotCancelled(job);
+      const claimed = await transaction.reportJob.updateMany({
+        where: {
+          id: job.id,
+          status: "processing",
+          lease_token: input.lease_token,
+          cancel_requested_at: null,
+          materialization_token: null,
+        },
+        data: { materialization_token: materializationToken },
+      });
+      this.assertUpdated(claimed.count);
+    });
     const event = await this.prisma.$transaction(async (transaction) => {
       const job = await this.getJob(transaction, input.job_id);
       this.assertOrganization(job, input.organization_id);
       assertTransition(job.status, "completed");
+      this.assertNotCancelled(job);
 
       const occurredAt = this.clock();
-      const result = await transaction.reportJob.updateMany({
-        where: { id: job.id, status: "processing", lease_token: input.lease_token },
-        data: { status: "completed", finished_at: occurredAt },
-      });
-      this.assertUpdated(result.count);
       const snapshot = await transaction.reportSnapshot.create({
         data: {
           organization_id: job.organization_id,
           report_model_version_id: job.report_model_version_id,
           report_job_id: job.id,
+          ...(input.expires_at ? { expires_at: input.expires_at } : {}),
         },
       });
-      await transaction.reportSnapshotRow.createMany({
-        data: snapshotRows.map((data_json, index) => ({
-          organization_id: job.organization_id,
-          snapshot_id: snapshot.id,
-          row_number: index + 1,
-          data_json,
-        })),
+      for (let start = 0; start < snapshotRows.length; start += SNAPSHOT_WRITE_CHUNK_SIZE) {
+        this.assertNotCancelled(await this.getJob(transaction, input.job_id));
+        await transaction.reportSnapshotRow.createMany({
+          data: snapshotRows
+            .slice(start, start + SNAPSHOT_WRITE_CHUNK_SIZE)
+            .map((data_json, offset) => ({
+              organization_id: job.organization_id,
+              snapshot_id: snapshot.id,
+              row_number: start + offset + 1,
+              data_json,
+            })),
+        });
+      }
+      const result = await transaction.reportJob.updateMany({
+        where: {
+          id: job.id,
+          status: "processing",
+          lease_token: input.lease_token,
+          cancel_requested_at: null,
+          materialization_token: materializationToken,
+        },
+        data: {
+          status: "completed",
+          finished_at: occurredAt,
+          materialization_token: null,
+        },
       });
+      this.assertUpdated(result.count);
 
       const auditEvent = this.auditEvent(job, input, "report.completed", occurredAt, {
         ...input.counts,
@@ -235,6 +302,8 @@ export class ReportLifecycleService {
           where: { snapshot_id: { in: snapshots.map((snapshot) => snapshot.id) } },
         });
       }
+      await transaction.reportSnapshot.deleteMany({ where: { report_job_id: job.id } });
+      await this.removeEphemeralDefinition(transaction, job.report_model_version_id);
 
       const auditEvent = this.auditEvent(job, input, eventType, occurredAt);
       await this.audit.recordLocal(transaction, auditEvent);
@@ -250,9 +319,31 @@ export class ReportLifecycleService {
     return job;
   }
 
+  private async removeEphemeralDefinition(
+    transaction: LifecycleTransaction,
+    reportModelVersionId: string,
+  ): Promise<void> {
+    const version = await transaction.reportModelVersion.findFirst({
+      where: { id: reportModelVersionId },
+    });
+    if (!version) return;
+    const model = await transaction.reportModel.findFirst({
+      where: { id: version.report_model_id, is_ephemeral: true },
+    });
+    if (!model) return;
+    await transaction.reportModelVersion.deleteMany({ where: { report_model_id: model.id } });
+    await transaction.reportModel.delete({ where: { id: model.id } });
+  }
+
   private assertOrganization(job: ReportJob, organizationId: string): void {
     if (job.organization_id !== organizationId) {
       throw new ServiceError(403, "O job não pertence à organização informada.");
+    }
+  }
+
+  private assertNotCancelled(job: ReportJob): void {
+    if (job.cancel_requested_at) {
+      throw new ServiceError(409, "O cancelamento do job foi solicitado.");
     }
   }
 

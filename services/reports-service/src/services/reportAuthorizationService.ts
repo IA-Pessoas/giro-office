@@ -93,6 +93,21 @@ export class ReportAuthorizationService {
     };
   }
 
+  async validateSharedDefinition(
+    input: ValidateReportDefinitionInput,
+  ): Promise<AuthorizedSharedReportDefinition> {
+    const execution = await this.getSharedExecutionContext(input);
+    const definition = this.definitionService.validate(input.definition, {
+      ...execution.scope,
+      grant: deriveReportCatalogGrant(input.definition),
+    });
+    return {
+      ...definition,
+      department_id: execution.department.id,
+      grant: deriveReportCatalogGrant(definition.definition),
+    };
+  }
+
   private requireSharedDepartment(context: {
     department: { id: string } | null;
     departmentModule: string | null;

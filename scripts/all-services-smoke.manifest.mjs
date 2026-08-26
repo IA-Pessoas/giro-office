@@ -817,6 +817,38 @@ const baseManifest = [
     auth: "bearer",
     expectEnvelope: false,
   }),
+  op({
+    service: "reports-service",
+    method: "POST",
+    path: "/reports/jobs",
+    action: "reportsJobCreate",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "reports-service",
+    method: "GET",
+    path: "/reports/jobs/{id}",
+    action: "reportsJobGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "reports-service",
+    method: "POST",
+    path: "/reports/jobs/{id}/cancel",
+    action: "reportsJobCancel",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "reports-service",
+    method: "GET",
+    path: "/reports/jobs/{id}/snapshot",
+    action: "reportsJobSnapshot",
+    target: "gateway",
+    auth: "bearer",
+  }),
 
   op({
     service: "parcelamento-service",

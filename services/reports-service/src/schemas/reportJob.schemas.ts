@@ -7,10 +7,17 @@ export const reportJobStatusSchema = z.enum(REPORT_LIFECYCLE_STATUSES);
 
 export const createReportJobSchema = z
   .object({
-    definition: reportDefinitionSchema,
-    format: z.enum(["json", "csv"]),
+    definition: reportDefinitionSchema.optional(),
+    modelVersionId: z.string().uuid().optional(),
+    parameterValues: z.record(z.string(), z.unknown()).optional(),
+    format: z.enum(["json", "csv"]).default("json"),
   })
-  .strict();
+  .strict()
+  .refine((value) => Boolean(value.definition) !== Boolean(value.modelVersionId), {
+    message: "Informe definition ou modelVersionId, mas não ambos.",
+  });
+
+export const reportJobIdParamsSchema = z.object({ id: z.string().uuid() }).strict();
 
 export const reportJobSchema = z
   .object({

@@ -192,6 +192,7 @@ export class ReportModelService {
         organization_id: input.organizationId,
         created_by_user_id: input.userId,
         department_id: null,
+        is_ephemeral: false,
       },
       orderBy: { updated_at: "desc" },
     });

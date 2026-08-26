@@ -2173,6 +2173,7 @@ model ReportModel {
   name               String
   description        String?
   active             Boolean  @default(true)
+  is_ephemeral       Boolean  @default(false)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
 
@@ -2203,6 +2204,8 @@ model ReportJob {
   finished_at             DateTime?
   lease_token             String?
   lease_expires_at        DateTime?
+  cancel_requested_at     DateTime?
+  materialization_token   String?
   error_message           String?
   created_at              DateTime @default(now())
   updated_at              DateTime @updatedAt
@@ -2219,6 +2222,7 @@ model ReportSnapshot {
   created_at              DateTime @default(now())
   expires_at              DateTime?
 
+  @@unique([report_job_id])
   @@map("reports.snapshots")
 }
 
