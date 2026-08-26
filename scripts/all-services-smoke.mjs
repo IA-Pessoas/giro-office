@@ -227,6 +227,7 @@ const state = {
   tiRobotId: "",
   certificatePjId: "",
   certificatePfId: "",
+  reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
 };
 
 const cleanupTasks = [];
@@ -1162,6 +1163,18 @@ const handlers = {
 
   async reportsCatalog(op) {
     await httpRequest(op);
+  },
+
+  async reportsSnapshotExport(op) {
+    const snapshotId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("reportsSnapshotId");
+    await httpRequest(op, {
+      path: `/reports/snapshots/${snapshotId}/export`,
+      query: { format: isBadExpectation(op) ? "pdf" : "csv" },
+      expectEnvelope: false,
+      expectedStatus: isBadExpectation(op) ? [400] : [200],
+    });
   },
 
   async reportsPreview(op) {

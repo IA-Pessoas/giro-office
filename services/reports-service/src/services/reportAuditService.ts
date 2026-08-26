@@ -33,6 +33,8 @@ export interface ReportAuditEventInput {
   report_model_version_id: string;
   event_type: ReportAuditEventType;
   occurred_at: Date;
+  format?: "csv" | "xlsx";
+  result?: "success" | "failure";
   counts?: {
     rows?: number;
     bytes?: number;
@@ -48,6 +50,8 @@ export function createReportAuditEvent(input: ReportAuditEventInput): ReportAudi
     report_model_version_id: input.report_model_version_id,
     event_type: input.event_type,
     occurred_at: input.occurred_at,
+    ...(input.format ? { format: input.format } : {}),
+    ...(input.result ? { result: input.result } : {}),
     ...(input.counts ? { counts: input.counts } : {}),
   };
 }
@@ -92,6 +96,8 @@ function metadata(input: ReportAuditEventInput): Record<string, unknown> {
     report_model_version_id: input.report_model_version_id,
     event_type: input.event_type,
     occurred_at: input.occurred_at.toISOString(),
+    ...(input.format ? { format: input.format } : {}),
+    ...(input.result ? { result: input.result } : {}),
     counts: safeCounts(input.counts),
   };
 }

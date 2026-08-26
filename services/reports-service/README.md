@@ -31,6 +31,11 @@ amostra limitada; não cria job, snapshot, arquivo ou registro persistido.
 somente o autor. Cada criação ou edição revalida a definição declarativa contra o catálogo e as
 permissões atuais; a edição cria uma nova versão e nunca compartilha o modelo com departamento.
 
+`GET /reports/snapshots/:id/export?format=csv|xlsx` revalida o acesso atual e gera um arquivo
+efêmero somente das linhas materializadas no snapshot. O arquivo não é salvo em storage nem
+registrado como exportação persistida; a auditoria conserva apenas formato, resultado, job, versão
+e contagens seguras.
+
 ## Desenvolvimento
 
 ```bash

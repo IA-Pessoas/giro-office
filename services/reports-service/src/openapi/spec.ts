@@ -191,6 +191,37 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           },
         },
       },
+      "/reports/snapshots/{id}/export": {
+        get: {
+          tags: ["Reports"],
+          summary: "Exportar snapshot autorizado sem persistir arquivo",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "format",
+              in: "query",
+              required: true,
+              schema: { type: "string", enum: ["csv", "xlsx"] },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Arquivo efêmero gerado a partir do snapshot",
+              content: {
+                "text/csv": { schema: { type: "string", format: "binary" } },
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                  schema: { type: "string", format: "binary" },
+                },
+              },
+            },
+            "400": { description: "Formato inválido" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Snapshot não autorizado" },
+            "404": { description: "Snapshot não encontrado ou expirado" },
+          },
+        },
+      },
       "/reports/models/shared": {
         post: {
           tags: ["Reports"],
