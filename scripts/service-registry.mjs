@@ -48,8 +48,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3038",
     urlEnvKey: "CONTABIL_SERVICE_URL",
     openapiSpecPath: "services/contabil-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/contabil-service/src/generated/prisma",
   },
   {
@@ -98,8 +98,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3043",
     urlEnvKey: "PARCELAMENTO_SERVICE_URL",
     openapiSpecPath: "services/parcelamento-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/parcelamento-service/src/generated/prisma",
   },
   {
@@ -128,8 +128,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3033",
     urlEnvKey: "PROJECT_SERVICE_URL",
     openapiSpecPath: "services/project-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer", "admin-bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "admin-bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/project-service/src/generated/prisma",
   },
   {
@@ -158,8 +158,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3032",
     urlEnvKey: "TASK_SERVICE_URL",
     openapiSpecPath: "services/task-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer", "admin-bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "admin-bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/task-service/src/generated/prisma",
   },
   {

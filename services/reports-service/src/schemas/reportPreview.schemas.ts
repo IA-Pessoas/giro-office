@@ -16,8 +16,7 @@ export const reportPreviewQuerySchema = z
 export const reportPreviewRequestSchema = z
   .object({
     definition: reportDefinitionSchema,
-    page: pageSchema.default(1),
-    page_size: pageSizeSchema.default(MAX_PREVIEW_ROWS),
+    parameterValues: z.record(z.unknown()).optional(),
   })
   .strict();
 

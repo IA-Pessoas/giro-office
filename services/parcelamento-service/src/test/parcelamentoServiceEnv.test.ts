@@ -25,6 +25,8 @@ describe("parcelamento-service env", () => {
         DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
         JWT_SECRET: "test-jwt-secret",
         AUDIT_SERVICE_TOKEN: "a".repeat(32),
+        REPORTS_INTERNAL_TOKEN: "b".repeat(32),
+        REPORTS_GRANT_SECRET: "c".repeat(32),
         SERVICE_ALLOWED_ORIGINS: "*",
       }),
     ).toThrow(/SERVICE_ALLOWED_ORIGINS/);

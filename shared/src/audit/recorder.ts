@@ -14,7 +14,16 @@ interface CreateAuditRecorderOptions {
   timeoutMs?: number;
   maxInFlight?: number;
   protectedCapacity?: number;
+  retryMaxAttempts?: number;
+  retryBaseDelayMs?: number;
+  maxPending?: number;
   fetchImpl?: typeof fetch;
+  sleep?: (delayMs: number) => Promise<void>;
+  random?: () => number;
+}
+
+function defaultSleep(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 export function createAuditRecorder({
@@ -25,7 +34,12 @@ export function createAuditRecorder({
   timeoutMs = 5_000,
   maxInFlight = Number.POSITIVE_INFINITY,
   protectedCapacity = 0,
+  retryMaxAttempts = 6,
+  retryBaseDelayMs = 500,
+  maxPending = 100,
   fetchImpl = fetch,
+  sleep = defaultSleep,
+  random = Math.random,
 }: CreateAuditRecorderOptions): ReservableAuditRecorder {
   if (!enabled) {
     return Object.assign(async () => {}, {
@@ -45,6 +59,7 @@ export function createAuditRecorder({
   const publicLimit = safeMaxInFlight - safeProtectedCapacity;
   let inFlight = 0;
   let publicInFlight = 0;
+  let pending = 0;
 
   const send = async (
     payload: CreateAuditRequestPayload,
@@ -72,37 +87,83 @@ export function createAuditRecorder({
       }
     }
 
+    let tracksPending = false;
     try {
-      const timeout = AbortSignal.timeout(Math.max(1, timeoutMs));
-      const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
-      requestSignal.throwIfAborted();
-      const response = await fetchImpl(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [INTERNAL_SERVICE_TOKEN_HEADER]: serviceToken,
-        },
-        body: JSON.stringify(payload),
-        signal: requestSignal,
-      });
-      requestSignal.throwIfAborted();
-
-      if (response.ok) {
-        return;
+      if (!required) {
+        if (pending >= maxPending) {
+          logger.error({
+            event: "audit.ingest.discarded",
+            message: "Audit record discarded because the retry buffer is full",
+            reason: "buffer_full",
+            request: { id: payload.requestId },
+          });
+          return;
+        }
+        pending += 1;
+        tracksPending = true;
       }
+      const body = JSON.stringify(payload);
+      // Required audit keeps its bounded persistence barrier; retries are best-effort only.
+      const attempts = required ? 1 : retryMaxAttempts;
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        let statusCode: number | undefined;
+        let failure: unknown;
+        try {
+          const timeout = AbortSignal.timeout(Math.max(1, timeoutMs));
+          const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+          requestSignal.throwIfAborted();
+          const response = await fetchImpl(url, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              [INTERNAL_SERVICE_TOKEN_HEADER]: serviceToken,
+            },
+            body,
+            signal: requestSignal,
+          });
+          requestSignal.throwIfAborted();
+          if (response.ok) return;
+          statusCode = response.status;
+        } catch (error) {
+          failure = error;
+        }
+        if (required) throw new Error("Audit persistence unavailable");
 
-      if (required) throw new Error("Audit persistence unavailable");
-
-      logger.warn({
-        event: "audit.ingest.failed",
-        message: "Audit ingest request failed",
-        request: {
-          id: payload.requestId,
-        },
-        http: {
-          statusCode: response.status,
-        },
-      });
+        const retryableStatus =
+          statusCode === undefined ||
+          statusCode === 408 ||
+          statusCode === 425 ||
+          statusCode === 429 ||
+          statusCode >= 500;
+        const willRetry = retryableStatus && attempt < attempts;
+        const failureContext = {
+          message: "Audit ingest request failed",
+          request: { id: payload.requestId },
+          attempt,
+          willRetry,
+          ...(statusCode === undefined ? {} : { http: { statusCode } }),
+          ...(failure === undefined ? {} : { err: failure }),
+        };
+        if (willRetry) {
+          logger.warn({ event: "audit.ingest.retry", ...failureContext });
+        } else {
+          logger.error({ event: "audit.ingest.failed", ...failureContext });
+        }
+        if (!willRetry) {
+          logger.error({
+            event: "audit.ingest.discarded",
+            message: retryableStatus
+              ? "Audit record discarded after retry exhaustion"
+              : "Audit record discarded after a non-retryable response",
+            reason: retryableStatus ? "retry_exhausted" : "non_retryable",
+            request: { id: payload.requestId },
+            attempts: attempt,
+          });
+          return;
+        }
+        const exponentialDelay = retryBaseDelayMs * 2 ** (attempt - 1);
+        await sleep(Math.round(exponentialDelay * (0.5 + random())));
+      }
     } catch (error) {
       logger.error({
         event: "audit.ingest.failed",
@@ -114,6 +175,7 @@ export function createAuditRecorder({
       });
       if (required) throw new Error("Audit persistence unavailable");
     } finally {
+      if (tracksPending) pending -= 1;
       inFlight -= 1;
       if (isPublic) {
         publicInFlight -= 1;

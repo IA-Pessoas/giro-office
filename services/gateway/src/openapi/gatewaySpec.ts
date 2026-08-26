@@ -97,7 +97,7 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "Project Service",
       buildSpec: () =>
         buildProjectServiceOpenApiSpec({ port: getPortFromUrl(env.projectServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "client-service",
@@ -148,7 +148,7 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "Contabil Service",
       buildSpec: () =>
         buildContabilServiceOpenApiSpec({ port: getPortFromUrl(env.contabilServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "ti-service",
@@ -186,7 +186,8 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
         buildParcelamentoServiceOpenApiSpec({
           port: getPortFromUrl(env.parcelamentoServiceUrl),
         } as never),
-      includePath: (path) => path !== "/health" && path !== "/ready",
+      includePath: (path) =>
+        path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
     },
     {
       key: "reports-service",

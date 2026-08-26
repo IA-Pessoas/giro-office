@@ -20,6 +20,7 @@ phase() {
 
 if [[ "${DEPLOY_DRY_RUN:-0}" == "1" ]]; then
   phase validate-env
+  phase database-pool-budget
   phase compose-config
   phase build-images-sequentially
   phase database-migrate
@@ -43,6 +44,9 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     exit 1
   fi
 done <"$MANIFEST"
+
+phase database-pool-budget
+node "$ROOT/scripts/ops/validate-database-pool-budget.mjs" "$ENV_ROOT"
 
 if [[ "$ENV_ROOT" != "$ROOT" ]]; then
   echo "DEPLOY_ENV_ROOT diferente do checkout só é permitido em dry-run." >&2

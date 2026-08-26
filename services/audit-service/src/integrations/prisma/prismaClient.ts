@@ -1,14 +1,16 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import {
+  parseDatabasePoolConnectionTimeoutMs,
+  parseDatabasePoolMax,
+} from "@workspace/shared/database";
 
 import { PrismaClient } from "../../../generated/prisma/client.js";
 
-const globalForPrisma = globalThis as typeof globalThis & {
-  auditPrisma?: PrismaClient;
-};
+let auditPrisma: PrismaClient | undefined;
 
 export function getPrismaClient(): PrismaClient {
-  if (globalForPrisma.auditPrisma) {
-    return globalForPrisma.auditPrisma;
+  if (auditPrisma) {
+    return auditPrisma;
   }
 
   if (!process.env.DATABASE_URL) {
@@ -17,12 +19,20 @@ export function getPrismaClient(): PrismaClient {
 
   const adapter = new PrismaPg({
     connectionString: process.env.DATABASE_URL,
+    max: parseDatabasePoolMax(process.env.DATABASE_POOL_MAX),
+    connectionTimeoutMillis: parseDatabasePoolConnectionTimeoutMs(
+      process.env.DATABASE_POOL_CONNECTION_TIMEOUT_MS,
+    ),
   });
-  const prismaClient = new PrismaClient({ adapter });
+  auditPrisma = new PrismaClient({ adapter });
+  return auditPrisma;
+}
 
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.auditPrisma = prismaClient;
+export async function disconnectPrismaClient(): Promise<void> {
+  const client = auditPrisma;
+  if (!client) {
+    return;
   }
-
-  return prismaClient;
+  auditPrisma = undefined;
+  await client.$disconnect();
 }

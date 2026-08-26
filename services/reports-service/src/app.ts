@@ -19,8 +19,14 @@ import type { ReportsPrismaClient } from "./prisma/index.js";
 import { createReportPreviewRouter } from "./routes/preview.routes.js";
 import { createReportCatalogRouter } from "./routes/reportCatalog.routes.js";
 import type { ReportingAccessContextClient } from "./routes/reportingContext.js";
+import { createReportJobRouter } from "./routes/reportJob.routes.js";
+import { createReportModelRouter } from "./routes/reportModel.routes.js";
+import { ReportAuthorizationService } from "./services/reportAuthorizationService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
+import { ReportJobService } from "./services/reportJobService.js";
+import { ReportModelService } from "./services/reportModelService.js";
 import { ReportPreviewService } from "./services/reportPreviewService.js";
+import { ReportSnapshotService } from "./services/reportSnapshotService.js";
 
 export interface CreateReportsAppOptions {
   env: ReportsServiceEnv;
@@ -71,10 +77,26 @@ export function createReportsApp({
   const sourceCatalog = new SourceCatalogService(reporting?.adapters ?? []);
   const definitionService = new ReportDefinitionService(sourceCatalog);
   const accessContextClient = reporting?.accessContextClient ?? new UserAccessContextClient(env);
-  const previewService = new ReportPreviewService(sourceCatalog, definitionService, 100);
+  const previewService = new ReportPreviewService(
+    sourceCatalog,
+    definitionService,
+    env.previewRowLimit,
+  );
+  const authorizationService = new ReportAuthorizationService(
+    accessContextClient,
+    definitionService,
+  );
+  const modelService = new ReportModelService(prisma);
+  const jobService = new ReportJobService(prisma);
+  const snapshotService = new ReportSnapshotService(prisma);
 
   app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
   app.use("/reports", createReportPreviewRouter({ previewService, accessContextClient }));
+  app.use(
+    "/reports",
+    createReportModelRouter({ modelService, authorizationService, previewService }),
+  );
+  app.use("/reports", createReportJobRouter({ jobService, snapshotService, authorizationService }));
   app.use(
     createExpressErrorHandler({
       logger,

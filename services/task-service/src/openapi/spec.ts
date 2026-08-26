@@ -352,6 +352,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       { name: "Financeiro", description: "Cobranca financeira" },
       { name: "Comercial", description: "Cobranca comercial" },
       { name: "Lifecycle", description: "Conclusao e aprovacao" },
+      { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     components: {
       securitySchemes: {
@@ -360,6 +361,11 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           scheme: "bearer",
           bearerFormat: "JWT",
         },
+        internalServiceToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
+        },
       },
       schemas: {
         SuccessEnvelope: {
@@ -367,9 +373,115 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           description: "Resposta de sucesso padrao do workspace",
           additionalProperties: true,
         },
+        ReportingGrantV1: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "version",
+            "audience",
+            "operation",
+            "source",
+            "organization_id",
+            "fields",
+            "request_id",
+            "issued_at",
+            "expires_at",
+            "body_sha256",
+          ],
+          properties: {
+            version: { type: "integer", enum: [1] },
+            audience: { type: "string", enum: ["task-service"] },
+            operation: { type: "string", enum: ["catalog", "extract"] },
+            source: { type: "string" },
+            organization_id: { type: "string", format: "uuid" },
+            fields: { type: "array", uniqueItems: true, items: { type: "string" } },
+            request_id: { type: "string" },
+            issued_at: { type: "integer", minimum: 0 },
+            expires_at: { type: "integer", minimum: 0 },
+            body_sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+          },
+        },
       },
     },
     paths: {
+      "/internal/reporting/catalog": {
+        get: {
+          tags: ["InternalReporting"],
+          summary: "Consultar catálogo interno de Tarefas",
+          security: [{ internalServiceToken: [] }],
+          parameters: [
+            {
+              name: "x-internal-service-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant",
+              in: "header",
+              required: true,
+              description: "Grant v1: JSON canônico codificado em base64url.",
+              schema: { type: "string" },
+            },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": { description: "Catálogo governado" },
+            "403": { description: "Grant ou token interno inválido" },
+          },
+        },
+      },
+      "/internal/reporting/extract": {
+        post: {
+          tags: ["InternalReporting"],
+          summary: "Extrair campos governados para relatórios",
+          security: [{ internalServiceToken: [] }],
+          parameters: [
+            {
+              name: "x-internal-service-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["source", "fields", "limit"],
+                  additionalProperties: false,
+                  properties: {
+                    source: { type: "string", enum: ["integracao.tasks"] },
+                    fields: { type: "array", minItems: 1, items: { type: "string" } },
+                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Linhas extraídas" },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Grant, token ou campo inválido" },
+          },
+        },
+      },
       "/health": {
         get: {
           tags: ["Health"],

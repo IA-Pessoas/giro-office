@@ -11,10 +11,12 @@ Por padrão: **3038** (`PORT` em [`src/config/env.ts`](src/config/env.ts)).
 Definição e defaults em [`src/config/env.ts`](src/config/env.ts):
 
 - `DATABASE_URL` — PostgreSQL (Prisma)
+- `DATABASE_POOL_MAX` — teto do pool por processo (default `1`)
 - `JWT_SECRET` — validação do Bearer nas rotas autenticadas
 - `PORT` — porta HTTP (default `3038`)
 - `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN` — auditoria via `integrations/audit.ts`
 - `INTERNAL_SERVICE_TOKEN` — token esperado no header interno quando o gateway encaminha usuário/organização (opcional; se omitido, usa o mesmo valor que `AUDIT_SERVICE_TOKEN`)
+- `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` — autenticação e grants HMAC curtos do Reports para `/internal/reporting`
 - `ENABLE_API_DOCS` — documentação OpenAPI em `/docs` (em produção o default é desligado)
 
 ## Gateway
@@ -40,6 +42,7 @@ Exemplos de paths públicos (via gateway, com `Authorization: Bearer …`):
 - `DELETE http://localhost:3010/contabil/relationships/<id>`
 
 Infraestrutura direto no serviço: `GET http://localhost:3038/health` e `GET http://localhost:3038/ready`.
+`/internal/reporting/*` é contrato interno direto; não passa pelo gateway.
 
 ## Desenvolvimento
 

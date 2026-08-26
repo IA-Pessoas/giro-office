@@ -96,16 +96,300 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                 schema: {
                   type: "object",
                   required: ["definition"],
-                  properties: { definition: { type: "object", additionalProperties: true } },
+                  additionalProperties: false,
+                  properties: {
+                    definition: { type: "object", additionalProperties: true },
+                    parameterValues: { type: "object", additionalProperties: true },
+                  },
                 },
               },
             },
           },
           responses: {
-            "200": { description: "Prévia limitada", ...successResponse },
+            "200": {
+              description: "Prévia limitada com linhas, apresentação e hasMore",
+              ...successResponse,
+            },
             "400": { description: "Definição inválida" },
             "401": { description: "Contexto autenticado ausente" },
             "403": { description: "Fonte ou campo não autorizado" },
+          },
+        },
+      },
+      "/reports/jobs": {
+        post: {
+          tags: ["Reports"],
+          summary: "Enfileirar execução durável de relatório",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    definition: { type: "object", additionalProperties: true },
+                    modelVersionId: { type: "string", format: "uuid" },
+                    parameterValues: { type: "object", additionalProperties: true },
+                    format: { type: "string", enum: ["json", "csv"] },
+                  },
+                  oneOf: [{ required: ["definition"] }, { required: ["modelVersionId"] }],
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Job enfileirado", ...successResponse },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Definição ou modelo não autorizado" },
+          },
+        },
+      },
+      "/reports/jobs/{id}": {
+        get: {
+          tags: ["Reports"],
+          summary: "Consultar job próprio de relatório",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Job", ...successResponse },
+            "404": { description: "Job não encontrado" },
+          },
+        },
+      },
+      "/reports/jobs/{id}/cancel": {
+        post: {
+          tags: ["Reports"],
+          summary: "Cancelar job enfileirado ou em processamento",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "204": { description: "Cancelado" },
+            "404": { description: "Job não encontrado" },
+          },
+        },
+      },
+      "/reports/jobs/{id}/snapshot": {
+        get: {
+          tags: ["Reports"],
+          summary: "Ler snapshot concluído e paginado do solicitante",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            { name: "cursor", in: "query", schema: { type: "integer", minimum: 0 } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 500 } },
+          ],
+          responses: {
+            "200": { description: "Snapshot paginado", ...successResponse },
+            "404": { description: "Snapshot não encontrado ou indisponível" },
+          },
+        },
+      },
+      "/reports/models/shared": {
+        post: {
+          tags: ["Reports"],
+          summary: "Criar modelo compartilhado do departamento",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name", "definition"],
+                  properties: {
+                    name: { type: "string" },
+                    definition: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Modelo compartilhado criado", ...successResponse },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Permissão departamental insuficiente" },
+          },
+        },
+      },
+      "/reports/models/shared/list": {
+        get: {
+          tags: ["Reports"],
+          summary: "Listar acervo compartilhado do departamento atual",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Acervo compartilhado", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Departamento atual indisponível" },
+          },
+        },
+      },
+      "/reports/models/shared/{id}": {
+        patch: {
+          tags: ["Reports"],
+          summary: "Criar nova versão de modelo compartilhado",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["definition"],
+                  properties: {
+                    name: { type: "string" },
+                    definition: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Nova versão compartilhada", ...successResponse },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Permissão departamental insuficiente" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+      },
+      "/reports/models/shared/{id}/copy": {
+        post: {
+          tags: ["Reports"],
+          summary: "Copiar modelo compartilhado como modelo pessoal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "201": { description: "Modelo pessoal copiado", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Departamento atual indisponível" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+      },
+      "/reports/models/shared/{id}/preview": {
+        post: {
+          tags: ["Reports"],
+          summary: "Gerar prévia com a concessão do modelo compartilhado",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Prévia limitada", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Concessão ou departamento indisponível" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+      },
+      "/reports/models": {
+        post: {
+          tags: ["Reports"],
+          summary: "Criar modelo pessoal de relatório",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name", "definition"],
+                  properties: {
+                    name: { type: "string", example: "Saldo mensal" },
+                    definition: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Modelo pessoal criado", ...successResponse },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Fonte ou campo não autorizado" },
+          },
+        },
+      },
+      "/reports/models/list": {
+        get: {
+          tags: ["Reports"],
+          summary: "Listar modelos pessoais autorizados",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Modelos pessoais", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "503": { description: "Contexto de acesso indisponível" },
+          },
+        },
+      },
+      "/reports/models/{id}": {
+        get: {
+          tags: ["Reports"],
+          summary: "Consultar modelo pessoal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Modelo pessoal", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Fonte ou campo não autorizado" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+        patch: {
+          tags: ["Reports"],
+          summary: "Criar nova versão de modelo pessoal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    definition: { type: "object", additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Nova versão criada", ...successResponse },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Fonte ou campo não autorizado" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
+        delete: {
+          tags: ["Reports"],
+          summary: "Excluir modelo pessoal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "204": { description: "Modelo excluído" },
+            "401": { description: "Contexto autenticado ausente" },
+            "404": { description: "Modelo não encontrado" },
           },
         },
       },

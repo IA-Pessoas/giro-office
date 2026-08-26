@@ -8,7 +8,7 @@ Por defeito: **3020** (variável específica do serviço em `src/config/env.ts`)
 
 ## Variáveis de ambiente
 
-Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `AUDIT_SERVICE_TOKEN`, logging, etc.
+Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `AUDIT_SERVICE_TOKEN`, logging, etc.
 
 ## Gateway
 

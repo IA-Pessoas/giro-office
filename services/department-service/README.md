@@ -8,7 +8,7 @@ Por defeito: **3036** (`DEPARTMENT_SERVICE_PORT`, com fallback para `PORT`).
 
 ## Variaveis de ambiente
 
-Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET`, `DEPARTMENT_SERVICE_PORT`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN` e `AUDIT_ENABLED`.
+Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `JWT_SECRET`, `DEPARTMENT_SERVICE_PORT`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN` e `AUDIT_ENABLED`.
 
 ## Gateway
 

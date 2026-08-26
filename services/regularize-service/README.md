@@ -11,6 +11,7 @@ Por defeito: **3039** (`PORT`).
 Definicao e defaults em [`src/config/env.ts`](src/config/env.ts):
 
 - `DATABASE_URL` - PostgreSQL (Prisma)
+- `DATABASE_POOL_MAX` - teto do pool por processo (default `1`)
 - `JWT_SECRET` - validacao do Bearer nas rotas autenticadas
 - `PORT` - porta HTTP (default `3039`)
 - `MTK_ENCRYPTION_KEY` - chave usada para criptografar credenciais do legado

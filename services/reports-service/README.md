@@ -10,9 +10,10 @@ Porta padrão: `3044`.
 
 Consulte [`src/config/env.ts`](src/config/env.ts).
 
-- Banco e autenticação: `DATABASE_URL`, `JWT_SECRET`.
+- Banco e autenticação: `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `JWT_SECRET`.
 - Tokens e segredo interno: `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`.
-- URLs upstream: `USER_SERVICE_URL`, `PARCELAMENTO_SERVICE_URL`, `CLIENT_SERVICE_URL`.
+- URLs upstream: `USER_SERVICE_URL`, `PARCELAMENTO_SERVICE_URL`, `CLIENT_SERVICE_URL`,
+  `PROJECT_SERVICE_URL`, `TASK_SERVICE_URL`, `CONTABIL_SERVICE_URL`.
 - Timeout de fontes internas: `REPORTS_SOURCE_TIMEOUT_MS`.
 - Worker e CORS: `REPORTS_WORKER_POLL_INTERVAL_MS`, `REPORTS_WORKER_CONCURRENCY`,
   `REPORTS_WORKER_LEASE_SECONDS`, `SERVICE_ALLOWED_ORIGINS`.
@@ -25,6 +26,11 @@ Prefixo público: `/reports`.
 organização e permissões atuais. `POST /reports/preview` valida a mesma definição e devolve uma
 amostra limitada; não cria job, snapshot, arquivo ou registro persistido.
 
+`POST /reports/models` cria um modelo pessoal. `GET /reports/models/list`,
+`GET /reports/models/:id`, `PATCH /reports/models/:id` e `DELETE /reports/models/:id` atendem
+somente o autor. Cada criação ou edição revalida a definição declarativa contra o catálogo e as
+permissões atuais; a edição cria uma nova versão e nunca compartilha o modelo com departamento.
+
 ## Desenvolvimento
 
 ```bash
@@ -33,4 +39,15 @@ pnpm --filter @workspace/reports-service worker
 pnpm --filter @workspace/reports-service test
 ```
 
-Esta issue não cria fonte de dados, catálogo populado, job, migration nem adapter.
+O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas e Controle Contábil.
+Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
+
+O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
+`REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.
+
+O smoke de Controle Contábil fica desativado por padrão; exija
+`CONTABIL_REPORTING_SMOKE_ENABLED=true` e `REPORTS_GRANT_SECRET` apenas em ambiente isolado com
+os dois segredos configurados.
+
+O smoke de Tarefas fica desativado por padrão; exija `TASK_REPORTING_SMOKE_ENABLED=true` e
+`REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.

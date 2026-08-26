@@ -62,8 +62,12 @@ export function OrganizationOverviewPanel({
   const [planDraft, setPlanDraft] = useState(organization.subscription_plan);
   const [logoDraft, setLogoDraft] = useState(organization.logo_url ?? "");
   const [statusToConfirm, setStatusToConfirm] = useState<PlatformOrganizationStatus | null>(null);
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [logoDialogOpen, setLogoDialogOpen] = useState(false);
   const [confirmationName, setConfirmationName] = useState("");
   const statusSelectRef = useRef<HTMLSelectElement>(null);
+  const planTriggerRef = useRef<HTMLButtonElement>(null);
+  const logoTriggerRef = useRef<HTMLButtonElement>(null);
   const [statusFeedback, setStatusFeedback] = useState<Feedback>(null);
   const [planFeedback, setPlanFeedback] = useState<Feedback>(null);
   const [logoFeedback, setLogoFeedback] = useState<Feedback>(null);
@@ -110,6 +114,8 @@ export function OrganizationOverviewPanel({
   };
 
   const handlePlanSave = async () => {
+    if (planMutation.isPending) return;
+
     setPlanFeedback(null);
     try {
       await planMutation.mutateAsync({
@@ -118,6 +124,7 @@ export function OrganizationOverviewPanel({
         expectedUpdatedAt: organization.updated_at,
       });
       setPlanFeedback({ kind: "success", message: "Plano atualizado." });
+      setPlanDialogOpen(false);
     } catch (error) {
       setPlanFeedback({
         kind: "error",
@@ -127,6 +134,8 @@ export function OrganizationOverviewPanel({
   };
 
   const handleLogoSave = async () => {
+    if (logoMutation.isPending) return;
+
     setLogoFeedback(null);
     const validationError = getLogoUrlError(logoDraft);
     if (validationError) {
@@ -144,12 +153,37 @@ export function OrganizationOverviewPanel({
         kind: "success",
         message: logoDraft.trim() ? "URL do logo atualizada." : "URL do logo removida.",
       });
+      setLogoDialogOpen(false);
     } catch (error) {
       setLogoFeedback({
         kind: "error",
         message: getPlatformMutationErrorMessage(error, "Não foi possível atualizar o logo."),
       });
     }
+  };
+
+  const openPlanDialog = () => {
+    setPlanDraft(organization.subscription_plan);
+    setPlanFeedback(null);
+    setPlanDialogOpen(true);
+  };
+
+  const closePlanDialog = () => {
+    if (planMutation.isPending) return;
+    setPlanFeedback(null);
+    setPlanDialogOpen(false);
+  };
+
+  const openLogoDialog = () => {
+    setLogoDraft(organization.logo_url ?? "");
+    setLogoFeedback(null);
+    setLogoDialogOpen(true);
+  };
+
+  const closeLogoDialog = () => {
+    if (logoMutation.isPending) return;
+    setLogoFeedback(null);
+    setLogoDialogOpen(false);
   };
 
   return (
@@ -242,36 +276,14 @@ export function OrganizationOverviewPanel({
             </p>
           </div>
           <div>
-            <label
-              className="text-sm font-medium text-slate-700 dark:text-slate-200"
-              htmlFor="platform-plan"
-            >
-              Novo plano
-            </label>
-            <select
-              className={FIELD_CLASSNAME}
-              disabled={planMutation.isPending}
-              id="platform-plan"
-              onChange={(event) => {
-                setPlanDraft(event.target.value as PlatformOrganizationPlan);
-                setPlanFeedback(null);
-              }}
-              value={planDraft}
-            >
-              {PLAN_OPTIONS.map((plan) => (
-                <option key={plan} value={plan}>
-                  {PLATFORM_PLAN_LABELS[plan]}
-                </option>
-              ))}
-            </select>
+            <p className="text-sm text-slate-700 dark:text-slate-200">
+              Plano atual: {PLATFORM_PLAN_LABELS[organization.subscription_plan]}
+            </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button
-                disabled={planMutation.isPending || planDraft === organization.subscription_plan}
-                onClick={() => void handlePlanSave()}
-                size="sm"
-                type="button"
-              >
-                {planMutation.isPending ? "Salvando..." : "Salvar plano"}
+              <Button asChild size="sm">
+                <button onClick={openPlanDialog} ref={planTriggerRef} type="button">
+                  Editar plano
+                </button>
               </Button>
               <InlineFeedback feedback={planFeedback} />
             </div>
@@ -297,38 +309,14 @@ export function OrganizationOverviewPanel({
             ) : null}
           </div>
           <div>
-            <label
-              className="text-sm font-medium text-slate-700 dark:text-slate-200"
-              htmlFor="platform-logo-url"
-            >
-              URL HTTPS
-            </label>
-            <Input
-              className="mt-1.5 bg-white dark:bg-slate-950"
-              disabled={logoMutation.isPending}
-              id="platform-logo-url"
-              maxLength={2_048}
-              onChange={(event) => {
-                setLogoDraft(event.target.value);
-                setLogoFeedback(null);
-              }}
-              placeholder="https://exemplo.com/logo.png"
-              type="url"
-              value={logoDraft}
-            />
-            <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-300">
-              Deixe em branco para limpar.
+            <p className="break-all text-sm text-slate-700 dark:text-slate-200">
+              URL atual: {organization.logo_url ?? "Não definida"}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button
-                disabled={
-                  logoMutation.isPending || logoDraft.trim() === (organization.logo_url ?? "")
-                }
-                onClick={() => void handleLogoSave()}
-                size="sm"
-                type="button"
-              >
-                {logoMutation.isPending ? "Salvando..." : "Salvar logo"}
+              <Button asChild size="sm">
+                <button onClick={openLogoDialog} ref={logoTriggerRef} type="button">
+                  Editar logo
+                </button>
               </Button>
               <InlineFeedback feedback={logoFeedback} />
             </div>
@@ -413,6 +401,132 @@ export function OrganizationOverviewPanel({
             </div>
           ) : null}
           <InlineFeedback feedback={statusFeedback?.kind === "error" ? statusFeedback : null} />
+        </div>
+      </Dialog>
+
+      <Dialog
+        contentClassName="!w-[min(92vw,440px)]"
+        description="Selecione o plano comercial da organização."
+        footer={
+          <>
+            <Button
+              disabled={planMutation.isPending}
+              onClick={closePlanDialog}
+              type="button"
+              variant="outline"
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={planMutation.isPending || planDraft === organization.subscription_plan}
+              onClick={() => void handlePlanSave()}
+              type="button"
+            >
+              {planMutation.isPending ? "Salvando..." : "Salvar plano"}
+            </Button>
+          </>
+        }
+        onOpenChange={(open) => {
+          if (!open) closePlanDialog();
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          planTriggerRef.current?.focus();
+        }}
+        open={planDialogOpen}
+        preventClose={planMutation.isPending}
+        title="Editar plano"
+      >
+        <div className="space-y-4">
+          <div>
+            <label
+              className="text-sm font-medium text-slate-700 dark:text-slate-200"
+              htmlFor="platform-plan"
+            >
+              Plano
+            </label>
+            <select
+              className={FIELD_CLASSNAME}
+              disabled={planMutation.isPending}
+              id="platform-plan"
+              onChange={(event) => {
+                setPlanDraft(event.target.value as PlatformOrganizationPlan);
+                setPlanFeedback(null);
+              }}
+              value={planDraft}
+            >
+              {PLAN_OPTIONS.map((plan) => (
+                <option key={plan} value={plan}>
+                  {PLATFORM_PLAN_LABELS[plan]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <InlineFeedback feedback={planFeedback?.kind === "error" ? planFeedback : null} />
+        </div>
+      </Dialog>
+
+      <Dialog
+        contentClassName="!w-[min(92vw,440px)]"
+        description="Informe o endereço HTTPS do logo da organização."
+        footer={
+          <>
+            <Button
+              disabled={logoMutation.isPending}
+              onClick={closeLogoDialog}
+              type="button"
+              variant="outline"
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={
+                logoMutation.isPending || logoDraft.trim() === (organization.logo_url ?? "")
+              }
+              onClick={() => void handleLogoSave()}
+              type="button"
+            >
+              {logoMutation.isPending ? "Salvando..." : "Salvar logo"}
+            </Button>
+          </>
+        }
+        onOpenChange={(open) => {
+          if (!open) closeLogoDialog();
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          logoTriggerRef.current?.focus();
+        }}
+        open={logoDialogOpen}
+        preventClose={logoMutation.isPending}
+        title="Editar logo"
+      >
+        <div className="space-y-4">
+          <div>
+            <label
+              className="text-sm font-medium text-slate-700 dark:text-slate-200"
+              htmlFor="platform-logo-url"
+            >
+              URL HTTPS
+            </label>
+            <Input
+              className="mt-1.5 bg-white dark:bg-slate-950"
+              disabled={logoMutation.isPending}
+              id="platform-logo-url"
+              maxLength={2_048}
+              onChange={(event) => {
+                setLogoDraft(event.target.value);
+                setLogoFeedback(null);
+              }}
+              placeholder="https://exemplo.com/logo.png"
+              type="url"
+              value={logoDraft}
+            />
+            <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-300">
+              Deixe em branco para limpar.
+            </p>
+          </div>
+          <InlineFeedback feedback={logoFeedback?.kind === "error" ? logoFeedback : null} />
         </div>
       </Dialog>
     </section>

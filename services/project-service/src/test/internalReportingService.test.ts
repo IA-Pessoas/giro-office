@@ -1,0 +1,58 @@
+import "./envBootstrap.js";
+
+import { describe, expect, it, vi } from "vitest";
+
+import { InternalReportingService } from "../services/internalReportingService.js";
+
+const ORG_A = "00000000-0000-4000-8000-000000000001";
+const ORG_B = "00000000-0000-4000-8000-000000000002";
+
+describe("InternalReportingService", () => {
+  it("extrai somente campos publicados na organização do grant e identifica corte", async () => {
+    const projects = {
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          { name: "Projeto A" },
+          { name: "Projeto A2" },
+          { name: "Projeto não retornado" },
+        ]),
+    };
+    const service = new InternalReportingService({ project: projects } as never);
+
+    await expect(
+      service.extract({
+        organizationId: ORG_A,
+        source: "integracao.projects",
+        fields: ["name"],
+        limit: 2,
+      }),
+    ).resolves.toEqual({
+      rows: [{ name: "Projeto A" }, { name: "Projeto A2" }],
+      reachedLimit: true,
+    });
+    expect(projects.findMany).toHaveBeenCalledWith({
+      where: { organization_id: ORG_A },
+      select: { name: true },
+      take: 3,
+    });
+    expect(projects.findMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG_B } }),
+    );
+  });
+
+  it("recusa chaves que não são campos de relatório", async () => {
+    const projects = { findMany: vi.fn() };
+    const service = new InternalReportingService({ project: projects } as never);
+
+    await expect(
+      service.extract({
+        organizationId: ORG_A,
+        source: "integracao.projects",
+        fields: ["client_id"],
+        limit: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(projects.findMany).not.toHaveBeenCalled();
+  });
+});

@@ -15,10 +15,13 @@ As variaveis sao lidas em `src/config/env.ts`.
 - `PORT`: porta HTTP, com default `3043`.
 - `NODE_ENV`: ambiente de execucao, default `development`.
 - `DATABASE_URL`: conexao Postgres usada pelo Prisma.
+- `DATABASE_POOL_MAX`: teto do pool por processo, default `1`.
 - `JWT_SECRET`: segredo JWT recebido por compatibilidade com o padrao dos services.
 - `AUDIT_ENABLED`: habilita integracao de auditoria, default `true`.
 - `AUDIT_SERVICE_URL`: URL do audit-service, default `http://localhost:3020`.
 - `AUDIT_SERVICE_TOKEN`: token interno para auditoria, default local `audit-service-token`.
+- `REPORTS_INTERNAL_TOKEN`: token interno aceito nas rotas de relatório.
+- `REPORTS_GRANT_SECRET`: segredo HMAC dos grants de relatório.
 - `LOG_LEVEL`: nivel do logger, default `info`.
 - `LOG_PRETTY`: habilita logs legiveis fora de `production`, default `false`.
 - `SERVICE_ALLOWED_ORIGINS`: origins CORS separadas por virgula, default local `*`.
@@ -33,6 +36,9 @@ Configure o upstream com:
 ```bash
 PARCELAMENTO_SERVICE_URL=http://localhost:3043
 ```
+
+As rotas internas `/internal/reporting/catalog` e `/internal/reporting/extract` não passam pelo
+gateway; ambas exigem token interno e grant HMAC de curta duração emitido pelo reports-service.
 
 ## Desenvolvimento
 

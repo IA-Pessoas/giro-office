@@ -10,6 +10,7 @@ Por defeito: **3010** (`GATEWAY_PORT`).
 
 Ver [`src/config/env.ts`](src/config/env.ts):
 
+- `DATABASE_URL` e `DATABASE_POOL_MAX` (default `1`) para o dashboard agregado
 - `JWT_SECRET`
 - `GATEWAY_ALLOWED_ORIGINS`
 - `GATEWAY_PUBLIC_URL` (opcional, usado no `servers[0].url` do OpenAPI agregado)

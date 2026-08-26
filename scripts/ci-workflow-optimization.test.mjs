@@ -251,6 +251,42 @@ test("reports-service is wired into VPS build, runtime, wait, and secret materia
   );
 });
 
+test("reports project adapter has internal URL and shared reporting secret provisioning", async () => {
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const reportsBlock = extractComposeServiceBlock(composeContents, "reports-service");
+  const projectBlock = extractComposeServiceBlock(composeContents, "project-service");
+  const manifest = await readFile(vpsSecretsManifest, "utf8");
+
+  assert.match(reportsBlock, /PROJECT_SERVICE_URL: http:\/\/project-service:3033/);
+  assert.match(projectBlock, /env_file:[\s\S]*\.env\.vps\.project-service/);
+  assert.match(
+    manifest,
+    /^# ENV_VPS_PROJECT_SERVICE deve incluir REPORTS_INTERNAL_TOKEN e REPORTS_GRANT_SECRET iguais aos de ENV_VPS_REPORTS_SERVICE\.$/m,
+  );
+  assert.match(
+    manifest,
+    /^# REPORTS_INTERNAL_TOKEN e REPORTS_GRANT_SECRET devem coincidir com ENV_VPS_PROJECT_SERVICE\.$/m,
+  );
+});
+
+test("reports task adapter has internal URL and shared reporting secret provisioning", async () => {
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const reportsBlock = extractComposeServiceBlock(composeContents, "reports-service");
+  const taskBlock = extractComposeServiceBlock(composeContents, "task-service");
+  const manifest = await readFile(vpsSecretsManifest, "utf8");
+
+  assert.match(reportsBlock, /TASK_SERVICE_URL: http:\/\/task-service:3032/);
+  assert.match(taskBlock, /env_file:[\s\S]*\.env\.vps\.task-service/);
+  assert.match(
+    manifest,
+    /^# ENV_VPS_TASK_SERVICE deve incluir REPORTS_INTERNAL_TOKEN e REPORTS_GRANT_SECRET iguais aos de ENV_VPS_REPORTS_SERVICE\.$/m,
+  );
+  assert.match(
+    manifest,
+    /^# REPORTS_INTERNAL_TOKEN e REPORTS_GRANT_SECRET devem coincidir com ENV_VPS_TASK_SERVICE\.$/m,
+  );
+});
+
 test("compose-vps-buildx-push plans cached web build with Next.js build args", async () => {
   const output = await dryRunBuildxPush("web");
   assert.match(output, /--file docker\/app\.Dockerfile/);
