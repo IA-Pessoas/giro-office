@@ -116,6 +116,81 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           },
         },
       },
+      "/reports/jobs": {
+        post: {
+          tags: ["Reports"],
+          summary: "Enfileirar execução durável de relatório",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    definition: { type: "object", additionalProperties: true },
+                    modelVersionId: { type: "string", format: "uuid" },
+                    parameterValues: { type: "object", additionalProperties: true },
+                    format: { type: "string", enum: ["json", "csv"] },
+                  },
+                  oneOf: [{ required: ["definition"] }, { required: ["modelVersionId"] }],
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Job enfileirado", ...successResponse },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Definição ou modelo não autorizado" },
+          },
+        },
+      },
+      "/reports/jobs/{id}": {
+        get: {
+          tags: ["Reports"],
+          summary: "Consultar job próprio de relatório",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Job", ...successResponse },
+            "404": { description: "Job não encontrado" },
+          },
+        },
+      },
+      "/reports/jobs/{id}/cancel": {
+        post: {
+          tags: ["Reports"],
+          summary: "Cancelar job enfileirado ou em processamento",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "204": { description: "Cancelado" },
+            "404": { description: "Job não encontrado" },
+          },
+        },
+      },
+      "/reports/jobs/{id}/snapshot": {
+        get: {
+          tags: ["Reports"],
+          summary: "Ler snapshot concluído e paginado do solicitante",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            { name: "cursor", in: "query", schema: { type: "integer", minimum: 0 } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 500 } },
+          ],
+          responses: {
+            "200": { description: "Snapshot paginado", ...successResponse },
+            "404": { description: "Snapshot não encontrado ou indisponível" },
+          },
+        },
+      },
       "/reports/models/shared": {
         post: {
           tags: ["Reports"],

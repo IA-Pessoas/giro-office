@@ -20,10 +20,13 @@ import { createReportPreviewRouter } from "./routes/preview.routes.js";
 import { createReportCatalogRouter } from "./routes/reportCatalog.routes.js";
 import type { ReportingAccessContextClient } from "./routes/reportingContext.js";
 import { createReportModelRouter } from "./routes/reportModel.routes.js";
+import { createReportJobRouter } from "./routes/reportJob.routes.js";
 import { ReportAuthorizationService } from "./services/reportAuthorizationService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
 import { ReportModelService } from "./services/reportModelService.js";
 import { ReportPreviewService } from "./services/reportPreviewService.js";
+import { ReportJobService } from "./services/reportJobService.js";
+import { ReportSnapshotService } from "./services/reportSnapshotService.js";
 
 export interface CreateReportsAppOptions {
   env: ReportsServiceEnv;
@@ -84,6 +87,8 @@ export function createReportsApp({
     definitionService,
   );
   const modelService = new ReportModelService(prisma);
+  const jobService = new ReportJobService(prisma);
+  const snapshotService = new ReportSnapshotService(prisma);
 
   app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
   app.use("/reports", createReportPreviewRouter({ previewService, accessContextClient }));
@@ -91,6 +96,7 @@ export function createReportsApp({
     "/reports",
     createReportModelRouter({ modelService, authorizationService, previewService }),
   );
+  app.use("/reports", createReportJobRouter({ jobService, snapshotService, authorizationService }));
   app.use(
     createExpressErrorHandler({
       logger,

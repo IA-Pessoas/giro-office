@@ -21,6 +21,7 @@ export type ClaimedReportJob = {
   started_at: Date | null;
   lease_token: string | null;
   lease_expires_at: Date | null;
+  payload_json: unknown;
 };
 
 const QUEUED = REPORT_LIFECYCLE_STATUSES[0];
@@ -51,6 +52,7 @@ export class ReportJobRepository {
         SET status = ${PROCESSING},
             lease_token = ${leaseToken},
             lease_expires_at = NOW() + (${this.leaseSeconds} * INTERVAL '1 second'),
+            materialization_token = NULL,
             started_at = COALESCE(started_at, NOW()),
             updated_at = NOW()
         FROM candidate
@@ -64,7 +66,8 @@ export class ReportJobRepository {
           job.requested_at,
           job.started_at,
           job.lease_token,
-          job.lease_expires_at
+          job.lease_expires_at,
+          job.payload_json
         `;
       if (!job) return { job: null, event: null };
 
@@ -83,5 +86,18 @@ export class ReportJobRepository {
     if (claim.event) await this.audit.recordExternal(claim.event);
 
     return claim.job;
+  }
+
+  async renewLease(input: { id: string; leaseToken: string }): Promise<boolean> {
+    const updated = await this.prisma.reportJob.updateMany({
+      where: {
+        id: input.id,
+        status: PROCESSING,
+        lease_token: input.leaseToken,
+        cancel_requested_at: null,
+      },
+      data: { lease_expires_at: new Date(Date.now() + this.leaseSeconds * 1000) },
+    });
+    return updated.count === 1;
   }
 }

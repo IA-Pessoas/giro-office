@@ -60,6 +60,8 @@ describe("reports-service app", () => {
     expect(openapi.body.paths["/reports/models/shared/{id}"]).toBeDefined();
     expect(openapi.body.paths["/reports/models/shared/{id}/copy"]).toBeDefined();
     expect(openapi.body.paths["/reports/models/shared/{id}/preview"]).toBeDefined();
+    expect(openapi.body.paths["/reports/jobs"]).toBeDefined();
+    expect(openapi.body.paths["/reports/jobs/{id}/snapshot"]).toBeDefined();
     expect(catalog.body.success).toBe(false);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
