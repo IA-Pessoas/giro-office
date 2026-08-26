@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { IoClose } from "react-icons/io5";
-import type { ReactNode, Ref } from "react";
+import type { ComponentProps, ReactNode, Ref } from "react";
 
 interface DialogProps {
   open: boolean;
@@ -14,6 +14,7 @@ interface DialogProps {
   bodyClassName?: string;
   contentRef?: Ref<HTMLDivElement>;
   preventClose?: boolean;
+  onCloseAutoFocus?: ComponentProps<typeof DialogPrimitive.Content>["onCloseAutoFocus"];
 }
 
 export function Dialog({
@@ -28,6 +29,7 @@ export function Dialog({
   bodyClassName = "",
   contentRef,
   preventClose = false,
+  onCloseAutoFocus,
 }: DialogProps) {
   const handleOpenChange = (nextOpen: boolean) => {
     if (preventClose && !nextOpen) {
@@ -45,6 +47,7 @@ export function Dialog({
         />
         <DialogPrimitive.Content
           ref={contentRef}
+          onCloseAutoFocus={onCloseAutoFocus}
           onEscapeKeyDown={(event) => {
             if (preventClose) {
               event.preventDefault();

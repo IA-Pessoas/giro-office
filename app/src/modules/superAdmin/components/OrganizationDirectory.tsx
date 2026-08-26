@@ -1,10 +1,13 @@
-import { Building2, Search } from "lucide-react";
+import { Building2, Plus, Search } from "lucide-react";
+import type { Ref } from "react";
 
 import { formatOrganizationCnpj } from "@modules/organizations/utils/organizationUi";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
+import { Button } from "@shared/ui/newLayout/button";
 import { Input } from "@shared/ui/newLayout/input";
 
 import type { PlatformOrganization } from "../types";
+import { PLATFORM_PLAN_LABELS, PLATFORM_STATUS_LABELS } from "../utils/platformManagement";
 
 interface OrganizationDirectoryProps {
   organizations: PlatformOrganization[];
@@ -17,18 +20,12 @@ interface OrganizationDirectoryProps {
   isFetching: boolean;
   isError: boolean;
   onSearchChange: (value: string) => void;
-  onSelect: (organization: PlatformOrganization) => void;
+  onSelect: (organizationId: string) => void;
+  onCreate: () => void;
+  createButtonRef: Ref<HTMLButtonElement>;
   onPageChange: (page: number) => void;
   onRetry: () => void;
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  active: "Ativa",
-  trial: "Trial",
-  past_due: "Em atraso",
-  suspended: "Suspensa",
-  cancelled: "Cancelada",
-};
 
 export function OrganizationDirectory({
   organizations,
@@ -42,6 +39,8 @@ export function OrganizationDirectory({
   isError,
   onSearchChange,
   onSelect,
+  onCreate,
+  createButtonRef,
   onPageChange,
   onRetry,
 }: OrganizationDirectoryProps) {
@@ -50,7 +49,7 @@ export function OrganizationDirectory({
   return (
     <aside className="flex min-h-[34rem] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
-        <div className="flex items-end justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700 dark:text-blue-300">
               Diretório
@@ -59,10 +58,15 @@ export function OrganizationDirectory({
               Organizações
             </h2>
           </div>
-          <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
-            {total} no total
-          </span>
+          <Button asChild size="sm">
+            <button onClick={onCreate} ref={createButtonRef} type="button">
+              <Plus aria-hidden="true" /> Criar organização
+            </button>
+          </Button>
         </div>
+        <p className="mt-2 text-xs tabular-nums text-slate-600 dark:text-slate-300">
+          {total} no total
+        </p>
 
         <label
           className="mt-4 block text-xs font-medium text-slate-600 dark:text-slate-300"
@@ -98,9 +102,16 @@ export function OrganizationDirectory({
             ))}
           </div>
         ) : isError ? (
-          <div className="m-2 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-100" role="alert">
+          <div
+            className="m-2 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-100"
+            role="alert"
+          >
             <p>Não foi possível carregar as organizações.</p>
-            <button className="mt-3 font-semibold underline underline-offset-4" onClick={onRetry} type="button">
+            <button
+              className="mt-3 font-semibold underline underline-offset-4"
+              onClick={onRetry}
+              type="button"
+            >
               Tentar novamente
             </button>
           </div>
@@ -128,7 +139,7 @@ export function OrganizationDirectory({
                       : "border-transparent text-slate-800 hover:border-slate-200 hover:bg-slate-50 dark:text-slate-100 dark:hover:border-slate-700 dark:hover:bg-slate-800"
                   }`}
                   key={organization.id}
-                  onClick={() => onSelect(organization)}
+                  onClick={() => onSelect(organization.id)}
                   type="button"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -139,9 +150,12 @@ export function OrganizationDirectory({
                       </p>
                     </div>
                     <span className="shrink-0 rounded-full border border-current/15 bg-white/70 px-2 py-0.5 text-[11px] font-semibold dark:bg-slate-950/40">
-                      {STATUS_LABELS[organization.status] ?? organization.status}
+                      {PLATFORM_STATUS_LABELS[organization.status]}
                     </span>
                   </div>
+                  <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                    Plano {PLATFORM_PLAN_LABELS[organization.subscription_plan]}
+                  </p>
                 </button>
               );
             })}
@@ -149,20 +163,22 @@ export function OrganizationDirectory({
         )}
       </div>
 
-      <PaginationControls
-        count={organizations.length}
-        hasMore={page < totalPages}
-        isFetching={isFetching}
-        limit={pageSize}
-        onFirst={() => onPageChange(1)}
-        onLast={() => onPageChange(totalPages)}
-        onNext={() => onPageChange(page + 1)}
-        onPageChange={onPageChange}
-        onPrevious={() => onPageChange(page - 1)}
-        page={page}
-        total={total}
-        totalPages={totalPages}
-      />
+      <div className="[&>div]:flex-col [&>div]:items-start">
+        <PaginationControls
+          count={organizations.length}
+          hasMore={page < totalPages}
+          isFetching={isFetching}
+          limit={pageSize}
+          onFirst={() => onPageChange(1)}
+          onLast={() => onPageChange(totalPages)}
+          onNext={() => onPageChange(page + 1)}
+          onPageChange={onPageChange}
+          onPrevious={() => onPageChange(page - 1)}
+          page={page}
+          total={total}
+          totalPages={totalPages}
+        />
+      </div>
     </aside>
   );
 }

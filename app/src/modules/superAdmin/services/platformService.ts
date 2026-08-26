@@ -1,9 +1,14 @@
 import { platformApi as api } from "@shared/services/api";
 
 import type {
+  CreatePlatformOrganizationPayload,
   PlatformAuditListResponse,
+  PlatformOrganization,
   PlatformOrganizationsListResponse,
   PlatformUsersListResponse,
+  UpdatePlatformOrganizationLogoPayload,
+  UpdatePlatformOrganizationPlanPayload,
+  UpdatePlatformOrganizationStatusPayload,
 } from "../types";
 
 function unwrapData<T>(response: { data?: { data?: T } }): T {
@@ -29,10 +34,48 @@ export const platformService = {
     return unwrapData<PlatformUsersListResponse>(response);
   },
 
+  async getOrganization(organizationId: string): Promise<PlatformOrganization> {
+    const response = await api.get(`/platform/organizations/${organizationId}`);
+    return unwrapData<PlatformOrganization>(response);
+  },
+
+  async createOrganization(data: CreatePlatformOrganizationPayload): Promise<PlatformOrganization> {
+    const response = await api.post("/platform/organizations", data);
+    return unwrapData<PlatformOrganization>(response);
+  },
+
+  async updateStatus(
+    organizationId: string,
+    data: UpdatePlatformOrganizationStatusPayload,
+  ): Promise<PlatformOrganization> {
+    const response = await api.patch(`/platform/organizations/${organizationId}/status`, data);
+    return unwrapData<PlatformOrganization>(response);
+  },
+
+  async updateSubscriptionPlan(
+    organizationId: string,
+    data: UpdatePlatformOrganizationPlanPayload,
+  ): Promise<PlatformOrganization> {
+    const response = await api.patch(
+      `/platform/organizations/${organizationId}/subscription-plan`,
+      data,
+    );
+    return unwrapData<PlatformOrganization>(response);
+  },
+
+  async updateLogoUrl(
+    organizationId: string,
+    data: UpdatePlatformOrganizationLogoPayload,
+  ): Promise<PlatformOrganization> {
+    const response = await api.patch(`/platform/organizations/${organizationId}/logo-url`, data);
+    return unwrapData<PlatformOrganization>(response);
+  },
+
   async searchAudit(params: {
     page: number;
     pageSize: number;
     path?: string;
+    organizationId?: string;
   }): Promise<PlatformAuditListResponse> {
     const response = await api.get("/platform/audit/requests", { params });
     return unwrapData<PlatformAuditListResponse>(response);
