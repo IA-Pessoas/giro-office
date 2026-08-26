@@ -702,15 +702,24 @@ it("audita somente queries allowlisted nas leituras de organização da platafor
       "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=10000&take=100",
       "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=10001&take=101",
       "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=11222333000181",
+      "/platform/organizations?page=501",
+      "/platform/organizations?page=502",
+      "/platform/organizations?page=1",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=0&take=1",
+      "/platform/organizations?page=invalid-page",
+      "/platform/organizations?pageSize=invalid-page-size",
+      "/platform/organizations?status=invalid-status",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=invalid-skip",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?take=invalid-take",
     ];
     const responses = [];
     for (const url of urls) {
       responses.push(await fetch(`${gatewayUrl}${url}`, { headers }));
     }
 
-    expect(responses.map(({ status }) => status)).toEqual(Array(10).fill(200));
+    expect(responses.map(({ status }) => status)).toEqual(Array(urls.length).fill(200));
     expect(upstreamUrls).toEqual(urls);
-    await waitForRecords(auditService.records, 10);
+    await waitForRecords(auditService.records, urls.length);
     expect(auditService.records[0]).toMatchObject({
       organizationId: null,
       userId: null,
@@ -734,6 +743,15 @@ it("audita somente queries allowlisted nas leituras de organização da platafor
       { skip: "10000", take: "100" },
       {},
       {},
+      { page: "501" },
+      {},
+      { page: "1" },
+      { skip: "0", take: "1" },
+      {},
+      {},
+      {},
+      {},
+      {},
     ]);
     const serializedAudit = JSON.stringify(auditService.records);
     for (const sensitive of [
@@ -751,6 +769,11 @@ it("audita somente queries allowlisted nas leituras de organização da platafor
       "skip-secret",
       "users-token-1",
       "users-token-2",
+      "invalid-page",
+      "invalid-page-size",
+      "invalid-status",
+      "invalid-skip",
+      "invalid-take",
     ]) {
       expect(serializedAudit).not.toContain(sensitive);
     }
@@ -3679,57 +3702,47 @@ it("logs aborted requests exactly once", async () => {
     organization_id: "org-1",
     permission: 2,
   });
-  const upstream = createServer((_request, response) => {
-    setTimeout(() => {
-      if (!response.headersSent) {
-        response.statusCode = 200;
-        response.setHeader("content-type", "application/json");
-        response.end(JSON.stringify({ success: true, data: { ok: true } }));
-      }
-    }, 100);
-  });
+  const upstream = createServer();
+  const upstreamReceivedRequest = once(upstream, "request", { signal: AbortSignal.timeout(1_000) });
   const taskServiceUrl = await startServer(upstream);
   const { logger, stream } = createCapturedTestLogger();
   const app = createApp(createEnv({ taskServiceUrl }), logger);
   const gateway = createServer(app);
   const gatewayUrl = await startServer(gateway);
-  const { hostname, port } = new URL(gatewayUrl);
+  const { port } = new URL(gatewayUrl);
 
   try {
-    await new Promise<void>((resolve) => {
-      const request = nodeRequest(
-        {
-          hostname,
-          port,
-          path: "/task/list",
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-        () => {
-          resolve();
-        },
-      );
-
-      request.on("error", () => {
-        resolve();
-      });
-      request.end();
-
-      setTimeout(() => {
-        request.destroy();
-      }, 10);
+    const request = nodeRequest({
+      hostname: "localhost",
+      family: 4,
+      lookup: (_hostname, _options, callback) => {
+        // Simula conexão lenta: abortar por timer poderia impedir a chegada ao gateway.
+        setTimeout(() => callback(null, "127.0.0.1", 4), 50);
+      },
+      port,
+      path: "/task/list",
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
     });
+    const requestAborted = new Promise<void>((resolve) => request.once("error", () => resolve()));
+    request.end();
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 150);
+    const [, upstreamResponse] = await upstreamReceivedRequest;
+    request.destroy();
+    await requestAborted;
+    await vi.waitFor(() => {
+      expect(
+        stream.entries().filter((entry) => entry.event === "http.request.aborted"),
+      ).toHaveLength(1);
     });
+    upstreamResponse.end(JSON.stringify({ success: true, data: { ok: true } }));
     await waitForLogs();
 
     const abortedLogs = stream.entries().filter((entry) => entry.event === "http.request.aborted");
     expect(abortedLogs).toHaveLength(1);
   } finally {
+    gateway.closeAllConnections();
+    upstream.closeAllConnections();
     await stopServer(gateway);
     await stopServer(upstream);
   }
