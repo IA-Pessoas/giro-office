@@ -43,6 +43,42 @@ const adapter: ReportSourceAdapter = {
 };
 
 describe("ReportAuthorizationService", () => {
+  it("bloqueia acervo compartilhado sem departamento atual", async () => {
+    const service = new ReportAuthorizationService(
+      {
+        getAccessContext: vi.fn().mockResolvedValue({
+          organization: { id: organizationId },
+          departmentModule: null,
+          modules: { financeiro: 3 },
+        }),
+      },
+      new ReportDefinitionService(new SourceCatalogService([adapter])),
+    );
+
+    await expect(
+      service.getSharedDepartment({ userId, organizationId, requestId: "request-departure" }),
+    ).rejects.toEqual(expect.objectContaining<ServiceError>({ statusCode: 403 }));
+  });
+
+  it("exige nível 3 do módulo do departamento para publicar modelo compartilhado", async () => {
+    const accessContextClient = {
+      getAccessContext: vi.fn().mockResolvedValue({
+        organization: { id: organizationId },
+        department: { id: "department-1", name: "Financeiro" },
+        departmentModule: "financeiro",
+        modules: { financeiro: 2 },
+      }),
+    };
+    const service = new ReportAuthorizationService(
+      accessContextClient,
+      new ReportDefinitionService(new SourceCatalogService([adapter])),
+    );
+
+    await expect(
+      service.authorizeSharedModel({ userId, organizationId, requestId: "request-3", definition }),
+    ).rejects.toEqual(expect.objectContaining<ServiceError>({ statusCode: 403 }));
+  });
+
   it("aceita definição quando fonte tem permissão atual de nível 1", async () => {
     const accessContextClient = {
       getAccessContext: vi.fn().mockResolvedValue({

@@ -16,10 +16,12 @@ import {
 } from "../schemas/reportModel.schemas.js";
 import type { ReportAuthorizationService } from "../services/reportAuthorizationService.js";
 import type { ReportModelService } from "../services/reportModelService.js";
+import type { ReportPreviewService } from "../services/reportPreviewService.js";
 
 export function createReportModelRouter(options: {
   modelService: ReportModelService;
   authorizationService: ReportAuthorizationService;
+  previewService: ReportPreviewService;
 }): ReturnType<typeof Router> {
   const router = Router();
 
@@ -32,6 +34,113 @@ export function createReportModelRouter(options: {
     });
     return { userId: userId ?? "", organizationId: organizationId ?? "" };
   };
+
+  router.post("/models/shared", async (request, response) => {
+    const context = getContext(request);
+    const body = parseWithZod(createReportModelSchema, request.body);
+    const authorized = await options.authorizationService.authorizeSharedModel({
+      ...context,
+      requestId: request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-create",
+      definition: body.definition,
+    });
+
+    response.status(201).json(
+      createSuccessResponse(
+        await options.modelService.createShared({
+          organizationId: context.organizationId,
+          departmentId: authorized.department_id,
+          name: body.name,
+          definition: authorized.definition,
+        }),
+      ),
+    );
+  });
+
+  router.get("/models/shared/list", async (request, response) => {
+    const context = getContext(request);
+    const department = await options.authorizationService.getSharedDepartment({
+      ...context,
+      requestId: request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-list",
+    });
+    const items = await options.modelService.listShared({
+      organizationId: context.organizationId,
+      departmentId: department.id,
+    });
+    response.json(createSuccessResponse({ items }));
+  });
+
+  router.post("/models/shared/:id/copy", async (request, response) => {
+    const context = getContext(request);
+    const { id } = parseWithZod(reportModelIdParamsSchema, request.params);
+    const department = await options.authorizationService.getSharedDepartment({
+      ...context,
+      requestId: request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-copy",
+    });
+    const shared = await options.modelService.getShared({
+      id,
+      organizationId: context.organizationId,
+      departmentId: department.id,
+    });
+    const personal = await options.modelService.create({
+      ...context,
+      name: shared.name,
+      definition: shared.definition,
+    });
+    response.status(201).json(createSuccessResponse(personal));
+  });
+
+  router.post("/models/shared/:id/preview", async (request, response) => {
+    const context = getContext(request);
+    const { id } = parseWithZod(reportModelIdParamsSchema, request.params);
+    const execution = await options.authorizationService.getSharedExecutionContext({
+      ...context,
+      requestId: request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-preview",
+    });
+    const shared = await options.modelService.getShared({
+      id,
+      organizationId: context.organizationId,
+      departmentId: execution.department.id,
+    });
+    const requestId = request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-preview";
+    response.json(
+      createSuccessResponse(
+        await options.previewService.preview(
+          shared.definition,
+          { ...execution.scope, grant: shared.grant },
+          requestId,
+        ),
+      ),
+    );
+  });
+
+  router.patch("/models/shared/:id", async (request, response) => {
+    const context = getContext(request);
+    const { id } = parseWithZod(reportModelIdParamsSchema, request.params);
+    const body = parseWithZod(updateReportModelSchema, request.body);
+    if (!body.definition) {
+      throw new ServiceError(
+        400,
+        "A definição é obrigatória para atualizar o modelo compartilhado.",
+      );
+    }
+    const authorized = await options.authorizationService.authorizeSharedModel({
+      ...context,
+      requestId: request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-update",
+      definition: body.definition,
+    });
+
+    response.json(
+      createSuccessResponse(
+        await options.modelService.updateShared({
+          id,
+          organizationId: context.organizationId,
+          departmentId: authorized.department_id,
+          name: body.name,
+          definition: authorized.definition,
+        }),
+      ),
+    );
+  });
 
   router.post("/models", async (request, response) => {
     const context = getContext(request);

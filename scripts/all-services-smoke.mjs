@@ -1216,6 +1216,62 @@ const handlers = {
     }
   },
 
+  async reportsSharedModelCreate(op) {
+    const response = await httpRequest(op, {
+      json: {
+        name: uniqueText("Smoke Shared Report Model"),
+        definition: {
+          sources: ["parcelamento.installments"],
+          columns: [
+            {
+              source: "parcelamento.installments",
+              field: "agreement_number",
+              alias: "agreement_number",
+            },
+          ],
+        },
+      },
+    });
+    state.reportsSharedModelId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async reportsSharedModelList(op) {
+    await httpRequest(op);
+  },
+
+  async reportsSharedModelPatch(op) {
+    await httpRequest(op, {
+      path: `/reports/models/shared/${requireState("reportsSharedModelId")}`,
+      json: {
+        name: uniqueText("Smoke Shared Report Model Updated"),
+        definition: {
+          sources: ["parcelamento.installments"],
+          columns: [
+            {
+              source: "parcelamento.installments",
+              field: "agreement_number",
+              alias: "agreement_number",
+            },
+          ],
+        },
+      },
+    });
+  },
+
+  async reportsSharedModelCopy(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/reports/models/shared/${requireState("reportsSharedModelId")}/copy`,
+    });
+  },
+
+  async reportsSharedModelPreview(op) {
+    await httpRequest(op, {
+      path: `/reports/models/shared/${requireState("reportsSharedModelId")}/preview`,
+    });
+  },
+
   async reportsModelList(op) {
     await httpRequest(op);
   },
