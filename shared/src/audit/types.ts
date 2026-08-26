@@ -10,6 +10,12 @@ export type AuditRecorder = (
 ) => Promise<void>;
 export type ReservableAuditRecorder = AuditRecorder & {
   reserve(kind: AuditReservation): AuditReservation | undefined;
+  /** Resolves only after persistence ACK; consumes and releases any supplied reservation. */
+  recordRequired(
+    payload: CreateAuditRequestPayload,
+    reservation?: AuditReservation,
+    signal?: AbortSignal,
+  ): Promise<void>;
 };
 
 export interface CreateAuditRequestPayload {
@@ -88,6 +94,41 @@ export interface AuditSearchFilters {
 
 export interface AuditSearchResult {
   items: AuditRequestRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export type OrganizationAuditStatus = "trial" | "past_due" | "active" | "suspended" | "cancelled";
+export type OrganizationAuditPlan = "trial" | "pro" | "enterprise";
+export type PlatformAuditChange<T extends string> = { from: T | null; to: T | null };
+
+export interface PlatformOrganizationAuditChanges {
+  status?: PlatformAuditChange<OrganizationAuditStatus>;
+  subscription_plan?: PlatformAuditChange<OrganizationAuditPlan>;
+  logo_url?: PlatformAuditChange<string>;
+}
+
+export interface PlatformAuditRequestRecord {
+  id: string;
+  requestId: string;
+  organizationId?: string | null;
+  method: string;
+  path: string;
+  statusCode?: number | null;
+  outcome: AuditOutcome;
+  durationMs?: number | null;
+  serviceSource: string;
+  createdAt: string;
+  action?: string | null;
+  referring?: string | null;
+  referringId?: string | null;
+  actorPlatformUserId?: string;
+  changes?: PlatformOrganizationAuditChanges;
+}
+
+export interface PlatformAuditSearchResult {
+  items: PlatformAuditRequestRecord[];
   total: number;
   page: number;
   pageSize: number;

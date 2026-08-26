@@ -179,6 +179,8 @@ export function buildAuditServiceOpenApiSpec(env: AuditServiceEnv): OpenApiDocum
         get: {
           tags: ["Audit"],
           summary: "Buscar requisições de auditoria (paginação / filtros via query)",
+          description:
+            "Super administradores podem filtrar por organização e sempre recebem uma projeção segura; administradores organizacionais permanecem restritos ao tenant encaminhado.",
           security: [{ internalServiceToken: [] }],
           parameters: [
             {
@@ -197,6 +199,14 @@ export function buildAuditServiceOpenApiSpec(env: AuditServiceEnv): OpenApiDocum
                 maximum: MAX_AUDIT_PAGE_SIZE,
                 default: DEFAULT_AUDIT_PAGE_SIZE,
               },
+            },
+            {
+              name: "organizationId",
+              in: "query",
+              required: false,
+              description:
+                "Filtro UUID opcional exclusivo para o super administrador da plataforma.",
+              schema: { type: "string", format: "uuid" },
             },
             ...[
               "requestId",

@@ -1,5 +1,9 @@
 import type { Logger } from "@workspace/shared";
-import type { ForwardedAuditAuthContext } from "@workspace/shared/audit";
+import type {
+  AuditSearchResult,
+  ForwardedAuditAuthContext,
+  PlatformAuditSearchResult,
+} from "@workspace/shared/audit";
 import {
   createSuccessResponse,
   isServiceError,
@@ -111,10 +115,19 @@ export function createAuditPublicRouter(options: CreateAuditRouterOptions): Rout
     asyncRoute(async (request, response) => {
       const auth = getAuthFromHeaders(request);
       assertAuditAdminOrLog(options.logger, request, auth, assertAuditSearchAdmin);
-      const result = await auditRequestService.search(
-        request.query as Record<string, unknown>,
-        auth.organizationId,
-      );
+      const query = request.query as Record<string, unknown>;
+      let result: AuditSearchResult | PlatformAuditSearchResult;
+      if (auth.authKind === "platform") {
+        if (auth.platformRole !== "super_admin") {
+          throw new ServiceError(403, "Acesso negado para esta rota.");
+        }
+        result = await auditRequestService.searchPlatform(query);
+      } else {
+        if (!auth.organizationId) {
+          throw new ServiceError(403, "Acesso negado para esta rota.");
+        }
+        result = await auditRequestService.search(query, auth.organizationId);
+      }
 
       options.logger.info({
         event: "audit.requests.search",

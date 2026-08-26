@@ -1,13 +1,19 @@
 import { getSingleQueryValue, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { isValidCnpj, normalizeCnpj } from "../domain/cnpj.js";
 import { status as statusEnum } from "../generated/prisma/client.js";
+
+const cnpjSchema = z
+  .string()
+  .refine(isValidCnpj, { message: "cnpj inválido." })
+  .transform(normalizeCnpj);
 
 export const createOrganizationBodySchema = z
   .object({
     name: zNonEmptyText("name"),
     email_created_by: zNonEmptyText("email_created_by"),
-    cnpj: zNonEmptyText("cnpj"),
+    cnpj: cnpjSchema,
   })
   .strict();
 
@@ -34,6 +40,65 @@ export const updateOrganizationSubscriptionPlanBodySchema = z
 export const updateOrganizationLogoUrlBodySchema = z
   .object({
     logo_url: z.union([z.string(), z.null()]),
+  })
+  .strict();
+
+const expectedUpdatedAtSchema = z.string().datetime({
+  offset: true,
+  message: "expected_updated_at deve ser uma data ISO válida.",
+});
+
+const httpsLogoUrlSchema = z
+  .string()
+  .max(2_048, "logo_url deve ter no máximo 2.048 caracteres.")
+  .superRefine((value, context) => {
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:" || url.username || url.password) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "logo_url deve ser uma URL HTTPS sem credenciais.",
+        });
+      }
+    } catch {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "logo_url deve ser uma URL HTTPS válida.",
+      });
+    }
+  });
+
+export const createPlatformOrganizationBodySchema = z
+  .object({
+    name: zNonEmptyText("name"),
+    cnpj: cnpjSchema,
+  })
+  .strict();
+
+export const platformOrganizationIdParamsSchema = organizationIdParamsSchema;
+
+export const updatePlatformOrganizationStatusBodySchema = z
+  .object({
+    status: z.nativeEnum(statusEnum, {
+      message: "status é obrigatório e deve ser trial, past_due, active, suspended ou cancelled.",
+    }),
+    expected_updated_at: expectedUpdatedAtSchema,
+  })
+  .strict();
+
+export const updatePlatformOrganizationSubscriptionPlanBodySchema = z
+  .object({
+    subscription_plan: z.enum(["trial", "pro", "enterprise"], {
+      message: "subscription_plan deve ser trial, pro ou enterprise.",
+    }),
+    expected_updated_at: expectedUpdatedAtSchema,
+  })
+  .strict();
+
+export const updatePlatformOrganizationLogoUrlBodySchema = z
+  .object({
+    logo_url: z.union([httpsLogoUrlSchema, z.null()]),
+    expected_updated_at: expectedUpdatedAtSchema,
   })
   .strict();
 

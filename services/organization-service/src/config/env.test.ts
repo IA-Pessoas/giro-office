@@ -52,4 +52,25 @@ describe("organization-service env security validation", () => {
 
     expect(getOrganizationEnv().auditServiceToken).toBe("audit-service-token");
   });
+
+  it("uses the internal audit-service URL and enables domain audit by default", () => {
+    // Falha detectada: o serviço deixa de auditar organizações quando as novas envs são omitidas.
+    setOrganizationEnv({ NODE_ENV: "development", SERVICE_ALLOWED_ORIGINS: "*" });
+
+    expect(getOrganizationEnv()).toMatchObject({
+      auditServiceUrl: "http://audit-service:3020",
+      organizationDomainAuditEnabled: true,
+    });
+  });
+
+  it("allows organization domain audit to be disabled explicitly", () => {
+    // Falha detectada: a flag textual "false" é interpretada como auditoria habilitada.
+    setOrganizationEnv({
+      NODE_ENV: "development",
+      ORGANIZATION_DOMAIN_AUDIT_ENABLED: "false",
+      SERVICE_ALLOWED_ORIGINS: "*",
+    });
+
+    expect(getOrganizationEnv().organizationDomainAuditEnabled).toBe(false);
+  });
 });

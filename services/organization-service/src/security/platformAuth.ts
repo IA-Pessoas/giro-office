@@ -1,11 +1,15 @@
 import {
   AUTH_SESSION_COOKIE_NAME,
+  CSRF_COOKIE_NAME,
+  CSRF_HEADER_NAME,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  hashCsrfToken,
   INTERNAL_SERVICE_TOKEN_HEADER,
   readCookie,
   ServiceError,
+  verifyCsrfToken,
   verifyJwtToken,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
@@ -105,6 +109,8 @@ export async function requirePlatformSession(
         platformUser: {
           select: {
             id: true,
+            name: true,
+            email: true,
             platform_role: true,
             status: true,
             session_version: true,
@@ -124,8 +130,46 @@ export async function requirePlatformSession(
       next(unauthenticated());
       return;
     }
+
+    request.platform_identity = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      auth_kind: "platform",
+      platform_role: PLATFORM_ROLE,
+    };
+    request.platform_session = {
+      user_id: claims.userId,
+      auth_kind: "platform",
+      platform_role: PLATFORM_ROLE,
+      session_version: claims.sessionVersion,
+      session_id: claims.sessionId,
+      csrf_hash: claims.csrfHash,
+    };
   } catch (err: unknown) {
     next(err);
+    return;
+  }
+
+  next();
+}
+
+export function requirePlatformCsrf(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  const cookieToken = readCookie(request.headers.cookie, CSRF_COOKIE_NAME);
+  const submittedToken = request.get(CSRF_HEADER_NAME);
+  const expectedHash = request.platform_session?.csrf_hash;
+  if (
+    !cookieToken ||
+    !submittedToken ||
+    !expectedHash ||
+    !verifyCsrfToken(submittedToken, hashCsrfToken(cookieToken)) ||
+    !verifyCsrfToken(submittedToken, expectedHash)
+  ) {
+    next(new ServiceError(403, "Requisição não autorizada."));
     return;
   }
 

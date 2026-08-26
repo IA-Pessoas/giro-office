@@ -7,7 +7,19 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
   const createOrganizationExample = {
     name: "Castelo Tecnologia",
     email_created_by: "admin@castelo.com",
-    cnpj: "12345678000190",
+    cnpj: "11222333000181",
+  };
+  const cnpjSchema = {
+    description:
+      "CNPJ com dígitos verificadores válidos, em 14 dígitos ou máscara oficial. Persistido sem máscara; duplicidade considera ambas as grafias.",
+    oneOf: [
+      { type: "string", pattern: "^[0-9]{14}$", example: "11222333000181" },
+      {
+        type: "string",
+        pattern: "^[0-9]{2}\\.[0-9]{3}\\.[0-9]{3}/[0-9]{4}-[0-9]{2}$",
+        example: "11.222.333/0001-81",
+      },
+    ],
   };
 
   return {
@@ -89,6 +101,195 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
             "403": { description: "Identidade não é um super administrador da plataforma" },
           },
         },
+        post: {
+          tags: ["Platform"],
+          summary: "Criar organização pela plataforma",
+          description:
+            "Cria somente a organização com status active e plano trial. O e-mail do criador é derivado da sessão validada.",
+          security: [{ cookieAuth: [] }],
+          parameters: [
+            {
+              name: "x-csrf-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    cnpj: cnpjSchema,
+                  },
+                  required: ["name", "cnpj"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Organização criada" },
+            "400": { description: "Body inválido" },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Acesso negado ou CSRF inválido" },
+            "409": { description: "Slug ou CNPJ já existe" },
+          },
+        },
+      },
+      "/platform/organizations/{id}": {
+        get: {
+          tags: ["Platform"],
+          summary: "Buscar organização pela plataforma",
+          security: [{ cookieAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Organização sem campos privados" },
+            "400": { description: "ID inválido" },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Acesso negado" },
+            "404": { description: "Organização não encontrada" },
+          },
+        },
+      },
+      "/platform/organizations/{id}/status": {
+        patch: {
+          tags: ["Platform"],
+          summary: "Atualizar status pela plataforma",
+          security: [{ cookieAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "x-csrf-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    status: {
+                      type: "string",
+                      enum: ["trial", "past_due", "active", "suspended", "cancelled"],
+                    },
+                    expected_updated_at: { type: "string", format: "date-time" },
+                  },
+                  required: ["status", "expected_updated_at"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Status atualizado" },
+            "400": { description: "Parâmetros ou body inválidos" },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Acesso negado ou CSRF inválido" },
+            "404": { description: "Organização não encontrada" },
+            "409": { description: "Organização alterada por outra operação" },
+          },
+        },
+      },
+      "/platform/organizations/{id}/subscription-plan": {
+        patch: {
+          tags: ["Platform"],
+          summary: "Atualizar plano pela plataforma",
+          security: [{ cookieAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "x-csrf-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    subscription_plan: {
+                      type: "string",
+                      enum: ["trial", "pro", "enterprise"],
+                    },
+                    expected_updated_at: { type: "string", format: "date-time" },
+                  },
+                  required: ["subscription_plan", "expected_updated_at"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Plano atualizado" },
+            "400": { description: "Parâmetros ou body inválidos" },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Acesso negado ou CSRF inválido" },
+            "404": { description: "Organização não encontrada" },
+            "409": { description: "Organização alterada por outra operação" },
+          },
+        },
+      },
+      "/platform/organizations/{id}/logo-url": {
+        patch: {
+          tags: ["Platform"],
+          summary: "Atualizar URL HTTPS do logo pela plataforma",
+          security: [{ cookieAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "x-csrf-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    logo_url: {
+                      type: "string",
+                      format: "uri",
+                      pattern: "^https://(?![^/?#]*@).+$",
+                      maxLength: 2_048,
+                      nullable: true,
+                      description:
+                        "URL HTTPS sem credenciais embutidas, ou null para remover a logo.",
+                    },
+                    expected_updated_at: { type: "string", format: "date-time" },
+                  },
+                  required: ["logo_url", "expected_updated_at"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Logo atualizado" },
+            "400": { description: "Parâmetros ou body inválidos" },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Acesso negado ou CSRF inválido" },
+            "404": { description: "Organização não encontrada" },
+            "409": { description: "Organização alterada por outra operação" },
+          },
+        },
       },
       "/health": {
         get: {
@@ -152,10 +353,10 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
                   properties: {
                     name: { type: "string" },
                     email_created_by: { type: "string" },
-                    cnpj: { type: "string" },
+                    cnpj: cnpjSchema,
                   },
                   required: ["name", "email_created_by", "cnpj"],
-                  additionalProperties: true,
+                  additionalProperties: false,
                   example: createOrganizationExample,
                 },
               },
@@ -170,6 +371,8 @@ export function buildOrganizationServiceOpenApiSpec(env: OrganizationEnv): OpenA
                 },
               },
             },
+            "400": { description: "Body ou CNPJ inválido" },
+            "409": { description: "Slug ou CNPJ já existe" },
           },
         },
       },

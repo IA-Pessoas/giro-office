@@ -47,3 +47,39 @@ describe("user-service gateway registry", () => {
     expect(resolveGatewayService(env, "/platform/../user/me", "GET")).toBeNull();
   });
 });
+
+describe("organization-service platform registry", () => {
+  const env = {
+    organizationServiceUrl: "http://organization-service:3031",
+    auditServiceToken: "gateway-organization-token",
+  } as GatewayEnv;
+
+  it.each([
+    ["GET", "/platform/organizations"],
+    ["POST", "/platform/organizations"],
+    ["GET", "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e"],
+    ["PATCH", "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/status"],
+    ["PATCH", "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/subscription-plan"],
+    ["PATCH", "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/logo-url"],
+  ])("resolve %s %s exclusivamente para o organization-service", (method, path) => {
+    expect(resolveGatewayService(env, `${path}/`, method)).toMatchObject({
+      key: "organization-service",
+      targetUrl: "http://organization-service:3031",
+      internalServiceToken: "gateway-organization-token",
+      forwardPlatformSessionCredentials: true,
+    });
+  });
+
+  it.each([
+    ["DELETE", "/platform/organizations"],
+    ["PUT", "/platform/organizations/id/status"],
+    ["GET", "/platform/organizations/id/status"],
+    ["PATCH", "/platform/organizations/id"],
+    ["PATCH", "/platform/organizations/id/status/extra"],
+    ["GET", "/platform/organizations/id/extra"],
+    ["GET", "/platform/organizations/id%2fstatus"],
+    ["GET", "/platform/organizations/../organizations"],
+  ])("mantém default-deny para %s %s", (method, path) => {
+    expect(resolveGatewayService(env, path, method)).toBeNull();
+  });
+});

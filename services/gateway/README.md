@@ -58,14 +58,23 @@ As rotas administrativas globais sob `/platform` são resolvidas por método e c
 upstream genérico:
 
 - sessão, identidade e usuários de organização -> `USER_SERVICE_URL`;
-- organizações globais -> `ORGANIZATION_SERVICE_URL`;
+- listagem, criação, detalhe e alterações de status/plano/logo de organizações ->
+  `ORGANIZATION_SERVICE_URL`;
 - `GET /platform/audit/requests` -> `AUDIT_SERVICE_URL` (quando a auditoria está habilitada).
 
 O gateway remove todos os headers `x-auth-*` recebidos do cliente e reconstrói somente a
 identidade verificada. O user-service aceita essa identidade apenas junto do
-`USER_SERVICE_INTERNAL_TOKEN` injetado pelo gateway. Cookies da plataforma também são encaminhados por
-allowlist de rota e nome: somente `cw.session`, acrescido de `cw.csrf` nas operações de refresh e
-logout. `Set-Cookie` de upstream só é publicado nos endpoints de criação/rotação de sessão.
+`USER_SERVICE_INTERNAL_TOKEN` injetado pelo gateway. Cookies da plataforma também são encaminhados
+por allowlist de método, rota e nome: somente `cw.session` nas leituras, acrescido de `cw.csrf` nas
+mutações autorizadas. Após autenticação, CSRF e autorização, criação e PATCH de status/plano/logo
+exigem ACK 2xx do audit-service (emitido após persistência) antes do upstream. Auditoria desabilitada,
+sem capacidade, erro de rede/HTTP ou timeout de 5s retorna 503; desconexão durante a espera não
+despacha a mutação. O registro `organization.mutation.attempt` tem UUID próprio e correlação pelo
+SHA-256 do request ID original em `source_request_id_sha256`. Seu `outcome: success` descreve apenas
+o registro da tentativa, com status HTTP nulo e `business_outcome: unknown`; não anuncia êxito do
+negócio. O evento final e o evento de domínio pós-commit continuam best-effort. `Set-Cookie` de
+upstream só é publicado nos endpoints de criação/rotação
+de sessão.
 
 ### Parcelamento
 

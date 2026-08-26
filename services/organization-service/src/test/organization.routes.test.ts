@@ -28,22 +28,36 @@ describe("organization routes", () => {
     });
   });
 
-  it("POST /organizations cria organizacao", async () => {
+  it.each([
+    "11222333000181",
+    "11.222.333/0001-81",
+  ])("POST /organizations normaliza %s", async (cnpj) => {
     organizationServiceMock.create.mockResolvedValue({ id: organizationId });
     const app = createTestApp();
 
     const res = await request(app).post("/organizations").send({
       name: "Org Teste",
       email_created_by: "admin@example.com",
-      cnpj: "12345678000199",
+      cnpj,
     });
 
     expect(res.status).toBe(201);
     expect(organizationServiceMock.create).toHaveBeenCalledWith({
       name: "Org Teste",
       email_created_by: "admin@example.com",
-      cnpj: "12345678000199",
+      cnpj: "11222333000181",
     });
+  });
+
+  it("POST /organizations rejeita CNPJ inválido antes de chamar o service", async () => {
+    const res = await request(createTestApp()).post("/organizations").send({
+      name: "Org Teste",
+      email_created_by: "admin@example.com",
+      cnpj: "11222333000182",
+    });
+
+    expect(res.status).toBe(400);
+    expect(organizationServiceMock.create).not.toHaveBeenCalled();
   });
 
   it("GET /organizations/:id retorna detalhe", async () => {

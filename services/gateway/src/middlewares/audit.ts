@@ -1,3 +1,5 @@
+import { createHash, randomUUID } from "node:crypto";
+
 import type {
   AuditOutcome,
   AuditQuery,
@@ -12,6 +14,7 @@ import type { ErrorRequestHandler, NextFunction, Request, Response } from "expre
 import { describeActivity } from "../audit/activityCatalog.js";
 import type { GatewayEnv } from "../config/env.js";
 import { resolveGatewayService } from "../config/serviceRegistry.js";
+import { normalizeGatewayPath } from "../security/routeClassification.js";
 
 interface BuildAuditLifecycleMiddlewareOptions {
   enabled: boolean;
@@ -25,6 +28,48 @@ const TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS = new Set(["password", "reas
 const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
+const PLATFORM_ORGANIZATIONS_PATH = "/platform/organizations";
+const PLATFORM_ORGANIZATION_STATUSES = new Set([
+  "trial",
+  "past_due",
+  "active",
+  "suspended",
+  "cancelled",
+]);
+const NON_NEGATIVE_INTEGER_QUERY = /^(?:0|[1-9]\d*)$/u;
+
+function isIntegerInRange(value: string, minimum: number, maximum: number): boolean {
+  if (!NON_NEGATIVE_INTEGER_QUERY.test(value)) {
+    return false;
+  }
+
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= minimum && parsed <= maximum;
+}
+
+const PLATFORM_ORGANIZATION_LIST_QUERY_VALIDATORS = {
+  page: (value: string) => isIntegerInRange(value, 1, 10_001),
+  pageSize: (value: string) => isIntegerInRange(value, 1, 100),
+  status: (value: string) => PLATFORM_ORGANIZATION_STATUSES.has(value),
+};
+const PLATFORM_ORGANIZATION_USERS_QUERY_VALIDATORS = {
+  skip: (value: string) => isIntegerInRange(value, 0, 10_000),
+  take: (value: string) => isIntegerInRange(value, 1, 100),
+};
+
+function requiresOrganizationMutationAudit(request: Request): boolean {
+  const path = normalizeGatewayPath(request.originalUrl ?? "");
+  if (!path) {
+    return false;
+  }
+
+  const method = request.method.toUpperCase();
+  return (
+    (method === "POST" && path.toLowerCase() === "/platform/organizations") ||
+    (method === "PATCH" &&
+      /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i.test(path))
+  );
+}
 
 interface BuildAuditCapacityGuardOptions {
   enabled: boolean;
@@ -35,13 +80,21 @@ export function buildAuditCapacityGuard({
   enabled,
   recordAuditRequest,
 }: BuildAuditCapacityGuardOptions) {
-  return function auditCapacityGuard(
+  return async function auditCapacityGuard(
     request: Request,
-    _response: Response,
+    response: Response,
     next: NextFunction,
-  ): void {
+  ): Promise<void> {
+    const requiresAudit = requiresOrganizationMutationAudit(request);
     const mustReserve =
-      request.auth !== undefined || !SAFE_METHODS.has(request.method.toUpperCase());
+      requiresAudit ||
+      request.auth !== undefined ||
+      !SAFE_METHODS.has(request.method.toUpperCase());
+
+    if (requiresAudit && (!enabled || !request.requestId)) {
+      next(new ServiceError(503, "Auditoria indisponível; operação não iniciada."));
+      return;
+    }
 
     if (!enabled || !mustReserve || !request.requestId) {
       next();
@@ -54,7 +107,55 @@ export function buildAuditCapacityGuard({
       return;
     }
 
-    RESERVED_AUDIT_REQUESTS.set(request, reservation);
+    if (requiresAudit) {
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      response.once("close", abort);
+      if (request.aborted || response.destroyed) abort();
+      try {
+        await recordAuditRequest.recordRequired(
+          {
+            requestId: randomUUID(),
+            organizationId: null,
+            userId: null,
+            method: request.method,
+            path: getPublicPath(request.originalUrl, request.path),
+            query: {},
+            statusCode: null,
+            // Success means the attempt was recorded, not that the business mutation succeeded.
+            outcome: "success",
+            serviceSource: "gateway",
+            createdAt: new Date().toISOString(),
+            action: "organization.mutation.attempt",
+            referring: "organization",
+            metadata: {
+              auth_kind: "platform",
+              platform_user_id: request.auth?.userId,
+              business_outcome: "unknown",
+              source_request_id_sha256: createHash("sha256")
+                .update(request.requestId)
+                .digest("hex"),
+            },
+          },
+          reservation,
+          controller.signal,
+        );
+      } catch {
+        request.log?.error({
+          event: "audit.required.failed",
+          message: "Required audit persistence unavailable",
+        });
+        if (!controller.signal.aborted && !response.destroyed) {
+          next(new ServiceError(503, "Auditoria indisponível; operação não iniciada."));
+        }
+        return;
+      } finally {
+        response.off("close", abort);
+      }
+      if (controller.signal.aborted || request.aborted || response.destroyed) return;
+    } else {
+      RESERVED_AUDIT_REQUESTS.set(request, reservation);
+    }
     next();
   };
 }
@@ -87,9 +188,63 @@ function normalizeOptionalString(value: string | undefined): string | undefined 
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function buildQueryFromUrl(url: string, method: string, path: string): AuditQuery {
+function buildValidatedQuery(
+  searchParams: URLSearchParams,
+  validators: Record<string, (value: string) => boolean>,
+): AuditQuery {
   const query: AuditQuery = {};
+  for (const [key, isValid] of Object.entries(validators)) {
+    const values = searchParams.getAll(key);
+    if (values.length === 1 && isValid(values[0] ?? "")) {
+      query[key] = values[0];
+    }
+  }
+  return query;
+}
+
+function buildPlatformOrganizationQuery(
+  searchParams: URLSearchParams,
+  method: string,
+  path: string,
+): AuditQuery | null {
+  const normalizedPath = path.replace(/\/+$/u, "").toLowerCase();
+  if (
+    normalizedPath !== PLATFORM_ORGANIZATIONS_PATH &&
+    !normalizedPath.startsWith(`${PLATFORM_ORGANIZATIONS_PATH}/`)
+  ) {
+    return null;
+  }
+
+  if (method === "GET" && normalizedPath === PLATFORM_ORGANIZATIONS_PATH) {
+    const query = buildValidatedQuery(searchParams, PLATFORM_ORGANIZATION_LIST_QUERY_VALIDATORS);
+    const page = typeof query.page === "string" ? Number(query.page) : 1;
+    const pageSize = typeof query.pageSize === "string" ? Number(query.pageSize) : 20;
+    if ((page - 1) * pageSize > 10_000) {
+      delete query.page;
+      delete query.pageSize;
+    }
+    return query;
+  }
+
+  if (method === "GET" && /^\/platform\/organizations\/[^/]+\/users$/u.test(normalizedPath)) {
+    return buildValidatedQuery(searchParams, PLATFORM_ORGANIZATION_USERS_QUERY_VALIDATORS);
+  }
+
+  return {};
+}
+
+function buildQueryFromUrl(url: string, method: string, path: string): AuditQuery {
   const parsedUrl = new URL(url, "http://localhost");
+  const platformOrganizationQuery = buildPlatformOrganizationQuery(
+    parsedUrl.searchParams,
+    method,
+    path,
+  );
+  if (platformOrganizationQuery) {
+    return platformOrganizationQuery;
+  }
+
+  const query: AuditQuery = {};
   const isTiPasswordDeactivation = method === "POST" && TI_PASSWORD_DEACTIVATION_PATH.test(path);
 
   parsedUrl.searchParams.forEach((value, key) => {
@@ -207,7 +362,11 @@ export function buildAuditLifecycleMiddleware({
         referring: activity?.item,
       };
 
-      const reservation = RESERVED_AUDIT_REQUESTS.get(request);
+      const reservation =
+        RESERVED_AUDIT_REQUESTS.get(request) ??
+        (isPlatform && requiresOrganizationMutationAudit(request)
+          ? recordAuditRequest.reserve("protected")
+          : undefined);
       RESERVED_AUDIT_REQUESTS.delete(request);
       void recordAuditRequest(payload, reservation);
       requestLogger.debug({

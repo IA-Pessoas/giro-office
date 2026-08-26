@@ -34,6 +34,12 @@ const organizationEnvSchema = z
     auditServiceToken: z
       .string()
       .min(1, "AUDIT_SERVICE_TOKEN não definido para o organization-service."),
+    auditServiceUrl: z.string().url().default("http://audit-service:3020"),
+    organizationDomainAuditEnabled: z
+      .string()
+      .optional()
+      .default("true")
+      .transform((value) => parseBoolean(value)),
     nodeEnv: z.string().optional().default("development"),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
@@ -83,6 +89,8 @@ export function getOrganizationEnv(): OrganizationEnv {
     databaseUrl: process.env.DATABASE_URL,
     jwtSecret: process.env.JWT_SECRET,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
+    auditServiceUrl: process.env.AUDIT_SERVICE_URL,
+    organizationDomainAuditEnabled: process.env.ORGANIZATION_DOMAIN_AUDIT_ENABLED,
     nodeEnv: process.env.NODE_ENV,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,

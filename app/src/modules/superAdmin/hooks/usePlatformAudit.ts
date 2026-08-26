@@ -7,6 +7,7 @@ export interface UsePlatformAuditParams {
   page: number;
   pageSize: number;
   path?: string;
+  organizationId?: string;
 }
 
 export function usePlatformAudit(
@@ -15,7 +16,6 @@ export function usePlatformAudit(
   return useQuery({
     queryKey: ["platform", "audit", params],
     queryFn: () => platformService.searchAudit(params),
-    placeholderData: (previousData) => previousData,
     staleTime: 15_000,
   });
 }

@@ -18,6 +18,7 @@ import {
   createAuditRequestRepository,
 } from "../integrations/prisma/auditRequestRepository.js";
 import { buildAuditServiceOpenApiSpec } from "../openapi/spec.js";
+import { createAuditRequestService } from "../services/auditRequestService.js";
 
 const env: AuditServiceEnv = {
   nodeEnv: "test",
@@ -43,8 +44,9 @@ function createRepository(): AuditRequestRepository {
   return {
     create: vi.fn(),
     search: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 50 }),
+    searchPlatform: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 50 }),
     findByRequestId: vi.fn().mockResolvedValue(null),
-  };
+  } satisfies AuditRequestRepository;
 }
 
 function platformHeaders(
@@ -90,10 +92,43 @@ describe("platform audit routes", () => {
       .set(platformHeaders());
 
     expect(response.status).toBe(200);
-    expect(repository.search).toHaveBeenCalledOnce();
-    const [filters] = vi.mocked(repository.search).mock.calls[0];
+    expect(repository.search).not.toHaveBeenCalled();
+    const searchPlatform = vi.mocked(repository.searchPlatform);
+    expect(searchPlatform).toHaveBeenCalledOnce();
+    const [filters] = searchPlatform.mock.calls[0];
     expect(filters).toMatchObject({ page: 1, pageSize: 25 });
     expect(filters).not.toHaveProperty("organizationId");
+  });
+
+  it("permite busca contextual da plataforma por organizationId UUID", async () => {
+    const organizationId = "918eeaf9-82db-4e46-930b-b2d8b50b2776";
+
+    const response = await request(createApp({ env, logger: createTestLogger(), repository }))
+      .get(`/audit/requests?organizationId=${organizationId}`)
+      .set(platformHeaders());
+
+    expect(response.status).toBe(200);
+    expect(repository.search).not.toHaveBeenCalled();
+    expect(vi.mocked(repository.searchPlatform)).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId }),
+    );
+  });
+
+  it.each([
+    ["vazio", "organizationId="],
+    ["invalido", "organizationId=not-a-uuid"],
+    [
+      "repetido",
+      "organizationId=918eeaf9-82db-4e46-930b-b2d8b50b2776&organizationId=22c4d498-1801-4d0f-a167-7f542e7b9954",
+    ],
+  ])("rejeita organizationId de plataforma %s", async (_label, query) => {
+    const response = await request(createApp({ env, logger: createTestLogger(), repository }))
+      .get(`/audit/requests?${query}`)
+      .set(platformHeaders());
+
+    expect(response.status).toBe(400);
+    expect(repository.search).not.toHaveBeenCalled();
+    expect(repository.searchPlatform).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -112,12 +147,38 @@ describe("platform audit routes", () => {
 
   it("mantem administradores organizacionais confinados ao tenant encaminhado", async () => {
     const response = await request(createApp({ env, logger: createTestLogger(), repository }))
-      .get("/audit/requests")
+      .get("/audit/requests?organizationId=918eeaf9-82db-4e46-930b-b2d8b50b2776")
       .set(organizationHeaders("org-2"));
 
     expect(response.status).toBe(200);
     expect(repository.search).toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: "org-2" }),
+    );
+    expect(repository.searchPlatform).not.toHaveBeenCalled();
+  });
+
+  it("ignora organizationId herdado na busca de plataforma", async () => {
+    const query = Object.create({
+      organizationId: "918eeaf9-82db-4e46-930b-b2d8b50b2776",
+    }) as Record<string, unknown>;
+
+    await createAuditRequestService(repository).searchPlatform(query);
+
+    expect(repository.searchPlatform).toHaveBeenCalledWith(
+      expect.not.objectContaining({ organizationId: expect.anything() }),
+    );
+  });
+
+  it("ignora organizationId accessor sem executar getter", async () => {
+    const getter = vi.fn(() => "918eeaf9-82db-4e46-930b-b2d8b50b2776");
+    const query = {} as Record<string, unknown>;
+    Object.defineProperty(query, "organizationId", { get: getter });
+
+    await createAuditRequestService(repository).searchPlatform(query);
+
+    expect(getter).not.toHaveBeenCalled();
+    expect(repository.searchPlatform).toHaveBeenCalledWith(
+      expect.not.objectContaining({ organizationId: expect.anything() }),
     );
   });
 
@@ -234,7 +295,7 @@ describe("platform audit persistence", () => {
       $transaction: (operations: Array<Promise<unknown>>) => Promise.all(operations),
     } as never);
 
-    const result = await repository.search({ page: 401, pageSize: 25 });
+    const result = await repository.searchPlatform({ page: 401, pageSize: 25 });
 
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -253,6 +314,11 @@ describe("platform audit persistence", () => {
           duration_ms: true,
           service_source: true,
           created_at: true,
+          metadata_json: true,
+          action: true,
+          referring: true,
+          referring_id: true,
+          changes_json: true,
         },
       }),
     );
@@ -271,8 +337,207 @@ describe("platform audit persistence", () => {
         durationMs: 12,
         serviceSource: "gateway",
         createdAt: "2026-08-24T12:00:00.000Z",
+        action: "READ",
+        referring: "user",
+        referringId: "user-1",
       },
     ]);
+  });
+
+  it("usa select seguro e total limitado na busca contextual da plataforma", async () => {
+    const organizationId = "918eeaf9-82db-4e46-930b-b2d8b50b2776";
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: "audit-2",
+        request_id: "request-2",
+        organization_id: organizationId,
+        method: "ENTITY_CHANGE",
+        path: "/internal/audit/requests",
+        status_code: 201,
+        outcome: "success",
+        duration_ms: 3,
+        service_source: "organization-service",
+        created_at: new Date("2026-08-25T12:00:00.000Z"),
+        metadata_json: {
+          actorPlatformUserId: " platform-user-1 ",
+          token: "must-not-leak",
+        },
+        action: "organization.status.updated",
+        referring: "organization",
+        referring_id: organizationId,
+        changes_json: {
+          status: { from: "trial", to: "active", secret: "must-not-leak" },
+          subscription_plan: { from: "trial", to: "pro" },
+          logo_url: { from: null, to: "https://cdn.example.com/logo.png" },
+          password: { from: "old", to: "new" },
+        },
+      },
+    ]);
+    const count = vi.fn().mockResolvedValue(50_000);
+    const repository = createAuditRequestRepository({
+      auditRequest: { findMany, count },
+      $transaction: (operations: Array<Promise<unknown>>) => Promise.all(operations),
+    } as never);
+
+    const result = await repository.searchPlatform({ organizationId, page: 1, pageSize: 25 });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: organizationId },
+        select: expect.objectContaining({
+          metadata_json: true,
+          action: true,
+          referring: true,
+          referring_id: true,
+          changes_json: true,
+        }),
+        orderBy: [{ created_at: "desc" }, { id: "desc" }],
+      }),
+    );
+    expect(count).toHaveBeenCalledWith({
+      where: { organization_id: organizationId },
+      take: 10_025,
+    });
+    expect(result.total).toBe(10_025);
+    expect(result.items[0]).toMatchObject({
+      action: "organization.status.updated",
+      referring: "organization",
+      referringId: organizationId,
+      actorPlatformUserId: "platform-user-1",
+      changes: {
+        status: { from: "trial", to: "active" },
+        subscription_plan: { from: "trial", to: "pro" },
+        logo_url: { from: null, to: "https://cdn.example.com/logo.png" },
+      },
+    });
+    expect(result.items[0]?.changes).toEqual({
+      status: { from: "trial", to: "active" },
+      subscription_plan: { from: "trial", to: "pro" },
+      logo_url: { from: null, to: "https://cdn.example.com/logo.png" },
+    });
+    expect(result.items[0]).not.toHaveProperty("metadata");
+    expect(result.items[0]).not.toHaveProperty("metadata_json");
+    expect(result.items[0]).not.toHaveProperty("changes_json");
+  });
+
+  it("omite ator e changes quando metadata ou evento organizacional nao passam na allowlist", async () => {
+    const organizationId = "918eeaf9-82db-4e46-930b-b2d8b50b2776";
+    const baseRow = {
+      request_id: "request-invalid",
+      organization_id: organizationId,
+      method: "ENTITY_CHANGE",
+      path: "/internal/audit/requests",
+      status_code: 201,
+      outcome: "success",
+      duration_ms: 3,
+      created_at: new Date("2026-08-25T12:00:00.000Z"),
+      action: "organization.status.updated",
+      referring: "organization",
+      referring_id: organizationId,
+    };
+    const subscriptionPlanGetter = vi.fn(() => ({ from: "trial", to: "pro" }));
+    const changesWithAccessor = {};
+    Object.defineProperty(changesWithAccessor, "subscription_plan", {
+      get: subscriptionPlanGetter,
+    });
+    const fromGetter = vi.fn(() => "trial");
+    const statusWithAccessor = { to: "active" };
+    Object.defineProperty(statusWithAccessor, "from", { get: fromGetter });
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        ...baseRow,
+        id: "inherited-change-key",
+        service_source: "organization-service",
+        metadata_json: null,
+        changes_json: Object.create({ status: { from: "trial", to: "active" } }),
+      },
+      {
+        ...baseRow,
+        id: "accessor-change-key",
+        service_source: "organization-service",
+        metadata_json: null,
+        changes_json: changesWithAccessor,
+      },
+      {
+        ...baseRow,
+        id: "inherited-pair-values",
+        service_source: "organization-service",
+        metadata_json: null,
+        changes_json: {
+          logo_url: Object.create({ from: null, to: "https://cdn.example.com/logo.png" }),
+        },
+      },
+      {
+        ...baseRow,
+        id: "accessor-pair-value",
+        service_source: "organization-service",
+        metadata_json: null,
+        changes_json: { status: statusWithAccessor },
+      },
+      {
+        ...baseRow,
+        id: "wrong-service",
+        service_source: "gateway",
+        metadata_json: { nested: { actorPlatformUserId: "hidden" } },
+        changes_json: { status: { from: "trial", to: "active" } },
+      },
+      {
+        ...baseRow,
+        id: "wrong-action",
+        service_source: "organization-service",
+        action: "organization.deleted",
+        metadata_json: null,
+        changes_json: { status: { from: "trial", to: "active" } },
+      },
+      {
+        ...baseRow,
+        id: "wrong-referring",
+        service_source: "organization-service",
+        referring: "user",
+        metadata_json: null,
+        changes_json: { status: { from: "trial", to: "active" } },
+      },
+      {
+        ...baseRow,
+        id: "wrong-referring-id",
+        service_source: "organization-service",
+        referring_id: "another-organization",
+        metadata_json: { actorPlatformUserId: " ".repeat(3) },
+        changes_json: { status: { from: "trial", to: "active" } },
+      },
+      {
+        ...baseRow,
+        id: "invalid-values",
+        service_source: "organization-service",
+        metadata_json: { actorPlatformUserId: "a".repeat(201) },
+        changes_json: {
+          status: { from: "unknown", to: "active" },
+          subscription_plan: { from: "trial", to: "custom" },
+          logo_url: { from: null, to: "https://user:password@example.com/logo.png" },
+        },
+      },
+      {
+        ...baseRow,
+        id: "malformed-json",
+        service_source: "organization-service",
+        metadata_json: ["platform-user-1"],
+        changes_json: "not-an-object",
+      },
+    ]);
+    const repository = createAuditRequestRepository({
+      auditRequest: { findMany, count: vi.fn().mockResolvedValue(4) },
+      $transaction: (operations: Array<Promise<unknown>>) => Promise.all(operations),
+    } as never);
+
+    const result = await repository.searchPlatform({ organizationId, page: 1, pageSize: 25 });
+
+    for (const item of result.items) {
+      expect(item).not.toHaveProperty("actorPlatformUserId");
+      expect(item).not.toHaveProperty("changes");
+      expect(item).not.toHaveProperty("metadata");
+    }
+    expect(subscriptionPlanGetter).not.toHaveBeenCalled();
+    expect(fromGetter).not.toHaveBeenCalled();
   });
 });
 
@@ -337,5 +602,28 @@ describe("platform audit OpenAPI", () => {
         "403": expect.any(Object),
       }),
     );
+  });
+
+  it("documenta organizationId UUID opcional e a projecao segura de plataforma", () => {
+    const spec = buildAuditServiceOpenApiSpec(env);
+    const operation = (spec.paths["/audit/requests"] as { get: unknown }).get as {
+      description?: string;
+      parameters: Array<{
+        name: string;
+        in: string;
+        required?: boolean;
+        schema: Record<string, unknown>;
+      }>;
+    };
+
+    expect(operation.parameters).toContainEqual(
+      expect.objectContaining({
+        name: "organizationId",
+        in: "query",
+        required: false,
+        schema: { type: "string", format: "uuid" },
+      }),
+    );
+    expect(operation.description).toContain("projeção segura");
   });
 });

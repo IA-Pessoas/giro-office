@@ -63,12 +63,26 @@ describe("platform default deny", () => {
       ["DELETE", "/platform/session"],
       ["GET", "/platform/me"],
       ["GET", "/platform/organizations"],
+      ["POST", "/platform/organizations"],
+      ["GET", "/platform/organizations/org-1"],
+      ["PATCH", "/platform/organizations/org-1/status"],
+      ["PATCH", "/platform/organizations/org-1/subscription-plan"],
+      ["PATCH", "/platform/organizations/org-1/logo-url"],
       ["GET", "/platform/organizations/org-1/users"],
       ["GET", "/platform/audit/requests"],
     ]) {
       expect(getRoutePolicy(method, path), `${method} ${path}`).toEqual({
         special: "platformOnly",
       });
+    }
+
+    for (const [method, path] of [
+      ["DELETE", "/platform/organizations"],
+      ["PATCH", "/platform/organizations/org-1"],
+      ["GET", "/platform/organizations/org-1/status"],
+      ["PATCH", "/platform/organizations/org-1/status/extra"],
+    ]) {
+      expect(getRoutePolicy(method, path), `${method} ${path}`).toBeNull();
     }
   });
 

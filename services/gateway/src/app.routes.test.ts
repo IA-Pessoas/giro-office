@@ -434,17 +434,19 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
     for (const path of [
       "/platform/me",
       "/platform/organizations",
+      "/platform/organizations/org-1",
       "/platform/organizations/org-1/users",
       "/platform/audit/requests",
     ]) {
       requests.push(await fetch(`${gatewayUrl}${path}`, { headers: forgedHeaders }));
     }
 
-    expect(requests.map((response) => response.status)).toEqual([200, 200, 200, 200]);
+    expect(requests.map((response) => response.status)).toEqual([200, 200, 200, 200, 200]);
     const proxiedRequests = seen.filter(({ url }) => url !== "/internal/audit/requests");
     expect(proxiedRequests.map(({ service, url }) => ({ service, url }))).toEqual([
       { service: "user-service", url: "/platform/me" },
       { service: "organization-service", url: "/platform/organizations" },
+      { service: "organization-service", url: "/platform/organizations/org-1" },
       { service: "user-service", url: "/platform/organizations/org-1/users" },
       { service: "audit-service", url: "/audit/requests" },
     ]);
@@ -460,12 +462,13 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
       });
       expect(forwarded.organizationId).toBeUndefined();
     }
-    expect(proxiedRequests.slice(0, 3).map(({ cookie }) => cookie)).toEqual([
+    expect(proxiedRequests.slice(0, 4).map(({ cookie }) => cookie)).toEqual([
+      `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
     ]);
-    expect(proxiedRequests[3]?.cookie).toBeUndefined();
+    expect(proxiedRequests[4]?.cookie).toBeUndefined();
 
     const platformOnOrganizationRoute = await fetch(`${gatewayUrl}/organizations`, {
       headers: { Cookie: `cw.session=${platformToken}` },
@@ -485,7 +488,7 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
     expect(organizationOnPlatformRoute.status).toBe(403);
     expect(browserBearer.status).toBe(401);
     expect(internalValidation.status).toBe(404);
-    expect(proxiedRequests).toHaveLength(4);
+    expect(proxiedRequests).toHaveLength(5);
   } finally {
     await stopServer(gateway);
     await stopServer(userService);
@@ -662,19 +665,22 @@ it("bloqueia self-PUT de ator de plataforma antes do proxy", async () => {
   }
 });
 
-it("audita principal de plataforma sem usar id estrangeiro organizacional", async () => {
+it("audita somente queries allowlisted nas leituras de organização da plataforma", async () => {
+  const upstreamUrls: string[] = [];
   const auditService = await startAuditIngestServer();
-  const organizationService = createServer((_request, response) => {
+  const platformServices = createServer((request, response) => {
+    upstreamUrls.push(request.url ?? "");
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ success: true, data: { organizations: [] } }));
   });
-  const organizationServiceUrl = await startServer(organizationService);
+  const platformServicesUrl = await startServer(platformServices);
   const app = createApp(
     createEnv({
       auditEnabled: true,
       auditServiceUrl: auditService.url,
-      organizationServiceUrl,
+      organizationServiceUrl: platformServicesUrl,
+      userServiceUrl: platformServicesUrl,
       bearerAuthCompatibility: false,
     }),
     createTestLogger(),
@@ -684,25 +690,422 @@ it("audita principal de plataforma sem usar id estrangeiro organizacional", asyn
   const gatewayUrl = await startServer(gateway);
 
   try {
-    const response = await fetch(`${gatewayUrl}/platform/organizations`, {
-      headers: { Cookie: `cw.session=${createPlatformToken()}` },
-    });
+    const headers = { Cookie: `cw.session=${createPlatformToken()}` };
+    const urls = [
+      "/platform/organizations?page=1&page=page-secret&pageSize=5&status=active&search=SecretCorp&search=11222333000181&cnpj=query-cnpj&email=query-email&token=query-token-1&token=query-token-2&cookie=query-cookie",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e?token=detail-token&email=detail-email",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=0&skip=skip-secret&take=5&search=user-secret&token=users-token-1&token=users-token-2",
+      "/platform/organizations?page=10001&pageSize=1&status=cancelled",
+      "/platform/organizations?page=10002&pageSize=101",
+      "/platform/organizations?page=11222333000181",
+      "/platform/organizations?page=102&pageSize=100&status=active",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=10000&take=100",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=10001&take=101",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=11222333000181",
+      "/platform/organizations?page=501",
+      "/platform/organizations?page=502",
+      "/platform/organizations?page=1",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=0&take=1",
+      "/platform/organizations?page=invalid-page",
+      "/platform/organizations?pageSize=invalid-page-size",
+      "/platform/organizations?status=invalid-status",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?skip=invalid-skip",
+      "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/users?take=invalid-take",
+    ];
+    const responses = [];
+    for (const url of urls) {
+      responses.push(await fetch(`${gatewayUrl}${url}`, { headers }));
+    }
 
-    expect(response.status).toBe(200);
-    await waitForRecords(auditService.records, 1);
+    expect(responses.map(({ status }) => status)).toEqual(Array(urls.length).fill(200));
+    expect(upstreamUrls).toEqual(urls);
+    await waitForRecords(auditService.records, urls.length);
     expect(auditService.records[0]).toMatchObject({
       organizationId: null,
       userId: null,
+      query: { pageSize: "5", status: "active" },
       metadata: {
         auth_kind: "platform",
         platform_user_id: "platform-user-1",
         routeTarget: "organization-service",
       },
     });
+    expect(auditService.records[1]?.query).toEqual({});
+    expect(auditService.records[2]).toMatchObject({
+      query: { take: "5" },
+      metadata: { routeTarget: "user-service" },
+    });
+    expect(auditService.records.slice(3).map(({ query }) => query)).toEqual([
+      { page: "10001", pageSize: "1", status: "cancelled" },
+      {},
+      {},
+      { status: "active" },
+      { skip: "10000", take: "100" },
+      {},
+      {},
+      { page: "501" },
+      {},
+      { page: "1" },
+      { skip: "0", take: "1" },
+      {},
+      {},
+      {},
+      {},
+      {},
+    ]);
+    const serializedAudit = JSON.stringify(auditService.records);
+    for (const sensitive of [
+      "SecretCorp",
+      "page-secret",
+      "11222333000181",
+      "query-cnpj",
+      "query-email",
+      "query-token-1",
+      "query-token-2",
+      "query-cookie",
+      "detail-token",
+      "detail-email",
+      "user-secret",
+      "skip-secret",
+      "users-token-1",
+      "users-token-2",
+      "invalid-page",
+      "invalid-page-size",
+      "invalid-status",
+      "invalid-skip",
+      "invalid-take",
+    ]) {
+      expect(serializedAudit).not.toContain(sensitive);
+    }
+  } finally {
+    await stopServer(gateway);
+    await stopServer(platformServices);
+    await stopServer(auditService.server);
+  }
+});
+
+it("persiste uma tentativa e audita o resultado de cada mutação de organização da plataforma", async () => {
+  const csrfToken = "P".repeat(43);
+  const platformToken = createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) });
+  const upstreamRequests: Array<{
+    method?: string;
+    url?: string;
+    cookie?: string;
+    csrf?: string;
+    authorization?: string;
+    body: unknown;
+  }> = [];
+  const auditService = await startAuditIngestServer();
+  const organizationService = createServer(async (request, response) => {
+    upstreamRequests.push({
+      method: request.method,
+      url: request.url,
+      cookie: request.headers.cookie,
+      csrf: request.headers[CSRF_HEADER_NAME] as string | undefined,
+      authorization: request.headers.authorization,
+      body: await readJsonBody(request),
+    });
+    response.statusCode = request.method === "POST" ? 201 : 200;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: true,
+        data: {
+          id: "9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+          updated_at: "2026-08-25T12:00:00.000Z",
+        },
+      }),
+    );
+  });
+  const organizationServiceUrl = await startServer(organizationService);
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      organizationServiceUrl,
+      allowedOrigins: ["https://useoffice.com.br"],
+      bearerAuthCompatibility: true,
+    }),
+    createTestLogger(),
+    { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const headers = {
+    Authorization: "Bearer browser-secret",
+    Cookie: `theme=dark; cw.session=${platformToken}; cw.csrf=${csrfToken}`,
+    Origin: "https://useoffice.com.br",
+    [CSRF_HEADER_NAME]: csrfToken,
+    "content-type": "application/json",
+  };
+  const operations = [
+    {
+      method: "POST",
+      path: "/platform/organizations",
+      body: { name: "Smoke secret name", cnpj: "11222333000181" },
+      query: "?token=mutation-token&cnpj=mutation-cnpj&email=mutation-email",
+      status: 201,
+    },
+    {
+      method: "PATCH",
+      path: "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/subscription-plan",
+      body: { subscription_plan: "pro", expected_updated_at: "2026-08-25T12:00:00.000Z" },
+      query: "?token=mutation-token&cnpj=mutation-cnpj&email=mutation-email",
+      status: 200,
+    },
+    {
+      method: "PATCH",
+      path: "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/logo-url",
+      body: {
+        logo_url: "https://cdn.example.com/private-logo.png",
+        expected_updated_at: "2026-08-25T12:00:00.000Z",
+      },
+      query: "?token=mutation-token&cnpj=mutation-cnpj&email=mutation-email",
+      status: 200,
+    },
+    {
+      method: "PATCH",
+      path: "/platform/organizations/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/status",
+      body: { status: "cancelled", expected_updated_at: "2026-08-25T12:00:00.000Z" },
+      query: "?token=mutation-token&cnpj=mutation-cnpj&email=mutation-email",
+      status: 200,
+    },
+  ];
+
+  try {
+    for (const operation of operations) {
+      const response = await fetch(`${gatewayUrl}${operation.path}${operation.query}`, {
+        method: operation.method,
+        headers,
+        body: JSON.stringify(operation.body),
+      });
+      expect(response.status, `${operation.method} ${operation.path}`).toBe(operation.status);
+    }
+
+    await waitForRecords(auditService.records, operations.length * 2);
+    expect(upstreamRequests).toHaveLength(operations.length);
+    for (const request of upstreamRequests) {
+      expect(request.url).toContain("mutation-token");
+      expect(request.cookie).toBe(`cw.session=${platformToken}; cw.csrf=${csrfToken}`);
+      expect(request.csrf).toBe(csrfToken);
+      expect(request.authorization).toBeUndefined();
+    }
+
+    expect(
+      auditService.records
+        .filter((record) => record.action !== "organization.mutation.attempt")
+        .map(({ method, path, metadata }) => ({ method, path, metadata })),
+    ).toEqual(
+      operations.map(({ method, path }) => ({
+        method,
+        path,
+        metadata: expect.objectContaining({
+          routeTarget: "organization-service",
+          auth_kind: "platform",
+          platform_user_id: "platform-user-1",
+        }),
+      })),
+    );
+    expect(
+      auditService.records.filter((record) => record.action === "organization.mutation.attempt"),
+    ).toHaveLength(operations.length);
+    expect(new Set(auditService.records.map((record) => record.requestId)).size).toBe(
+      operations.length * 2,
+    );
+    const serializedAudit = JSON.stringify(auditService.records);
+    expect(serializedAudit).not.toContain("11222333000181");
+    expect(serializedAudit).not.toContain("Smoke secret name");
+    expect(serializedAudit).not.toContain("private-logo.png");
+    expect(serializedAudit).not.toContain(platformToken);
+    expect(serializedAudit).not.toContain(csrfToken);
+    expect(serializedAudit).not.toContain("mutation-token");
+    expect(serializedAudit).not.toContain("mutation-cnpj");
+    expect(serializedAudit).not.toContain("mutation-email");
   } finally {
     await stopServer(gateway);
     await stopServer(organizationService);
     await stopServer(auditService.server);
+  }
+});
+
+it("não chama o organization-service quando a auditoria obrigatória está desabilitada", async () => {
+  const csrfToken = "P".repeat(43);
+  let upstreamHits = 0;
+  const organizationService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 201;
+    response.end();
+  });
+  const organizationServiceUrl = await startServer(organizationService);
+  const app = createApp(
+    createEnv({
+      auditEnabled: false,
+      organizationServiceUrl,
+      allowedOrigins: ["https://useoffice.com.br"],
+    }),
+    createTestLogger(),
+    { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/platform/organizations`, {
+      method: "POST",
+      headers: {
+        Cookie: `cw.session=${createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) })}; cw.csrf=${csrfToken}`,
+        Origin: "https://useoffice.com.br",
+        [CSRF_HEADER_NAME]: csrfToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Blocked", cnpj: "11222333000181" }),
+    });
+
+    expect(response.status).toBe(503);
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(organizationService);
+  }
+});
+
+it.each([
+  "network",
+  "http",
+  "timeout",
+])("barreira HTTP não despacha organização quando ACK de auditoria falha: %s", async (failure) => {
+  const realFetch = globalThis.fetch;
+  const csrfToken = "P".repeat(43);
+  let upstreamHits = 0;
+  const organizationService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.writeHead(201).end();
+  });
+  const organizationServiceUrl = await startServer(organizationService);
+  const auditServiceUrl = "http://audit-service.test";
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    if (!String(input).startsWith(auditServiceUrl)) return realFetch(input, init);
+    const payload = JSON.parse(String(init?.body)) as CreateAuditRequestPayload;
+    if (payload.action !== "organization.mutation.attempt")
+      return new Response(null, { status: 201 });
+    if (failure === "http") return new Response("private-audit-error", { status: 500 });
+    if (failure === "timeout") {
+      await new Promise((_, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+      });
+    }
+    throw new Error("private-audit-error");
+  });
+  const gateway = createServer(
+    createApp(
+      createEnv({ auditEnabled: true, auditServiceUrl, organizationServiceUrl }),
+      createTestLogger(),
+      { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+    ),
+  );
+  const gatewayUrl = await startServer(gateway);
+  try {
+    const response = await realFetch(`${gatewayUrl}/platform/organizations`, {
+      method: "POST",
+      headers: {
+        Cookie: `cw.session=${createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) })}; cw.csrf=${csrfToken}`,
+        [CSRF_HEADER_NAME]: csrfToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Blocked", cnpj: "11222333000181" }),
+    });
+    expect(response.status).toBe(503);
+    expect(await response.text()).not.toContain("private-audit-error");
+    expect(upstreamHits).toBe(0);
+  } finally {
+    fetchSpy.mockRestore();
+    await stopServer(gateway);
+    await stopServer(organizationService);
+  }
+}, 15_000);
+
+it("nega auth/CSRF antes do ACK e só despacha a organização após confirmação", async () => {
+  const realFetch = globalThis.fetch;
+  const csrfToken = "P".repeat(43);
+  let upstreamHits = 0;
+  const organizationService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.writeHead(201).end();
+  });
+  const organizationServiceUrl = await startServer(organizationService);
+  const auditServiceUrl = "http://audit-service.test";
+  const attempts: CreateAuditRequestPayload[] = [];
+  let release!: () => void;
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    if (!String(input).startsWith(auditServiceUrl)) return realFetch(input, init);
+    const payload = JSON.parse(String(init?.body)) as CreateAuditRequestPayload;
+    if (payload.action === "organization.mutation.attempt") {
+      attempts.push(payload);
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    }
+    return new Response(null, { status: 201 });
+  });
+  const gateway = createServer(
+    createApp(
+      createEnv({ auditEnabled: true, auditServiceUrl, organizationServiceUrl }),
+      createTestLogger(),
+      { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+    ),
+  );
+  const gatewayUrl = await startServer(gateway);
+  const headers = {
+    Cookie: `cw.session=${createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) })}; cw.csrf=${csrfToken}`,
+    [CSRF_HEADER_NAME]: csrfToken,
+    "content-type": "application/json",
+  };
+  const url = `${gatewayUrl}/platform/organizations`;
+  const body = JSON.stringify({ name: "Allowed", cnpj: "11222333000181" });
+  try {
+    expect(
+      (
+        await realFetch(url, {
+          method: "POST",
+          body,
+          headers: { "content-type": "application/json" },
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await realFetch(url, {
+          method: "POST",
+          body,
+          headers: { ...headers, [CSRF_HEADER_NAME]: "wrong" },
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await realFetch(url, {
+          method: "POST",
+          body,
+          headers: {
+            ...headers,
+            Cookie: `cw.session=${createToken({ user_id: "org-user", organization_id: "org-1", permission: 3, type: "owner", csrf_hash: hashCsrfToken(csrfToken) })}; cw.csrf=${csrfToken}`,
+          },
+        })
+      ).status,
+    ).toBe(403);
+    expect(attempts).toHaveLength(0);
+    expect(upstreamHits).toBe(0);
+    const operation = realFetch(url, { method: "POST", body, headers });
+    await vi.waitFor(() => expect(attempts).toHaveLength(1));
+    expect(upstreamHits).toBe(0);
+    release();
+    expect((await operation).status).toBe(201);
+    expect(upstreamHits).toBe(1);
+  } finally {
+    release?.();
+    fetchSpy.mockRestore();
+    await stopServer(gateway);
+    await stopServer(organizationService);
   }
 });
 
@@ -3447,57 +3850,47 @@ it("logs aborted requests exactly once", async () => {
     organization_id: "org-1",
     permission: 2,
   });
-  const upstream = createServer((_request, response) => {
-    setTimeout(() => {
-      if (!response.headersSent) {
-        response.statusCode = 200;
-        response.setHeader("content-type", "application/json");
-        response.end(JSON.stringify({ success: true, data: { ok: true } }));
-      }
-    }, 100);
-  });
+  const upstream = createServer();
+  const upstreamReceivedRequest = once(upstream, "request", { signal: AbortSignal.timeout(1_000) });
   const taskServiceUrl = await startServer(upstream);
   const { logger, stream } = createCapturedTestLogger();
   const app = createApp(createEnv({ taskServiceUrl }), logger);
   const gateway = createServer(app);
   const gatewayUrl = await startServer(gateway);
-  const { hostname, port } = new URL(gatewayUrl);
+  const { port } = new URL(gatewayUrl);
 
   try {
-    await new Promise<void>((resolve) => {
-      const request = nodeRequest(
-        {
-          hostname,
-          port,
-          path: "/task/list",
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-        () => {
-          resolve();
-        },
-      );
-
-      request.on("error", () => {
-        resolve();
-      });
-      request.end();
-
-      setTimeout(() => {
-        request.destroy();
-      }, 10);
+    const request = nodeRequest({
+      hostname: "localhost",
+      family: 4,
+      lookup: (_hostname, _options, callback) => {
+        // Simula conexão lenta: abortar por timer poderia impedir a chegada ao gateway.
+        setTimeout(() => callback(null, "127.0.0.1", 4), 50);
+      },
+      port,
+      path: "/task/list",
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
     });
+    const requestAborted = new Promise<void>((resolve) => request.once("error", () => resolve()));
+    request.end();
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 150);
+    const [, upstreamResponse] = await upstreamReceivedRequest;
+    request.destroy();
+    await requestAborted;
+    await vi.waitFor(() => {
+      expect(
+        stream.entries().filter((entry) => entry.event === "http.request.aborted"),
+      ).toHaveLength(1);
     });
+    upstreamResponse.end(JSON.stringify({ success: true, data: { ok: true } }));
     await waitForLogs();
 
     const abortedLogs = stream.entries().filter((entry) => entry.event === "http.request.aborted");
     expect(abortedLogs).toHaveLength(1);
   } finally {
+    gateway.closeAllConnections();
+    upstream.closeAllConnections();
     await stopServer(gateway);
     await stopServer(upstream);
   }

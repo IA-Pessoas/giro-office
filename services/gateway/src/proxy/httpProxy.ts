@@ -118,6 +118,24 @@ const SESSION_COOKIE_RULES: SessionCookieRule[] = [
     outbound: [],
   },
   {
+    method: "POST",
+    path: "/platform/organizations",
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "GET",
+    path: /^\/platform\/organizations\/[^/]+$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "PATCH",
+    path: /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
     method: "GET",
     path: /^\/platform\/organizations\/[^/]+\/users$/u,
     inbound: [AUTH_SESSION_COOKIE_NAME],
