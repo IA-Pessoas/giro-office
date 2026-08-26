@@ -338,7 +338,7 @@ await runTest("mantém seleção por id e detalhe independente da página do dir
   assert.match(superAdminPageSource, /selectedId=\{selectedOrganizationId\}/);
 });
 
-await runTest("confirma todo status e exige nome exato para suspensão e cancelamento", () => {
+await runTest("confirma status e concentra as edições de plano e logo em diálogos", () => {
   assert.match(organizationOverviewSource, /<Dialog/);
   assert.match(organizationOverviewSource, /confirmationName !== organization\.name/);
   assert.match(
@@ -348,8 +348,13 @@ await runTest("confirma todo status e exige nome exato para suspensão e cancela
   assert.doesNotMatch(organizationOverviewSource, /void updateStatus\(statusDraft\)/);
   assert.match(managementUtilsSource, /past_due|suspended|cancelled/);
   assert.match(organizationOverviewSource, /Salvar status/);
-  assert.match(organizationOverviewSource, /Salvar plano/);
-  assert.match(organizationOverviewSource, /Salvar logo/);
+  assert.match(organizationOverviewSource, /Editar plano/);
+  assert.match(organizationOverviewSource, /Editar logo/);
+  assert.match(organizationOverviewSource, /title="Editar plano"/);
+  assert.match(organizationOverviewSource, /title="Editar logo"/);
+  assert.match(organizationOverviewSource, /onCloseAutoFocus=\{/);
+  assert.match(organizationOverviewSource, /preventClose=\{planMutation\.isPending\}/);
+  assert.match(organizationOverviewSource, /preventClose=\{logoMutation\.isPending\}/);
   assert.match(organizationOverviewSource, /expectedUpdatedAt: organization\.updated_at/);
   assert.doesNotMatch(organizationOverviewSource, /<img|next\/image|backgroundImage/);
   assert.match(organizationOverviewSource, /rel="noreferrer noopener"/);

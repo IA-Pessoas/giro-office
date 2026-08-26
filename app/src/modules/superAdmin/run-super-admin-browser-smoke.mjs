@@ -48,12 +48,23 @@ let revision = 1;
 let delayedDetailId = null;
 let delayedDetail;
 let failedDetailId = null;
+let delayedMutationPath = null;
+let delayedMutation;
 
 function reply(response, status, data) {
   response.writeHead(status, { "content-type": "application/json" });
   response.end(
     JSON.stringify(status < 400 ? { success: true, data } : { success: false, error: data }),
   );
+}
+
+function hasProcessExited(pid) {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    return error && typeof error === "object" && error.code === "ESRCH";
+  }
 }
 
 const upstream = createServer(async (request, response) => {
@@ -153,6 +164,7 @@ const upstream = createServer(async (request, response) => {
       "logo-url": "logo_url",
     }[match[2]];
     assert.deepEqual(Object.keys(body).sort(), ["expected_updated_at", field].sort());
+    if (url.pathname === delayedMutationPath) await delayedMutation;
     selected.updated_at = new Date(Date.UTC(2026, 7, 25, 12, 0, revision++)).toISOString();
     if (forceConflict) {
       forceConflict = false;
@@ -212,6 +224,7 @@ const prepareScreenshot = async () => {
   });
   await settleLayout();
 };
+let primaryError;
 
 try {
   const startedAt = Date.now();
@@ -415,26 +428,99 @@ try {
     await page.getByLabel("Pesquisar organização").fill("");
     console.log("PASS criação limitada e seleção preservada após refetch do diretório");
 
-    await page.getByLabel("Novo plano", { exact: true }).selectOption("pro");
-    await page.getByRole("button", { name: "Salvar plano", exact: true }).click();
+    const planTrigger = page.getByRole("button", { name: "Editar plano", exact: true });
+    const planDialog = page.getByRole("dialog", { name: "Editar plano", exact: true });
+    await planTrigger.click();
+    await planDialog.waitFor();
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await settleLayout();
+      await page.screenshot({
+        path: join(
+          screenshotDirectory,
+          viewport.width > 1000
+            ? "task-8-plan-dialog-desktop.png"
+            : "task-8-plan-dialog-mobile.png",
+        ),
+      });
+    }
+    await planDialog.getByLabel("Plano", { exact: true }).selectOption("enterprise");
+    await page.keyboard.press("Escape");
+    await planDialog.waitFor({ state: "hidden" });
+    await page.waitForFunction(
+      () => document.activeElement?.textContent?.trim() === "Editar plano",
+      null,
+      { timeout: 3_000 },
+    );
+    await planTrigger.click();
+    assert.equal(
+      await planDialog.getByLabel("Plano", { exact: true }).inputValue(),
+      created.subscription_plan,
+      "cancelar não pode preservar rascunho de plano",
+    );
+    const pendingPlan = created.subscription_plan === "pro" ? "enterprise" : "pro";
+    let releaseMutation;
+    try {
+      delayedMutationPath = `/platform/organizations/${created.id}/subscription-plan`;
+      delayedMutation = new Promise((resolve) => {
+        releaseMutation = resolve;
+      });
+      await planDialog.getByLabel("Plano", { exact: true }).selectOption(pendingPlan);
+      await planDialog.getByRole("button", { name: "Salvar plano", exact: true }).click();
+      await planDialog.getByRole("button", { name: "Salvando...", exact: true }).waitFor();
+      assert.equal(await planDialog.getByRole("button", { name: "Cancelar", exact: true }).isDisabled(), true);
+      assert.equal(await planDialog.getByRole("button", { name: "Salvando...", exact: true }).isDisabled(), true);
+      await page.keyboard.press("Escape");
+      assert.equal(await planDialog.isVisible(), true, "não fecha durante a mutação pendente");
+    } finally {
+      delayedMutationPath = null;
+      releaseMutation?.();
+    }
+    await planDialog.waitFor({ state: "hidden" });
     await page.getByText("Plano atualizado.", { exact: true }).waitFor();
-    assert.equal(created.subscription_plan, "pro");
-    await page
-      .getByLabel("URL HTTPS", { exact: true })
-      .fill("https://user:secret@example.test/logo.png");
-    await page.getByRole("button", { name: "Salvar logo", exact: true }).click();
-    await page.getByText("Informe uma URL HTTPS sem credenciais.", { exact: true }).waitFor();
-    await page
+    assert.equal(created.subscription_plan, pendingPlan);
+
+    const logoTrigger = page.getByRole("button", { name: "Editar logo", exact: true });
+    const logoDialog = page.getByRole("dialog", { name: "Editar logo", exact: true });
+    await logoTrigger.click();
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await settleLayout();
+      await page.screenshot({
+        path: join(
+          screenshotDirectory,
+          viewport.width > 1000
+            ? "task-8-logo-dialog-desktop.png"
+            : "task-8-logo-dialog-mobile.png",
+        ),
+      });
+    }
+    await logoDialog.getByLabel("URL HTTPS", { exact: true }).fill("https://user:secret@example.test/logo.png");
+    await logoDialog.getByRole("button", { name: "Salvar logo", exact: true }).click();
+    await logoDialog.getByText("Informe uma URL HTTPS sem credenciais.", { exact: true }).waitFor();
+    await page.keyboard.press("Escape");
+    await logoDialog.waitFor({ state: "hidden" });
+    await page.waitForFunction(
+      () => document.activeElement?.textContent?.trim() === "Editar logo",
+      null,
+      { timeout: 3_000 },
+    );
+    await logoTrigger.click();
+    assert.equal(await logoDialog.getByLabel("URL HTTPS", { exact: true }).inputValue(), created.logo_url ?? "");
+    await logoDialog
       .getByLabel("URL HTTPS", { exact: true })
       .fill("https://assets.example.test/logo.png");
-    await page.getByRole("button", { name: "Salvar logo", exact: true }).click();
+    await logoDialog.getByRole("button", { name: "Salvar logo", exact: true }).click();
+    await logoDialog.waitFor({ state: "hidden" });
     await page.getByText("URL do logo atualizada.", { exact: true }).waitFor();
     assert.equal(created.logo_url, "https://assets.example.test/logo.png");
-    await page.getByLabel("URL HTTPS", { exact: true }).fill("");
-    await page.getByRole("button", { name: "Salvar logo", exact: true }).click();
+    await logoTrigger.click();
+    await logoDialog.getByLabel("URL HTTPS", { exact: true }).fill("");
+    await logoDialog.getByRole("button", { name: "Salvar logo", exact: true }).click();
+    await logoDialog.waitFor({ state: "hidden" });
     await page.getByText("URL do logo removida.", { exact: true }).waitFor();
     assert.equal(created.logo_url, null);
-    console.log("PASS plano, URL HTTPS e limpeza de logo sem fetch de imagem externa");
+    console.log("PASS diálogos de plano/logo, URL HTTPS e limpeza sem fetch de imagem externa");
 
     const confirmation = page.getByRole("dialog", { name: "Confirmar alteração de status" });
     for (const status of ["trial", "past_due", "suspended", "cancelled", "active"]) {
@@ -490,9 +576,10 @@ try {
 
     const mutationCount = requests.filter((request) => request.method === "PATCH").length;
     forceConflict = true;
-    await page.getByLabel("Novo plano", { exact: true }).selectOption("enterprise");
-    await page.getByRole("button", { name: "Salvar plano", exact: true }).click();
-    await page
+    await planTrigger.click();
+    await planDialog.getByLabel("Plano", { exact: true }).selectOption("enterprise");
+    await planDialog.getByRole("button", { name: "Salvar plano", exact: true }).click();
+    await planDialog
       .getByText("Esta organização foi alterada por outra pessoa.", { exact: false })
       .waitFor();
     await page.waitForFunction(() => document.querySelector("#platform-status")?.value === "trial");
@@ -501,8 +588,9 @@ try {
       requests.filter((request) => request.method === "PATCH").length,
       mutationCount + 1,
     );
-    await page.getByLabel("Novo plano", { exact: true }).selectOption("enterprise");
-    await page.getByRole("button", { name: "Salvar plano", exact: true }).click();
+    await planDialog.getByLabel("Plano", { exact: true }).selectOption("enterprise");
+    await planDialog.getByRole("button", { name: "Salvar plano", exact: true }).click();
+    await planDialog.waitFor({ state: "hidden" });
     await page.getByText("Plano atualizado.", { exact: true }).waitFor();
     assert.equal(created.subscription_plan, "enterprise");
     console.log(
@@ -558,6 +646,7 @@ try {
   assert.deepEqual(remoteImages, []);
   console.log("PASS desktop/mobile, Escape, console sem erros inesperados e nenhuma imagem remota");
 } catch (error) {
+  primaryError = error;
   console.error("URL", page?.url());
   console.error(
     "ACTIVE_ELEMENT",
@@ -582,16 +671,39 @@ try {
   console.error("NEXT_OUTPUT", serverOutput);
   throw error;
 } finally {
-  await browser?.close();
-  if (serverProcess.pid && serverProcess.exitCode === null) {
-    if (process.platform === "win32") {
-      execFileSync("taskkill", ["/pid", String(serverProcess.pid), "/T", "/F"], {
-        stdio: "ignore",
-        windowsHide: true,
-      });
+  let cleanupError;
+  try {
+    await page?.unrouteAll({ behavior: "ignoreErrors" });
+    await browser?.close();
+    if (serverProcess.pid && serverProcess.exitCode === null) {
+      if (process.platform === "win32") {
+        try {
+          execFileSync("taskkill", ["/pid", String(serverProcess.pid), "/T", "/F"], {
+            stdio: "ignore",
+            windowsHide: true,
+          });
+        } catch (error) {
+          await new Promise(setImmediate);
+          if (error && typeof error === "object" && error.code === "EPERM") throw error;
+          if (!hasProcessExited(serverProcess.pid)) throw error;
+        }
+      } else {
+        serverProcess.kill("SIGTERM");
+      }
+    }
+  } catch (error) {
+    cleanupError = error;
+  }
+  try {
+    await new Promise((resolve) => upstream.close(resolve));
+  } catch (error) {
+    cleanupError ??= error;
+  }
+  if (cleanupError) {
+    if (primaryError) {
+      console.error("CLEANUP_ERROR", cleanupError);
     } else {
-      serverProcess.kill("SIGTERM");
+      throw cleanupError;
     }
   }
-  await new Promise((resolve) => upstream.close(resolve));
 }

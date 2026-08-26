@@ -38,6 +38,9 @@ jobs:
       - name: Install frozen dependencies without lifecycle scripts
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Test legacy platform auth reconciliation in memory
+        run: node --test scripts/reconcile-platform-auth-sessions.test.mjs
+
       - name: Build shared package
         run: corepack pnpm --filter @workspace/shared build
 
