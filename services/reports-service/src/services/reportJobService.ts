@@ -1,5 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 
+import type { Prisma } from "../generated/prisma/client.js";
 import type { ReportsPrismaClient } from "../prisma/index.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import { DEFAULT_REPORT_RETENTION_DAYS } from "../schemas/reportRetention.schemas.js";
@@ -21,7 +22,7 @@ export class ReportJobService {
         requester_id: input.userId,
         report_model_version_id: input.modelVersionId,
         status: "queued",
-        payload_json: input.payload,
+        payload_json: input.payload as Prisma.InputJsonValue,
       },
     });
   }
@@ -60,7 +61,7 @@ export class ReportJobService {
           requester_id: input.userId,
           report_model_version_id: version.id,
           status: "queued",
-          payload_json: { ...input.payload, retentionDays },
+          payload_json: { ...input.payload, retentionDays } as Prisma.InputJsonValue,
         },
       });
     });

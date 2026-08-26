@@ -26,7 +26,7 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 const prisma = createReportsPrismaClient(env.databaseUrl);
-const audit = new ReportAuditService(prisma, async () => undefined);
+const audit = new ReportAuditService(prisma as never, async () => undefined);
 const catalog = new SourceCatalogService([
   new ParcelamentoAdapter(env),
   new ClientIntegrationAdapter(env),
@@ -39,7 +39,7 @@ const worker = new ReportWorkerService(
   prisma,
   new UserAccessContextClient(env),
   new ReportExecutionService(catalog, new ReportDefinitionService(catalog)),
-  new ReportLifecycleService(prisma, audit),
+  new ReportLifecycleService(prisma as never, audit),
   Math.max(1_000, Math.floor((env.workerLeaseSeconds * 1000) / 2)),
 );
 

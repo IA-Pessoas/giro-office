@@ -50,7 +50,8 @@ export class ReportSnapshotService {
         row_number: row.row_number,
         values: row.data_json as Record<string, unknown>,
       })),
-      nextCursor: records.length > input.limit ? (visible.at(-1)?.row_number ?? null) : null,
+      nextCursor:
+        records.length > input.limit ? (visible[visible.length - 1]?.row_number ?? null) : null,
     };
   }
 }
