@@ -100,6 +100,8 @@ interface ReportLifecycleInput {
   actor_id: string;
   department_id?: string;
   counts?: ReportAuditEventInput["counts"];
+  reason?: "retention" | "requested";
+  justification?: string;
 }
 
 export interface TransitionReportJobInput extends ReportLifecycleInput {
@@ -115,6 +117,7 @@ export interface CompleteReportJobInput extends ReportLifecycleInput {
 
 export interface RemoveReportSnapshotInput extends ReportLifecycleInput {
   reason: "retention" | "requested";
+  justification?: string;
 }
 
 export const REPORT_LIFECYCLE_TRANSITIONS: Record<
@@ -270,6 +273,9 @@ export class ReportLifecycleService {
     if (input.reason !== "requested") {
       throw new ServiceError(400, "A exclusão exige a justificativa de solicitação.");
     }
+    if (!input.justification?.trim()) {
+      throw new ServiceError(400, "A exclusão exige uma justificativa.");
+    }
     await this.removeSnapshotRows(input, "deleted", "report.deleted.requested");
   }
 
@@ -403,6 +409,7 @@ export class ReportLifecycleService {
       event_type: eventType,
       occurred_at: occurredAt,
       counts,
+      justification_provided: input.reason === "requested" && Boolean(input.justification?.trim()),
     });
   }
 }

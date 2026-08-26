@@ -37,6 +37,7 @@ export interface ReportAuditEventInput {
     rows?: number;
     bytes?: number;
   };
+  justification_provided?: boolean;
 }
 
 export function createReportAuditEvent(input: ReportAuditEventInput): ReportAuditEventInput {
@@ -49,6 +50,7 @@ export function createReportAuditEvent(input: ReportAuditEventInput): ReportAudi
     event_type: input.event_type,
     occurred_at: input.occurred_at,
     ...(input.counts ? { counts: input.counts } : {}),
+    ...(input.justification_provided ? { justification_provided: true } : {}),
   };
 }
 
@@ -93,6 +95,7 @@ function metadata(input: ReportAuditEventInput): Record<string, unknown> {
     event_type: input.event_type,
     occurred_at: input.occurred_at.toISOString(),
     counts: safeCounts(input.counts),
+    ...(input.justification_provided ? { justification_provided: true } : {}),
   };
 }
 

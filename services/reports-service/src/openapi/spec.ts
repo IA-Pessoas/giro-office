@@ -160,6 +160,83 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
             "404": { description: "Job não encontrado" },
           },
         },
+        delete: {
+          tags: ["Reports"],
+          summary: "Excluir antecipadamente o historico de um relatorio",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["justification"],
+                  additionalProperties: false,
+                  properties: { justification: { type: "string", minLength: 1, maxLength: 500 } },
+                },
+              },
+            },
+          },
+          responses: {
+            "204": { description: "Historico excluido" },
+            "400": { description: "Justificativa invalida" },
+            "403": { description: "Admin 3 ou owner necessario" },
+            "404": { description: "Job nao encontrado" },
+            "409": { description: "Job ainda nao pode ser excluido" },
+          },
+        },
+      },
+      "/reports/history": {
+        get: {
+          tags: ["Reports"],
+          summary: "Listar historico pessoal de execucoes",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "cursor", in: "query", schema: { type: "integer", minimum: 0 } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+          ],
+          responses: {
+            "200": { description: "Historico pessoal paginado", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+          },
+        },
+      },
+      "/reports/retention": {
+        get: {
+          tags: ["Reports"],
+          summary: "Consultar retencao organizacional de relatorios",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Politica de retencao", ...successResponse },
+            "403": { description: "Somente owner" },
+          },
+        },
+        put: {
+          tags: ["Reports"],
+          summary: "Definir retencao para jobs futuros",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["retention_days"],
+                  additionalProperties: false,
+                  properties: { retention_days: { type: "integer", minimum: 1, maximum: 365 } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Politica atualizada", ...successResponse },
+            "400": { description: "Retencao invalida" },
+            "403": { description: "Somente owner" },
+          },
+        },
       },
       "/reports/jobs/{id}/cancel": {
         post: {

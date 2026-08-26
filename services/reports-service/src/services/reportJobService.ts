@@ -12,6 +12,15 @@ export interface CreateReportJobInput {
   payload: Record<string, unknown>;
 }
 
+export interface ReportHistoryItem {
+  id: string;
+  report_model_version_id: string;
+  status: string;
+  requested_at: Date;
+  started_at: Date | null;
+  finished_at: Date | null;
+}
+
 export class ReportJobService {
   constructor(private readonly prisma: ReportsPrismaClient) {}
 
@@ -103,6 +112,34 @@ export class ReportJobService {
     });
     if (!job) throw new ServiceError(404, "Job de relatório não encontrado.");
     return job;
+  }
+
+  async listHistory(input: {
+    organizationId: string;
+    userId: string;
+    cursor?: number;
+    limit: number;
+  }): Promise<{ items: ReportHistoryItem[]; nextCursor: number | null }> {
+    const cursor = input.cursor ?? 0;
+    const jobs = await this.prisma.reportJob.findMany({
+      where: { organization_id: input.organizationId, requester_id: input.userId },
+      orderBy: { requested_at: "desc" },
+      skip: cursor,
+      take: input.limit + 1,
+      select: {
+        id: true,
+        report_model_version_id: true,
+        status: true,
+        requested_at: true,
+        started_at: true,
+        finished_at: true,
+      },
+    });
+    const items = jobs.slice(0, input.limit) as ReportHistoryItem[];
+    return {
+      items,
+      nextCursor: jobs.length > input.limit ? cursor + input.limit : null,
+    };
   }
 
   async cancel(input: { organizationId: string; userId: string; id: string }): Promise<void> {

@@ -1,6 +1,9 @@
 import {
   createSuccessResponse,
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   parseWithZod,
   REQUEST_ID_HEADER,
@@ -9,11 +12,34 @@ import {
 } from "@workspace/shared";
 import { type Request, Router } from "express";
 import { z } from "zod";
-
+import {
+  deleteReportJobSchema,
+  reportHistoryQuerySchema,
+} from "../schemas/reportHistory.schemas.js";
 import { createReportJobSchema, reportJobIdParamsSchema } from "../schemas/reportJob.schemas.js";
 import type { ReportAuthorizationService } from "../services/reportAuthorizationService.js";
 import type { ReportJobService } from "../services/reportJobService.js";
+import type { ReportLifecycleService } from "../services/reportLifecycleService.js";
 import type { ReportSnapshotService } from "../services/reportSnapshotService.js";
+
+function hasAdmin3Access(request: Request): boolean {
+  if (request.get(FORWARDED_AUTH_TYPE_HEADER) === "owner") return true;
+
+  const permission = Number(request.get(FORWARDED_AUTH_PERMISSION_HEADER));
+  if (Number.isInteger(permission) && permission >= 3) return true;
+
+  if (request.get(FORWARDED_AUTH_TYPE_HEADER) !== "admin") return false;
+  try {
+    const modules = JSON.parse(request.get(FORWARDED_AUTH_MODULES_HEADER) ?? "null");
+    return (
+      typeof modules === "object" &&
+      modules !== null &&
+      Object.values(modules).some((level) => typeof level === "number" && level >= 3)
+    );
+  } catch {
+    return false;
+  }
+}
 
 const snapshotQuerySchema = z
   .object({
@@ -26,6 +52,7 @@ export function createReportJobRouter(options: {
   jobService: ReportJobService;
   snapshotService: ReportSnapshotService;
   authorizationService: ReportAuthorizationService;
+  lifecycleService: Pick<ReportLifecycleService, "delete">;
 }): ReturnType<typeof Router> {
   const router = Router();
   const context = (request: Request) => {
@@ -103,6 +130,31 @@ export function createReportJobRouter(options: {
     const actor = context(request);
     const { id } = parseWithZod(reportJobIdParamsSchema, request.params);
     response.json(createSuccessResponse(await options.jobService.get({ ...actor, id })));
+  });
+
+  router.get("/history", async (request, response) => {
+    const actor = context(request);
+    const query = parseWithZod(reportHistoryQuerySchema, request.query);
+    response.json(
+      createSuccessResponse(await options.jobService.listHistory({ ...actor, ...query })),
+    );
+  });
+
+  router.delete("/jobs/:id", async (request, response) => {
+    const actor = context(request);
+    if (!hasAdmin3Access(request)) {
+      throw new ServiceError(403, "A exclusão antecipada exige Admin 3.");
+    }
+    const { id } = parseWithZod(reportJobIdParamsSchema, request.params);
+    const { justification } = parseWithZod(deleteReportJobSchema, request.body);
+    await options.lifecycleService.delete({
+      job_id: id,
+      organization_id: actor.organizationId,
+      actor_id: actor.userId,
+      reason: "requested",
+      justification,
+    });
+    response.status(204).send();
   });
 
   router.post("/jobs/:id/cancel", async (request, response) => {

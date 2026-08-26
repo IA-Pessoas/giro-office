@@ -518,4 +518,28 @@ describe("ReportLifecycleService", () => {
     expect(migration).toContain("WHEN 'pending' THEN 'queued'");
     expect(migration).toContain("WHEN 'running' THEN 'processing'");
   });
+
+  it("registra somente a presença da justificativa ao excluir antecipadamente", async () => {
+    const { prisma, transaction } = createPersistence("completed");
+    const audit = new ReportAuditService(prisma as never, vi.fn());
+    const service = new ReportLifecycleService(prisma as never, audit, () => now);
+
+    await service.delete({
+      job_id: "job-1",
+      organization_id: "org-1",
+      actor_id: "admin-1",
+      reason: "requested",
+      justification: "Motivo sensível que não deve ir para auditoria.",
+    });
+
+    expect(transaction.reportAuditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        event_type: "report.deleted.requested",
+        payload_json: expect.objectContaining({ justification_provided: true }),
+      }),
+    });
+    expect(
+      transaction.reportAuditEvent.create.mock.calls[0]?.[0].data.payload_json,
+    ).not.toHaveProperty("justification");
+  });
 });

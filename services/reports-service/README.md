@@ -45,6 +45,10 @@ Eles consultam somente rotas internas governadas dos serviços de origem e assin
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.
 
+`GET /reports/history` lista somente as execuções do usuário atual. `GET` e `PUT /reports/retention`
+administram a retenção organizacional para jobs futuros e exigem owner. `DELETE /reports/jobs/:id`
+remove antecipadamente um histórico concluído ou expirado com justificativa e exige Admin 3 ou owner.
+
 O smoke de Controle Contábil fica desativado por padrão; exija
 `CONTABIL_REPORTING_SMOKE_ENABLED=true` e `REPORTS_GRANT_SECRET` apenas em ambiente isolado com
 os dois segredos configurados.
