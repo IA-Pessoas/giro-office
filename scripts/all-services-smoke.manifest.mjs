@@ -767,6 +767,18 @@ const baseManifest = [
   op({
     service: "reports-service",
     method: "POST",
+    path: "/reports/preview",
+    action: "reportsPreviewInvalidDefinition",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectationKind: "bad",
+    expectedStatus: [400],
+    expectedLabel: "invalid definition",
+  }),
+  op({
+    service: "reports-service",
+    method: "POST",
     path: "/reports/models",
     action: "reportsModelCreate",
     target: "gateway",

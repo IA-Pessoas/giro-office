@@ -53,6 +53,7 @@ const reportsServiceEnvSchema = z
     workerLeaseSeconds: z.coerce.number().int().positive().default(120),
     adapterTimeoutMs: z.coerce.number().int().positive().default(10000),
     sourceTimeoutMs: z.coerce.number().int().positive().default(10000),
+    previewRowLimit: z.coerce.number().int().positive().max(1000).default(100),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
       .string()
@@ -125,6 +126,7 @@ export function parseReportsServiceEnv(
     workerLeaseSeconds: source.REPORTS_WORKER_LEASE_SECONDS,
     adapterTimeoutMs: source.REPORTS_ADAPTER_TIMEOUT_MS,
     sourceTimeoutMs: source.REPORTS_SOURCE_TIMEOUT_MS,
+    previewRowLimit: source.REPORTS_PREVIEW_ROW_LIMIT,
     logLevel: source.LOG_LEVEL,
     logPretty: source.LOG_PRETTY,
     allowedOrigins: source.SERVICE_ALLOWED_ORIGINS,

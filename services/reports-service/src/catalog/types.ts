@@ -84,6 +84,7 @@ export interface ReportCatalogScope {
 
 export interface ReportPreviewAdapterInput {
   definition: unknown;
+  parameter_values?: Readonly<Record<string, unknown>>;
   organization_id: string;
   limit: number;
   request_id: string;
