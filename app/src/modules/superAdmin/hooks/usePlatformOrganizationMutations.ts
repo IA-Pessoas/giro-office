@@ -19,6 +19,10 @@ function usePlatformOrganizationCache() {
   const queryClient = useQueryClient();
 
   const syncPlatformOrganization = async (organization: PlatformOrganization) => {
+    await queryClient.cancelQueries({
+      queryKey: platformOrganizationKeys.detail(organization.id),
+      exact: true,
+    });
     queryClient.setQueryData(platformOrganizationKeys.detail(organization.id), organization);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: platformOrganizationKeys.lists }),
