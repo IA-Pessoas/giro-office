@@ -1170,8 +1170,8 @@ const handlers = {
     await httpRequest(op);
   },
 
-  async reportsHistory(op) {
-    await httpRequest(op, { query: { limit: 10 } });
+  async reportsJobList(op) {
+    await httpRequest(op, { query: { scope: "personal", limit: 10 } });
   },
 
   async reportsRetentionGet(op) {
@@ -1182,10 +1182,10 @@ const handlers = {
     await httpRequest(op, { json: { retention_days: 30 } });
   },
 
-  async reportsJobDelete(op) {
+  async reportsSnapshotDelete(op) {
     await httpRequest(op, {
-      path: `/reports/jobs/${requireState("reportsJobId")}`,
-      json: { justification: "Smoke lifecycle cleanup." },
+      path: `/reports/snapshots/${requireState("reportsSnapshotId")}/delete`,
+      json: { justification: "Smoke lifecycle cleanup with audit." },
       expectEnvelope: false,
     });
   },

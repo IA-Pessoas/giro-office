@@ -107,7 +107,13 @@ export function createReportsApp({
   );
   app.use(
     "/reports",
-    createReportJobRouter({ jobService, snapshotService, authorizationService, lifecycleService }),
+    createReportJobRouter({
+      jobService,
+      snapshotService,
+      authorizationService,
+      lifecycleService,
+      accessContextClient,
+    }),
   );
   app.use("/reports", createReportRetentionRouter({ retentionService, accessContextClient }));
   app.use(

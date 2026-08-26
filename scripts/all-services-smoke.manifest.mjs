@@ -852,8 +852,8 @@ const baseManifest = [
   op({
     service: "reports-service",
     method: "GET",
-    path: "/reports/history",
-    action: "reportsHistory",
+    path: "/reports/jobs/list",
+    action: "reportsJobList",
     target: "gateway",
     auth: "bearer",
   }),
@@ -877,9 +877,9 @@ const baseManifest = [
   }),
   op({
     service: "reports-service",
-    method: "DELETE",
-    path: "/reports/jobs/{id}",
-    action: "reportsJobDelete",
+    method: "POST",
+    path: "/reports/snapshots/{id}/delete",
+    action: "reportsSnapshotDelete",
     target: "gateway",
     auth: "admin-bearer",
     condition: "reportsLifecycleSmokeEnabled",

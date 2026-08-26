@@ -47,4 +47,50 @@ describe("ReportSnapshotService", () => {
       take: 2,
     });
   });
+
+  it("abre snapshot do acervo somente quando o modelo pertence ao departamento atual", async () => {
+    const reportJob = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: "job-1",
+        report_model_version_id: "version-1",
+      }),
+    };
+    const reportModelVersion = {
+      findFirst: vi.fn().mockResolvedValue({ report_model_id: "model-1" }),
+    };
+    const reportModel = { findFirst: vi.fn().mockResolvedValue({ id: "model-1" }) };
+    const reportSnapshot = {
+      findFirst: vi.fn().mockResolvedValue({ id: "snapshot-1", created_at: new Date() }),
+    };
+    const reportSnapshotRow = { findMany: vi.fn().mockResolvedValue([]) };
+    const service = new ReportSnapshotService({
+      reportJob,
+      reportModelVersion,
+      reportModel,
+      reportSnapshot,
+      reportSnapshotRow,
+    } as never);
+
+    await service.get({
+      organizationId: "org-1",
+      userId: "user-1",
+      jobId: "job-1",
+      scope: "library",
+      departmentId: "department-1",
+      limit: 10,
+    });
+
+    expect(reportJob.findFirst).toHaveBeenCalledWith({
+      where: { id: "job-1", organization_id: "org-1", status: "completed" },
+    });
+    expect(reportModel.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "model-1",
+        organization_id: "org-1",
+        department_id: "department-1",
+        active: true,
+        is_ephemeral: false,
+      },
+    });
+  });
 });

@@ -160,47 +160,45 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
             "404": { description: "Job não encontrado" },
           },
         },
-        delete: {
-          tags: ["Reports"],
-          summary: "Excluir antecipadamente o historico de um relatorio",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["justification"],
-                  additionalProperties: false,
-                  properties: { justification: { type: "string", minLength: 1, maxLength: 500 } },
-                },
-              },
-            },
-          },
-          responses: {
-            "204": { description: "Historico excluido" },
-            "400": { description: "Justificativa invalida" },
-            "403": { description: "Admin 3 ou owner necessario" },
-            "404": { description: "Job nao encontrado" },
-            "409": { description: "Job ainda nao pode ser excluido" },
-          },
-        },
       },
-      "/reports/history": {
+      "/reports/jobs/list": {
         get: {
           tags: ["Reports"],
-          summary: "Listar historico pessoal de execucoes",
+          summary: "Listar historico pessoal ou acervo departamental",
           security: [{ bearerAuth: [] }],
           parameters: [
+            {
+              name: "scope",
+              in: "query",
+              schema: { type: "string", enum: ["personal", "library"], default: "personal" },
+            },
+            {
+              name: "status",
+              in: "query",
+              schema: {
+                type: "string",
+                enum: [
+                  "queued",
+                  "processing",
+                  "completed",
+                  "cancelled",
+                  "failed",
+                  "expired",
+                  "deleted",
+                ],
+              },
+            },
+            { name: "from", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "to", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "model_id", in: "query", schema: { type: "string", format: "uuid" } },
+            { name: "author_id", in: "query", schema: { type: "string", format: "uuid" } },
             { name: "cursor", in: "query", schema: { type: "integer", minimum: 0 } },
             { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
           ],
           responses: {
-            "200": { description: "Historico pessoal paginado", ...successResponse },
+            "200": { description: "Historico paginado", ...successResponse },
             "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Membro do departamento atual necessario" },
           },
         },
       },
@@ -259,12 +257,48 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "scope",
+              in: "query",
+              schema: { type: "string", enum: ["personal", "library"], default: "personal" },
+            },
             { name: "cursor", in: "query", schema: { type: "integer", minimum: 0 } },
             { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 500 } },
           ],
           responses: {
             "200": { description: "Snapshot paginado", ...successResponse },
+            "403": { description: "Membro do departamento atual necessário" },
             "404": { description: "Snapshot não encontrado ou indisponível" },
+          },
+        },
+      },
+      "/reports/snapshots/{id}/delete": {
+        post: {
+          tags: ["Reports"],
+          summary: "Excluir snapshot por solicitação administrativa",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["justification"],
+                  additionalProperties: false,
+                  properties: { justification: { type: "string", minLength: 10, maxLength: 1000 } },
+                },
+              },
+            },
+          },
+          responses: {
+            "204": { description: "Snapshot excluído" },
+            "400": { description: "Justificativa inválida" },
+            "403": { description: "Admin 3 do departamento necessário" },
+            "404": { description: "Snapshot não encontrado" },
+            "409": { description: "Snapshot indisponível" },
           },
         },
       },

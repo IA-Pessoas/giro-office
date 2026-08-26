@@ -1,9 +1,6 @@
 import {
   createSuccessResponse,
-  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
-  FORWARDED_AUTH_PERMISSION_HEADER,
-  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   parseWithZod,
   REQUEST_ID_HEADER,
@@ -14,35 +11,21 @@ import { type Request, Router } from "express";
 import { z } from "zod";
 import {
   deleteReportJobSchema,
-  reportHistoryQuerySchema,
+  reportJobListQuerySchema,
 } from "../schemas/reportHistory.schemas.js";
 import { createReportJobSchema, reportJobIdParamsSchema } from "../schemas/reportJob.schemas.js";
 import type { ReportAuthorizationService } from "../services/reportAuthorizationService.js";
 import type { ReportJobService } from "../services/reportJobService.js";
 import type { ReportLifecycleService } from "../services/reportLifecycleService.js";
 import type { ReportSnapshotService } from "../services/reportSnapshotService.js";
-
-function hasAdmin3Access(request: Request): boolean {
-  if (request.get(FORWARDED_AUTH_TYPE_HEADER) === "owner") return true;
-
-  const permission = Number(request.get(FORWARDED_AUTH_PERMISSION_HEADER));
-  if (Number.isInteger(permission) && permission >= 3) return true;
-
-  if (request.get(FORWARDED_AUTH_TYPE_HEADER) !== "admin") return false;
-  try {
-    const modules = JSON.parse(request.get(FORWARDED_AUTH_MODULES_HEADER) ?? "null");
-    return (
-      typeof modules === "object" &&
-      modules !== null &&
-      Object.values(modules).some((level) => typeof level === "number" && level >= 3)
-    );
-  } catch {
-    return false;
-  }
-}
+import {
+  getReportingAccessContext,
+  type ReportingAccessContextClient,
+} from "./reportingContext.js";
 
 const snapshotQuerySchema = z
   .object({
+    scope: z.enum(["personal", "library"]).default("personal"),
     cursor: z.coerce.number().int().min(0).optional(),
     limit: z.coerce.number().int().min(1).max(500).default(100),
   })
@@ -52,7 +35,8 @@ export function createReportJobRouter(options: {
   jobService: ReportJobService;
   snapshotService: ReportSnapshotService;
   authorizationService: ReportAuthorizationService;
-  lifecycleService: Pick<ReportLifecycleService, "delete">;
+  lifecycleService: Pick<ReportLifecycleService, "deleteSnapshot">;
+  accessContextClient: ReportingAccessContextClient;
 }): ReturnType<typeof Router> {
   const router = Router();
   const context = (request: Request) => {
@@ -126,31 +110,61 @@ export function createReportJobRouter(options: {
     response.status(201).json(createSuccessResponse(job));
   });
 
+  router.get("/jobs/list", async (request, response) => {
+    const actor = context(request);
+    const query = parseWithZod(reportJobListQuerySchema, request.query);
+    const access =
+      query.scope === "library"
+        ? await getReportingAccessContext(options.accessContextClient, {
+            ...actor,
+            requestId: request.get(REQUEST_ID_HEADER) ?? "reports-job-list",
+          })
+        : null;
+    if (query.scope === "library" && !access?.department) {
+      throw new ServiceError(403, "O acervo compartilhado exige membro de departamento.");
+    }
+    response.json(
+      createSuccessResponse(
+        await options.jobService.listHistory({
+          ...actor,
+          scope: query.scope,
+          ...(access?.department ? { departmentId: access.department.id } : {}),
+          ...(query.status ? { status: query.status } : {}),
+          ...(query.from ? { from: query.from } : {}),
+          ...(query.to ? { to: query.to } : {}),
+          ...(query.model_id ? { modelId: query.model_id } : {}),
+          ...(query.author_id ? { authorId: query.author_id } : {}),
+          ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
+          limit: query.limit,
+        }),
+      ),
+    );
+  });
+
   router.get("/jobs/:id", async (request, response) => {
     const actor = context(request);
     const { id } = parseWithZod(reportJobIdParamsSchema, request.params);
     response.json(createSuccessResponse(await options.jobService.get({ ...actor, id })));
   });
 
-  router.get("/history", async (request, response) => {
+  router.post("/snapshots/:id/delete", async (request, response) => {
     const actor = context(request);
-    const query = parseWithZod(reportHistoryQuerySchema, request.query);
-    response.json(
-      createSuccessResponse(await options.jobService.listHistory({ ...actor, ...query })),
-    );
-  });
-
-  router.delete("/jobs/:id", async (request, response) => {
-    const actor = context(request);
-    if (!hasAdmin3Access(request)) {
-      throw new ServiceError(403, "A exclusão antecipada exige Admin 3.");
+    const access = await getReportingAccessContext(options.accessContextClient, {
+      ...actor,
+      requestId: request.get(REQUEST_ID_HEADER) ?? "reports-snapshot-delete",
+    });
+    const department = access.department;
+    const module = access.departmentModule;
+    if (access.type !== "admin" || !department || !module || (access.modules[module] ?? 0) < 3) {
+      throw new ServiceError(403, "A exclusão exige Admin 3 do departamento do job.");
     }
     const { id } = parseWithZod(reportJobIdParamsSchema, request.params);
     const { justification } = parseWithZod(deleteReportJobSchema, request.body);
-    await options.lifecycleService.delete({
-      job_id: id,
+    await options.lifecycleService.deleteSnapshot({
+      snapshot_id: id,
       organization_id: actor.organizationId,
       actor_id: actor.userId,
+      department_id: department.id,
       reason: "requested",
       justification,
     });
@@ -168,15 +182,27 @@ export function createReportJobRouter(options: {
     const actor = context(request);
     const { id } = parseWithZod(reportJobIdParamsSchema, request.params);
     const query = parseWithZod(snapshotQuerySchema, request.query);
-    const job = await options.jobService.get({ ...actor, id });
-    await validateVersion(
-      actor,
-      request.get(REQUEST_ID_HEADER) ?? "reports-job-snapshot",
-      job.report_model_version_id,
-      true,
-    );
+    const access =
+      query.scope === "library"
+        ? await getReportingAccessContext(options.accessContextClient, {
+            ...actor,
+            requestId: request.get(REQUEST_ID_HEADER) ?? "reports-job-snapshot",
+          })
+        : null;
+    if (query.scope === "library" && !access?.department) {
+      throw new ServiceError(403, "O acervo compartilhado exige membro de departamento.");
+    }
     response.json(
-      createSuccessResponse(await options.snapshotService.get({ ...actor, jobId: id, ...query })),
+      createSuccessResponse(
+        await options.snapshotService.get({
+          ...actor,
+          jobId: id,
+          scope: query.scope,
+          ...(access?.department ? { departmentId: access.department.id } : {}),
+          ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
+          limit: query.limit,
+        }),
+      ),
     );
   });
 

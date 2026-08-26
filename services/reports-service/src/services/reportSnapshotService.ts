@@ -9,6 +9,8 @@ export class ReportSnapshotService {
     organizationId: string;
     userId: string;
     jobId: string;
+    scope?: "personal" | "library";
+    departmentId?: string;
     cursor?: number;
     limit: number;
   }): Promise<{
@@ -20,11 +22,35 @@ export class ReportSnapshotService {
       where: {
         id: input.jobId,
         organization_id: input.organizationId,
-        requester_id: input.userId,
+        ...(input.scope !== "library" ? { requester_id: input.userId } : {}),
         status: "completed",
       },
     });
     if (!job) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+
+    if (input.scope === "library") {
+      if (!input.departmentId) {
+        throw new ServiceError(403, "O acervo compartilhado exige departamento atual.");
+      }
+      const version = await this.prisma.reportModelVersion.findFirst({
+        where: {
+          id: job.report_model_version_id,
+          organization_id: input.organizationId,
+        },
+      });
+      const model = version
+        ? await this.prisma.reportModel.findFirst({
+            where: {
+              id: version.report_model_id,
+              organization_id: input.organizationId,
+              department_id: input.departmentId,
+              active: true,
+              is_ephemeral: false,
+            },
+          })
+        : null;
+      if (!model) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+    }
 
     const snapshot = await this.prisma.reportSnapshot.findFirst({
       where: {
