@@ -40,4 +40,96 @@ describe("ReportJobService", () => {
       orderBy: { updated_at: "desc" },
     });
   });
+
+  it("marca modelo temporário de execução avulsa para não exibi-lo na biblioteca", async () => {
+    const transaction = {
+      reportModel: { create: vi.fn().mockResolvedValue({ id: "model-1" }) },
+      reportModelVersion: { create: vi.fn().mockResolvedValue({ id: "version-1" }) },
+      reportJob: { create: vi.fn().mockResolvedValue({ id: "job-1", status: "queued" }) },
+      reportRetentionPolicy: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    const service = new ReportJobService({
+      $transaction: vi.fn(async (callback: (client: typeof transaction) => unknown) =>
+        callback(transaction),
+      ),
+    } as never);
+
+    await service.createFromDefinition({
+      organizationId,
+      userId,
+      definition: {
+        sources: [],
+        columns: [],
+        joins: [],
+        parameters: [],
+        filters: [],
+        aggregations: [],
+        order_by: [],
+      },
+      payload: { format: "json" },
+    });
+
+    expect(transaction.reportModel.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: organizationId,
+        created_by_user_id: userId,
+        name: "Execução avulsa",
+        is_ephemeral: true,
+      }),
+    });
+  });
+
+  it("remove definição efêmera quando job em fila é cancelado", async () => {
+    const reportModelVersion = {
+      findFirst: vi.fn().mockResolvedValue({ report_model_id: "model-1" }),
+      deleteMany: vi.fn(),
+    };
+    const reportModel = {
+      findFirst: vi.fn().mockResolvedValue({ id: "model-1", is_ephemeral: true }),
+      delete: vi.fn(),
+    };
+    const prisma = {
+      reportJob: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "job-1",
+          status: "queued",
+          report_model_version_id: "version-1",
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      reportModelVersion,
+      reportModel,
+      $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(prisma)),
+    };
+    const service = new ReportJobService(prisma as never);
+
+    await service.cancel({ organizationId, userId, id: "job-1" });
+
+    expect(reportModelVersion.deleteMany).toHaveBeenCalledWith({
+      where: { report_model_id: "model-1" },
+    });
+    expect(reportModel.delete).toHaveBeenCalledWith({ where: { id: "model-1" } });
+  });
+
+  it("não permite reutilizar versão efêmera em novo job", async () => {
+    const reportModel = { findFirst: vi.fn().mockResolvedValue(null) };
+    const service = new ReportJobService({
+      reportModelVersion: {
+        findFirst: vi.fn().mockResolvedValue({ report_model_id: "model-1" }),
+      },
+      reportModel,
+    } as never);
+
+    await expect(service.getVersion({ organizationId, modelVersionId })).rejects.toEqual(
+      expect.objectContaining<ServiceError>({ statusCode: 404 }),
+    );
+    expect(reportModel.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "model-1",
+        organization_id: organizationId,
+        active: true,
+        is_ephemeral: false,
+      },
+    });
+  });
 });

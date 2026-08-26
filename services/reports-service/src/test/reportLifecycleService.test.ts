@@ -35,10 +35,19 @@ function createPersistence(status = "processing") {
     reportSnapshot: {
       create: vi.fn(async () => ({ id: "snapshot-1" })),
       findMany: vi.fn(async () => [{ id: "snapshot-1" }]),
+      deleteMany: vi.fn(),
     },
     reportSnapshotRow: {
       createMany: vi.fn(),
       deleteMany: vi.fn(),
+    },
+    reportModelVersion: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      deleteMany: vi.fn(),
+    },
+    reportModel: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      delete: vi.fn(),
     },
     reportAuditEvent: {
       create: vi.fn(),
@@ -285,6 +294,26 @@ describe("ReportLifecycleService", () => {
     expect(transaction.reportSnapshotRow.createMany).toHaveBeenCalledTimes(1);
   });
 
+  it("remove definição efêmera após expirar execução avulsa", async () => {
+    const { prisma, transaction } = createPersistence("completed");
+    transaction.reportModelVersion.findFirst.mockResolvedValue({ report_model_id: "model-1" });
+    transaction.reportModel.findFirst.mockResolvedValue({ id: "model-1" });
+    const audit = new ReportAuditService(prisma as never, vi.fn());
+    const service = new ReportLifecycleService(prisma as never, audit, () => now);
+
+    await service.expire({
+      job_id: "job-1",
+      organization_id: "org-1",
+      actor_id: "user-1",
+      reason: "retention",
+    });
+
+    expect(transaction.reportModelVersion.deleteMany).toHaveBeenCalledWith({
+      where: { report_model_id: "model-1" },
+    });
+    expect(transaction.reportModel.delete).toHaveBeenCalledWith({ where: { id: "model-1" } });
+  });
+
   it("interrompe materialização ao observar cancelamento antes do chunk", async () => {
     const { prisma, transaction } = createPersistence();
     const originalFind = transaction.reportJob.findUnique.getMockImplementation();
@@ -446,7 +475,7 @@ describe("ReportLifecycleService", () => {
     expect(transaction.reportSnapshot.create).not.toHaveBeenCalled();
   });
 
-  it("expira removendo só as linhas e registra a justificativa no tipo do evento", async () => {
+  it("expira removendo snapshot e linhas para não reprocessá-lo", async () => {
     const { prisma, transaction } = createPersistence("completed");
     const audit = new ReportAuditService(prisma as never, vi.fn());
     const service = new ReportLifecycleService(prisma as never, audit, () => now);
@@ -464,6 +493,9 @@ describe("ReportLifecycleService", () => {
     });
     expect(transaction.reportSnapshotRow.deleteMany).toHaveBeenCalledWith({
       where: { snapshot_id: { in: ["snapshot-1"] } },
+    });
+    expect(transaction.reportSnapshot.deleteMany).toHaveBeenCalledWith({
+      where: { report_job_id: "job-1" },
     });
     expect(transaction.reportSnapshot.create).not.toHaveBeenCalled();
     expect(transaction.reportAuditEvent.create).toHaveBeenCalledWith(

@@ -34,6 +34,35 @@ export function createReportJobRouter(options: {
     requireAuthenticatedRequestContext({ user_id: userId, organization_id: organizationId });
     return { userId: userId ?? "", organizationId: organizationId ?? "" };
   };
+  const validateVersion = async (
+    actor: { userId: string; organizationId: string },
+    requestId: string,
+    modelVersionId: string,
+    includeEphemeral = false,
+  ) => {
+    const version = await options.jobService.getVersion({
+      organizationId: actor.organizationId,
+      modelVersionId,
+      ...(includeEphemeral ? { includeEphemeral: true } : {}),
+    });
+    if (version.model.created_by_user_id === actor.userId) {
+      await options.authorizationService.validateDefinition({
+        ...actor,
+        requestId,
+        definition: version.version.definition_json as never,
+      });
+      return version;
+    }
+    const shared = await options.authorizationService.validateSharedDefinition({
+      ...actor,
+      requestId,
+      definition: version.version.definition_json as never,
+    });
+    if (version.model.department_id !== shared.department_id) {
+      throw new ServiceError(403, "O modelo compartilhado não pertence ao departamento atual.");
+    }
+    return version;
+  };
 
   router.post("/jobs", async (request, response) => {
     const actor = context(request);
@@ -56,29 +85,7 @@ export function createReportJobRouter(options: {
           payload,
         })
       : await (async () => {
-          const version = await options.jobService.getVersion({
-            organizationId: actor.organizationId,
-            modelVersionId: body.modelVersionId ?? "",
-          });
-          if (version.model.created_by_user_id === actor.userId) {
-            await options.authorizationService.validateDefinition({
-              ...actor,
-              requestId,
-              definition: version.version.definition_json as never,
-            });
-          } else {
-            const shared = await options.authorizationService.validateSharedDefinition({
-              ...actor,
-              requestId,
-              definition: version.version.definition_json as never,
-            });
-            if (version.model.department_id !== shared.department_id) {
-              throw new ServiceError(
-                403,
-                "O modelo compartilhado não pertence ao departamento atual.",
-              );
-            }
-          }
+          const version = await validateVersion(actor, requestId, body.modelVersionId ?? "");
           const retentionDays = await options.jobService.getRetentionDays({
             organizationId: actor.organizationId,
             modelId: version.model.id,
@@ -109,6 +116,13 @@ export function createReportJobRouter(options: {
     const actor = context(request);
     const { id } = parseWithZod(reportJobIdParamsSchema, request.params);
     const query = parseWithZod(snapshotQuerySchema, request.query);
+    const job = await options.jobService.get({ ...actor, id });
+    await validateVersion(
+      actor,
+      request.get(REQUEST_ID_HEADER) ?? "reports-job-snapshot",
+      job.report_model_version_id,
+      true,
+    );
     response.json(
       createSuccessResponse(await options.snapshotService.get({ ...actor, jobId: id, ...query })),
     );

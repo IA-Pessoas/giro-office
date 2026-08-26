@@ -2,8 +2,8 @@ import { ServiceError } from "@workspace/shared";
 
 import type { SourceCatalogService } from "../catalog/sourceCatalogService.js";
 import type { ReportCatalogScope } from "../catalog/types.js";
-import { MAX_SNAPSHOT_ROWS } from "../schemas/reportSnapshot.schemas.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
+import { MAX_SNAPSHOT_ROWS } from "../schemas/reportSnapshot.schemas.js";
 import type { ReportDefinitionService } from "./reportDefinitionService.js";
 
 export class ReportExecutionService {

@@ -2173,6 +2173,7 @@ model ReportModel {
   name               String
   description        String?
   active             Boolean  @default(true)
+  is_ephemeral       Boolean  @default(false)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
 

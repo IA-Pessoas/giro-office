@@ -61,4 +61,28 @@ describe("ReportWorkerService", () => {
       expect.objectContaining({ job_id: "job-1", status: "failed" }),
     );
   });
+
+  it("continua expirando os demais snapshots quando uma expiração falha", async () => {
+    const expire = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("conflito"))
+      .mockResolvedValue(undefined);
+    const worker = new ReportWorkerService(
+      {} as never,
+      {
+        reportSnapshot: {
+          findMany: vi.fn().mockResolvedValue([
+            { organization_id: "org-1", report_job_id: "job-1" },
+            { organization_id: "org-1", report_job_id: "job-2" },
+          ]),
+        },
+      } as never,
+      {} as never,
+      {} as never,
+      { expire } as never,
+    );
+
+    await expect(worker.expireDue()).resolves.toBeUndefined();
+    expect(expire).toHaveBeenCalledTimes(2);
+  });
 });

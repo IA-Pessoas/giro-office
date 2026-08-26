@@ -40,6 +40,7 @@ export class ReportJobService {
           created_by_user_id: input.userId,
           department_id: null,
           name: "Execução avulsa",
+          is_ephemeral: true,
         },
       });
       const version = await transaction.reportModelVersion.create({
@@ -67,13 +68,22 @@ export class ReportJobService {
     });
   }
 
-  async getVersion(input: { organizationId: string; modelVersionId: string }) {
+  async getVersion(input: {
+    organizationId: string;
+    modelVersionId: string;
+    includeEphemeral?: boolean;
+  }) {
     const version = await this.prisma.reportModelVersion.findFirst({
       where: { id: input.modelVersionId, organization_id: input.organizationId },
     });
     if (!version) throw new ServiceError(404, "Versão de modelo de relatório não encontrada.");
     const model = await this.prisma.reportModel.findFirst({
-      where: { id: version.report_model_id, organization_id: input.organizationId, active: true },
+      where: {
+        id: version.report_model_id,
+        organization_id: input.organizationId,
+        active: true,
+        ...(input.includeEphemeral ? {} : { is_ephemeral: false }),
+      },
     });
     if (!model) throw new ServiceError(404, "Modelo de relatório não encontrado.");
     return { version, model };
@@ -100,12 +110,21 @@ export class ReportJobService {
     if (job.status !== "queued" && job.status !== "processing") {
       throw new ServiceError(409, "O job já está em estado terminal.");
     }
-    const updated = await this.prisma.reportJob.updateMany({
-      where: { id: job.id, status: job.status },
-      data:
-        job.status === "queued"
-          ? { status: "cancelled", finished_at: new Date() }
-          : { cancel_requested_at: new Date() },
+    const updated = await this.prisma.$transaction(async (transaction) => {
+      const updated = await transaction.reportJob.updateMany({
+        where: { id: job.id, status: job.status },
+        data:
+          job.status === "queued"
+            ? { status: "cancelled", finished_at: new Date() }
+            : { cancel_requested_at: new Date() },
+      });
+      if (updated.count === 1 && job.status === "queued") {
+        await this.removeEphemeralDefinition(
+          transaction as ReportsPrismaClient,
+          job.report_model_version_id,
+        );
+      }
+      return updated;
     });
     if (updated.count !== 1) {
       throw new ServiceError(409, "O job foi alterado por outra operação.");
@@ -127,5 +146,21 @@ export class ReportJobService {
       orderBy: { updated_at: "desc" },
     });
     return organization?.retention_days ?? DEFAULT_REPORT_RETENTION_DAYS;
+  }
+
+  private async removeEphemeralDefinition(
+    prisma: ReportsPrismaClient,
+    reportModelVersionId: string,
+  ): Promise<void> {
+    const version = await prisma.reportModelVersion.findFirst({
+      where: { id: reportModelVersionId },
+    });
+    if (!version) return;
+    const model = await prisma.reportModel.findFirst({
+      where: { id: version.report_model_id, is_ephemeral: true },
+    });
+    if (!model) return;
+    await prisma.reportModelVersion.deleteMany({ where: { report_model_id: model.id } });
+    await prisma.reportModel.delete({ where: { id: model.id } });
   }
 }

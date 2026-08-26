@@ -1,17 +1,16 @@
 import "dotenv/config";
 
 import { createLogger } from "@workspace/shared/logger";
-
-import { getReportsServiceEnv } from "./config/env.js";
-import { createReportsPrismaClient } from "./prisma/index.js";
-import { ReportJobRepository } from "./prisma/reportJobRepository.js";
 import { SourceCatalogService } from "./catalog/sourceCatalogService.js";
+import { getReportsServiceEnv } from "./config/env.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { UserAccessContextClient } from "./integrations/userAccessContextClient.js";
+import { createReportsPrismaClient } from "./prisma/index.js";
+import { ReportJobRepository } from "./prisma/reportJobRepository.js";
 import { ReportAuditService } from "./services/reportAuditService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
 import { ReportExecutionService } from "./services/reportExecutionService.js";

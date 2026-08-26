@@ -43,7 +43,10 @@ export class ReportJobRepository {
           SELECT id
           FROM "reports.jobs"
           WHERE status = ${QUEUED}
-            OR (status = ${PROCESSING} AND lease_expires_at < NOW())
+            OR (
+              status = ${PROCESSING}
+              AND lease_expires_at < (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+            )
           ORDER BY requested_at ASC
           FOR UPDATE SKIP LOCKED
           LIMIT 1
@@ -51,10 +54,11 @@ export class ReportJobRepository {
         UPDATE "reports.jobs" AS job
         SET status = ${PROCESSING},
             lease_token = ${leaseToken},
-            lease_expires_at = NOW() + (${this.leaseSeconds} * INTERVAL '1 second'),
+            lease_expires_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+              + (${this.leaseSeconds} * INTERVAL '1 second'),
             materialization_token = NULL,
-            started_at = COALESCE(started_at, NOW()),
-            updated_at = NOW()
+            started_at = COALESCE(started_at, CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+            updated_at = CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
         FROM candidate
         WHERE job.id = candidate.id
         RETURNING
@@ -89,15 +93,16 @@ export class ReportJobRepository {
   }
 
   async renewLease(input: { id: string; leaseToken: string }): Promise<boolean> {
-    const updated = await this.prisma.reportJob.updateMany({
-      where: {
-        id: input.id,
-        status: PROCESSING,
-        lease_token: input.leaseToken,
-        cancel_requested_at: null,
-      },
-      data: { lease_expires_at: new Date(Date.now() + this.leaseSeconds * 1000) },
-    });
-    return updated.count === 1;
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "reports.jobs"
+      SET lease_expires_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+            + (${this.leaseSeconds} * INTERVAL '1 second'),
+          updated_at = CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
+      WHERE id = ${input.id}
+        AND status = ${PROCESSING}
+        AND lease_token = ${input.leaseToken}
+        AND cancel_requested_at IS NULL
+    `;
+    return updated === 1;
   }
 }

@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 
 import { ReportJobRepository } from "../prisma/reportJobRepository.js";
@@ -142,7 +143,34 @@ describe("ReportJobRepository.claimNext", () => {
 
     expect(claim?.lease_token).not.toBe("expired-lease");
     expect(claim?.started_at).toEqual(originalStartedAt);
-    expect(sql).toContain("lease_expires_at < NOW()");
-    expect(sql).toContain("COALESCE(started_at, NOW())");
+    expect(sql).toContain("lease_expires_at < (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')");
+    expect(sql).toContain("COALESCE(started_at, CURRENT_TIMESTAMP AT TIME ZONE 'UTC')");
+  });
+
+  it("renova lease com relógio UTC do banco", async () => {
+    const executeRaw = vi.fn().mockResolvedValue(1);
+    const repository = new ReportJobRepository(
+      { $executeRaw: executeRaw } as never,
+      120,
+      new ReportAuditService({} as never, vi.fn()),
+    );
+
+    await expect(repository.renewLease({ id: "job-1", leaseToken: "lease-1" })).resolves.toBe(true);
+
+    const sql = (executeRaw.mock.calls[0]?.[0] as TemplateStringsArray).join("?");
+    expect(sql).toContain("CURRENT_TIMESTAMP AT TIME ZONE 'UTC'");
+  });
+
+  it("invalida leases em processamento durante a migração para UTC", async () => {
+    const migration = await readFile(
+      new URL(
+        "../../../../infra/prisma/migrations/20260826110000_report_job_ephemeral_model_and_snapshot_expiry/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain("WHERE status = 'processing'");
+    expect(migration).toContain("lease_expires_at = CURRENT_TIMESTAMP AT TIME ZONE 'UTC'");
   });
 });

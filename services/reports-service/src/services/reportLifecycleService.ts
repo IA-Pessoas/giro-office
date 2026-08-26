@@ -1,5 +1,5 @@
-import { ServiceError } from "@workspace/shared";
 import { randomUUID } from "node:crypto";
+import { ServiceError } from "@workspace/shared";
 
 import { MAX_SNAPSHOT_BYTES, MAX_SNAPSHOT_ROWS } from "../schemas/reportSnapshot.schemas.js";
 import type {
@@ -65,6 +65,7 @@ type LifecycleTransaction = ReportAuditStore & {
       where: { report_job_id: string };
       select: { id: true };
     }): Promise<Array<{ id: string }>>;
+    deleteMany(args: { where: { report_job_id: string } }): Promise<unknown>;
   };
   reportSnapshotRow: {
     createMany(args: {
@@ -76,6 +77,16 @@ type LifecycleTransaction = ReportAuditStore & {
       }>;
     }): Promise<unknown>;
     deleteMany(args: { where: { snapshot_id: { in: string[] } } }): Promise<unknown>;
+  };
+  reportModelVersion: {
+    findFirst(args: { where: { id: string } }): Promise<{ report_model_id: string } | null>;
+    deleteMany(args: { where: { report_model_id: string } }): Promise<unknown>;
+  };
+  reportModel: {
+    findFirst(args: {
+      where: { id: string; is_ephemeral: boolean };
+    }): Promise<{ id: string } | null>;
+    delete(args: { where: { id: string } }): Promise<unknown>;
   };
 };
 
@@ -159,6 +170,9 @@ export class ReportLifecycleService {
         },
       });
       this.assertUpdated(result.count);
+      if (input.status === "cancelled" || input.status === "failed") {
+        await this.removeEphemeralDefinition(transaction, job.report_model_version_id);
+      }
 
       const auditEvent = this.auditEvent(job, input, `report.${input.status}`, occurredAt);
       await this.audit.recordLocal(transaction, auditEvent);
@@ -288,6 +302,8 @@ export class ReportLifecycleService {
           where: { snapshot_id: { in: snapshots.map((snapshot) => snapshot.id) } },
         });
       }
+      await transaction.reportSnapshot.deleteMany({ where: { report_job_id: job.id } });
+      await this.removeEphemeralDefinition(transaction, job.report_model_version_id);
 
       const auditEvent = this.auditEvent(job, input, eventType, occurredAt);
       await this.audit.recordLocal(transaction, auditEvent);
@@ -301,6 +317,22 @@ export class ReportLifecycleService {
     const job = await transaction.reportJob.findUnique({ where: { id: jobId } });
     if (!job) throw new ServiceError(404, "Job de relatório não encontrado.");
     return job;
+  }
+
+  private async removeEphemeralDefinition(
+    transaction: LifecycleTransaction,
+    reportModelVersionId: string,
+  ): Promise<void> {
+    const version = await transaction.reportModelVersion.findFirst({
+      where: { id: reportModelVersionId },
+    });
+    if (!version) return;
+    const model = await transaction.reportModel.findFirst({
+      where: { id: version.report_model_id, is_ephemeral: true },
+    });
+    if (!model) return;
+    await transaction.reportModelVersion.deleteMany({ where: { report_model_id: model.id } });
+    await transaction.reportModel.delete({ where: { id: model.id } });
   }
 
   private assertOrganization(job: ReportJob, organizationId: string): void {

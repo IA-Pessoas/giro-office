@@ -1,8 +1,8 @@
 import { ServiceError } from "@workspace/shared";
 
 import { deriveReportCatalogGrant, type ReportCatalogScope } from "../catalog/types.js";
-import type { ClaimedReportJob, ReportJobRepository } from "../prisma/reportJobRepository.js";
 import type { ReportsPrismaClient } from "../prisma/index.js";
+import type { ClaimedReportJob, ReportJobRepository } from "../prisma/reportJobRepository.js";
 import {
   getReportingAccessContext,
   getReportingCatalogScope,
@@ -29,7 +29,7 @@ export class ReportWorkerService {
 
     const leaseToken = job.lease_token ?? "";
     const renewal = setInterval(() => {
-      void this.jobs.renewLease({ id: job.id, leaseToken });
+      void this.jobs.renewLease({ id: job.id, leaseToken }).catch(() => undefined);
     }, this.leaseRenewalMs);
 
     try {
@@ -78,7 +78,7 @@ export class ReportWorkerService {
       select: { organization_id: true, report_job_id: true },
       take: 100,
     });
-    await Promise.all(
+    await Promise.allSettled(
       snapshots.map((snapshot) =>
         this.lifecycle.expire({
           job_id: snapshot.report_job_id,
