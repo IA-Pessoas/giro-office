@@ -23,11 +23,14 @@ describe("reports-service app", () => {
         userServiceUrl: "http://localhost:3001",
         parcelamentoServiceUrl: "http://localhost:3043",
         clientServiceUrl: "http://localhost:3000",
+        taskServiceUrl: "http://localhost:3032",
+        projectServiceUrl: "http://localhost:3033",
         workerPollIntervalMs: 5000,
         workerConcurrency: 2,
         workerLeaseSeconds: 120,
         adapterTimeoutMs: 10000,
         sourceTimeoutMs: 10000,
+        previewRowLimit: 100,
         logLevel: "silent",
         logPretty: false,
         allowedOrigins: ["*"],
@@ -51,6 +54,14 @@ describe("reports-service app", () => {
       data: { status: "ready", service: "reports-service" },
     });
     expect(openapi.body.paths["/reports/catalog"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models/shared"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models/shared/list"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models/shared/{id}"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models/shared/{id}/copy"]).toBeDefined();
+    expect(openapi.body.paths["/reports/models/shared/{id}/preview"]).toBeDefined();
+    expect(openapi.body.paths["/reports/jobs"]).toBeDefined();
+    expect(openapi.body.paths["/reports/jobs/{id}/snapshot"]).toBeDefined();
     expect(catalog.body.success).toBe(false);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
@@ -67,11 +78,14 @@ describe("reports-service app", () => {
         userServiceUrl: "http://localhost:3001",
         parcelamentoServiceUrl: "http://localhost:3043",
         clientServiceUrl: "http://localhost:3000",
+        taskServiceUrl: "http://localhost:3032",
+        projectServiceUrl: "http://localhost:3033",
         workerPollIntervalMs: 5000,
         workerConcurrency: 2,
         workerLeaseSeconds: 120,
         adapterTimeoutMs: 10000,
         sourceTimeoutMs: 10000,
+        previewRowLimit: 100,
         logLevel: "silent",
         logPretty: false,
         allowedOrigins: ["*"],

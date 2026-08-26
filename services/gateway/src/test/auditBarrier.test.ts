@@ -21,6 +21,7 @@ function fixture(fetchImpl: typeof fetch, maxInFlight = 1) {
     serviceToken: "secret-token",
     logger: logger as never,
     timeoutMs: 10,
+    retryMaxAttempts: 1,
     maxInFlight,
     fetchImpl,
   });

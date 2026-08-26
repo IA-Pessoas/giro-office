@@ -15,8 +15,13 @@ export class ReportPreviewService {
   async preview(
     definition: ReportDefinition,
     scope: ReportCatalogScope,
+    requestId = "reports-preview",
+    parameterValues?: Readonly<Record<string, unknown>>,
   ): Promise<{
     rows: readonly Record<string, unknown>[];
+    presentation: {
+      columns: readonly { key: string; label: string }[];
+    };
     hasMore: boolean;
   }> {
     const validated = this.definitionService.validate(definition, scope);
@@ -26,11 +31,19 @@ export class ReportPreviewService {
     }
     const rows = await adapter.preview({
       definition: validated.definition,
+      parameter_values: parameterValues,
       organization_id: scope.organization_id,
       limit: this.previewRowLimit + 1,
+      request_id: requestId,
     });
     return {
       rows: rows.slice(0, this.previewRowLimit),
+      presentation: {
+        columns: validated.definition.columns.map((column) => ({
+          key: column.alias,
+          label: column.alias,
+        })),
+      },
       hasMore: rows.length > this.previewRowLimit,
     };
   }

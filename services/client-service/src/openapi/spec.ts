@@ -4,6 +4,27 @@ import type { ClientServiceEnv } from "../config/env.js";
 
 type OpenApiSchema = Record<string, unknown>;
 
+const reportingGrantParameters = [
+  {
+    name: "x-request-id",
+    in: "header",
+    required: true,
+    schema: { type: "string", maxLength: 128 },
+  },
+  {
+    name: "x-reports-grant",
+    in: "header",
+    required: true,
+    schema: { type: "string" },
+  },
+  {
+    name: "x-reports-grant-signature",
+    in: "header",
+    required: true,
+    schema: { type: "string" },
+  },
+];
+
 function successEnvelopeContent(dataSchema?: OpenApiSchema) {
   return {
     content: {
@@ -816,6 +837,47 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
               description: "Rotina executada",
               ...successEnvelopeContent(),
             },
+          },
+        },
+      },
+      "/internal/reporting/catalog": {
+        get: {
+          tags: ["Internal"],
+          summary: "Catálogo de Integração para relatórios internos",
+          security: [{ internalToken: [] }],
+          parameters: reportingGrantParameters,
+          responses: {
+            "200": { description: "Catálogo autorizado", ...successEnvelopeContent() },
+            "403": { description: "Token ou grant inválido" },
+          },
+        },
+      },
+      "/internal/reporting/extract": {
+        post: {
+          tags: ["Internal"],
+          summary: "Extrair campos publicados de clientes para relatórios internos",
+          security: [{ internalToken: [] }],
+          parameters: reportingGrantParameters,
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["source", "fields", "limit"],
+                  properties: {
+                    source: { type: "string", enum: ["integracao.clients"] },
+                    fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
+                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Linhas autorizadas", ...successEnvelopeContent() },
+            "403": { description: "Token, grant ou campos inválidos" },
           },
         },
       },

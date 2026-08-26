@@ -1,0 +1,25 @@
+name: Database Resilience Guard
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate database pool policy
+        run: node --test scripts/database-pool-policy.test.mjs
+      - name: Validate production pool preflight
+        run: node --test scripts/production-deploy.test.mjs

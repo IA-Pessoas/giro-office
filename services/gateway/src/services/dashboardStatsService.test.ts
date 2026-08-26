@@ -110,10 +110,10 @@ describe("DashboardStatsService", () => {
     expect(query).toHaveBeenCalledTimes(20);
   });
 
-  it("limits the dashboard pool to the same number of concurrent queries", () => {
+  it("limits the dashboard pool through DATABASE_POOL_MAX", () => {
     const source = readFileSync(new URL("./dashboardStatsService.ts", import.meta.url), "utf8");
 
-    expect(source).toContain("max: DASHBOARD_MAX_CONCURRENT_QUERIES");
+    expect(source).toContain("max: parseDatabasePoolMax(process.env.DATABASE_POOL_MAX)");
   });
 
   it("returns semantic audit fields as friendly dashboard activity", async () => {

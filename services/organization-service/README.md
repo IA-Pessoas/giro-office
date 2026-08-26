@@ -8,7 +8,7 @@ Por defeito: **3031** (`PORT`).
 
 ## Variáveis de ambiente
 
-Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `JWT_SECRET` (alinhado com o gateway
+Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `JWT_SECRET` (alinhado com o gateway
 para validação JWT), `AUDIT_SERVICE_TOKEN`, `AUDIT_SERVICE_URL` (por defeito,
 `http://audit-service:3020`) e `ORGANIZATION_DOMAIN_AUDIT_ENABLED` (por defeito, `true`).
 

@@ -97,6 +97,36 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "gerou", item: "uma prévia de relatório" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/reports\/jobs$/,
+    description: { action: "solicitou", item: "uma execução de relatório" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/reports\/jobs\/[^/]+$/,
+    description: { action: "consultou", item: "uma execução de relatório" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/jobs\/[^/]+\/cancel$/,
+    description: { action: "solicitou", item: "o cancelamento de uma execução de relatório" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/reports\/jobs\/[^/]+\/snapshot$/,
+    description: { action: "consultou", item: "o resultado de uma execução de relatório" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/models\/shared\/[^/]+\/copy$/,
+    description: { action: "copiou", item: "um modelo compartilhado de relatório" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/models\/shared\/[^/]+\/preview$/,
+    description: { action: "gerou", item: "uma prévia de modelo compartilhado de relatório" },
+  },
+  {
     methods: ["PATCH", "PUT"],
     pattern: /^\/organizations\/[^/]+\/status$/,
     description: { action: "alterou", item: "o status de uma organização" },
@@ -507,6 +537,18 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 ];
 
 const RESOURCE_RULES: ResourceRule[] = [
+  {
+    pattern: /^\/reports\/models\/shared(?:\/|$)/,
+    singular: "um modelo compartilhado de relatório",
+    newSingular: "um novo modelo compartilhado de relatório",
+    plural: "modelos compartilhados de relatório",
+  },
+  {
+    pattern: /^\/reports\/models(?:\/|$)/,
+    singular: "um modelo pessoal de relatório",
+    newSingular: "um novo modelo pessoal de relatório",
+    plural: "modelos pessoais de relatório",
+  },
   {
     pattern: /^\/task\/project-plan\/task(?:\/|$)/,
     singular: "uma tarefa do plano de projeto",

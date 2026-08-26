@@ -111,6 +111,18 @@ const env = {
   parcelamentoSmokeEnabled:
     process.env.PARCELAMENTO_SMOKE_ENABLED === "true" ||
     process.env.PARCELAMENTO_SMOKE_ENABLED === "1",
+  clientReportingSmokeEnabled:
+    process.env.CLIENT_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.CLIENT_REPORTING_SMOKE_ENABLED === "1",
+  contabilReportingSmokeEnabled:
+    process.env.CONTABIL_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.CONTABIL_REPORTING_SMOKE_ENABLED === "1",
+  projectReportingSmokeEnabled:
+    process.env.PROJECT_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.PROJECT_REPORTING_SMOKE_ENABLED === "1",
+  taskReportingSmokeEnabled:
+    process.env.TASK_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.TASK_REPORTING_SMOKE_ENABLED === "1",
   namespace:
     process.env.SMOKE_NAMESPACE?.trim() ||
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -351,7 +363,7 @@ function getSessionHeaders(method, cookies = state.sessionCookies) {
   return headers;
 }
 
-function getAuthHeaders(auth, service, method, target) {
+function getAuthHeaders(auth, service, method, target, internalTokenEnvKey) {
   if (auth === "public") {
     return {};
   }
@@ -396,7 +408,7 @@ function getAuthHeaders(auth, service, method, target) {
   }
 
   if (auth === "internal-token") {
-    const envKey = INTERNAL_SERVICE_TOKENS[service];
+    const envKey = internalTokenEnvKey ?? INTERNAL_SERVICE_TOKENS[service];
     if (!envKey) {
       throw new Error(`No internal token mapping registered for ${service}.`);
     }
@@ -640,7 +652,7 @@ async function httpRequest(op, options) {
 
   const url = buildUrl(target, service, requestPath, query);
   const requestHeaders = new Headers({
-    ...getAuthHeaders(auth, service, method, target),
+    ...getAuthHeaders(auth, service, method, target, op.internalTokenEnvKey),
     ...optionHeaders,
     ...(opOverrides?.headers ?? {}),
   });
@@ -817,6 +829,147 @@ function requireState(key) {
     throw new Error(`Required smoke state ${key} is missing.`);
   }
   return value;
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function createParcelamentoReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for Parcelamento reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "parcelamento-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createClientIntegrationReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for client reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "client-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createContabilReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for contabil reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "contabil-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createProjectReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for project reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "project-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createTaskReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for task reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "task-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
 }
 
 function resolveDepartmentIdFromResponse(responseBody) {
@@ -1069,6 +1222,129 @@ const handlers = {
         },
       },
     });
+  },
+
+  async reportsPreviewInvalidDefinition(op) {
+    await httpRequest(op, { json: { definition: { sources: [] } } });
+  },
+
+  async reportsModelCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      json: {
+        name: uniqueText("Smoke Report Model"),
+        definition: {
+          sources: ["parcelamento.installments"],
+          columns: [
+            {
+              source: "parcelamento.installments",
+              field: "agreement_number",
+              alias: "agreement_number",
+            },
+          ],
+        },
+      },
+    });
+    if (op.expectationKind === "good") {
+      state.reportsModelId =
+        pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+      registerCleanup("reports-model", async () => {
+        if (!state.reportsModelId) return;
+        await helperCall("reports-model-cleanup", {
+          method: "DELETE",
+          path: `/reports/models/${state.reportsModelId}`,
+          target: "gateway",
+          service: "reports-service",
+          auth: "bearer",
+          expectedStatus: [204, 404],
+          expectEnvelope: false,
+        });
+      });
+    }
+  },
+
+  async reportsSharedModelCreate(op) {
+    const response = await httpRequest(op, {
+      json: {
+        name: uniqueText("Smoke Shared Report Model"),
+        definition: {
+          sources: ["parcelamento.installments"],
+          columns: [
+            {
+              source: "parcelamento.installments",
+              field: "agreement_number",
+              alias: "agreement_number",
+            },
+          ],
+        },
+      },
+    });
+    state.reportsSharedModelId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async reportsSharedModelList(op) {
+    await httpRequest(op);
+  },
+
+  async reportsSharedModelPatch(op) {
+    await httpRequest(op, {
+      path: `/reports/models/shared/${requireState("reportsSharedModelId")}`,
+      json: {
+        name: uniqueText("Smoke Shared Report Model Updated"),
+        definition: {
+          sources: ["parcelamento.installments"],
+          columns: [
+            {
+              source: "parcelamento.installments",
+              field: "agreement_number",
+              alias: "agreement_number",
+            },
+          ],
+        },
+      },
+    });
+  },
+
+  async reportsSharedModelCopy(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: `/reports/models/shared/${requireState("reportsSharedModelId")}/copy`,
+    });
+  },
+
+  async reportsSharedModelPreview(op) {
+    await httpRequest(op, {
+      path: `/reports/models/shared/${requireState("reportsSharedModelId")}/preview`,
+    });
+  },
+
+  async reportsModelList(op) {
+    await httpRequest(op);
+  },
+
+  async reportsModelGet(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/models/${requireState("reportsModelId")}`,
+    });
+  },
+
+  async reportsModelPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/models/${requireState("reportsModelId")}`,
+      json: { name: uniqueText("Smoke Report Model Updated") },
+    });
+  },
+
+  async reportsModelDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/models/${requireState("reportsModelId")}`,
+      expectEnvelope: false,
+    });
+    if (op.expectationKind === "good") state.reportsModelId = null;
   },
 
   async certificatePjList(op) {
@@ -2089,6 +2365,156 @@ const handlers = {
         userId: requireState("session").id,
         organizationId: requireState("session").organization_id,
       },
+    });
+  },
+
+  async parcelamentoReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createParcelamentoReportingGrant({
+            operation: "catalog",
+            source: "parcelamento.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async parcelamentoReportingExtract(op) {
+    const body = { source: "parcelamento.installments", fields: ["status"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createParcelamentoReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
+  },
+
+  async clientIntegrationReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createClientIntegrationReportingGrant({
+            operation: "catalog",
+            source: "integracao.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async clientIntegrationReportingExtract(op) {
+    const body = { source: "integracao.clients", fields: ["name"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createClientIntegrationReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
+  },
+
+  async projectReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createProjectReportingGrant({
+            operation: "catalog",
+            source: "integracao.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async projectReportingExtract(op) {
+    const body = { source: "integracao.projects", fields: ["name"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createProjectReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
+  },
+
+  async taskReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createTaskReportingGrant({
+            operation: "catalog",
+            source: "integracao.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async taskReportingExtract(op) {
+    const body = { source: "integracao.tasks", fields: ["name"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createTaskReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
+  },
+
+  async contabilReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createContabilReportingGrant({
+            operation: "catalog",
+            source: "contabil.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async contabilReportingExtract(op) {
+    const body = { source: "contabil.control", fields: ["competence"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createContabilReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
     });
   },
 
@@ -4802,6 +5228,22 @@ function disabledConditionReason(condition) {
 
   if (condition === "parcelamentoSmokeEnabled" && !env.parcelamentoSmokeEnabled) {
     return "PARCELAMENTO_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "clientReportingSmokeEnabled" && !env.clientReportingSmokeEnabled) {
+    return "CLIENT_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "contabilReportingSmokeEnabled" && !env.contabilReportingSmokeEnabled) {
+    return "CONTABIL_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "projectReportingSmokeEnabled" && !env.projectReportingSmokeEnabled) {
+    return "PROJECT_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "taskReportingSmokeEnabled" && !env.taskReportingSmokeEnabled) {
+    return "TASK_REPORTING_SMOKE_ENABLED is false";
   }
 
   return "";

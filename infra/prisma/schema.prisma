@@ -2199,14 +2199,16 @@ model TriageResponsible {
 }
 
 model ReportModel {
-  id              String   @id @default(uuid())
-  organization_id String
-  department_id   String?
-  name            String
-  description     String?
-  active          Boolean  @default(true)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  organization_id    String
+  created_by_user_id String?
+  department_id      String?
+  name               String
+  description        String?
+  active             Boolean  @default(true)
+  is_ephemeral       Boolean  @default(false)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
 
   @@map("reports.models")
 }
@@ -2219,6 +2221,7 @@ model ReportModelVersion {
   definition_json Json
   created_at      DateTime @default(now())
 
+  @@unique([report_model_id, version])
   @@map("reports.model_versions")
 }
 
@@ -2227,13 +2230,15 @@ model ReportJob {
   organization_id         String
   requester_id            String
   report_model_version_id String
-  status                  String   @default("pending")
+  status                  String   @default("queued")
   payload_json            Json?
   requested_at            DateTime @default(now())
   started_at              DateTime?
   finished_at             DateTime?
   lease_token             String?
   lease_expires_at        DateTime?
+  cancel_requested_at     DateTime?
+  materialization_token   String?
   error_message           String?
   created_at              DateTime @default(now())
   updated_at              DateTime @updatedAt
@@ -2250,6 +2255,7 @@ model ReportSnapshot {
   created_at              DateTime @default(now())
   expires_at              DateTime?
 
+  @@unique([report_job_id])
   @@map("reports.snapshots")
 }
 

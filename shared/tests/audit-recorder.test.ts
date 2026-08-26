@@ -14,6 +14,7 @@ for (const failure of ["network", "http", "timeout"] as const) {
       logger: { error: (value: unknown) => logs.push(value), warn() {} } as never,
       maxInFlight: 1,
       timeoutMs: 5,
+      retryMaxAttempts: 1,
       fetchImpl: async (_input, init) => {
         if (!fail) return new Response(null, { status: 201 });
         if (failure === "http") return new Response("private-error", { status: 500 });
@@ -124,6 +125,7 @@ test("createAuditRecorder bounds an unavailable audit request with a timeout", a
       warn() {},
     } as never,
     timeoutMs: 1,
+    retryMaxAttempts: 1,
     fetchImpl: async (_input, init) => {
       capturedSignal = init?.signal ?? undefined;
       await new Promise((_, reject) => {
@@ -139,7 +141,7 @@ test("createAuditRecorder bounds an unavailable audit request with a timeout", a
 
   assert(capturedSignal instanceof AbortSignal);
   assert.equal(capturedSignal.aborted, true);
-  assert.equal(errors.length, 1);
+  assert(errors.some((entry) => (entry as { event: string }).event === "audit.ingest.failed"));
 });
 
 test("createAuditRecorder drops work when its in-flight limit is reached", async () => {
@@ -236,7 +238,7 @@ test("createAuditRecorder keeps public traffic out of protected capacity", async
   await publicRead;
 });
 
-test("createAuditRecorder preserves unlimited legacy concurrency unless configured", async () => {
+test("createAuditRecorder allows an explicit opt-out of the pending buffer limit", async () => {
   const releases: Array<(response: Response) => void> = [];
   let fetchCalls = 0;
   const recorder = createAuditRecorder({
@@ -244,6 +246,7 @@ test("createAuditRecorder preserves unlimited legacy concurrency unless configur
     serviceUrl: "http://audit-service:3020",
     serviceToken: "test-token",
     logger: { error() {}, warn() {} } as never,
+    maxPending: Number.POSITIVE_INFINITY,
     fetchImpl: async () => {
       fetchCalls += 1;
       return await new Promise<Response>((resolve) => releases.push(resolve));

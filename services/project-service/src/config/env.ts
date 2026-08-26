@@ -45,6 +45,8 @@ const envSchema = z
       .transform((value) => parseBoolean(value)),
     auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
+    reportsInternalToken: z.string().optional().default("reports-service-token"),
+    reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     enableApiDocsEnv: z.string().optional(),
     allowedOrigins: z
       .string()
@@ -63,6 +65,18 @@ const envSchema = z
       serviceName: "project-service",
       envName: "AUDIT_SERVICE_TOKEN",
       token: rest.auditServiceToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "project-service",
+      envName: "REPORTS_INTERNAL_TOKEN",
+      token: rest.reportsInternalToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "project-service",
+      envName: "REPORTS_GRANT_SECRET",
+      token: rest.reportsGrantSecret,
     });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
@@ -90,6 +104,8 @@ export function getProjectServiceEnv(): ProjectServiceEnv {
     auditEnabled: process.env.AUDIT_ENABLED,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
+    reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,
+    reportsGrantSecret: process.env.REPORTS_GRANT_SECRET,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
   });

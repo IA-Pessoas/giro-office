@@ -17,6 +17,8 @@ import { requestContext } from "./middlewares/requestContext.js";
 import { requireInternalToken } from "./middlewares/requireInternalToken.js";
 import { buildClientServiceOpenApiSpec } from "./openapi/spec.js";
 import { createClientRouter } from "./routes/client.routes.js";
+import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
+import { ClientIntegrationReportingService } from "./services/clientIntegrationReportingService.js";
 import type { IClientService } from "./services/clientService.js";
 import { runCompetenceOutputUpdate } from "./services/competenceOutputRoutineService.js";
 import type { HistoryFileStorage } from "./services/historyStorageService.js";
@@ -93,6 +95,14 @@ export function createApp({
         next(err);
       }
     },
+  );
+
+  app.use(
+    "/internal",
+    createInternalReportingRouter({
+      env,
+      reportingService: new ClientIntegrationReportingService(prisma),
+    }),
   );
 
   app.use(

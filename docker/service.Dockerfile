@@ -26,7 +26,7 @@ COPY infra ./infra
 COPY services ./services
 COPY scripts ./scripts
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 ARG WORKSPACE_PACKAGE
 ARG SERVICE_DIR
