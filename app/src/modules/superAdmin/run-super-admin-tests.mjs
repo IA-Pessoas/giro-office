@@ -292,6 +292,17 @@ await runTest("não cria segunda entrada de navegação para o Super Admin", () 
   assert.equal((appShellSource.match(/name: "Super Admin"/g) ?? []).length, 1);
 });
 
+await runTest("não converte detalhe pendente ou falho em auditoria global", () => {
+  const detailRendering = superAdminPageSource.slice(
+    superAdminPageSource.indexOf("{selectedOrganizationId && organizationDetailQuery.isLoading"),
+  );
+  assert.ok(detailRendering.indexOf("organizationDetailQuery.isError") >= 0);
+  assert.ok(
+    detailRendering.indexOf("organizationDetailQuery.isError") <
+      detailRendering.indexOf('activePanel === "audit"'),
+  );
+});
+
 await runTest("devolve foco pelo lifecycle Radix opcional sem corrida de animation frame", () => {
   assert.match(
     dialogSource,
@@ -300,6 +311,9 @@ await runTest("devolve foco pelo lifecycle Radix opcional sem corrida de animati
   assert.match(dialogSource, /onCloseAutoFocus=\{onCloseAutoFocus\}/);
   assert.match(createOrganizationDialogSource, /onCloseAutoFocus=\{/);
   assert.match(organizationOverviewSource, /onCloseAutoFocus=\{/);
-  assert.match(organizationDirectorySource, /<Button asChild size="sm">\s*<button onClick=\{onCreate\} ref=\{createButtonRef\}/);
+  assert.match(
+    organizationDirectorySource,
+    /<Button asChild size="sm">\s*<button onClick=\{onCreate\} ref=\{createButtonRef\}/,
+  );
   assert.doesNotMatch(superAdminPageSource + organizationOverviewSource, /requestAnimationFrame/);
 });

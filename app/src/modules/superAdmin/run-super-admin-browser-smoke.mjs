@@ -45,6 +45,9 @@ const organizations = [organization, secondOrganization];
 const requests = [];
 let forceConflict = false;
 let revision = 1;
+let delayedDetailId = null;
+let delayedDetail;
+let failedDetailId = null;
 
 function reply(response, status, data) {
   response.writeHead(status, { "content-type": "application/json" });
@@ -118,6 +121,9 @@ const upstream = createServer(async (request, response) => {
   );
   const selected = match && organizations.find((item) => item.id === match[1]);
   if (selected && request.method === "GET") {
+    if (!match[2] && selected.id === delayedDetailId) await delayedDetail;
+    if (!match[2] && selected.id === failedDetailId)
+      return reply(response, 403, "Detalhe indisponível no teste.");
     if (match[2] === "users") {
       return reply(response, 200, {
         users: [
@@ -198,6 +204,14 @@ const settleLayout = async () => {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   });
 };
+const prepareScreenshot = async () => {
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    for (const element of document.querySelectorAll("main, [data-scroll-container]"))
+      element.scrollTo(0, 0);
+  });
+  await settleLayout();
+};
 
 try {
   const startedAt = Date.now();
@@ -241,7 +255,8 @@ try {
   page.on("console", (message) => {
     if (
       message.type() === "error" &&
-      !/server responded with a status of (401|409)/.test(message.text())
+      !/server responded with a status of (401|409)/.test(message.text()) &&
+      !(failedDetailId && /server responded with a status of 403/.test(message.text()))
     ) {
       consoleErrors.push(message.text());
     }
@@ -250,183 +265,279 @@ try {
     if (request.resourceType() === "image" && !request.url().startsWith(baseUrl))
       remoteImages.push(request.url());
   });
-  await page.goto("/super-admin", { waitUntil: "networkidle" });
-  await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
-  const directory = page.locator("aside").filter({ has: page.getByLabel("Pesquisar organização") });
-  const directoryBox = await directory.boundingBox();
-  for (const name of ["Próxima", "Última página"]) {
-    const buttonBox = await directory.getByRole("button", { name, exact: true }).boundingBox();
-    assert.ok(
-      buttonBox && buttonBox.x + buttonBox.width <= directoryBox.x + directoryBox.width,
-      `Paginação ${name} fora do diretório: ${JSON.stringify({ directoryBox, buttonBox })}`,
-    );
-  }
-  assert.equal(await page.getByRole("link", { name: "Super Admin", exact: true }).count(), 1);
-  await page.getByRole("button", { name: "Usuários", exact: true }).click();
-  await page.getByText("Pessoa de teste", { exact: true }).waitFor();
-  assert.ok(
-    requests.some((request) => request.path === `/platform/organizations/${organization.id}/users`),
-  );
-  await page.getByRole("button", { name: "Auditoria", exact: true }).click();
-  await page.getByText("Plano: Trial → Pro", { exact: true }).waitFor();
-  assert.equal(
-    requests
-      .filter((request) => request.path === "/platform/audit/requests")
-      .at(-1)
-      .query.get("organizationId"),
-    organization.id,
-  );
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.url().includes("/platform/audit/requests") &&
-        !response.url().includes("organizationId"),
-    ),
-    page.getByLabel("Mostrar auditoria global").check(),
-  ]);
-  assert.equal(
-    requests
-      .filter((request) => request.path === "/platform/audit/requests")
-      .at(-1)
-      .query.get("organizationId"),
-    null,
-  );
-  console.log("PASS seleção, usuários e auditoria contextual/global");
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    organizations.splice(0, organizations.length, organization, secondOrganization);
+    requests.length = 0;
+    await page.goto("/super-admin", { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
 
-  await page.getByRole("button", { name: "Criar organização", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Criar organização", exact: true });
-  await dialog.waitFor();
-  for (const key of ["Tab", "Tab", "Tab", "Tab", "Tab", "Tab", "Shift+Tab", "Shift+Tab"]) {
-    await page.keyboard.press(key);
-    assert.equal(
-      await dialog.evaluate((element) => element.contains(document.activeElement)),
-      true,
-      `Foco saiu do diálogo após ${key}`,
-    );
-  }
-  await dialog.getByLabel("Nome", { exact: true }).fill("Nova Organização");
-  await dialog.getByLabel("CNPJ", { exact: true }).fill("98765432000198");
-  assert.equal(await dialog.getByLabel("CNPJ", { exact: true }).inputValue(), "98.765.432/0001-98");
-  await dialog.getByRole("button", { name: "Criar organização", exact: true }).click();
-  await dialog.waitFor({ state: "hidden" });
-  await page.getByRole("heading", { name: "Nova Organização", exact: true }).waitFor();
-  const created = organizations[0];
-  await page.getByLabel("Pesquisar organização").fill("não encontrada");
-  await page.getByText("Nenhuma organização encontrada", { exact: true }).waitFor();
-  await page.getByRole("heading", { name: "Nova Organização", exact: true }).waitFor();
-  await page.getByLabel("Pesquisar organização").fill("");
-  console.log("PASS criação limitada e seleção preservada após refetch do diretório");
-
-  await page.getByLabel("Novo plano", { exact: true }).selectOption("pro");
-  await page.getByRole("button", { name: "Salvar plano", exact: true }).click();
-  await page.getByText("Plano atualizado.", { exact: true }).waitFor();
-  assert.equal(created.subscription_plan, "pro");
-  await page
-    .getByLabel("URL HTTPS", { exact: true })
-    .fill("https://user:secret@example.test/logo.png");
-  await page.getByRole("button", { name: "Salvar logo", exact: true }).click();
-  await page.getByText("Informe uma URL HTTPS sem credenciais.", { exact: true }).waitFor();
-  await page.getByLabel("URL HTTPS", { exact: true }).fill("https://assets.example.test/logo.png");
-  await page.getByRole("button", { name: "Salvar logo", exact: true }).click();
-  await page.getByText("URL do logo atualizada.", { exact: true }).waitFor();
-  assert.equal(created.logo_url, "https://assets.example.test/logo.png");
-  await page.getByLabel("URL HTTPS", { exact: true }).fill("");
-  await page.getByRole("button", { name: "Salvar logo", exact: true }).click();
-  await page.getByText("URL do logo removida.", { exact: true }).waitFor();
-  assert.equal(created.logo_url, null);
-  console.log("PASS plano, URL HTTPS e limpeza de logo sem fetch de imagem externa");
-
-  const confirmation = page.getByRole("dialog", { name: "Confirmar alteração de status" });
-  for (const status of ["trial", "past_due", "suspended", "cancelled", "active"]) {
-    const previousStatus = created.status;
-    const previousCount = requests.filter((request) => request.method === "PATCH").length;
-    await page.getByLabel("Novo status", { exact: true }).selectOption(status);
-    await page.getByRole("button", { name: "Salvar status", exact: true }).click();
-    await confirmation.waitFor();
-    assert.equal(created.status, previousStatus);
-    await confirmation.getByRole("button", { name: "Manter status" }).click();
-    assert.equal(requests.filter((request) => request.method === "PATCH").length, previousCount);
-    await page.getByRole("button", { name: "Salvar status", exact: true }).click();
-    const confirmButton = confirmation.getByRole("button", { name: "Alterar status" });
-    if (status === "suspended" || status === "cancelled") {
-      assert.equal(await confirmButton.isDisabled(), true);
-      await confirmation.getByLabel("Nome exato da organização").fill("nome incorreto");
-      assert.equal(await confirmButton.isDisabled(), true);
-      await confirmation.getByLabel("Nome exato da organização").fill(created.name);
-      if (status === "suspended" && screenshotDirectory) {
-        await mkdir(screenshotDirectory, { recursive: true });
-        await settleLayout();
-        await page.screenshot({
-          path: join(screenshotDirectory, "super-admin-status-confirmation.png"),
-        });
+    if (process.env.SUPER_ADMIN_DETAIL_CASE !== "failed") {
+      let releaseDetail;
+      delayedDetailId = secondOrganization.id;
+      delayedDetail = new Promise((resolve) => {
+        releaseDetail = resolve;
+      });
+      const delayMarker = requests.length;
+      try {
+        await page.getByRole("button", { name: /Organização Horizonte/ }).click();
+        await page.getByText("Carregando detalhes da organização...", { exact: true }).waitFor();
+        await page.getByRole("button", { name: "Auditoria", exact: true }).click();
+        assert.equal(
+          await page.getByText("Carregando detalhes da organização...", { exact: true }).count(),
+          1,
+          "Auditoria deve manter gate de detalhe pendente, sem mudar para global",
+        );
+        assert.equal(
+          requests
+            .slice(delayMarker)
+            .some(
+              (request) =>
+                request.path === "/platform/audit/requests" && !request.query.has("organizationId"),
+            ),
+          false,
+        );
+      } finally {
+        delayedDetailId = null;
+        releaseDetail();
       }
-    } else {
-      assert.equal(await confirmation.getByLabel("Nome exato da organização").count(), 0);
+      await page.getByText("Plano: Trial → Pro", { exact: true }).waitFor();
+      assert.equal(
+        requests
+          .filter((request) => request.path === "/platform/audit/requests")
+          .at(-1)
+          .query.get("organizationId"),
+        secondOrganization.id,
+      );
     }
-    await confirmButton.click();
-    await confirmation.waitFor({ state: "hidden" });
-    assert.equal(created.status, status);
-    await page.waitForFunction(() => document.activeElement?.id === "platform-status", null, {
-      timeout: 3_000,
-    });
-  }
-  console.log("PASS confirmação dos cinco status; suspensão/cancelamento exigem nome exato");
 
-  const mutationCount = requests.filter((request) => request.method === "PATCH").length;
-  forceConflict = true;
-  await page.getByLabel("Novo plano", { exact: true }).selectOption("enterprise");
-  await page.getByRole("button", { name: "Salvar plano", exact: true }).click();
-  await page
-    .getByText("Esta organização foi alterada por outra pessoa.", { exact: false })
-    .waitFor();
-  await page.waitForFunction(() => document.querySelector("#platform-status")?.value === "trial");
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  assert.equal(requests.filter((request) => request.method === "PATCH").length, mutationCount + 1);
-  await page.getByLabel("Novo plano", { exact: true }).selectOption("enterprise");
-  await page.getByRole("button", { name: "Salvar plano", exact: true }).click();
-  await page.getByText("Plano atualizado.", { exact: true }).waitFor();
-  assert.equal(created.subscription_plan, "enterprise");
-  console.log(
-    "PASS 409 atualiza detalhe/lista sem retry automático; nova tentativa usa versão atual",
-  );
+    failedDetailId = organization.id;
+    const failureMarker = requests.length;
+    await page.reload({ waitUntil: "networkidle" });
+    await page
+      .getByText("Não foi possível carregar os detalhes da organização.", { exact: true })
+      .waitFor();
+    await page.getByRole("button", { name: "Auditoria", exact: true }).click();
+    assert.equal(
+      await page
+        .getByText("Não foi possível carregar os detalhes da organização.", { exact: true })
+        .count(),
+      1,
+      "Auditoria deve manter gate de detalhe falho, sem mudar para global",
+    );
+    assert.equal(
+      requests
+        .slice(failureMarker)
+        .some(
+          (request) =>
+            request.path === "/platform/audit/requests" && !request.query.has("organizationId"),
+        ),
+      false,
+    );
+    failedDetailId = null;
+    await page.getByRole("button", { name: "Tentar novamente", exact: true }).click();
+    await page.getByText("Plano: Trial → Pro", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Visão geral", exact: true }).click();
+    await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
+    console.log(`PASS ${viewport.width}px detalhe atrasado/falho não consulta auditoria global`);
+    const directory = page
+      .locator("aside")
+      .filter({ has: page.getByLabel("Pesquisar organização") });
+    const directoryBox = await directory.boundingBox();
+    for (const name of ["Próxima", "Última página"]) {
+      const buttonBox = await directory.getByRole("button", { name, exact: true }).boundingBox();
+      assert.ok(
+        buttonBox && buttonBox.x + buttonBox.width <= directoryBox.x + directoryBox.width,
+        `Paginação ${name} fora do diretório: ${JSON.stringify({ directoryBox, buttonBox })}`,
+      );
+    }
+    assert.equal(await page.getByRole("link", { name: "Super Admin", exact: true }).count(), 1);
+    await page.getByRole("button", { name: "Usuários", exact: true }).click();
+    await page.getByText("Pessoa de teste", { exact: true }).waitFor();
+    assert.ok(
+      requests.some(
+        (request) => request.path === `/platform/organizations/${organization.id}/users`,
+      ),
+    );
+    await page.getByRole("button", { name: "Auditoria", exact: true }).click();
+    await page.getByText("Plano: Trial → Pro", { exact: true }).waitFor();
+    assert.equal(
+      requests
+        .filter((request) => request.path === "/platform/audit/requests")
+        .at(-1)
+        .query.get("organizationId"),
+      organization.id,
+    );
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes("/platform/audit/requests") &&
+          !response.url().includes("organizationId"),
+      ),
+      page.getByLabel("Mostrar auditoria global").check(),
+    ]);
+    assert.equal(
+      requests
+        .filter((request) => request.path === "/platform/audit/requests")
+        .at(-1)
+        .query.get("organizationId"),
+      null,
+    );
+    console.log("PASS seleção, usuários e auditoria contextual/global");
 
-  await page.getByRole("button", { name: "Criar organização", exact: true }).click();
-  await dialog.waitFor();
-  assert.equal(await dialog.getByLabel("Nome", { exact: true }).inputValue(), "");
-  await page.keyboard.press("Escape");
-  await dialog.waitFor({ state: "hidden" });
-  await page.waitForFunction(
-    () => document.activeElement?.textContent?.trim() === "Criar organização",
-    null,
-    { timeout: 3_000 },
-  );
-  const prepareScreenshot = async () => {
-    await page.evaluate(async () => {
-      await document.fonts.ready;
-      window.scrollTo(0, 0);
-      for (const element of document.querySelectorAll("main, [data-scroll-container]"))
-        element.scrollTo(0, 0);
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    });
-    await settleLayout();
-  };
-  await prepareScreenshot();
-  if (screenshotDirectory) {
-    await mkdir(screenshotDirectory, { recursive: true });
-    await page.screenshot({
-      path: join(screenshotDirectory, "super-admin-organizations-desktop.png"),
-      fullPage: true,
-    });
-  }
-  await page.setViewportSize({ width: 390, height: 844 });
-  await prepareScreenshot();
-  const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  assert.ok(documentWidth <= 391, `Página mobile com overflow horizontal: ${documentWidth}px`);
-  if (screenshotDirectory) {
-    await page.screenshot({
-      path: join(screenshotDirectory, "super-admin-organizations-mobile.png"),
-      fullPage: true,
-    });
+    await page.getByRole("button", { name: "Criar organização", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Criar organização", exact: true });
+    await dialog.waitFor();
+    for (const key of ["Tab", "Tab", "Tab", "Tab", "Tab", "Tab", "Shift+Tab", "Shift+Tab"]) {
+      await page.keyboard.press(key);
+      assert.equal(
+        await dialog.evaluate((element) => element.contains(document.activeElement)),
+        true,
+        `Foco saiu do diálogo após ${key}`,
+      );
+    }
+    await dialog.getByLabel("Nome", { exact: true }).fill("Nova Organização");
+    await dialog.getByLabel("CNPJ", { exact: true }).fill("98765432000198");
+    assert.equal(
+      await dialog.getByLabel("CNPJ", { exact: true }).inputValue(),
+      "98.765.432/0001-98",
+    );
+    await dialog.getByRole("button", { name: "Criar organização", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
+    await page.getByRole("heading", { name: "Nova Organização", exact: true }).waitFor();
+    const created = organizations[0];
+    await page.getByLabel("Pesquisar organização").fill("não encontrada");
+    await page.getByText("Nenhuma organização encontrada", { exact: true }).waitFor();
+    await page.getByRole("heading", { name: "Nova Organização", exact: true }).waitFor();
+    await page.getByLabel("Pesquisar organização").fill("");
+    console.log("PASS criação limitada e seleção preservada após refetch do diretório");
+
+    await page.getByLabel("Novo plano", { exact: true }).selectOption("pro");
+    await page.getByRole("button", { name: "Salvar plano", exact: true }).click();
+    await page.getByText("Plano atualizado.", { exact: true }).waitFor();
+    assert.equal(created.subscription_plan, "pro");
+    await page
+      .getByLabel("URL HTTPS", { exact: true })
+      .fill("https://user:secret@example.test/logo.png");
+    await page.getByRole("button", { name: "Salvar logo", exact: true }).click();
+    await page.getByText("Informe uma URL HTTPS sem credenciais.", { exact: true }).waitFor();
+    await page
+      .getByLabel("URL HTTPS", { exact: true })
+      .fill("https://assets.example.test/logo.png");
+    await page.getByRole("button", { name: "Salvar logo", exact: true }).click();
+    await page.getByText("URL do logo atualizada.", { exact: true }).waitFor();
+    assert.equal(created.logo_url, "https://assets.example.test/logo.png");
+    await page.getByLabel("URL HTTPS", { exact: true }).fill("");
+    await page.getByRole("button", { name: "Salvar logo", exact: true }).click();
+    await page.getByText("URL do logo removida.", { exact: true }).waitFor();
+    assert.equal(created.logo_url, null);
+    console.log("PASS plano, URL HTTPS e limpeza de logo sem fetch de imagem externa");
+
+    const confirmation = page.getByRole("dialog", { name: "Confirmar alteração de status" });
+    for (const status of ["trial", "past_due", "suspended", "cancelled", "active"]) {
+      const previousStatus = created.status;
+      const previousCount = requests.filter((request) => request.method === "PATCH").length;
+      await page.getByLabel("Novo status", { exact: true }).selectOption(status);
+      await page.getByRole("button", { name: "Salvar status", exact: true }).click();
+      await confirmation.waitFor();
+      assert.equal(created.status, previousStatus);
+      for (const key of ["Tab", "Tab", "Tab", "Tab", "Shift+Tab"]) {
+        await page.keyboard.press(key);
+        assert.equal(
+          await confirmation.evaluate((element) => element.contains(document.activeElement)),
+          true,
+        );
+      }
+      await page.keyboard.press("Escape");
+      await confirmation.waitFor({ state: "hidden" });
+      await page.waitForFunction(() => document.activeElement?.id === "platform-status");
+      await page.getByRole("button", { name: "Salvar status", exact: true }).click();
+      await confirmation.getByRole("button", { name: "Manter status" }).click();
+      assert.equal(requests.filter((request) => request.method === "PATCH").length, previousCount);
+      await page.getByRole("button", { name: "Salvar status", exact: true }).click();
+      const confirmButton = confirmation.getByRole("button", { name: "Alterar status" });
+      if (status === "suspended" || status === "cancelled") {
+        assert.equal(await confirmButton.isDisabled(), true);
+        await confirmation.getByLabel("Nome exato da organização").fill("nome incorreto");
+        assert.equal(await confirmButton.isDisabled(), true);
+        await confirmation.getByLabel("Nome exato da organização").fill(created.name);
+        if (status === "suspended" && screenshotDirectory) {
+          await mkdir(screenshotDirectory, { recursive: true });
+          await settleLayout();
+          await page.screenshot({
+            path: join(
+              screenshotDirectory,
+              viewport.width > 1000
+                ? "super-admin-status-confirmation.png"
+                : "super-admin-status-confirmation-mobile.png",
+            ),
+          });
+        }
+      } else {
+        assert.equal(await confirmation.getByLabel("Nome exato da organização").count(), 0);
+      }
+      await confirmButton.click();
+      await confirmation.waitFor({ state: "hidden" });
+      assert.equal(created.status, status);
+      await page.waitForFunction(() => document.activeElement?.id === "platform-status", null, {
+        timeout: 3_000,
+      });
+    }
+    console.log("PASS confirmação dos cinco status; suspensão/cancelamento exigem nome exato");
+
+    const mutationCount = requests.filter((request) => request.method === "PATCH").length;
+    forceConflict = true;
+    await page.getByLabel("Novo plano", { exact: true }).selectOption("enterprise");
+    await page.getByRole("button", { name: "Salvar plano", exact: true }).click();
+    await page
+      .getByText("Esta organização foi alterada por outra pessoa.", { exact: false })
+      .waitFor();
+    await page.waitForFunction(() => document.querySelector("#platform-status")?.value === "trial");
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(
+      requests.filter((request) => request.method === "PATCH").length,
+      mutationCount + 1,
+    );
+    await page.getByLabel("Novo plano", { exact: true }).selectOption("enterprise");
+    await page.getByRole("button", { name: "Salvar plano", exact: true }).click();
+    await page.getByText("Plano atualizado.", { exact: true }).waitFor();
+    assert.equal(created.subscription_plan, "enterprise");
+    console.log(
+      "PASS 409 atualiza detalhe/lista sem retry automático; nova tentativa usa versão atual",
+    );
+
+    await page.getByRole("button", { name: "Criar organização", exact: true }).click();
+    await dialog.waitFor();
+    assert.equal(await dialog.getByLabel("Nome", { exact: true }).inputValue(), "");
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "hidden" });
+    await page.waitForFunction(
+      () => document.activeElement?.textContent?.trim() === "Criar organização",
+      null,
+      { timeout: 3_000 },
+    );
+    await prepareScreenshot();
+    const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    assert.ok(
+      documentWidth <= viewport.width + 1,
+      `Página com overflow horizontal: ${documentWidth}px`,
+    );
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await page.screenshot({
+        path: join(
+          screenshotDirectory,
+          viewport.width > 1000
+            ? "super-admin-organizations-desktop.png"
+            : "super-admin-organizations-mobile.png",
+        ),
+        fullPage: true,
+      });
+    }
+    console.log(`PASS ${viewport.width}px fluxos completos, foco/Tab/Escape nos dois diálogos`);
   }
   await page.evaluate(() => {
     localStorage.setItem("workspace-theme", "dark");
@@ -466,7 +577,7 @@ try {
   console.error("CONSOLE_ERRORS", consoleErrors);
   console.error(
     "API_REQUESTS",
-    requests.map((request) => `${request.method} ${request.path}`),
+    requests.map((request) => `${request.method} ${request.path}?${request.query}`),
   );
   console.error("NEXT_OUTPUT", serverOutput);
   throw error;
