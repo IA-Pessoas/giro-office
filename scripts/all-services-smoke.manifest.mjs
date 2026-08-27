@@ -861,6 +861,14 @@ const baseManifest = [
   op({
     service: "reports-service",
     method: "GET",
+    path: "/reports/jobs/list",
+    action: "reportsJobList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "reports-service",
+    method: "GET",
     path: "/reports/snapshots/{id}/export",
     action: "reportsSnapshotExportInvalidFormat",
     handlerAction: "reportsSnapshotExport",
@@ -871,6 +879,33 @@ const baseManifest = [
     expectedStatus: [400],
     expectedLabel: "invalid format",
     expectEnvelope: false,
+  }),
+  op({
+    service: "reports-service",
+    method: "GET",
+    path: "/reports/retention",
+    action: "reportsRetentionGet",
+    target: "gateway",
+    auth: "bearer",
+    condition: "reportsRetentionSmokeEnabled",
+  }),
+  op({
+    service: "reports-service",
+    method: "PUT",
+    path: "/reports/retention",
+    action: "reportsRetentionPut",
+    target: "gateway",
+    auth: "bearer",
+    condition: "reportsRetentionSmokeEnabled",
+  }),
+  op({
+    service: "reports-service",
+    method: "POST",
+    path: "/reports/snapshots/{id}/delete",
+    action: "reportsSnapshotDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+    condition: "reportsLifecycleSmokeEnabled",
   }),
 
   op({

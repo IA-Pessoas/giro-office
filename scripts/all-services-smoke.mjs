@@ -121,6 +121,12 @@ const env = {
   taskReportingSmokeEnabled:
     process.env.TASK_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.TASK_REPORTING_SMOKE_ENABLED === "1",
+  reportsRetentionSmokeEnabled:
+    process.env.REPORTS_RETENTION_SMOKE_ENABLED === "true" ||
+    process.env.REPORTS_RETENTION_SMOKE_ENABLED === "1",
+  reportsLifecycleSmokeEnabled:
+    process.env.REPORTS_LIFECYCLE_SMOKE_ENABLED === "true" ||
+    process.env.REPORTS_LIFECYCLE_SMOKE_ENABLED === "1",
   namespace:
     process.env.SMOKE_NAMESPACE?.trim() ||
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1174,6 +1180,26 @@ const handlers = {
       query: { format: isBadExpectation(op) ? "pdf" : "csv" },
       expectEnvelope: false,
       expectedStatus: isBadExpectation(op) ? [400] : [200],
+    });
+  },
+
+  async reportsJobList(op) {
+    await httpRequest(op, { query: { scope: "personal", limit: 10 } });
+  },
+
+  async reportsRetentionGet(op) {
+    await httpRequest(op);
+  },
+
+  async reportsRetentionPut(op) {
+    await httpRequest(op, { json: { retention_days: 30 } });
+  },
+
+  async reportsSnapshotDelete(op) {
+    await httpRequest(op, {
+      path: `/reports/snapshots/${requireState("reportsSnapshotId")}/delete`,
+      json: { justification: "Smoke lifecycle cleanup with audit." },
+      expectEnvelope: false,
     });
   },
 
@@ -5028,6 +5054,14 @@ function disabledConditionReason(condition) {
 
   if (condition === "taskReportingSmokeEnabled" && !env.taskReportingSmokeEnabled) {
     return "TASK_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "reportsRetentionSmokeEnabled" && !env.reportsRetentionSmokeEnabled) {
+    return "REPORTS_RETENTION_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "reportsLifecycleSmokeEnabled" && !env.reportsLifecycleSmokeEnabled) {
+    return "REPORTS_LIFECYCLE_SMOKE_ENABLED is false";
   }
 
   return "";

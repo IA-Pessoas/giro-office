@@ -39,6 +39,14 @@ export interface ReportAuditEventInput {
     rows?: number;
     bytes?: number;
   };
+  justification_provided?: boolean;
+}
+
+export interface ReportRetentionAuditInput {
+  actor_id: string;
+  organization_id: string;
+  previous_retention_days: number;
+  next_retention_days: number;
 }
 
 export function createReportAuditEvent(input: ReportAuditEventInput): ReportAuditEventInput {
@@ -53,6 +61,7 @@ export function createReportAuditEvent(input: ReportAuditEventInput): ReportAudi
     ...(input.format ? { format: input.format } : {}),
     ...(input.result ? { result: input.result } : {}),
     ...(input.counts ? { counts: input.counts } : {}),
+    ...(input.justification_provided ? { justification_provided: true } : {}),
   };
 }
 
@@ -61,7 +70,7 @@ export interface ReportAuditStore {
     create(args: {
       data: {
         organization_id: string;
-        report_job_id?: string;
+        report_job_id?: string | null;
         actor_id: string;
         event_type: ReportAuditEventType;
         payload_json: Record<string, unknown>;
@@ -101,6 +110,7 @@ function metadata(input: ReportAuditEventInput): Record<string, unknown> {
     ...(input.format ? { format: input.format } : {}),
     ...(input.result ? { result: input.result } : {}),
     counts: safeCounts(input.counts),
+    ...(input.justification_provided ? { justification_provided: true } : {}),
   };
 }
 
@@ -121,6 +131,36 @@ export class ReportAuditService {
         payload_json: Object.fromEntries(
           Object.entries(payload).filter(([key]) => key !== "report_job_id"),
         ),
+      },
+    });
+  }
+
+  async recordRetentionChangeLocal(input: ReportRetentionAuditInput): Promise<void>;
+  async recordRetentionChangeLocal(
+    store: ReportAuditStore,
+    input: ReportRetentionAuditInput,
+  ): Promise<void>;
+  async recordRetentionChangeLocal(
+    storeOrInput: ReportAuditStore | ReportRetentionAuditInput,
+    transactionInput?: ReportRetentionAuditInput,
+  ): Promise<void> {
+    const store = transactionInput ? (storeOrInput as ReportAuditStore) : this.prisma;
+    const input = transactionInput ?? (storeOrInput as ReportRetentionAuditInput);
+    await store.reportAuditEvent.create({
+      data: {
+        organization_id: input.organization_id,
+        report_job_id: null,
+        actor_id: input.actor_id,
+        event_type: "report.retention",
+        payload_json: {
+          event_type: "report.retention",
+          changes: {
+            retention_days: {
+              previous: input.previous_retention_days,
+              next: input.next_retention_days,
+            },
+          },
+        },
       },
     });
   }

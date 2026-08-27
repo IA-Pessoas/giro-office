@@ -46,7 +46,7 @@ describe("ReportJobService", () => {
       reportModel: { create: vi.fn().mockResolvedValue({ id: "model-1" }) },
       reportModelVersion: { create: vi.fn().mockResolvedValue({ id: "version-1" }) },
       reportJob: { create: vi.fn().mockResolvedValue({ id: "job-1", status: "queued" }) },
-      reportRetentionPolicy: { findFirst: vi.fn().mockResolvedValue(null) },
+      reportRetentionPolicy: { findFirst: vi.fn().mockResolvedValue({ retention_days: 14 }) },
     };
     const service = new ReportJobService({
       $transaction: vi.fn(async (callback: (client: typeof transaction) => unknown) =>
@@ -76,6 +76,9 @@ describe("ReportJobService", () => {
         name: "Execução avulsa",
         is_ephemeral: true,
       }),
+    });
+    expect(transaction.reportJob.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ payload_json: { format: "json", retentionDays: 14 } }),
     });
   });
 
