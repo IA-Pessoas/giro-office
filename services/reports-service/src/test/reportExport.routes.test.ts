@@ -60,4 +60,15 @@ describe("report export routes", () => {
 
     expect(exportService.export).not.toHaveBeenCalled();
   });
+
+  it("rejeita requisição sem contexto de autenticação", async () => {
+    const exportService = { export: vi.fn() };
+    const app = express();
+    app.use("/reports", createReportExportRouter({ exportService: exportService as never }));
+    app.use(createExpressErrorHandler({ logger: { error: vi.fn() } as never, event: "test" }));
+
+    await request(app).get(`/reports/snapshots/${snapshotId}/export?format=csv`).expect(401);
+
+    expect(exportService.export).not.toHaveBeenCalled();
+  });
 });

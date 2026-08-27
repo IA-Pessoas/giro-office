@@ -39,6 +39,17 @@ describe("ReportCsvService", () => {
       }),
     ).toEqual(Buffer.from("Nome\r\nAna\r\n"));
   });
+
+  it("neutraliza fórmulas precedidas por whitespace ou tab", () => {
+    const service = new ReportCsvService();
+
+    expect(
+      service.render({
+        columns: [{ key: "value", label: "Valor" }],
+        rows: [{ value: " =1+1" }, { value: "\t@cmd" }],
+      }),
+    ).toEqual(Buffer.from("Valor\r\n' =1+1\r\n'\t@cmd\r\n"));
+  });
 });
 
 describe("ReportXlsxService", () => {
@@ -62,31 +73,21 @@ describe("ReportXlsxService", () => {
 });
 
 describe("ReportExportService", () => {
-  it("reauthoriza o snapshot, exporta seus dados e audita somente metadados seguros", async () => {
+  it("exporta somente os dados persistidos no snapshot e audita metadados seguros", async () => {
     const record = vi.fn().mockResolvedValue(undefined);
     const render = vi.fn().mockReturnValue(Buffer.from("Nome\r\nAna\r\n"));
     const snapshotService = {
       getForExport: vi.fn().mockResolvedValue({
         snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
         job: { id: "job-1", report_model_version_id: "version-1" },
-        rows: [{ name: "Ana", secret: "não exporte" }],
+        rows: [{ name: "Ana" }],
       }),
       assertExportable: vi.fn().mockResolvedValue(undefined),
     };
-    const authorizationService = {
-      validateDefinition: vi.fn().mockResolvedValue({
-        definition: { columns: [{ alias: "name" }] },
-      }),
-    };
+    const jobs = { getVersion: vi.fn() };
+    const authorizationService = { validateDefinition: vi.fn() };
     const service = new ReportExportService(
       snapshotService as never,
-      {
-        getVersion: vi.fn().mockResolvedValue({
-          model: { created_by_user_id: "user-1" },
-          version: { definition_json: { columns: [{ alias: "name" }] } },
-        }),
-      } as never,
-      authorizationService as never,
       { csv: { render } } as never,
       { record } as never,
     );
@@ -110,9 +111,10 @@ describe("ReportExportService", () => {
       userId: "user-1",
       organizationId: "org-1",
     });
-    expect(authorizationService.validateDefinition).toHaveBeenCalledOnce();
+    expect(jobs.getVersion).not.toHaveBeenCalled();
+    expect(authorizationService.validateDefinition).not.toHaveBeenCalled();
     expect(render).toHaveBeenCalledWith({
-      columns: [{ key: "name", label: "name" }],
+      columns: [{ key: "name", label: "name", valueType: "string" }],
       rows: [{ name: "Ana" }],
     });
     expect(record).toHaveBeenCalledWith(
@@ -123,6 +125,9 @@ describe("ReportExportService", () => {
         result: "success",
         counts: { rows: 1, bytes: 11 },
       }),
+    );
+    expect(record.mock.invocationCallOrder[0]).toBeLessThan(
+      snapshotService.assertExportable.mock.invocationCallOrder[0] ?? 0,
     );
   });
 
@@ -138,17 +143,8 @@ describe("ReportExportService", () => {
         assertExportable: vi.fn().mockResolvedValue(undefined),
       } as never,
       {
-        getVersion: vi.fn().mockResolvedValue({
-          model: { created_by_user_id: "user-1" },
-          version: { definition_json: { columns: [{ alias: "name" }] } },
-        }),
-      } as never,
-      {
-        validateDefinition: vi
-          .fn()
-          .mockResolvedValue({ definition: { columns: [{ alias: "name" }] } }),
-      } as never,
-      { csv: { render } } as never,
+        csv: { render },
+      },
       { record: vi.fn() } as never,
     );
 
@@ -178,17 +174,6 @@ describe("ReportExportService", () => {
     };
     const service = new ReportExportService(
       snapshotService as never,
-      {
-        getVersion: vi.fn().mockResolvedValue({
-          model: { created_by_user_id: "user-1" },
-          version: { definition_json: { columns: [{ alias: "name" }] } },
-        }),
-      } as never,
-      {
-        validateDefinition: vi
-          .fn()
-          .mockResolvedValue({ definition: { columns: [{ alias: "name" }] } }),
-      } as never,
       { csv: { render: vi.fn().mockReturnValue(Buffer.from("Name\r\nAna\r\n")) } } as never,
       { record } as never,
     );
@@ -219,48 +204,14 @@ describe("ReportExportService", () => {
     );
   });
 
-  it.each([
-    ["getForExport", "getForExport"],
-    ["getVersion", "getVersion"],
-    ["authorization", "validateDefinition"],
-  ])("audits %s failures without sensitive data", async (_stage, failingMethod) => {
+  it("audits snapshot lookup failures without sensitive data", async () => {
     const record = vi.fn().mockResolvedValue(undefined);
-    const source = {
-      snapshot: { id: "snapshot-1", created_at: new Date() },
-      job: { id: "job-1", report_model_version_id: "version-1" },
-      rows: [{ name: "Ana" }],
-    };
     const snapshotService = {
-      getForExport: vi
-        .fn()
-        .mockImplementation(() =>
-          failingMethod === "getForExport" ? Promise.reject(new Error("rejected")) : source,
-        ),
+      getForExport: vi.fn().mockImplementation(() => Promise.reject(new Error("rejected"))),
       assertExportable: vi.fn().mockResolvedValue(undefined),
-    };
-    const jobs = {
-      getVersion: vi.fn().mockImplementation(() =>
-        failingMethod === "getVersion"
-          ? Promise.reject(new Error("rejected"))
-          : {
-              model: { created_by_user_id: "user-1" },
-              version: { definition_json: { columns: [{ alias: "name" }] } },
-            },
-      ),
-    };
-    const authorization = {
-      validateDefinition: vi
-        .fn()
-        .mockImplementation(() =>
-          failingMethod === "validateDefinition"
-            ? Promise.reject(new Error("rejected"))
-            : { definition: { columns: [{ alias: "name" }] } },
-        ),
     };
     const service = new ReportExportService(
       snapshotService as never,
-      jobs as never,
-      authorization as never,
       { csv: { render: vi.fn() } } as never,
       { record } as never,
     );

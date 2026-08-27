@@ -30,6 +30,13 @@ const reportsServiceEnvSchema = z
     jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o reports-service."),
     reportsInternalToken: z.string().optional().default("reports-service-token"),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
+    auditEnabled: z
+      .string()
+      .optional()
+      .default("true")
+      .transform((value) => parseBoolean(value)),
+    auditServiceUrl: z.string().url().default("http://localhost:3020"),
+    auditServiceToken: z.string().default("audit-service-token"),
     userServiceUrl: z.string().url("USER_SERVICE_URL invalida.").default("http://localhost:3001"),
     parcelamentoServiceUrl: z
       .string()
@@ -115,6 +122,9 @@ export function parseReportsServiceEnv(
     jwtSecret: source.JWT_SECRET,
     reportsInternalToken: source.REPORTS_INTERNAL_TOKEN,
     reportsGrantSecret: source.REPORTS_GRANT_SECRET,
+    auditEnabled: source.AUDIT_ENABLED,
+    auditServiceUrl: source.AUDIT_SERVICE_URL,
+    auditServiceToken: source.AUDIT_SERVICE_TOKEN,
     userServiceUrl: source.USER_SERVICE_URL,
     parcelamentoServiceUrl: source.PARCELAMENTO_SERVICE_URL,
     clientServiceUrl: source.CLIENT_SERVICE_URL,

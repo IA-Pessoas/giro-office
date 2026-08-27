@@ -14,7 +14,7 @@ function cellText(value: unknown): string {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "object") return JSON.stringify(value);
   const text = String(value);
-  return typeof value === "string" && /^[=+\-@]/u.test(text) ? `'${text}` : text;
+  return typeof value === "string" && /^\s*[=+\-@]/u.test(text) ? `'${text}` : text;
 }
 
 function escapeCell(value: unknown): string {

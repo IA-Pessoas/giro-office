@@ -22,7 +22,7 @@ import { createReportExportRouter } from "./routes/reportExport.routes.js";
 import type { ReportingAccessContextClient } from "./routes/reportingContext.js";
 import { createReportJobRouter } from "./routes/reportJob.routes.js";
 import { createReportModelRouter } from "./routes/reportModel.routes.js";
-import { ReportAuditService } from "./services/reportAuditService.js";
+import { createReportAuditService } from "./services/reportAuditService.js";
 import { ReportAuthorizationService } from "./services/reportAuthorizationService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
 import { ReportExportService } from "./services/reportExportService.js";
@@ -92,14 +92,13 @@ export function createReportsApp({
   const modelService = new ReportModelService(prisma);
   const jobService = new ReportJobService(prisma);
   const snapshotService = new ReportSnapshotService(prisma);
-  const auditService = new ReportAuditService(prisma as never, async () => undefined);
-  const exportService = new ReportExportService(
-    snapshotService,
-    jobService,
-    authorizationService,
-    undefined,
-    auditService,
-  );
+  const auditService = createReportAuditService(prisma as never, {
+    enabled: env.auditEnabled,
+    serviceUrl: env.auditServiceUrl,
+    serviceToken: env.auditServiceToken,
+    logger,
+  });
+  const exportService = new ReportExportService(snapshotService, undefined, auditService);
 
   app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
   app.use("/reports", createReportPreviewRouter({ previewService, accessContextClient }));
