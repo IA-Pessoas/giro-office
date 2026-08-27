@@ -16,6 +16,10 @@ const { prismaMock, passwordHashMock, permissionServiceMock, userAuditMock } = v
       create: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    logs: {
+      create: vi.fn(),
     },
     department: {
       findFirst: vi.fn(),
@@ -590,6 +594,68 @@ describe("UserService", () => {
       }),
     );
     expect(userAuditMock.mock.calls[0]?.[0].changes).not.toHaveProperty("password");
+  });
+
+  it("update registra auditoria detalhada para alterações de módulos", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      name: "User",
+      login: "user",
+      permission: 1,
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      joined_at: new Date("2025-01-01"),
+      organization_id: "org-1",
+      type: "user",
+      first_owner_flag: false,
+      permission_id: "permission-1",
+    });
+    const previousPermission = {
+      id: "permission-1",
+      user_id: "user-1",
+      organization_id: "org-1",
+      fiscal: 0,
+    };
+    const nextPermission = { ...previousPermission, fiscal: 2 };
+    prismaMock.permission.findFirst
+      .mockResolvedValueOnce(previousPermission)
+      .mockResolvedValueOnce(nextPermission);
+
+    await new UserService(userAuditMock).update(
+      "user-1",
+      { modules: { fiscal: 2 } },
+      "org-1",
+      "actor-1",
+    );
+
+    const expectedChanges = {
+      affected_user_id: "user-1",
+      organization_id: "org-1",
+      previous: previousPermission,
+      next: nextPermission,
+    };
+    expect(prismaMock.logs.create).toHaveBeenCalledWith({
+      data: {
+        user_id: "actor-1",
+        organization_id: "org-1",
+        action: "UPDATE",
+        referring: "Permission",
+        referring_id: "user-1",
+        changes: expectedChanges,
+      },
+    });
+    expect(userAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: "actor-1",
+        organizationId: "org-1",
+        action: "UPDATE",
+        referring: "Permission",
+        referringId: "user-1",
+        changes: expectedChanges,
+        outcome: "success",
+      }),
+    );
   });
 
   it("create records the new user without credentials", async () => {

@@ -641,6 +641,7 @@ class UserManagementService {
 
     try {
       const expectedVersion = data.expected_version ?? existingUser.version ?? 1;
+      let permissionAudit: Parameters<UserAuditRecorder>[0] | null = null;
       await prismaClient.$transaction(
         async (transaction) => {
           if (removesActiveOwner(currentType, existingUser.status, requestedType, data.status)) {
@@ -670,6 +671,15 @@ class UserManagementService {
           }
 
           if (modulesToApply && hasModulePatch(modulesToApply)) {
+            const previousPermission = actorUserId
+              ? await transaction.permission.findFirst({
+                  where: { user_id: id, organization_id: organizationId },
+                })
+              : null;
+            if (actorUserId && !previousPermission) {
+              throw new ServiceError(404, "Permissão não encontrada.");
+            }
+
             const permissionResult = await transaction.permission.updateMany({
               where: { user_id: id, organization_id: organizationId },
               data: modulesToApply,
@@ -677,12 +687,50 @@ class UserManagementService {
             if (permissionResult.count !== 1) {
               throw new ServiceError(404, "Permissão não encontrada.");
             }
+
+            if (actorUserId) {
+              const nextPermission = await transaction.permission.findFirst({
+                where: { user_id: id, organization_id: organizationId },
+              });
+              if (!nextPermission) {
+                throw new ServiceError(404, "Permissão não encontrada.");
+              }
+              const changes = {
+                affected_user_id: id,
+                organization_id: organizationId,
+                previous: previousPermission,
+                next: nextPermission,
+              };
+              await transaction.logs.create({
+                data: {
+                  user_id: actorUserId,
+                  organization_id: organizationId,
+                  action: "UPDATE",
+                  referring: "Permission",
+                  referring_id: id,
+                  changes,
+                },
+              });
+              permissionAudit = {
+                actorUserId,
+                organizationId,
+                action: "UPDATE",
+                referring: "Permission",
+                referringId: id,
+                changes,
+                outcome: "success",
+              };
+            }
           }
 
           return result;
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
+
+      if (permissionAudit) {
+        this.#recordAudit(permissionAudit);
+      }
 
       const {
         password: _password,

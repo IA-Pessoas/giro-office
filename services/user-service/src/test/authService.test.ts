@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { prismaMock, passwordHashMock, jwtMock } = vi.hoisted(() => ({
   prismaMock: {
     $executeRaw: vi.fn(),
+    $transaction: vi.fn(async (callback) => callback(prismaMock)),
     user: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
