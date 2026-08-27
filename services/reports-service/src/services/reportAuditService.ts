@@ -133,7 +133,7 @@ export class ReportAuditService {
       userId: input.actor_id,
       method: "REPORT_LIFECYCLE",
       path: input.job_id ? `/reports/jobs/${input.job_id}` : "/reports/snapshots/export",
-      outcome: "success",
+      outcome: input.result === "failure" ? "error" : "success",
       serviceSource: "reports-service",
       createdAt: input.occurred_at.toISOString(),
       finishedAt: input.occurred_at.toISOString(),

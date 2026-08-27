@@ -84,8 +84,9 @@ export class ReportSnapshotService {
     if (!job) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
 
     const records = await this.prisma.reportSnapshotRow.findMany({
-      where: { snapshot_id: snapshot.id },
+      where: { snapshot_id: snapshot.id, organization_id: input.organizationId },
       orderBy: { row_number: "asc" },
+      select: { row_number: true, data_json: true },
     });
     return {
       snapshot: { id: snapshot.id, created_at: snapshot.created_at },

@@ -95,6 +95,11 @@ describe("ReportSnapshotService", () => {
         status: "completed",
       },
     });
+    expect(prisma.reportSnapshotRow.findMany).toHaveBeenCalledWith({
+      where: { snapshot_id: "snapshot-1", organization_id: "org-1" },
+      orderBy: { row_number: "asc" },
+      select: { row_number: true, data_json: true },
+    });
   });
 
   it("revalidates snapshot and requester immediately before export", async () => {
