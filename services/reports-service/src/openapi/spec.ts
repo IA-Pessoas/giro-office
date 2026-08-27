@@ -161,6 +161,85 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           },
         },
       },
+      "/reports/jobs/list": {
+        get: {
+          tags: ["Reports"],
+          summary: "Listar historico pessoal ou acervo departamental",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "scope",
+              in: "query",
+              schema: { type: "string", enum: ["personal", "library"], default: "personal" },
+            },
+            {
+              name: "status",
+              in: "query",
+              schema: {
+                type: "string",
+                enum: [
+                  "queued",
+                  "processing",
+                  "completed",
+                  "cancelled",
+                  "failed",
+                  "expired",
+                  "deleted",
+                ],
+              },
+            },
+            { name: "from", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "to", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "model_id", in: "query", schema: { type: "string", format: "uuid" } },
+            { name: "author_id", in: "query", schema: { type: "string", format: "uuid" } },
+            { name: "cursor", in: "query", schema: { type: "integer", minimum: 0 } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+          ],
+          responses: {
+            "200": { description: "Historico paginado", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Membro do departamento atual necessario" },
+          },
+        },
+      },
+      "/reports/retention": {
+        get: {
+          tags: ["Reports"],
+          summary: "Consultar retenção organizacional de relatórios",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Política de retenção", ...successResponse },
+            "403": { description: "Somente owner" },
+          },
+        },
+        put: {
+          tags: ["Reports"],
+          summary: "Definir retenção para jobs futuros",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["retention_days"],
+                  additionalProperties: false,
+                  properties: { retention_days: { type: "integer", minimum: 1, maximum: 365 } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description:
+                "Política atualizada; o evento de alteração é gravado na auditoria local",
+              ...successResponse,
+            },
+            "400": { description: "Retenção inválida" },
+            "403": { description: "Somente owner" },
+          },
+        },
+      },
       "/reports/jobs/{id}/cancel": {
         post: {
           tags: ["Reports"],
@@ -178,15 +257,26 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
       "/reports/jobs/{id}/snapshot": {
         get: {
           tags: ["Reports"],
-          summary: "Ler snapshot concluído e paginado do solicitante",
+          summary: "Ler snapshot concluído e paginado",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "scope",
+              in: "query",
+              description:
+                "Use scope=personal, or omit it, to open the author's personal snapshot, including after source permission loss. Use scope=library for shared snapshots; this requires the current department.",
+              schema: { type: "string", enum: ["personal", "library"], default: "personal" },
+            },
             { name: "cursor", in: "query", schema: { type: "integer", minimum: 0 } },
             { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 500 } },
           ],
           responses: {
             "200": { description: "Snapshot paginado", ...successResponse },
+            "403": {
+              description:
+                "Departamento atual necessário para o acervo ou scope=library obrigatório para snapshot compartilhado",
+            },
             "404": { description: "Snapshot não encontrado ou indisponível" },
           },
         },
@@ -222,6 +312,36 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
             "401": { description: "Contexto autenticado ausente" },
             "403": { description: "Snapshot não autorizado" },
             "404": { description: "Snapshot não encontrado ou expirado" },
+          },
+        },
+      },
+      "/reports/snapshots/{id}/delete": {
+        post: {
+          tags: ["Reports"],
+          summary: "Excluir snapshot por solicitação administrativa",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["justification"],
+                  additionalProperties: false,
+                  properties: { justification: { type: "string", minLength: 10, maxLength: 1000 } },
+                },
+              },
+            },
+          },
+          responses: {
+            "204": { description: "Snapshot excluído" },
+            "400": { description: "Justificativa inválida" },
+            "403": { description: "Admin 3 do departamento necessário" },
+            "404": { description: "Snapshot não encontrado" },
+            "409": { description: "Snapshot indisponível" },
           },
         },
       },

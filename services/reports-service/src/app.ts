@@ -22,6 +22,7 @@ import { createReportExportRouter } from "./routes/reportExport.routes.js";
 import type { ReportingAccessContextClient } from "./routes/reportingContext.js";
 import { createReportJobRouter } from "./routes/reportJob.routes.js";
 import { createReportModelRouter } from "./routes/reportModel.routes.js";
+import { createReportRetentionRouter } from "./routes/reportRetention.routes.js";
 import { createReportAuditService } from "./services/reportAuditService.js";
 import { ReportAuthorizationService } from "./services/reportAuthorizationService.js";
 import { ReportCsvService } from "./services/reportCsvService.js";
@@ -32,9 +33,11 @@ import {
   type ReportLetterheadAsset,
   ReportLetterheadService,
 } from "./services/reportLetterheadService.js";
+import { ReportLifecycleService } from "./services/reportLifecycleService.js";
 import { ReportModelService } from "./services/reportModelService.js";
 import { ReportPdfService } from "./services/reportPdfService.js";
 import { ReportPreviewService } from "./services/reportPreviewService.js";
+import { ReportRetentionService } from "./services/reportRetentionService.js";
 import { ReportSnapshotService } from "./services/reportSnapshotService.js";
 import { ReportXlsxService } from "./services/reportXlsxService.js";
 
@@ -118,6 +121,8 @@ export function createReportsApp({
     jobService,
     authorizationService,
   );
+  const retentionService = new ReportRetentionService(prisma, auditService);
+  const lifecycleService = new ReportLifecycleService(prisma as never, auditService);
 
   app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
   app.use("/reports", createReportPreviewRouter({ previewService, accessContextClient }));
@@ -126,7 +131,17 @@ export function createReportsApp({
     "/reports",
     createReportModelRouter({ modelService, authorizationService, previewService }),
   );
-  app.use("/reports", createReportJobRouter({ jobService, snapshotService, authorizationService }));
+  app.use(
+    "/reports",
+    createReportJobRouter({
+      jobService,
+      snapshotService,
+      authorizationService,
+      lifecycleService,
+      accessContextClient,
+    }),
+  );
+  app.use("/reports", createReportRetentionRouter({ retentionService, accessContextClient }));
   app.use(
     createExpressErrorHandler({
       logger,
