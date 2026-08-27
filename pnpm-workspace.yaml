@@ -28,3 +28,6 @@ blockExoticSubdeps: true
 strictDepBuilds: true
 dangerouslyAllowAllBuilds: false
 allowBuilds: {}
+
+overrides:
+  uuid: 11.1.1
