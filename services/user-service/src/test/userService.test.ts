@@ -12,9 +12,17 @@ const { prismaMock, passwordHashMock, permissionServiceMock, userAuditMock } = v
       update: vi.fn(),
       updateMany: vi.fn(),
     },
+    permission: {
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
     department: {
       findFirst: vi.fn(),
     },
+    $transaction: vi.fn(async (callback: (client: typeof prismaMock) => unknown) =>
+      callback(prismaMock),
+    ),
   },
   passwordHashMock: {
     hashPassword: vi.fn(),
@@ -47,6 +55,8 @@ describe("UserService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.user.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.permission.create.mockResolvedValue({ id: "permission-1" });
+    prismaMock.permission.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it("getById aceita usuário legado vinculado pela organização do departamento", async () => {
@@ -216,11 +226,11 @@ describe("UserService", () => {
       where: { id: "dep-1", organization_id: "org-1" },
       select: { id: true, name: true },
     });
-    expect(permissionServiceMock.create).toHaveBeenCalledWith("user-1", "org-1");
-    expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "user-1",
-      { fiscal: 1, rh: 1, ti: 1 },
-      "org-1",
+    expect(prismaMock.permission.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { user_id: "user-1", organization_id: "org-1" } }),
+    );
+    expect(prismaMock.permission.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { fiscal: 1, rh: 1, ti: 1 } }),
     );
     expect(passwordHashMock.hashPassword).toHaveBeenCalledWith("secret");
     expect(prismaMock.user.create).toHaveBeenCalledWith(
@@ -260,10 +270,8 @@ describe("UserService", () => {
       type: "user",
     });
 
-    expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "user-self-service",
-      { rh: 1, ti: 1 },
-      "org-1",
+    expect(prismaMock.permission.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { rh: 1, ti: 1 } }),
     );
   });
 
@@ -299,10 +307,8 @@ describe("UserService", () => {
       modules: { rh: 2, ti: 2 },
     });
 
-    expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "user-management",
-      { rh: 2, ti: 2 },
-      "org-1",
+    expect(prismaMock.permission.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { rh: 2, ti: 2 } }),
     );
   });
 
@@ -337,7 +343,7 @@ describe("UserService", () => {
       type: "user",
     });
 
-    expect(permissionServiceMock.update).not.toHaveBeenCalled();
+    expect(prismaMock.permission.update).not.toHaveBeenCalled();
   });
 
   it("create normaliza admin departamental para permissao modular do departamento", async () => {
@@ -380,10 +386,8 @@ describe("UserService", () => {
         }),
       }),
     );
-    expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "user-admin-contabil",
-      { financeiro: 1, contabil: 3, rh: 1, ti: 1 },
-      "org-1",
+    expect(prismaMock.permission.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { financeiro: 1, contabil: 3, rh: 1, ti: 1 } }),
     );
   });
 
@@ -419,10 +423,8 @@ describe("UserService", () => {
       first_owner_flag: true,
     });
 
-    expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "owner-1",
-      expect.objectContaining({ ti: 3, rh: 3, certificado: 3 }),
-      "org-1",
+    expect(prismaMock.permission.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ ti: 3, rh: 3, certificado: 3 }) }),
     );
   });
 
@@ -491,7 +493,18 @@ describe("UserService", () => {
     );
 
     expect(prismaMock.user.updateMany).toHaveBeenCalledWith({
-      where: { id: "user-1", version: 7 },
+      where: {
+        AND: [
+          {
+            id: "user-1",
+            OR: [
+              { organization_id: "org-1" },
+              { organization_id: null, department: { organization_id: "org-1" } },
+            ],
+          },
+          { version: 7 },
+        ],
+      },
       data: { name: "Depois", version: { increment: 1 } },
     });
     expect(result).toMatchObject({ id: "user-1", name: "Depois", version: 8 });
@@ -513,9 +526,13 @@ describe("UserService", () => {
     ).rejects.toMatchObject({ statusCode: 409 });
 
     expect(prismaMock.user.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "user-1", version: 7 } }),
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([expect.objectContaining({ version: 7 })]),
+        }),
+      }),
     );
-    expect(permissionServiceMock.update).not.toHaveBeenCalled();
+    expect(prismaMock.permission.updateMany).not.toHaveBeenCalled();
   });
 
   it("update armazena uma nova senha usando o hash atual", async () => {
@@ -713,14 +730,14 @@ describe("UserService", () => {
         }),
       }),
     );
-    expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "user-1",
+    expect(prismaMock.permission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        rh: 1,
-        ti: 1,
-        contabil: 0,
+        data: expect.objectContaining({
+          rh: 1,
+          ti: 1,
+          contabil: 0,
+        }),
       }),
-      "org-1",
     );
   });
 
@@ -736,13 +753,78 @@ describe("UserService", () => {
 
     await service.update("user-viewer", { permission: 1 }, "org-1");
 
-    expect(permissionServiceMock.update).toHaveBeenCalledWith(
-      "user-viewer",
+    expect(prismaMock.permission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        rh: 1,
-        ti: 1,
+        data: expect.objectContaining({
+          rh: 1,
+          ti: 1,
+        }),
       }),
+    );
+  });
+
+  it("mantém criação de usuário e permissões no mesmo limite transacional", async () => {
+    passwordHashMock.hashPassword.mockResolvedValue("hashed");
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1", name: "Fiscal" });
+    prismaMock.user.create.mockResolvedValue({ id: "user-1", organization_id: "org-1" });
+
+    await new UserService().create({
+      name: "Novo",
+      login: "novo",
+      password: "secret",
+      department_id: "dep-1",
+      permission: 1,
+      organization_id: "org-1",
+    });
+
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.permission.create).toHaveBeenCalled();
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { permission_id: "permission-1" } }),
+    );
+  });
+
+  it("rejeita o rebaixamento do último owner ativo antes de persistir", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "owner-1",
+      status: "active",
+      type: "owner",
+      version: 1,
+      permission_id: "permission-1",
+    });
+    prismaMock.user.count.mockResolvedValue(1);
+
+    await expect(
+      new UserService().update("owner-1", { type: "user", expected_version: 1 }, "org-1"),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("revoga sessões ao alterar senha sem retornar a credencial", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      status: "active",
+      type: "user",
+      version: 1,
+      permission_id: "permission-1",
+    });
+    passwordHashMock.hashPassword.mockResolvedValue("$argon2id$hash");
+
+    const result = await new UserService().update(
+      "user-1",
+      { password: "nova-senha", expected_version: 1 },
       "org-1",
     );
+
+    expect(prismaMock.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          password: "$argon2id$hash",
+          session_version: { increment: 1 },
+        }),
+      }),
+    );
+    expect(result).not.toHaveProperty("password");
   });
 });

@@ -8,7 +8,7 @@ import {
   ServiceError,
 } from "@workspace/shared";
 
-import type { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "../generated/prisma/client.js";
 import type { UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { hashPassword } from "../security/passwordHashService.js";
@@ -86,7 +86,7 @@ const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleField> = {
   triagem: "triagem",
 };
 
-interface CreateUserInput {
+export interface CreateUserInput {
   name: string;
   login: string;
   password: string;
@@ -101,7 +101,7 @@ interface CreateUserInput {
   modules?: Record<string, number>;
 }
 
-interface UpdateUserInput {
+export interface UpdateUserInput {
   name?: string;
   login?: string;
   password?: string;
@@ -116,7 +116,7 @@ interface UpdateUserInput {
   expected_version?: number;
 }
 
-interface ListUsersParams {
+export interface ListUsersParams {
   skip?: number;
   take?: number;
   organizationId: string;
@@ -195,6 +195,28 @@ function resolveDepartmentModuleKey(departmentName: string | null | undefined): 
 
 function normalizeUserType(value: unknown): AuthUserType | null {
   return value === "owner" || value === "admin" || value === "user" ? value : null;
+}
+
+function organizationUsersWhere(organizationId: string): Prisma.UserWhereInput {
+  return {
+    OR: [
+      { organization_id: organizationId },
+      { organization_id: null, department: { organization_id: organizationId } },
+    ],
+  };
+}
+
+function removesActiveOwner(
+  currentType: AuthUserType | null,
+  currentStatus: string | null,
+  nextType: AuthUserType | null,
+  nextStatus: string | undefined,
+): boolean {
+  return (
+    currentType === "owner" &&
+    currentStatus === "active" &&
+    (nextType !== "owner" || nextStatus === "inactive")
+  );
 }
 
 function pickKnownModules(modules: Record<string, number> | undefined): ModulePatch {
@@ -290,7 +312,7 @@ function withDefaultSelfServiceModules(modules: ModulePatch, permission: number)
   };
 }
 
-class UserService {
+class UserManagementService {
   constructor(private readonly audit?: UserAuditRecorder) {}
 
   async list({ skip = 0, take = 20, organizationId }: ListUsersParams): Promise<{
@@ -343,6 +365,24 @@ class UserService {
       ...user,
       modules: normalizeModulePermissions(permission),
     };
+  }
+
+  async updatePermissions(
+    id: string,
+    modules: ModulePatch,
+    organizationId: string,
+    actorUserId?: string,
+  ): Promise<Awaited<ReturnType<PermissionService["update"]>>> {
+    const permissionService = new PermissionService(this.audit);
+    return permissionService.update(id, modules, organizationId, { actorUserId });
+  }
+
+  async getPermissions(
+    id: string,
+    modulo: string | undefined,
+    organizationId: string,
+  ): Promise<Awaited<ReturnType<PermissionService["getByUserId"]>>> {
+    return new PermissionService(this.audit).getByUserId(id, modulo, organizationId);
   }
 
   async getReportingAccessContext(
@@ -404,64 +444,58 @@ class UserService {
     const passwordHash = await hashPassword(data.password);
 
     try {
-      const user = await prismaClient.user.create({
-        data: {
-          name: data.name,
-          login: data.login,
-          password: passwordHash,
-          department_id: data.department_id,
-          permission: normalizedPermission,
-          status: data.status ?? "active",
-          photo_url: data.photo_url,
-          invited_by: data.invited_by,
-          organization_id: data.organization_id ?? null,
-          type: normalizedType,
-          first_owner_flag: data.first_owner_flag ?? false,
-        },
-        select: data.organization_id ? USER_CREATE_SELECT : USER_PUBLIC_SELECT,
+      const user = await prismaClient.$transaction(async (transaction) => {
+        const createdUser = await transaction.user.create({
+          data: {
+            name: data.name,
+            login: data.login,
+            password: passwordHash,
+            department_id: data.department_id,
+            permission: normalizedPermission,
+            status: data.status ?? "active",
+            photo_url: data.photo_url,
+            invited_by: data.invited_by,
+            organization_id: data.organization_id ?? null,
+            type: normalizedType,
+            first_owner_flag: data.first_owner_flag ?? false,
+          },
+          select: data.organization_id ? USER_CREATE_SELECT : USER_PUBLIC_SELECT,
+        });
+
+        if (!data.organization_id) {
+          return createdUser;
+        }
+
+        const permission = await transaction.permission.create({
+          data: { user_id: createdUser.id, organization_id: data.organization_id },
+          select: { id: true },
+        });
+
+        if (hasModulePatch(modulesToApply)) {
+          await transaction.permission.update({
+            where: { id: permission.id },
+            data: modulesToApply,
+          });
+        }
+
+        await transaction.user.update({
+          where: { id: createdUser.id },
+          data: { permission_id: permission.id },
+        });
+
+        return { ...createdUser, permission_id: permission.id };
       });
 
-      if (data.organization_id) {
-        try {
-          const permissionService = new PermissionService(this.audit);
-          const permission = await permissionService.create(user.id, data.organization_id);
-
-          if (hasModulePatch(modulesToApply)) {
-            if (actorUserId) {
-              await permissionService.update(user.id, modulesToApply, data.organization_id, {
-                actorUserId,
-              });
-            } else {
-              await permissionService.update(user.id, modulesToApply, data.organization_id);
-            }
-          }
-
-          await prismaClient.user.update({
-            where: { id: user.id },
-            data: { permission_id: permission.id },
-          });
-
-          const createdUser = {
-            ...user,
-            permission_id: permission.id,
-          };
-          if (this.audit && actorUserId) {
-            this.#recordAudit({
-              actorUserId,
-              organizationId: data.organization_id,
-              action: "CREATE",
-              referring: "user",
-              referringId: user.id,
-              changes: { next: pickUserAuditFields(createdUser) },
-              outcome: "success",
-            });
-          }
-
-          return createdUser;
-        } catch (permErr: unknown) {
-          logError("Erro ao criar/atualizar permissao no create de usuario", { err: permErr });
-          throw new ServiceError(500, "Erro ao criar permissao para o usuario.", permErr);
-        }
+      if (this.audit && actorUserId && data.organization_id) {
+        this.#recordAudit({
+          actorUserId,
+          organizationId: data.organization_id,
+          action: "CREATE",
+          referring: "user",
+          referringId: user.id,
+          changes: { next: pickUserAuditFields(user) },
+          outcome: "success",
+        });
       }
 
       return user;
@@ -594,38 +628,72 @@ class UserService {
       modulesToApply = withDefaultSelfServiceModules(modulesToApply, effectivePermission);
     }
 
+    const mustRevokeSessions =
+      data.password !== undefined ||
+      data.status === "inactive" ||
+      data.permission !== undefined ||
+      data.type !== undefined ||
+      data.modules !== undefined;
+
+    if (mustRevokeSessions) {
+      updateData.session_version = { increment: 1 };
+    }
+
     try {
       const expectedVersion = data.expected_version ?? existingUser.version ?? 1;
-      const updateResult = await prismaClient.user.updateMany({
-        where: { id, version: expectedVersion },
-        data: { ...updateData, version: { increment: 1 } },
-      });
+      await prismaClient.$transaction(
+        async (transaction) => {
+          if (removesActiveOwner(currentType, existingUser.status, requestedType, data.status)) {
+            const activeOwners = await transaction.user.count({
+              where: { ...organizationUsersWhere(organizationId), type: "owner", status: "active" },
+            });
+            if (activeOwners <= 1) {
+              throw new ServiceError(
+                409,
+                "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+              );
+            }
+          }
 
-      if (updateResult.count !== 1) {
-        throw new ServiceError(
-          409,
-          "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
-        );
-      }
+          const result = await transaction.user.updateMany({
+            where: {
+              AND: [userOrganizationWhere(id, organizationId), { version: expectedVersion }],
+            },
+            data: { ...updateData, version: { increment: 1 } },
+          });
 
+          if (result.count !== 1) {
+            throw new ServiceError(
+              409,
+              "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+            );
+          }
+
+          if (modulesToApply && hasModulePatch(modulesToApply)) {
+            const permissionResult = await transaction.permission.updateMany({
+              where: { user_id: id, organization_id: organizationId },
+              data: modulesToApply,
+            });
+            if (permissionResult.count !== 1) {
+              throw new ServiceError(404, "Permissão não encontrada.");
+            }
+          }
+
+          return result;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+
+      const {
+        password: _password,
+        session_version: _sessionVersion,
+        ...publicUpdateData
+      } = updateData;
       const user = {
         ...existingUser,
-        ...updateData,
+        ...publicUpdateData,
         version: expectedVersion + 1,
       } as UserPublicRow;
-
-      if (modulesToApply && hasModulePatch(modulesToApply)) {
-        if (!existingUser.permission_id) {
-          logError("Usuario sem permissao: nao e possivel atualizar modules", { userId: id });
-          throw new ServiceError(400, "Usuario nao possui permissao. Crie a permissao primeiro.");
-        }
-        const permissionService = new PermissionService(this.audit);
-        if (actorUserId) {
-          await permissionService.update(id, modulesToApply, organizationId, { actorUserId });
-        } else {
-          await permissionService.update(id, modulesToApply, organizationId);
-        }
-      }
 
       const normalizedUser = normalizeUserOrganization(user, organizationId);
       if (this.audit && actorUserId) {
@@ -670,16 +738,49 @@ class UserService {
     const existingUser = await this.getById(id, organizationId);
 
     try {
-      const updateResult = await prismaClient.user.updateMany({
-        where: { id, version: existingUser.version ?? 1 },
-        data: { status: "inactive", version: { increment: 1 } },
-      });
-      if (updateResult.count !== 1) {
-        throw new ServiceError(
-          409,
-          "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
-        );
-      }
+      await prismaClient.$transaction(
+        async (transaction) => {
+          if (
+            removesActiveOwner(
+              normalizeUserType(existingUser.type),
+              existingUser.status,
+              normalizeUserType(existingUser.type),
+              "inactive",
+            )
+          ) {
+            const activeOwners = await transaction.user.count({
+              where: { ...organizationUsersWhere(organizationId), type: "owner", status: "active" },
+            });
+            if (activeOwners <= 1) {
+              throw new ServiceError(
+                409,
+                "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+              );
+            }
+          }
+
+          const updateResult = await transaction.user.updateMany({
+            where: {
+              AND: [
+                userOrganizationWhere(id, organizationId),
+                { version: existingUser.version ?? 1 },
+              ],
+            },
+            data: {
+              status: "inactive",
+              session_version: { increment: 1 },
+              version: { increment: 1 },
+            },
+          });
+          if (updateResult.count !== 1) {
+            throw new ServiceError(
+              409,
+              "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+            );
+          }
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
       if (this.audit && actorUserId) {
         this.#recordAudit({
           actorUserId,
@@ -722,4 +823,4 @@ class UserService {
   }
 }
 
-export { UserService };
+export { UserManagementService, UserManagementService as UserService };
