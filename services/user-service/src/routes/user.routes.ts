@@ -22,6 +22,10 @@ import {
   requireOwnerUserAuth,
 } from "../security/userManagementAuth.js";
 import { StorageService } from "../services/storageService.js";
+import {
+  OrganizationUserManagementAdapter,
+  type UserManagement,
+} from "../services/userManagementService.js";
 import { UserService } from "../services/userService.js";
 
 export function createUserRoutes(
@@ -31,6 +35,13 @@ export function createUserRoutes(
   const upload = createPhotoUploadMiddleware();
   const userService = new UserService(options.audit);
   const storageService = new StorageService();
+
+  function userManagement(auth: { user_id: string; organization_id: string }): UserManagement {
+    return new OrganizationUserManagementAdapter(userService, {
+      actor: { kind: "organization", userId: auth.user_id },
+      organizationId: auth.organization_id,
+    });
+  }
 
   function requireManageUsersAuthMiddleware(
     request: Request,
@@ -58,7 +69,7 @@ export function createUserRoutes(
       try {
         const auth = requireManageUsersAuth(request);
         const { skip, take } = parseWithZod(listUsersQuerySchema, request.query);
-        const result = await userService.list({ skip, take, organizationId: auth.organization_id });
+        const result = await userManagement(auth).list({ skip, take });
 
         response.json(createSuccessResponse(result));
       } catch (err) {
@@ -75,7 +86,7 @@ export function createUserRoutes(
       try {
         const auth = requireManageUsersAuth(request);
         const { id } = parseWithZod(userIdParamsSchema, request.params);
-        const user = await userService.getById(id, auth.organization_id);
+        const user = await userManagement(auth).getById(id);
         const publicPhotoUrl = storageService.readUserPhoto(user.photo_url);
 
         if (!publicPhotoUrl) {
@@ -97,7 +108,7 @@ export function createUserRoutes(
       try {
         const auth = requireManageUsersAuth(request);
         const { id } = parseWithZod(userIdParamsSchema, request.params);
-        const user = await userService.getById(id, auth.organization_id);
+        const user = await userManagement(auth).getById(id);
 
         response.json(createSuccessResponse(user));
       } catch (err) {
@@ -121,14 +132,10 @@ export function createUserRoutes(
           requireOwnerUserAuth(request);
         }
 
-        const user = await userService.create(
-          {
-            ...body,
-            organization_id: auth.organization_id,
-            first_owner_flag: body.first_owner_flag ?? false,
-          },
-          auth.user_id,
-        );
+        const user = await userManagement(auth).create({
+          ...body,
+          first_owner_flag: body.first_owner_flag ?? false,
+        });
 
         response.status(201).json(createSuccessResponse(user));
       } catch (err) {
@@ -157,7 +164,7 @@ export function createUserRoutes(
           requireOwnerUserAuth(request);
         }
 
-        const user = await userService.update(id, body, auth.organization_id, auth.user_id);
+        const user = await userManagement(auth).update(id, body);
 
         response.json(createSuccessResponse(user));
       } catch (err) {
@@ -183,13 +190,7 @@ export function createUserRoutes(
 
         validateUploadFileSignature(request.file);
         const photoUrl = await storageService.uploadUserPhoto(request.file, id);
-        const user = await userService.update(
-          id,
-          { photo_url: photoUrl },
-          auth.organization_id,
-          auth.user_id,
-          "UPDATE_PHOTO",
-        );
+        const user = await userManagement(auth).update(id, { photo_url: photoUrl }, "UPDATE_PHOTO");
 
         response.json(createSuccessResponse(user));
       } catch (err) {
@@ -208,13 +209,7 @@ export function createUserRoutes(
         const { id } = parseWithZod(userIdParamsSchema, request.params);
 
         await storageService.deleteUserPhoto(id);
-        const user = await userService.update(
-          id,
-          { photo_url: null },
-          auth.organization_id,
-          auth.user_id,
-          "UPDATE_PHOTO",
-        );
+        const user = await userManagement(auth).update(id, { photo_url: null }, "UPDATE_PHOTO");
 
         response.json(createSuccessResponse(user));
       } catch (err) {
@@ -232,7 +227,7 @@ export function createUserRoutes(
         const auth = requireManageUsersAuth(request);
         const { id } = parseWithZod(userIdParamsSchema, request.params);
 
-        await userService.delete(id, auth.organization_id, auth.user_id);
+        await userManagement(auth).delete(id);
 
         response.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
       } catch (err) {
