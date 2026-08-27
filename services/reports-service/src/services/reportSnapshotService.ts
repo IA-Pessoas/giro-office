@@ -80,4 +80,70 @@ export class ReportSnapshotService {
         records.length > input.limit ? (visible[visible.length - 1]?.row_number ?? null) : null,
     };
   }
+
+  async getForExport(input: {
+    organizationId: string;
+    userId: string;
+    snapshotId: string;
+  }): Promise<{
+    snapshot: { id: string; created_at: Date };
+    job: { id: string; report_model_version_id: string };
+    rows: Array<Record<string, unknown>>;
+  }> {
+    const snapshot = await this.prisma.reportSnapshot.findFirst({
+      where: {
+        id: input.snapshotId,
+        organization_id: input.organizationId,
+        OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+      },
+    });
+    if (!snapshot) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+
+    const job = await this.prisma.reportJob.findFirst({
+      where: {
+        id: snapshot.report_job_id,
+        organization_id: input.organizationId,
+        requester_id: input.userId,
+        status: "completed",
+      },
+    });
+    if (!job) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+
+    const records = await this.prisma.reportSnapshotRow.findMany({
+      where: { snapshot_id: snapshot.id, organization_id: input.organizationId },
+      orderBy: { row_number: "asc" },
+      select: { row_number: true, data_json: true },
+    });
+    return {
+      snapshot: { id: snapshot.id, created_at: snapshot.created_at },
+      job: { id: job.id, report_model_version_id: job.report_model_version_id },
+      rows: records.map((record) => record.data_json as Record<string, unknown>),
+    };
+  }
+
+  async assertExportable(input: {
+    organizationId: string;
+    userId: string;
+    snapshotId: string;
+  }): Promise<void> {
+    const snapshot = await this.prisma.reportSnapshot.findFirst({
+      where: {
+        id: input.snapshotId,
+        organization_id: input.organizationId,
+        OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+      },
+    });
+    if (!snapshot) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+
+    const job = await this.prisma.reportJob.findFirst({
+      where: {
+        id: snapshot.report_job_id,
+        organization_id: input.organizationId,
+        requester_id: input.userId,
+        status: "completed",
+      },
+      select: { id: true },
+    });
+    if (!job) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+  }
 }

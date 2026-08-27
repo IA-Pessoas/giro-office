@@ -11,7 +11,7 @@ import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { UserAccessContextClient } from "./integrations/userAccessContextClient.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
 import { ReportJobRepository } from "./prisma/reportJobRepository.js";
-import { ReportAuditService } from "./services/reportAuditService.js";
+import { createReportAuditService } from "./services/reportAuditService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
 import { ReportExecutionService } from "./services/reportExecutionService.js";
 import { ReportLifecycleService } from "./services/reportLifecycleService.js";
@@ -25,7 +25,12 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 const prisma = createReportsPrismaClient(env.databaseUrl);
-const audit = new ReportAuditService(prisma as never, async () => undefined);
+const audit = createReportAuditService(prisma as never, {
+  enabled: env.auditEnabled,
+  serviceUrl: env.auditServiceUrl,
+  serviceToken: env.auditServiceToken,
+  logger,
+});
 const catalog = new SourceCatalogService([
   new ParcelamentoAdapter(env),
   new ClientIntegrationAdapter(env),

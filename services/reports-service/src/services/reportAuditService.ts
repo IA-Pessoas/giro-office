@@ -29,10 +29,12 @@ export interface ReportAuditEventInput {
   actor_id: string;
   organization_id: string;
   department_id?: string;
-  job_id: string;
-  report_model_version_id: string;
+  job_id?: string;
+  report_model_version_id?: string;
   event_type: ReportAuditEventType;
   occurred_at: Date;
+  format?: "csv" | "xlsx";
+  result?: "success" | "failure";
   counts?: {
     rows?: number;
     bytes?: number;
@@ -56,6 +58,8 @@ export function createReportAuditEvent(input: ReportAuditEventInput): ReportAudi
     report_model_version_id: input.report_model_version_id,
     event_type: input.event_type,
     occurred_at: input.occurred_at,
+    ...(input.format ? { format: input.format } : {}),
+    ...(input.result ? { result: input.result } : {}),
     ...(input.counts ? { counts: input.counts } : {}),
     ...(input.justification_provided ? { justification_provided: true } : {}),
   };
@@ -66,7 +70,7 @@ export interface ReportAuditStore {
     create(args: {
       data: {
         organization_id: string;
-        report_job_id: string | null;
+        report_job_id?: string | null;
         actor_id: string;
         event_type: ReportAuditEventType;
         payload_json: Record<string, unknown>;
@@ -97,10 +101,14 @@ function safeCounts(counts: ReportAuditEventInput["counts"]): Record<string, num
 function metadata(input: ReportAuditEventInput): Record<string, unknown> {
   return {
     ...(input.department_id ? { department_id: input.department_id } : {}),
-    report_job_id: input.job_id,
-    report_model_version_id: input.report_model_version_id,
+    ...(input.job_id ? { report_job_id: input.job_id } : {}),
+    ...(input.report_model_version_id
+      ? { report_model_version_id: input.report_model_version_id }
+      : {}),
     event_type: input.event_type,
     occurred_at: input.occurred_at.toISOString(),
+    ...(input.format ? { format: input.format } : {}),
+    ...(input.result ? { result: input.result } : {}),
     counts: safeCounts(input.counts),
     ...(input.justification_provided ? { justification_provided: true } : {}),
   };
@@ -117,7 +125,7 @@ export class ReportAuditService {
     await store.reportAuditEvent.create({
       data: {
         organization_id: input.organization_id,
-        report_job_id: input.job_id,
+        ...(input.job_id ? { report_job_id: input.job_id } : {}),
         actor_id: input.actor_id,
         event_type: input.event_type,
         payload_json: Object.fromEntries(
@@ -164,14 +172,14 @@ export class ReportAuditService {
       organizationId: input.organization_id,
       userId: input.actor_id,
       method: "REPORT_LIFECYCLE",
-      path: `/reports/jobs/${input.job_id}`,
-      outcome: "success",
+      path: input.job_id ? `/reports/jobs/${input.job_id}` : "/reports/snapshots/export",
+      outcome: input.result === "failure" ? "error" : "success",
       serviceSource: "reports-service",
       createdAt: input.occurred_at.toISOString(),
       finishedAt: input.occurred_at.toISOString(),
       action: input.event_type,
       referring: "reports.job",
-      referringId: input.job_id,
+      referringId: input.job_id ?? null,
       department: input.department_id ?? null,
       metadata: auditMetadata,
     });

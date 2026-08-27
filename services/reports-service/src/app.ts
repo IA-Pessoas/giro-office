@@ -18,13 +18,15 @@ import { buildReportsServiceOpenApiSpec } from "./openapi/spec.js";
 import type { ReportsPrismaClient } from "./prisma/index.js";
 import { createReportPreviewRouter } from "./routes/preview.routes.js";
 import { createReportCatalogRouter } from "./routes/reportCatalog.routes.js";
+import { createReportExportRouter } from "./routes/reportExport.routes.js";
 import type { ReportingAccessContextClient } from "./routes/reportingContext.js";
 import { createReportJobRouter } from "./routes/reportJob.routes.js";
 import { createReportModelRouter } from "./routes/reportModel.routes.js";
 import { createReportRetentionRouter } from "./routes/reportRetention.routes.js";
-import { ReportAuditService } from "./services/reportAuditService.js";
+import { createReportAuditService } from "./services/reportAuditService.js";
 import { ReportAuthorizationService } from "./services/reportAuthorizationService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
+import { ReportExportService } from "./services/reportExportService.js";
 import { ReportJobService } from "./services/reportJobService.js";
 import { ReportLifecycleService } from "./services/reportLifecycleService.js";
 import { ReportModelService } from "./services/reportModelService.js";
@@ -93,12 +95,19 @@ export function createReportsApp({
   const modelService = new ReportModelService(prisma);
   const jobService = new ReportJobService(prisma);
   const snapshotService = new ReportSnapshotService(prisma);
-  const auditService = new ReportAuditService(prisma as never, async () => undefined);
+  const auditService = createReportAuditService(prisma as never, {
+    enabled: env.auditEnabled,
+    serviceUrl: env.auditServiceUrl,
+    serviceToken: env.auditServiceToken,
+    logger,
+  });
+  const exportService = new ReportExportService(snapshotService, undefined, auditService);
   const retentionService = new ReportRetentionService(prisma, auditService);
   const lifecycleService = new ReportLifecycleService(prisma as never, auditService);
 
   app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
   app.use("/reports", createReportPreviewRouter({ previewService, accessContextClient }));
+  app.use("/reports", createReportExportRouter({ exportService }));
   app.use(
     "/reports",
     createReportModelRouter({ modelService, authorizationService, previewService }),
