@@ -41,42 +41,48 @@ export class ReportExportService {
     requestId: string;
     format: ReportExportFormat;
   }): Promise<ReportExportResult> {
-    const source = await this.snapshots.getForExport({
-      snapshotId: input.snapshotId,
-      userId: input.userId,
-      organizationId: input.organizationId,
-    });
-    const version = await this.jobs.getVersion({
-      organizationId: input.organizationId,
-      modelVersionId: source.job.report_model_version_id,
-      includeEphemeral: true,
-    });
-    const validated = await this.authorizeDefinition(input, version);
-    const table: ReportTable = {
-      columns: validated.definition.columns.map((column) => ({
-        key: column.alias,
-        label: column.alias,
-        valueType: validated.catalog?.sources
-          .find((source) => source.key === column.source)
-          ?.fields.find((field) => field.key === column.field)?.value_type,
-      })),
-      rows: source.rows.map((row) =>
-        Object.fromEntries(
-          validated.definition.columns.map((column) => [
-            column.alias,
-            // biome-ignore lint/suspicious/noPrototypeBuiltins: reports-service targets ES2020.
-            Object.prototype.hasOwnProperty.call(row, column.alias)
-              ? row[column.alias]
-              : row[column.field],
-          ]),
-        ),
-      ),
-    };
-    const renderer = this.renderers[input.format];
-    if (!renderer) throw new ServiceError(500, "Formato de exportação indisponível.");
-
+    let source: Awaited<ReturnType<ReportSnapshotService["getForExport"]>> | undefined;
     try {
+      source = await this.snapshots.getForExport({
+        snapshotId: input.snapshotId,
+        userId: input.userId,
+        organizationId: input.organizationId,
+      });
+      const version = await this.jobs.getVersion({
+        organizationId: input.organizationId,
+        modelVersionId: source.job.report_model_version_id,
+        includeEphemeral: true,
+      });
+      const validated = await this.authorizeDefinition(input, version);
+      const table: ReportTable = {
+        columns: validated.definition.columns.map((column) => ({
+          key: column.alias,
+          label: column.alias,
+          valueType: validated.catalog?.sources
+            .find((source) => source.key === column.source)
+            ?.fields.find((field) => field.key === column.field)?.value_type,
+        })),
+        rows: source.rows.map((row) =>
+          Object.fromEntries(
+            validated.definition.columns.map((column) => [
+              column.alias,
+              // biome-ignore lint/suspicious/noPrototypeBuiltins: reports-service targets ES2020.
+              Object.prototype.hasOwnProperty.call(row, column.alias)
+                ? row[column.alias]
+                : row[column.field],
+            ]),
+          ),
+        ),
+      };
+      const renderer = this.renderers[input.format];
+      if (!renderer) throw new ServiceError(500, "Formato de exportação indisponível.");
+
       const body = await renderer.render(table);
+      await this.snapshots.assertExportable({
+        snapshotId: input.snapshotId,
+        userId: input.userId,
+        organizationId: input.organizationId,
+      });
       await this.audit?.record({
         actor_id: input.userId,
         organization_id: input.organizationId,
@@ -100,8 +106,12 @@ export class ReportExportService {
       await this.audit?.record({
         actor_id: input.userId,
         organization_id: input.organizationId,
-        job_id: source.job.id,
-        report_model_version_id: source.job.report_model_version_id,
+        ...(source?.job
+          ? {
+              job_id: source.job.id,
+              report_model_version_id: source.job.report_model_version_id,
+            }
+          : {}),
         event_type: "report.export",
         occurred_at: new Date(),
         format: input.format,

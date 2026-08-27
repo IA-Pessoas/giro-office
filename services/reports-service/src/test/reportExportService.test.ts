@@ -71,6 +71,7 @@ describe("ReportExportService", () => {
         job: { id: "job-1", report_model_version_id: "version-1" },
         rows: [{ name: "Ana", secret: "não exporte" }],
       }),
+      assertExportable: vi.fn().mockResolvedValue(undefined),
     };
     const authorizationService = {
       validateDefinition: vi.fn().mockResolvedValue({
@@ -134,6 +135,7 @@ describe("ReportExportService", () => {
           job: { id: "job-1", report_model_version_id: "version-1" },
           rows: [],
         }),
+        assertExportable: vi.fn().mockResolvedValue(undefined),
       } as never,
       {
         getVersion: vi.fn().mockResolvedValue({
@@ -162,5 +164,124 @@ describe("ReportExportService", () => {
 
     expect(first.body).not.toBe(second.body);
     expect(render).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects export when the snapshot expires during rendering and audits the failure", async () => {
+    const record = vi.fn().mockResolvedValue(undefined);
+    const snapshotService = {
+      getForExport: vi.fn().mockResolvedValue({
+        snapshot: { id: "snapshot-1", created_at: new Date() },
+        job: { id: "job-1", report_model_version_id: "version-1" },
+        rows: [{ name: "Ana" }],
+      }),
+      assertExportable: vi.fn().mockRejectedValue(new Error("snapshot expired")),
+    };
+    const service = new ReportExportService(
+      snapshotService as never,
+      {
+        getVersion: vi.fn().mockResolvedValue({
+          model: { created_by_user_id: "user-1" },
+          version: { definition_json: { columns: [{ alias: "name" }] } },
+        }),
+      } as never,
+      {
+        validateDefinition: vi
+          .fn()
+          .mockResolvedValue({ definition: { columns: [{ alias: "name" }] } }),
+      } as never,
+      { csv: { render: vi.fn().mockReturnValue(Buffer.from("Name\r\nAna\r\n")) } } as never,
+      { record } as never,
+    );
+
+    await expect(
+      service.export({
+        snapshotId: "snapshot-1",
+        userId: "user-1",
+        organizationId: "org-1",
+        requestId: "request-1",
+        format: "csv",
+      }),
+    ).rejects.toThrow("snapshot expired");
+
+    expect(snapshotService.assertExportable).toHaveBeenCalledWith({
+      snapshotId: "snapshot-1",
+      userId: "user-1",
+      organizationId: "org-1",
+    });
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event_type: "report.export",
+        job_id: "job-1",
+        report_model_version_id: "version-1",
+        format: "csv",
+        result: "failure",
+      }),
+    );
+  });
+
+  it.each([
+    ["getForExport", "getForExport"],
+    ["getVersion", "getVersion"],
+    ["authorization", "validateDefinition"],
+  ])("audits %s failures without sensitive data", async (_stage, failingMethod) => {
+    const record = vi.fn().mockResolvedValue(undefined);
+    const source = {
+      snapshot: { id: "snapshot-1", created_at: new Date() },
+      job: { id: "job-1", report_model_version_id: "version-1" },
+      rows: [{ name: "Ana" }],
+    };
+    const snapshotService = {
+      getForExport: vi
+        .fn()
+        .mockImplementation(() =>
+          failingMethod === "getForExport" ? Promise.reject(new Error("rejected")) : source,
+        ),
+      assertExportable: vi.fn().mockResolvedValue(undefined),
+    };
+    const jobs = {
+      getVersion: vi.fn().mockImplementation(() =>
+        failingMethod === "getVersion"
+          ? Promise.reject(new Error("rejected"))
+          : {
+              model: { created_by_user_id: "user-1" },
+              version: { definition_json: { columns: [{ alias: "name" }] } },
+            },
+      ),
+    };
+    const authorization = {
+      validateDefinition: vi
+        .fn()
+        .mockImplementation(() =>
+          failingMethod === "validateDefinition"
+            ? Promise.reject(new Error("rejected"))
+            : { definition: { columns: [{ alias: "name" }] } },
+        ),
+    };
+    const service = new ReportExportService(
+      snapshotService as never,
+      jobs as never,
+      authorization as never,
+      { csv: { render: vi.fn() } } as never,
+      { record } as never,
+    );
+
+    await expect(
+      service.export({
+        snapshotId: "snapshot-1",
+        userId: "user-1",
+        organizationId: "org-1",
+        requestId: "request-1",
+        format: "csv",
+      }),
+    ).rejects.toThrow("rejected");
+
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event_type: "report.export",
+        format: "csv",
+        result: "failure",
+      }),
+    );
+    expect(record.mock.calls[0]?.[0]).not.toHaveProperty("error");
   });
 });

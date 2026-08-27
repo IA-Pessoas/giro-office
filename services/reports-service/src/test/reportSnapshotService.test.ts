@@ -96,4 +96,41 @@ describe("ReportSnapshotService", () => {
       },
     });
   });
+
+  it("revalidates snapshot and requester immediately before export", async () => {
+    const prisma = {
+      reportSnapshot: {
+        findFirst: vi.fn().mockResolvedValue({ report_job_id: "job-1" }),
+      },
+      reportJob: {
+        findFirst: vi.fn().mockResolvedValue({ id: "job-1" }),
+      },
+    };
+    const service = new ReportSnapshotService(prisma as never);
+
+    await expect(
+      service.assertExportable({
+        organizationId: "org-1",
+        userId: "user-1",
+        snapshotId: "snapshot-1",
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(prisma.reportSnapshot.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "snapshot-1",
+        organization_id: "org-1",
+        OR: [{ expires_at: null }, { expires_at: { gt: expect.any(Date) } }],
+      },
+    });
+    expect(prisma.reportJob.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "job-1",
+        organization_id: "org-1",
+        requester_id: "user-1",
+        status: "completed",
+      },
+      select: { id: true },
+    });
+  });
 });
