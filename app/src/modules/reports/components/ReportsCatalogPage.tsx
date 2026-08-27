@@ -1,6 +1,8 @@
-import { useState } from "react";
-import { ArrowLeft, ArrowRight, BookOpen, FileText, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Archive, ArrowLeft, ArrowRight, BookOpen, FileText, Layers3, ListChecks, Loader2, Plus } from "lucide-react";
+import { toast } from "react-toastify";
 
+import { useModuleAccessMap } from "@modules/auth/hooks/useModuleAccess";
 import { Button } from "@shared/ui/newLayout/button";
 
 import { useReportBuilder } from "../hooks/useReportBuilder";
@@ -17,8 +19,11 @@ import { ReportOrganizationStep } from "./ReportOrganizationStep";
 import { ReportPreviewStep } from "./ReportPreviewStep";
 import { ReportRelationStep } from "./ReportRelationStep";
 import { ReportSourceStep } from "./ReportSourceStep";
+import { ReportHistoryPanel } from "./ReportHistoryPanel";
+import { ReportModelsPanel } from "./ReportModelsPanel";
 
 const steps = ["Fonte", "Relação", "Campos", "Filtros", "Organização", "Prévia"];
+type ReportsTab = "create" | "models" | "history" | "library";
 
 export function ReportsCatalogPage() {
   const catalogQuery = useReportsCatalog();
@@ -26,6 +31,16 @@ export function ReportsCatalogPage() {
   const builder = useReportBuilder();
   const preview = useReportPreview();
   const [activeStep, setActiveStep] = useState(0);
+  const [activeTab, setActiveTab] = useState<ReportsTab>("create");
+  const { accessMap, departmentModule, user } = useModuleAccessMap();
+  const [libraryAvailable, setLibraryAvailable] = useState(true);
+  const canManageShared = user?.type === "admin" || user?.type === "owner" || Boolean(departmentModule && accessMap[departmentModule]?.isAdmin);
+  const tabs: Array<{ id: ReportsTab; label: string; icon: typeof Plus }> = [
+    { id: "create", label: "Criar", icon: Plus },
+    { id: "models", label: "Modelos", icon: Layers3 },
+    { id: "history", label: "Histórico pessoal", icon: ListChecks },
+    { id: "library", label: "Acervo", icon: Archive },
+  ];
   const selectedSource = catalogItems.find((source) => source.key === builder.state.sourceKey);
   const canPreview = Boolean(
     selectedSource &&
@@ -54,6 +69,16 @@ export function ReportsCatalogPage() {
     if (!selectedSource) return;
     const payload = buildReportPreviewPayload(builder.state, selectedSource);
     if (payload) preview.mutate(payload);
+  }
+
+  useEffect(() => {
+    if (!departmentModule && activeTab === "library") setActiveTab("create");
+  }, [activeTab, departmentModule]);
+
+  function handleLibraryAccessDenied() {
+    setLibraryAvailable(false);
+    setActiveTab("create");
+    toast.info("O Acervo não está disponível para este usuário.");
   }
 
   function renderBuilderStep() {
@@ -126,33 +151,19 @@ export function ReportsCatalogPage() {
           </span>
           Relatórios
         </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Consulte fontes autorizadas para montar relatórios.
-        </p>
+        <p className="text-gray-600 dark:text-gray-400">Modelos governados, histórico pessoal, acervo e snapshots somente leitura.</p>
       </header>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
-        <nav aria-label="Abas de relatórios">
-          <div role="tablist" className="flex min-w-max items-center gap-1">
-            <button
-              aria-controls="reports-catalog-panel"
-              aria-selected="true"
-              className="inline-flex items-center rounded-lg bg-blue-100 px-5 py-2.5 font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-              id="reports-tab-catalog"
-              role="tab"
-              tabIndex={0}
-              type="button"
-            >
-              Catálogo
-            </button>
-          </div>
-        </nav>
+      <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+        <nav aria-label="Abas de relatórios"><div role="tablist" className="flex min-w-max items-center gap-1">
+          {tabs.filter((tab) => tab.id !== "library" || (libraryAvailable && Boolean(departmentModule))).map(({ id, label, icon: Icon }) => <button key={id} id={`reports-tab-${id}`} role="tab" type="button" aria-selected={activeTab === id} aria-controls={`reports-${id}-panel`} tabIndex={activeTab === id ? 0 : -1} onClick={() => setActiveTab(id)} className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors ${activeTab === id ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "text-gray-600 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</button>)}
+        </div></nav>
       </section>
 
-      <section
+      {activeTab === "create" ? <section
         aria-labelledby="reports-tab-catalog"
         className="rounded-xl border border-gray-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900"
-        id="reports-catalog-panel"
+        id="reports-create-panel"
         role="tabpanel"
       >
         {catalogQuery.isPending ? (
@@ -275,7 +286,10 @@ export function ReportsCatalogPage() {
             </ul>
           </div>
         )}
-      </section>
+      </section> : null}
+      {activeTab === "models" ? <ReportModelsPanel canManageShared={canManageShared} /> : null}
+      {activeTab === "history" ? <ReportHistoryPanel scope="personal" /> : null}
+      {activeTab === "library" ? <ReportHistoryPanel scope="library" onAccessDenied={handleLibraryAccessDenied} /> : null}
     </div>
   );
 }

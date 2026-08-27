@@ -100,3 +100,55 @@ export type ReportPreviewResult = {
   limit: number;
   hasMore: boolean;
 };
+
+export type ReportModel = {
+  id: string;
+  organization_id: string;
+  name: string;
+  version: number;
+  definition: ReportDefinition;
+  created_by_user_id?: string | null;
+  owner_id?: string | null;
+  owner_name?: string | null;
+};
+
+export type SharedReportModel = ReportModel & {
+  department_id: string;
+  grant?: { sources: Record<string, string[]>; relations: string[] };
+};
+
+export const REPORT_JOB_STATUSES = [
+  "queued",
+  "processing",
+  "completed",
+  "cancelled",
+  "failed",
+  "expired",
+  "deleted",
+] as const;
+
+export type ReportJobStatus = (typeof REPORT_JOB_STATUSES)[number];
+
+export type ReportHistoryItem = {
+  id: string;
+  report_model_version_id: string;
+  requester_id: string;
+  status: ReportJobStatus;
+  requested_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  expires_at?: string | null;
+  model_name?: string | null;
+  model_version?: number | null;
+  author_name?: string | null;
+};
+
+export type ReportHistoryPage = { items: ReportHistoryItem[]; nextCursor: number | null };
+export type ReportSnapshotPage = {
+  snapshot: { id: string; created_at: string };
+  rows: Array<{ row_number: number; values: Record<string, unknown> }>;
+  nextCursor: number | null;
+};
+export type ReportDownloadResult = { blob: Blob; filename: string; mimeType: string };
+export type ReportHistoryScope = "personal" | "library";
+export type ReportExportFormat = "pdf" | "csv" | "xlsx";

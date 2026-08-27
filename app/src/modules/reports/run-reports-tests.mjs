@@ -4,14 +4,24 @@ import { readFile } from "node:fs/promises";
 const {
   fetchReportsCatalog,
   fetchReportsPreview,
+  REPORTS_ENDPOINTS,
+  buildReportJobListParams,
   normalizeReportsError,
   normalizeReportsPreviewError,
+  unwrapReportDownload,
+  unwrapReportJobListEnvelope,
   unwrapReportsCatalogEnvelope,
   unwrapReportsEnvelope,
 } = await import(
   "./services/reportsService.contract.ts"
 );
-const { reportsCatalogQueryKey } = await import("./hooks/queryKeys.ts");
+const {
+  reportsCatalogQueryKey,
+  reportsHistoryQueryKey,
+  reportsModelsQueryKey,
+  reportsPreviewQueryKey,
+  reportsSnapshotQueryKey,
+} = await import("./hooks/queryKeys.ts");
 const {
   buildReportPreviewPayload,
   getSelectableReportFields,
@@ -20,8 +30,10 @@ const {
   normalizeReportBuilderState,
   sanitizeReportPreviewResult,
 } = await import("./utils/reportBuilder.ts");
-const { reportsPreviewQueryKey } = await import("./hooks/queryKeys.ts");
 const appPackage = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url)));
+const reportsPageSource = await readFile(new URL("./components/ReportsCatalogPage.tsx", import.meta.url), "utf8");
+const snapshotTableSource = await readFile(new URL("./components/ReportSnapshotTable.tsx", import.meta.url), "utf8");
+const downloadActionsSource = await readFile(new URL("./components/ReportDownloadActions.tsx", import.meta.url), "utf8");
 
 function runTest(name, callback) {
   try {
@@ -286,6 +298,54 @@ runTest("normalizes builder state without leaking unknown catalog keys", () => {
 
 runTest("uses one stable preview query key", () => {
   assert.deepEqual(reportsPreviewQueryKey("requests"), ["reports", "preview", "requests"]);
+});
+
+runTest("exposes the governed history, snapshot, and download contracts", () => {
+  assert.equal(REPORTS_ENDPOINTS.models, "/reports/models/list");
+  assert.equal(REPORTS_ENDPOINTS.sharedModels, "/reports/models/shared/list");
+  assert.equal(REPORTS_ENDPOINTS.jobs, "/reports/jobs/list");
+  assert.equal(REPORTS_ENDPOINTS.snapshot("job-1"), "/reports/jobs/job-1/snapshot");
+  assert.equal(REPORTS_ENDPOINTS.download("snapshot-1"), "/reports/snapshots/snapshot-1/export");
+  assert.deepEqual(
+    buildReportJobListParams({ scope: "personal", status: "", cursor: undefined }),
+    { scope: "personal" },
+  );
+  assert.deepEqual(reportsModelsQueryKey("personal"), ["reports", "models", "personal"]);
+  assert.deepEqual(reportsHistoryQueryKey({ scope: "library", status: "completed" }), [
+    "reports",
+    "history",
+    "library",
+    "completed",
+    "",
+    "",
+    "",
+    "",
+    null,
+  ]);
+  assert.deepEqual(reportsSnapshotQueryKey("snapshot-1", "library"), [
+    "reports",
+    "snapshot",
+    "snapshot-1",
+    "library",
+    null,
+  ]);
+});
+
+runTest("uses the materialized snapshot id for in-memory downloads", () => {
+  assert.match(snapshotTableSource, /snapshotQuery\.data\?\.snapshot\.id/);
+  assert.match(snapshotTableSource, /ReportDownloadActions id=\{snapshotId \?\? ""\}/);
+  assert.match(snapshotTableSource, /disabled=\{!snapshotId\}/);
+  assert.match(downloadActionsSource, /URL\.createObjectURL\(result\.blob\)/);
+  assert.match(downloadActionsSource, /URL\.revokeObjectURL\(objectUrl\)/);
+});
+
+runTest("keeps reports tabs module-scoped", () => {
+  assert.match(reportsPageSource, /Criar/);
+  assert.match(reportsPageSource, /Modelos/);
+  assert.match(reportsPageSource, /Histórico pessoal/);
+  assert.match(reportsPageSource, /Acervo/);
+  assert.match(reportsPageSource, /useModuleAccessMap/);
+  assert.doesNotMatch(reportsPageSource, /APP_ROUTE_MODULE_MAP/);
 });
 
 runTest("does not render preview columns outside the published catalog", () => {
