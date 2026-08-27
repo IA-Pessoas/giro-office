@@ -115,6 +115,8 @@ export function createReportsApp({
       pdf: new ReportPdfService(letterheadService),
     },
     auditService,
+    jobService,
+    authorizationService,
   );
 
   app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));

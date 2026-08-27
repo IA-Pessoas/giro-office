@@ -1,7 +1,9 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { ReportAuditService } from "./reportAuditService.js";
+import type { ReportAuthorizationService } from "./reportAuthorizationService.js";
 import { ReportCsvService, type ReportTable } from "./reportCsvService.js";
+import type { ReportJobService } from "./reportJobService.js";
 import { ReportLetterheadService } from "./reportLetterheadService.js";
 import { type ReportPdfRenderer, ReportPdfService } from "./reportPdfService.js";
 import type { ReportSnapshotService } from "./reportSnapshotService.js";
@@ -25,6 +27,11 @@ interface ReportTableRenderer {
   render(table: ReportTable): Buffer | Promise<Buffer>;
 }
 
+interface SnapshotExportContext {
+  scope: "personal" | "shared";
+  departmentId?: string;
+}
+
 function createDefaultRenderers(): ReportExportRenderers {
   return {
     csv: new ReportCsvService(),
@@ -38,6 +45,8 @@ export class ReportExportService {
     private readonly snapshots: ReportSnapshotService,
     private readonly renderers: ReportExportRenderers = createDefaultRenderers(),
     private readonly audit?: Pick<ReportAuditService, "record">,
+    private readonly jobs?: Pick<ReportJobService, "getVersion">,
+    private readonly authorization?: Pick<ReportAuthorizationService, "getSharedDepartment">,
   ) {}
 
   async export(input: {
@@ -54,6 +63,7 @@ export class ReportExportService {
         userId: input.userId,
         organizationId: input.organizationId,
       });
+      const exportContext = await this.reauthorizeSnapshot(input, source);
       const table = createTable(source.rows);
       const renderer = this.renderers[input.format];
       if (!renderer) throw new ServiceError(500, "Formato de exportação indisponível.");
@@ -64,7 +74,7 @@ export class ReportExportService {
               author: input.userId,
               generatedAt: source.snapshot.created_at,
               organizationId: input.organizationId,
-              scope: "personal",
+              ...exportContext,
               presentation_json: {
                 columns: table.columns.map((column) => ({
                   key: column.key,
@@ -75,6 +85,11 @@ export class ReportExportService {
               rows: table.rows,
             })
           : await (renderer as ReportTableRenderer).render(table);
+      await this.snapshots.assertExportable({
+        snapshotId: input.snapshotId,
+        userId: input.userId,
+        organizationId: input.organizationId,
+      });
       await this.audit?.record({
         actor_id: input.userId,
         organization_id: input.organizationId,
@@ -85,11 +100,6 @@ export class ReportExportService {
         format: input.format,
         result: "success",
         counts: { rows: source.rows.length, bytes: body.byteLength },
-      });
-      await this.snapshots.assertExportable({
-        snapshotId: input.snapshotId,
-        userId: input.userId,
-        organizationId: input.organizationId,
       });
       return {
         contentType:
@@ -118,6 +128,30 @@ export class ReportExportService {
       });
       throw error;
     }
+  }
+
+  private async reauthorizeSnapshot(
+    input: { userId: string; organizationId: string; requestId: string },
+    source: Awaited<ReturnType<ReportSnapshotService["getForExport"]>>,
+  ): Promise<SnapshotExportContext> {
+    if (!this.jobs || !this.authorization) return { scope: "personal" };
+
+    const version = await this.jobs.getVersion({
+      organizationId: input.organizationId,
+      modelVersionId: source.job.report_model_version_id,
+      includeEphemeral: true,
+    });
+    if (version.model.created_by_user_id === input.userId) return { scope: "personal" };
+
+    const department = await this.authorization.getSharedDepartment({
+      userId: input.userId,
+      organizationId: input.organizationId,
+      requestId: input.requestId,
+    });
+    if (version.model.department_id !== department.id) {
+      throw new ServiceError(403, "O modelo compartilhado não pertence ao departamento atual.");
+    }
+    return { scope: "shared", departmentId: department.id };
   }
 }
 
