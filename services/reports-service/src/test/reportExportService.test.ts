@@ -35,9 +35,20 @@ describe("ReportCsvService", () => {
     expect(
       service.render({
         columns: [{ key: "name", label: "Nome" }],
-        rows: [{ name: "Ana", secret: "não exporte" }],
+        rows: [{ name: "Ana" }],
       }),
     ).toEqual(Buffer.from("Nome\r\nAna\r\n"));
+  });
+
+  it("neutraliza fórmulas precedidas por whitespace ou tab", () => {
+    const service = new ReportCsvService();
+
+    expect(
+      service.render({
+        columns: [{ key: "value", label: "Valor" }],
+        rows: [{ value: " =1+1" }, { value: "\t@cmd" }],
+      }),
+    ).toEqual(Buffer.from("Valor\r\n' =1+1\r\n'\t@cmd\r\n"));
   });
 });
 
@@ -62,90 +73,21 @@ describe("ReportXlsxService", () => {
 });
 
 describe("ReportExportService", () => {
-  it("reutiliza a projeção autorizada para exportar PDF sem consultar fontes vivas", async () => {
-    const render = vi.fn().mockResolvedValue(Buffer.from("%PDF-1.3"));
-    const snapshots = {
-      getForExport: vi.fn().mockResolvedValue({
-        snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
-        job: { id: "job-1", report_model_version_id: "version-1" },
-        rows: [{ name: "Ana", secret: "não exporte" }],
-      }),
-      assertExportable: vi.fn().mockResolvedValue(undefined),
-    };
-    const service = new ReportExportService(
-      snapshots as never,
-      {
-        getVersion: vi.fn().mockResolvedValue({
-          model: { created_by_user_id: "user-1", department_id: null },
-          version: {
-            definition_json: { columns: [{ alias: "name", source: "users", field: "name" }] },
-          },
-        }),
-      } as never,
-      {
-        validateDefinition: vi.fn().mockResolvedValue({
-          definition: { columns: [{ alias: "name", source: "users", field: "name" }] },
-          catalog: undefined,
-        }),
-      } as never,
-      {
-        pdf: { format: "pdf", contentType: "application/pdf", render },
-      } as never,
-    );
-
-    await expect(
-      service.export({
-        snapshotId: "snapshot-1",
-        userId: "user-1",
-        organizationId: "org-1",
-        requestId: "request-1",
-        format: "pdf",
-      }),
-    ).resolves.toMatchObject({
-      contentType: "application/pdf",
-      fileName: "report-job-1.pdf",
-      body: Buffer.from("%PDF-1.3"),
-    });
-
-    expect(render).toHaveBeenCalledWith({
-      author: "user-1",
-      generatedAt: new Date("2026-08-26T12:00:00.000Z"),
-      organizationId: "org-1",
-      scope: "personal",
-      presentation_json: {
-        columns: [{ key: "name", label: "name", format: undefined }],
-      },
-      rows: [{ name: "Ana" }],
-    });
-    expect(snapshots.getForExport).toHaveBeenCalledOnce();
-    expect(snapshots.assertExportable).toHaveBeenCalledOnce();
-  });
-
-  it("reauthoriza o snapshot, exporta seus dados e audita somente metadados seguros", async () => {
+  it("exporta somente os dados persistidos no snapshot e audita metadados seguros", async () => {
     const record = vi.fn().mockResolvedValue(undefined);
     const render = vi.fn().mockReturnValue(Buffer.from("Nome\r\nAna\r\n"));
     const snapshotService = {
       getForExport: vi.fn().mockResolvedValue({
         snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
         job: { id: "job-1", report_model_version_id: "version-1" },
-        rows: [{ name: "Ana", secret: "não exporte" }],
+        rows: [{ name: "Ana" }],
       }),
       assertExportable: vi.fn().mockResolvedValue(undefined),
     };
-    const authorizationService = {
-      validateDefinition: vi.fn().mockResolvedValue({
-        definition: { columns: [{ alias: "name" }] },
-      }),
-    };
+    const jobs = { getVersion: vi.fn() };
+    const authorizationService = { validateDefinition: vi.fn() };
     const service = new ReportExportService(
       snapshotService as never,
-      {
-        getVersion: vi.fn().mockResolvedValue({
-          model: { created_by_user_id: "user-1" },
-          version: { definition_json: { columns: [{ alias: "name" }] } },
-        }),
-      } as never,
-      authorizationService as never,
       { csv: { render } } as never,
       { record } as never,
     );
@@ -169,9 +111,10 @@ describe("ReportExportService", () => {
       userId: "user-1",
       organizationId: "org-1",
     });
-    expect(authorizationService.validateDefinition).toHaveBeenCalledOnce();
+    expect(jobs.getVersion).not.toHaveBeenCalled();
+    expect(authorizationService.validateDefinition).not.toHaveBeenCalled();
     expect(render).toHaveBeenCalledWith({
-      columns: [{ key: "name", label: "name" }],
+      columns: [{ key: "name", label: "name", valueType: "string" }],
       rows: [{ name: "Ana" }],
     });
     expect(record).toHaveBeenCalledWith(
@@ -183,6 +126,55 @@ describe("ReportExportService", () => {
         counts: { rows: 1, bytes: 11 },
       }),
     );
+    expect(record.mock.invocationCallOrder[0]).toBeLessThan(
+      snapshotService.assertExportable.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it("reutiliza a projeção persistida para exportar PDF sem consultar definição ou dados vivos", async () => {
+    const render = vi.fn().mockResolvedValue(Buffer.from("%PDF-1.3"));
+    const snapshotService = {
+      getForExport: vi.fn().mockResolvedValue({
+        snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
+        job: { id: "job-1", report_model_version_id: "version-1" },
+        rows: [{ name: "Ana" }],
+      }),
+      assertExportable: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new ReportExportService(
+      snapshotService as never,
+      {
+        pdf: { format: "pdf", contentType: "application/pdf", render },
+      } as never,
+      { record: vi.fn() } as never,
+    );
+
+    await expect(
+      service.export({
+        snapshotId: "snapshot-1",
+        userId: "user-1",
+        organizationId: "org-1",
+        requestId: "request-1",
+        format: "pdf",
+      }),
+    ).resolves.toMatchObject({
+      contentType: "application/pdf",
+      fileName: "report-job-1.pdf",
+      body: Buffer.from("%PDF-1.3"),
+    });
+
+    expect(render).toHaveBeenCalledWith({
+      author: "user-1",
+      generatedAt: new Date("2026-08-26T12:00:00.000Z"),
+      organizationId: "org-1",
+      scope: "personal",
+      presentation_json: {
+        columns: [{ key: "name", label: "name", format: "string" }],
+      },
+      rows: [{ name: "Ana" }],
+    });
+    expect(snapshotService.getForExport).toHaveBeenCalledOnce();
+    expect(snapshotService.assertExportable).toHaveBeenCalledOnce();
   });
 
   it("cria uma resposta nova em cada tentativa de exportação", async () => {
@@ -197,17 +189,8 @@ describe("ReportExportService", () => {
         assertExportable: vi.fn().mockResolvedValue(undefined),
       } as never,
       {
-        getVersion: vi.fn().mockResolvedValue({
-          model: { created_by_user_id: "user-1" },
-          version: { definition_json: { columns: [{ alias: "name" }] } },
-        }),
-      } as never,
-      {
-        validateDefinition: vi
-          .fn()
-          .mockResolvedValue({ definition: { columns: [{ alias: "name" }] } }),
-      } as never,
-      { csv: { render } } as never,
+        csv: { render },
+      },
       { record: vi.fn() } as never,
     );
 
@@ -237,17 +220,6 @@ describe("ReportExportService", () => {
     };
     const service = new ReportExportService(
       snapshotService as never,
-      {
-        getVersion: vi.fn().mockResolvedValue({
-          model: { created_by_user_id: "user-1" },
-          version: { definition_json: { columns: [{ alias: "name" }] } },
-        }),
-      } as never,
-      {
-        validateDefinition: vi
-          .fn()
-          .mockResolvedValue({ definition: { columns: [{ alias: "name" }] } }),
-      } as never,
       { csv: { render: vi.fn().mockReturnValue(Buffer.from("Name\r\nAna\r\n")) } } as never,
       { record } as never,
     );
@@ -278,48 +250,14 @@ describe("ReportExportService", () => {
     );
   });
 
-  it.each([
-    ["getForExport", "getForExport"],
-    ["getVersion", "getVersion"],
-    ["authorization", "validateDefinition"],
-  ])("audits %s failures without sensitive data", async (_stage, failingMethod) => {
+  it("audits snapshot lookup failures without sensitive data", async () => {
     const record = vi.fn().mockResolvedValue(undefined);
-    const source = {
-      snapshot: { id: "snapshot-1", created_at: new Date() },
-      job: { id: "job-1", report_model_version_id: "version-1" },
-      rows: [{ name: "Ana" }],
-    };
     const snapshotService = {
-      getForExport: vi
-        .fn()
-        .mockImplementation(() =>
-          failingMethod === "getForExport" ? Promise.reject(new Error("rejected")) : source,
-        ),
+      getForExport: vi.fn().mockImplementation(() => Promise.reject(new Error("rejected"))),
       assertExportable: vi.fn().mockResolvedValue(undefined),
-    };
-    const jobs = {
-      getVersion: vi.fn().mockImplementation(() =>
-        failingMethod === "getVersion"
-          ? Promise.reject(new Error("rejected"))
-          : {
-              model: { created_by_user_id: "user-1" },
-              version: { definition_json: { columns: [{ alias: "name" }] } },
-            },
-      ),
-    };
-    const authorization = {
-      validateDefinition: vi
-        .fn()
-        .mockImplementation(() =>
-          failingMethod === "validateDefinition"
-            ? Promise.reject(new Error("rejected"))
-            : { definition: { columns: [{ alias: "name" }] } },
-        ),
     };
     const service = new ReportExportService(
       snapshotService as never,
-      jobs as never,
-      authorization as never,
       { csv: { render: vi.fn() } } as never,
       { record } as never,
     );

@@ -22,7 +22,7 @@ import { createReportExportRouter } from "./routes/reportExport.routes.js";
 import type { ReportingAccessContextClient } from "./routes/reportingContext.js";
 import { createReportJobRouter } from "./routes/reportJob.routes.js";
 import { createReportModelRouter } from "./routes/reportModel.routes.js";
-import { ReportAuditService } from "./services/reportAuditService.js";
+import { createReportAuditService } from "./services/reportAuditService.js";
 import { ReportAuthorizationService } from "./services/reportAuthorizationService.js";
 import { ReportCsvService } from "./services/reportCsvService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
@@ -100,12 +100,15 @@ export function createReportsApp({
   const modelService = new ReportModelService(prisma);
   const jobService = new ReportJobService(prisma);
   const snapshotService = new ReportSnapshotService(prisma);
-  const auditService = new ReportAuditService(prisma as never, async () => undefined);
+  const auditService = createReportAuditService(prisma as never, {
+    enabled: env.auditEnabled,
+    serviceUrl: env.auditServiceUrl,
+    serviceToken: env.auditServiceToken,
+    logger,
+  });
   const letterheadService = new ReportLetterheadService(reporting?.letterheads ?? []);
   const exportService = new ReportExportService(
     snapshotService,
-    jobService,
-    authorizationService,
     {
       csv: new ReportCsvService(),
       xlsx: new ReportXlsxService(),
