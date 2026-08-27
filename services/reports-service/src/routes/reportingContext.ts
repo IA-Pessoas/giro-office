@@ -12,6 +12,7 @@ export interface ReportingAccessContextClient {
 
 export interface ReportingAccessContext {
   organization_id: string;
+  type: "owner" | "admin" | "user" | null;
   department: { id: string } | null;
   departmentModule: string | null;
   modules: Readonly<Record<string, number>>;
@@ -28,6 +29,7 @@ export async function getReportingAccessContext(
 
   const value = context as {
     organization?: { id?: unknown };
+    type?: unknown;
     department?: { id?: unknown };
     departmentModule?: unknown;
     modules?: unknown;
@@ -44,6 +46,8 @@ export async function getReportingAccessContext(
   );
   return {
     organization_id: input.organizationId,
+    type:
+      value.type === "owner" || value.type === "admin" || value.type === "user" ? value.type : null,
     department: typeof value.department?.id === "string" ? { id: value.department.id } : null,
     departmentModule: typeof value.departmentModule === "string" ? value.departmentModule : null,
     modules,

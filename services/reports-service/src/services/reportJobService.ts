@@ -12,6 +12,16 @@ export interface CreateReportJobInput {
   payload: Record<string, unknown>;
 }
 
+export interface ReportHistoryItem {
+  id: string;
+  report_model_version_id: string;
+  requester_id: string;
+  status: string;
+  requested_at: Date;
+  started_at: Date | null;
+  finished_at: Date | null;
+}
+
 export class ReportJobService {
   constructor(private readonly prisma: ReportsPrismaClient) {}
 
@@ -103,6 +113,88 @@ export class ReportJobService {
     });
     if (!job) throw new ServiceError(404, "Job de relatório não encontrado.");
     return job;
+  }
+
+  async listHistory(input: {
+    organizationId: string;
+    userId: string;
+    scope: "personal" | "library";
+    departmentId?: string;
+    status?: string;
+    from?: Date;
+    to?: Date;
+    modelId?: string;
+    authorId?: string;
+    cursor?: number;
+    limit: number;
+  }): Promise<{ items: ReportHistoryItem[]; nextCursor: number | null }> {
+    if (input.scope === "library" && !input.departmentId) {
+      throw new ServiceError(403, "O acervo compartilhado exige departamento atual.");
+    }
+    if (input.scope === "personal" && input.authorId && input.authorId !== input.userId) {
+      return { items: [], nextCursor: null };
+    }
+
+    let versionIds: string[] | undefined;
+    if (input.scope === "library" || input.modelId) {
+      const models = await this.prisma.reportModel.findMany({
+        where: {
+          organization_id: input.organizationId,
+          ...(input.scope === "library"
+            ? { department_id: input.departmentId, is_ephemeral: false }
+            : {}),
+          ...(input.modelId ? { id: input.modelId } : {}),
+        },
+        select: { id: true },
+      });
+      if (models.length === 0) return { items: [], nextCursor: null };
+
+      const versions = await this.prisma.reportModelVersion.findMany({
+        where: {
+          organization_id: input.organizationId,
+          report_model_id: { in: models.map((model) => model.id) },
+        },
+        select: { id: true },
+      });
+      if (versions.length === 0) return { items: [], nextCursor: null };
+      versionIds = versions.map((version) => version.id);
+    }
+
+    const cursor = input.cursor ?? 0;
+    const requestedAt = {
+      ...(input.from ? { gte: input.from } : {}),
+      ...(input.to ? { lte: input.to } : {}),
+    };
+    const jobs = await this.prisma.reportJob.findMany({
+      where: {
+        organization_id: input.organizationId,
+        ...(input.scope === "personal"
+          ? { requester_id: input.userId }
+          : input.authorId
+            ? { requester_id: input.authorId }
+            : {}),
+        ...(input.status ? { status: input.status } : {}),
+        ...(Object.keys(requestedAt).length > 0 ? { requested_at: requestedAt } : {}),
+        ...(versionIds ? { report_model_version_id: { in: versionIds } } : {}),
+      },
+      orderBy: { requested_at: "desc" },
+      skip: cursor,
+      take: input.limit + 1,
+      select: {
+        id: true,
+        report_model_version_id: true,
+        requester_id: true,
+        status: true,
+        requested_at: true,
+        started_at: true,
+        finished_at: true,
+      },
+    });
+    const items = jobs.slice(0, input.limit) as ReportHistoryItem[];
+    return {
+      items,
+      nextCursor: jobs.length > input.limit ? cursor + input.limit : null,
+    };
   }
 
   async cancel(input: { organizationId: string; userId: string; id: string }): Promise<void> {
