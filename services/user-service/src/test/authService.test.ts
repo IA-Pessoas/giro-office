@@ -71,6 +71,7 @@ describe("AuthService", () => {
       type: "user",
       status: "active",
       session_version: 1,
+      version: 1,
       department_id: "dep-1",
       organization_id: "org-1",
       organization: { id: "org-1", status: "active" },
@@ -477,10 +478,14 @@ describe("AuthService", () => {
       permissions: [{ organization_id: "org-1" }],
     });
     prismaMock.user.findFirst.mockResolvedValue(user);
-    prismaMock.user.update.mockImplementation(
+    prismaMock.user.updateMany.mockImplementation(
       async ({ data }: { data: Record<string, unknown> }) => {
-        Object.assign(user, data);
-        return user;
+        const { version, ...fields } = data;
+        Object.assign(user, fields);
+        if (typeof version === "object" && version !== null && "increment" in version) {
+          user.version = (typeof user.version === "number" ? user.version : 1) + 1;
+        }
+        return { count: 1 };
       },
     );
     passwordHashMock.hashPassword.mockImplementation(
