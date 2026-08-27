@@ -69,6 +69,8 @@ describe("platform default deny", () => {
       ["PATCH", "/platform/organizations/org-1/subscription-plan"],
       ["PATCH", "/platform/organizations/org-1/logo-url"],
       ["GET", "/platform/organizations/org-1/users"],
+      ["GET", "/platform/organizations/org-1/users/user-1"],
+      ["GET", "/platform/organizations/org-1/departments"],
       ["GET", "/platform/audit/requests"],
     ]) {
       expect(getRoutePolicy(method, path), `${method} ${path}`).toEqual({
@@ -81,6 +83,8 @@ describe("platform default deny", () => {
       ["PATCH", "/platform/organizations/org-1"],
       ["GET", "/platform/organizations/org-1/status"],
       ["PATCH", "/platform/organizations/org-1/status/extra"],
+      ["POST", "/platform/organizations/org-1/users/user-1"],
+      ["POST", "/platform/organizations/org-1/departments"],
     ]) {
       expect(getRoutePolicy(method, path), `${method} ${path}`).toBeNull();
     }

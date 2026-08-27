@@ -3,6 +3,7 @@ import { platformApi as api } from "@shared/services/api";
 import type {
   CreatePlatformOrganizationPayload,
   PlatformAuditListResponse,
+  PlatformDepartmentOption,
   PlatformOrganization,
   PlatformOrganizationsListResponse,
   PlatformUsersListResponse,
@@ -32,6 +33,16 @@ export const platformService = {
   ): Promise<PlatformUsersListResponse> {
     const response = await api.get(`/platform/organizations/${organizationId}/users`, { params });
     return unwrapData<PlatformUsersListResponse>(response);
+  },
+
+  async getUser(organizationId: string, userId: string): Promise<PlatformUsersListResponse["users"][number]> {
+    const response = await api.get(`/platform/organizations/${organizationId}/users/${userId}`);
+    return unwrapData<PlatformUsersListResponse["users"][number]>(response);
+  },
+
+  async listDepartments(organizationId: string): Promise<PlatformDepartmentOption[]> {
+    const response = await api.get(`/platform/organizations/${organizationId}/departments`);
+    return unwrapData<PlatformDepartmentOption[]>(response);
   },
 
   async getOrganization(organizationId: string): Promise<PlatformOrganization> {

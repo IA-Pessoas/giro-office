@@ -27,6 +27,7 @@ O endpoint `/internal/reporting/access-context` é chamado diretamente pelo repo
 - `POST /platform/session` autentica o administrador da plataforma e emite `cw.session` como cookie `HttpOnly`; o contrato direto exige `USER_SERVICE_INTERNAL_TOKEN` e aplica rate limit local, portanto o navegador deve chamá-lo pelo gateway. `cw.csrf` não autentica a requisição, servindo somente como prova CSRF para refresh e logout.
 - `POST /platform/session/refresh`, `DELETE /platform/session` e `GET /platform/me` usam a sessão de plataforma. Nenhum endpoint retorna o JWT ou a prova CSRF no JSON.
 - `POST /platform/session/validate` é interno: exige `USER_SERVICE_INTERNAL_TOKEN` e não deve ser chamado pelo navegador.
+- `GET /platform/organizations/:organizationId/users`, `GET /platform/organizations/:organizationId/users/:userId` e `GET /platform/organizations/:organizationId/departments` são consultas de plataforma somente leitura. Exigem a sessão HTTP-only encaminhada pelo gateway; usuário e departamentos são sempre filtrados pela organização do path, e departamentos retornam somente `id` e `name`.
 
 ## Gateway
 

@@ -2235,6 +2235,28 @@ const handlers = {
     });
   },
 
+  async platformUserDetail(op) {
+    const organizationId = requireState("session").organization_id;
+    const listed = await platformHttpRequest(op, {
+      path: `/platform/organizations/${organizationId}/users`,
+      query: { skip: 0, take: 1 },
+      expectedStatus: [200],
+    });
+    const userId = pickFirst(listed.body, "data.users.0.id");
+    if (!userId) throw new Error("Smoke platform user detail requires one organizational user.");
+    await platformHttpRequest(op, {
+      path: `/platform/organizations/${organizationId}/users/${userId}`,
+      expectedStatus: [200],
+    });
+  },
+
+  async platformDepartments(op) {
+    await platformHttpRequest(op, {
+      path: `/platform/organizations/${requireState("session").organization_id}/departments`,
+      expectedStatus: [200],
+    });
+  },
+
   async platformOrganizations(op) {
     await platformHttpRequest(op, {
       query: { page: 1, pageSize: 5 },

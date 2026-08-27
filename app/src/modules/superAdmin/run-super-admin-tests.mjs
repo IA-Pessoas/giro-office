@@ -319,6 +319,17 @@ await runTest("renderiza somente o contrato real de usuário da plataforma", () 
   assert.doesNotMatch(usersPanelSource, /Nível|Entrada|joined_at|user\.permission/);
 });
 
+await runTest("mantém lista e painel de detalhe isolados pela organização selecionada", () => {
+  assert.match(platformServiceSource, /\/users\/\$\{userId\}/);
+  assert.match(platformServiceSource, /\/departments/);
+  assert.match(usersPanelSource, /selectedUserId/);
+  assert.match(usersPanelSource, /lg:grid-cols-\[22rem_minmax\(0,1fr\)\]/);
+  assert.match(usersPanelSource, /usePlatformUserDetail/);
+  assert.match(usersPanelSource, /usePlatformDepartments/);
+  assert.match(usersPanelSource, /departmentsQuery\.isError/);
+  assert.match(usersPanelSource, /departmentsQuery\.refetch/);
+});
+
 await runTest("usa três botões nativos simples para alternar painéis", () => {
   assert.doesNotMatch(superAdminPageSource, /role="tab(?:list|panel)?"/);
   assert.doesNotMatch(

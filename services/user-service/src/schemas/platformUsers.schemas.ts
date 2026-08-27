@@ -6,6 +6,10 @@ export const platformOrganizationUsersParamsSchema = z
   })
   .strict();
 
+export const platformOrganizationUserParamsSchema = platformOrganizationUsersParamsSchema
+  .extend({ userId: z.string().trim().min(1, "userId e obrigatorio.") })
+  .strict();
+
 export const listPlatformUsersQuerySchema = z
   .object({
     skip: z.coerce.number().int().min(0).max(10_000).optional().default(0),

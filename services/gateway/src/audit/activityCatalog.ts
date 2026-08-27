@@ -88,6 +88,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/,
+    description: { action: "consultou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+\/departments$/,
+    description: { action: "consultou", item: "os departamentos da organização" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/reports\/catalog$/,
     description: { action: "consultou", item: "o catálogo de relatórios" },
   },

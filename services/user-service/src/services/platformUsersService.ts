@@ -1,3 +1,4 @@
+import { ServiceError } from "@workspace/shared";
 import type { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
 
@@ -52,5 +53,23 @@ export class PlatformUsersService {
     ]);
 
     return { users, total, hasMore: skip + users.length < total };
+  }
+
+  async getById(organizationId: string, userId: string): Promise<PlatformUserListRow> {
+    const user = await prismaClient.user.findFirst({
+      where: { id: userId, organization_id: organizationId },
+      select: PLATFORM_USER_LIST_SELECT,
+    });
+
+    if (!user) throw new ServiceError(404, "Usuário não encontrado.");
+    return user;
+  }
+
+  async listDepartments(organizationId: string): Promise<Array<{ id: string; name: string }>> {
+    return prismaClient.department.findMany({
+      where: { organization_id: organizationId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
   }
 }

@@ -475,6 +475,22 @@ const baseManifest = [
     auth: "session",
   }),
   op({
+    service: "user-service",
+    method: "GET",
+    path: "/platform/organizations/{organizationId}/users/{userId}",
+    action: "platformUserDetail",
+    target: "gateway",
+    auth: "session",
+  }),
+  op({
+    service: "user-service",
+    method: "GET",
+    path: "/platform/organizations/{organizationId}/departments",
+    action: "platformDepartments",
+    target: "gateway",
+    auth: "session",
+  }),
+  op({
     service: "organization-service",
     method: "GET",
     path: "/platform/organizations",
