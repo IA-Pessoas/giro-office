@@ -262,6 +262,7 @@ model User {
   type                        enumType?
   first_owner_flag            Boolean?               @default(false)
   session_version             Int                    @default(0)
+  version                     Int                    @default(1)
   permission_id               String?                @unique
   department_id               String
   invited_by                  String?
@@ -345,6 +346,7 @@ model User {
   responsiblesTriage          TriageResponsible[]
   department                  Department             @relation(fields: [department_id], references: [id])
 
+  @@unique([login], map: "users_login_key")
   @@index([organization_id, name, id])
   @@map("users")
 }

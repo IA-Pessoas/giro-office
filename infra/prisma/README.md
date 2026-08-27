@@ -17,3 +17,13 @@ nomes, senhas, hashes, cookies ou tokens.
 Quando estiver bloqueado, trate cada login listado pelo fluxo administrativo autorizado, escolhendo
 e atribuindo logins distintos aos usuários envolvidos. Em seguida, execute o preflight novamente;
 aplique a migration somente com relatório vazio.
+
+## Migration e rollback
+
+A migration também verifica colisões no próprio banco antes de criar o índice único, portanto ela
+falha sem alterar o schema se um login duplicado surgir entre o preflight e a aplicação. Ela adiciona
+`users.version`, iniciado em `1`, para permitir compare-and-swap nas edições.
+
+Em uma reversão operacional, interrompa escritores da aplicação e execute manualmente o
+`rollback.sql` da migration para remover somente o índice. A coluna de versão é preservada para não
+descartar histórico de concorrência; versões anteriores da aplicação a ignoram com segurança.

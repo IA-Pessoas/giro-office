@@ -27,6 +27,7 @@ const USER_PUBLIC_SELECT = {
   type: true,
   first_owner_flag: true,
   permission_id: true,
+  version: true,
 } as const;
 
 const USER_CREATE_SELECT = {
@@ -112,6 +113,7 @@ interface UpdateUserInput {
   type?: AuthUserType | null;
   first_owner_flag?: boolean;
   modules?: Record<string, number>;
+  expected_version?: number;
 }
 
 interface ListUsersParams {
@@ -593,11 +595,24 @@ class UserService {
     }
 
     try {
-      const user = await prismaClient.user.update({
-        where: { id },
-        data: updateData,
-        select: USER_PUBLIC_SELECT,
+      const expectedVersion = data.expected_version ?? existingUser.version ?? 1;
+      const updateResult = await prismaClient.user.updateMany({
+        where: { id, version: expectedVersion },
+        data: { ...updateData, version: { increment: 1 } },
       });
+
+      if (updateResult.count !== 1) {
+        throw new ServiceError(
+          409,
+          "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+        );
+      }
+
+      const user = {
+        ...existingUser,
+        ...updateData,
+        version: expectedVersion + 1,
+      } as UserPublicRow;
 
       if (modulesToApply && hasModulePatch(modulesToApply)) {
         if (!existingUser.permission_id) {
@@ -655,10 +670,16 @@ class UserService {
     const existingUser = await this.getById(id, organizationId);
 
     try {
-      await prismaClient.user.update({
-        where: { id },
-        data: { status: "inactive" },
+      const updateResult = await prismaClient.user.updateMany({
+        where: { id, version: existingUser.version ?? 1 },
+        data: { status: "inactive", version: { increment: 1 } },
       });
+      if (updateResult.count !== 1) {
+        throw new ServiceError(
+          409,
+          "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+        );
+      }
       if (this.audit && actorUserId) {
         this.#recordAudit({
           actorUserId,
@@ -671,11 +692,12 @@ class UserService {
         });
       }
     } catch (err: unknown) {
+      logError("Erro ao desativar usuario", { err });
+      if (err instanceof ServiceError) throw err;
       const prismaErr = err as { code?: string };
       if (prismaErr?.code === "P2003") {
         throw new ServiceError(409, "Nao e possivel desativar: usuario possui vinculos.");
       }
-      logError("Erro ao desativar usuario", { err });
       throw new ServiceError(500, "Erro ao desativar usuario.", err);
     }
   }

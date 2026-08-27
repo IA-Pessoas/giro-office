@@ -126,6 +126,7 @@ function extractUserItem(payload: unknown): UserItem {
   const permission = userPayload.permission;
   const departmentId = userPayload.department_id;
   const status = userPayload.status;
+  const version = userPayload.version;
 
   if (
     typeof id !== "string" ||
@@ -133,7 +134,8 @@ function extractUserItem(payload: unknown): UserItem {
     typeof login !== "string" ||
     typeof permission !== "number" ||
     typeof departmentId !== "string" ||
-    typeof status !== "string"
+    typeof status !== "string" ||
+    typeof version !== "number"
   ) {
     throw new Error("Unexpected user payload shape.");
   }
@@ -152,6 +154,7 @@ function extractUserItem(payload: unknown): UserItem {
     permission,
     department_id: departmentId,
     status,
+    version,
     photo_url: readOptionalString(userPayload.photo_url),
     department,
   };
