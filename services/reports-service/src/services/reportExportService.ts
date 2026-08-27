@@ -6,10 +6,12 @@ import type { ReportAuthorizationService } from "./reportAuthorizationService.js
 import { ReportCsvService, type ReportTable } from "./reportCsvService.js";
 import type { ValidatedReportDefinition } from "./reportDefinitionService.js";
 import type { ReportJobService } from "./reportJobService.js";
+import { ReportLetterheadService } from "./reportLetterheadService.js";
+import { type ReportPdfRenderer, ReportPdfService } from "./reportPdfService.js";
 import type { ReportSnapshotService } from "./reportSnapshotService.js";
 import { ReportXlsxService } from "./reportXlsxService.js";
 
-export type ReportExportFormat = "csv" | "xlsx";
+export type ReportExportFormat = "csv" | "xlsx" | "pdf";
 
 export interface ReportExportResult {
   contentType: string;
@@ -17,9 +19,22 @@ export interface ReportExportResult {
   body: Buffer;
 }
 
+interface ReportTableRenderer {
+  render(table: ReportTable): Buffer | Promise<Buffer>;
+}
+
 interface ReportExportRenderers {
-  csv?: ReportCsvService;
-  xlsx?: ReportXlsxService;
+  csv?: ReportTableRenderer;
+  xlsx?: ReportTableRenderer;
+  pdf?: ReportPdfRenderer;
+}
+
+function createDefaultRenderers(): ReportExportRenderers {
+  return {
+    csv: new ReportCsvService(),
+    xlsx: new ReportXlsxService(),
+    pdf: new ReportPdfService(new ReportLetterheadService()),
+  };
 }
 
 export class ReportExportService {
@@ -27,10 +42,7 @@ export class ReportExportService {
     private readonly snapshots: ReportSnapshotService,
     private readonly jobs: ReportJobService,
     private readonly authorization: ReportAuthorizationService,
-    private readonly renderers: ReportExportRenderers = {
-      csv: new ReportCsvService(),
-      xlsx: new ReportXlsxService(),
-    },
+    private readonly renderers: ReportExportRenderers = createDefaultRenderers(),
     private readonly audit?: Pick<ReportAuditService, "record">,
   ) {}
 
@@ -77,7 +89,24 @@ export class ReportExportService {
       const renderer = this.renderers[input.format];
       if (!renderer) throw new ServiceError(500, "Formato de exportação indisponível.");
 
-      const body = await renderer.render(table);
+      const body =
+        input.format === "pdf"
+          ? await (renderer as ReportPdfRenderer).render({
+              author: input.userId,
+              generatedAt: source.snapshot.created_at,
+              organizationId: input.organizationId,
+              ...(validated.department_id ? { departmentId: validated.department_id } : {}),
+              scope: validated.department_id ? "shared" : "personal",
+              presentation_json: {
+                columns: table.columns.map((column) => ({
+                  key: column.key,
+                  label: column.label,
+                  format: column.valueType,
+                })),
+              },
+              rows: table.rows,
+            })
+          : await (renderer as ReportTableRenderer).render(table);
       await this.snapshots.assertExportable({
         snapshotId: input.snapshotId,
         userId: input.userId,
@@ -98,7 +127,9 @@ export class ReportExportService {
         contentType:
           input.format === "csv"
             ? "text/csv; charset=utf-8"
-            : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            : input.format === "xlsx"
+              ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              : "application/pdf",
         fileName: `report-${source.job.id}.${input.format}`,
         body: Buffer.from(body),
       };
@@ -127,7 +158,7 @@ export class ReportExportService {
       model: { created_by_user_id: string | null; department_id?: string | null };
       version: { definition_json: unknown };
     },
-  ): Promise<ValidatedReportDefinition> {
+  ): Promise<ValidatedReportDefinition & { department_id?: string }> {
     if (version.model.created_by_user_id === input.userId) {
       return this.authorization.validateDefinition({
         ...input,

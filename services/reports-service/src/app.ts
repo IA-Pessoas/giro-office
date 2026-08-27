@@ -24,12 +24,19 @@ import { createReportJobRouter } from "./routes/reportJob.routes.js";
 import { createReportModelRouter } from "./routes/reportModel.routes.js";
 import { ReportAuditService } from "./services/reportAuditService.js";
 import { ReportAuthorizationService } from "./services/reportAuthorizationService.js";
+import { ReportCsvService } from "./services/reportCsvService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
 import { ReportExportService } from "./services/reportExportService.js";
 import { ReportJobService } from "./services/reportJobService.js";
+import {
+  type ReportLetterheadAsset,
+  ReportLetterheadService,
+} from "./services/reportLetterheadService.js";
 import { ReportModelService } from "./services/reportModelService.js";
+import { ReportPdfService } from "./services/reportPdfService.js";
 import { ReportPreviewService } from "./services/reportPreviewService.js";
 import { ReportSnapshotService } from "./services/reportSnapshotService.js";
+import { ReportXlsxService } from "./services/reportXlsxService.js";
 
 export interface CreateReportsAppOptions {
   env: ReportsServiceEnv;
@@ -38,6 +45,7 @@ export interface CreateReportsAppOptions {
   reporting?: {
     adapters?: readonly ReportSourceAdapter[];
     accessContextClient?: ReportingAccessContextClient;
+    letterheads?: readonly ReportLetterheadAsset[];
   };
 }
 
@@ -93,11 +101,16 @@ export function createReportsApp({
   const jobService = new ReportJobService(prisma);
   const snapshotService = new ReportSnapshotService(prisma);
   const auditService = new ReportAuditService(prisma as never, async () => undefined);
+  const letterheadService = new ReportLetterheadService(reporting?.letterheads ?? []);
   const exportService = new ReportExportService(
     snapshotService,
     jobService,
     authorizationService,
-    undefined,
+    {
+      csv: new ReportCsvService(),
+      xlsx: new ReportXlsxService(),
+      pdf: new ReportPdfService(letterheadService),
+    },
     auditService,
   );
 

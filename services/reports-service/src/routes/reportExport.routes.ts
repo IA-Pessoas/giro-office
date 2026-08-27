@@ -11,7 +11,7 @@ import { z } from "zod";
 import { reportJobIdParamsSchema } from "../schemas/reportJob.schemas.js";
 import type { ReportExportService } from "../services/reportExportService.js";
 
-const exportQuerySchema = z.object({ format: z.enum(["csv", "xlsx"]) }).strict();
+const exportQuerySchema = z.object({ format: z.enum(["csv", "xlsx", "pdf"]) }).strict();
 
 export function createReportExportRouter(options: {
   exportService: ReportExportService;

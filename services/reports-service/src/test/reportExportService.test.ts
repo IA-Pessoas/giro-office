@@ -62,6 +62,65 @@ describe("ReportXlsxService", () => {
 });
 
 describe("ReportExportService", () => {
+  it("reutiliza a projeção autorizada para exportar PDF sem consultar fontes vivas", async () => {
+    const render = vi.fn().mockResolvedValue(Buffer.from("%PDF-1.3"));
+    const snapshots = {
+      getForExport: vi.fn().mockResolvedValue({
+        snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
+        job: { id: "job-1", report_model_version_id: "version-1" },
+        rows: [{ name: "Ana", secret: "não exporte" }],
+      }),
+      assertExportable: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new ReportExportService(
+      snapshots as never,
+      {
+        getVersion: vi.fn().mockResolvedValue({
+          model: { created_by_user_id: "user-1", department_id: null },
+          version: {
+            definition_json: { columns: [{ alias: "name", source: "users", field: "name" }] },
+          },
+        }),
+      } as never,
+      {
+        validateDefinition: vi.fn().mockResolvedValue({
+          definition: { columns: [{ alias: "name", source: "users", field: "name" }] },
+          catalog: undefined,
+        }),
+      } as never,
+      {
+        pdf: { format: "pdf", contentType: "application/pdf", render },
+      } as never,
+    );
+
+    await expect(
+      service.export({
+        snapshotId: "snapshot-1",
+        userId: "user-1",
+        organizationId: "org-1",
+        requestId: "request-1",
+        format: "pdf",
+      }),
+    ).resolves.toMatchObject({
+      contentType: "application/pdf",
+      fileName: "report-job-1.pdf",
+      body: Buffer.from("%PDF-1.3"),
+    });
+
+    expect(render).toHaveBeenCalledWith({
+      author: "user-1",
+      generatedAt: new Date("2026-08-26T12:00:00.000Z"),
+      organizationId: "org-1",
+      scope: "personal",
+      presentation_json: {
+        columns: [{ key: "name", label: "name", format: undefined }],
+      },
+      rows: [{ name: "Ana" }],
+    });
+    expect(snapshots.getForExport).toHaveBeenCalledOnce();
+    expect(snapshots.assertExportable).toHaveBeenCalledOnce();
+  });
+
   it("reauthoriza o snapshot, exporta seus dados e audita somente metadados seguros", async () => {
     const record = vi.fn().mockResolvedValue(undefined);
     const render = vi.fn().mockReturnValue(Buffer.from("Nome\r\nAna\r\n"));

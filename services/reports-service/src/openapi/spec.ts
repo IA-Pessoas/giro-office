@@ -202,7 +202,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
               name: "format",
               in: "query",
               required: true,
-              schema: { type: "string", enum: ["csv", "xlsx"] },
+              schema: { type: "string", enum: ["csv", "xlsx", "pdf"] },
             },
           ],
           responses: {
@@ -211,6 +211,9 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
               content: {
                 "text/csv": { schema: { type: "string", format: "binary" } },
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                  schema: { type: "string", format: "binary" },
+                },
+                "application/pdf": {
                   schema: { type: "string", format: "binary" },
                 },
               },
