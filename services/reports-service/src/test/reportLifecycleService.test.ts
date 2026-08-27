@@ -34,6 +34,7 @@ function createPersistence(status = "processing") {
     },
     reportSnapshot: {
       create: vi.fn(async () => ({ id: "snapshot-1" })),
+      findFirst: vi.fn(async () => ({ id: "snapshot-1", report_job_id: "job-1" })),
       findMany: vi.fn(async () => [{ id: "snapshot-1" }]),
       deleteMany: vi.fn(),
     },
@@ -503,6 +504,51 @@ describe("ReportLifecycleService", () => {
         data: expect.objectContaining({ event_type: "report.expired.retention" }),
       }),
     );
+  });
+
+  it("não expira snapshot que ainda não atingiu o prazo capturado", async () => {
+    const transaction = {
+      reportJob: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "job-1",
+          organization_id: "org-1",
+          report_model_version_id: "version-1",
+          status: "completed",
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      reportSnapshot: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        findMany: vi.fn().mockResolvedValue([{ id: "snapshot-1" }]),
+        deleteMany: vi.fn(),
+      },
+      reportSnapshotRow: { deleteMany: vi.fn() },
+      reportModelVersion: { findFirst: vi.fn(), deleteMany: vi.fn() },
+      reportModel: { findFirst: vi.fn(), delete: vi.fn() },
+      reportAuditEvent: { create: vi.fn() },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof transaction) => Promise<unknown>) =>
+        callback(transaction),
+      ),
+    };
+    const service = new ReportLifecycleService(
+      prisma as never,
+      new ReportAuditService(prisma as never, vi.fn()),
+      () => now,
+    );
+
+    await expect(
+      service.expire({
+        job_id: "job-1",
+        organization_id: "org-1",
+        actor_id: "system",
+        reason: "retention",
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(transaction.reportJob.updateMany).not.toHaveBeenCalled();
+    expect(transaction.reportSnapshotRow.deleteMany).not.toHaveBeenCalled();
   });
 
   it("mantém a migration de lifecycle que atualiza default e estados legados", async () => {

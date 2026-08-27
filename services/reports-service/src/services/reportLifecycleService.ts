@@ -54,7 +54,12 @@ type LifecycleTransaction = ReportAuditStore & {
   };
   reportSnapshot: {
     findFirst(args: {
-      where: { id: string; organization_id: string };
+      where: {
+        id?: string;
+        report_job_id?: string;
+        organization_id: string;
+        expires_at?: { lte: Date };
+      };
     }): Promise<{ id: string; report_job_id: string } | null>;
     create(args: {
       data: {
@@ -336,10 +341,22 @@ export class ReportLifecycleService {
           throw new ServiceError(403, "O snapshot não pertence ao departamento atual.");
         }
       }
+      const occurredAt = this.clock();
+      if (status === "completed") {
+        const dueSnapshot = await transaction.reportSnapshot.findFirst({
+          where: {
+            report_job_id: job.id,
+            organization_id: input.organization_id,
+            expires_at: { lte: occurredAt },
+          },
+        });
+        if (!dueSnapshot) {
+          throw new ServiceError(409, "O snapshot ainda não atingiu o prazo de retenção.");
+        }
+      }
       const nextStatus = status === "completed" ? "expired" : "deleted";
       assertTransition(job.status, nextStatus);
 
-      const occurredAt = this.clock();
       const result = await transaction.reportJob.updateMany({
         where: { id: job.id, status: job.status as ReportLifecycleStatus },
         data: { status: nextStatus, finished_at: occurredAt },
