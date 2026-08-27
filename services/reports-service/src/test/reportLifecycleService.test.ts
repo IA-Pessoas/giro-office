@@ -77,6 +77,31 @@ describe("ReportLifecycleService", () => {
     );
   });
 
+  it("grava localmente o ator e o antes/depois da retenção", async () => {
+    const create = vi.fn();
+    const audit = new ReportAuditService({ reportAuditEvent: { create } } as never, vi.fn());
+
+    await audit.recordRetentionChangeLocal({
+      actor_id: "owner-1",
+      organization_id: "org-1",
+      previous_retention_days: 30,
+      next_retention_days: 45,
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      data: {
+        organization_id: "org-1",
+        report_job_id: null,
+        actor_id: "owner-1",
+        event_type: "report.retention",
+        payload_json: {
+          event_type: "report.retention",
+          changes: { retention_days: { previous: 30, next: 45 } },
+        },
+      },
+    });
+  });
+
   it("aceita somente os estados nomeados do lifecycle nos contratos de job", () => {
     expect(reportJobStatusSchema.options).toEqual([
       "queued",

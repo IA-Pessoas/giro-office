@@ -21,7 +21,11 @@ describe("reportRetention routes", () => {
     app.use(
       "/reports",
       createReportRetentionRouter({
-        retentionService: { updateOrganizationPolicy } as never,
+        retentionService: {
+          getOrganizationPolicy: vi.fn().mockResolvedValue({ retention_days: 30 }),
+          updateOrganizationPolicy,
+        } as never,
+        auditService: { recordRetentionChangeLocal: vi.fn() } as never,
         accessContextClient: {
           getAccessContext: vi.fn().mockResolvedValue({
             organization: { id: organizationId },
@@ -64,6 +68,7 @@ describe("reportRetention routes", () => {
       "/reports",
       createReportRetentionRouter({
         retentionService: { updateOrganizationPolicy } as never,
+        auditService: { recordRetentionChangeLocal: vi.fn() } as never,
         accessContextClient: {
           getAccessContext: vi.fn().mockResolvedValue({
             organization: { id: organizationId },
@@ -93,5 +98,51 @@ describe("reportRetention routes", () => {
       .expect(403);
 
     expect(updateOrganizationPolicy).not.toHaveBeenCalled();
+  });
+
+  it("audita localmente o ator e o antes/depois da retenção", async () => {
+    const getOrganizationPolicy = vi.fn().mockResolvedValue({ retention_days: 30 });
+    const updateOrganizationPolicy = vi.fn().mockResolvedValue({ retention_days: 45 });
+    const recordRetentionChangeLocal = vi.fn().mockResolvedValue(undefined);
+    const app = express();
+    app.use(express.json());
+    app.use(
+      "/reports",
+      createReportRetentionRouter({
+        retentionService: { getOrganizationPolicy, updateOrganizationPolicy } as never,
+        auditService: { recordRetentionChangeLocal } as never,
+        accessContextClient: {
+          getAccessContext: vi.fn().mockResolvedValue({
+            organization: { id: organizationId },
+            type: "owner",
+            modules: {},
+          }),
+        },
+      }),
+    );
+    app.use(
+      (
+        error: { statusCode?: number },
+        _request: unknown,
+        response: express.Response,
+        _next: unknown,
+      ) => {
+        response.status(error.statusCode ?? 500).end();
+      },
+    );
+
+    await request(app)
+      .put("/reports/retention")
+      .set(FORWARDED_AUTH_USER_ID_HEADER, ownerId)
+      .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, organizationId)
+      .send({ retention_days: 45 })
+      .expect(200);
+
+    expect(recordRetentionChangeLocal).toHaveBeenCalledWith({
+      actor_id: ownerId,
+      organization_id: organizationId,
+      previous_retention_days: 30,
+      next_retention_days: 45,
+    });
   });
 });

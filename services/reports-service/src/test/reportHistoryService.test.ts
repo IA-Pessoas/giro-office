@@ -134,4 +134,26 @@ describe("ReportJobService histórico", () => {
       }),
     );
   });
+
+  it("retorna o cursor da próxima página quando há mais itens", async () => {
+    const reportJob = {
+      findMany: vi.fn().mockResolvedValue([{ id: "job-1" }, { id: "job-2" }, { id: "job-3" }]),
+    };
+    const service = new ReportJobService({ reportJob } as never);
+
+    await expect(
+      service.listHistory({
+        organizationId: "org-1",
+        userId: "user-1",
+        scope: "personal",
+        cursor: 4,
+        limit: 2,
+      }),
+    ).resolves.toEqual({
+      items: [{ id: "job-1" }, { id: "job-2" }],
+      nextCursor: 6,
+    });
+
+    expect(reportJob.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 4, take: 3 }));
+  });
 });

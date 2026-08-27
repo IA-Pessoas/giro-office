@@ -6,6 +6,12 @@ describe("ReportSnapshotService", () => {
   it("retorna somente linhas de snapshot concluído, autorizado e paginado", async () => {
     const prisma = {
       reportJob: { findFirst: vi.fn().mockResolvedValue({ id: "job-1" }) },
+      reportModelVersion: {
+        findFirst: vi.fn().mockResolvedValue({ report_model_id: "model-1" }),
+      },
+      reportModel: {
+        findFirst: vi.fn().mockResolvedValue({ id: "model-1", department_id: null }),
+      },
       reportSnapshot: {
         findFirst: vi.fn().mockResolvedValue({ id: "snapshot-1", created_at: new Date() }),
       },
@@ -92,5 +98,46 @@ describe("ReportSnapshotService", () => {
         is_ephemeral: false,
       },
     });
+  });
+
+  it("não abre snapshot compartilhado quando scope é omitido", async () => {
+    const reportJob = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: "job-1",
+        report_model_version_id: "version-1",
+      }),
+    };
+    const reportModelVersion = {
+      findFirst: vi.fn().mockResolvedValue({ report_model_id: "model-1" }),
+    };
+    const reportModel = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: "model-1",
+        department_id: "department-1",
+        active: true,
+        is_ephemeral: false,
+      }),
+    };
+    const reportSnapshot = {
+      findFirst: vi.fn(),
+    };
+    const service = new ReportSnapshotService({
+      reportJob,
+      reportModelVersion,
+      reportModel,
+      reportSnapshot,
+      reportSnapshotRow: { findMany: vi.fn() },
+    } as never);
+
+    await expect(
+      service.get({
+        organizationId: "org-1",
+        userId: "user-1",
+        jobId: "job-1",
+        limit: 10,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(reportSnapshot.findFirst).not.toHaveBeenCalled();
   });
 });

@@ -205,16 +205,16 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
       "/reports/retention": {
         get: {
           tags: ["Reports"],
-          summary: "Consultar retencao organizacional de relatorios",
+          summary: "Consultar retenção organizacional de relatórios",
           security: [{ bearerAuth: [] }],
           responses: {
-            "200": { description: "Politica de retencao", ...successResponse },
+            "200": { description: "Política de retenção", ...successResponse },
             "403": { description: "Somente owner" },
           },
         },
         put: {
           tags: ["Reports"],
-          summary: "Definir retencao para jobs futuros",
+          summary: "Definir retenção para jobs futuros",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -230,8 +230,12 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
             },
           },
           responses: {
-            "200": { description: "Politica atualizada", ...successResponse },
-            "400": { description: "Retencao invalida" },
+            "200": {
+              description:
+                "Política atualizada; o evento de alteração é gravado na auditoria local",
+              ...successResponse,
+            },
+            "400": { description: "Retenção inválida" },
             "403": { description: "Somente owner" },
           },
         },
@@ -253,13 +257,15 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
       "/reports/jobs/{id}/snapshot": {
         get: {
           tags: ["Reports"],
-          summary: "Ler snapshot concluído e paginado do solicitante",
+          summary: "Ler snapshot concluído e paginado",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
             {
               name: "scope",
               in: "query",
+              description:
+                "Omitido somente para snapshots pessoais; snapshots compartilhados exigem scope=library e o departamento atual.",
               schema: { type: "string", enum: ["personal", "library"], default: "personal" },
             },
             { name: "cursor", in: "query", schema: { type: "integer", minimum: 0 } },
@@ -267,7 +273,10 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           ],
           responses: {
             "200": { description: "Snapshot paginado", ...successResponse },
-            "403": { description: "Membro do departamento atual necessário" },
+            "403": {
+              description:
+                "Departamento atual necessário para o acervo ou scope=library obrigatório para snapshot compartilhado",
+            },
             "404": { description: "Snapshot não encontrado ou indisponível" },
           },
         },

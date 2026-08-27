@@ -40,6 +40,13 @@ export interface ReportAuditEventInput {
   justification_provided?: boolean;
 }
 
+export interface ReportRetentionAuditInput {
+  actor_id: string;
+  organization_id: string;
+  previous_retention_days: number;
+  next_retention_days: number;
+}
+
 export function createReportAuditEvent(input: ReportAuditEventInput): ReportAuditEventInput {
   return {
     actor_id: input.actor_id,
@@ -59,7 +66,7 @@ export interface ReportAuditStore {
     create(args: {
       data: {
         organization_id: string;
-        report_job_id: string;
+        report_job_id: string | null;
         actor_id: string;
         event_type: ReportAuditEventType;
         payload_json: Record<string, unknown>;
@@ -116,6 +123,26 @@ export class ReportAuditService {
         payload_json: Object.fromEntries(
           Object.entries(payload).filter(([key]) => key !== "report_job_id"),
         ),
+      },
+    });
+  }
+
+  async recordRetentionChangeLocal(input: ReportRetentionAuditInput): Promise<void> {
+    await this.prisma.reportAuditEvent.create({
+      data: {
+        organization_id: input.organization_id,
+        report_job_id: null,
+        actor_id: input.actor_id,
+        event_type: "report.retention",
+        payload_json: {
+          event_type: "report.retention",
+          changes: {
+            retention_days: {
+              previous: input.previous_retention_days,
+              next: input.next_retention_days,
+            },
+          },
+        },
       },
     });
   }
