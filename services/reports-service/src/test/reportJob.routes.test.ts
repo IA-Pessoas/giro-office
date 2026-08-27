@@ -196,6 +196,31 @@ describe("reportJob routes", () => {
     );
   });
 
+  it("trata scope omitido como acesso pessoal do autor", async () => {
+    const snapshotService = { get: vi.fn().mockResolvedValue({ rows: [], nextCursor: null }) };
+    const app = express();
+    app.use(
+      "/reports",
+      createReportJobRouter({
+        jobService: {},
+        snapshotService: snapshotService as never,
+        authorizationService: {} as never,
+        lifecycleService: {} as never,
+        accessContextClient: { getAccessContext: vi.fn() },
+      }),
+    );
+
+    await request(app)
+      .get(`/reports/jobs/${jobId}/snapshot`)
+      .set(FORWARDED_AUTH_USER_ID_HEADER, userId)
+      .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, organizationId)
+      .expect(200);
+
+    expect(snapshotService.get).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "personal", userId, organizationId, jobId }),
+    );
+  });
+
   it("revoga abertura de snapshot do acervo para membro removido", async () => {
     const snapshotService = { get: vi.fn() };
     const getAccessContext = vi

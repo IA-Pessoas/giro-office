@@ -50,26 +50,6 @@ export class ReportSnapshotService {
           })
         : null;
       if (!model) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
-    } else {
-      const version = await this.prisma.reportModelVersion.findFirst({
-        where: {
-          id: job.report_model_version_id,
-          organization_id: input.organizationId,
-        },
-      });
-      const model = version
-        ? await this.prisma.reportModel.findFirst({
-            where: {
-              id: version.report_model_id,
-              organization_id: input.organizationId,
-              active: true,
-            },
-          })
-        : null;
-      if (!model) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
-      if (model.department_id !== null) {
-        throw new ServiceError(403, "O snapshot compartilhado exige scope=library.");
-      }
     }
 
     const snapshot = await this.prisma.reportSnapshot.findFirst({

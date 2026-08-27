@@ -127,8 +127,18 @@ export class ReportAuditService {
     });
   }
 
-  async recordRetentionChangeLocal(input: ReportRetentionAuditInput): Promise<void> {
-    await this.prisma.reportAuditEvent.create({
+  async recordRetentionChangeLocal(input: ReportRetentionAuditInput): Promise<void>;
+  async recordRetentionChangeLocal(
+    store: ReportAuditStore,
+    input: ReportRetentionAuditInput,
+  ): Promise<void>;
+  async recordRetentionChangeLocal(
+    storeOrInput: ReportAuditStore | ReportRetentionAuditInput,
+    transactionInput?: ReportRetentionAuditInput,
+  ): Promise<void> {
+    const store = transactionInput ? (storeOrInput as ReportAuditStore) : this.prisma;
+    const input = transactionInput ?? (storeOrInput as ReportRetentionAuditInput);
+    await store.reportAuditEvent.create({
       data: {
         organization_id: input.organization_id,
         report_job_id: null,

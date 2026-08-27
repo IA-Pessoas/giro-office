@@ -93,8 +93,8 @@ export function createReportsApp({
   const modelService = new ReportModelService(prisma);
   const jobService = new ReportJobService(prisma);
   const snapshotService = new ReportSnapshotService(prisma);
-  const retentionService = new ReportRetentionService(prisma);
   const auditService = new ReportAuditService(prisma as never, async () => undefined);
+  const retentionService = new ReportRetentionService(prisma, auditService);
   const lifecycleService = new ReportLifecycleService(prisma as never, auditService);
 
   app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
@@ -113,10 +113,7 @@ export function createReportsApp({
       accessContextClient,
     }),
   );
-  app.use(
-    "/reports",
-    createReportRetentionRouter({ retentionService, auditService, accessContextClient }),
-  );
+  app.use("/reports", createReportRetentionRouter({ retentionService, accessContextClient }));
   app.use(
     createExpressErrorHandler({
       logger,

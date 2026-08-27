@@ -8,7 +8,6 @@ import {
 } from "@workspace/shared";
 import { type Request, Router } from "express";
 import { reportRetentionPolicySchema } from "../schemas/reportRetention.schemas.js";
-import type { ReportAuditService } from "../services/reportAuditService.js";
 import type { ReportRetentionService } from "../services/reportRetentionService.js";
 import {
   getReportingAccessContext,
@@ -38,7 +37,6 @@ async function requireOwner(
 
 export function createReportRetentionRouter(options: {
   retentionService: ReportRetentionService;
-  auditService: Pick<ReportAuditService, "recordRetentionChangeLocal">;
   accessContextClient: ReportingAccessContextClient;
 }): ReturnType<typeof Router> {
   const router = Router();
@@ -58,16 +56,10 @@ export function createReportRetentionRouter(options: {
       reportRetentionPolicySchema.omit({ organization_id: true }),
       request.body,
     );
-    const previous = await options.retentionService.getOrganizationPolicy(context);
     const updated = await options.retentionService.updateOrganizationPolicy({
       organizationId: context.organizationId,
       retentionDays: body.retention_days,
-    });
-    await options.auditService.recordRetentionChangeLocal({
-      actor_id: context.userId,
-      organization_id: context.organizationId,
-      previous_retention_days: previous.retention_days,
-      next_retention_days: updated.retention_days,
+      actorId: context.userId,
     });
     response.json(createSuccessResponse(updated));
   });

@@ -25,7 +25,6 @@ describe("reportRetention routes", () => {
           getOrganizationPolicy: vi.fn().mockResolvedValue({ retention_days: 30 }),
           updateOrganizationPolicy,
         } as never,
-        auditService: { recordRetentionChangeLocal: vi.fn() } as never,
         accessContextClient: {
           getAccessContext: vi.fn().mockResolvedValue({
             organization: { id: organizationId },
@@ -57,6 +56,7 @@ describe("reportRetention routes", () => {
     expect(updateOrganizationPolicy).toHaveBeenCalledWith({
       organizationId,
       retentionDays: 45,
+      actorId: ownerId,
     });
   });
 
@@ -68,7 +68,6 @@ describe("reportRetention routes", () => {
       "/reports",
       createReportRetentionRouter({
         retentionService: { updateOrganizationPolicy } as never,
-        auditService: { recordRetentionChangeLocal: vi.fn() } as never,
         accessContextClient: {
           getAccessContext: vi.fn().mockResolvedValue({
             organization: { id: organizationId },
@@ -101,16 +100,13 @@ describe("reportRetention routes", () => {
   });
 
   it("audita localmente o ator e o antes/depois da retenção", async () => {
-    const getOrganizationPolicy = vi.fn().mockResolvedValue({ retention_days: 30 });
     const updateOrganizationPolicy = vi.fn().mockResolvedValue({ retention_days: 45 });
-    const recordRetentionChangeLocal = vi.fn().mockResolvedValue(undefined);
     const app = express();
     app.use(express.json());
     app.use(
       "/reports",
       createReportRetentionRouter({
-        retentionService: { getOrganizationPolicy, updateOrganizationPolicy } as never,
-        auditService: { recordRetentionChangeLocal } as never,
+        retentionService: { updateOrganizationPolicy } as never,
         accessContextClient: {
           getAccessContext: vi.fn().mockResolvedValue({
             organization: { id: organizationId },
@@ -138,11 +134,10 @@ describe("reportRetention routes", () => {
       .send({ retention_days: 45 })
       .expect(200);
 
-    expect(recordRetentionChangeLocal).toHaveBeenCalledWith({
-      actor_id: ownerId,
-      organization_id: organizationId,
-      previous_retention_days: 30,
-      next_retention_days: 45,
+    expect(updateOrganizationPolicy).toHaveBeenCalledWith({
+      organizationId,
+      retentionDays: 45,
+      actorId: ownerId,
     });
   });
 });

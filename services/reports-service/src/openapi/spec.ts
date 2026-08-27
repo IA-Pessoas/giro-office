@@ -265,7 +265,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
               name: "scope",
               in: "query",
               description:
-                "Omitido somente para snapshots pessoais; snapshots compartilhados exigem scope=library e o departamento atual.",
+                "Use scope=personal, or omit it, to open the author's personal snapshot, including after source permission loss. Use scope=library for shared snapshots; this requires the current department.",
               schema: { type: "string", enum: ["personal", "library"], default: "personal" },
             },
             { name: "cursor", in: "query", schema: { type: "integer", minimum: 0 } },

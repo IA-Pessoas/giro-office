@@ -100,7 +100,7 @@ describe("ReportSnapshotService", () => {
     });
   });
 
-  it("não abre snapshot compartilhado quando scope é omitido", async () => {
+  it("mantém acesso pessoal do autor quando scope é omitido", async () => {
     const reportJob = {
       findFirst: vi.fn().mockResolvedValue({
         id: "job-1",
@@ -119,14 +119,14 @@ describe("ReportSnapshotService", () => {
       }),
     };
     const reportSnapshot = {
-      findFirst: vi.fn(),
+      findFirst: vi.fn().mockResolvedValue({ id: "snapshot-1", created_at: new Date() }),
     };
     const service = new ReportSnapshotService({
       reportJob,
       reportModelVersion,
       reportModel,
       reportSnapshot,
-      reportSnapshotRow: { findMany: vi.fn() },
+      reportSnapshotRow: { findMany: vi.fn().mockResolvedValue([]) },
     } as never);
 
     await expect(
@@ -136,8 +136,50 @@ describe("ReportSnapshotService", () => {
         jobId: "job-1",
         limit: 10,
       }),
-    ).rejects.toMatchObject({ statusCode: 403 });
+    ).resolves.toEqual({
+      snapshot: { id: "snapshot-1", created_at: expect.any(Date) },
+      rows: [],
+      nextCursor: null,
+    });
+  });
 
-    expect(reportSnapshot.findFirst).not.toHaveBeenCalled();
+  it("mantém acesso pessoal do autor mesmo quando o modelo tem departamento", async () => {
+    const prisma = {
+      reportJob: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "job-1",
+          report_model_version_id: "version-1",
+        }),
+      },
+      reportModelVersion: {
+        findFirst: vi.fn().mockResolvedValue({ report_model_id: "model-1" }),
+      },
+      reportModel: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "model-1",
+          department_id: "department-1",
+          active: true,
+        }),
+      },
+      reportSnapshot: {
+        findFirst: vi.fn().mockResolvedValue({ id: "snapshot-1", created_at: new Date() }),
+      },
+      reportSnapshotRow: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const service = new ReportSnapshotService(prisma as never);
+
+    await expect(
+      service.get({
+        organizationId: "org-1",
+        userId: "user-1",
+        jobId: "job-1",
+        scope: "personal",
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      snapshot: { id: "snapshot-1", created_at: expect.any(Date) },
+      rows: [],
+      nextCursor: null,
+    });
   });
 });
