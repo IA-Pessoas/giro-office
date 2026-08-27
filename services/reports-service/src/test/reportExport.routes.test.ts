@@ -46,14 +46,45 @@ describe("report export routes", () => {
     });
   });
 
-  it("rejeita formato diferente de csv ou xlsx antes de chamar o serviço", async () => {
+  it("responde o arquivo PDF com content type e disposition próprios", async () => {
+    const exportService = {
+      export: vi.fn().mockResolvedValue({
+        contentType: "application/pdf",
+        fileName: "report-job.pdf",
+        body: Buffer.from("%PDF-1.3"),
+      }),
+    };
+    const app = express();
+    app.use("/reports", createReportExportRouter({ exportService: exportService as never }));
+    app.use(createExpressErrorHandler({ logger: { error: vi.fn() } as never, event: "test" }));
+
+    const response = await request(app)
+      .get(`/reports/snapshots/${snapshotId}/export?format=pdf`)
+      .set(FORWARDED_AUTH_USER_ID_HEADER, userId)
+      .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, organizationId)
+      .expect(200);
+
+    expect(response.headers["content-type"]).toMatch(/^application\/pdf/);
+    expect(response.headers["content-disposition"]).toBe('attachment; filename="report-job.pdf"');
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body).toEqual(Buffer.from("%PDF-1.3"));
+    expect(exportService.export).toHaveBeenCalledWith({
+      snapshotId,
+      userId,
+      organizationId,
+      requestId: "reports-export",
+      format: "pdf",
+    });
+  });
+
+  it("rejeita formato desconhecido antes de chamar o serviço", async () => {
     const exportService = { export: vi.fn() };
     const app = express();
     app.use("/reports", createReportExportRouter({ exportService: exportService as never }));
     app.use(createExpressErrorHandler({ logger: { error: vi.fn() } as never, event: "test" }));
 
     await request(app)
-      .get(`/reports/snapshots/${snapshotId}/export?format=pdf`)
+      .get(`/reports/snapshots/${snapshotId}/export?format=html`)
       .set(FORWARDED_AUTH_USER_ID_HEADER, userId)
       .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, organizationId)
       .expect(400);

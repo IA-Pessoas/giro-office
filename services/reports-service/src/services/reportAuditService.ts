@@ -33,7 +33,7 @@ export interface ReportAuditEventInput {
   report_model_version_id?: string;
   event_type: ReportAuditEventType;
   occurred_at: Date;
-  format?: "csv" | "xlsx";
+  format?: "csv" | "xlsx" | "pdf";
   result?: "success" | "failure";
   counts?: {
     rows?: number;

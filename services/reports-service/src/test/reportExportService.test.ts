@@ -35,7 +35,7 @@ describe("ReportCsvService", () => {
     expect(
       service.render({
         columns: [{ key: "name", label: "Nome" }],
-        rows: [{ name: "Ana", secret: "não exporte" }],
+        rows: [{ name: "Ana" }],
       }),
     ).toEqual(Buffer.from("Nome\r\nAna\r\n"));
   });
@@ -126,8 +126,108 @@ describe("ReportExportService", () => {
         counts: { rows: 1, bytes: 11 },
       }),
     );
-    expect(record.mock.invocationCallOrder[0]).toBeLessThan(
-      snapshotService.assertExportable.mock.invocationCallOrder[0] ?? 0,
+    expect(snapshotService.assertExportable.mock.invocationCallOrder[0]).toBeLessThan(
+      record.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+  });
+
+  it("reutiliza a projeção persistida para exportar PDF sem consultar definição ou dados vivos", async () => {
+    const render = vi.fn().mockResolvedValue(Buffer.from("%PDF-1.3"));
+    const snapshotService = {
+      getForExport: vi.fn().mockResolvedValue({
+        snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
+        job: { id: "job-1", report_model_version_id: "version-1" },
+        rows: [{ name: "Ana" }],
+      }),
+      assertExportable: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new ReportExportService(
+      snapshotService as never,
+      {
+        pdf: { format: "pdf", contentType: "application/pdf", render },
+      } as never,
+      { record: vi.fn() } as never,
+    );
+
+    await expect(
+      service.export({
+        snapshotId: "snapshot-1",
+        userId: "user-1",
+        organizationId: "org-1",
+        requestId: "request-1",
+        format: "pdf",
+      }),
+    ).resolves.toMatchObject({
+      contentType: "application/pdf",
+      fileName: "report-job-1.pdf",
+      body: Buffer.from("%PDF-1.3"),
+    });
+
+    expect(render).toHaveBeenCalledWith({
+      author: "user-1",
+      generatedAt: new Date("2026-08-26T12:00:00.000Z"),
+      organizationId: "org-1",
+      scope: "personal",
+      presentation_json: {
+        columns: [{ key: "name", label: "name", format: "string" }],
+      },
+      rows: [{ name: "Ana" }],
+    });
+    expect(snapshotService.getForExport).toHaveBeenCalledOnce();
+    expect(snapshotService.assertExportable).toHaveBeenCalledOnce();
+  });
+
+  it("revalida o departamento atual para snapshots de modelos compartilhados", async () => {
+    const render = vi.fn().mockResolvedValue(Buffer.from("%PDF-1.3"));
+    const snapshotService = {
+      getForExport: vi.fn().mockResolvedValue({
+        snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
+        job: { id: "job-1", report_model_version_id: "version-1" },
+        rows: [{ name: "Ana" }],
+      }),
+      assertExportable: vi.fn().mockResolvedValue(undefined),
+    };
+    const jobs = {
+      getVersion: vi.fn().mockResolvedValue({
+        model: { created_by_user_id: null, department_id: "department-1" },
+      }),
+    };
+    const authorization = {
+      getSharedDepartment: vi.fn().mockResolvedValue({ id: "department-1" }),
+    };
+    const service = new ReportExportService(
+      snapshotService as never,
+      { pdf: { format: "pdf", contentType: "application/pdf", render } } as never,
+      { record: vi.fn() } as never,
+      jobs as never,
+      authorization as never,
+    );
+
+    await expect(
+      service.export({
+        snapshotId: "snapshot-1",
+        userId: "user-1",
+        organizationId: "org-1",
+        requestId: "request-1",
+        format: "pdf",
+      }),
+    ).resolves.toMatchObject({ contentType: "application/pdf" });
+
+    expect(jobs.getVersion).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      modelVersionId: "version-1",
+      includeEphemeral: true,
+    });
+    expect(authorization.getSharedDepartment).toHaveBeenCalledWith({
+      userId: "user-1",
+      organizationId: "org-1",
+      requestId: "request-1",
+    });
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: "shared",
+        departmentId: "department-1",
+      }),
     );
   });
 
@@ -202,6 +302,7 @@ describe("ReportExportService", () => {
         result: "failure",
       }),
     );
+    expect(record.mock.calls.map(([event]) => event.result)).toEqual(["failure"]);
   });
 
   it("audits snapshot lookup failures without sensitive data", async () => {

@@ -25,14 +25,21 @@ import { createReportModelRouter } from "./routes/reportModel.routes.js";
 import { createReportRetentionRouter } from "./routes/reportRetention.routes.js";
 import { createReportAuditService } from "./services/reportAuditService.js";
 import { ReportAuthorizationService } from "./services/reportAuthorizationService.js";
+import { ReportCsvService } from "./services/reportCsvService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
 import { ReportExportService } from "./services/reportExportService.js";
 import { ReportJobService } from "./services/reportJobService.js";
+import {
+  type ReportLetterheadAsset,
+  ReportLetterheadService,
+} from "./services/reportLetterheadService.js";
 import { ReportLifecycleService } from "./services/reportLifecycleService.js";
 import { ReportModelService } from "./services/reportModelService.js";
+import { ReportPdfService } from "./services/reportPdfService.js";
 import { ReportPreviewService } from "./services/reportPreviewService.js";
 import { ReportRetentionService } from "./services/reportRetentionService.js";
 import { ReportSnapshotService } from "./services/reportSnapshotService.js";
+import { ReportXlsxService } from "./services/reportXlsxService.js";
 
 export interface CreateReportsAppOptions {
   env: ReportsServiceEnv;
@@ -41,6 +48,7 @@ export interface CreateReportsAppOptions {
   reporting?: {
     adapters?: readonly ReportSourceAdapter[];
     accessContextClient?: ReportingAccessContextClient;
+    letterheads?: readonly ReportLetterheadAsset[];
   };
 }
 
@@ -101,7 +109,18 @@ export function createReportsApp({
     serviceToken: env.auditServiceToken,
     logger,
   });
-  const exportService = new ReportExportService(snapshotService, undefined, auditService);
+  const letterheadService = new ReportLetterheadService(reporting?.letterheads ?? []);
+  const exportService = new ReportExportService(
+    snapshotService,
+    {
+      csv: new ReportCsvService(),
+      xlsx: new ReportXlsxService(),
+      pdf: new ReportPdfService(letterheadService),
+    },
+    auditService,
+    jobService,
+    authorizationService,
+  );
   const retentionService = new ReportRetentionService(prisma, auditService);
   const lifecycleService = new ReportLifecycleService(prisma as never, auditService);
 
