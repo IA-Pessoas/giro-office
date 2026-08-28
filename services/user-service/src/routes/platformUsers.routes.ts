@@ -6,6 +6,7 @@ import {
   listPlatformUsersQuerySchema,
   platformOrganizationUserParamsSchema,
   platformOrganizationUsersParamsSchema,
+  transferPlatformOwnershipBodySchema,
 } from "../schemas/platformUsers.schemas.js";
 import { createUserBodySchema } from "../schemas/user.schemas.js";
 import {
@@ -18,6 +19,30 @@ import { PlatformUsersService } from "../services/platformUsersService.js";
 export function createPlatformUsersRoutes(): ReturnType<typeof Router> {
   const router = Router();
   const platformUsersService = new PlatformUsersService();
+
+  router.post(
+    "/organizations/:organizationId/ownership-transfer",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId } = parseWithZod(
+          platformOrganizationUsersParamsSchema,
+          request.params,
+        );
+        const input = parseWithZod(transferPlatformOwnershipBodySchema, request.body);
+        response.json(
+          createSuccessResponse(
+            await platformUsersService.transferOwnership(organizationId, input),
+          ),
+        );
+      } catch (err) {
+        logError("Erro ao transferir ownership pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
 
   router.post(
     "/organizations/:organizationId/users",

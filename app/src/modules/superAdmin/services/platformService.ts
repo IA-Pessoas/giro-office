@@ -6,7 +6,9 @@ import type {
   PlatformDepartmentOption,
   PlatformOrganization,
   PlatformOrganizationsListResponse,
+  PlatformOwnershipTransferResult,
   PlatformUsersListResponse,
+  TransferPlatformOwnershipPayload,
   UpdatePlatformOrganizationLogoPayload,
   UpdatePlatformOrganizationPlanPayload,
   UpdatePlatformOrganizationStatusPayload,
@@ -57,6 +59,17 @@ export const platformService = {
       `/platform/organizations/${organizationId}/users/${userId}/reactivate`,
     );
     return unwrapData<PlatformUsersListResponse["users"][number]>(response);
+  },
+
+  async transferOwnership(
+    organizationId: string,
+    data: TransferPlatformOwnershipPayload,
+  ): Promise<PlatformOwnershipTransferResult> {
+    const response = await api.post(
+      `/platform/organizations/${organizationId}/ownership-transfer`,
+      data,
+    );
+    return unwrapData<PlatformOwnershipTransferResult>(response);
   },
 
   async listDepartments(organizationId: string): Promise<PlatformDepartmentOption[]> {

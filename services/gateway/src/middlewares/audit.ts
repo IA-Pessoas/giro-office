@@ -29,6 +29,8 @@ const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
 const PLATFORM_ORGANIZATIONS_PATH = "/platform/organizations";
+const PLATFORM_OWNERSHIP_TRANSFER_PATH =
+  /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/i;
 const PLATFORM_ORGANIZATION_STATUSES = new Set([
   "trial",
   "past_due",
@@ -83,12 +85,61 @@ function requiresOrganizationMutationAudit(request: Request): boolean {
   return (
     (method === "POST" && path.toLowerCase() === "/platform/organizations") ||
     (method === "POST" && /^\/platform\/organizations\/[^/]+\/users$/i.test(path)) ||
+    (method === "POST" && PLATFORM_OWNERSHIP_TRANSFER_PATH.test(path)) ||
     (method === "PATCH" &&
       /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i.test(path)) ||
     (method === "DELETE" && /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i.test(path)) ||
     (method === "POST" &&
       /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path))
   );
+}
+
+function getSafeAuditText(value: unknown, maximumLength: number): string | undefined {
+  if (typeof value !== "string" || value.length > maximumLength) {
+    return undefined;
+  }
+
+  return value.trim() || undefined;
+}
+
+function getOwnershipTransferAuditChanges(request: Request): Record<string, unknown> | undefined {
+  const body = request.body;
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return undefined;
+  }
+
+  const input = body as Record<string, unknown>;
+  const currentOwnerId = getSafeAuditText(input.currentOwnerId, 200);
+  const successorUserId = getSafeAuditText(input.successorUserId, 200);
+  const previousOwnerAction = input.previousOwnerAction;
+  const justification = getSafeAuditText(input.justification, 500);
+  if (
+    !currentOwnerId ||
+    !successorUserId ||
+    currentOwnerId === successorUserId ||
+    (previousOwnerAction !== "demote" && previousOwnerAction !== "deactivate") ||
+    !justification
+  ) {
+    return undefined;
+  }
+
+  return {
+    ownership: {
+      before: { ownerId: currentOwnerId, type: "owner", status: "active" },
+      after: {
+        ownerId: successorUserId,
+        type: "owner",
+        status: "active",
+        previousOwner: {
+          id: currentOwnerId,
+          type: "admin",
+          status: previousOwnerAction === "deactivate" ? "inactive" : "active",
+        },
+      },
+      previousOwnerAction,
+      justification,
+    },
+  };
 }
 
 interface BuildAuditCapacityGuardOptions {
@@ -128,6 +179,9 @@ export function buildAuditCapacityGuard({
     if (requiresAudit) {
       const publicPath = getPublicPath(request.originalUrl, request.path);
       const auditTarget = getPlatformOrganizationAuditTarget(publicPath);
+      const ownershipChanges = PLATFORM_OWNERSHIP_TRANSFER_PATH.test(publicPath)
+        ? getOwnershipTransferAuditChanges(request)
+        : undefined;
       const controller = new AbortController();
       const abort = () => controller.abort();
       response.once("close", abort);
@@ -146,24 +200,19 @@ export function buildAuditCapacityGuard({
             outcome: "success",
             serviceSource: "gateway",
             createdAt: new Date().toISOString(),
-            action:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+            action: ownershipChanges
+              ? "platform.organization.ownership.transfer.attempt"
+              : method === "POST" && /\/users$/i.test(publicPath)
                 ? "platform.user.create.attempt"
                 : "organization.mutation.attempt",
-            referring:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
-                ? "user"
-                : "organization",
+            referring: method === "POST" && /\/users$/i.test(publicPath) ? "user" : "organization",
             referringId:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+              method === "POST" && /\/users$/i.test(publicPath)
                 ? String(request.body?.login ?? "new-user")
-                : undefined,
+                : auditTarget?.organizationId,
             changes:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+              ownershipChanges ??
+              (method === "POST" && /\/users$/i.test(publicPath)
                 ? {
                     before: null,
                     after: {
@@ -176,10 +225,11 @@ export function buildAuditCapacityGuard({
                       modules: request.body?.modules,
                     },
                   }
-                : undefined,
+                : undefined),
             metadata: {
               auth_kind: "platform",
               platform_user_id: request.auth?.userId,
+              actorPlatformUserId: request.auth?.userId,
               business_outcome: "unknown",
               source_request_id_sha256: createHash("sha256")
                 .update(request.requestId)

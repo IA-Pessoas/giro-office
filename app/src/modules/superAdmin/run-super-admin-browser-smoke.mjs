@@ -51,6 +51,15 @@ const platformUser = {
   photo_url: null,
   type: "admin",
 };
+const currentOwner = {
+  id: "owner-safe-1",
+  name: "Owner atual",
+  login: "owner@example.test",
+  status: "active",
+  department_id: "department-safe-1",
+  photo_url: null,
+  type: "owner",
+};
 const requests = [];
 let forceConflict = false;
 let revision = 1;
@@ -138,25 +147,45 @@ const upstream = createServer(async (request, response) => {
       pageSize: 25,
     });
   }
+  const ownershipTransferMatch = url.pathname.match(
+    /^\/platform\/organizations\/([^/]+)\/ownership-transfer$/,
+  );
+  if (ownershipTransferMatch && organizations.some((item) => item.id === ownershipTransferMatch[1])) {
+    assert.equal(request.method, "POST");
+    assert.equal(request.headers["x-csrf-token"], csrf);
+    assert.equal(request.headers.authorization, undefined);
+    assert.deepEqual(Object.keys(body).sort(), [
+      "currentOwnerId",
+      "justification",
+      "previousOwnerAction",
+      "successorUserId",
+    ]);
+    assert.equal(body.currentOwnerId, currentOwner.id);
+    assert.equal(body.successorUserId, platformUser.id);
+    assert.equal(body.previousOwnerAction, "demote");
+    assert.equal(body.justification, "Recuperação de ownership aprovada.");
+    return reply(response, 200, { currentOwner, successor: platformUser });
+  }
   const userMatch = url.pathname.match(
     /^\/platform\/organizations\/([^/]+)\/users\/([^/]+)(?:\/(reactivate))?$/,
   );
   const selectedUser = userMatch && organizations.find((item) => item.id === userMatch[1]);
-  if (selectedUser && userMatch[2] === platformUser.id) {
-    if (request.method === "GET" && !userMatch[3]) return reply(response, 200, platformUser);
+  const managedUser = userMatch && [platformUser, currentOwner].find((item) => item.id === userMatch[2]);
+  if (selectedUser && managedUser) {
+    if (request.method === "GET" && !userMatch[3]) return reply(response, 200, managedUser);
     if (request.method === "DELETE" && !userMatch[3]) {
       assert.equal(request.headers["x-csrf-token"], csrf);
       assert.equal(request.headers.authorization, undefined);
       if (url.pathname === delayedUserLifecyclePath) await delayedUserLifecycle;
-      platformUser.status = "inactive";
-      return reply(response, 200, platformUser);
+      managedUser.status = "inactive";
+      return reply(response, 200, managedUser);
     }
     if (request.method === "POST" && userMatch[3] === "reactivate") {
       assert.equal(request.headers["x-csrf-token"], csrf);
       assert.equal(request.headers.authorization, undefined);
       if (url.pathname === delayedUserLifecyclePath) await delayedUserLifecycle;
-      platformUser.status = "active";
-      return reply(response, 200, platformUser);
+      managedUser.status = "active";
+      return reply(response, 200, managedUser);
     }
   }
   const match = url.pathname.match(
@@ -169,7 +198,7 @@ const upstream = createServer(async (request, response) => {
       return reply(response, 403, "Detalhe indisponível no teste.");
     if (match[2] === "users") {
       return reply(response, 200, {
-        users: [platformUser],
+        users: [platformUser, currentOwner],
         total: 1,
         hasMore: false,
       });
@@ -310,6 +339,9 @@ try {
     await page.setViewportSize(viewport);
     organizations.splice(0, organizations.length, organization, secondOrganization);
     platformUser.status = "active";
+    platformUser.type = "admin";
+    currentOwner.status = "active";
+    currentOwner.type = "owner";
     requests.length = 0;
     await page.goto("/super-admin", { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
@@ -403,6 +435,45 @@ try {
         (request) => request.path === `/platform/organizations/${organization.id}/users`,
       ),
     );
+    await page.getByRole("button", { name: /Owner atual owner@example\.test/ }).click();
+    const transferTrigger = page.getByRole("button", {
+      name: "Transferir ownership",
+      exact: true,
+    });
+    await transferTrigger.click();
+    const transferDialog = page.getByRole("dialog", {
+      name: "Transferir ownership",
+      exact: true,
+    });
+    await transferDialog.getByText(organization.name, { exact: true }).waitFor();
+    await transferDialog.getByText(currentOwner.name, { exact: true }).last().waitFor();
+    await transferDialog.getByLabel("Sucessor ativo", { exact: true }).selectOption(platformUser.id);
+    await transferDialog
+      .getByLabel("Justificativa", { exact: true })
+      .fill("Recuperação de ownership aprovada.");
+    await transferDialog.getByText(platformUser.name, { exact: true }).last().waitFor();
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await settleLayout();
+      await page.screenshot({
+        path: join(
+          screenshotDirectory,
+          viewport.width > 1000
+            ? "issue-904-ownership-transfer-desktop.png"
+            : "issue-904-ownership-transfer-mobile.png",
+        ),
+      });
+    }
+    await transferDialog.getByRole("button", { name: "Confirmar transferência", exact: true }).click();
+    await transferDialog.waitFor({ state: "hidden" });
+    assert.ok(
+      requests.some(
+        (request) =>
+          request.method === "POST" &&
+          request.path === `/platform/organizations/${organization.id}/ownership-transfer`,
+      ),
+    );
+    await page.getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ }).click();
     const deactivateTrigger = page.getByRole("button", {
       name: "Desativar usuário",
       exact: true,
@@ -473,7 +544,7 @@ try {
     await reactivateDialog.getByText(organization.name).first().waitFor();
     await reactivateDialog.getByRole("button", { name: "Reativar usuário", exact: true }).click();
     await reactivateDialog.waitFor({ state: "hidden" });
-    await page.getByText("Ativo", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Desativar usuário", exact: true }).waitFor();
     assert.ok(
       requests.some(
         (request) =>

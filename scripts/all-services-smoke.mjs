@@ -2338,6 +2338,47 @@ const handlers = {
     });
   },
 
+  async platformOwnershipTransfer(op) {
+    if (isBadExpectation(op)) {
+      await platformHttpRequest(op, {
+        path: "/platform/organizations/smoke-org/ownership-transfer",
+        json: {
+          currentOwnerId: "owner-1",
+          successorUserId: "owner-1",
+          previousOwnerAction: "demote",
+          justification: "smoke",
+        },
+      });
+      return;
+    }
+
+    const organizationId = requireState("session").organization_id;
+    const listed = await platformHttpRequest(op, {
+      method: "GET",
+      path: `/platform/organizations/${organizationId}/users`,
+      query: { skip: 0, take: 100 },
+      expectedStatus: [200],
+    });
+    const currentOwner = listed.body?.data?.users?.find(
+      (candidate) => candidate?.status === "active" && candidate?.type === "owner",
+    );
+    const successorUserId = requireState("platformLifecycleUserId");
+    if (!currentOwner?.id || currentOwner.id === successorUserId) {
+      throw new Error("Smoke ownership transfer requires distinct active owner and successor.");
+    }
+
+    await platformHttpRequest(op, {
+      path: `/platform/organizations/${organizationId}/ownership-transfer`,
+      json: {
+        currentOwnerId: currentOwner.id,
+        successorUserId,
+        previousOwnerAction: "demote",
+        justification: "Smoke ownership transfer validation.",
+      },
+      expectedStatus: [200],
+    });
+  },
+
   async platformDepartments(op) {
     await platformHttpRequest(op, {
       path: `/platform/organizations/${requireState("session").organization_id}/departments`,

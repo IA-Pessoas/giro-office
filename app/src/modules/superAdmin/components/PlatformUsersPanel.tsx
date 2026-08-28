@@ -11,12 +11,14 @@ import type { UserItem } from "@modules/users/types";
 
 import {
   usePlatformDepartments,
+  usePlatformOwnershipTransferMutation,
   usePlatformUserDetail,
   usePlatformUserLifecycleMutation,
   usePlatformUsers,
 } from "../hooks/usePlatformUsers";
 import { platformService } from "../services/platformService";
 import type { PlatformOrganization, PlatformOrganizationUser } from "../types";
+import { OwnershipTransferDialog } from "./OwnershipTransferDialog";
 
 const PAGE_SIZE = 20;
 
@@ -32,6 +34,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isOwnershipTransferOpen, setIsOwnershipTransferOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<"deactivate" | "reactivate" | null>(null);
   const lifecycleActionRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
@@ -42,11 +45,13 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
   const users = usersQuery.data?.users ?? [];
+  const ownershipCandidatesQuery = usePlatformUsers(organization.id, { skip: 0, take: 100 });
   const total = usersQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const userDetailQuery = usePlatformUserDetail(organization.id, selectedUserId);
   const departmentsQuery = usePlatformDepartments(organization.id);
   const userLifecycleMutation = usePlatformUserLifecycleMutation();
+  const ownershipTransferMutation = usePlatformOwnershipTransferMutation();
   const departmentName = departmentsQuery.data?.find(
     (department) => department.id === userDetailQuery.data?.department_id,
   )?.name;
@@ -63,6 +68,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
 
   useEffect(() => {
     setSelectedUserId(null);
+    setIsOwnershipTransferOpen(false);
   }, [organization.id]);
   const selectedUser = userDetailQuery.data;
 
@@ -182,14 +188,24 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
               <div className="space-y-4">
                 <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Usuário selecionado</p><h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{selectedUser.name}</h3></div>
                 <dl className="space-y-3 text-sm"><div><dt className="text-slate-500">Login</dt><dd className="font-medium">{selectedUser.login}</dd></div><div><dt className="text-slate-500">Departamento</dt><dd className="font-medium">{departmentsQuery.isLoading ? "Carregando..." : departmentsQuery.isError ? <span className="text-rose-700 dark:text-rose-300" role="alert">Não foi possível carregar departamentos. <button className="font-semibold underline" onClick={() => void departmentsQuery.refetch()} type="button">Tentar novamente</button></span> : departmentName ?? "Sem departamento"}</dd></div><div><dt className="text-slate-500">Perfil</dt><dd className="font-medium">{getProfileLabel(selectedUser)}</dd></div></dl>
-                <button
-                  ref={lifecycleActionRef}
-                  className={selectedUser.status === "active" ? "rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600" : "rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"}
-                  onClick={() => setPendingAction(selectedUser.status === "active" ? "deactivate" : "reactivate")}
-                  type="button"
-                >
-                  {selectedUser.status === "active" ? "Desativar usuário" : "Reativar usuário"}
-                </button>
+                {selectedUser.status === "active" && selectedUser.type === "owner" ? (
+                  <button
+                    className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={() => setIsOwnershipTransferOpen(true)}
+                    type="button"
+                  >
+                    Transferir ownership
+                  </button>
+                ) : (
+                  <button
+                    ref={lifecycleActionRef}
+                    className={selectedUser.status === "active" ? "rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600" : "rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"}
+                    onClick={() => setPendingAction(selectedUser.status === "active" ? "deactivate" : "reactivate")}
+                    type="button"
+                  >
+                    {selectedUser.status === "active" ? "Desativar usuário" : "Reativar usuário"}
+                  </button>
+                )}
               </div>
             ) : null}
           </aside>
@@ -252,6 +268,24 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
         open={pendingAction !== null}
         title={pendingAction === "deactivate" ? "Desativar usuário" : "Reativar usuário"}
         variant={pendingAction === "deactivate" ? "destructive" : "neutral"}
+      />
+      <OwnershipTransferDialog
+        currentOwner={selectedUser?.type === "owner" && selectedUser.status === "active" ? selectedUser : null}
+        isConfirming={ownershipTransferMutation.isPending}
+        onOpenChange={setIsOwnershipTransferOpen}
+        onTransfer={async ({ successorUserId, previousOwnerAction, justification }) => {
+          if (!selectedUser) return;
+          await ownershipTransferMutation.mutateAsync({
+            organizationId: organization.id,
+            currentOwnerId: selectedUser.id,
+            successorUserId,
+            previousOwnerAction,
+            justification,
+          });
+        }}
+        open={isOwnershipTransferOpen}
+        organization={organization}
+        users={ownershipCandidatesQuery.data?.users ?? []}
       />
     </section>
   );

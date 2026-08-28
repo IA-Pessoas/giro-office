@@ -7,7 +7,13 @@ import {
 } from "@tanstack/react-query";
 
 import { platformService } from "../services/platformService";
-import type { PlatformDepartmentOption, PlatformOrganizationUser, PlatformUsersListResponse } from "../types";
+import type {
+  PlatformDepartmentOption,
+  PlatformOrganizationUser,
+  PlatformOwnershipTransferResult,
+  PlatformUsersListResponse,
+  PreviousOwnerAction,
+} from "../types";
 
 export interface UsePlatformUsersParams {
   skip: number;
@@ -93,6 +99,33 @@ export function usePlatformUserLifecycleMutation(): UseMutationResult<
               }
             : current,
       );
+    },
+  });
+}
+
+export function usePlatformOwnershipTransferMutation(): UseMutationResult<
+  PlatformOwnershipTransferResult,
+  unknown,
+  {
+    organizationId: string;
+    currentOwnerId: string;
+    successorUserId: string;
+    previousOwnerAction: PreviousOwnerAction;
+    justification: string;
+  }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ organizationId, ...data }) => platformService.transferOwnership(organizationId, data),
+    retry: false,
+    onSuccess: async (_result, { organizationId }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["platform", "organizations", organizationId, "users"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["platform", "audit"] }),
+      ]);
     },
   });
 }
