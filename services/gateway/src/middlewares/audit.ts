@@ -87,10 +87,8 @@ export function buildAuditCapacityGuard({
     next: NextFunction,
   ): Promise<void> {
     const requiresAudit = requiresOrganizationMutationAudit(request);
-    const mustReserve =
-      requiresAudit ||
-      request.auth !== undefined ||
-      !SAFE_METHODS.has(request.method.toUpperCase());
+    const method = request.method.toUpperCase();
+    const mustReserve = requiresAudit || request.auth !== undefined || !SAFE_METHODS.has(method);
 
     if (requiresAudit && (!enabled || !request.requestId)) {
       next(new ServiceError(503, "Auditoria indisponível; operação não iniciada."));

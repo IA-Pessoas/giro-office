@@ -198,6 +198,12 @@ describe("buildForwardHeaders", () => {
       expectedCsrf: null,
     },
     {
+      method: "POST",
+      path: "/platform/organizations/org-1/users",
+      expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
+      expectedCsrf: "proof",
+    },
+    {
       method: "GET",
       path: "/platform/organizations/org-1/departments",
       expectedCookie: "cw.session=verified-platform-token",
