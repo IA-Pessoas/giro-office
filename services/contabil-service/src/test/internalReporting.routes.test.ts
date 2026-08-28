@@ -91,6 +91,16 @@ describe("internal reporting routes", () => {
       response.body.data.sources[0].fields.map((field: { key: string }) => field.key),
     ).not.toEqual(expect.arrayContaining(["client_id", "id", "notes"]));
 
+    const relationship = response.body.data.sources.find(
+      (source: { key: string }) => source.key === "contabil.relationship",
+    );
+    expect(relationship.fields.map((field: { key: string }) => field.key)).toEqual([
+      "bidding",
+      "chart_accounts",
+      "tool",
+      "system",
+    ]);
+    expect(relationship.keys.map((field: { key: string }) => field.key)).toEqual(["client_id"]);
     const responsibles = response.body.data.sources.find(
       (source: { key: string }) => source.key === "contabil.responsibles",
     );
@@ -144,6 +154,32 @@ describe("internal reporting routes", () => {
         .expect(403);
     }
     expect(extract).not.toHaveBeenCalled();
+  });
+
+  it("extrai relacionamento contábil com grant e campos publicados", async () => {
+    const body = {
+      source: "contabil.relationship",
+      fields: ["bidding", "chart_accounts", "tool", "system"],
+      limit: 1,
+    };
+    const signed = signedGrant({ body });
+    const { app, extract } = createApp();
+
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
+      .set("x-request-id", requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(extract).toHaveBeenCalledWith({
+      organizationId,
+      source: "contabil.relationship",
+      fields: ["bidding", "chart_accounts", "tool", "system"],
+      limit: 1,
+    });
   });
 
   it("extrai responsibles somente pelo campo publicado", async () => {

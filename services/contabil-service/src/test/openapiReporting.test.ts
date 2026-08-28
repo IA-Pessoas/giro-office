@@ -55,7 +55,7 @@ describe("contabil-service OpenAPI reporting", () => {
     ).requestBody?.content?.["application/json"]?.schema;
     expect(extractBody?.properties?.source).toEqual({
       type: "string",
-      enum: ["contabil.control", "contabil.responsibles"],
+      enum: ["contabil.control", "contabil.responsibles", "contabil.relationship"],
     });
   });
 });
