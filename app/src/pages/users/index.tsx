@@ -20,6 +20,7 @@ import {
   filterAdminUsersByStatus,
   listAdminUsers,
   normalizeAdminUserStatus,
+  userService,
   type UserItem,
   type UsersIndexPageProps,
 } from "@modules/users";
@@ -145,6 +146,7 @@ export default function Users({
         isOpen={isModalOpen}
         onClose={onModalClose}
         onUserCreated={handleUserCreated}
+        onCreateUser={userService.create}
         departments={deps}
         canCreateOrganizationOwner={canManageOrganizationOwners}
       />

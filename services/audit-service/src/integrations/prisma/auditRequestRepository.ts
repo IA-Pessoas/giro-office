@@ -1,9 +1,15 @@
-import type {
-  AuditQuery,
-  AuditRequestRecord,
-  AuditSearchFilters,
-  AuditSearchResult,
-  CreateAuditRequestPayload,
+import {
+  type AuditQuery,
+  type AuditRequestRecord,
+  type AuditSearchFilters,
+  type AuditSearchResult,
+  type CreateAuditRequestPayload,
+  MAX_AUDIT_OFFSET,
+  type OrganizationAuditPlan,
+  type OrganizationAuditStatus,
+  type PlatformAuditRequestRecord,
+  type PlatformAuditSearchResult,
+  type PlatformOrganizationAuditChanges,
 } from "@workspace/shared/audit";
 
 import {
@@ -12,11 +18,13 @@ import {
   type PrismaClient,
 } from "../../../generated/prisma/client.js";
 
+import { getOwnDataProperty } from "../../security/ownDataProperty.js";
 import { getPrismaClient } from "./prismaClient.js";
 
 export interface AuditRequestRepository {
   create(payload: CreateAuditRequestPayload): Promise<void>;
   search(filters: AuditSearchFilters): Promise<AuditSearchResult>;
+  searchPlatform(filters: AuditSearchFilters): Promise<PlatformAuditSearchResult>;
   findByRequestId(requestId: string, organizationId: string): Promise<AuditRequestRecord | null>;
 }
 
@@ -128,10 +136,157 @@ function toAuditRequest(record: PrismaAuditRequest): AuditRequestRecord {
   };
 }
 
-function buildWhere(filters: AuditSearchFilters): Prisma.AuditRequestWhereInput {
-  const where: Prisma.AuditRequestWhereInput = {
-    organization_id: filters.organizationId,
+const platformAuditSelect = {
+  id: true,
+  request_id: true,
+  organization_id: true,
+  method: true,
+  path: true,
+  status_code: true,
+  outcome: true,
+  duration_ms: true,
+  service_source: true,
+  created_at: true,
+  metadata_json: true,
+  action: true,
+  referring: true,
+  referring_id: true,
+  changes_json: true,
+} satisfies Prisma.AuditRequestSelect;
+
+type PlatformAuditRow = Prisma.AuditRequestGetPayload<{ select: typeof platformAuditSelect }>;
+
+const platformAuditActions = new Set([
+  "organization.created",
+  "organization.status.updated",
+  "organization.subscription_plan.updated",
+  "organization.logo_url.updated",
+]);
+const organizationStatuses = new Set<OrganizationAuditStatus>([
+  "trial",
+  "past_due",
+  "active",
+  "suspended",
+  "cancelled",
+]);
+const organizationPlans = new Set<OrganizationAuditPlan>(["trial", "pro", "enterprise"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function getPlatformActor(value: unknown): string | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const actor = getOwnDataProperty(value, "actorPlatformUserId");
+  if (typeof actor !== "string" || actor.length > 200) {
+    return undefined;
+  }
+
+  return actor.trim() || undefined;
+}
+
+function isSafeLogoUrl(value: unknown): value is string | null {
+  if (value === null) {
+    return true;
+  }
+  if (typeof value !== "string" || value.length > 2048) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.username === "" && url.password === "";
+  } catch {
+    return false;
+  }
+}
+
+function getPlatformChanges(
+  record: PlatformAuditRow,
+): PlatformOrganizationAuditChanges | undefined {
+  if (
+    record.service_source !== "organization-service" ||
+    record.referring !== "organization" ||
+    typeof record.organization_id !== "string" ||
+    record.referring_id !== record.organization_id ||
+    typeof record.action !== "string" ||
+    !platformAuditActions.has(record.action) ||
+    !isRecord(record.changes_json)
+  ) {
+    return undefined;
+  }
+
+  const changes: PlatformOrganizationAuditChanges = {};
+  const status = getOwnDataProperty(record.changes_json, "status");
+  const statusFrom = getOwnDataProperty(status, "from");
+  const statusTo = getOwnDataProperty(status, "to");
+  if (
+    isRecord(status) &&
+    (statusFrom === null || organizationStatuses.has(statusFrom as OrganizationAuditStatus)) &&
+    (statusTo === null || organizationStatuses.has(statusTo as OrganizationAuditStatus))
+  ) {
+    changes.status = {
+      from: statusFrom as OrganizationAuditStatus | null,
+      to: statusTo as OrganizationAuditStatus | null,
+    };
+  }
+
+  const plan = getOwnDataProperty(record.changes_json, "subscription_plan");
+  const planFrom = getOwnDataProperty(plan, "from");
+  const planTo = getOwnDataProperty(plan, "to");
+  if (
+    isRecord(plan) &&
+    (planFrom === null || organizationPlans.has(planFrom as OrganizationAuditPlan)) &&
+    (planTo === null || organizationPlans.has(planTo as OrganizationAuditPlan))
+  ) {
+    changes.subscription_plan = {
+      from: planFrom as OrganizationAuditPlan | null,
+      to: planTo as OrganizationAuditPlan | null,
+    };
+  }
+
+  const logo = getOwnDataProperty(record.changes_json, "logo_url");
+  const logoFrom = getOwnDataProperty(logo, "from");
+  const logoTo = getOwnDataProperty(logo, "to");
+  if (isRecord(logo) && isSafeLogoUrl(logoFrom) && isSafeLogoUrl(logoTo)) {
+    changes.logo_url = { from: logoFrom, to: logoTo };
+  }
+
+  return Object.keys(changes).length > 0 ? changes : undefined;
+}
+
+function toPlatformAuditRequest(record: PlatformAuditRow): PlatformAuditRequestRecord {
+  const actorPlatformUserId = getPlatformActor(record.metadata_json);
+  const changes = getPlatformChanges(record);
+
+  return {
+    id: record.id,
+    requestId: record.request_id,
+    organizationId: record.organization_id,
+    method: record.method,
+    path: record.path,
+    statusCode: record.status_code,
+    outcome: record.outcome as AuditRequestRecord["outcome"],
+    durationMs: record.duration_ms,
+    serviceSource: record.service_source,
+    createdAt: record.created_at.toISOString(),
+    ...(record.action ? { action: record.action } : {}),
+    ...(record.referring ? { referring: record.referring } : {}),
+    ...(record.referring_id ? { referringId: record.referring_id } : {}),
+    ...(actorPlatformUserId ? { actorPlatformUserId } : {}),
+    ...(changes ? { changes } : {}),
   };
+}
+
+function buildWhere(filters: AuditSearchFilters): Prisma.AuditRequestWhereInput {
+  const where: Prisma.AuditRequestWhereInput = {};
+
+  if (filters.organizationId) {
+    where.organization_id = filters.organizationId;
+  }
 
   if (filters.requestId) {
     where.request_id = filters.requestId;
@@ -226,9 +381,7 @@ export function createAuditRequestRepository(
       const [items, total] = await client.$transaction([
         client.auditRequest.findMany({
           where,
-          orderBy: {
-            created_at: "desc",
-          },
+          orderBy: [{ created_at: "desc" }, { id: "desc" }],
           skip: (filters.page - 1) * filters.pageSize,
           take: filters.pageSize,
         }),
@@ -238,6 +391,27 @@ export function createAuditRequestRepository(
       return {
         items: items.map(toAuditRequest),
         total,
+        page: filters.page,
+        pageSize: filters.pageSize,
+      };
+    },
+    async searchPlatform(filters) {
+      const where = buildWhere(filters);
+      const totalLimit = MAX_AUDIT_OFFSET + filters.pageSize;
+      const [items, total] = await client.$transaction([
+        client.auditRequest.findMany({
+          where,
+          select: platformAuditSelect,
+          orderBy: [{ created_at: "desc" }, { id: "desc" }],
+          skip: (filters.page - 1) * filters.pageSize,
+          take: filters.pageSize,
+        }),
+        client.auditRequest.count({ where, take: totalLimit }),
+      ]);
+
+      return {
+        items: items.map(toPlatformAuditRequest),
+        total: Math.min(total, totalLimit),
         page: filters.page,
         pageSize: filters.pageSize,
       };

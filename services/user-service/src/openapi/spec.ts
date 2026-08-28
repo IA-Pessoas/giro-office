@@ -11,6 +11,8 @@ const successJson = {
 } as const;
 const bearer = [{ bearerAuth: [] }] as const;
 const browserSession = [{ cookieAuth: [] }, { bearerAuth: [] }] as const;
+const platformBrowserSession = [{ cookieAuth: [], gatewayInternalToken: [] }] as const;
+const platformGateway = [{ gatewayInternalToken: [] }] as const;
 const csrfHeader = {
   name: "x-csrf-token",
   in: "header",
@@ -34,6 +36,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
     tags: [
       { name: "Health", description: "Saúde do serviço" },
       { name: "Auth", description: "Sessão e configuração inicial" },
+      { name: "Platform auth", description: "Sessão HTTP-only do administrador da plataforma" },
       { name: "Users", description: "Usuários" },
       { name: "Permission", description: "Permissões por usuário" },
       { name: "Internal reporting", description: "Contexto autoritativo para relatórios" },
@@ -55,6 +58,12 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           in: "header",
           name: "x-internal-service-token",
           description: "Valor igual a REPORTS_INTERNAL_TOKEN.",
+        },
+        gatewayInternalToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
+          description: "Valor igual a USER_SERVICE_INTERNAL_TOKEN; uso exclusivo do gateway.",
         },
       },
       schemas: {
@@ -101,6 +110,279 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           summary: "Health check",
           responses: {
             "200": { description: "Serviço disponível", ...successJson },
+          },
+        },
+      },
+      "/platform/session": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Login do administrador da plataforma",
+          description: "Contrato interno: o navegador deve chamar esta rota pelo gateway.",
+          security: platformGateway,
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["email", "password"],
+                  properties: {
+                    email: { type: "string", format: "email" },
+                    password: { type: "string", format: "password" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description:
+                "Identidade do administrador sem credenciais no JSON; emite cw.session HttpOnly e cw.csrf.",
+              ...successJson,
+            },
+            "400": { description: "Payload inválido" },
+            "401": { description: "Credenciais inválidas" },
+            "403": { description: "Token interno do gateway inválido" },
+            "429": { description: "Limite local de tentativas excedido" },
+          },
+        },
+        delete: {
+          tags: ["Platform auth"],
+          summary: "Revogar a sessão atual do administrador da plataforma",
+          security: platformBrowserSession,
+          parameters: [csrfHeader],
+          responses: {
+            "200": { description: "Sessão revogada e cookies expirados", ...successJson },
+            "401": { description: "Sessão ausente, inválida ou revogada" },
+            "403": { description: "Identidade ou prova CSRF inválida" },
+          },
+        },
+      },
+      "/platform/session/refresh": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Rotacionar a sessão e a prova CSRF da plataforma",
+          security: platformBrowserSession,
+          parameters: [csrfHeader],
+          responses: {
+            "200": { description: "Novos cookies, sem token no JSON", ...successJson },
+            "401": { description: "Sessão ausente, inválida ou revogada" },
+            "403": { description: "Identidade ou prova CSRF inválida" },
+            "409": { description: "Sessão já rotacionada concorrentemente" },
+          },
+        },
+      },
+      "/platform/me": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Identidade autenticada da plataforma",
+          security: platformBrowserSession,
+          responses: {
+            "200": { description: "Identidade server-side", ...successJson },
+            "401": { description: "Sessão ausente, inválida ou revogada" },
+            "403": { description: "Identidade organizacional não permitida" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/users": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Listar usuários de uma organização pela plataforma",
+          description:
+            "Consulta somente leitura, restrita à sessão HTTP-only de um super administrador da plataforma. Não retorna credenciais ou dados pessoais sensíveis.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "skip",
+              in: "query",
+              schema: { type: "integer", minimum: 0, maximum: 10_000, default: 0 },
+            },
+            {
+              name: "take",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+            { name: "search", in: "query", schema: { type: "string", maxLength: 100 } },
+          ],
+          responses: {
+            "200": { description: "Página de usuários da organização", ...successJson },
+            "400": { description: "Parâmetros inválidos" },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador da plataforma" },
+          },
+        },
+        post: {
+          tags: ["Platform auth"],
+          summary: "Criar usuário de uma organização pela plataforma",
+          security: platformBrowserSession,
+          parameters: [csrfHeader],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["name", "login", "password", "department_id", "permission"],
+                  properties: {
+                    name: { type: "string" },
+                    login: { type: "string" },
+                    password: { type: "string", format: "password" },
+                    department_id: { type: "string" },
+                    permission: { type: "integer" },
+                    type: { type: "string", enum: ["owner", "admin", "user"] },
+                    status: { type: "string" },
+                    modules: {
+                      type: "object",
+                      additionalProperties: { type: "integer", minimum: 0, maximum: 3 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Usuário criado sem credenciais", ...successJson },
+            "400": { description: "Payload inválido" },
+            "401": { description: "Sessão ausente" },
+            "403": { description: "CSRF ou identidade inválida" },
+            "404": { description: "Departamento fora do tenant" },
+            "409": { description: "Login duplicado" },
+            "503": { description: "Auditoria indisponível" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/users/{userId}": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Consultar usuário de uma organização pela plataforma",
+          description:
+            "Consulta somente leitura por sessão HTTP-only; o usuário deve pertencer à organização do path.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+          ],
+          responses: {
+            "200": { description: "Detalhe de usuário sem campos sensíveis", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador da plataforma" },
+            "404": { description: "Usuário não pertence à organização do contexto" },
+          },
+        },
+        delete: {
+          tags: ["Platform auth"],
+          summary: "Desativar usuário sem exclusão física",
+          description:
+            "Desativa o usuário da organização do path, revoga suas sessões e preserva o histórico. O último owner ativo deve usar a transferência de ownership.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          responses: {
+            "200": { description: "Usuário desativado", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador ou CSRF inválido" },
+            "404": { description: "Usuário não pertence à organização do contexto" },
+            "409": {
+              description: "Último owner ativo, versão desatualizada ou conflito de estado",
+            },
+            "503": { description: "Auditoria durável indisponível antes da mutação" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/users/{userId}/reactivate": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Reativar usuário para sessões futuras",
+          description:
+            "Permite novos logins sem restaurar qualquer sessão revogada durante a desativação.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          responses: {
+            "200": { description: "Usuário reativado para sessões futuras", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador ou CSRF inválido" },
+            "404": { description: "Usuário não pertence à organização do contexto" },
+            "409": { description: "Versão desatualizada ou conflito de estado" },
+            "503": { description: "Auditoria durável indisponível antes da mutação" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/departments": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Listar departamentos de uma organização pela plataforma",
+          description:
+            "Consulta somente leitura por sessão HTTP-only; retorna exclusivamente id e name.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+          ],
+          responses: {
+            "200": { description: "Departamentos da organização", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador da plataforma" },
+          },
+        },
+      },
+      "/platform/session/validate": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Validar internamente uma sessão da plataforma",
+          security: [{ gatewayInternalToken: [], bearerAuth: [] }],
+          responses: {
+            "200": { description: "Sessão válida", ...successJson },
+            "401": { description: "Sessão ausente, inválida ou revogada" },
+            "403": { description: "Token de serviço ou identidade não permitidos" },
           },
         },
       },

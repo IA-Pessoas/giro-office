@@ -326,7 +326,10 @@ await (async () => {
   });
 
   await runTest("app shell checks full user access for administration navigation", () => {
-    assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user;/);
+    assert.match(
+      appShellSource,
+      /const accessUser = isPlatformSuperAdmin \? user : meQuery\.data \?\? user;/,
+    );
     assert.match(appShellSource, /canAccessAdministration\(accessUser, \{ rhAccess \}\)/);
   });
 
@@ -572,7 +575,10 @@ await (async () => {
     () => {
       assert.match(appShellSource, /useModuleAccessMap\(MODULE_KEYS\)/);
       assert.equal(appShellSource.includes("useAccessStore("), false);
-      assert.match(appShellSource, /const accessUser = meQuery\.data \?\? user/);
+      assert.match(
+        appShellSource,
+        /const accessUser = isPlatformSuperAdmin \? user : meQuery\.data \?\? user/,
+      );
       assert.match(appShellSource, /canAccessAdministration\(accessUser,\s*\{\s*rhAccess\s*\}\)/);
       assert.match(appShellSource, /const rhAccess = moduleAccessMap\.rh/);
       assert.match(appShellSource, /getNavigationModuleName\(module, moduleAccessUser\)/);
@@ -751,10 +757,9 @@ await (async () => {
     () => {
       assert.match(authContextSource, /refreshSession:\s*\(\)\s*=>\s*Promise<UserProps \| null>/);
       assert.match(authContextSource, /async function refreshSession\(\)/);
-      assert.match(
-        authContextSource,
-        /<AuthContext\.Provider value=\{\{ user, isAuthenticated, signIn, logoutUser, refreshSession, loading \}\}/,
-      );
+      assert.match(authContextSource, /<AuthContext\.Provider value=\{\{/);
+      assert.match(authContextSource, /signIn,\s*signInPlatform,\s*logoutUser,\s*logoutPlatform/);
+      assert.match(authContextSource, /refreshSession,\s*refreshPlatformSession,\s*loading/);
       assert.match(administracaoSource, /import \{ signOut, useAuth \} from "@\/context\/AuthContext";/);
       assert.match(administracaoSource, /const \{ user \} = useAuth\(\);/);
       assert.match(

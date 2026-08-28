@@ -93,6 +93,36 @@ const userServiceSource = readFileSync(
   new URL("./services/userService.ts", import.meta.url),
   "utf8",
 );
+const adminUserContractsSource = readFileSync(
+  new URL("./types/adminUserContracts.ts", import.meta.url),
+  "utf8",
+);
+const adminPermissionsEditorSource = readFileSync(
+  new URL("./components/AdminPermissionsEditor.tsx", import.meta.url),
+  "utf8",
+);
+
+runTest("shared administration contracts keep creation, details and permissions independent of URLs", () => {
+  assert.match(adminUserContractsSource, /export interface CreateAdminUserHandler/);
+  assert.match(adminUserContractsSource, /export interface AdminUserDetailsDataSource/);
+  assert.match(adminUserContractsSource, /export interface AdminUserPermissionsDataSource/);
+  assert.doesNotMatch(adminUserContractsSource, /\/user|https?:\/\//);
+});
+
+runTest("shared creation and details panels delegate mutations through their contracts", () => {
+  assert.match(createUserModalSource, /onCreateUser: CreateAdminUserHandler/);
+  assert.doesNotMatch(createUserModalSource, /await import\('\.\.\/services\/userService'\)/);
+  assert.match(adminUserDetailsPanelSource, /dataSource: AdminUserDetailsDataSource/);
+  assert.doesNotMatch(adminUserDetailsPanelSource, /from "\.\.\/services\/userService"/);
+});
+
+runTest("shared permission editor delegates loading and saving through its contract", () => {
+  assert.match(adminPermissionsEditorSource, /dataSource: AdminUserPermissionsDataSource/);
+  assert.doesNotMatch(adminPermissionsEditorSource, /from "\.\.\/services\/permissionService"/);
+  assert.doesNotMatch(adminPermissionsEditorSource, /from "\.\.\/services\/userService"/);
+  assert.match(administracaoSource, /const administrationUserContracts/);
+  assert.match(administracaoSource, /<AdminPermissionsEditor/);
+});
 
 function extractClassConstant(source, constantName) {
   const match = source.match(new RegExp(`const ${constantName} =\\s*\\n\\s*"([^"]+)";`));
@@ -583,33 +613,33 @@ runTest("department permission sync detects stale global user access", () => {
 
 runTest("department module remains editable in permissions tab", () => {
   assert.match(
-    administracaoSource,
-    /const isDepartmentModule = selectedPermissionDepartmentModule === moduleKey;/,
+    adminPermissionsEditorSource,
+    /const isDepartmentModule = selectedDepartmentModule === moduleKey;/,
   );
-  assert.match(administracaoSource, /buildDepartmentPermissionSyncPayload/);
-  assert.match(administracaoSource, /needsDepartmentPermissionSync/);
+  assert.match(adminPermissionsEditorSource, /buildDepartmentPermissionSyncPayload/);
+  assert.match(adminPermissionsEditorSource, /needsDepartmentPermissionSync/);
   assert.match(
-    administracaoSource,
-    /needsDepartmentPermissionSync\(\s*selectedPermissionDepartmentModule,\s*normalizedPermissionDraft,\s*selectedPermissionUser,\s*permissionBaseline \?\? undefined,/s,
+    adminPermissionsEditorSource,
+    /needsDepartmentPermissionSync\(\s*selectedDepartmentModule,\s*normalizedPermissionDraft,\s*selectedUser,\s*permissionBaseline \?\? undefined,/s,
   );
-  assert.match(administracaoSource, /userService\.update\(\s*selectedPermissionUserId/s);
+  assert.match(adminPermissionsEditorSource, /dataSource\.syncDepartmentPermission/);
   assert.doesNotMatch(
-    administracaoSource,
+    adminPermissionsEditorSource,
     /isDepartmentModule \? \(\s*<div/s,
   );
 });
 
 runTest("admin permission editor uses module-specific options and normalization", () => {
   assert.match(
-    administracaoSource,
+    adminPermissionsEditorSource,
     /getPermissionSelectOptions\(moduleKey\)\.map/,
   );
   assert.match(
-    administracaoSource,
+    adminPermissionsEditorSource,
     /normalizePermissionForModule\(\s*moduleKey,/s,
   );
   assert.doesNotMatch(
-    administracaoSource,
+    adminPermissionsEditorSource,
     /\{PERMISSION_SELECT_OPTIONS\.map\(\(option\) => \(/,
   );
 });
@@ -637,15 +667,14 @@ runTest("administration empty states avoid backend wording", () => {
 });
 
 runTest("admin permission context changes confirm discarding pending edits through the shared dialog", () => {
-  assert.match(administracaoSource, /import \{ ConfirmationDialog \} from "@shared\/components";/);
+  assert.match(adminPermissionsEditorSource, /import \{ ConfirmationDialog \} from "@shared\/components";/);
   assert.match(
-    administracaoSource,
-    /const \[pendingPermissionUserId, setPendingPermissionUserId\] = useState<string \| null>\(null\);/,
+    adminPermissionsEditorSource,
+    /const \[pendingUserId, setPendingUserId\] = useState<string \| null>\(null\);/,
   );
-  assert.match(administracaoSource, /if \(isDirty\) \{\s*setPendingPermissionUserId\(nextUserId\);\s*return;/s);
-  assert.match(administracaoSource, /<ConfirmationDialog\s+open=\{pendingPermissionUserId !== null\}/s);
-  assert.match(administracaoSource, /onConfirm=\{handleConfirmPermissionUserChange\}/);
-  assert.doesNotMatch(administracaoSource, /window\.confirm\(/);
+  assert.match(adminPermissionsEditorSource, /if \(isDirty\) \{\s*setPendingUserId\(nextUserId\);\s*return;/s);
+  assert.match(adminPermissionsEditorSource, /<ConfirmationDialog open=\{pendingUserId !== null\}/s);
+  assert.doesNotMatch(adminPermissionsEditorSource, /window\.confirm\(/);
 });
 
 runTest("admin user details panels avoid stacked borders while keeping empty states clear", () => {

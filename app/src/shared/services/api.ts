@@ -45,3 +45,5 @@ export function setupAPIClient(ctx?: ApiServerContext, onUnauthorized?: () => vo
     },
   });
 }
+
+export const platformApi = setupAPIClient();

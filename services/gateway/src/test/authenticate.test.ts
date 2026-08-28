@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import { type AuthContext, authenticateFromToken, ServiceError } from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
 import express from "express";
@@ -23,7 +23,7 @@ function createTestLogger() {
 function createProtectedApp(options: {
   bearerAuthCompatibility: boolean;
   logger?: ReturnType<typeof createTestLogger>;
-  sessionValidator?: (token: string) => Promise<void>;
+  sessionValidator?: (auth: AuthContext, transport: "cookie" | "bearer") => Promise<void>;
 }) {
   const app = express();
   app.use(
@@ -67,14 +67,46 @@ describe("createUserServiceSessionValidator", () => {
       "internal-token",
     );
 
-    await validate("jwt-token", "bearer");
+    const token = jwt.sign({ user_id: "user-1", organization_id: "org-1" }, "test-secret");
+    await validate(authenticateFromToken(token, "test-secret"), "bearer");
 
     expect(fetchMock).toHaveBeenCalledWith(
       new URL("/user/session/validate", "http://user-service.test"),
       expect.objectContaining({
         headers: expect.objectContaining({
-          authorization: "Bearer jwt-token",
+          authorization: `Bearer ${token}`,
           "x-auth-session-transport": "bearer",
+          "x-internal-service-token": "internal-token",
+        }),
+      }),
+    );
+  });
+
+  it("valida identidade de plataforma somente no endpoint interno da plataforma", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const validate = createUserServiceSessionValidator(
+      "http://user-service.test",
+      "internal-token",
+    );
+    const token = jwt.sign(
+      {
+        user_id: "platform-user-1",
+        auth_kind: "platform",
+        platform_role: "super_admin",
+      },
+      "test-secret",
+    );
+
+    await validate(authenticateFromToken(token, "test-secret"), "cookie");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL("/platform/session/validate", "http://user-service.test"),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          authorization: `Bearer ${token}`,
+          "x-auth-session-transport": "cookie",
           "x-internal-service-token": "internal-token",
         }),
       }),
@@ -88,7 +120,10 @@ describe("createUserServiceSessionValidator", () => {
       "internal-token",
     );
 
-    await expect(validate("revoked-token", "cookie")).rejects.toMatchObject({ statusCode: 401 });
+    const token = jwt.sign({ user_id: "user-1", organization_id: "org-1" }, "test-secret");
+    await expect(
+      validate(authenticateFromToken(token, "test-secret"), "cookie"),
+    ).rejects.toMatchObject({ statusCode: 401 });
   });
 
   it("preserva a resposta de sessão substituída para não derrubar a sessão nova", async () => {
@@ -98,7 +133,10 @@ describe("createUserServiceSessionValidator", () => {
       "internal-token",
     );
 
-    await expect(validate("rotated-token", "cookie")).rejects.toMatchObject({ statusCode: 409 });
+    const token = jwt.sign({ user_id: "user-1", organization_id: "org-1" }, "test-secret");
+    await expect(
+      validate(authenticateFromToken(token, "test-secret"), "cookie"),
+    ).rejects.toMatchObject({ statusCode: 409 });
   });
 });
 
@@ -122,7 +160,14 @@ describe("buildAuthenticateMiddleware", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.transport).toBe("cookie");
-    expect(validateSession).toHaveBeenCalledWith(cookieToken, "cookie");
+    expect(validateSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: cookieToken,
+        actorKind: "organization",
+        userId: "user-1",
+      }),
+      "cookie",
+    );
   });
 
   it("registra somente o uso aceito da compatibilidade Bearer no hot path", async () => {
@@ -153,6 +198,27 @@ describe("buildAuthenticateMiddleware", () => {
       .set("Authorization", `Bearer ${cookieToken}`);
 
     expect(response.status).toBe(401);
+  });
+
+  it("rejeita Bearer de plataforma mesmo com a compatibilidade organizacional ligada", async () => {
+    const platformToken = jwt.sign(
+      {
+        user_id: "platform-user-1",
+        auth_kind: "platform",
+        platform_role: "super_admin",
+      },
+      "test-secret",
+    );
+    const validateSession = vi.fn().mockResolvedValue(undefined);
+
+    const response = await request(
+      createProtectedApp({ bearerAuthCompatibility: true, sessionValidator: validateSession }),
+    )
+      .get("/protected")
+      .set("Authorization", `Bearer ${platformToken}`);
+
+    expect(response.status).toBe(401);
+    expect(validateSession).not.toHaveBeenCalled();
   });
 
   it("não encerra a UI quando uma validação antiga termina após a rotação", async () => {

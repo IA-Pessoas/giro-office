@@ -32,6 +32,27 @@ export const createUserBodySchema = z
   })
   .strict()
   .superRefine((body, ctx) => {
+    const hasMutableField = [
+      "name",
+      "login",
+      "password",
+      "department_id",
+      "permission",
+      "status",
+      "photo_url",
+      "organization_id",
+      "type",
+      "first_owner_flag",
+      "modules",
+    ].some((field) => field in body);
+
+    if (!hasMutableField) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Informe ao menos um campo para atualizar.",
+      });
+    }
+
     if (body.first_owner_flag === true && body.type !== "owner") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -53,6 +74,7 @@ export const updateUserBodySchema = z
     type: z.union([userTypeSchema, z.null()]).optional(),
     first_owner_flag: z.boolean().optional(),
     modules: modulesSchema.optional(),
+    expected_version: z.number().int().positive().optional(),
   })
   .strict()
   .superRefine((body, ctx) => {

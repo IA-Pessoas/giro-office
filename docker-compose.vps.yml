@@ -23,7 +23,7 @@ services:
     env_file:
       - .env.vps.reverse-proxy
     ports:
-      - "8085:80"
+      - "127.0.0.1:8085:80"
       # - "443:443"
     volumes:
       - ./docker/nginx/generate-nginx-config.sh:/opt/generate-nginx-config.sh:ro
@@ -45,7 +45,7 @@ services:
     env_file:
       - .env.vps.web
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     healthcheck:
       test:
         [
@@ -84,7 +84,7 @@ services:
       PARCELAMENTO_SERVICE_URL: http://parcelamento-service:3043
       REPORTS_SERVICE_URL: http://reports-service:3044
     ports:
-      - "3010:3010"
+      - "127.0.0.1:3010:3010"
     depends_on:
       organization-service:
         condition: service_healthy
@@ -572,6 +572,7 @@ services:
     environment:
       USER_SERVICE_URL: http://user-service:3030
       CONTABIL_SERVICE_URL: http://contabil-service:3038
+      CERTIFICATE_SERVICE_URL: http://certificate-service:3041
       PROJECT_SERVICE_URL: http://project-service:3033
       TASK_SERVICE_URL: http://task-service:3032
     expose:
@@ -608,6 +609,7 @@ services:
     environment:
       USER_SERVICE_URL: http://user-service:3030
       CONTABIL_SERVICE_URL: http://contabil-service:3038
+      CERTIFICATE_SERVICE_URL: http://certificate-service:3041
     depends_on:
       reports-service:
         condition: service_healthy

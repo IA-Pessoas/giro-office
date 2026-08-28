@@ -2,6 +2,7 @@ import type { AuthPolicy } from "@workspace/shared";
 
 const userManagementPolicy: AuthPolicy = { special: "manageUsers" };
 const authenticatedPolicy: AuthPolicy = { minPermission: 0 };
+const platformOnlyPolicy: AuthPolicy = { special: "platformOnly" };
 const moduleAccessPermission = 1;
 const moduleEditPermission = 2;
 
@@ -126,6 +127,12 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /user", userManagementPolicy],
   ["GET /rh/operational-users", operationalUsersCatalogPolicy],
   ["POST /user", userManagementPolicy],
+  ["POST /platform/session/refresh", platformOnlyPolicy],
+  ["DELETE /platform/session", platformOnlyPolicy],
+  ["GET /platform/me", platformOnlyPolicy],
+  ["GET /platform/organizations", platformOnlyPolicy],
+  ["POST /platform/organizations", platformOnlyPolicy],
+  ["GET /platform/audit/requests", platformOnlyPolicy],
 ]);
 
 const routePolicyMatchers: Array<{
@@ -147,6 +154,11 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhEditPolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },
   { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: { special: "ownerOnly" } },
+  {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+    policy: platformOnlyPolicy,
+  },
   {
     method: "GET",
     path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
@@ -181,6 +193,31 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/certificate(?:\/|$)/, policy: certificateEditPolicy },
   { method: "ANY", path: /^\/organizations(?:\/|$)/, policy: authenticatedPolicy },
   { method: "ANY", path: /^\/audit(?:\/|$)/, policy: authenticatedPolicy },
+  {
+    method: "GET",
+    path: /^\/platform\/organizations\/[^/]+\/(?:users(?:\/[^/]+)?|departments)\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "DELETE",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "GET",
+    path: /^\/platform\/organizations\/[^/]+\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "PATCH",
+    path: /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)\/?$/,
+    policy: platformOnlyPolicy,
+  },
 ];
 
 export function getRoutePolicy(method: string, path: string): AuthPolicy | null {

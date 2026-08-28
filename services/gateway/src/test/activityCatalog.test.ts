@@ -37,6 +37,20 @@ describe("activityCatalog", () => {
     ["PUT", "/reports/retention", "alterou", "a política de retenção de relatórios"],
     ["GET", "/reports/models/list", "consultou", "a lista de modelos pessoais de relatório"],
     ["POST", "/reports/models", "cadastrou", "um novo modelo pessoal de relatório"],
+    [
+      "GET",
+      "/reports/models/shared/list",
+      "consultou",
+      "a lista de modelos compartilhados de relatório",
+    ],
+    ["PATCH", "/reports/models/shared/42", "atualizou", "um modelo compartilhado de relatório"],
+    ["POST", "/reports/models/shared/42/copy", "copiou", "um modelo compartilhado de relatório"],
+    [
+      "POST",
+      "/reports/models/shared/42/preview",
+      "gerou",
+      "uma prévia de modelo compartilhado de relatório",
+    ],
     ["POST", "/user", "cadastrou", "um novo usuário"],
     [
       "PATCH",
@@ -170,6 +184,31 @@ describe("activityCatalog", () => {
       "gerou",
       "obrigações da competência",
     ],
+    ["GET", "/platform/organizations", "consultou", "a lista global de organizações"],
+    ["POST", "/platform/organizations", "criou", "uma organização"],
+    ["POST", "/platform/organizations/org-1/users", "criou", "um usuário da organização"],
+    ["GET", "/platform/organizations/org-1", "consultou", "uma organização"],
+    ["PATCH", "/platform/organizations/org-1/status", "alterou", "o status de uma organização"],
+    [
+      "PATCH",
+      "/platform/organizations/org-1/subscription-plan",
+      "alterou",
+      "o plano de uma organização",
+    ],
+    ["PATCH", "/platform/organizations/org-1/logo-url", "atualizou", "a marca de uma organização"],
+    [
+      "GET",
+      "/platform/organizations/org-1/users",
+      "consultou",
+      "a lista global de usuários da organização",
+    ],
+    ["GET", "/platform/organizations/org-1/users/user-1", "consultou", "um usuário da organização"],
+    [
+      "GET",
+      "/platform/organizations/org-1/departments",
+      "consultou",
+      "os departamentos da organização",
+    ],
   ])("traduz %s %s", (method, path, action, item) => {
     expect(describeActivity(method, path)).toEqual({ action, item });
   });
@@ -183,6 +222,11 @@ describe("activityCatalog", () => {
     ["GET", "/audit/requests"],
     ["POST", "/user/session"],
     ["GET", "/user/me"],
+    ["POST", "/platform/session"],
+    ["DELETE", "/platform/session"],
+    ["POST", "/platform/session/refresh"],
+    ["GET", "/platform/me"],
+    ["GET", "/platform/audit/requests"],
   ])("classifica %s %s como técnico", (method, path) => {
     expect(classifyActivity(method, path)).toEqual({ kind: "technical" });
     expect(describeActivity(method, path)).toBeNull();

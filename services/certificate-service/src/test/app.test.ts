@@ -131,6 +131,25 @@ describe("certificate-service app", () => {
       security: [{ internalToken: [] }],
     });
   });
+
+  it("documents reporting interno sem expor a rota no contrato público", async () => {
+    const app = createCertificateApplication({
+      env: { ...env, enableApiDocs: true },
+      logger,
+      prisma: {} as never,
+    });
+
+    const response = await request(app).get("/openapi.json").expect(200);
+
+    expect(response.body.paths["/internal/reporting/catalog"].get).toMatchObject({
+      "x-internal": true,
+      security: [{ internalToken: [] }],
+    });
+    expect(response.body.paths["/internal/reporting/extract"].post).toMatchObject({
+      "x-internal": true,
+      security: [{ internalToken: [] }],
+    });
+  });
 });
 
 describe("certificate-service auth context", () => {

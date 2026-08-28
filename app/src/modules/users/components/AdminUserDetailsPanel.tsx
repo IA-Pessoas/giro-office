@@ -8,8 +8,8 @@ import { useAuth } from "@/context/AuthContext";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { CREATE_USER_PERMISSION_OPTIONS } from "../constants/createUserConfig";
 import { ADMIN_USER_STATUS_LABELS, type AdminUserStatus, normalizeAdminUserStatus } from "../services/adminUsersService";
-import { userService } from "../services/userService";
 import type { UpdateUserData, UserItem } from "../types";
+import type { AdminUserDetailsDataSource } from "../types/adminUserContracts";
 
 interface AdminUserDetailsPanelProps {
   userId: string | null;
@@ -17,6 +17,7 @@ interface AdminUserDetailsPanelProps {
   departmentsError: boolean;
   onUserUpdated: () => Promise<unknown> | unknown;
   canManageUsers?: boolean;
+  dataSource: AdminUserDetailsDataSource;
 }
 
 const FIELD_CLASSNAME =
@@ -82,6 +83,7 @@ export function AdminUserDetailsPanel({
   departmentsError,
   onUserUpdated,
   canManageUsers,
+  dataSource,
 }: AdminUserDetailsPanelProps) {
   const router = useRouter();
   const { user: currentUser } = useAuth();
@@ -103,7 +105,7 @@ export function AdminUserDetailsPanel({
     setLoadError(null);
 
     try {
-      const nextUser = await userService.getById(nextUserId);
+      const nextUser = await dataSource.loadUser(nextUserId);
       setUser(nextUser);
       setFormData(buildFormState(nextUser));
     } catch (error) {
@@ -187,7 +189,7 @@ export function AdminUserDetailsPanel({
     };
 
     try {
-      const updatedUser = await userService.update(userId, payload);
+      const updatedUser = await dataSource.saveUser(userId, payload);
       setUser(updatedUser);
       setFormData(buildFormState(updatedUser));
       await onUserUpdated();

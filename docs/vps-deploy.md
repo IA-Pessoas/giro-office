@@ -32,9 +32,9 @@ Para o ambiente single-slot publicado em `useoffice.com.br`, consulte
 ## First start
 
 1. Fill the `.env.vps.*` files with the real VPS values.
-2. If `NGINX_TLS_ENABLED=true`, place the certificate files in `docker/nginx/certs` on the VPS.
+2. Termine TLS no Caddy compartilhado do host ou, com `NGINX_TLS_ENABLED=true`, monte os certificados em `docker/nginx/certs`.
 3. Configure o secret **`ENV_VPS_WEB`** (corpo = ficheiro `.env.vps.web`): `NEXT_PUBLIC_API_URL=/api` e `API_INTERNAL_URL=http://gateway:3010` para manter browser e API na mesma origem.
-4. If you keep `NGINX_TLS_ENABLED=false`, use `http://api.seu-dominio` instead.
+4. Com `NGINX_TLS_ENABLED=false`, as portas HTTP permanecem vinculadas apenas ao loopback e devem ficar atrás do terminador TLS do host; nunca publique login de plataforma em HTTP.
 5. Start the stable stack:
 
 ```bash
@@ -103,7 +103,7 @@ permite encaminhamento pelo canal de incidentes existente.
 `AUTH_COOKIE_SECURE` é uma configuração exclusiva do gateway e do user-service; nunca deve ser exposta como `NEXT_PUBLIC_*`.
 
 - Produção HTTPS: `AUTH_COOKIE_SECURE=true`, `GATEWAY_ALLOWED_ORIGINS=https://useoffice.com.br` e `GATEWAY_BEARER_AUTH_COMPATIBILITY=false`.
-- Slots locais/develop sem TLS: os overlays Compose definem `AUTH_COOKIE_SECURE=false` somente nos dois serviços que emitem ou expiram cookies.
+- Todos os slots com `NODE_ENV=production` mantêm `AUTH_COOKIE_SECURE=true`; execute-os atrás de HTTPS. Gateway e user-service falham no bootstrap se a flag for desabilitada.
 - O browser usa `NEXT_PUBLIC_API_URL=/api`; SSR usa `API_INTERNAL_URL=http://gateway:3010`.
 
 O procedimento de rollout, validação, telemetria e rollback está em [http-only-session-rollout.md](security/http-only-session-rollout.md).
@@ -113,7 +113,7 @@ O procedimento de rollout, validação, telemetria e rollback está em [http-onl
 Nginx in this stack does not provision certificates automatically.
 
 - `NGINX_TLS_ENABLED=true`: listens on `80` and `443`, redirects HTTP to HTTPS and requires mounted cert files.
-- `NGINX_TLS_ENABLED=false`: serves the API only over plain HTTP on port `80`.
+- `NGINX_TLS_ENABLED=false`: serve HTTP somente no bind de loopback do host, para uso atrás de um terminador TLS externo.
 
 ## Update one service without touching the others
 
@@ -191,8 +191,9 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 
 | Segredo | Uso |
 |---------|-----|
-| `ENV_VPS_GATEWAY` | Inclua `AUTH_COOKIE_SECURE=true`, `GATEWAY_ALLOWED_ORIGINS=https://useoffice.com.br`, `GATEWAY_BEARER_AUTH_COMPATIBILITY=false`, `REGULARIZE_SERVICE_URL=http://regularize-service:3039`, `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` e `PESSOAL_SERVICE_URL=http://pessoal-service:3042`. |
-| `ENV_VPS_USER_SERVICE` | Inclua `AUTH_COOKIE_SECURE=true` além dos segredos existentes do user-service. |
+| `ENV_VPS_GATEWAY` | Inclua `AUTH_COOKIE_SECURE=true`, `USER_SERVICE_INTERNAL_TOKEN`, `GATEWAY_ALLOWED_ORIGINS=https://useoffice.com.br`, `GATEWAY_BEARER_AUTH_COMPATIBILITY=false`, `REGULARIZE_SERVICE_URL=http://regularize-service:3039`, `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` e `PESSOAL_SERVICE_URL=http://pessoal-service:3042`. |
+| `ENV_VPS_ORGANIZATION_SERVICE` | Corpo de `.env.vps.organization-service`; inclua `DATABASE_URL`, `JWT_SECRET`, `AUDIT_SERVICE_URL=http://audit-service:3020`, `AUDIT_SERVICE_TOKEN`, `ORGANIZATION_DOMAIN_AUDIT_ENABLED=true` e `SERVICE_ALLOWED_ORIGINS`. O token deve coincidir com o audit-service e com o token interno usado pelo gateway para este serviço. |
+| `ENV_VPS_USER_SERVICE` | Inclua `AUTH_COOKIE_SECURE=true` e o mesmo `USER_SERVICE_INTERNAL_TOKEN` exclusivo do gateway, além dos segredos existentes do user-service. |
 | `ENV_VPS_CERTIFICATE_SERVICE` | Corpo de `.env.vps.certificate-service`; alem das variaveis base do service, inclua `CERTIFICATE_STORAGE_MODE=supabase`, `CERTIFICATE_STORAGE_BUCKET`, `CERTIFICATE_FILE_MAX_SIZE_BYTES`, `CERTIFICATE_FILE_ENCRYPTION_KEY`, `CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `UPLOAD_RATE_LIMIT_MAX` e `UPLOAD_RATE_LIMIT_WINDOW_MS` para upload/download criptografado de arquivos. |
 | `ENV_VPS_PESSOAL_SERVICE` | Corpo de `.env.vps.pessoal-service`; inclua `DATABASE_URL`, `JWT_SECRET`, `AUDIT_SERVICE_URL=http://audit-service:3020`, `AUDIT_SERVICE_TOKEN`, `INTERNAL_SERVICE_TOKEN`, `PESSOAL_PASSWORD_ENCRYPTION_KEY`, `PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION` e `PESSOAL_DOMAIN_AUDIT_ENABLED`. |
 | `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | URL **com namespace** (ex.: `ghcr.io/meu-org`, `docker.io/meuuser` — não use só `ghcr.io`). Push/pull normalizam em minúsculas. |

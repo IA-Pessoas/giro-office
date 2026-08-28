@@ -22,6 +22,7 @@ function setGatewayEnv(overrides: NodeJS.ProcessEnv) {
   process.env.JWT_SECRET = "test-secret";
   process.env.NODE_ENV = "production";
   process.env.AUDIT_SERVICE_TOKEN = "secure-internal-token-with-at-least-32-chars";
+  process.env.USER_SERVICE_INTERNAL_TOKEN = "secure-user-service-token-with-at-least-32-chars";
   process.env.CLIENT_SERVICE_INTERNAL_TOKEN = "secure-client-service-token-with-at-least-32-chars";
   process.env.TI_SERVICE_INTERNAL_TOKEN = "secure-ti-service-token-with-at-least-32-chars";
   process.env.CERTIFICATE_SERVICE_INTERNAL_TOKEN =
@@ -48,6 +49,27 @@ describe("gateway env security validation", () => {
     delete process.env.CLIENT_SERVICE_INTERNAL_TOKEN;
 
     expect(() => getGatewayEnv()).toThrow(/CLIENT_SERVICE_INTERNAL_TOKEN/);
+  });
+
+  it("requires a dedicated user-service token in production", () => {
+    setGatewayEnv({});
+    delete process.env.USER_SERVICE_INTERNAL_TOKEN;
+
+    expect(() => getGatewayEnv()).toThrow(/USER_SERVICE_INTERNAL_TOKEN/);
+  });
+
+  it("rejects reusing the audit token for user-service in production", () => {
+    setGatewayEnv({
+      USER_SERVICE_INTERNAL_TOKEN: "secure-internal-token-with-at-least-32-chars",
+    });
+
+    expect(() => getGatewayEnv()).toThrow(/USER_SERVICE_INTERNAL_TOKEN.*AUDIT_SERVICE_TOKEN/);
+  });
+
+  it("rejects insecure auth cookies in production", () => {
+    setGatewayEnv({ AUTH_COOKIE_SECURE: "false" });
+
+    expect(() => getGatewayEnv()).toThrow(/AUTH_COOKIE_SECURE/);
   });
 
   it("allows the audit token fallback for client-service outside production", () => {
@@ -88,8 +110,9 @@ describe("gateway env security validation", () => {
     expect(env.authCookieSecure).toBe(true);
   });
 
-  it("parses explicit auth rollout overrides and rejects ambiguous values", () => {
+  it("parses explicit auth rollout overrides outside production and rejects ambiguous values", () => {
     setGatewayEnv({
+      NODE_ENV: "development",
       GATEWAY_BEARER_AUTH_COMPATIBILITY: "true",
       AUTH_COOKIE_SECURE: "false",
     });

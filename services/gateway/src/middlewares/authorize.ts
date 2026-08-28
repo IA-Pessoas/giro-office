@@ -41,7 +41,11 @@ export function buildAuthorizeMiddleware(
   mode: GatewayAuthorizationMode,
   logger?: Pick<Logger, "warn">,
 ) {
-  return function authorizeRequest(request: Request, _response: Response, next: NextFunction): void {
+  return function authorizeRequest(
+    request: Request,
+    _response: Response,
+    next: NextFunction,
+  ): void {
     const normalizedPath = normalizeGatewayPath(request.originalUrl);
     if (!normalizedPath) {
       deny(next);
@@ -79,7 +83,11 @@ export function buildAuthorizeMiddleware(
 
     const selfUserPutMatch =
       request.method.toUpperCase() === "PUT" ? selfUserPutPath.exec(normalizedPath) : null;
-    if (selfUserPutMatch?.[1] === request.auth.userId) {
+    if (
+      request.auth.actorKind === "organization" &&
+      request.auth.organizationId.length > 0 &&
+      selfUserPutMatch?.[1] === request.auth.userId
+    ) {
       next();
       return;
     }

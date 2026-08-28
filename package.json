@@ -25,7 +25,7 @@
     "smoke": "node scripts/all-services-smoke.mjs",
     "smoke:coverage": "node scripts/check-smoke-spec-coverage.mjs",
     "smoke:scaffold": "node scripts/generate-service-harness.mjs",
-    "harness:test": "node --test scripts/service-harness.test.mjs scripts/check-compose-security.test.mjs scripts/ci-workflow-optimization.test.mjs scripts/check-unused-deps-candidates.test.mjs",
+    "harness:test": "node --test scripts/service-harness.test.mjs scripts/check-compose-security.test.mjs scripts/nginx-forwarded-for.test.mjs scripts/ci-workflow-optimization.test.mjs scripts/check-unused-deps-candidates.test.mjs",
     "deps:unused": "node --test scripts/check-unused-deps-candidates.test.mjs",
     "qa:integracao": "node --test scripts/qa-fixtures.test.mjs",
     "qa:integracao:db": "test -n \"${QA_INTEGRACAO_DATABASE_URL:-}\" && export DATABASE_URL=\"$QA_INTEGRACAO_DATABASE_URL\" && pnpm --filter @workspace/infra prisma:generate && pnpm --filter @workspace/infra exec tsx --test ../scripts/qa-integracao-seed.test.mjs",
