@@ -58,6 +58,8 @@ export interface HttpProxyOptions {
 
 const OWNER_MODULE_PERMISSION = 3;
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
+const PLATFORM_OWNERSHIP_TRANSFER_PATH =
+  /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/iu;
 
 type SessionCookieName = typeof AUTH_SESSION_COOKIE_NAME | typeof CSRF_COOKIE_NAME;
 
@@ -156,6 +158,12 @@ const SESSION_COOKIE_RULES: SessionCookieRule[] = [
   {
     method: "POST",
     path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/ownership-transfer$/u,
     inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
     outbound: [],
   },
@@ -444,6 +452,24 @@ function getSessionCookieHeaders(
     .filter((header) => allowedCookies.some((cookie) => header.startsWith(`${cookie}=`)));
 }
 
+function captureOwnershipTransferAuditResult(
+  response: Response,
+  normalizedPath: string,
+  status: number,
+  data: Buffer,
+): void {
+  if (!PLATFORM_OWNERSHIP_TRANSFER_PATH.test(normalizedPath) || status < 200 || status >= 300) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(data.toString("utf8")) as { data?: unknown };
+    response.locals.ownershipTransferAuditResult = parsed.data;
+  } catch {
+    // The lifecycle middleware omits ownership changes when the upstream payload is not valid JSON.
+  }
+}
+
 function createHttpProxy(
   resolveTargetUrl: (request: Request) => string,
   options: HttpProxyOptions = {},
@@ -502,6 +528,7 @@ function createHttpProxy(
       }
 
       const data = Buffer.from(await upstreamResponse.arrayBuffer());
+      captureOwnershipTransferAuditResult(response, normalizedPath, upstreamResponse.status, data);
       response.send(data);
     } catch (error) {
       next(new ServiceError(502, "Erro ao comunicar com o serviço upstream.", error));

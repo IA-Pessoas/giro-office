@@ -102,26 +102,56 @@ function getSafeAuditText(value: unknown, maximumLength: number): string | undef
   return value.trim() || undefined;
 }
 
-function getOwnershipTransferAuditChanges(request: Request): Record<string, unknown> | undefined {
+function getOwnershipTransferAuditChanges(
+  request: Request,
+  ownershipTransferResult: unknown,
+): Record<string, unknown> | undefined {
   const body = request.body;
-  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+  if (
+    body === null ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    ownershipTransferResult === null ||
+    typeof ownershipTransferResult !== "object" ||
+    Array.isArray(ownershipTransferResult)
+  ) {
     return undefined;
   }
 
   const input = body as Record<string, unknown>;
-  const currentOwnerId = getSafeAuditText(input.currentOwnerId, 200);
-  const successorUserId = getSafeAuditText(input.successorUserId, 200);
-  const previousOwnerAction = input.previousOwnerAction;
+  const result = ownershipTransferResult as Record<string, unknown>;
+  const currentOwner = result.currentOwner;
+  const successor = result.successor;
   const justification = getSafeAuditText(input.justification, 500);
   if (
-    !currentOwnerId ||
-    !successorUserId ||
-    currentOwnerId === successorUserId ||
-    (previousOwnerAction !== "demote" && previousOwnerAction !== "deactivate") ||
+    currentOwner === null ||
+    typeof currentOwner !== "object" ||
+    Array.isArray(currentOwner) ||
+    successor === null ||
+    typeof successor !== "object" ||
+    Array.isArray(successor) ||
     !justification
   ) {
     return undefined;
   }
+
+  const currentOwnerRecord = currentOwner as Record<string, unknown>;
+  const successorRecord = successor as Record<string, unknown>;
+  const currentOwnerId = getSafeAuditText(currentOwnerRecord.id, 200);
+  const successorUserId = getSafeAuditText(successorRecord.id, 200);
+  const currentOwnerStatus = currentOwnerRecord.status;
+  if (
+    !currentOwnerId ||
+    !successorUserId ||
+    currentOwnerId === successorUserId ||
+    currentOwnerRecord.type !== "admin" ||
+    (currentOwnerStatus !== "active" && currentOwnerStatus !== "inactive") ||
+    successorRecord.type !== "owner" ||
+    successorRecord.status !== "active"
+  ) {
+    return undefined;
+  }
+  const previousOwnerAction = currentOwnerStatus === "inactive" ? "deactivate" : "demote";
 
   return {
     ownership: {
@@ -179,9 +209,7 @@ export function buildAuditCapacityGuard({
     if (requiresAudit) {
       const publicPath = getPublicPath(request.originalUrl, request.path);
       const auditTarget = getPlatformOrganizationAuditTarget(publicPath);
-      const ownershipChanges = PLATFORM_OWNERSHIP_TRANSFER_PATH.test(publicPath)
-        ? getOwnershipTransferAuditChanges(request)
-        : undefined;
+      const isOwnershipTransfer = PLATFORM_OWNERSHIP_TRANSFER_PATH.test(publicPath);
       const controller = new AbortController();
       const abort = () => controller.abort();
       response.once("close", abort);
@@ -200,7 +228,7 @@ export function buildAuditCapacityGuard({
             outcome: "success",
             serviceSource: "gateway",
             createdAt: new Date().toISOString(),
-            action: ownershipChanges
+            action: isOwnershipTransfer
               ? "platform.organization.ownership.transfer.attempt"
               : method === "POST" && /\/users$/i.test(publicPath)
                 ? "platform.user.create.attempt"
@@ -211,8 +239,7 @@ export function buildAuditCapacityGuard({
                 ? String(request.body?.login ?? "new-user")
                 : auditTarget?.organizationId,
             changes:
-              ownershipChanges ??
-              (method === "POST" && /\/users$/i.test(publicPath)
+              method === "POST" && /\/users$/i.test(publicPath)
                 ? {
                     before: null,
                     after: {
@@ -225,7 +252,7 @@ export function buildAuditCapacityGuard({
                       modules: request.body?.modules,
                     },
                   }
-                : undefined),
+                : undefined,
             metadata: {
               auth_kind: "platform",
               platform_user_id: request.auth?.userId,
@@ -424,6 +451,13 @@ export function buildAuditLifecycleMiddleware({
 
       const isPlatform = request.auth?.actorKind === "platform";
       const auditTarget = isPlatform ? getPlatformOrganizationAuditTarget(publicPath) : null;
+      const ownershipChanges =
+        isPlatform &&
+        statusCode !== null &&
+        statusCode < 400 &&
+        PLATFORM_OWNERSHIP_TRANSFER_PATH.test(publicPath)
+          ? getOwnershipTransferAuditChanges(request, response.locals.ownershipTransferAuditResult)
+          : undefined;
 
       const payload: CreateAuditRequestPayload = {
         requestId: request.requestId,
@@ -459,11 +493,16 @@ export function buildAuditLifecycleMiddleware({
             ? {
                 auth_kind: "platform",
                 platform_user_id: request.auth?.userId,
+                actorPlatformUserId: request.auth?.userId,
               }
             : {}),
         },
-        action: activity?.action,
-        referring: activity?.item,
+        action: ownershipChanges
+          ? "platform.organization.ownership.transfer.completed"
+          : activity?.action,
+        referring: ownershipChanges ? "organization" : activity?.item,
+        referringId: ownershipChanges ? auditTarget?.organizationId : undefined,
+        changes: ownershipChanges,
       };
 
       const reservation =

@@ -162,7 +162,7 @@ const platformAuditActions = new Set([
   "organization.subscription_plan.updated",
   "organization.logo_url.updated",
 ]);
-const PLATFORM_OWNERSHIP_TRANSFER_ACTION = "platform.organization.ownership.transfer.attempt";
+const PLATFORM_OWNERSHIP_TRANSFER_ACTION = "platform.organization.ownership.transfer.completed";
 const organizationStatuses = new Set<OrganizationAuditStatus>([
   "trial",
   "past_due",

@@ -435,7 +435,7 @@ describe("platform audit persistence", () => {
         service_source: "gateway",
         created_at: new Date("2026-08-28T12:00:00.000Z"),
         metadata_json: { actorPlatformUserId: "platform-user-1", secret: "must-not-leak" },
-        action: "platform.organization.ownership.transfer.attempt",
+        action: "platform.organization.ownership.transfer.completed",
         referring: "organization",
         referring_id: organizationId,
         changes_json: {
