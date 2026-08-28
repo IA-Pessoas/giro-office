@@ -1,5 +1,5 @@
-import type { OpenApiDocument } from "@workspace/shared/http";
 import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
+import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { UserServiceEnv } from "../config/env.js";
 

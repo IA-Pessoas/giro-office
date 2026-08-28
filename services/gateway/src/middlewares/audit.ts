@@ -8,8 +8,8 @@ import type {
   Logger,
   ReservableAuditRecorder,
 } from "@workspace/shared";
-import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 import { ServiceError } from "@workspace/shared";
+import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
 import { describeActivity } from "../audit/activityCatalog.js";

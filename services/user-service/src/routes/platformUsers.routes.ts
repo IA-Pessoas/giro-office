@@ -7,6 +7,8 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
+import type { UserAuditRecorder } from "../integrations/audit.js";
+import { updatePermissionBodySchema } from "../schemas/permission.schemas.js";
 import {
   listPlatformUsersQuerySchema,
   platformOrganizationUserParamsSchema,
@@ -14,14 +16,12 @@ import {
   updatePlatformUserBodySchema,
 } from "../schemas/platformUsers.schemas.js";
 import { createUserBodySchema } from "../schemas/user.schemas.js";
-import { updatePermissionBodySchema } from "../schemas/permission.schemas.js";
 import {
   requirePlatformCsrf,
   requirePlatformGatewayAuth,
   requirePlatformSession,
 } from "../security/platformAuth.js";
 import { PlatformUsersService } from "../services/platformUsersService.js";
-import type { UserAuditRecorder } from "../integrations/audit.js";
 
 export function createPlatformUsersRoutes(
   options: { audit?: UserAuditRecorder } = {},
