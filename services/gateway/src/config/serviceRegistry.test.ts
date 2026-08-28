@@ -63,6 +63,22 @@ describe("user-service gateway registry", () => {
       forwardPlatformSessionCredentials: true,
     });
   });
+
+  it("encaminha a criação de usuário da organização ao user-service", () => {
+    const env = {
+      userServiceUrl: "http://user-service:3030",
+      userServiceInternalToken: "gateway-user-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, "/platform/organizations/org-1/users", "POST")).toMatchObject(
+      {
+        key: "user-service",
+        targetUrl: "http://user-service:3030",
+        internalServiceToken: "gateway-user-token",
+        forwardPlatformSessionCredentials: true,
+      },
+    );
+  });
 });
 
 describe("organization-service platform registry", () => {
