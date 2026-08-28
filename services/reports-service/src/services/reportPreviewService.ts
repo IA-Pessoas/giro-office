@@ -22,6 +22,7 @@ export class ReportPreviewService {
     presentation: {
       columns: readonly { key: string; label: string }[];
     };
+    limit: number;
     hasMore: boolean;
   }> {
     const validated = this.definitionService.validate(definition, scope);
@@ -44,6 +45,7 @@ export class ReportPreviewService {
           label: column.alias,
         })),
       },
+      limit: this.previewRowLimit,
       hasMore: rows.length > this.previewRowLimit,
     };
   }
