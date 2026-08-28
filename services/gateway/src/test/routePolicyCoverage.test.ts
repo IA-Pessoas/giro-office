@@ -69,6 +69,7 @@ describe("platform default deny", () => {
       ["PATCH", "/platform/organizations/org-1/subscription-plan"],
       ["PATCH", "/platform/organizations/org-1/logo-url"],
       ["GET", "/platform/organizations/org-1/users"],
+      ["POST", "/platform/organizations/org-1/users"],
       ["GET", "/platform/organizations/org-1/users/user-1"],
       ["GET", "/platform/organizations/org-1/departments"],
       ["GET", "/platform/audit/requests"],

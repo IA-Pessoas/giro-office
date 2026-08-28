@@ -218,6 +218,46 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             "403": { description: "Identidade não é um super administrador da plataforma" },
           },
         },
+        post: {
+          tags: ["Platform auth"],
+          summary: "Criar usuário de uma organização pela plataforma",
+          security: platformBrowserSession,
+          parameters: [csrfHeader],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["name", "login", "password", "department_id", "permission"],
+                  properties: {
+                    name: { type: "string" },
+                    login: { type: "string" },
+                    password: { type: "string", format: "password" },
+                    department_id: { type: "string" },
+                    permission: { type: "integer" },
+                    type: { type: "string", enum: ["owner", "admin", "user"] },
+                    status: { type: "string" },
+                    modules: {
+                      type: "object",
+                      additionalProperties: { type: "integer", minimum: 0, maximum: 3 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Usuário criado sem credenciais", ...successJson },
+            "400": { description: "Payload inválido" },
+            "401": { description: "Sessão ausente" },
+            "403": { description: "CSRF ou identidade inválida" },
+            "404": { description: "Departamento fora do tenant" },
+            "409": { description: "Login duplicado" },
+            "503": { description: "Auditoria indisponível" },
+          },
+        },
       },
       "/platform/organizations/{organizationId}/users/{userId}": {
         get: {

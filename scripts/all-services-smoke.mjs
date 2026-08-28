@@ -2235,6 +2235,29 @@ const handlers = {
     });
   },
 
+  async platformUserCreate(op) {
+    const organizationId = requireState("session").organization_id;
+    const departments = await platformHttpRequest(op, {
+      path: `/platform/organizations/${organizationId}/departments`,
+      expectedStatus: [200],
+    });
+    const departmentId = pickFirst(departments.body, "data.0.id");
+    if (!departmentId) throw new Error("Smoke platform user creation requires one department.");
+    await platformHttpRequest(op, {
+      path: `/platform/organizations/${organizationId}/users`,
+      json: {
+        name: uniqueText("Smoke Platform User"),
+        login: `${uniqueText("platform.user").replace(/\s+/g, ".").toLowerCase()}@example.test`,
+        password: "SmokePassword!123",
+        department_id: departmentId,
+        permission: 1,
+        type: "admin",
+        modules: { rh: 1, ti: 1 },
+      },
+      expectedStatus: isBadExpectation(op) ? op.expectedStatus : [201],
+    });
+  },
+
   async platformUserDetail(op) {
     const organizationId = requireState("session").organization_id;
     const listed = await platformHttpRequest(op, {

@@ -53,6 +53,11 @@ const TECHNICAL_RULES = [
 const EXPLICIT_RULES: ExplicitRule[] = [
   {
     methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users$/,
+    description: { action: "criou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "criou", item: "uma organização" },
   },

@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { platformAuthMock, platformUsersMock } = vi.hoisted(() => ({
   platformAuthMock: { validateSession: vi.fn() },
-  platformUsersMock: { list: vi.fn(), getById: vi.fn(), listDepartments: vi.fn() },
+  platformUsersMock: { list: vi.fn(), getById: vi.fn(), listDepartments: vi.fn(), create: vi.fn() },
 }));
 
 const { testEnv } = vi.hoisted(() => ({
@@ -119,6 +119,7 @@ describe("platform users routes", () => {
     });
     platformUsersMock.getById.mockResolvedValue({ id: "user-1", name: "Ana" });
     platformUsersMock.listDepartments.mockResolvedValue([{ id: "dep-1", name: "Fiscal" }]);
+    platformUsersMock.create.mockResolvedValue({ id: "user-2", name: "Nova", login: "nova" });
   });
 
   it("lists only the organization requested by a platform super admin", async () => {
@@ -160,6 +161,55 @@ describe("platform users routes", () => {
     expect(departments.status).toBe(200);
     expect(platformUsersMock.getById).toHaveBeenCalledWith("org-2", "user-1");
     expect(platformUsersMock.listDepartments).toHaveBeenCalledWith("org-2");
+  });
+
+  it("cria usuário no tenant do path com sessão de plataforma e CSRF", async () => {
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/users")
+      .set(platformGatewayHeaders())
+      .send({
+        name: "Nova",
+        login: "nova",
+        password: "senha-normal",
+        department_id: "dep-2",
+        permission: 1,
+        organization_id: "org-forjada",
+        type: "admin",
+        modules: { rh: 1 },
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toEqual({ id: "user-2", name: "Nova", login: "nova" });
+    expect(platformUsersMock.create).toHaveBeenCalledWith(
+      "org-2",
+      expect.objectContaining({
+        name: "Nova",
+        organization_id: "org-forjada",
+      }),
+      platformIdentity.id,
+    );
+  });
+
+  it("rejeita criação sem CSRF antes de chamar o serviço", async () => {
+    const headers = platformGatewayHeaders();
+    delete headers[CSRF_HEADER_NAME];
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/users")
+      .set(headers)
+      .send({});
+
+    expect(response.status).toBe(403);
+    expect(platformUsersMock.create).not.toHaveBeenCalled();
+  });
+
+  it("rejeita payload de criação inválido", async () => {
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/users")
+      .set(platformGatewayHeaders())
+      .send({ name: "Nova" });
+
+    expect(response.status).toBe(400);
+    expect(platformUsersMock.create).not.toHaveBeenCalled();
   });
 
   it("returns 403 for an organizational identity", async () => {

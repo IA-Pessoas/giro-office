@@ -10,9 +10,18 @@ const { prismaMock } = vi.hoisted(() => ({
     department: { findMany: vi.fn() },
   },
 }));
+const { managementMock } = vi.hoisted(() => ({ managementMock: { create: vi.fn() } }));
 
 vi.mock("../prisma/index.js", () => ({
   default: prismaMock,
+}));
+vi.mock("../services/userManagementService.js", () => ({
+  PlatformUserManagementAdapter: vi.fn(function PlatformUserManagementAdapter() {
+    return managementMock;
+  }),
+}));
+vi.mock("../services/userService.js", () => ({
+  UserManagementService: vi.fn(),
 }));
 
 import { PlatformUsersService } from "../services/platformUsersService.js";
@@ -22,6 +31,7 @@ describe("PlatformUsersService", () => {
     vi.clearAllMocks();
     prismaMock.user.findMany.mockResolvedValue([{ id: "user-1", name: "Ana" }]);
     prismaMock.user.count.mockResolvedValue(21);
+    managementMock.create.mockReset();
   });
 
   it("filters every query by organization", async () => {
@@ -58,6 +68,45 @@ describe("PlatformUsersService", () => {
     });
     expect(prismaMock.user.count).toHaveBeenCalledWith({ where: expectedWhere });
     expect(result).toEqual({ users: [{ id: "user-1", name: "Ana" }], total: 21, hasMore: true });
+  });
+
+  it("cria no tenant do path e projeta a resposta sem credenciais", async () => {
+    managementMock.create.mockResolvedValue({
+      id: "user-1",
+      name: "Ana",
+      login: "ana",
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      type: "admin",
+    });
+    const service = new PlatformUsersService();
+
+    await expect(
+      service.create(
+        "org-path",
+        {
+          name: "Ana",
+          login: "ana",
+          password: "segredo",
+          department_id: "dep-1",
+          permission: 1,
+          organization_id: "org-forjada",
+        },
+        "platform-1",
+      ),
+    ).resolves.toEqual({
+      id: "user-1",
+      name: "Ana",
+      login: "ana",
+      status: "active",
+      department_id: "dep-1",
+      photo_url: null,
+      type: "admin",
+    });
+    expect(managementMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organization_id: "org-path" }),
+    );
   });
 
   it("caps the page size at 100", async () => {

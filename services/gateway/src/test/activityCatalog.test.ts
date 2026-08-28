@@ -163,6 +163,7 @@ describe("activityCatalog", () => {
     ],
     ["GET", "/platform/organizations", "consultou", "a lista global de organizações"],
     ["POST", "/platform/organizations", "criou", "uma organização"],
+    ["POST", "/platform/organizations/org-1/users", "criou", "um usuário da organização"],
     ["GET", "/platform/organizations/org-1", "consultou", "uma organização"],
     ["PATCH", "/platform/organizations/org-1/status", "alterou", "o status de uma organização"],
     [
