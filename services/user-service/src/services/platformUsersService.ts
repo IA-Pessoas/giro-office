@@ -48,8 +48,10 @@ export class PlatformUsersService {
       login: user.login,
       status: user.status,
       department_id: user.department_id,
+      permission: user.permission,
       photo_url: user.photo_url,
       type: user.type,
+      version: user.version,
     };
   }
 

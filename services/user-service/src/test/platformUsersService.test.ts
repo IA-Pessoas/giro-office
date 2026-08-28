@@ -89,8 +89,10 @@ describe("PlatformUsersService", () => {
       login: "ana",
       status: "active",
       department_id: "dep-1",
+      permission: 1,
       photo_url: null,
       type: "admin",
+      version: 1,
     });
     const service = new PlatformUsersService();
 
@@ -113,8 +115,10 @@ describe("PlatformUsersService", () => {
       login: "ana",
       status: "active",
       department_id: "dep-1",
+      permission: 1,
       photo_url: null,
       type: "admin",
+      version: 1,
     });
     expect(managementMock.create).toHaveBeenCalledWith(
       expect.objectContaining({ organization_id: "org-path" }),
