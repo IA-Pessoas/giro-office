@@ -61,13 +61,13 @@ describe("FiscalNcmAdapter", () => {
           order_by: [],
         },
         organization_id: "a0000000-0000-4000-8000-000000000001",
-        limit: 10,
+        limit: 50_001,
         request_id: "request-839",
       }),
     ).resolves.toEqual([{ ncm_code: "84719012" }]);
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "fiscal.ncm", fields: ["ncm_code"], limit: 10 };
+    const body = { source: "fiscal.ncm", fields: ["ncm_code"], limit: 101 };
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://fiscal.test/internal/reporting/extract",
     );

@@ -19,6 +19,7 @@ import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
+const MAX_FISCAL_REPORTING_LIMIT = 101;
 
 const sources = fiscalNcmReportingCatalog.sources.map(
   ({ keys: _keys, ...source }) => source,
@@ -103,7 +104,11 @@ export class FiscalNcmAdapter implements ReportSourceAdapter {
     if (new Set(fields).size !== fields.length) {
       throw new ServiceError(400, "As colunas de NCM fiscal devem usar campos únicos.");
     }
-    const body = { source, fields, limit: input.limit };
+    const body = {
+      source,
+      fields,
+      limit: Math.min(input.limit, MAX_FISCAL_REPORTING_LIMIT),
+    };
     const requestId = input.request_id || randomUUID();
     const signed = createGrant({
       secret: this.env.reportsGrantSecret,

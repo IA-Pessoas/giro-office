@@ -287,6 +287,15 @@ test("reports task adapter has internal URL and shared reporting secret provisio
   );
 });
 
+test("reports fiscal adapter has internal URL in both VPS processes", async () => {
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const reportsBlock = extractComposeServiceBlock(composeContents, "reports-service");
+  const workerBlock = extractComposeServiceBlock(composeContents, "reports-worker");
+
+  assert.match(reportsBlock, /FISCAL_SERVICE_URL: http:\/\/fiscal-service:3037/);
+  assert.match(workerBlock, /FISCAL_SERVICE_URL: http:\/\/fiscal-service:3037/);
+});
+
 test("compose-vps-buildx-push plans cached web build with Next.js build args", async () => {
   const output = await dryRunBuildxPush("web");
   assert.match(output, /--file docker\/app\.Dockerfile/);
