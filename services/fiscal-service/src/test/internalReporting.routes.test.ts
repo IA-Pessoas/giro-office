@@ -11,8 +11,9 @@ import { describe, expect, it, vi } from "vitest";
 import { createInternalReportingRouter } from "../routes/internalReporting.routes.js";
 
 const grantSecret = "test-reports-grant-secret";
-const requestId = "request-839";
+const requestId = "request-840";
 const organizationId = "a0000000-0000-4000-8000-000000000001";
+const internalToken = "test-reports-internal-token";
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -53,7 +54,7 @@ function createApp(extract = vi.fn().mockResolvedValue({ rows: [], reachedLimit:
     "/internal",
     createInternalReportingRouter({
       env: {
-        reportsInternalToken: "test-reports-internal-token",
+        reportsInternalToken: internalToken,
         reportsGrantSecret: grantSecret,
       } as never,
       reportingService: { extract } as never,
@@ -70,51 +71,59 @@ function createApp(extract = vi.fn().mockResolvedValue({ rows: [], reachedLimit:
 }
 
 describe("fiscal internal reporting routes", () => {
-  it("protege o catálogo e não publica IDs nem relações", async () => {
+  it("protege o catálogo e publica ICMS e NCM sem IDs nem relações", async () => {
     const signed = signedGrant({});
     const { app } = createApp();
 
     await request(app).get("/internal/reporting/catalog").expect(403);
     const response = await request(app)
       .get("/internal/reporting/catalog")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
       .set("x-request-id", requestId)
       .set("x-reports-grant", signed.grant)
       .set("x-reports-grant-signature", signed.signature)
       .expect(200);
 
+    expect(response.body.data.sources.map((source: { key: string }) => source.key)).toEqual([
+      "fiscal.icms",
+      "fiscal.ncm",
+    ]);
     expect(response.body.data.sources[0]).toMatchObject({
+      key: "fiscal.icms",
+      module: "fiscal",
+      keys: [],
+    });
+    expect(response.body.data.sources[1]).toMatchObject({
       key: "fiscal.ncm",
       module: "fiscal",
       keys: [],
     });
-    expect(response.body.data.sources[0].fields.map((field: { key: string }) => field.key)).toEqual(
-      expect.arrayContaining([
-        "tax_regime",
-        "ncm_code",
-        "federal_taxation_type",
-        "cst_pis_outgoing",
-        "cst_cofins_outgoing",
-        "product_group",
-        "description",
-        "validity_start_date",
-        "validity_end_date",
-      ]),
-    );
+    expect(response.body.data.relations).toEqual([]);
     expect(
-      response.body.data.sources[0].fields.map((field: { key: string }) => field.key),
+      response.body.data.sources.flatMap((source: { fields: { key: string }[] }) =>
+        source.fields.map((field) => field.key),
+      ),
     ).not.toContain("id");
   });
 
-  it("exige token e grant válidos e usa a organização assinada", async () => {
-    const body = { source: "fiscal.ncm", fields: ["ncm_code"], limit: 1 };
+  it.each([
+    {
+      source: "fiscal.icms",
+      fields: ["state"],
+    },
+    {
+      source: "fiscal.ncm",
+      fields: ["ncm_code"],
+    },
+  ])("exige grant válido e encaminha a organização assinada para $source", async (input) => {
+    const body = { ...input, limit: 1 };
     const signed = signedGrant(body);
     const { app, extract } = createApp();
 
     await request(app).post("/internal/reporting/extract").send(body).expect(403);
     await request(app)
       .post("/internal/reporting/extract")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
       .set("x-request-id", requestId)
       .set("x-reports-grant", signed.grant)
       .set("x-reports-grant-signature", signed.signature)
@@ -122,15 +131,15 @@ describe("fiscal internal reporting routes", () => {
       .expect(200);
 
     expect(extract).toHaveBeenCalledWith({
-      organizationId: organizationId,
-      source: "fiscal.ncm",
-      fields: ["ncm_code"],
+      organizationId,
+      source: input.source,
+      fields: input.fields,
       limit: 1,
     });
   });
 
-  it("recusa grant expirado, assinatura inválida e campo não publicado", async () => {
-    const body = { source: "fiscal.ncm", fields: ["id"], limit: 1 };
+  it("recusa grant expirado, assinatura inválida e limite acima do máximo", async () => {
+    const body = { source: "fiscal.icms", fields: ["state"], limit: 1 };
     const expired = signedGrant(body, Math.floor(Date.now() / 1000) - 1);
     const invalidSignature = { ...signedGrant(body), signature: "invalid" };
     const { app, extract } = createApp();
@@ -138,13 +147,25 @@ describe("fiscal internal reporting routes", () => {
     for (const signed of [expired, invalidSignature]) {
       await request(app)
         .post("/internal/reporting/extract")
-        .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
+        .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
         .set("x-request-id", requestId)
         .set("x-reports-grant", signed.grant)
         .set("x-reports-grant-signature", signed.signature)
         .send(body)
         .expect(403);
     }
+
+    const tooLargeBody = { ...body, limit: 102 };
+    const tooLarge = signedGrant(tooLargeBody);
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+      .set("x-request-id", requestId)
+      .set("x-reports-grant", tooLarge.grant)
+      .set("x-reports-grant-signature", tooLarge.signature)
+      .send(tooLargeBody)
+      .expect(400);
+
     expect(extract).not.toHaveBeenCalled();
   });
 });

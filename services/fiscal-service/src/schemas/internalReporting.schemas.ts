@@ -1,12 +1,13 @@
 import { z } from "zod";
 
+import { FISCAL_ICMS_REPORTING_SOURCES } from "../reporting/fiscalIcmsReportingCatalog.js";
 import { FISCAL_NCM_REPORTING_SOURCES } from "../reporting/fiscalNcmReportingCatalog.js";
 
 const reportingFieldSchema = z.string().trim().min(1).max(64);
 
 export const internalReportingExtractBodySchema = z
   .object({
-    source: z.enum(FISCAL_NCM_REPORTING_SOURCES),
+    source: z.enum([...FISCAL_ICMS_REPORTING_SOURCES, ...FISCAL_NCM_REPORTING_SOURCES]),
     fields: z.array(reportingFieldSchema).min(1).max(25),
     limit: z.number().int().min(1).max(101),
   })
