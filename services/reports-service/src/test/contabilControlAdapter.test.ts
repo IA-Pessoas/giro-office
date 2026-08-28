@@ -3,7 +3,6 @@ import { createHash, createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import { ContabilControlAdapter } from "../integrations/contabilControlAdapter.js";
-import { ContabilResponsiblesAdapter } from "../integrations/contabilResponsiblesAdapter.js";
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -108,53 +107,5 @@ describe("ContabilControlAdapter", () => {
         request_id: "request-834",
       }),
     ).rejects.toMatchObject({ statusCode: 503 });
-  });
-
-  it("assina a extração de responsáveis sem enviar chaves internas", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        success: true,
-        data: { rows: [{ customer_with_movement: true }], reachedLimit: false },
-      }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const adapter = new ContabilResponsiblesAdapter({
-      contabilServiceUrl: "http://contabil.test",
-      reportsInternalToken: "internal-token",
-      reportsGrantSecret: "grant-secret",
-      sourceTimeoutMs: 100,
-    });
-
-    await expect(
-      adapter.preview({
-        definition: {
-          sources: ["contabil.responsibles"],
-          columns: [
-            {
-              source: "contabil.responsibles",
-              field: "customer_with_movement",
-              alias: "customer_with_movement",
-            },
-          ],
-          joins: [],
-          filters: [],
-          filter_groups: [],
-          parameters: [],
-          aggregations: [],
-          order_by: [],
-        },
-        organization_id: "00000000-0000-4000-8000-000000000001",
-        limit: 10,
-        request_id: "request-835",
-      }),
-    ).resolves.toEqual([{ customer_with_movement: true }]);
-
-    const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    expect(JSON.parse(String(request.body))).toEqual({
-      source: "contabil.responsibles",
-      fields: ["customer_with_movement"],
-      limit: 10,
-    });
   });
 });

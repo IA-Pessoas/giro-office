@@ -6,7 +6,6 @@ import { createReportsApp } from "./app.js";
 import { getReportsServiceEnv } from "./config/env.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
-import { ContabilResponsiblesAdapter } from "./integrations/contabilResponsiblesAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
@@ -29,7 +28,6 @@ const app = createReportsApp({
       new ParcelamentoAdapter(env),
       new ClientIntegrationAdapter(env),
       new ContabilControlAdapter(env),
-      new ContabilResponsiblesAdapter(env),
       new TaskAdapter(env),
       new ProjectAdapter(env),
     ],
