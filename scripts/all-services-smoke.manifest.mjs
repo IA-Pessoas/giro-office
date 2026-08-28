@@ -405,6 +405,15 @@ const baseManifest = [
 
   op({
     service: "user-service",
+    method: "POST",
+    path: "/platform/organizations/{organizationId}/users",
+    action: "platformUserCreate",
+    target: "gateway",
+    auth: "session",
+    condition: "auditEnabled",
+  }),
+  op({
+    service: "user-service",
     method: "GET",
     path: "/health",
     action: "serviceHealth",

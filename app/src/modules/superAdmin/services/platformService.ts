@@ -12,6 +12,7 @@ import type {
   UpdatePlatformOrganizationPlanPayload,
   UpdatePlatformOrganizationStatusPayload,
 } from "../types";
+import type { AdminCreateUserData, UserItem } from "@modules/users/types";
 
 function unwrapData<T>(response: { data?: { data?: T } }): T {
   return response.data?.data as T;
@@ -74,6 +75,12 @@ export const platformService = {
   async listDepartments(organizationId: string): Promise<PlatformDepartmentOption[]> {
     const response = await api.get(`/platform/organizations/${organizationId}/departments`);
     return unwrapData<PlatformDepartmentOption[]>(response);
+  },
+
+  async createUser(organizationId: string, data: AdminCreateUserData): Promise<UserItem> {
+    const { organization_id: _organizationId, ...payload } = data;
+    const response = await api.post(`/platform/organizations/${organizationId}/users`, payload);
+    return unwrapData<UserItem>(response);
   },
 
   async getOrganization(organizationId: string): Promise<PlatformOrganization> {

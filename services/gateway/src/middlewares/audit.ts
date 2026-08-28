@@ -85,6 +85,7 @@ function requiresOrganizationMutationAudit(request: Request): boolean {
   const method = request.method.toUpperCase();
   return (
     (method === "POST" && path.toLowerCase() === "/platform/organizations") ||
+    (method === "POST" && /^\/platform\/organizations\/[^/]+\/users$/i.test(path)) ||
     (method === "PATCH" &&
       (PLATFORM_ORGANIZATION_SETTINGS_PATH.test(path) ||
         PLATFORM_ORGANIZATION_USER_PATH.test(path))) ||
@@ -109,10 +110,8 @@ export function buildAuditCapacityGuard({
     next: NextFunction,
   ): Promise<void> {
     const requiresAudit = requiresOrganizationMutationAudit(request);
-    const mustReserve =
-      requiresAudit ||
-      request.auth !== undefined ||
-      !SAFE_METHODS.has(request.method.toUpperCase());
+    const method = request.method.toUpperCase();
+    const mustReserve = requiresAudit || request.auth !== undefined || !SAFE_METHODS.has(method);
 
     if (requiresAudit && (!enabled || !request.requestId)) {
       next(new ServiceError(503, "Auditoria indisponível; operação não iniciada."));
@@ -151,8 +150,37 @@ export function buildAuditCapacityGuard({
             outcome: "success",
             serviceSource: "gateway",
             createdAt: new Date().toISOString(),
-            action: "organization.mutation.attempt",
-            referring: "organization",
+            action:
+              method === "POST" &&
+              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                ? "platform.user.create.attempt"
+                : "organization.mutation.attempt",
+            referring:
+              method === "POST" &&
+              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                ? "user"
+                : "organization",
+            referringId:
+              method === "POST" &&
+              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                ? String(request.body?.login ?? "new-user")
+                : undefined,
+            changes:
+              method === "POST" &&
+              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                ? {
+                    before: null,
+                    after: {
+                      name: request.body?.name,
+                      login: request.body?.login,
+                      department_id: request.body?.department_id,
+                      permission: request.body?.permission,
+                      status: request.body?.status,
+                      type: request.body?.type,
+                      modules: request.body?.modules,
+                    },
+                  }
+                : undefined,
             metadata: {
               actorKind: "platform",
               actorPlatformUserId: request.auth?.userId,

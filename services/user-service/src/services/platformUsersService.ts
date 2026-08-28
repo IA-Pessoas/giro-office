@@ -1,7 +1,8 @@
 import { ServiceError } from "@workspace/shared";
 import type { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
-import { UserService } from "./userService.js";
+import { PlatformUserManagementAdapter } from "./userManagementService.js";
+import { type CreateUserInput, UserManagementService, UserService } from "./userService.js";
 
 const MAX_PAGE_SIZE = 100;
 const PLATFORM_USER_LIST_SELECT = {
@@ -27,6 +28,30 @@ type PlatformUserListRow = Prisma.UserGetPayload<{ select: typeof PLATFORM_USER_
 
 export class PlatformUsersService {
   private readonly userService = new UserService();
+
+  async create(
+    organizationId: string,
+    input: CreateUserInput,
+    _platformUserId: string,
+  ): Promise<PlatformUserListRow> {
+    const management = new PlatformUserManagementAdapter(new UserManagementService(), {
+      actor: { kind: "platform", platformUserId: _platformUserId },
+      organizationId,
+    });
+    const user = await management.create({
+      ...input,
+      organization_id: organizationId,
+    });
+    return {
+      id: user.id,
+      name: user.name,
+      login: user.login,
+      status: user.status,
+      department_id: user.department_id,
+      photo_url: user.photo_url,
+      type: user.type,
+    };
+  }
 
   async list({ organizationId, skip, take, search }: ListPlatformUsersInput): Promise<{
     users: PlatformUserListRow[];

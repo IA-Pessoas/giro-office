@@ -1,11 +1,14 @@
 import { isAxiosError } from "axios";
 import { Search, UserRound } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { ConfirmationDialog } from "@shared/components";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { Input } from "@shared/ui/newLayout/input";
+import { CreateUserModal } from "@modules/users/components/CreateUserModal";
+import type { UserItem } from "@modules/users/types";
 
 import {
   usePlatformDepartments,
@@ -14,6 +17,7 @@ import {
   usePlatformUserUpdateMutation,
   usePlatformUsers,
 } from "../hooks/usePlatformUsers";
+import { platformService } from "../services/platformService";
 import type { PlatformOrganization, PlatformOrganizationUser } from "../types";
 
 const PAGE_SIZE = 20;
@@ -29,8 +33,10 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<"deactivate" | "reactivate" | null>(null);
   const lifecycleActionRef = useRef<HTMLButtonElement>(null);
+  const queryClient = useQueryClient();
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const usersQuery = usePlatformUsers(organization.id, {
     skip: (page - 1) * PAGE_SIZE,
@@ -51,6 +57,20 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const departmentName = departmentsQuery.data?.find(
     (department) => department.id === userDetailQuery.data?.department_id,
   )?.name;
+  const createUserMutation = useMutation({
+    mutationFn: (data: Parameters<typeof platformService.createUser>[1]) =>
+      platformService.createUser(organization.id, data),
+    onSuccess: async (user) => {
+      setSelectedUserId(user.id);
+      await queryClient.invalidateQueries({
+        queryKey: ["platform", "organizations", organization.id, "users"],
+      });
+    },
+  });
+
+  useEffect(() => {
+    setSelectedUserId(null);
+  }, [organization.id]);
   const selectedUser = userDetailQuery.data;
 
   useEffect(() => {
@@ -108,7 +128,8 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
             Usuários
           </h2>
         </div>
-        <div className="w-full sm:max-w-xs">
+        <div className="flex w-full gap-2 sm:max-w-md">
+        <div className="min-w-0 flex-1">
           <label className="block text-xs font-medium text-slate-600 dark:text-slate-300" htmlFor="platform-user-search">
             Pesquisar usuário
           </label>
@@ -126,6 +147,8 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
               value={search}
             />
           </div>
+        </div>
+          <button className="self-end rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" onClick={() => setIsCreateOpen(true)} type="button">Criar usuário</button>
         </div>
       </div>
 
@@ -351,6 +374,18 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
         page={page}
         total={total}
         totalPages={totalPages}
+      />
+      <CreateUserModal
+        canCreateOrganizationOwner
+        departments={departmentsQuery.data}
+        departmentsError={departmentsQuery.isError}
+        departmentsLoading={departmentsQuery.isLoading}
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onCreateUser={(payload) => createUserMutation.mutateAsync(payload)}
+        onRetryDepartments={() => void departmentsQuery.refetch()}
+        onUserCreated={(user: UserItem) => { setSelectedUserId(user.id); setIsCreateOpen(false); }}
+        organizationId={organization.id}
       />
 
       <ConfirmationDialog

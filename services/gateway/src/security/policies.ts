@@ -155,6 +155,11 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },
   { method: "PUT", path: /^\/user\/permission\/[^/]+$/, policy: { special: "ownerOnly" } },
   {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
     method: "GET",
     path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
     policy: userManagementPolicy,

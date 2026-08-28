@@ -66,6 +66,22 @@ describe("user-service gateway registry", () => {
     });
   });
 
+  it("encaminha a criação de usuário da organização ao user-service", () => {
+    const env = {
+      userServiceUrl: "http://user-service:3030",
+      userServiceInternalToken: "gateway-user-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, "/platform/organizations/org-1/users", "POST")).toMatchObject(
+      {
+        key: "user-service",
+        targetUrl: "http://user-service:3030",
+        internalServiceToken: "gateway-user-token",
+        forwardPlatformSessionCredentials: true,
+      },
+    );
+  });
+
   it("não libera DELETE de departamento pela allowlist de lifecycle de usuário", () => {
     const env = {
       userServiceUrl: "http://user-service:3030",

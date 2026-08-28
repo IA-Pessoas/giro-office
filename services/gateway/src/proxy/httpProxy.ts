@@ -148,6 +148,12 @@ const SESSION_COOKIE_RULES: SessionCookieRule[] = [
     outbound: [],
   },
   {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/users$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
     method: "DELETE",
     path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/u,
     inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
