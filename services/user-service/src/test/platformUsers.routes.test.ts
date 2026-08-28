@@ -5,6 +5,7 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   hashCsrfToken,
   INTERNAL_SERVICE_TOKEN_HEADER,
+  ServiceError,
 } from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
@@ -14,7 +15,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { platformAuthMock, platformUsersMock } = vi.hoisted(() => ({
   platformAuthMock: { validateSession: vi.fn() },
-  platformUsersMock: { list: vi.fn(), getById: vi.fn(), listDepartments: vi.fn() },
+  platformUsersMock: {
+    list: vi.fn(),
+    getById: vi.fn(),
+    listDepartments: vi.fn(),
+    deactivate: vi.fn(),
+    reactivate: vi.fn(),
+  },
 }));
 
 const { testEnv } = vi.hoisted(() => ({
@@ -162,6 +169,55 @@ describe("platform users routes", () => {
     expect(platformUsersMock.listDepartments).toHaveBeenCalledWith("org-2");
   });
 
+  it("deactivates only the selected tenant user after platform session and CSRF validation", async () => {
+    const response = await request(createApp())
+      .delete("/platform/organizations/org-2/users/user-1")
+      .set(platformGatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(platformUsersMock.deactivate).toHaveBeenCalledWith("org-2", "user-1");
+  });
+
+  it("reactivates only future sessions after platform session and CSRF validation", async () => {
+    platformUsersMock.reactivate.mockResolvedValue({ id: "user-1", status: "active" });
+
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/users/user-1/reactivate")
+      .set(platformGatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ id: "user-1", status: "active" });
+    expect(platformUsersMock.reactivate).toHaveBeenCalledWith("org-2", "user-1");
+  });
+
+  it("rejects a lifecycle mutation without CSRF before reaching the platform service", async () => {
+    const headers = platformGatewayHeaders();
+    delete headers[CSRF_HEADER_NAME];
+
+    const response = await request(createApp())
+      .delete("/platform/organizations/org-2/users/user-1")
+      .set(headers);
+
+    expect(response.status).toBe(403);
+    expect(platformUsersMock.deactivate).not.toHaveBeenCalled();
+  });
+
+  it("returns the last-owner transfer conflict from the common user lifecycle", async () => {
+    platformUsersMock.deactivate.mockRejectedValue(
+      new ServiceError(
+        409,
+        "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+      ),
+    );
+
+    const response = await request(createApp())
+      .delete("/platform/organizations/org-2/users/user-1")
+      .set(platformGatewayHeaders());
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain("transferencia de ownership");
+  });
+
   it("returns 403 for an organizational identity", async () => {
     const response = await request(createApp())
       .get("/platform/organizations/org-2/users")
@@ -207,6 +263,19 @@ describe("platform users OpenAPI", () => {
       ["/platform/organizations/{organizationId}/users", "get", "parameters", 1, "schema"],
       { type: "integer", minimum: 0, maximum: 10_000, default: 0 },
     );
+  });
+
+  it("documents the secure deactivate and reactivate lifecycle contracts", () => {
+    const spec = buildUserServiceOpenApiSpec(testEnv);
+
+    expect(spec.paths).toHaveProperty([
+      "/platform/organizations/{organizationId}/users/{userId}",
+      "delete",
+    ]);
+    expect(spec.paths).toHaveProperty([
+      "/platform/organizations/{organizationId}/users/{userId}/reactivate",
+      "post",
+    ]);
   });
 
   it("documents the gateway-only token on direct platform routes", () => {

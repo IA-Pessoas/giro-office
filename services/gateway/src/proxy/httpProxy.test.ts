@@ -203,6 +203,18 @@ describe("buildForwardHeaders", () => {
       expectedCookie: "cw.session=verified-platform-token",
       expectedCsrf: null,
     },
+    {
+      method: "DELETE",
+      path: "/platform/organizations/org-1/users/user-1",
+      expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
+      expectedCsrf: "proof",
+    },
+    {
+      method: "POST",
+      path: "/platform/organizations/org-1/users/user-1/reactivate",
+      expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
+      expectedCsrf: "proof",
+    },
   ])("encaminha somente as credenciais allowlisted em $method $path", (entry) => {
     const request = {
       ...authenticatedRequest,

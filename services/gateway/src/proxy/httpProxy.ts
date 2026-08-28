@@ -141,6 +141,18 @@ const SESSION_COOKIE_RULES: SessionCookieRule[] = [
     inbound: [AUTH_SESSION_COOKIE_NAME],
     outbound: [],
   },
+  {
+    method: "DELETE",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [],
+  },
 ];
 
 const HOP_BY_HOP_HEADERS = new Set([
