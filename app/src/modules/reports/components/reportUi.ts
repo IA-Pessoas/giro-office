@@ -1,0 +1,44 @@
+import {
+  CheckCircle2,
+  Clock3,
+  CircleX,
+  FileWarning,
+  Loader2,
+  Trash2,
+} from "lucide-react";
+
+import type { ReportJobStatus } from "../types/report.types";
+
+export const panelClassName =
+  "rounded-xl border border-gray-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900";
+
+export function formatReportDate(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("pt-BR");
+}
+
+export function getReportStatusConfig(status: ReportJobStatus) {
+  switch (status) {
+    case "completed":
+      return { label: "Concluído", variant: "success" as const, icon: CheckCircle2 };
+    case "processing":
+      return { label: "Processando", variant: "info" as const, icon: Loader2 };
+    case "queued":
+      return { label: "Na fila", variant: "warning" as const, icon: Clock3 };
+    case "cancelled":
+      return { label: "Cancelado", variant: "neutral" as const, icon: CircleX };
+    case "expired":
+      return { label: "Expirado", variant: "orange" as const, icon: FileWarning };
+    case "deleted":
+      return { label: "Removido", variant: "neutral" as const, icon: Trash2 };
+    default:
+      return { label: "Falhou", variant: "danger" as const, icon: CircleX };
+  }
+}
+
+export function getErrorStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const response = (error as { response?: { status?: unknown } }).response;
+  return typeof response?.status === "number" ? response.status : undefined;
+}

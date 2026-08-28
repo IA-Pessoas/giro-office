@@ -31,6 +31,11 @@ amostra limitada; não cria job, snapshot, arquivo ou registro persistido.
 somente o autor. Cada criação ou edição revalida a definição declarativa contra o catálogo e as
 permissões atuais; a edição cria uma nova versão e nunca compartilha o modelo com departamento.
 
+`GET /reports/snapshots/:id/export?format=csv|xlsx` revalida o acesso atual e gera um arquivo
+efêmero somente das linhas materializadas no snapshot. O arquivo não é salvo em storage nem
+registrado como exportação persistida; a auditoria conserva apenas formato, resultado, job, versão
+e contagens seguras.
+
 ## Desenvolvimento
 
 ```bash
@@ -45,6 +50,11 @@ Eles consultam somente rotas internas governadas dos serviços de origem e assin
 
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.
+
+`GET /reports/jobs/list` lista o histórico pessoal ou o acervo departamental com filtros. `GET` e
+`PUT /reports/retention` administram a retenção organizacional para jobs futuros e exigem owner.
+`POST /reports/snapshots/:id/delete` remove antecipadamente um snapshot com justificativa e exige
+Admin 3 do departamento do job.
 
 O smoke de Controle Contábil fica desativado por padrão; exija
 `CONTABIL_REPORTING_SMOKE_ENABLED=true` e `REPORTS_GRANT_SECRET` apenas em ambiente isolado com

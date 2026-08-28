@@ -122,24 +122,59 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "gerou", item: "uma prévia de relatório" },
   },
   {
-    methods: ["POST"],
-    pattern: /^\/reports\/jobs$/,
-    description: { action: "solicitou", item: "uma execução de relatório" },
+    methods: ["GET"],
+    pattern: /^\/reports\/jobs\/list$/,
+    description: { action: "consultou", item: "o histórico de relatórios" },
   },
   {
     methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+$/,
-    description: { action: "consultou", item: "uma execução de relatório" },
+    description: { action: "consultou", item: "um job de relatório" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/jobs$/,
+    description: { action: "gerou", item: "um relatório" },
   },
   {
     methods: ["POST"],
     pattern: /^\/reports\/jobs\/[^/]+\/cancel$/,
-    description: { action: "solicitou", item: "o cancelamento de uma execução de relatório" },
+    description: { action: "cancelou", item: "um job de relatório" },
   },
   {
     methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+\/snapshot$/,
-    description: { action: "consultou", item: "o resultado de uma execução de relatório" },
+    description: { action: "consultou", item: "um snapshot de relatório" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/snapshots\/[^/]+\/delete$/,
+    description: { action: "excluiu", item: "um snapshot de relatório" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/reports\/retention$/,
+    description: { action: "consultou", item: "a política de retenção de relatórios" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/reports\/retention$/,
+    description: { action: "alterou", item: "a política de retenção de relatórios" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/models\/shared$/,
+    description: { action: "cadastrou", item: "um modelo compartilhado de relatório" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/reports\/models\/shared\/list$/,
+    description: { action: "consultou", item: "a lista de modelos compartilhados de relatório" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/reports\/models\/shared\/[^/]+$/,
+    description: { action: "atualizou", item: "um modelo compartilhado de relatório" },
   },
   {
     methods: ["POST"],
