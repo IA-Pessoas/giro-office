@@ -219,6 +219,11 @@ const routePolicyMatchers: Array<{
     policy: platformOnlyPolicy,
   },
   {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
     method: "GET",
     path: /^\/platform\/organizations\/[^/]+\/?$/,
     policy: platformOnlyPolicy,

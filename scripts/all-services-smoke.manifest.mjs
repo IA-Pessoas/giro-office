@@ -536,6 +536,15 @@ const baseManifest = [
   }),
   op({
     service: "user-service",
+    method: "POST",
+    path: "/platform/organizations/{organizationId}/ownership-transfer",
+    action: "platformOwnershipTransfer",
+    target: "gateway",
+    auth: "session",
+    condition: "auditEnabled",
+  }),
+  op({
+    service: "user-service",
     method: "GET",
     path: "/platform/organizations/{organizationId}/departments",
     action: "platformDepartments",

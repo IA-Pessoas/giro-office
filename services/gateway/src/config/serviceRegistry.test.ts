@@ -54,6 +54,7 @@ describe("user-service gateway registry", () => {
     ["GET", "/platform/organizations/org-1/departments"],
     ["DELETE", "/platform/organizations/org-1/users/user-1"],
     ["POST", "/platform/organizations/org-1/users/user-1/reactivate"],
+    ["POST", "/platform/organizations/org-1/ownership-transfer"],
   ])("encaminha %s %s exclusivamente ao user-service com sessão de plataforma", (method, path) => {
     const env = {
       userServiceUrl: "http://user-service:3030",

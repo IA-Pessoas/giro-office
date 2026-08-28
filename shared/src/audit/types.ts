@@ -104,10 +104,33 @@ export type OrganizationAuditStatus = "trial" | "past_due" | "active" | "suspend
 export type OrganizationAuditPlan = "trial" | "pro" | "enterprise";
 export type PlatformAuditChange<T extends string> = { from: T | null; to: T | null };
 
+export interface PlatformOwnershipAuditUser {
+  id: string;
+  type: "owner" | "admin";
+  status: "active" | "inactive";
+}
+
+export interface PlatformOwnershipAuditChanges {
+  before: {
+    ownerId: string;
+    type: "owner";
+    status: "active";
+  };
+  after: {
+    ownerId: string;
+    type: "owner";
+    status: "active";
+    previousOwner: PlatformOwnershipAuditUser;
+  };
+  previousOwnerAction: "demote" | "deactivate";
+  justification: string;
+}
+
 export interface PlatformOrganizationAuditChanges {
   status?: PlatformAuditChange<OrganizationAuditStatus>;
   subscription_plan?: PlatformAuditChange<OrganizationAuditPlan>;
   logo_url?: PlatformAuditChange<string>;
+  ownership?: PlatformOwnershipAuditChanges;
 }
 
 export interface PlatformPermissionAuditChanges {

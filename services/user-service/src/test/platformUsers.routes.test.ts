@@ -24,6 +24,7 @@ const { platformAuthMock, platformUsersMock } = vi.hoisted(() => ({
     create: vi.fn(),
     deactivate: vi.fn(),
     reactivate: vi.fn(),
+    transferOwnership: vi.fn(),
     update: vi.fn(),
   },
 }));
@@ -133,6 +134,10 @@ describe("platform users routes", () => {
     platformUsersMock.getPermissions.mockResolvedValue({ rh: 2, fiscal: 1 });
     platformUsersMock.updatePermissions.mockResolvedValue({ rh: 3, fiscal: 1 });
     platformUsersMock.create.mockResolvedValue({ id: "user-2", name: "Nova", login: "nova" });
+    platformUsersMock.transferOwnership.mockResolvedValue({
+      currentOwner: { id: "owner-1", status: "inactive", type: "admin" },
+      successor: { id: "successor-1", status: "active", type: "owner" },
+    });
   });
 
   it("lists only the organization requested by a platform super admin", async () => {
@@ -240,6 +245,41 @@ describe("platform users routes", () => {
       }),
       platformIdentity.id,
     );
+  });
+
+  it("transfers ownership only after platform session and CSRF validation", async () => {
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/ownership-transfer")
+      .set(platformGatewayHeaders())
+      .send({
+        currentOwnerId: "owner-1",
+        successorUserId: "successor-1",
+        previousOwnerAction: "deactivate",
+        justification: "Recuperação administrativa aprovada.",
+      });
+
+    expect(response.status).toBe(200);
+    expect(platformUsersMock.transferOwnership).toHaveBeenCalledWith("org-2", {
+      currentOwnerId: "owner-1",
+      successorUserId: "successor-1",
+      previousOwnerAction: "deactivate",
+      justification: "Recuperação administrativa aprovada.",
+    });
+  });
+
+  it("rejects a transfer without a justification before reaching the platform service", async () => {
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/ownership-transfer")
+      .set(platformGatewayHeaders())
+      .send({
+        currentOwnerId: "owner-1",
+        successorUserId: "successor-1",
+        previousOwnerAction: "demote",
+        justification: "   ",
+      });
+
+    expect(response.status).toBe(400);
+    expect(platformUsersMock.transferOwnership).not.toHaveBeenCalled();
   });
 
   it("rejeita criação sem CSRF antes de chamar o serviço", async () => {

@@ -116,6 +116,10 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
           methods: ["POST"],
           path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/,
         },
+        {
+          methods: ["POST"],
+          path: /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/,
+        },
       ],
     },
     {

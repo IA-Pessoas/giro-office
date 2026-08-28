@@ -269,6 +269,56 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/platform/organizations/{organizationId}/ownership-transfer": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Transferir ownership de uma organização",
+          description:
+            "Ação excepcional e atômica. Promove um sucessor ativo do tenant, rebaixa ou desativa o owner anterior e invalida as sessões dos dois usuários.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: [
+                    "currentOwnerId",
+                    "successorUserId",
+                    "previousOwnerAction",
+                    "justification",
+                  ],
+                  properties: {
+                    currentOwnerId: { type: "string", minLength: 1 },
+                    successorUserId: { type: "string", minLength: 1 },
+                    previousOwnerAction: { type: "string", enum: ["demote", "deactivate"] },
+                    justification: { type: "string", minLength: 1, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Ownership transferido", ...successJson },
+            "400": { description: "Payload inválido" },
+            "401": { description: "Sessão de plataforma ausente ou inválida" },
+            "403": { description: "CSRF ou identidade inválida" },
+            "404": { description: "Owner atual ou sucessor fora do tenant" },
+            "409": { description: "Conflito de concorrência ou sucessor inelegível" },
+            "503": { description: "Auditoria durável indisponível antes da mutação" },
+          },
+        },
+      },
       "/platform/organizations/{organizationId}/users/{userId}": {
         get: {
           tags: ["Platform auth"],

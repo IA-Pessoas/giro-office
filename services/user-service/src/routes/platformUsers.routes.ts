@@ -13,6 +13,7 @@ import {
   listPlatformUsersQuerySchema,
   platformOrganizationUserParamsSchema,
   platformOrganizationUsersParamsSchema,
+  transferPlatformOwnershipBodySchema,
   updatePlatformUserBodySchema,
 } from "../schemas/platformUsers.schemas.js";
 import { createUserBodySchema } from "../schemas/user.schemas.js";
@@ -36,6 +37,30 @@ export function createPlatformUsersRoutes(
     }
     return result.data;
   }
+
+  router.post(
+    "/organizations/:organizationId/ownership-transfer",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId } = parseWithZod(
+          platformOrganizationUsersParamsSchema,
+          request.params,
+        );
+        const input = parseWithZod(transferPlatformOwnershipBodySchema, request.body);
+        response.json(
+          createSuccessResponse(
+            await platformUsersService.transferOwnership(organizationId, input),
+          ),
+        );
+      } catch (err) {
+        logError("Erro ao transferir ownership pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
 
   router.post(
     "/organizations/:organizationId/users",

@@ -15,6 +15,7 @@ import type { PermissionDraft, UserItem } from "@modules/users/types";
 
 import {
   usePlatformDepartments,
+  usePlatformOwnershipTransferMutation,
   usePlatformUserDetail,
   usePlatformUserLifecycleMutation,
   usePlatformUserUpdateMutation,
@@ -22,6 +23,7 @@ import {
 } from "../hooks/usePlatformUsers";
 import { platformService } from "../services/platformService";
 import type { PlatformOrganization, PlatformOrganizationUser } from "../types";
+import { OwnershipTransferDialog } from "./OwnershipTransferDialog";
 
 const PAGE_SIZE = 20;
 
@@ -38,6 +40,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
+  const [isOwnershipTransferOpen, setIsOwnershipTransferOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<"deactivate" | "reactivate" | null>(null);
   const lifecycleActionRef = useRef<HTMLButtonElement>(null);
   const permissionActionRef = useRef<HTMLButtonElement>(null);
@@ -49,11 +52,13 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
   const users = usersQuery.data?.users ?? [];
+  const ownershipCandidatesQuery = usePlatformUsers(organization.id, { skip: 0, take: 100 });
   const total = usersQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const userDetailQuery = usePlatformUserDetail(organization.id, selectedUserId);
   const departmentsQuery = usePlatformDepartments(organization.id);
   const userLifecycleMutation = usePlatformUserLifecycleMutation();
+  const ownershipTransferMutation = usePlatformOwnershipTransferMutation();
   const userUpdateMutation = usePlatformUserUpdateMutation();
   const [editMode, setEditMode] = useState(false);
   const [passwordConfirmationOpen, setPasswordConfirmationOpen] = useState(false);
@@ -75,6 +80,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
 
   useEffect(() => {
     setSelectedUserId(null);
+    setIsOwnershipTransferOpen(false);
   }, [organization.id]);
   const selectedUser = userDetailQuery.data;
   const permissionsDataSource = useMemo<AdminUserPermissionsDataSource>(
@@ -354,7 +360,9 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                         <dd className="font-medium">
                           {departmentsQuery.isLoading
                             ? "Carregando..."
-                            : departmentName ?? "Sem departamento"}
+                            : departmentsQuery.isError
+                              ? "Não foi possível carregar departamentos."
+                              : departmentName ?? "Sem departamento"}
                         </dd>
                       </div>
                       <div>
@@ -379,6 +387,15 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                 >
                   Editar permissões
                 </button>
+                {selectedUser.status === "active" && selectedUser.type === "owner" ? (
+                  <button
+                    className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={() => setIsOwnershipTransferOpen(true)}
+                    type="button"
+                  >
+                    Transferir ownership
+                  </button>
+                ) : (
                 <button
                   ref={lifecycleActionRef}
                   className={selectedUser.status === "active" ? "rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600" : "rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"}
@@ -387,6 +404,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                 >
                   {selectedUser.status === "active" ? "Desativar usuário" : "Reativar usuário"}
                 </button>
+                )}
               </div>
             ) : null}
           </aside>
@@ -487,6 +505,24 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
         open={passwordConfirmationOpen}
         title="Confirmar alteração de senha"
         variant="destructive"
+      />
+      <OwnershipTransferDialog
+        currentOwner={selectedUser?.type === "owner" && selectedUser.status === "active" ? selectedUser : null}
+        isConfirming={ownershipTransferMutation.isPending}
+        onOpenChange={setIsOwnershipTransferOpen}
+        onTransfer={async ({ successorUserId, previousOwnerAction, justification }) => {
+          if (!selectedUser) return;
+          await ownershipTransferMutation.mutateAsync({
+            organizationId: organization.id,
+            currentOwnerId: selectedUser.id,
+            successorUserId,
+            previousOwnerAction,
+            justification,
+          });
+        }}
+        open={isOwnershipTransferOpen}
+        organization={organization}
+        users={ownershipCandidatesQuery.data?.users ?? []}
       />
     </section>
   );

@@ -18,6 +18,19 @@ export const listPlatformUsersQuerySchema = z
   })
   .strict();
 
+export const transferPlatformOwnershipBodySchema = z
+  .object({
+    currentOwnerId: z.string().trim().min(1, "currentOwnerId e obrigatório."),
+    successorUserId: z.string().trim().min(1, "successorUserId e obrigatório."),
+    previousOwnerAction: z.enum(["demote", "deactivate"]),
+    justification: z.string().trim().min(1, "justification e obrigatória.").max(500),
+  })
+  .strict()
+  .refine((input) => input.currentOwnerId !== input.successorUserId, {
+    message: "O sucessor deve ser diferente do owner atual.",
+    path: ["successorUserId"],
+  });
+
 export const updatePlatformUserBodySchema = z
   .object({
     name: z.string().trim().min(1).max(255).optional(),

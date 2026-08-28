@@ -164,6 +164,7 @@ const platformAuditActions = new Set([
   "organization.subscription_plan.updated",
   "organization.logo_url.updated",
 ]);
+const PLATFORM_OWNERSHIP_TRANSFER_ACTION = "platform.organization.ownership.transfer.completed";
 const organizationStatuses = new Set<OrganizationAuditStatus>([
   "trial",
   "past_due",
@@ -220,14 +221,10 @@ function getPlatformPermissionChanges(
   ) {
     return undefined;
   }
-
   const modules = getOwnDataProperty(record.changes_json, "modules");
   const before = getOwnDataProperty(modules, "before");
   const after = getOwnDataProperty(modules, "after");
-  if (!isRecord(modules) || !isRecord(before) || !isRecord(after)) {
-    return undefined;
-  }
-
+  if (!isRecord(modules) || !isRecord(before) || !isRecord(after)) return undefined;
   const sanitize = (value: Record<string, unknown>) =>
     Object.fromEntries(
       Object.entries(value).filter(
@@ -241,11 +238,92 @@ function getPlatformPermissionChanges(
     );
   const safeBefore = sanitize(before);
   const safeAfter = sanitize(after);
-  if (Object.keys(safeBefore).length === 0 || Object.keys(safeAfter).length === 0) {
+  return Object.keys(safeBefore).length && Object.keys(safeAfter).length
+    ? { modules: { before: safeBefore, after: safeAfter } }
+    : undefined;
+}
+
+function getSafeIdentifier(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 200) {
     return undefined;
   }
 
-  return { modules: { before: safeBefore, after: safeAfter } };
+  return value.trim() || undefined;
+}
+
+function getPlatformOwnershipChanges(
+  record: PlatformAuditRow,
+): PlatformOrganizationAuditChanges | undefined {
+  if (
+    record.service_source !== "gateway" ||
+    record.referring !== "organization" ||
+    typeof record.organization_id !== "string" ||
+    record.referring_id !== record.organization_id ||
+    record.action !== PLATFORM_OWNERSHIP_TRANSFER_ACTION ||
+    !isRecord(record.changes_json)
+  ) {
+    return undefined;
+  }
+
+  const ownership = getOwnDataProperty(record.changes_json, "ownership");
+  if (!isRecord(ownership)) {
+    return undefined;
+  }
+
+  const before = getOwnDataProperty(ownership, "before");
+  const after = getOwnDataProperty(ownership, "after");
+  const action = getOwnDataProperty(ownership, "previousOwnerAction");
+  const justification = getOwnDataProperty(ownership, "justification");
+  if (
+    !isRecord(before) ||
+    !isRecord(after) ||
+    (action !== "demote" && action !== "deactivate") ||
+    typeof justification !== "string" ||
+    justification.trim().length === 0 ||
+    justification.length > 500
+  ) {
+    return undefined;
+  }
+
+  const beforeOwnerId = getSafeIdentifier(getOwnDataProperty(before, "ownerId"));
+  const afterOwnerId = getSafeIdentifier(getOwnDataProperty(after, "ownerId"));
+  const previousOwner = getOwnDataProperty(after, "previousOwner");
+  if (
+    !beforeOwnerId ||
+    !afterOwnerId ||
+    beforeOwnerId === afterOwnerId ||
+    before.type !== "owner" ||
+    before.status !== "active" ||
+    after.type !== "owner" ||
+    after.status !== "active" ||
+    !isRecord(previousOwner)
+  ) {
+    return undefined;
+  }
+
+  const previousOwnerId = getSafeIdentifier(getOwnDataProperty(previousOwner, "id"));
+  const expectedStatus = action === "deactivate" ? "inactive" : "active";
+  if (
+    previousOwnerId !== beforeOwnerId ||
+    previousOwner.type !== "admin" ||
+    previousOwner.status !== expectedStatus
+  ) {
+    return undefined;
+  }
+
+  return {
+    ownership: {
+      before: { ownerId: beforeOwnerId, type: "owner", status: "active" },
+      after: {
+        ownerId: afterOwnerId,
+        type: "owner",
+        status: "active",
+        previousOwner: { id: previousOwnerId, type: "admin", status: expectedStatus },
+      },
+      previousOwnerAction: action,
+      justification: justification.trim(),
+    },
+  };
 }
 
 function getPlatformChanges(
@@ -253,6 +331,11 @@ function getPlatformChanges(
 ): PlatformOrganizationAuditChanges | PlatformPermissionAuditChanges | undefined {
   const permissionChanges = getPlatformPermissionChanges(record);
   if (permissionChanges) return permissionChanges;
+
+  const ownershipChanges = getPlatformOwnershipChanges(record);
+  if (ownershipChanges) {
+    return ownershipChanges;
+  }
   if (
     record.service_source !== "organization-service" ||
     record.referring !== "organization" ||
