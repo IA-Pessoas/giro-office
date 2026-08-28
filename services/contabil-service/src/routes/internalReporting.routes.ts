@@ -1,7 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 import {
-  contabilReportingCatalog,
+  contabilControlReportingCatalog,
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
   parseWithZod,
@@ -119,7 +119,7 @@ export function createInternalReportingRouter(options: {
       fields: [],
       body: {},
     });
-    response.json(createSuccessResponse(contabilReportingCatalog));
+    response.json(createSuccessResponse(contabilControlReportingCatalog));
   });
 
   router.post("/reporting/extract", async (request, response) => {
