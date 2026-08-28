@@ -195,7 +195,12 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/audit(?:\/|$)/, policy: authenticatedPolicy },
   {
     method: "GET",
-    path: /^\/platform\/organizations\/[^/]+\/(?:users(?:\/[^/]+)?|departments)\/?$/,
+    path: /^\/platform\/organizations\/[^/]+\/(?:users(?:\/[^/]+(?:\/permissions)?)?|departments)\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "PUT",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions\/?$/,
     policy: platformOnlyPolicy,
   },
   {

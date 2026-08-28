@@ -10,7 +10,9 @@ import {
   type PlatformAuditRequestRecord,
   type PlatformAuditSearchResult,
   type PlatformOrganizationAuditChanges,
+  type PlatformPermissionAuditChanges,
 } from "@workspace/shared/audit";
+import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 
 import {
   Prisma,
@@ -171,6 +173,7 @@ const organizationStatuses = new Set<OrganizationAuditStatus>([
   "cancelled",
 ]);
 const organizationPlans = new Set<OrganizationAuditPlan>(["trial", "pro", "enterprise"]);
+const activeModuleKeySet = new Set<string>(ACTIVE_MODULE_KEYS);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -203,6 +206,41 @@ function isSafeLogoUrl(value: unknown): value is string | null {
   } catch {
     return false;
   }
+}
+
+function getPlatformPermissionChanges(
+  record: PlatformAuditRow,
+): PlatformPermissionAuditChanges | undefined {
+  if (
+    record.service_source !== "user-service" ||
+    record.referring !== "user" ||
+    typeof record.organization_id !== "string" ||
+    typeof record.referring_id !== "string" ||
+    record.action !== "platform.user.permissions.updated" ||
+    !isRecord(record.changes_json)
+  ) {
+    return undefined;
+  }
+  const modules = getOwnDataProperty(record.changes_json, "modules");
+  const before = getOwnDataProperty(modules, "before");
+  const after = getOwnDataProperty(modules, "after");
+  if (!isRecord(modules) || !isRecord(before) || !isRecord(after)) return undefined;
+  const sanitize = (value: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.entries(value).filter(
+        ([key, level]) =>
+          activeModuleKeySet.has(key) &&
+          typeof level === "number" &&
+          Number.isInteger(level) &&
+          level >= 0 &&
+          level <= 3,
+      ),
+    );
+  const safeBefore = sanitize(before);
+  const safeAfter = sanitize(after);
+  return Object.keys(safeBefore).length && Object.keys(safeAfter).length
+    ? { modules: { before: safeBefore, after: safeAfter } }
+    : undefined;
 }
 
 function getSafeIdentifier(value: unknown): string | undefined {
@@ -290,12 +328,14 @@ function getPlatformOwnershipChanges(
 
 function getPlatformChanges(
   record: PlatformAuditRow,
-): PlatformOrganizationAuditChanges | undefined {
+): PlatformOrganizationAuditChanges | PlatformPermissionAuditChanges | undefined {
+  const permissionChanges = getPlatformPermissionChanges(record);
+  if (permissionChanges) return permissionChanges;
+
   const ownershipChanges = getPlatformOwnershipChanges(record);
   if (ownershipChanges) {
     return ownershipChanges;
   }
-
   if (
     record.service_source !== "organization-service" ||
     record.referring !== "organization" ||

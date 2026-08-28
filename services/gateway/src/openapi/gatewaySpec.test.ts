@@ -46,6 +46,17 @@ it("agrega o catálogo público do reports-service", () => {
 
   expect(spec.paths["/reports/catalog"]?.get?.["x-origin-service"]).toBe("reports-service");
   expect(spec.paths["/internal/reporting/access-context"]).toBeUndefined();
+  expect(
+    spec.paths["/platform/organizations/{organizationId}/users/{userId}/permissions"]?.get
+      ?.security,
+  ).toEqual([{ cookieAuth: [] }]);
+  const permissionUpdate =
+    spec.paths["/platform/organizations/{organizationId}/users/{userId}/permissions"]?.put;
+  expect(permissionUpdate?.security).toEqual([{ cookieAuth: [] }]);
+  expect(permissionUpdate?.parameters).toEqual(
+    expect.arrayContaining([expect.objectContaining({ name: "x-csrf-token", required: true })]),
+  );
+  expect(permissionUpdate?.responses).toHaveProperty("422");
 
   for (const [path, method] of [
     ["/platform/organizations", "get"],

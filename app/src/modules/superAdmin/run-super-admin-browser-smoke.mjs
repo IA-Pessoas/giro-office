@@ -51,6 +51,7 @@ const platformUser = {
   photo_url: null,
   type: "admin",
 };
+let platformUserPermissions = { rh: 1, fiscal: 1 };
 const currentOwner = {
   id: "owner-safe-1",
   name: "Owner atual",
@@ -146,6 +147,23 @@ const upstream = createServer(async (request, response) => {
       page: 1,
       pageSize: 25,
     });
+  }
+  const permissionsMatch = url.pathname.match(
+    /^\/platform\/organizations\/([^/]+)\/users\/([^/]+)\/permissions$/,
+  );
+  const permissionsOrganization =
+    permissionsMatch && organizations.find((item) => item.id === permissionsMatch[1]);
+  if (permissionsOrganization && permissionsMatch[2] === platformUser.id) {
+    if (request.method === "GET") return reply(response, 200, platformUserPermissions);
+    if (request.method === "PUT") {
+      assert.equal(request.headers["x-csrf-token"], csrf);
+      assert.equal(request.headers.authorization, undefined);
+      assert.ok(
+        Object.values(body).every((level) => Number.isInteger(level) && level >= 0 && level <= 3),
+      );
+      platformUserPermissions = body;
+      return reply(response, 200, platformUserPermissions);
+    }
   }
   const ownershipTransferMatch = url.pathname.match(
     /^\/platform\/organizations\/([^/]+)\/ownership-transfer$/,
@@ -339,6 +357,7 @@ try {
     await page.setViewportSize(viewport);
     organizations.splice(0, organizations.length, organization, secondOrganization);
     platformUser.status = "active";
+    platformUserPermissions = { rh: 1, fiscal: 1 };
     platformUser.type = "admin";
     currentOwner.status = "active";
     currentOwner.type = "owner";
@@ -435,6 +454,49 @@ try {
         (request) => request.path === `/platform/organizations/${organization.id}/users`,
       ),
     );
+    const permissionsTrigger = page.getByRole("button", {
+      name: "Editar permissões",
+      exact: true,
+    });
+    await permissionsTrigger.click();
+    const permissionsDialog = page.getByRole("dialog", {
+      name: "Permissões modulares",
+      exact: true,
+    });
+    await permissionsDialog.waitFor();
+    await permissionsDialog.getByText(platformUser.name, { exact: true }).first().waitFor();
+    const permissionSelect = permissionsDialog.locator("select").first();
+    await permissionSelect.selectOption("3");
+    await permissionsDialog.getByRole("button", { name: "Salvar permissões", exact: true }).click();
+    await page.getByText("Permissões atualizadas com sucesso.", { exact: true }).waitFor();
+    assert.ok(
+      requests.some(
+        (request) =>
+          request.method === "PUT" &&
+          request.path ===
+            `/platform/organizations/${organization.id}/users/${platformUser.id}/permissions`,
+      ),
+    );
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await settleLayout();
+      await page.screenshot({
+        path: join(
+          screenshotDirectory,
+          viewport.width > 1000
+            ? "issue-902-permissions-desktop.png"
+            : "issue-902-permissions-mobile.png",
+        ),
+      });
+    }
+    await page.keyboard.press("Escape");
+    await permissionsDialog.waitFor({ state: "hidden" });
+    await page.waitForFunction(
+      () => document.activeElement?.textContent?.trim() === "Editar permissões",
+      null,
+      { timeout: 3_000 },
+    );
+
     await page.getByRole("button", { name: /Owner atual owner@example\.test/ }).click();
     const transferTrigger = page.getByRole("button", {
       name: "Transferir ownership",

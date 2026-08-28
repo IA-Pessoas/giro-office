@@ -75,6 +75,7 @@ describe("buildAuditCapacityGuard", () => {
     ["PATCH", "/platform/organizations/org-1/users/user-1"],
     ["DELETE", "/platform/organizations/org-1/users/user-1"],
     ["POST", "/platform/organizations/org-1/users/user-1/reactivate"],
+    ["PUT", "/platform/organizations/org-1/users/user-1/permissions"],
   ])("fails closed when audit is disabled for %s %s", (method, originalUrl) => {
     const reserve = vi.fn(() => "protected" as const);
     const next = vi.fn();

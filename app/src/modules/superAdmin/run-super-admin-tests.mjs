@@ -206,17 +206,32 @@ await runTest("consome contratos explícitos de gestão pela sessão HTTP-only",
   );
   assert.match(
     platformServiceSource,
-    /api\.post\(\s*`\/platform\/organizations\/\$\{organizationId\}\/ownership-transfer`/,
+    /api\.get\(\s*`\/platform\/organizations\/\$\{organizationId\}\/users\/\$\{userId\}\/permissions`/,
+  );
+  assert.match(
+    platformServiceSource,
+    /api\.put\(\s*`\/platform\/organizations\/\$\{organizationId\}\/users\/\$\{userId\}\/permissions`,\s*permissions,?\s*\)/,
+  );
+  assert.match(
+    platformServiceSource,
+     /api\.post\(\s*`\/platform\/organizations\/\$\{organizationId\}\/ownership-transfer`/,
   );
   assert.doesNotMatch(
     allSuperAdminSources,
     /cw\.token|jwtDecode|Authorization|Bearer|nookies|support_mode|support-sessions/,
   );
-  assert.doesNotMatch(platformServiceSource, /api\.put\(/);
   assert.doesNotMatch(platformServiceSource, /updateOrganization\s*\(/);
 });
 
-await runTest("separa a transferência de ownership com confirmação reforçada", () => {
+await runTest("reutiliza o editor compartilhado para permissões no tenant selecionado", () => {
+  assert.match(usersPanelSource, /AdminPermissionsEditor/);
+  assert.match(usersPanelSource, /getUserPermissions/);
+  assert.match(usersPanelSource, /updateUserPermissions/);
+  assert.match(usersPanelSource, /Editar permissões/);
+  assert.match(usersPanelSource, /permissionActionRef/);
+});
+
+ await runTest("separa a transferência de ownership com confirmação reforçada", () => {
   assert.match(usersPanelSource, /Transferir ownership/);
   assert.match(usersPanelSource, /OwnershipTransferDialog/);
   assert.match(usersHookSource, /usePlatformOwnershipTransferMutation/);
@@ -227,8 +242,8 @@ await runTest("separa a transferência de ownership com confirmação reforçada
   assert.match(ownershipTransferDialogSource, /Consequência para o owner anterior/);
   assert.match(ownershipTransferDialogSource, /Justificativa/);
   assert.match(ownershipTransferDialogSource, /Confirmar transferência/);
-  assert.match(ownershipTransferDialogSource, /maxLength=\{500\}/);
-});
+   assert.match(ownershipTransferDialogSource, /maxLength=\{500\}/);
+ });
 
 await runTest("usa React Query, detalhe condicionado e mutations sem retry automático", () => {
   assert.match(organizationsHookSource, /useQuery\(/);
