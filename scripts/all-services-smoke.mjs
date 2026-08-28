@@ -2750,7 +2750,7 @@ const handlers = {
             source: body.source,
             fields: body.fields,
             body,
-      }),
+          }),
     });
   },
 
