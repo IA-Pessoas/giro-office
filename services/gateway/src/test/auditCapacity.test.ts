@@ -68,6 +68,7 @@ describe("buildAuditCapacityGuard", () => {
 
   it.each([
     ["POST", "/platform/organizations"],
+    ["POST", "/platform/organizations/org-1/users"],
     ["PATCH", "/platform/organizations/org-1/status"],
     ["PATCH", "/platform/organizations/org-1/subscription-plan"],
     ["PATCH", "/platform/organizations/org-1/logo-url"],

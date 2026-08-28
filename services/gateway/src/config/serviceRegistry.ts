@@ -89,6 +89,10 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
         { methods: ["POST"], path: /^\/platform\/session\/refresh\/?$/ },
         { methods: ["GET"], path: /^\/platform\/me\/?$/ },
         {
+          methods: ["POST"],
+          path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+        },
+        {
           methods: ["GET"],
           path: /^\/platform\/organizations\/[^/]+\/(?:users\/[^/]+|departments)\/?$/,
         },

@@ -7,6 +7,7 @@ import {
   platformOrganizationUserParamsSchema,
   platformOrganizationUsersParamsSchema,
 } from "../schemas/platformUsers.schemas.js";
+import { createUserBodySchema } from "../schemas/user.schemas.js";
 import {
   requirePlatformCsrf,
   requirePlatformGatewayAuth,
@@ -17,6 +18,31 @@ import { PlatformUsersService } from "../services/platformUsersService.js";
 export function createPlatformUsersRoutes(): ReturnType<typeof Router> {
   const router = Router();
   const platformUsersService = new PlatformUsersService();
+
+  router.post(
+    "/organizations/:organizationId/users",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId } = parseWithZod(
+          platformOrganizationUsersParamsSchema,
+          request.params,
+        );
+        const input = parseWithZod(createUserBodySchema, request.body);
+        const user = await platformUsersService.create(
+          organizationId,
+          input,
+          request.platform_identity?.id ?? "",
+        );
+        response.status(201).json(createSuccessResponse(user));
+      } catch (err) {
+        logError("Erro ao criar usuario da organizacao pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
 
   router.get(
     "/organizations/:organizationId/users/:userId",
