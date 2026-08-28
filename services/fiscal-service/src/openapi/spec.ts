@@ -115,6 +115,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       { name: "ICMS", description: "CRUD de ICMS" },
       { name: "IPI", description: "CRUD de IPI" },
       { name: "NCM", description: "CRUD de NCM" },
+      { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     components: {
       securitySchemes: {
@@ -122,6 +123,11 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
+        },
+        internalServiceToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
         },
       },
       schemas: {
@@ -146,6 +152,94 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                 },
               },
             },
+          },
+        },
+      },
+      "/internal/reporting/catalog": {
+        get: {
+          tags: ["InternalReporting"],
+          summary: "Consultar catálogo interno de NCM fiscal",
+          security: [{ internalServiceToken: [] }],
+          parameters: [
+            {
+              name: "x-internal-service-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Catálogo governado",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "403": { description: "Grant ou token interno inválido" },
+          },
+        },
+      },
+      "/internal/reporting/extract": {
+        post: {
+          tags: ["InternalReporting"],
+          summary: "Extrair campos governados de NCM fiscal",
+          security: [{ internalServiceToken: [] }],
+          parameters: [
+            {
+              name: "x-internal-service-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["source", "fields", "limit"],
+                  additionalProperties: false,
+                  properties: {
+                    source: { type: "string", enum: ["fiscal.ncm"] },
+                    fields: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 25,
+                      uniqueItems: true,
+                      items: { type: "string" },
+                    },
+                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Linhas limitadas",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Grant, token ou campo inválido" },
           },
         },
       },

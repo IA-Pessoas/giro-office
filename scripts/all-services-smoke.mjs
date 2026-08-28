@@ -120,6 +120,9 @@ const env = {
   certificateReportingSmokeEnabled:
     process.env.CERTIFICATE_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.CERTIFICATE_REPORTING_SMOKE_ENABLED === "1",
+  fiscalReportingSmokeEnabled:
+    process.env.FISCAL_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.FISCAL_REPORTING_SMOKE_ENABLED === "1",
   projectReportingSmokeEnabled:
     process.env.PROJECT_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.PROJECT_REPORTING_SMOKE_ENABLED === "1",
@@ -953,6 +956,31 @@ function createCertificateReportingGrant({ operation, source, fields, body }) {
     "x-request-id": requestId,
     "x-reports-grant": grant,
     "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createFiscalReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for fiscal reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "fiscal-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: FIXTURE_ORGANIZATION_ID,
+    request_id: requestId,
+    source,
+  };
+  const canonical = canonicalJson(payload);
+  const signature = crypto.createHmac("sha256", secret).update(canonical).digest("hex");
+  return {
+    "x-reports-grant": Buffer.from(canonical).toString("base64url"),
+    "x-reports-grant-signature": signature,
   };
 }
 
@@ -2718,6 +2746,36 @@ const handlers = {
       headers: isBadExpectation(op)
         ? {}
         : createCertificateReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+      }),
+    });
+  },
+
+  async fiscalReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createFiscalReportingGrant({
+            operation: "catalog",
+            source: "fiscal.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async fiscalReportingExtract(op) {
+    const body = { source: "fiscal.ncm", fields: ["ncm_code"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createFiscalReportingGrant({
             operation: "extract",
             source: body.source,
             fields: body.fields,
@@ -5448,6 +5506,10 @@ function disabledConditionReason(condition) {
 
   if (condition === "certificateReportingSmokeEnabled" && !env.certificateReportingSmokeEnabled) {
     return "CERTIFICATE_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "fiscalReportingSmokeEnabled" && !env.fiscalReportingSmokeEnabled) {
+    return "FISCAL_REPORTING_SMOKE_ENABLED is false";
   }
 
   if (condition === "projectReportingSmokeEnabled" && !env.projectReportingSmokeEnabled) {
