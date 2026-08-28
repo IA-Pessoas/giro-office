@@ -29,6 +29,9 @@ const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
 const PLATFORM_ORGANIZATIONS_PATH = "/platform/organizations";
+const PLATFORM_ORGANIZATION_SETTINGS_PATH =
+  /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i;
+const PLATFORM_ORGANIZATION_USER_PATH = /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i;
 const PLATFORM_ORGANIZATION_STATUSES = new Set([
   "trial",
   "past_due",
@@ -83,7 +86,8 @@ function requiresOrganizationMutationAudit(request: Request): boolean {
   return (
     (method === "POST" && path.toLowerCase() === "/platform/organizations") ||
     (method === "PATCH" &&
-      /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i.test(path)) ||
+      (PLATFORM_ORGANIZATION_SETTINGS_PATH.test(path) ||
+        PLATFORM_ORGANIZATION_USER_PATH.test(path))) ||
     (method === "DELETE" && /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i.test(path)) ||
     (method === "POST" &&
       /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path))
@@ -150,8 +154,8 @@ export function buildAuditCapacityGuard({
             action: "organization.mutation.attempt",
             referring: "organization",
             metadata: {
-              auth_kind: "platform",
-              platform_user_id: request.auth?.userId,
+              actorKind: "platform",
+              actorPlatformUserId: request.auth?.userId,
               business_outcome: "unknown",
               source_request_id_sha256: createHash("sha256")
                 .update(request.requestId)
@@ -379,8 +383,8 @@ export function buildAuditLifecycleMiddleware({
           activityVisible: activity !== null,
           ...(isPlatform
             ? {
-                auth_kind: "platform",
-                platform_user_id: request.auth?.userId,
+                actorKind: "platform",
+                actorPlatformUserId: request.auth?.userId,
               }
             : {}),
         },

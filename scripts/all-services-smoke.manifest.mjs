@@ -484,6 +484,14 @@ const baseManifest = [
   }),
   op({
     service: "user-service",
+    method: "PATCH",
+    path: "/platform/organizations/{organizationId}/users/{userId}",
+    action: "platformUserUpdate",
+    target: "gateway",
+    auth: "session",
+  }),
+  op({
+    service: "user-service",
     method: "DELETE",
     path: "/platform/organizations/{organizationId}/users/{userId}",
     action: "platformUserDeactivate",

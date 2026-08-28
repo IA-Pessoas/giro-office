@@ -7,7 +7,12 @@ import {
 } from "@tanstack/react-query";
 
 import { platformService } from "../services/platformService";
-import type { PlatformDepartmentOption, PlatformOrganizationUser, PlatformUsersListResponse } from "../types";
+import type {
+  PlatformDepartmentOption,
+  PlatformOrganizationUser,
+  PlatformUsersListResponse,
+  UpdatePlatformOrganizationUserPayload,
+} from "../types";
 
 export interface UsePlatformUsersParams {
   skip: number;
@@ -55,6 +60,34 @@ export type PlatformUserLifecycleMutationVariables = {
   userId: string;
   action: "deactivate" | "reactivate";
 };
+
+export type PlatformUserUpdateMutationVariables = {
+  organizationId: string;
+  userId: string;
+  data: UpdatePlatformOrganizationUserPayload;
+};
+
+export function usePlatformUserUpdateMutation(): UseMutationResult<
+  PlatformOrganizationUser,
+  unknown,
+  PlatformUserUpdateMutationVariables
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ organizationId, userId, data }) =>
+      platformService.updateUser(organizationId, userId, data),
+    retry: false,
+    onSuccess: (user, { organizationId }) => {
+      queryClient.setQueryData<PlatformOrganizationUser>(
+        ["platform", "organizations", organizationId, "users", user.id],
+        user,
+      );
+      void queryClient.invalidateQueries({
+        queryKey: ["platform", "organizations", organizationId, "users"],
+      });
+    },
+  });
+}
 
 export function usePlatformUserLifecycleMutation(): UseMutationResult<
   PlatformOrganizationUser,

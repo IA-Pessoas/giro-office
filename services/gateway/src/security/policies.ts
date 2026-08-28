@@ -199,6 +199,11 @@ const routePolicyMatchers: Array<{
     policy: platformOnlyPolicy,
   },
   {
+    method: "PATCH",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
     method: "POST",
     path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/,
     policy: platformOnlyPolicy,

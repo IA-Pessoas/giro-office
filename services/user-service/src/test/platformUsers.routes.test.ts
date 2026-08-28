@@ -21,6 +21,7 @@ const { platformAuthMock, platformUsersMock } = vi.hoisted(() => ({
     listDepartments: vi.fn(),
     deactivate: vi.fn(),
     reactivate: vi.fn(),
+    update: vi.fn(),
   },
 }));
 
@@ -176,6 +177,54 @@ describe("platform users routes", () => {
 
     expect(response.status).toBe(200);
     expect(platformUsersMock.deactivate).toHaveBeenCalledWith("org-2", "user-1");
+  });
+
+  it("edita apenas o usuário do tenant do path com versão esperada", async () => {
+    platformUsersMock.update.mockResolvedValue({
+      id: "user-1",
+      name: "Ana atualizada",
+      version: 2,
+    });
+
+    const response = await request(createApp())
+      .patch("/platform/organizations/org-2/users/user-1")
+      .set(platformGatewayHeaders())
+      .send({ name: "Ana atualizada", expected_version: 1 });
+
+    expect(response.status).toBe(200);
+    expect(platformUsersMock.update).toHaveBeenCalledWith("org-2", "user-1", {
+      name: "Ana atualizada",
+      expected_version: 1,
+    });
+  });
+
+  it("rejeita payload de edição inválido e CSRF ausente antes da mutação", async () => {
+    const invalidPayload = await request(createApp())
+      .patch("/platform/organizations/org-2/users/user-1")
+      .set(platformGatewayHeaders())
+      .send({ name: "Ana" });
+    expect(invalidPayload.status).toBe(400);
+
+    const headers = platformGatewayHeaders();
+    delete headers[CSRF_HEADER_NAME];
+    const missingCsrf = await request(createApp())
+      .patch("/platform/organizations/org-2/users/user-1")
+      .set(headers)
+      .send({ name: "Ana", expected_version: 1 });
+    expect(missingCsrf.status).toBe(403);
+    expect(platformUsersMock.update).not.toHaveBeenCalled();
+  });
+
+  it("preserva o conflito de concorrência sem chamar outro tenant", async () => {
+    platformUsersMock.update.mockRejectedValue(
+      new ServiceError(409, "Usuario foi alterado por outra edicao. Recarregue e tente novamente."),
+    );
+    const response = await request(createApp())
+      .patch("/platform/organizations/org-2/users/user-1")
+      .set(platformGatewayHeaders())
+      .send({ name: "Ana", expected_version: 1 });
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain("Recarregue");
   });
 
   it("reactivates only future sessions after platform session and CSRF validation", async () => {

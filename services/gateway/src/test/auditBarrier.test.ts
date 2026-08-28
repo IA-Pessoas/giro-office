@@ -12,6 +12,7 @@ const paths = [
   ["PATCH", "/platform/organizations/org-1/status", "org-1", null],
   ["PATCH", "/platform/organizations/org-1/subscription-plan", "org-1", null],
   ["PATCH", "/platform/organizations/org-1/logo-url", "org-1", null],
+  ["PATCH", "/platform/organizations/org-1/users/user-1", "org-1", "user-1"],
   ["DELETE", "/platform/organizations/org-1/users/user-1", "org-1", "user-1"],
   ["POST", "/platform/organizations/org-1/users/user-1/reactivate", "org-1", "user-1"],
 ];
@@ -124,6 +125,8 @@ describe("durable organization mutation audit barrier", () => {
       outcome: "success",
       query: {},
       metadata: {
+        actorKind: "platform",
+        actorPlatformUserId: "platform-user-1",
         business_outcome: "unknown",
         source_request_id_sha256: createHash("sha256").update("original-request-id").digest("hex"),
       },
