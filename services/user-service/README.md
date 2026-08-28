@@ -28,6 +28,7 @@ O endpoint `/internal/reporting/access-context` é chamado diretamente pelo repo
 - `POST /platform/session/refresh`, `DELETE /platform/session` e `GET /platform/me` usam a sessão de plataforma. Nenhum endpoint retorna o JWT ou a prova CSRF no JSON.
 - `POST /platform/session/validate` é interno: exige `USER_SERVICE_INTERNAL_TOKEN` e não deve ser chamado pelo navegador.
 - `GET /platform/organizations/:organizationId/users`, `GET /platform/organizations/:organizationId/users/:userId` e `GET /platform/organizations/:organizationId/departments` são consultas de plataforma somente leitura. Exigem a sessão HTTP-only encaminhada pelo gateway; usuário e departamentos são sempre filtrados pela organização do path, e departamentos retornam somente `id` e `name`.
+- `DELETE /platform/organizations/:organizationId/users/:userId` desativa logicamente o usuário, preserva o histórico e revoga todas as sessões. `POST /platform/organizations/:organizationId/users/:userId/reactivate` permite somente sessões futuras. Ambos exigem sessão HTTP-only, `x-csrf-token` encaminhado pelo gateway e recusam a remoção do último owner ativo com `409` orientando a transferência de ownership.
 
 ## Gateway
 

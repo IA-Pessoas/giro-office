@@ -193,17 +193,29 @@ await runTest("consome contratos explícitos de gestão pela sessão HTTP-only",
     platformServiceSource,
     /api\.patch\(`\/platform\/organizations\/\$\{organizationId\}\/logo-url`,\s*data\)/,
   );
+  assert.match(
+    platformServiceSource,
+    /api\.delete\(`\/platform\/organizations\/\$\{organizationId\}\/users\/\$\{userId\}`\)/,
+  );
+  assert.match(
+    platformServiceSource,
+    /api\.post\(\s*`\/platform\/organizations\/\$\{organizationId\}\/users\/\$\{userId\}\/reactivate`/,
+  );
   assert.doesNotMatch(
     allSuperAdminSources,
     /cw\.token|jwtDecode|Authorization|Bearer|nookies|support_mode|support-sessions/,
   );
-  assert.doesNotMatch(platformServiceSource, /api\.(put|delete)\(/);
+  assert.doesNotMatch(platformServiceSource, /api\.put\(/);
   assert.doesNotMatch(platformServiceSource, /updateOrganization\s*\(/);
 });
 
 await runTest("usa React Query, detalhe condicionado e mutations sem retry automático", () => {
   assert.match(organizationsHookSource, /useQuery\(/);
   assert.match(usersHookSource, /useQuery\(/);
+  assert.match(
+    usersHookSource,
+    /setQueriesData<PlatformUsersListResponse>\(\s*\{\s*predicate: \(query\) =>[\s\S]*typeof query\.queryKey\[4\] === "object"/,
+  );
   assert.match(usersHookSource, /enabled: Boolean\(organizationId\)/);
   assert.doesNotMatch(usersHookSource, /placeholderData/);
   assert.match(
@@ -262,6 +274,14 @@ await runTest("expõe estados reais de carregamento, erro, vazio e sucesso", () 
   assert.match(panels, /Nenhum registro de auditoria encontrado/);
   assert.match(usersPanelSource, /users\.map/);
   assert.match(auditPanelSource, /items\.map/);
+});
+
+await runTest("confirma o ciclo de status com organização e usuário sem simular exclusão", () => {
+  assert.match(usersPanelSource, /Desativar usuário/);
+  assert.match(usersPanelSource, /Reativar usuário/);
+  assert.match(usersPanelSource, /organization\.name/);
+  assert.match(usersPanelSource, /ConfirmationDialog/);
+  assert.match(usersHookSource, /usePlatformUserLifecycleMutation/);
 });
 
 await runTest("mantém pesquisa e paginação acessíveis e responsivas", () => {
@@ -414,6 +434,7 @@ await runTest("devolve foco pelo lifecycle Radix opcional sem corrida de animati
     dialogSource,
     /onCloseAutoFocus\?: ComponentProps<typeof DialogPrimitive\.Content>\["onCloseAutoFocus"\]/,
   );
+  assert.match(usersPanelSource, /lifecycleActionRef\.current\?\.focus\(\);/);
   assert.match(dialogSource, /onCloseAutoFocus=\{onCloseAutoFocus\}/);
   assert.match(createOrganizationDialogSource, /onCloseAutoFocus=\{/);
   assert.match(organizationOverviewSource, /onCloseAutoFocus=\{/);

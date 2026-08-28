@@ -41,6 +41,24 @@ export const platformService = {
     return unwrapData<PlatformUsersListResponse["users"][number]>(response);
   },
 
+  async deactivateUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<PlatformUsersListResponse["users"][number]> {
+    const response = await api.delete(`/platform/organizations/${organizationId}/users/${userId}`);
+    return unwrapData<PlatformUsersListResponse["users"][number]>(response);
+  },
+
+  async reactivateUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<PlatformUsersListResponse["users"][number]> {
+    const response = await api.post(
+      `/platform/organizations/${organizationId}/users/${userId}/reactivate`,
+    );
+    return unwrapData<PlatformUsersListResponse["users"][number]>(response);
+  },
+
   async listDepartments(organizationId: string): Promise<PlatformDepartmentOption[]> {
     const response = await api.get(`/platform/organizations/${organizationId}/departments`);
     return unwrapData<PlatformDepartmentOption[]>(response);

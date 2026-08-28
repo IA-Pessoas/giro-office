@@ -42,6 +42,15 @@ const secondOrganization = {
   subscription_plan: "pro",
 };
 const organizations = [organization, secondOrganization];
+const platformUser = {
+  id: "user-safe-1",
+  name: "Pessoa de teste",
+  login: "pessoa@example.test",
+  status: "active",
+  department_id: "department-safe-1",
+  photo_url: null,
+  type: "admin",
+};
 const requests = [];
 let forceConflict = false;
 let revision = 1;
@@ -50,6 +59,8 @@ let delayedDetail;
 let failedDetailId = null;
 let delayedMutationPath = null;
 let delayedMutation;
+let delayedUserLifecyclePath = null;
+let delayedUserLifecycle;
 
 function reply(response, status, data) {
   response.writeHead(status, { "content-type": "application/json" });
@@ -127,8 +138,29 @@ const upstream = createServer(async (request, response) => {
       pageSize: 25,
     });
   }
+  const userMatch = url.pathname.match(
+    /^\/platform\/organizations\/([^/]+)\/users\/([^/]+)(?:\/(reactivate))?$/,
+  );
+  const selectedUser = userMatch && organizations.find((item) => item.id === userMatch[1]);
+  if (selectedUser && userMatch[2] === platformUser.id) {
+    if (request.method === "GET" && !userMatch[3]) return reply(response, 200, platformUser);
+    if (request.method === "DELETE" && !userMatch[3]) {
+      assert.equal(request.headers["x-csrf-token"], csrf);
+      assert.equal(request.headers.authorization, undefined);
+      if (url.pathname === delayedUserLifecyclePath) await delayedUserLifecycle;
+      platformUser.status = "inactive";
+      return reply(response, 200, platformUser);
+    }
+    if (request.method === "POST" && userMatch[3] === "reactivate") {
+      assert.equal(request.headers["x-csrf-token"], csrf);
+      assert.equal(request.headers.authorization, undefined);
+      if (url.pathname === delayedUserLifecyclePath) await delayedUserLifecycle;
+      platformUser.status = "active";
+      return reply(response, 200, platformUser);
+    }
+  }
   const match = url.pathname.match(
-    /^\/platform\/organizations\/([^/]+)(?:\/(users|status|subscription-plan|logo-url))?$/,
+    /^\/platform\/organizations\/([^/]+)(?:\/(users|departments|status|subscription-plan|logo-url))?$/,
   );
   const selected = match && organizations.find((item) => item.id === match[1]);
   if (selected && request.method === "GET") {
@@ -137,20 +169,13 @@ const upstream = createServer(async (request, response) => {
       return reply(response, 403, "Detalhe indisponível no teste.");
     if (match[2] === "users") {
       return reply(response, 200, {
-        users: [
-          {
-            id: "user-safe-1",
-            name: "Pessoa de teste",
-            login: "pessoa@example.test",
-            status: "active",
-            department_id: "department-safe-1",
-            photo_url: null,
-            type: "admin",
-          },
-        ],
+        users: [platformUser],
         total: 1,
         hasMore: false,
       });
+    }
+    if (match[2] === "departments") {
+      return reply(response, 200, [{ id: "department-safe-1", name: "Operações" }]);
     }
     return reply(response, 200, selected);
   }
@@ -284,6 +309,7 @@ try {
   ]) {
     await page.setViewportSize(viewport);
     organizations.splice(0, organizations.length, organization, secondOrganization);
+    platformUser.status = "active";
     requests.length = 0;
     await page.goto("/super-admin", { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
@@ -369,10 +395,98 @@ try {
     }
     assert.equal(await page.getByRole("link", { name: "Super Admin", exact: true }).count(), 1);
     await page.getByRole("button", { name: "Usuários", exact: true }).click();
-    await page.getByText("Pessoa de teste", { exact: true }).waitFor();
+    await page
+      .getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ })
+      .waitFor();
     assert.ok(
       requests.some(
         (request) => request.path === `/platform/organizations/${organization.id}/users`,
+      ),
+    );
+    const deactivateTrigger = page.getByRole("button", {
+      name: "Desativar usuário",
+      exact: true,
+    });
+    await deactivateTrigger.waitFor();
+    await deactivateTrigger.click();
+    const deactivateDialog = page.getByRole("dialog", {
+      name: "Desativar usuário",
+      exact: true,
+    });
+    await deactivateDialog.waitFor();
+    await deactivateDialog.getByText(organization.name).first().waitFor();
+    await deactivateDialog.getByText(platformUser.name).first().waitFor();
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await settleLayout();
+      await page.screenshot({
+        path: join(
+          screenshotDirectory,
+          viewport.width > 1000
+            ? "issue-903-user-deactivation-desktop.png"
+            : "issue-903-user-deactivation-mobile.png",
+        ),
+      });
+    }
+    await page.keyboard.press("Escape");
+    await deactivateDialog.waitFor({ state: "hidden" });
+    await page.waitForFunction(
+      () => document.activeElement?.textContent?.trim() === "Desativar usuário",
+      null,
+      { timeout: 3_000 },
+    );
+    await deactivateTrigger.click();
+    let releaseUserLifecycle;
+    try {
+      delayedUserLifecyclePath = `/platform/organizations/${organization.id}/users/${platformUser.id}`;
+      delayedUserLifecycle = new Promise((resolve) => {
+        releaseUserLifecycle = resolve;
+      });
+      await deactivateDialog.getByRole("button", { name: "Desativar usuário", exact: true }).click();
+      await deactivateDialog.getByRole("button", { name: "Confirmando...", exact: true }).waitFor();
+      assert.equal(
+        await deactivateDialog.getByRole("button", { name: "Cancelar", exact: true }).isDisabled(),
+        true,
+      );
+      await page.keyboard.press("Escape");
+      assert.equal(await deactivateDialog.isVisible(), true, "não fecha durante a mutação pendente");
+    } finally {
+      delayedUserLifecyclePath = null;
+      releaseUserLifecycle?.();
+    }
+    await deactivateDialog.waitFor({ state: "hidden" });
+    await page.getByText("Inativo", { exact: true }).waitFor();
+    await page.waitForFunction(
+      () => document.activeElement?.textContent?.trim() === "Reativar usuário",
+      null,
+      { timeout: 3_000 },
+    );
+    const reactivateTrigger = page.getByRole("button", {
+      name: "Reativar usuário",
+      exact: true,
+    });
+    await reactivateTrigger.click();
+    const reactivateDialog = page.getByRole("dialog", {
+      name: "Reativar usuário",
+      exact: true,
+    });
+    await reactivateDialog.getByText(organization.name).first().waitFor();
+    await reactivateDialog.getByRole("button", { name: "Reativar usuário", exact: true }).click();
+    await reactivateDialog.waitFor({ state: "hidden" });
+    await page.getByText("Ativo", { exact: true }).waitFor();
+    assert.ok(
+      requests.some(
+        (request) =>
+          request.method === "DELETE" &&
+          request.path === `/platform/organizations/${organization.id}/users/${platformUser.id}`,
+      ),
+    );
+    assert.ok(
+      requests.some(
+        (request) =>
+          request.method === "POST" &&
+          request.path ===
+            `/platform/organizations/${organization.id}/users/${platformUser.id}/reactivate`,
       ),
     );
     await page.getByRole("button", { name: "Auditoria", exact: true }).click();

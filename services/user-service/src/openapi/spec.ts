@@ -287,6 +287,70 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             "404": { description: "Usuário não pertence à organização do contexto" },
           },
         },
+        delete: {
+          tags: ["Platform auth"],
+          summary: "Desativar usuário sem exclusão física",
+          description:
+            "Desativa o usuário da organização do path, revoga suas sessões e preserva o histórico. O último owner ativo deve usar a transferência de ownership.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          responses: {
+            "200": { description: "Usuário desativado", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador ou CSRF inválido" },
+            "404": { description: "Usuário não pertence à organização do contexto" },
+            "409": {
+              description: "Último owner ativo, versão desatualizada ou conflito de estado",
+            },
+            "503": { description: "Auditoria durável indisponível antes da mutação" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/users/{userId}/reactivate": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Reativar usuário para sessões futuras",
+          description:
+            "Permite novos logins sem restaurar qualquer sessão revogada durante a desativação.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          responses: {
+            "200": { description: "Usuário reativado para sessões futuras", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador ou CSRF inválido" },
+            "404": { description: "Usuário não pertence à organização do contexto" },
+            "409": { description: "Versão desatualizada ou conflito de estado" },
+            "503": { description: "Auditoria durável indisponível antes da mutação" },
+          },
+        },
       },
       "/platform/organizations/{organizationId}/departments": {
         get: {

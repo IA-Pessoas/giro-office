@@ -2,7 +2,7 @@ import { ServiceError } from "@workspace/shared";
 import type { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
 import { PlatformUserManagementAdapter } from "./userManagementService.js";
-import { type CreateUserInput, UserManagementService } from "./userService.js";
+import { type CreateUserInput, UserManagementService, UserService } from "./userService.js";
 
 const MAX_PAGE_SIZE = 100;
 const PLATFORM_USER_LIST_SELECT = {
@@ -25,6 +25,8 @@ export interface ListPlatformUsersInput {
 type PlatformUserListRow = Prisma.UserGetPayload<{ select: typeof PLATFORM_USER_LIST_SELECT }>;
 
 export class PlatformUsersService {
+  private readonly userService = new UserService();
+
   async create(
     organizationId: string,
     input: CreateUserInput,
@@ -97,5 +99,30 @@ export class PlatformUsersService {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
+  }
+
+  async deactivate(organizationId: string, userId: string): Promise<PlatformUserListRow> {
+    const user = await this.getById(organizationId, userId);
+    await this.userService.delete(userId, organizationId);
+    return { ...user, status: "inactive" };
+  }
+
+  async reactivate(organizationId: string, userId: string): Promise<PlatformUserListRow> {
+    const user = await this.userService.update(
+      userId,
+      { status: "active" },
+      organizationId,
+      undefined,
+      "REACTIVATE",
+    );
+    return {
+      id: user.id,
+      name: user.name,
+      login: user.login,
+      status: user.status,
+      department_id: user.department_id,
+      photo_url: user.photo_url,
+      type: user.type,
+    };
   }
 }

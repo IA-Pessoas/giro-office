@@ -71,6 +71,8 @@ describe("platform default deny", () => {
       ["GET", "/platform/organizations/org-1/users"],
       ["POST", "/platform/organizations/org-1/users"],
       ["GET", "/platform/organizations/org-1/users/user-1"],
+      ["DELETE", "/platform/organizations/org-1/users/user-1"],
+      ["POST", "/platform/organizations/org-1/users/user-1/reactivate"],
       ["GET", "/platform/organizations/org-1/departments"],
       ["GET", "/platform/audit/requests"],
     ]) {
@@ -84,7 +86,7 @@ describe("platform default deny", () => {
       ["PATCH", "/platform/organizations/org-1"],
       ["GET", "/platform/organizations/org-1/status"],
       ["PATCH", "/platform/organizations/org-1/status/extra"],
-      ["POST", "/platform/organizations/org-1/users/user-1"],
+      ["PATCH", "/platform/organizations/org-1/users/user-1"],
       ["POST", "/platform/organizations/org-1/departments"],
     ]) {
       expect(getRoutePolicy(method, path), `${method} ${path}`).toBeNull();

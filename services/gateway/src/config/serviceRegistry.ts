@@ -94,7 +94,19 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
         },
         {
           methods: ["GET"],
-          path: /^\/platform\/organizations\/[^/]+\/(?:users(?:\/[^/]+)?|departments)\/?$/,
+          path: /^\/platform\/organizations\/[^/]+\/(?:users\/[^/]+|departments)\/?$/,
+        },
+        {
+          methods: ["GET"],
+          path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+        },
+        {
+          methods: ["DELETE"],
+          path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/?$/,
+        },
+        {
+          methods: ["POST"],
+          path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/,
         },
       ],
     },

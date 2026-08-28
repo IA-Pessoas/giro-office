@@ -48,15 +48,17 @@ describe("user-service gateway registry", () => {
   });
 
   it.each([
-    "/platform/organizations/org-1/users/user-1",
-    "/platform/organizations/org-1/departments",
-  ])("encaminha %s exclusivamente ao user-service com sessão de plataforma", (path) => {
+    ["GET", "/platform/organizations/org-1/users/user-1"],
+    ["GET", "/platform/organizations/org-1/departments"],
+    ["DELETE", "/platform/organizations/org-1/users/user-1"],
+    ["POST", "/platform/organizations/org-1/users/user-1/reactivate"],
+  ])("encaminha %s %s exclusivamente ao user-service com sessão de plataforma", (method, path) => {
     const env = {
       userServiceUrl: "http://user-service:3030",
       userServiceInternalToken: "gateway-user-token",
     } as GatewayEnv;
 
-    expect(resolveGatewayService(env, path, "GET")).toMatchObject({
+    expect(resolveGatewayService(env, path, method)).toMatchObject({
       key: "user-service",
       targetUrl: "http://user-service:3030",
       internalServiceToken: "gateway-user-token",
@@ -78,6 +80,17 @@ describe("user-service gateway registry", () => {
         forwardPlatformSessionCredentials: true,
       },
     );
+  });
+
+  it("não libera DELETE de departamento pela allowlist de lifecycle de usuário", () => {
+    const env = {
+      userServiceUrl: "http://user-service:3030",
+      userServiceInternalToken: "gateway-user-token",
+    } as GatewayEnv;
+
+    expect(
+      resolveGatewayService(env, "/platform/organizations/org-1/departments", "DELETE"),
+    ).toBeNull();
   });
 });
 

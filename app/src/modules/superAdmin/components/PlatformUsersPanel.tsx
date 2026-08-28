@@ -1,14 +1,20 @@
 import { Search, UserRound } from "lucide-react";
-import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 
+import { ConfirmationDialog } from "@shared/components";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { Input } from "@shared/ui/newLayout/input";
 import { CreateUserModal } from "@modules/users/components/CreateUserModal";
 import type { UserItem } from "@modules/users/types";
 
-import { usePlatformDepartments, usePlatformUserDetail, usePlatformUsers } from "../hooks/usePlatformUsers";
+import {
+  usePlatformDepartments,
+  usePlatformUserDetail,
+  usePlatformUserLifecycleMutation,
+  usePlatformUsers,
+} from "../hooks/usePlatformUsers";
 import { platformService } from "../services/platformService";
 import type { PlatformOrganization, PlatformOrganizationUser } from "../types";
 
@@ -26,6 +32,8 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"deactivate" | "reactivate" | null>(null);
+  const lifecycleActionRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const usersQuery = usePlatformUsers(organization.id, {
@@ -38,6 +46,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const userDetailQuery = usePlatformUserDetail(organization.id, selectedUserId);
   const departmentsQuery = usePlatformDepartments(organization.id);
+  const userLifecycleMutation = usePlatformUserLifecycleMutation();
   const departmentName = departmentsQuery.data?.find(
     (department) => department.id === userDetailQuery.data?.department_id,
   )?.name;
@@ -55,6 +64,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   useEffect(() => {
     setSelectedUserId(null);
   }, [organization.id]);
+  const selectedUser = userDetailQuery.data;
 
   useEffect(() => {
     if (!selectedUserId && users[0]) setSelectedUserId(users[0].id);
@@ -146,7 +156,11 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                   <td className="px-4 py-3">{getProfileLabel(user)}</td>
                   <td className="px-4 py-3">
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold dark:bg-slate-800">
-                      {user.status === "active" ? "Ativo" : user.status || "Sem status"}
+                      {user.status === "active"
+                        ? "Ativo"
+                        : user.status === "inactive"
+                          ? "Inativo"
+                          : user.status || "Sem status"}
                     </span>
                   </td>
                 </tr>
@@ -164,10 +178,18 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                 <p>Não foi possível carregar os detalhes do usuário.</p>
                 <button className="mt-3 font-semibold underline" onClick={() => void userDetailQuery.refetch()} type="button">Tentar novamente</button>
               </div>
-            ) : userDetailQuery.data ? (
+            ) : selectedUser ? (
               <div className="space-y-4">
-                <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Usuário selecionado</p><h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{userDetailQuery.data.name}</h3></div>
-                <dl className="space-y-3 text-sm"><div><dt className="text-slate-500">Login</dt><dd className="font-medium">{userDetailQuery.data.login}</dd></div><div><dt className="text-slate-500">Departamento</dt><dd className="font-medium">{departmentsQuery.isLoading ? "Carregando..." : departmentsQuery.isError ? <span className="text-rose-700 dark:text-rose-300" role="alert">Não foi possível carregar departamentos. <button className="font-semibold underline" onClick={() => void departmentsQuery.refetch()} type="button">Tentar novamente</button></span> : departmentName ?? "Sem departamento"}</dd></div><div><dt className="text-slate-500">Perfil</dt><dd className="font-medium">{getProfileLabel(userDetailQuery.data)}</dd></div></dl>
+                <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Usuário selecionado</p><h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{selectedUser.name}</h3></div>
+                <dl className="space-y-3 text-sm"><div><dt className="text-slate-500">Login</dt><dd className="font-medium">{selectedUser.login}</dd></div><div><dt className="text-slate-500">Departamento</dt><dd className="font-medium">{departmentsQuery.isLoading ? "Carregando..." : departmentsQuery.isError ? <span className="text-rose-700 dark:text-rose-300" role="alert">Não foi possível carregar departamentos. <button className="font-semibold underline" onClick={() => void departmentsQuery.refetch()} type="button">Tentar novamente</button></span> : departmentName ?? "Sem departamento"}</dd></div><div><dt className="text-slate-500">Perfil</dt><dd className="font-medium">{getProfileLabel(selectedUser)}</dd></div></dl>
+                <button
+                  ref={lifecycleActionRef}
+                  className={selectedUser.status === "active" ? "rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600" : "rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"}
+                  onClick={() => setPendingAction(selectedUser.status === "active" ? "deactivate" : "reactivate")}
+                  type="button"
+                >
+                  {selectedUser.status === "active" ? "Desativar usuário" : "Reativar usuário"}
+                </button>
               </div>
             ) : null}
           </aside>
@@ -200,6 +222,36 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
         onRetryDepartments={() => void departmentsQuery.refetch()}
         onUserCreated={(user: UserItem) => { setSelectedUserId(user.id); setIsCreateOpen(false); }}
         organizationId={organization.id}
+      />
+
+      <ConfirmationDialog
+        cancelLabel="Cancelar"
+        confirmLabel={pendingAction === "deactivate" ? "Desativar usuário" : "Reativar usuário"}
+        description={
+          pendingAction === "deactivate"
+            ? `Você vai desativar ${selectedUser?.name ?? "este usuário"} na organização ${organization.name}. As sessões atuais serão revogadas.`
+            : `Você vai reativar ${selectedUser?.name ?? "este usuário"} na organização ${organization.name}. Somente novos logins serão permitidos.`
+        }
+        errorMessage={null}
+        isConfirming={userLifecycleMutation.isPending}
+        onConfirm={async () => {
+          if (!pendingAction || !selectedUser) return;
+          await userLifecycleMutation.mutateAsync({
+            organizationId: organization.id,
+            userId: selectedUser.id,
+            action: pendingAction,
+          });
+        }}
+        onOpenChange={(open) => {
+          if (!open) setPendingAction(null);
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          lifecycleActionRef.current?.focus();
+        }}
+        open={pendingAction !== null}
+        title={pendingAction === "deactivate" ? "Desativar usuário" : "Reativar usuário"}
+        variant={pendingAction === "deactivate" ? "destructive" : "neutral"}
       />
     </section>
   );

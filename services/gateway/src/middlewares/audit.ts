@@ -57,6 +57,22 @@ const PLATFORM_ORGANIZATION_USERS_QUERY_VALIDATORS = {
   take: (value: string) => isIntegerInRange(value, 1, 100),
 };
 
+function getPlatformOrganizationAuditTarget(path: string): {
+  organizationId: string;
+  userId: string | null;
+} | null {
+  const normalizedPath = path.replace(/\/+$/u, "");
+  const organizationMatch = normalizedPath.match(/^\/platform\/organizations\/([^/]+)(?:\/|$)/iu);
+  if (!organizationMatch) {
+    return null;
+  }
+  const userMatch = normalizedPath.match(
+    /^\/platform\/organizations\/[^/]+\/users\/([^/]+)(?:\/reactivate)?$/iu,
+  );
+
+  return { organizationId: organizationMatch[1], userId: userMatch?.[1] ?? null };
+}
+
 function requiresOrganizationMutationAudit(request: Request): boolean {
   const path = normalizeGatewayPath(request.originalUrl ?? "");
   if (!path) {
@@ -68,7 +84,10 @@ function requiresOrganizationMutationAudit(request: Request): boolean {
     (method === "POST" && path.toLowerCase() === "/platform/organizations") ||
     (method === "POST" && /^\/platform\/organizations\/[^/]+\/users$/i.test(path)) ||
     (method === "PATCH" &&
-      /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i.test(path))
+      /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i.test(path)) ||
+    (method === "DELETE" && /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i.test(path)) ||
+    (method === "POST" &&
+      /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path))
   );
 }
 
@@ -107,6 +126,8 @@ export function buildAuditCapacityGuard({
     }
 
     if (requiresAudit) {
+      const publicPath = getPublicPath(request.originalUrl, request.path);
+      const auditTarget = getPlatformOrganizationAuditTarget(publicPath);
       const controller = new AbortController();
       const abort = () => controller.abort();
       response.once("close", abort);
@@ -115,13 +136,10 @@ export function buildAuditCapacityGuard({
         await recordAuditRequest.recordRequired(
           {
             requestId: randomUUID(),
-            organizationId:
-              /^\/platform\/organizations\/([^/]+)/i.exec(
-                getPublicPath(request.originalUrl, request.path),
-              )?.[1] ?? null,
-            userId: null,
+            organizationId: auditTarget?.organizationId ?? null,
+            userId: auditTarget?.userId ?? null,
             method: request.method,
-            path: getPublicPath(request.originalUrl, request.path),
+            path: publicPath,
             query: {},
             statusCode: null,
             // Success means the attempt was recorded, not that the business mutation succeeded.
@@ -355,11 +373,16 @@ export function buildAuditLifecycleMiddleware({
       }
 
       const isPlatform = request.auth?.actorKind === "platform";
+      const auditTarget = isPlatform ? getPlatformOrganizationAuditTarget(publicPath) : null;
 
       const payload: CreateAuditRequestPayload = {
         requestId: request.requestId,
-        organizationId: isPlatform ? null : normalizeOptionalString(request.auth?.organizationId),
-        userId: isPlatform ? null : normalizeOptionalString(request.auth?.userId),
+        organizationId: isPlatform
+          ? (auditTarget?.organizationId ?? null)
+          : normalizeOptionalString(request.auth?.organizationId),
+        userId: isPlatform
+          ? (auditTarget?.userId ?? null)
+          : normalizeOptionalString(request.auth?.userId),
         permission:
           typeof request.auth?.claims.permission === "number"
             ? request.auth.claims.permission
