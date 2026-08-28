@@ -1,3 +1,4 @@
+import type { ModulePermissionKey } from "../auth/modules.js";
 import type { AuthKind, PlatformRole } from "../auth/types.js";
 
 export type AuditOutcome = "success" | "error" | "aborted";
@@ -148,4 +149,3 @@ export interface ForwardedAuditAuthContext {
   authKind?: AuthKind;
   platformRole?: PlatformRole;
 }
-import type { ModulePermissionKey } from "../auth/modules.js";
