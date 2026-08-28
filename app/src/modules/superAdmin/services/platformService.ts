@@ -9,6 +9,7 @@ import type {
   PlatformOwnershipTransferResult,
   PlatformUsersListResponse,
   TransferPlatformOwnershipPayload,
+  UpdatePlatformOrganizationUserPayload,
   UpdatePlatformOrganizationLogoPayload,
   UpdatePlatformOrganizationPlanPayload,
   UpdatePlatformOrganizationStatusPayload,
@@ -70,6 +71,18 @@ export const platformService = {
       data,
     );
     return unwrapData<PlatformOwnershipTransferResult>(response);
+  },
+
+  async updateUser(
+    organizationId: string,
+    userId: string,
+    data: UpdatePlatformOrganizationUserPayload,
+  ): Promise<PlatformUsersListResponse["users"][number]> {
+    const response = await api.patch(
+      `/platform/organizations/${organizationId}/users/${userId}`,
+      data,
+    );
+    return unwrapData<PlatformUsersListResponse["users"][number]>(response);
   },
 
   async listDepartments(organizationId: string): Promise<PlatformDepartmentOption[]> {

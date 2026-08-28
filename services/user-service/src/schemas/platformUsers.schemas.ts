@@ -30,3 +30,25 @@ export const transferPlatformOwnershipBodySchema = z
     message: "O sucessor deve ser diferente do owner atual.",
     path: ["successorUserId"],
   });
+
+export const updatePlatformUserBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(255).optional(),
+    login: z.string().trim().min(1).max(255).optional(),
+    password: z.string().min(8).max(255).optional(),
+    department_id: z.string().trim().min(1).optional(),
+    permission: z.number().int().min(0).max(3).optional(),
+    status: z.enum(["active", "inactive"]).optional(),
+    expected_version: z.number().int().min(1),
+  })
+  .strict()
+  .refine(
+    (input) =>
+      input.name !== undefined ||
+      input.login !== undefined ||
+      input.password !== undefined ||
+      input.department_id !== undefined ||
+      input.permission !== undefined ||
+      input.status !== undefined,
+    { message: "Informe ao menos um campo para atualizar." },
+  );

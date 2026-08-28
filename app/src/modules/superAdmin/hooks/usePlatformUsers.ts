@@ -13,6 +13,7 @@ import type {
   PlatformOwnershipTransferResult,
   PlatformUsersListResponse,
   PreviousOwnerAction,
+  UpdatePlatformOrganizationUserPayload,
 } from "../types";
 
 export interface UsePlatformUsersParams {
@@ -61,6 +62,34 @@ export type PlatformUserLifecycleMutationVariables = {
   userId: string;
   action: "deactivate" | "reactivate";
 };
+
+export type PlatformUserUpdateMutationVariables = {
+  organizationId: string;
+  userId: string;
+  data: UpdatePlatformOrganizationUserPayload;
+};
+
+export function usePlatformUserUpdateMutation(): UseMutationResult<
+  PlatformOrganizationUser,
+  unknown,
+  PlatformUserUpdateMutationVariables
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ organizationId, userId, data }) =>
+      platformService.updateUser(organizationId, userId, data),
+    retry: false,
+    onSuccess: (user, { organizationId }) => {
+      queryClient.setQueryData<PlatformOrganizationUser>(
+        ["platform", "organizations", organizationId, "users", user.id],
+        user,
+      );
+      void queryClient.invalidateQueries({
+        queryKey: ["platform", "organizations", organizationId, "users"],
+      });
+    },
+  });
+}
 
 export function usePlatformUserLifecycleMutation(): UseMutationResult<
   PlatformOrganizationUser,

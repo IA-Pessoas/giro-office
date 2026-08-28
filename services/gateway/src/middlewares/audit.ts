@@ -31,6 +31,9 @@ const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
 const PLATFORM_ORGANIZATIONS_PATH = "/platform/organizations";
 const PLATFORM_OWNERSHIP_TRANSFER_PATH =
   /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/i;
+const PLATFORM_ORGANIZATION_SETTINGS_PATH =
+  /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i;
+const PLATFORM_ORGANIZATION_USER_PATH = /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i;
 const PLATFORM_ORGANIZATION_STATUSES = new Set([
   "trial",
   "past_due",
@@ -87,7 +90,8 @@ function requiresOrganizationMutationAudit(request: Request): boolean {
     (method === "POST" && /^\/platform\/organizations\/[^/]+\/users$/i.test(path)) ||
     (method === "POST" && PLATFORM_OWNERSHIP_TRANSFER_PATH.test(path)) ||
     (method === "PATCH" &&
-      /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i.test(path)) ||
+      (PLATFORM_ORGANIZATION_SETTINGS_PATH.test(path) ||
+        PLATFORM_ORGANIZATION_USER_PATH.test(path))) ||
     (method === "DELETE" && /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i.test(path)) ||
     (method === "POST" &&
       /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path))
@@ -172,6 +176,13 @@ function getOwnershipTransferAuditChanges(
   };
 }
 
+function usesExplicitPlatformActor(method: string, path: string): boolean {
+  return (
+    method.toUpperCase() === "PATCH" &&
+    PLATFORM_ORGANIZATION_USER_PATH.test(path.replace(/\/+$/u, ""))
+  );
+}
+
 interface BuildAuditCapacityGuardOptions {
   enabled: boolean;
   recordAuditRequest: ReservableAuditRecorder;
@@ -210,6 +221,7 @@ export function buildAuditCapacityGuard({
       const publicPath = getPublicPath(request.originalUrl, request.path);
       const auditTarget = getPlatformOrganizationAuditTarget(publicPath);
       const isOwnershipTransfer = PLATFORM_OWNERSHIP_TRANSFER_PATH.test(publicPath);
+      const explicitPlatformActor = usesExplicitPlatformActor(request.method, publicPath);
       const controller = new AbortController();
       const abort = () => controller.abort();
       response.once("close", abort);
@@ -254,9 +266,15 @@ export function buildAuditCapacityGuard({
                   }
                 : undefined,
             metadata: {
-              auth_kind: "platform",
-              platform_user_id: request.auth?.userId,
-              actorPlatformUserId: request.auth?.userId,
+              ...(explicitPlatformActor
+                ? { actorKind: "platform", actorPlatformUserId: request.auth?.userId }
+                : isOwnershipTransfer
+                  ? {
+                      auth_kind: "platform",
+                      platform_user_id: request.auth?.userId,
+                      actorPlatformUserId: request.auth?.userId,
+                    }
+                  : { auth_kind: "platform", platform_user_id: request.auth?.userId }),
               business_outcome: "unknown",
               source_request_id_sha256: createHash("sha256")
                 .update(request.requestId)
@@ -451,13 +469,13 @@ export function buildAuditLifecycleMiddleware({
 
       const isPlatform = request.auth?.actorKind === "platform";
       const auditTarget = isPlatform ? getPlatformOrganizationAuditTarget(publicPath) : null;
+      const isOwnershipTransfer = isPlatform && PLATFORM_OWNERSHIP_TRANSFER_PATH.test(publicPath);
       const ownershipChanges =
-        isPlatform &&
-        statusCode !== null &&
-        statusCode < 400 &&
-        PLATFORM_OWNERSHIP_TRANSFER_PATH.test(publicPath)
+        isOwnershipTransfer && statusCode !== null && statusCode < 400
           ? getOwnershipTransferAuditChanges(request, response.locals.ownershipTransferAuditResult)
           : undefined;
+      const explicitPlatformActor =
+        isPlatform && usesExplicitPlatformActor(request.method, publicPath);
 
       const payload: CreateAuditRequestPayload = {
         requestId: request.requestId,
@@ -490,11 +508,15 @@ export function buildAuditLifecycleMiddleware({
           routeTarget: getRouteTarget(env, request),
           activityVisible: activity !== null,
           ...(isPlatform
-            ? {
-                auth_kind: "platform",
-                platform_user_id: request.auth?.userId,
-                actorPlatformUserId: request.auth?.userId,
-              }
+            ? explicitPlatformActor
+              ? { actorKind: "platform", actorPlatformUserId: request.auth?.userId }
+              : isOwnershipTransfer
+                ? {
+                    auth_kind: "platform",
+                    platform_user_id: request.auth?.userId,
+                    actorPlatformUserId: request.auth?.userId,
+                  }
+                : { auth_kind: "platform", platform_user_id: request.auth?.userId }
             : {}),
         },
         action: ownershipChanges

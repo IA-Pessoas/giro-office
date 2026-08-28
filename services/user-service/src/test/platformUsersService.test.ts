@@ -71,8 +71,10 @@ describe("PlatformUsersService", () => {
         login: true,
         status: true,
         department_id: true,
+        permission: true,
         photo_url: true,
         type: true,
+        version: true,
       },
       skip: 0,
       take: 20,
@@ -89,8 +91,10 @@ describe("PlatformUsersService", () => {
       login: "ana",
       status: "active",
       department_id: "dep-1",
+      permission: 1,
       photo_url: null,
       type: "admin",
+      version: 1,
     });
     const service = new PlatformUsersService();
 
@@ -113,8 +117,10 @@ describe("PlatformUsersService", () => {
       login: "ana",
       status: "active",
       department_id: "dep-1",
+      permission: 1,
       photo_url: null,
       type: "admin",
+      version: 1,
     });
     expect(managementMock.create).toHaveBeenCalledWith(
       expect.objectContaining({ organization_id: "org-path" }),
@@ -230,8 +236,20 @@ describe("PlatformUsersService", () => {
         justification: "Recuperação administrativa aprovada.",
       }),
     ).resolves.toEqual({
-      currentOwner: expect.objectContaining({ id: "owner-1", status: "inactive", type: "admin" }),
-      successor: expect.objectContaining({ id: "successor-1", status: "active", type: "owner" }),
+      currentOwner: expect.objectContaining({
+        id: "owner-1",
+        status: "inactive",
+        type: "admin",
+        permission: 1,
+        version: 4,
+      }),
+      successor: expect.objectContaining({
+        id: "successor-1",
+        status: "active",
+        type: "owner",
+        permission: 2,
+        version: 6,
+      }),
     });
 
     expect(transaction.user.updateMany).toHaveBeenNthCalledWith(

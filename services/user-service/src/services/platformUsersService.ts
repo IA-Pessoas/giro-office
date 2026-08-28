@@ -13,8 +13,10 @@ const PLATFORM_USER_LIST_SELECT = {
   login: true,
   status: true,
   department_id: true,
+  permission: true,
   photo_url: true,
   type: true,
+  version: true,
 } as const;
 
 export interface ListPlatformUsersInput {
@@ -43,12 +45,7 @@ const PLATFORM_OWNERSHIP_SELECT = {
 type PlatformOwnershipUser = Prisma.UserGetPayload<{ select: typeof PLATFORM_OWNERSHIP_SELECT }>;
 
 function toPlatformUser(user: PlatformOwnershipUser): PlatformUserListRow {
-  const {
-    permission: _permission,
-    session_version: _sessionVersion,
-    version: _version,
-    ...platformUser
-  } = user;
+  const { session_version: _sessionVersion, ...platformUser } = user;
   return platformUser;
 }
 
@@ -74,8 +71,10 @@ export class PlatformUsersService {
       login: user.login,
       status: user.status,
       department_id: user.department_id,
+      permission: user.permission,
       photo_url: user.photo_url,
       type: user.type,
+      version: user.version,
     };
   }
 
@@ -132,7 +131,7 @@ export class PlatformUsersService {
   async deactivate(organizationId: string, userId: string): Promise<PlatformUserListRow> {
     const user = await this.getById(organizationId, userId);
     await this.userService.delete(userId, organizationId);
-    return { ...user, status: "inactive" };
+    return { ...user, status: "inactive", version: user.version + 1 };
   }
 
   async reactivate(organizationId: string, userId: string): Promise<PlatformUserListRow> {
@@ -151,6 +150,35 @@ export class PlatformUsersService {
       department_id: user.department_id,
       photo_url: user.photo_url,
       type: user.type,
+      permission: user.permission,
+      version: user.version,
+    };
+  }
+
+  async update(
+    organizationId: string,
+    userId: string,
+    input: {
+      name?: string;
+      login?: string;
+      password?: string;
+      department_id?: string;
+      permission?: number;
+      status?: "active" | "inactive";
+      expected_version: number;
+    },
+  ): Promise<PlatformUserListRow> {
+    const user = await this.userService.update(userId, input, organizationId);
+    return {
+      id: user.id,
+      name: user.name,
+      login: user.login,
+      status: user.status,
+      department_id: user.department_id,
+      photo_url: user.photo_url,
+      type: user.type,
+      permission: user.permission,
+      version: user.version,
     };
   }
 

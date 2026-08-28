@@ -7,6 +7,7 @@ import {
   platformOrganizationUserParamsSchema,
   platformOrganizationUsersParamsSchema,
   transferPlatformOwnershipBodySchema,
+  updatePlatformUserBodySchema,
 } from "../schemas/platformUsers.schemas.js";
 import { createUserBodySchema } from "../schemas/user.schemas.js";
 import {
@@ -146,6 +147,28 @@ export function createPlatformUsersRoutes(): ReturnType<typeof Router> {
         );
       } catch (err) {
         logError("Erro ao desativar usuario da organizacao pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.patch(
+    "/organizations/:organizationId/users/:userId",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId, userId } = parseWithZod(
+          platformOrganizationUserParamsSchema,
+          request.params,
+        );
+        const input = parseWithZod(updatePlatformUserBodySchema, request.body);
+        response.json(
+          createSuccessResponse(await platformUsersService.update(organizationId, userId, input)),
+        );
+      } catch (err) {
+        logError("Erro ao atualizar usuario da organizacao pela plataforma", { err });
         next(err);
       }
     },

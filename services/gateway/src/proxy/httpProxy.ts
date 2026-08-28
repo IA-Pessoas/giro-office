@@ -90,6 +90,12 @@ const SESSION_COOKIE_RULES: SessionCookieRule[] = [
     outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
   },
   {
+    method: "PATCH",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
     method: "POST",
     path: "/platform/session",
     inbound: [],

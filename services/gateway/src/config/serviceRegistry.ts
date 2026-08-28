@@ -105,6 +105,10 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
           path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/?$/,
         },
         {
+          methods: ["PATCH"],
+          path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/?$/,
+        },
+        {
           methods: ["POST"],
           path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/,
         },

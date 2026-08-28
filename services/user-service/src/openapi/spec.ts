@@ -337,6 +337,46 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             "404": { description: "Usuário não pertence à organização do contexto" },
           },
         },
+        patch: {
+          tags: ["Platform auth"],
+          summary: "Editar usuário de uma organização pela plataforma",
+          security: platformBrowserSession,
+          parameters: [
+            { name: "organizationId", in: "path", required: true, schema: { type: "string" } },
+            { name: "userId", in: "path", required: true, schema: { type: "string" } },
+            csrfHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["expected_version"],
+                  additionalProperties: false,
+                  properties: {
+                    name: { type: "string" },
+                    login: { type: "string" },
+                    password: { type: "string", writeOnly: true },
+                    department_id: { type: "string" },
+                    permission: { type: "integer", minimum: 0, maximum: 3 },
+                    status: { type: "string", enum: ["active", "inactive"] },
+                    expected_version: { type: "integer", minimum: 1 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Usuário atualizado sem credenciais", ...successJson },
+            "400": { description: "Payload inválido" },
+            "401": { description: "Sessão ausente" },
+            "403": { description: "CSRF ou identidade inválida" },
+            "404": { description: "Usuário ou departamento fora do tenant" },
+            "409": { description: "Login duplicado ou versão desatualizada" },
+            "503": { description: "Auditoria indisponível" },
+          },
+        },
         delete: {
           tags: ["Platform auth"],
           summary: "Desativar usuário sem exclusão física",
