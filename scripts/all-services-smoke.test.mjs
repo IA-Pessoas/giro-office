@@ -151,6 +151,32 @@ test("contexto de relatórios do user-service permanece no smoke direto interno"
   assert.ok(loginIndex >= 0 && reportingIndex > loginIndex);
 });
 
+test("smoke do certificado PJ cobre reporting com token do reports-service", async () => {
+  const smoke = await readFile(path.join(repoRoot, "scripts", "all-services-smoke.mjs"), "utf8");
+  const reportingEntries = manifest.filter(
+    (entry) =>
+      entry.service === "certificate-service" && entry.path.startsWith("/internal/reporting/"),
+  );
+
+  assert.deepEqual(
+    reportingEntries.map((entry) => [entry.method, entry.path, entry.expectationKind]),
+    [
+      ["GET", "/internal/reporting/catalog", "good"],
+      ["GET", "/internal/reporting/catalog", "bad"],
+      ["POST", "/internal/reporting/extract", "good"],
+      ["POST", "/internal/reporting/extract", "bad"],
+    ],
+  );
+  assert.ok(
+    reportingEntries.every((entry) => entry.internalTokenEnvKey === "REPORTS_INTERNAL_TOKEN"),
+  );
+  assert.ok(
+    reportingEntries.every((entry) => entry.condition === "certificateReportingSmokeEnabled"),
+  );
+  assert.match(smoke, /certificateReportingSmokeEnabled/);
+  assert.match(smoke, /createCertificateReportingGrant/);
+});
+
 test("smoke fiscal exclui cada fixture somente depois das operações que dependem dela", () => {
   for (const [deleteAction, prerequisiteActions] of [
     ["fiscalNcmDelete", ["fiscalNcmGet", "fiscalNcmList", "fiscalNcmPut", "fiscalNcmSearch"]],
