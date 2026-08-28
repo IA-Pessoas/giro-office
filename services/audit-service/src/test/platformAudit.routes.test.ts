@@ -420,6 +420,66 @@ describe("platform audit persistence", () => {
     expect(result.items[0]).not.toHaveProperty("changes_json");
   });
 
+  it("expõe somente o before/after sanitizado de uma transferência de ownership", async () => {
+    const organizationId = "918eeaf9-82db-4e46-930b-b2d8b50b2776";
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: "audit-ownership",
+        request_id: "request-ownership",
+        organization_id: organizationId,
+        method: "POST",
+        path: `/platform/organizations/${organizationId}/ownership-transfer`,
+        status_code: 200,
+        outcome: "success",
+        duration_ms: 8,
+        service_source: "gateway",
+        created_at: new Date("2026-08-28T12:00:00.000Z"),
+        metadata_json: { actorPlatformUserId: "platform-user-1", secret: "must-not-leak" },
+        action: "platform.organization.ownership.transfer.completed",
+        referring: "organization",
+        referring_id: organizationId,
+        changes_json: {
+          ownership: {
+            before: { ownerId: "owner-1", type: "owner", status: "active", password: "hidden" },
+            after: {
+              ownerId: "successor-1",
+              type: "owner",
+              status: "active",
+              previousOwner: { id: "owner-1", type: "admin", status: "inactive", token: "hidden" },
+            },
+            previousOwnerAction: "deactivate",
+            justification: "Recuperação administrativa aprovada.",
+            secret: "must-not-leak",
+          },
+        },
+      },
+    ]);
+    const repository = createAuditRequestRepository({
+      auditRequest: { findMany, count: vi.fn().mockResolvedValue(1) },
+      $transaction: (operations: Array<Promise<unknown>>) => Promise.all(operations),
+    } as never);
+
+    const result = await repository.searchPlatform({ organizationId, page: 1, pageSize: 25 });
+
+    expect(result.items[0]).toMatchObject({
+      actorPlatformUserId: "platform-user-1",
+      changes: {
+        ownership: {
+          before: { ownerId: "owner-1", type: "owner", status: "active" },
+          after: {
+            ownerId: "successor-1",
+            type: "owner",
+            status: "active",
+            previousOwner: { id: "owner-1", type: "admin", status: "inactive" },
+          },
+          previousOwnerAction: "deactivate",
+          justification: "Recuperação administrativa aprovada.",
+        },
+      },
+    });
+    expect(JSON.stringify(result.items[0])).not.toContain("must-not-leak");
+  });
+
   it("omite ator e changes quando metadata ou evento organizacional nao passam na allowlist", async () => {
     const organizationId = "918eeaf9-82db-4e46-930b-b2d8b50b2776";
     const baseRow = {

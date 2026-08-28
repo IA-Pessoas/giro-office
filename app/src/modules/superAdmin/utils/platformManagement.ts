@@ -92,5 +92,13 @@ export function formatAuditChanges(changes: PlatformAuditRecord["changes"]): str
       `Logo: ${formatAuditValue(changes.logo_url.from, "logo")} → ${formatAuditValue(changes.logo_url.to, "logo")}`,
     );
   }
+  if (changes.ownership) {
+    const { before, after, previousOwnerAction, justification } = changes.ownership;
+    lines.push(`Ownership: ${before.ownerId} → ${after.ownerId}`);
+    lines.push(
+      `Owner anterior: ${previousOwnerAction === "deactivate" ? "desativado" : "rebaixado"}`,
+    );
+    lines.push(`Justificativa: ${justification}`);
+  }
   return lines;
 }

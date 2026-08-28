@@ -67,6 +67,20 @@ export interface UpdatePlatformOrganizationUserPayload {
   expected_version: number;
 }
 
+export type PreviousOwnerAction = "demote" | "deactivate";
+
+export interface TransferPlatformOwnershipPayload {
+  currentOwnerId: string;
+  successorUserId: string;
+  previousOwnerAction: PreviousOwnerAction;
+  justification: string;
+}
+
+export interface PlatformOwnershipTransferResult {
+  currentOwner: PlatformOrganizationUser;
+  successor: PlatformOrganizationUser;
+}
+
 export interface PlatformUsersListResponse {
   users: PlatformOrganizationUser[];
   total: number;
@@ -100,6 +114,17 @@ export interface PlatformAuditRecord {
       to: PlatformOrganizationPlan | null;
     };
     logo_url?: { from: string | null; to: string | null };
+    ownership?: {
+      before: { ownerId: string; type: "owner"; status: "active" };
+      after: {
+        ownerId: string;
+        type: "owner";
+        status: "active";
+        previousOwner: { id: string; type: "owner" | "admin"; status: "active" | "inactive" };
+      };
+      previousOwnerAction: "demote" | "deactivate";
+      justification: string;
+    };
   };
 }
 

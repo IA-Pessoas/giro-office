@@ -1,10 +1,12 @@
 import { ServiceError } from "@workspace/shared";
-import type { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
 import { PlatformUserManagementAdapter } from "./userManagementService.js";
 import { type CreateUserInput, UserManagementService, UserService } from "./userService.js";
 
 const MAX_PAGE_SIZE = 100;
+const OWNER_PERMISSION = 2;
+const DEMOTED_OWNER_PERMISSION = 1;
 const PLATFORM_USER_LIST_SELECT = {
   id: true,
   name: true,
@@ -24,7 +26,28 @@ export interface ListPlatformUsersInput {
   search: string;
 }
 
+export interface TransferPlatformOwnershipInput {
+  currentOwnerId: string;
+  successorUserId: string;
+  previousOwnerAction: "demote" | "deactivate";
+  justification: string;
+}
+
 type PlatformUserListRow = Prisma.UserGetPayload<{ select: typeof PLATFORM_USER_LIST_SELECT }>;
+
+const PLATFORM_OWNERSHIP_SELECT = {
+  ...PLATFORM_USER_LIST_SELECT,
+  permission: true,
+  session_version: true,
+  version: true,
+} as const;
+
+type PlatformOwnershipUser = Prisma.UserGetPayload<{ select: typeof PLATFORM_OWNERSHIP_SELECT }>;
+
+function toPlatformUser(user: PlatformOwnershipUser): PlatformUserListRow {
+  const { session_version: _sessionVersion, ...platformUser } = user;
+  return platformUser;
+}
 
 export class PlatformUsersService {
   private readonly userService = new UserService();
@@ -157,5 +180,106 @@ export class PlatformUsersService {
       permission: user.permission,
       version: user.version,
     };
+  }
+
+  async transferOwnership(
+    organizationId: string,
+    input: TransferPlatformOwnershipInput,
+  ): Promise<{ currentOwner: PlatformUserListRow; successor: PlatformUserListRow }> {
+    if (input.currentOwnerId === input.successorUserId) {
+      throw new ServiceError(400, "O sucessor deve ser diferente do owner atual.");
+    }
+
+    return prismaClient.$transaction(
+      async (transaction) => {
+        const currentOwner = await transaction.user.findFirst({
+          where: { id: input.currentOwnerId, organization_id: organizationId },
+          select: PLATFORM_OWNERSHIP_SELECT,
+        });
+        if (!currentOwner) {
+          throw new ServiceError(404, "Owner atual não encontrado na organização.");
+        }
+        if (currentOwner.type !== "owner" || currentOwner.status !== "active") {
+          throw new ServiceError(409, "O usuário selecionado não é um owner ativo.");
+        }
+
+        const successor = await transaction.user.findFirst({
+          where: { id: input.successorUserId, organization_id: organizationId },
+          select: PLATFORM_OWNERSHIP_SELECT,
+        });
+        if (!successor) {
+          throw new ServiceError(404, "Sucessor não encontrado na organização.");
+        }
+        if (successor.status !== "active") {
+          throw new ServiceError(409, "O sucessor precisa estar ativo.");
+        }
+
+        const promoted = await transaction.user.updateMany({
+          where: {
+            id: successor.id,
+            organization_id: organizationId,
+            version: successor.version,
+          },
+          data: {
+            type: "owner",
+            permission: OWNER_PERMISSION,
+            session_version: { increment: 1 },
+            version: { increment: 1 },
+          },
+        });
+        if (promoted.count !== 1) {
+          throw new ServiceError(409, "O sucessor foi alterado por outra edição. Tente novamente.");
+        }
+
+        const currentOwnerStatus =
+          input.previousOwnerAction === "deactivate" ? "inactive" : "active";
+        const demoted = await transaction.user.updateMany({
+          where: {
+            id: currentOwner.id,
+            organization_id: organizationId,
+            version: currentOwner.version,
+          },
+          data: {
+            type: "admin",
+            permission: DEMOTED_OWNER_PERMISSION,
+            status: currentOwnerStatus,
+            session_version: { increment: 1 },
+            version: { increment: 1 },
+          },
+        });
+        if (demoted.count !== 1) {
+          throw new ServiceError(
+            409,
+            "O owner atual foi alterado por outra edição. Tente novamente.",
+          );
+        }
+
+        const activeOwners = await transaction.user.count({
+          where: { organization_id: organizationId, type: "owner", status: "active" },
+        });
+        if (activeOwners < 1) {
+          throw new ServiceError(409, "A organização deve manter ao menos um owner ativo.");
+        }
+
+        return {
+          currentOwner: toPlatformUser({
+            ...currentOwner,
+            type: "admin",
+            permission: DEMOTED_OWNER_PERMISSION,
+            status: currentOwnerStatus,
+            session_version: currentOwner.session_version + 1,
+            version: currentOwner.version + 1,
+          }),
+          successor: toPlatformUser({
+            ...successor,
+            type: "owner",
+            permission: OWNER_PERMISSION,
+            session_version: successor.session_version + 1,
+            version: successor.version + 1,
+          }),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 }

@@ -36,14 +36,19 @@ function fixture(fetchImpl: typeof fetch, maxInFlight = 1) {
     logger: logger as never,
     recordAuditRequest: recorder,
   });
-  function start(method = "POST", path = "/platform/organizations") {
+  function start(
+    method = "POST",
+    path = "/platform/organizations",
+    body = { cnpj: "11222333000181", logo_url: "https://secret.example/logo" },
+    ownershipTransferAuditResult?: unknown,
+  ) {
     const request = {
       method,
       originalUrl: `${path}?token=query-secret`,
       path,
       requestId: "original-request-id",
       auth: { actorKind: "platform", userId: "platform-user-1", claims: {} },
-      body: { cnpj: "11222333000181", logo_url: "https://secret.example/logo" },
+      body,
       get: () => undefined,
       log: logger,
     } as unknown as Request;
@@ -58,7 +63,10 @@ function fixture(fetchImpl: typeof fetch, maxInFlight = 1) {
     lifecycle(request, response as unknown as Response, () => {});
     const pending = guard(request, response as unknown as Response, (failure?: unknown) => {
       error = failure;
-      if (!failure) upstreamCalls += 1;
+      if (!failure) {
+        upstreamCalls += 1;
+        response.locals = { ownershipTransferAuditResult };
+      }
       response.statusCode = failure ? 503 : 200;
       response.writableEnded = true;
       response.emit("finish");
@@ -148,6 +156,76 @@ describe("durable organization mutation audit barrier", () => {
     await Promise.resolve();
     expect(recorder.reserve("protected")).toBe("protected");
     expect(recorder.reserve("protected")).toBeUndefined();
+  });
+
+  it("registra before/after da transferência somente após a resposta confirmada", async () => {
+    const records: CreateAuditRequestPayload[] = [];
+    const { start } = fixture(async (_input, init) => {
+      records.push(JSON.parse(String(init?.body)));
+      return new globalThis.Response(null, { status: 201 });
+    });
+
+    const operation = start(
+      "POST",
+      "/platform/organizations/org-1/ownership-transfer",
+      {
+        currentOwnerId: "owner-1",
+        successorUserId: "successor-1",
+        previousOwnerAction: "deactivate",
+        justification: "Recuperação administrativa aprovada.",
+        password: "must-not-leak",
+      },
+      {
+        currentOwner: { id: "owner-1", type: "admin", status: "inactive" },
+        successor: { id: "successor-1", type: "owner", status: "active" },
+      },
+    );
+    await operation.pending;
+    await vi.waitFor(() => expect(records).toHaveLength(2));
+
+    expect(records[0]).toMatchObject({
+      action: "platform.organization.ownership.transfer.attempt",
+      organizationId: "org-1",
+      referring: "organization",
+      referringId: "org-1",
+      metadata: { actorPlatformUserId: "platform-user-1" },
+    });
+    expect(records[0].changes).toBeUndefined();
+    expect(records[1]).toMatchObject({
+      action: "platform.organization.ownership.transfer.completed",
+      organizationId: "org-1",
+      referring: "organization",
+      referringId: "org-1",
+      metadata: { actorPlatformUserId: "platform-user-1" },
+      changes: {
+        ownership: {
+          before: { ownerId: "owner-1", type: "owner", status: "active" },
+          after: {
+            ownerId: "successor-1",
+            previousOwner: { id: "owner-1", type: "admin", status: "inactive" },
+          },
+          justification: "Recuperação administrativa aprovada.",
+        },
+      },
+    });
+    expect(JSON.stringify(records)).not.toContain("must-not-leak");
+  });
+
+  it("bloqueia a transferência quando a auditoria obrigatória está indisponível", async () => {
+    const { start } = fixture(async () => {
+      throw new Error("audit unavailable");
+    });
+
+    const operation = start("POST", "/platform/organizations/org-1/ownership-transfer", {
+      currentOwnerId: "owner-1",
+      successorUserId: "successor-1",
+      previousOwnerAction: "demote",
+      justification: "Recuperação administrativa aprovada.",
+    });
+    await operation.pending;
+
+    expect(operation.error()).toMatchObject({ statusCode: 503 });
+    expect(operation.upstreamCalls()).toBe(0);
   });
 
   it.each([

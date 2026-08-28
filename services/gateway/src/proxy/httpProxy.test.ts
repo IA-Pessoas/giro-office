@@ -10,7 +10,7 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildForwardHeaders, buildHttpProxyMiddleware } from "./httpProxy.js";
@@ -221,6 +221,12 @@ describe("buildForwardHeaders", () => {
       expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
       expectedCsrf: "proof",
     },
+    {
+      method: "POST",
+      path: "/platform/organizations/org-1/ownership-transfer",
+      expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
+      expectedCsrf: "proof",
+    },
   ])("encaminha somente as credenciais allowlisted em $method $path", (entry) => {
     const request = {
       ...authenticatedRequest,
@@ -290,6 +296,53 @@ describe("buildForwardHeaders", () => {
 });
 
 describe("buildHttpProxyMiddleware", () => {
+  it("expõe somente a resposta confirmada de transferência para o ciclo de auditoria", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new globalThis.Response(
+            JSON.stringify({
+              success: true,
+              data: {
+                currentOwner: { id: "owner-1", type: "admin", status: "inactive" },
+                successor: { id: "successor-1", type: "owner", status: "active" },
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+      ),
+    );
+    const response = {
+      locals: {},
+      send: vi.fn(),
+      setHeader: vi.fn(),
+      status: vi.fn().mockReturnThis(),
+    } as unknown as Response;
+    const proxy = buildHttpProxyMiddleware("http://upstream.test");
+    const next = vi.fn();
+
+    await proxy(
+      {
+        body: {},
+        get: () => undefined,
+        headers: { "content-type": "application/json" },
+        ip: "127.0.0.1",
+        method: "POST",
+        originalUrl: "/platform/organizations/org-1/ownership-transfer",
+        protocol: "http",
+      } as Request,
+      response,
+      next,
+    );
+
+    expect(next).not.toHaveBeenCalled();
+    expect(response.locals.ownershipTransferAuditResult).toEqual({
+      currentOwner: { id: "owner-1", type: "admin", status: "inactive" },
+      successor: { id: "successor-1", type: "owner", status: "active" },
+    });
+  });
+
   it("applies an abort deadline to upstream requests", async () => {
     let capturedSignal: AbortSignal | null | undefined;
     vi.stubGlobal(
