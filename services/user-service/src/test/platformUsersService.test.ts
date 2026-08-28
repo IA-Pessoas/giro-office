@@ -11,8 +11,21 @@ const { prismaMock } = vi.hoisted(() => ({
   },
 }));
 
+const { userServiceMock } = vi.hoisted(() => ({
+  userServiceMock: {
+    delete: vi.fn(),
+    update: vi.fn(),
+  },
+}));
+
 vi.mock("../prisma/index.js", () => ({
   default: prismaMock,
+}));
+
+vi.mock("../services/userService.js", () => ({
+  UserService: vi.fn(function UserService() {
+    return userServiceMock;
+  }),
 }));
 
 import { PlatformUsersService } from "../services/platformUsersService.js";
@@ -95,5 +108,36 @@ describe("PlatformUsersService", () => {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
+  });
+
+  it("delegates deactivation and reactivation to the transactional user lifecycle in the selected organization", async () => {
+    const service = new PlatformUsersService();
+    const reactivated = {
+      id: "user-1",
+      name: "Ana",
+      login: "ana",
+      status: "active",
+      department_id: "department-1",
+      photo_url: null,
+      type: "user",
+    };
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "user-1",
+      name: "Ana",
+      status: "active",
+    });
+    userServiceMock.update.mockResolvedValue(reactivated);
+
+    await service.deactivate("org-1", "user-1");
+    await expect(service.reactivate("org-1", "user-1")).resolves.toEqual(reactivated);
+
+    expect(userServiceMock.delete).toHaveBeenCalledWith("user-1", "org-1");
+    expect(userServiceMock.update).toHaveBeenCalledWith(
+      "user-1",
+      { status: "active" },
+      "org-1",
+      undefined,
+      "REACTIVATE",
+    );
   });
 });

@@ -92,6 +92,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "um usuário da organização" },
   },
   {
+    methods: ["DELETE"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/,
+    description: { action: "desativou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/,
+    description: { action: "reativou", item: "um usuário da organização" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/platform\/organizations\/[^/]+\/departments$/,
     description: { action: "consultou", item: "os departamentos da organização" },

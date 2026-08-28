@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentProps } from "react";
+import type * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Dialog } from "./Dialog";
 
 const CANCEL_BUTTON_CLASSNAME =
@@ -22,6 +23,7 @@ export interface ConfirmationDialogProps {
   confirmLabel: string;
   cancelLabel: string;
   variant?: "destructive" | "neutral";
+  onCloseAutoFocus?: ComponentProps<typeof DialogPrimitive.Content>["onCloseAutoFocus"];
 }
 
 export function ConfirmationDialog({
@@ -35,6 +37,7 @@ export function ConfirmationDialog({
   confirmLabel,
   cancelLabel,
   variant = "destructive",
+  onCloseAutoFocus,
 }: ConfirmationDialogProps) {
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -85,6 +88,7 @@ export function ConfirmationDialog({
       title={title}
       description={description}
       preventClose={isConfirming}
+      onCloseAutoFocus={onCloseAutoFocus}
       contentClassName="!w-[min(92vw,440px)]"
       bodyClassName="space-y-3"
       footer={

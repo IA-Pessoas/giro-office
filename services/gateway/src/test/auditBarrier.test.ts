@@ -8,10 +8,12 @@ import { buildAuditCapacityGuard, buildAuditLifecycleMiddleware } from "../middl
 
 const logger = { error: vi.fn(), warn: vi.fn(), debug: vi.fn() };
 const paths = [
-  ["POST", "/platform/organizations"],
-  ["PATCH", "/platform/organizations/org-1/status"],
-  ["PATCH", "/platform/organizations/org-1/subscription-plan"],
-  ["PATCH", "/platform/organizations/org-1/logo-url"],
+  ["POST", "/platform/organizations", null, null],
+  ["PATCH", "/platform/organizations/org-1/status", "org-1", null],
+  ["PATCH", "/platform/organizations/org-1/subscription-plan", "org-1", null],
+  ["PATCH", "/platform/organizations/org-1/logo-url", "org-1", null],
+  ["DELETE", "/platform/organizations/org-1/users/user-1", "org-1", "user-1"],
+  ["POST", "/platform/organizations/org-1/users/user-1/reactivate", "org-1", "user-1"],
 ];
 
 function fixture(fetchImpl: typeof fetch, maxInFlight = 1) {
@@ -98,7 +100,7 @@ describe("durable organization mutation audit barrier", () => {
 
   it.each(
     paths,
-  )("waits for ACK before %s %s with a distinct, safe attempt", async (method, path) => {
+  )("waits for ACK before %s %s with a distinct, safe attempt", async (method, path, organizationId, userId) => {
     const records: CreateAuditRequestPayload[] = [];
     let release!: (response: globalThis.Response) => void;
     const { start, recorder } = fixture(async (_input, init) => {
@@ -116,6 +118,8 @@ describe("durable organization mutation audit barrier", () => {
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({
       action: "organization.mutation.attempt",
+      organizationId,
+      userId,
       statusCode: null,
       outcome: "success",
       query: {},
@@ -130,6 +134,7 @@ describe("durable organization mutation audit barrier", () => {
     await vi.waitFor(() => expect(records).toHaveLength(2));
     expect(records[0].requestId).not.toBe(records[1].requestId);
     expect(records[1].requestId).toBe("original-request-id");
+    expect(records[1]).toMatchObject({ organizationId, userId });
     const serialized = JSON.stringify(records);
     for (const secret of ["query-secret", "11222333000181", "secret.example", "secret-token"]) {
       expect(serialized).not.toContain(secret);

@@ -1,4 +1,10 @@
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 
 import { platformService } from "../services/platformService";
 import type { PlatformDepartmentOption, PlatformOrganizationUser, PlatformUsersListResponse } from "../types";
@@ -41,5 +47,52 @@ export function usePlatformDepartments(
     queryFn: () => platformService.listDepartments(organizationId as string),
     enabled: Boolean(organizationId),
     staleTime: 15_000,
+  });
+}
+
+export type PlatformUserLifecycleMutationVariables = {
+  organizationId: string;
+  userId: string;
+  action: "deactivate" | "reactivate";
+};
+
+export function usePlatformUserLifecycleMutation(): UseMutationResult<
+  PlatformOrganizationUser,
+  unknown,
+  PlatformUserLifecycleMutationVariables
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ organizationId, userId, action }) =>
+      action === "deactivate"
+        ? platformService.deactivateUser(organizationId, userId)
+        : platformService.reactivateUser(organizationId, userId),
+    retry: false,
+    onSuccess: (user, { organizationId }) => {
+      queryClient.setQueryData<PlatformOrganizationUser>(
+        ["platform", "organizations", organizationId, "users", user.id],
+        user,
+      );
+      queryClient.setQueriesData<PlatformUsersListResponse>(
+        {
+          predicate: (query) =>
+            query.queryKey[0] === "platform" &&
+            query.queryKey[1] === "organizations" &&
+            query.queryKey[2] === organizationId &&
+            query.queryKey[3] === "users" &&
+            typeof query.queryKey[4] === "object",
+        },
+        (current) =>
+          current
+            ? {
+                ...current,
+                users: current.users.map((listedUser) =>
+                  listedUser.id === user.id ? { ...listedUser, ...user } : listedUser,
+                ),
+              }
+            : current,
+      );
+    },
   });
 }

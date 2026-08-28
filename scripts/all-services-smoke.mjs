@@ -2250,6 +2250,71 @@ const handlers = {
     });
   },
 
+  async platformUserDeactivate(op) {
+    if (isBadExpectation(op)) {
+      await platformHttpRequest(op, {
+        path: "/platform/organizations/smoke-org/users/smoke-user",
+      });
+      return;
+    }
+
+    const organizationId = requireState("session").organization_id;
+    const listed = await platformHttpRequest(op, {
+      method: "GET",
+      path: `/platform/organizations/${organizationId}/users`,
+      query: { skip: 0, take: 100 },
+      expectedStatus: [200],
+    });
+    let user = listed.body?.data?.users?.find(
+      (candidate) => candidate?.status === "active" && candidate?.type !== "owner",
+    );
+    if (!user?.id) {
+      const created = await httpRequest(op, {
+        method: "POST",
+        path: "/user",
+        target: "gateway",
+        service: "user-service",
+        auth: "bearer",
+        expectedStatus: [201],
+        json: {
+          name: uniqueText("Smoke Platform Lifecycle User"),
+          login: uniqueEmail("platform-lifecycle-user"),
+          password: env.password,
+          department_id: await ensureDepartmentId(),
+          permission: 1,
+          organization_id: organizationId,
+          type: "user",
+          modules: { integracao: 1, rh: 1 },
+        },
+      });
+      user = { id: pickFirst(created.body, "data.id") ?? findFirstId(created.body?.data) };
+    }
+    if (!user.id) {
+      throw new Error("Smoke platform user lifecycle could not create an active non-owner user.");
+    }
+
+    state.platformLifecycleUserId = user.id;
+    await platformHttpRequest(op, {
+      path: `/platform/organizations/${organizationId}/users/${user.id}`,
+      expectedStatus: [200],
+    });
+  },
+
+  async platformUserReactivate(op) {
+    if (isBadExpectation(op)) {
+      await platformHttpRequest(op, {
+        path: "/platform/organizations/smoke-org/users/smoke-user/reactivate",
+      });
+      return;
+    }
+
+    const organizationId = requireState("session").organization_id;
+    await platformHttpRequest(op, {
+      path: `/platform/organizations/${organizationId}/users/${requireState("platformLifecycleUserId")}/reactivate`,
+      expectedStatus: [200],
+    });
+  },
+
   async platformDepartments(op) {
     await platformHttpRequest(op, {
       path: `/platform/organizations/${requireState("session").organization_id}/departments`,

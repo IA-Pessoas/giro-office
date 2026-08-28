@@ -7,7 +7,11 @@ import {
   platformOrganizationUserParamsSchema,
   platformOrganizationUsersParamsSchema,
 } from "../schemas/platformUsers.schemas.js";
-import { requirePlatformGatewayAuth, requirePlatformSession } from "../security/platformAuth.js";
+import {
+  requirePlatformCsrf,
+  requirePlatformGatewayAuth,
+  requirePlatformSession,
+} from "../security/platformAuth.js";
 import { PlatformUsersService } from "../services/platformUsersService.js";
 
 export function createPlatformUsersRoutes(): ReturnType<typeof Router> {
@@ -70,6 +74,48 @@ export function createPlatformUsersRoutes(): ReturnType<typeof Router> {
         response.json(createSuccessResponse(result));
       } catch (err) {
         logError("Erro ao listar usuarios da organizacao pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.delete(
+    "/organizations/:organizationId/users/:userId",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId, userId } = parseWithZod(
+          platformOrganizationUserParamsSchema,
+          request.params,
+        );
+        response.json(
+          createSuccessResponse(await platformUsersService.deactivate(organizationId, userId)),
+        );
+      } catch (err) {
+        logError("Erro ao desativar usuario da organizacao pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/organizations/:organizationId/users/:userId/reactivate",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId, userId } = parseWithZod(
+          platformOrganizationUserParamsSchema,
+          request.params,
+        );
+        response.json(
+          createSuccessResponse(await platformUsersService.reactivate(organizationId, userId)),
+        );
+      } catch (err) {
+        logError("Erro ao reativar usuario da organizacao pela plataforma", { err });
         next(err);
       }
     },
