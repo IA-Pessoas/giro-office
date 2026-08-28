@@ -1,5 +1,5 @@
 import { ACTIVE_MODULE_KEYS, type ModulePermissions, ServiceError } from "@workspace/shared";
-import type { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "../generated/prisma/client.js";
 import type { UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { PlatformUserManagementAdapter } from "./userManagementService.js";
