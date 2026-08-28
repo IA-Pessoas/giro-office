@@ -13,7 +13,8 @@ Consulte [`src/config/env.ts`](src/config/env.ts).
 - Banco e autenticação: `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `JWT_SECRET`.
 - Tokens e segredo interno: `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`.
 - URLs upstream: `USER_SERVICE_URL`, `PARCELAMENTO_SERVICE_URL`, `CLIENT_SERVICE_URL`,
-  `PROJECT_SERVICE_URL`, `TASK_SERVICE_URL`, `CONTABIL_SERVICE_URL`, `CERTIFICATE_SERVICE_URL`.
+  `PROJECT_SERVICE_URL`, `TASK_SERVICE_URL`, `CONTABIL_SERVICE_URL`, `CERTIFICATE_SERVICE_URL`,
+  `FISCAL_SERVICE_URL` (default `http://localhost:3037`).
 - Timeout de fontes internas: `REPORTS_SOURCE_TIMEOUT_MS`.
 - Worker e CORS: `REPORTS_WORKER_POLL_INTERVAL_MS`, `REPORTS_WORKER_CONCURRENCY`,
   `REPORTS_WORKER_LEASE_SECONDS`, `SERVICE_ALLOWED_ORIGINS`.
@@ -61,4 +62,7 @@ O smoke de Controle Contábil fica desativado por padrão; exija
 os dois segredos configurados.
 
 O smoke de Tarefas fica desativado por padrão; exija `TASK_REPORTING_SMOKE_ENABLED=true` e
+`REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.
+
+O smoke fiscal fica desativado por padrão; exija `FISCAL_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.

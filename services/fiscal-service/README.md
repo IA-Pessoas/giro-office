@@ -14,6 +14,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `DATABASE_POOL_MAX` (default `1`)
 - `JWT_SECRET`
 - `AUDIT_*` quando a auditoria estiver ativa
+- `REPORTS_INTERNAL_TOKEN` e `REPORTS_GRANT_SECRET` para as rotas internas de relatórios
 
 ## Gateway
 
@@ -27,6 +28,9 @@ Exemplos de paths publicos:
 - `/fiscal/icms`
 - `/fiscal/icms/list`
 - `/health`
+
+As rotas `/internal/reporting/catalog` e `/internal/reporting/extract` são internas, não passam
+pelo gateway e exigem token de serviço e grant HMAC emitido pelo `reports-service`.
 
 ## Desenvolvimento
 
