@@ -4,6 +4,7 @@ import { createLogger } from "@workspace/shared/logger";
 
 import { createReportsApp } from "./app.js";
 import { getReportsServiceEnv } from "./config/env.js";
+import { CertificatePjAdapter } from "./integrations/certificatePjAdapter.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
@@ -30,6 +31,7 @@ const app = createReportsApp({
       new ContabilControlAdapter(env),
       new TaskAdapter(env),
       new ProjectAdapter(env),
+      new CertificatePjAdapter(env),
     ],
   },
 });

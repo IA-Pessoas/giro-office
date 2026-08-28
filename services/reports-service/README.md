@@ -13,7 +13,7 @@ Consulte [`src/config/env.ts`](src/config/env.ts).
 - Banco e autenticação: `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `JWT_SECRET`.
 - Tokens e segredo interno: `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`.
 - URLs upstream: `USER_SERVICE_URL`, `PARCELAMENTO_SERVICE_URL`, `CLIENT_SERVICE_URL`,
-  `PROJECT_SERVICE_URL`, `TASK_SERVICE_URL`, `CONTABIL_SERVICE_URL`.
+  `PROJECT_SERVICE_URL`, `TASK_SERVICE_URL`, `CONTABIL_SERVICE_URL`, `CERTIFICATE_SERVICE_URL`.
 - Timeout de fontes internas: `REPORTS_SOURCE_TIMEOUT_MS`.
 - Worker e CORS: `REPORTS_WORKER_POLL_INTERVAL_MS`, `REPORTS_WORKER_CONCURRENCY`,
   `REPORTS_WORKER_LEASE_SECONDS`, `SERVICE_ALLOWED_ORIGINS`.
@@ -39,7 +39,8 @@ pnpm --filter @workspace/reports-service worker
 pnpm --filter @workspace/reports-service test
 ```
 
-O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas e Controle Contábil.
+O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas, Controle Contábil
+e Certificados PJ.
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
 
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e

@@ -352,6 +352,62 @@ function internalCertificateNotificationRunOperation() {
   };
 }
 
+function internalCertificatePjReportingCatalogOperation() {
+  return {
+    operationId: "getCertificatePjReportingCatalog",
+    tags: ["Internal"],
+    summary: "Publica o catálogo interno de Certificados PJ para relatórios",
+    "x-internal": true,
+    security: [{ internalToken: [] }],
+    responses: {
+      "200": successResponse("Catálogo interno de Certificados PJ", {
+        type: "object",
+        additionalProperties: true,
+      }),
+      "403": errorResponse("Acesso interno ou grant inválido"),
+    },
+  };
+}
+
+function internalCertificatePjReportingExtractOperation() {
+  return {
+    operationId: "extractCertificatePjReportingData",
+    tags: ["Internal"],
+    summary: "Extrai campos publicados de Certificados PJ para relatórios",
+    "x-internal": true,
+    security: [{ internalToken: [] }],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["source", "fields", "limit"],
+            properties: {
+              source: { type: "string", enum: ["certificado.pj"] },
+              fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
+              limit: { type: "integer", minimum: 1, maximum: 101 },
+            },
+          },
+        },
+      },
+    },
+    responses: {
+      "200": successResponse("Dados internos de Certificados PJ", {
+        type: "object",
+        required: ["rows", "reachedLimit"],
+        properties: {
+          rows: { type: "array", items: { type: "object", additionalProperties: true } },
+          reachedLimit: { type: "boolean" },
+        },
+      }),
+      "400": errorResponse("Requisição inválida"),
+      "403": errorResponse("Acesso interno, grant ou campo inválido"),
+    },
+  };
+}
+
 function certificatePjRequestBody(required = true) {
   return {
     required,
@@ -617,6 +673,12 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
       },
       "/internal/notifications/run": {
         post: internalCertificateNotificationRunOperation(),
+      },
+      "/internal/reporting/catalog": {
+        get: internalCertificatePjReportingCatalogOperation(),
+      },
+      "/internal/reporting/extract": {
+        post: internalCertificatePjReportingExtractOperation(),
       },
     },
     components: {

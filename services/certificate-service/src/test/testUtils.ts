@@ -226,6 +226,8 @@ export function createCertificateTestApp(
     auditServiceUrl: "http://localhost:3020",
     auditServiceToken: "audit-service-token-test",
     internalServiceToken: "certificate-service-internal-token-test",
+    reportsInternalToken: "reports-internal-token-test",
+    reportsGrantSecret: "reports-grant-secret-test",
     notificationWindowDays: 30,
     allowedOrigins: ["*"],
     enableApiDocs: false,

@@ -38,6 +38,8 @@ versionado.
 - `CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `REPORTS_INTERNAL_TOKEN`
+- `REPORTS_GRANT_SECRET`
 - `UPLOAD_RATE_LIMIT_MAX`
 - `UPLOAD_RATE_LIMIT_WINDOW_MS`
 
@@ -87,9 +89,15 @@ leitura autorizada.
 ## Rotas internas
 
 - `POST /internal/notifications/run`
+- `GET /internal/reporting/catalog`
+- `POST /internal/reporting/extract`
 
 Esta rota nao deve ser exposta pelo gateway publico. Ela exige `x-internal-service-token` com o
 valor de `CERTIFICATE_SERVICE_INTERNAL_TOKEN`.
+
+As rotas de reporting tambem nao devem ser expostas pelo gateway publico. Elas exigem o token
+interno e grants HMAC curtos compartilhados com o `reports-service`, usando
+`REPORTS_INTERNAL_TOKEN` e `REPORTS_GRANT_SECRET`.
 
 ## Notificacoes
 
