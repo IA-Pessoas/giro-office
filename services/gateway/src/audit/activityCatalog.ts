@@ -97,7 +97,17 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "um usuário da organização" },
   },
   {
-    methods: ["GET", "PUT"],
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/,
+    description: { action: "consultou", item: "as permissões de um usuário da organização" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/,
+    description: { action: "atualizou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["PUT"],
     pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/,
     description: { action: "alterou", item: "as permissões de um usuário da organização" },
   },

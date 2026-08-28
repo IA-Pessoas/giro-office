@@ -53,6 +53,18 @@ export interface PlatformOrganizationUser {
   department_id: string;
   photo_url: string | null;
   type: "owner" | "admin" | "user" | null;
+  permission: number;
+  version: number;
+}
+
+export interface UpdatePlatformOrganizationUserPayload {
+  name?: string;
+  login?: string;
+  password?: string;
+  department_id?: string;
+  permission?: number;
+  status?: "active" | "inactive";
+  expected_version: number;
 }
 
 export interface PlatformUsersListResponse {

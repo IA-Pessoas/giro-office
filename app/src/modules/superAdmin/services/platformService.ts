@@ -7,6 +7,7 @@ import type {
   PlatformOrganization,
   PlatformOrganizationsListResponse,
   PlatformUsersListResponse,
+  UpdatePlatformOrganizationUserPayload,
   UpdatePlatformOrganizationLogoPayload,
   UpdatePlatformOrganizationPlanPayload,
   UpdatePlatformOrganizationStatusPayload,
@@ -79,6 +80,18 @@ export const platformService = {
   ): Promise<PlatformUsersListResponse["users"][number]> {
     const response = await api.post(
       `/platform/organizations/${organizationId}/users/${userId}/reactivate`,
+    );
+    return unwrapData<PlatformUsersListResponse["users"][number]>(response);
+  },
+
+  async updateUser(
+    organizationId: string,
+    userId: string,
+    data: UpdatePlatformOrganizationUserPayload,
+  ): Promise<PlatformUsersListResponse["users"][number]> {
+    const response = await api.patch(
+      `/platform/organizations/${organizationId}/users/${userId}`,
+      data,
     );
     return unwrapData<PlatformUsersListResponse["users"][number]>(response);
   },
