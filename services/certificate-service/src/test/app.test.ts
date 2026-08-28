@@ -132,6 +132,18 @@ describe("certificate-service app", () => {
     });
   });
 
+  it("monta reporting somente no contexto interno e exige grant", async () => {
+    const app = createCertificateApplication({ env, logger, prisma: {} as never });
+
+    const response = await request(app).get("/internal/reporting/catalog");
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      code: "FORBIDDEN",
+    });
+  });
+
   it("documents reporting interno sem expor a rota no contrato público", async () => {
     const app = createCertificateApplication({
       env: { ...env, enableApiDocs: true },

@@ -6,9 +6,10 @@ import {
   createExpressErrorHandler,
   INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
+  ServiceError,
 } from "@workspace/shared";
-import "express-async-errors";
 import express from "express";
+import "express-async-errors";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,6 +17,8 @@ import { createInternalReportingRouter } from "../routes/internalReporting.route
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const env = {
+  certificateReportingToken: "certificate-reporting-token",
+  certificateReportingGrantSecret: "certificate-reporting-secret",
   reportsInternalToken: "reports-internal-token",
   reportsGrantSecret: "reports-grant-secret",
 };
@@ -29,6 +32,15 @@ function canonicalJson(value: unknown): string {
       .join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+function credentialsFor(source: string) {
+  return source === "certificado.pf"
+    ? {
+        token: env.certificateReportingToken,
+        secret: env.certificateReportingGrantSecret,
+      }
+    : { token: env.reportsInternalToken, secret: env.reportsGrantSecret };
 }
 
 function grantFor(input: {
@@ -54,13 +66,16 @@ function grantFor(input: {
     version: 1,
   };
   const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  const { secret } = credentialsFor(input.source);
   return {
     grant,
-    signature: createHmac("sha256", env.reportsGrantSecret).update(grant).digest("hex"),
+    signature: createHmac("sha256", secret).update(grant).digest("hex"),
   };
 }
 
-function createTestApp(reportingService = { extract: vi.fn() }) {
+function createTestApp(
+  reportingService = { consumeGrant: vi.fn().mockResolvedValue(undefined), extract: vi.fn() },
+) {
   const app = express();
   app.use(express.json());
   app.use("/internal", createInternalReportingRouter({ env, reportingService } as never));
@@ -75,9 +90,9 @@ function createTestApp(reportingService = { extract: vi.fn() }) {
 }
 
 describe("certificate-service internal reporting routes", () => {
-  it("publica o catálogo sem IDs, segredos ou relações", async () => {
+  it("publica os catálogos PF e PJ sem dados sensíveis ou relações", async () => {
     const body = {};
-    const requestId = "request-837-catalog";
+    const requestId = "request-838-catalog";
     const signed = grantFor({
       operation: "catalog",
       source: "certificado.catalog",
@@ -95,14 +110,26 @@ describe("certificate-service internal reporting routes", () => {
       .set("x-reports-grant-signature", signed.signature)
       .expect(200);
 
+    expect(response.body.data.sources.map((source: { key: string }) => source.key)).toEqual([
+      "certificado.pf",
+      "certificado.pj",
+    ]);
     expect(response.body.data.sources[0]).toEqual(
-      expect.objectContaining({
-        key: "certificado.pj",
-        module: "certificado",
-        keys: [],
-      }),
+      expect.objectContaining({ key: "certificado.pf", module: "certificado", keys: [] }),
     );
     expect(response.body.data.sources[0].fields.map((field: { key: string }) => field.key)).toEqual(
+      [
+        "name",
+        "model",
+        "enterprise",
+        "expiration_date",
+        "has_certificate",
+        "was_paid",
+        "payment_date",
+        "payment_amount",
+      ],
+    );
+    expect(response.body.data.sources[1].fields.map((field: { key: string }) => field.key)).toEqual(
       [
         "name",
         "model",
@@ -115,12 +142,14 @@ describe("certificate-service internal reporting routes", () => {
       ],
     );
     expect(response.body.data.relations).toEqual([]);
-    expect(JSON.stringify(response.body)).not.toMatch(/organization_id|password|file_path|sql/i);
+    expect(JSON.stringify(response.body)).not.toMatch(
+      /organization_id|password|cpf|file_path|sql/i,
+    );
   });
 
   it("rejeita token inválido, grant expirado e limite inválido", async () => {
-    const body = { source: "certificado.pj", fields: ["name"], limit: 2 };
-    const requestId = "request-837-invalid";
+    const body = { source: "certificado.pf", fields: ["name"], limit: 2 };
+    const requestId = "request-838-invalid";
     const signed = grantFor({
       operation: "extract",
       source: body.source,
@@ -142,7 +171,7 @@ describe("certificate-service internal reporting routes", () => {
 
     await request(app)
       .post("/internal/reporting/extract")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.reportsInternalToken)
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.certificateReportingToken)
       .set(REQUEST_ID_HEADER, requestId)
       .set("x-reports-grant", signed.grant)
       .set("x-reports-grant-signature", signed.signature)
@@ -151,14 +180,14 @@ describe("certificate-service internal reporting routes", () => {
 
     await request(app)
       .post("/internal/reporting/extract")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.reportsInternalToken)
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.certificateReportingToken)
       .send({ ...body, limit: 102 })
       .expect(400);
   });
 
-  it("encaminha organização do grant e devolve reachedLimit", async () => {
-    const body = { source: "certificado.pj", fields: ["name"], limit: 2 };
-    const requestId = "request-837-extract";
+  it("encaminha organização do grant e rejeita replay para PF", async () => {
+    const body = { source: "certificado.pf", fields: ["name"], limit: 2 };
+    const requestId = "request-838-extract";
     const signed = grantFor({
       operation: "extract",
       source: body.source,
@@ -167,8 +196,12 @@ describe("certificate-service internal reporting routes", () => {
       requestId,
     });
     const reportingService = {
+      consumeGrant: vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValue(new ServiceError(403, "Grant de relatórios já utilizado.")),
       extract: vi.fn().mockResolvedValue({
-        rows: [{ name: "Empresa segura" }],
+        rows: [{ name: "Pessoa segura" }],
         reachedLimit: true,
       }),
     };
@@ -176,7 +209,7 @@ describe("certificate-service internal reporting routes", () => {
 
     const response = await request(app)
       .post("/internal/reporting/extract")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.reportsInternalToken)
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.certificateReportingToken)
       .set(REQUEST_ID_HEADER, requestId)
       .set("x-reports-grant", signed.grant)
       .set("x-reports-grant-signature", signed.signature)
@@ -185,13 +218,60 @@ describe("certificate-service internal reporting routes", () => {
 
     expect(response.body).toEqual({
       success: true,
-      data: { rows: [{ name: "Empresa segura" }], reachedLimit: true },
+      data: { rows: [{ name: "Pessoa segura" }], reachedLimit: true },
     });
+    expect(reportingService.extract).toHaveBeenCalledWith({
+      organizationId,
+      source: "certificado.pf",
+      fields: ["name"],
+      limit: 2,
+    });
+
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.certificateReportingToken)
+      .set(REQUEST_ID_HEADER, requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(403);
+
+    expect(reportingService.extract).toHaveBeenCalledTimes(1);
+  });
+
+  it("encaminha extração PJ com as credenciais compartilhadas de relatórios", async () => {
+    const body = { source: "certificado.pj", fields: ["name"], limit: 1 };
+    const requestId = "request-838-pj-extract";
+    const signed = grantFor({
+      operation: "extract",
+      source: body.source,
+      fields: body.fields,
+      body,
+      requestId,
+    });
+    const reportingService = {
+      consumeGrant: vi.fn().mockResolvedValue(undefined),
+      extract: vi.fn().mockResolvedValue({
+        rows: [{ name: "Empresa segura" }],
+        reachedLimit: false,
+      }),
+    };
+    const { app } = createTestApp(reportingService);
+
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, env.reportsInternalToken)
+      .set(REQUEST_ID_HEADER, requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
     expect(reportingService.extract).toHaveBeenCalledWith({
       organizationId,
       source: "certificado.pj",
       fields: ["name"],
-      limit: 2,
+      limit: 1,
     });
   });
 });

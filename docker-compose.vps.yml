@@ -574,8 +574,9 @@ services:
       CONTABIL_SERVICE_URL: http://contabil-service:3038
       CERTIFICATE_SERVICE_URL: http://certificate-service:3041
       PROJECT_SERVICE_URL: http://project-service:3033
-      TASK_SERVICE_URL: http://task-service:3032
-      FISCAL_SERVICE_URL: http://fiscal-service:3037
+       TASK_SERVICE_URL: http://task-service:3032
+       CERTIFICATE_SERVICE_URL: http://certificate-service:3041
+       FISCAL_SERVICE_URL: http://fiscal-service:3037
     expose:
       - "3044"
     healthcheck:
@@ -610,8 +611,8 @@ services:
     environment:
       USER_SERVICE_URL: http://user-service:3030
       CONTABIL_SERVICE_URL: http://contabil-service:3038
-      CERTIFICATE_SERVICE_URL: http://certificate-service:3041
-      FISCAL_SERVICE_URL: http://fiscal-service:3037
+       CERTIFICATE_SERVICE_URL: http://certificate-service:3041
+       FISCAL_SERVICE_URL: http://fiscal-service:3037
     depends_on:
       reports-service:
         condition: service_healthy

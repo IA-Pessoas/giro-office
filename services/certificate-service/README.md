@@ -23,6 +23,8 @@ versionado.
 - `AUDIT_SERVICE_URL`
 - `AUDIT_SERVICE_TOKEN`
 - `CERTIFICATE_SERVICE_INTERNAL_TOKEN`
+- `CERTIFICATE_REPORTING_TOKEN`
+- `CERTIFICATE_REPORTING_GRANT_SECRET`
 - `CERTIFICATE_NOTIFICATION_WINDOW_DAYS`
 - `SERVICE_ALLOWED_ORIGINS`
 - `ENABLE_API_DOCS`
@@ -92,8 +94,13 @@ leitura autorizada.
 - `GET /internal/reporting/catalog`
 - `POST /internal/reporting/extract`
 
-Esta rota nao deve ser exposta pelo gateway publico. Ela exige `x-internal-service-token` com o
-valor de `CERTIFICATE_SERVICE_INTERNAL_TOKEN`.
+Estas rotas nao devem ser expostas pelo gateway publico. As notificacoes exigem
+`CERTIFICATE_SERVICE_INTERNAL_TOKEN`; reporting exige `CERTIFICATE_REPORTING_TOKEN` e um grant HMAC
+de curta duração assinado com `CERTIFICATE_REPORTING_GRANT_SECRET`.
+
+O catálogo interno de `certificado.pf` publica somente nome, modelo, empresa, vencimento, existência,
+pagamento, data e valor pagos. IDs, CPF, senha, organização, SQL e metadados de arquivo não são
+publicados.
 
 As rotas de reporting tambem nao devem ser expostas pelo gateway publico. Elas exigem o token
 interno e grants HMAC curtos compartilhados com o `reports-service`, usando

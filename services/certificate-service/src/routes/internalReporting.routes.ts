@@ -10,6 +10,7 @@ import {
 import { Router } from "express";
 
 import type { CertificateServiceEnv } from "../config/env.js";
+import { certificatePfReportingCatalog } from "../reporting/certificatePfReportingCatalog.js";
 import { certificatePjReportingCatalog } from "../reporting/certificatePjReportingCatalog.js";
 import {
   type InternalReportingGrant,
@@ -59,8 +60,14 @@ function decodeGrant(value: string | undefined): InternalReportingGrant {
   }
 }
 
-function verifyGrant(input: {
-  env: Pick<CertificateServiceEnv, "reportsInternalToken" | "reportsGrantSecret">;
+async function verifyGrant(input: {
+  env: Pick<
+    CertificateServiceEnv,
+    | "certificateReportingToken"
+    | "certificateReportingGrantSecret"
+    | "reportsInternalToken"
+    | "reportsGrantSecret"
+  >;
   token: string | undefined;
   grant: string | undefined;
   signature: string | undefined;
@@ -69,15 +76,22 @@ function verifyGrant(input: {
   source: string;
   fields: readonly string[];
   body: unknown;
-}): InternalReportingGrant {
-  if (!equalSecret(input.token, input.env.reportsInternalToken)) {
+  consumeGrant: (grant: string, expiresAt: number) => Promise<void>;
+}): Promise<InternalReportingGrant> {
+  const payload = decodeGrant(input.grant);
+  const token =
+    input.source === "certificado.pf"
+      ? input.env.certificateReportingToken
+      : input.env.reportsInternalToken;
+  const secret =
+    input.source === "certificado.pf"
+      ? input.env.certificateReportingGrantSecret
+      : input.env.reportsGrantSecret;
+  if (!equalSecret(input.token, token)) {
     throw new ServiceError(403, "Acesso negado.");
   }
-
-  const payload = decodeGrant(input.grant);
-  const expectedSignature = createHmac("sha256", input.env.reportsGrantSecret)
-    .update(input.grant ?? "")
-    .digest("hex");
+  const grant = input.grant ?? "";
+  const expectedSignature = createHmac("sha256", secret).update(grant).digest("hex");
   if (!equalSecret(input.signature, expectedSignature)) {
     throw new ServiceError(403, "Grant de relatórios inválido.");
   }
@@ -98,17 +112,24 @@ function verifyGrant(input: {
     throw new ServiceError(403, "Grant de relatórios inválido.");
   }
 
+  await input.consumeGrant(grant, payload.expires_at);
   return payload;
 }
 
 export function createInternalReportingRouter(options: {
-  env: Pick<CertificateServiceEnv, "reportsInternalToken" | "reportsGrantSecret">;
+  env: Pick<
+    CertificateServiceEnv,
+    | "certificateReportingToken"
+    | "certificateReportingGrantSecret"
+    | "reportsInternalToken"
+    | "reportsGrantSecret"
+  >;
   reportingService: InternalReportingService;
 }): ReturnType<typeof Router> {
   const router = Router();
 
-  router.get("/reporting/catalog", (request, response) => {
-    verifyGrant({
+  router.get("/reporting/catalog", async (request, response) => {
+    await verifyGrant({
       env: options.env,
       token: request.get(INTERNAL_SERVICE_TOKEN_HEADER),
       grant: request.get(REPORTS_GRANT_HEADER),
@@ -118,13 +139,22 @@ export function createInternalReportingRouter(options: {
       source: "certificado.catalog",
       fields: [],
       body: {},
+      consumeGrant: (grant, expiresAt) => options.reportingService.consumeGrant(grant, expiresAt),
     });
-    response.json(createSuccessResponse(certificatePjReportingCatalog));
+    response.json(
+      createSuccessResponse({
+        sources: [
+          ...certificatePfReportingCatalog.sources,
+          ...certificatePjReportingCatalog.sources,
+        ],
+        relations: [],
+      }),
+    );
   });
 
   router.post("/reporting/extract", async (request, response) => {
     const body = parseWithZod(internalReportingExtractBodySchema, request.body);
-    const grant = verifyGrant({
+    const grant = await verifyGrant({
       env: options.env,
       token: request.get(INTERNAL_SERVICE_TOKEN_HEADER),
       grant: request.get(REPORTS_GRANT_HEADER),
@@ -134,6 +164,7 @@ export function createInternalReportingRouter(options: {
       source: body.source,
       fields: body.fields,
       body,
+      consumeGrant: (grant, expiresAt) => options.reportingService.consumeGrant(grant, expiresAt),
     });
     const result = await options.reportingService.extract({
       organizationId: grant.organization_id,
