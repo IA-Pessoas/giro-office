@@ -8,13 +8,14 @@ import { buildAuditCapacityGuard, buildAuditLifecycleMiddleware } from "../middl
 
 const logger = { error: vi.fn(), warn: vi.fn(), debug: vi.fn() };
 const paths = [
-  ["POST", "/platform/organizations", null, null],
-  ["PATCH", "/platform/organizations/org-1/status", "org-1", null],
-  ["PATCH", "/platform/organizations/org-1/subscription-plan", "org-1", null],
-  ["PATCH", "/platform/organizations/org-1/logo-url", "org-1", null],
-  ["PATCH", "/platform/organizations/org-1/users/user-1", "org-1", "user-1"],
-  ["DELETE", "/platform/organizations/org-1/users/user-1", "org-1", "user-1"],
-  ["POST", "/platform/organizations/org-1/users/user-1/reactivate", "org-1", "user-1"],
+  ["POST", "/platform/organizations", null, null, false],
+  ["PATCH", "/platform/organizations/org-1/status", "org-1", null, false],
+  ["PATCH", "/platform/organizations/org-1/subscription-plan", "org-1", null, false],
+  ["PATCH", "/platform/organizations/org-1/logo-url", "org-1", null, false],
+  ["PATCH", "/platform/organizations/org-1/users/user-1", "org-1", "user-1", true],
+  ["PATCH", "/platform/organizations/org-1/users/user-1/", "org-1", "user-1", true],
+  ["DELETE", "/platform/organizations/org-1/users/user-1", "org-1", "user-1", false],
+  ["POST", "/platform/organizations/org-1/users/user-1/reactivate", "org-1", "user-1", false],
 ];
 
 function fixture(fetchImpl: typeof fetch, maxInFlight = 1) {
@@ -101,7 +102,7 @@ describe("durable organization mutation audit barrier", () => {
 
   it.each(
     paths,
-  )("waits for ACK before %s %s with a distinct, safe attempt", async (method, path, organizationId, userId) => {
+  )("waits for ACK before %s %s with the correct actor contract", async (method, path, organizationId, userId, expectsExplicitActor) => {
     const records: CreateAuditRequestPayload[] = [];
     let release!: (response: globalThis.Response) => void;
     const { start, recorder } = fixture(async (_input, init) => {
@@ -117,6 +118,9 @@ describe("durable organization mutation audit barrier", () => {
     await Promise.resolve();
     expect(operation.upstreamCalls()).toBe(0);
     expect(records).toHaveLength(1);
+    const actorMetadata = expectsExplicitActor
+      ? { actorKind: "platform", actorPlatformUserId: "platform-user-1" }
+      : { auth_kind: "platform", platform_user_id: "platform-user-1" };
     expect(records[0]).toMatchObject({
       action: "organization.mutation.attempt",
       organizationId,
@@ -125,8 +129,7 @@ describe("durable organization mutation audit barrier", () => {
       outcome: "success",
       query: {},
       metadata: {
-        actorKind: "platform",
-        actorPlatformUserId: "platform-user-1",
+        ...actorMetadata,
         business_outcome: "unknown",
         source_request_id_sha256: createHash("sha256").update("original-request-id").digest("hex"),
       },
@@ -137,7 +140,7 @@ describe("durable organization mutation audit barrier", () => {
     await vi.waitFor(() => expect(records).toHaveLength(2));
     expect(records[0].requestId).not.toBe(records[1].requestId);
     expect(records[1].requestId).toBe("original-request-id");
-    expect(records[1]).toMatchObject({ organizationId, userId });
+    expect(records[1]).toMatchObject({ organizationId, userId, metadata: actorMetadata });
     const serialized = JSON.stringify(records);
     for (const secret of ["query-secret", "11222333000181", "secret.example", "secret-token"]) {
       expect(serialized).not.toContain(secret);

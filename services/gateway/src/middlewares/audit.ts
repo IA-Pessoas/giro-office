@@ -95,6 +95,13 @@ function requiresOrganizationMutationAudit(request: Request): boolean {
   );
 }
 
+function usesExplicitPlatformActor(method: string, path: string): boolean {
+  return (
+    method.toUpperCase() === "PATCH" &&
+    PLATFORM_ORGANIZATION_USER_PATH.test(path.replace(/\/+$/u, ""))
+  );
+}
+
 interface BuildAuditCapacityGuardOptions {
   enabled: boolean;
   recordAuditRequest: ReservableAuditRecorder;
@@ -132,6 +139,7 @@ export function buildAuditCapacityGuard({
     if (requiresAudit) {
       const publicPath = getPublicPath(request.originalUrl, request.path);
       const auditTarget = getPlatformOrganizationAuditTarget(publicPath);
+      const explicitPlatformActor = usesExplicitPlatformActor(request.method, publicPath);
       const controller = new AbortController();
       const abort = () => controller.abort();
       response.once("close", abort);
@@ -182,8 +190,9 @@ export function buildAuditCapacityGuard({
                   }
                 : undefined,
             metadata: {
-              actorKind: "platform",
-              actorPlatformUserId: request.auth?.userId,
+              ...(explicitPlatformActor
+                ? { actorKind: "platform", actorPlatformUserId: request.auth?.userId }
+                : { auth_kind: "platform", platform_user_id: request.auth?.userId }),
               business_outcome: "unknown",
               source_request_id_sha256: createHash("sha256")
                 .update(request.requestId)
@@ -378,6 +387,8 @@ export function buildAuditLifecycleMiddleware({
 
       const isPlatform = request.auth?.actorKind === "platform";
       const auditTarget = isPlatform ? getPlatformOrganizationAuditTarget(publicPath) : null;
+      const explicitPlatformActor =
+        isPlatform && usesExplicitPlatformActor(request.method, publicPath);
 
       const payload: CreateAuditRequestPayload = {
         requestId: request.requestId,
@@ -410,10 +421,9 @@ export function buildAuditLifecycleMiddleware({
           routeTarget: getRouteTarget(env, request),
           activityVisible: activity !== null,
           ...(isPlatform
-            ? {
-                actorKind: "platform",
-                actorPlatformUserId: request.auth?.userId,
-              }
+            ? explicitPlatformActor
+              ? { actorKind: "platform", actorPlatformUserId: request.auth?.userId }
+              : { auth_kind: "platform", platform_user_id: request.auth?.userId }
             : {}),
         },
         action: activity?.action,
