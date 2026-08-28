@@ -10,7 +10,9 @@ const { prismaMock } = vi.hoisted(() => ({
     department: { findMany: vi.fn() },
   },
 }));
-const { managementMock } = vi.hoisted(() => ({ managementMock: { create: vi.fn() } }));
+const { managementMock } = vi.hoisted(() => ({
+  managementMock: { create: vi.fn(), getPermissions: vi.fn(), updatePermissions: vi.fn() },
+}));
 
 const { userServiceMock } = vi.hoisted(() => ({
   userServiceMock: {
@@ -42,6 +44,8 @@ describe("PlatformUsersService", () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: "user-1", name: "Ana" }]);
     prismaMock.user.count.mockResolvedValue(21);
     managementMock.create.mockReset();
+    managementMock.getPermissions.mockResolvedValue({ rh: 2, fiscal: 1 });
+    managementMock.updatePermissions.mockResolvedValue({ rh: 3, fiscal: 1 });
   });
 
   it("filters every query by organization", async () => {
@@ -154,6 +158,32 @@ describe("PlatformUsersService", () => {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
+  });
+
+  it("delegates modular permission reads and writes through the platform adapter scoped to the tenant", async () => {
+    const audit = vi.fn().mockResolvedValue(undefined);
+    const service = new PlatformUsersService(audit);
+
+    await expect(service.getPermissions("org-1", "user-1", "platform-user-1")).resolves.toEqual({
+      rh: 2,
+      fiscal: 1,
+    });
+    await expect(
+      service.updatePermissions("org-1", "user-1", { rh: 3 }, "platform-user-1"),
+    ).resolves.toEqual({ rh: 3, fiscal: 1 });
+
+    expect(managementMock.getPermissions).toHaveBeenCalledWith("user-1");
+    expect(managementMock.updatePermissions).toHaveBeenCalledWith("user-1", { rh: 3 });
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: "platform-user-1",
+        platformActorUserId: "platform-user-1",
+        action: "platform.user.permissions.updated",
+        referring: "user",
+        referringId: "user-1",
+        changes: { modules: { before: { rh: 2, fiscal: 1 }, after: { rh: 3, fiscal: 1 } } },
+      }),
+    );
   });
 
   it("delegates deactivation and reactivation to the transactional user lifecycle in the selected organization", async () => {

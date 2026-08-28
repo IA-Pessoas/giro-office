@@ -201,12 +201,27 @@ await runTest("consome contratos explícitos de gestão pela sessão HTTP-only",
     platformServiceSource,
     /api\.post\(\s*`\/platform\/organizations\/\$\{organizationId\}\/users\/\$\{userId\}\/reactivate`/,
   );
+  assert.match(
+    platformServiceSource,
+    /api\.get\(\s*`\/platform\/organizations\/\$\{organizationId\}\/users\/\$\{userId\}\/permissions`/,
+  );
+  assert.match(
+    platformServiceSource,
+    /api\.put\(\s*`\/platform\/organizations\/\$\{organizationId\}\/users\/\$\{userId\}\/permissions`,\s*permissions,?\s*\)/,
+  );
   assert.doesNotMatch(
     allSuperAdminSources,
     /cw\.token|jwtDecode|Authorization|Bearer|nookies|support_mode|support-sessions/,
   );
-  assert.doesNotMatch(platformServiceSource, /api\.put\(/);
   assert.doesNotMatch(platformServiceSource, /updateOrganization\s*\(/);
+});
+
+await runTest("reutiliza o editor compartilhado para permissões no tenant selecionado", () => {
+  assert.match(usersPanelSource, /AdminPermissionsEditor/);
+  assert.match(usersPanelSource, /getUserPermissions/);
+  assert.match(usersPanelSource, /updateUserPermissions/);
+  assert.match(usersPanelSource, /Editar permissões/);
+  assert.match(usersPanelSource, /permissionActionRef/);
 });
 
 await runTest("usa React Query, detalhe condicionado e mutations sem retry automático", () => {

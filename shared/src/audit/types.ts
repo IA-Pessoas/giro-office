@@ -109,6 +109,13 @@ export interface PlatformOrganizationAuditChanges {
   logo_url?: PlatformAuditChange<string>;
 }
 
+export interface PlatformPermissionAuditChanges {
+  modules: {
+    before: Partial<Record<ModulePermissionKey, 0 | 1 | 2 | 3>>;
+    after: Partial<Record<ModulePermissionKey, 0 | 1 | 2 | 3>>;
+  };
+}
+
 export interface PlatformAuditRequestRecord {
   id: string;
   requestId: string;
@@ -124,7 +131,7 @@ export interface PlatformAuditRequestRecord {
   referring?: string | null;
   referringId?: string | null;
   actorPlatformUserId?: string;
-  changes?: PlatformOrganizationAuditChanges;
+  changes?: PlatformOrganizationAuditChanges | PlatformPermissionAuditChanges;
 }
 
 export interface PlatformAuditSearchResult {
@@ -141,3 +148,4 @@ export interface ForwardedAuditAuthContext {
   authKind?: AuthKind;
   platformRole?: PlatformRole;
 }
+import type { ModulePermissionKey } from "../auth/modules.js";

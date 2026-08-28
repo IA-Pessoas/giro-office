@@ -8,6 +8,7 @@ import type {
   Logger,
   ReservableAuditRecorder,
 } from "@workspace/shared";
+import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 import { ServiceError } from "@workspace/shared";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
@@ -37,6 +38,24 @@ const PLATFORM_ORGANIZATION_STATUSES = new Set([
   "cancelled",
 ]);
 const NON_NEGATIVE_INTEGER_QUERY = /^(?:0|[1-9]\d*)$/u;
+const ACTIVE_MODULE_KEY_SET = new Set<string>(ACTIVE_MODULE_KEYS);
+
+function getAllowlistedModulePermissions(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([key, level]) =>
+        ACTIVE_MODULE_KEY_SET.has(key) &&
+        typeof level === "number" &&
+        Number.isInteger(level) &&
+        level >= 0 &&
+        level <= 3,
+    ),
+  );
+}
 
 function isIntegerInRange(value: string, minimum: number, maximum: number): boolean {
   if (!NON_NEGATIVE_INTEGER_QUERY.test(value)) {
@@ -67,7 +86,7 @@ function getPlatformOrganizationAuditTarget(path: string): {
     return null;
   }
   const userMatch = normalizedPath.match(
-    /^\/platform\/organizations\/[^/]+\/users\/([^/]+)(?:\/reactivate)?$/iu,
+    /^\/platform\/organizations\/[^/]+\/users\/([^/]+)(?:\/(?:reactivate|permissions))?$/iu,
   );
 
   return { organizationId: organizationMatch[1], userId: userMatch?.[1] ?? null };
@@ -87,7 +106,9 @@ function requiresOrganizationMutationAudit(request: Request): boolean {
       /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i.test(path)) ||
     (method === "DELETE" && /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i.test(path)) ||
     (method === "POST" &&
-      /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path))
+      /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path)) ||
+    (method === "PUT" &&
+      /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/i.test(path))
   );
 }
 
@@ -147,39 +168,51 @@ export function buildAuditCapacityGuard({
             serviceSource: "gateway",
             createdAt: new Date().toISOString(),
             action:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
-                ? "platform.user.create.attempt"
-                : "organization.mutation.attempt",
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
+                ? "platform.user.permissions.update.attempt"
+                : method === "POST" &&
+                    /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                  ? "platform.user.create.attempt"
+                  : "organization.mutation.attempt",
             referring:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
                 ? "user"
-                : "organization",
+                : method === "POST" &&
+                    /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                  ? "user"
+                  : "organization",
             referringId:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
-                ? String(request.body?.login ?? "new-user")
-                : undefined,
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
+                ? (auditTarget?.userId ?? undefined)
+                : method === "POST" &&
+                    /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                  ? String(request.body?.login ?? "new-user")
+                  : undefined,
             changes:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
                 ? {
                     before: null,
-                    after: {
-                      name: request.body?.name,
-                      login: request.body?.login,
-                      department_id: request.body?.department_id,
-                      permission: request.body?.permission,
-                      status: request.body?.status,
-                      type: request.body?.type,
-                      modules: request.body?.modules,
-                    },
+                    after: { modules: getAllowlistedModulePermissions(request.body) },
                   }
-                : undefined,
+                : method === "POST" &&
+                    /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                  ? {
+                      before: null,
+                      after: {
+                        name: request.body?.name,
+                        login: request.body?.login,
+                        department_id: request.body?.department_id,
+                        permission: request.body?.permission,
+                        status: request.body?.status,
+                        type: request.body?.type,
+                        modules: request.body?.modules,
+                      },
+                    }
+                  : undefined,
             metadata: {
               auth_kind: "platform",
               platform_user_id: request.auth?.userId,
+              actorPlatformUserId: request.auth?.userId,
               business_outcome: "unknown",
               source_request_id_sha256: createHash("sha256")
                 .update(request.requestId)

@@ -493,6 +493,23 @@ const baseManifest = [
   }),
   op({
     service: "user-service",
+    method: "GET",
+    path: "/platform/organizations/{organizationId}/users/{userId}/permissions",
+    action: "platformUserPermissions",
+    target: "gateway",
+    auth: "session",
+  }),
+  op({
+    service: "user-service",
+    method: "PUT",
+    path: "/platform/organizations/{organizationId}/users/{userId}/permissions",
+    action: "platformUserPermissionsUpdate",
+    target: "gateway",
+    auth: "session",
+    condition: "auditEnabled",
+  }),
+  op({
+    service: "user-service",
     method: "DELETE",
     path: "/platform/organizations/{organizationId}/users/{userId}",
     action: "platformUserDeactivate",

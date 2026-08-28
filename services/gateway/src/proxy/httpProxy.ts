@@ -137,8 +137,14 @@ const SESSION_COOKIE_RULES: SessionCookieRule[] = [
   },
   {
     method: "GET",
-    path: /^\/platform\/organizations\/[^/]+\/(?:users(?:\/[^/]+)?|departments)$/u,
+    path: /^\/platform\/organizations\/[^/]+\/(?:users(?:\/[^/]+(?:\/permissions)?)?|departments)$/u,
     inbound: [AUTH_SESSION_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "PUT",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
     outbound: [],
   },
   {

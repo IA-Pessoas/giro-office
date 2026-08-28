@@ -1,4 +1,5 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
+import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 
 import type { UserServiceEnv } from "../config/env.js";
 
@@ -19,6 +20,15 @@ const csrfHeader = {
   required: true,
   description: "Prova CSRF vinculada à sessão, exigida em mutações autenticadas por cookie.",
   schema: { type: "string" },
+} as const;
+const modularPermissionsSchema = {
+  type: "object",
+  description: "Níveis modulares do editor compartilhado: 0 a 3, apenas módulos ativos.",
+  properties: Object.fromEntries(
+    ACTIVE_MODULE_KEYS.map((moduleKey) => [moduleKey, { type: "integer", minimum: 0, maximum: 3 }]),
+  ),
+  additionalProperties: false,
+  minProperties: 1,
 } as const;
 
 export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocument {
@@ -348,6 +358,70 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             "403": { description: "Identidade não é um super administrador ou CSRF inválido" },
             "404": { description: "Usuário não pertence à organização do contexto" },
             "409": { description: "Versão desatualizada ou conflito de estado" },
+            "503": { description: "Auditoria durável indisponível antes da mutação" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/users/{userId}/permissions": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Ler permissões modulares pelo editor compartilhado",
+          description:
+            "Consulta as permissões do usuário exclusivamente dentro da organização selecionada.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+          ],
+          responses: {
+            "200": { description: "Permissões modulares atuais", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador da plataforma" },
+            "404": { description: "Usuário não pertence à organização do contexto" },
+          },
+        },
+        put: {
+          tags: ["Platform auth"],
+          summary: "Salvar permissões modulares pelo editor compartilhado",
+          description:
+            "Atualização atômica no tenant do path; invalida sessões do usuário e é bloqueada se a auditoria durável estiver indisponível.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: modularPermissionsSchema } },
+          },
+          responses: {
+            "200": { description: "Permissões modulares atualizadas", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador ou CSRF inválido" },
+            "404": { description: "Usuário não pertence à organização do contexto" },
+            "409": { description: "Conflito de estado ou último owner ativo" },
+            "422": { description: "Módulo ou nível de permissão incompatível" },
             "503": { description: "Auditoria durável indisponível antes da mutação" },
           },
         },

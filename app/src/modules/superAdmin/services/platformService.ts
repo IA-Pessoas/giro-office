@@ -11,7 +11,7 @@ import type {
   UpdatePlatformOrganizationPlanPayload,
   UpdatePlatformOrganizationStatusPayload,
 } from "../types";
-import type { AdminCreateUserData, UserItem } from "@modules/users/types";
+import type { AdminCreateUserData, PermissionDraft, UserItem } from "@modules/users/types";
 
 function unwrapData<T>(response: { data?: { data?: T } }): T {
   return response.data?.data as T;
@@ -39,6 +39,30 @@ export const platformService = {
   async getUser(organizationId: string, userId: string): Promise<PlatformUsersListResponse["users"][number]> {
     const response = await api.get(`/platform/organizations/${organizationId}/users/${userId}`);
     return unwrapData<PlatformUsersListResponse["users"][number]>(response);
+  },
+
+  async getUserPermissions(
+    organizationId: string,
+    userId: string,
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>> {
+    const response = await api.get(
+      `/platform/organizations/${organizationId}/users/${userId}/permissions`,
+      { signal },
+    );
+    return unwrapData<Record<string, unknown>>(response);
+  },
+
+  async updateUserPermissions(
+    organizationId: string,
+    userId: string,
+    permissions: PermissionDraft,
+  ): Promise<Record<string, unknown>> {
+    const response = await api.put(
+      `/platform/organizations/${organizationId}/users/${userId}/permissions`,
+      permissions,
+    );
+    return unwrapData<Record<string, unknown>>(response);
   },
 
   async deactivateUser(

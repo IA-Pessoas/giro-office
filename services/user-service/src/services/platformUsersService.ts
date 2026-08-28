@@ -1,5 +1,6 @@
-import { ServiceError } from "@workspace/shared";
+import { ACTIVE_MODULE_KEYS, type ModulePermissions, ServiceError } from "@workspace/shared";
 import type { Prisma } from "../generated/prisma/client.js";
+import type { UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { PlatformUserManagementAdapter } from "./userManagementService.js";
 import { type CreateUserInput, UserManagementService, UserService } from "./userService.js";
@@ -26,6 +27,8 @@ type PlatformUserListRow = Prisma.UserGetPayload<{ select: typeof PLATFORM_USER_
 
 export class PlatformUsersService {
   private readonly userService = new UserService();
+
+  constructor(private readonly audit?: UserAuditRecorder) {}
 
   async create(
     organizationId: string,
@@ -99,6 +102,48 @@ export class PlatformUsersService {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
+  }
+
+  async getPermissions(
+    organizationId: string,
+    userId: string,
+    platformUserId: string,
+  ): ReturnType<UserManagementService["getPermissions"]> {
+    const management = new PlatformUserManagementAdapter(new UserManagementService(), {
+      actor: { kind: "platform", platformUserId },
+      organizationId,
+    });
+    return management.getPermissions(userId);
+  }
+
+  async updatePermissions(
+    organizationId: string,
+    userId: string,
+    modules: Partial<ModulePermissions>,
+    platformUserId: string,
+  ): ReturnType<UserManagementService["updatePermissions"]> {
+    const management = new PlatformUserManagementAdapter(new UserManagementService(), {
+      actor: { kind: "platform", platformUserId },
+      organizationId,
+    });
+    const before = await management.getPermissions(userId);
+    const after = await management.updatePermissions(userId, modules);
+    await this.audit?.({
+      actorUserId: platformUserId,
+      platformActorUserId: platformUserId,
+      organizationId,
+      action: "platform.user.permissions.updated",
+      referring: "user",
+      referringId: userId,
+      changes: {
+        modules: {
+          before: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, before[key]])),
+          after: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, after[key]])),
+        },
+      },
+      outcome: "success",
+    });
+    return after;
   }
 
   async deactivate(organizationId: string, userId: string): Promise<PlatformUserListRow> {

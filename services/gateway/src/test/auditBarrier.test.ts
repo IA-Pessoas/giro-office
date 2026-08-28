@@ -34,14 +34,21 @@ function fixture(fetchImpl: typeof fetch, maxInFlight = 1) {
     logger: logger as never,
     recordAuditRequest: recorder,
   });
-  function start(method = "POST", path = "/platform/organizations") {
+  function start(
+    method = "POST",
+    path = "/platform/organizations",
+    body: Record<string, unknown> = {
+      cnpj: "11222333000181",
+      logo_url: "https://secret.example/logo",
+    },
+  ) {
     const request = {
       method,
       originalUrl: `${path}?token=query-secret`,
       path,
       requestId: "original-request-id",
       auth: { actorKind: "platform", userId: "platform-user-1", claims: {} },
-      body: { cnpj: "11222333000181", logo_url: "https://secret.example/logo" },
+      body,
       get: () => undefined,
       log: logger,
     } as unknown as Request;
@@ -142,6 +149,29 @@ describe("durable organization mutation audit barrier", () => {
     await Promise.resolve();
     expect(recorder.reserve("protected")).toBe("protected");
     expect(recorder.reserve("protected")).toBeUndefined();
+  });
+
+  it("atribui a alteração de permissões ao PlatformUser e registra apenas módulos allowlisted", async () => {
+    const records: CreateAuditRequestPayload[] = [];
+    const { start } = fixture(async (_input, init) => {
+      records.push(JSON.parse(String(init?.body)));
+      return new globalThis.Response(null, { status: 201 });
+    });
+    const operation = start("PUT", "/platform/organizations/org-1/users/user-1/permissions", {
+      rh: 3,
+      ignored: "secret",
+    });
+    await operation.pending;
+
+    expect(operation.upstreamCalls()).toBe(1);
+    expect(records[0]).toMatchObject({
+      action: "platform.user.permissions.update.attempt",
+      referring: "user",
+      referringId: "user-1",
+      changes: { before: null, after: { modules: { rh: 3 } } },
+      metadata: { actorPlatformUserId: "platform-user-1" },
+    });
+    expect(JSON.stringify(records[0])).not.toContain("secret");
   });
 
   it.each([

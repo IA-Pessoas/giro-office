@@ -19,6 +19,8 @@ const { platformAuthMock, platformUsersMock } = vi.hoisted(() => ({
     list: vi.fn(),
     getById: vi.fn(),
     listDepartments: vi.fn(),
+    getPermissions: vi.fn(),
+    updatePermissions: vi.fn(),
     create: vi.fn(),
     deactivate: vi.fn(),
     reactivate: vi.fn(),
@@ -127,6 +129,8 @@ describe("platform users routes", () => {
     });
     platformUsersMock.getById.mockResolvedValue({ id: "user-1", name: "Ana" });
     platformUsersMock.listDepartments.mockResolvedValue([{ id: "dep-1", name: "Fiscal" }]);
+    platformUsersMock.getPermissions.mockResolvedValue({ rh: 2, fiscal: 1 });
+    platformUsersMock.updatePermissions.mockResolvedValue({ rh: 3, fiscal: 1 });
     platformUsersMock.create.mockResolvedValue({ id: "user-2", name: "Nova", login: "nova" });
   });
 
@@ -169,6 +173,45 @@ describe("platform users routes", () => {
     expect(departments.status).toBe(200);
     expect(platformUsersMock.getById).toHaveBeenCalledWith("org-2", "user-1");
     expect(platformUsersMock.listDepartments).toHaveBeenCalledWith("org-2");
+  });
+
+  it("lê permissões somente para o usuário da organização selecionada", async () => {
+    const response = await request(createApp())
+      .get("/platform/organizations/org-2/users/user-1/permissions")
+      .set(platformGatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ rh: 2, fiscal: 1 });
+    expect(platformUsersMock.getPermissions).toHaveBeenCalledWith(
+      "org-2",
+      "user-1",
+      platformIdentity.id,
+    );
+  });
+
+  it("salva permissões válidas com CSRF e rejeita níveis incompatíveis com 422", async () => {
+    const app = createApp();
+    const headers = platformGatewayHeaders();
+
+    const updated = await request(app)
+      .put("/platform/organizations/org-2/users/user-1/permissions")
+      .set(headers)
+      .send({ rh: 3, fiscal: 1 });
+    const invalid = await request(app)
+      .put("/platform/organizations/org-2/users/user-1/permissions")
+      .set(headers)
+      .send({ rh: 4 });
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.data).toEqual({ rh: 3, fiscal: 1 });
+    expect(platformUsersMock.updatePermissions).toHaveBeenCalledWith(
+      "org-2",
+      "user-1",
+      { rh: 3, fiscal: 1 },
+      platformIdentity.id,
+    );
+    expect(invalid.status).toBe(422);
+    expect(platformUsersMock.updatePermissions).toHaveBeenCalledTimes(1);
   });
 
   it("cria usuário no tenant do path com sessão de plataforma e CSRF", async () => {
@@ -326,6 +369,35 @@ describe("platform users OpenAPI", () => {
     expect(spec.paths).toHaveProperty([
       "/platform/organizations/{organizationId}/users/{userId}/reactivate",
       "post",
+    ]);
+  });
+
+  it("documents the shared modular permissions contract with CSRF and 422 validation", () => {
+    const spec = buildUserServiceOpenApiSpec(testEnv);
+
+    expect(spec.paths).toHaveProperty([
+      "/platform/organizations/{organizationId}/users/{userId}/permissions",
+      "get",
+    ]);
+    expect(spec.paths).toHaveProperty([
+      "/platform/organizations/{organizationId}/users/{userId}/permissions",
+      "put",
+    ]);
+    expect(spec).toHaveProperty(
+      [
+        "paths",
+        "/platform/organizations/{organizationId}/users/{userId}/permissions",
+        "put",
+        "parameters",
+      ],
+      expect.arrayContaining([expect.objectContaining({ name: "x-csrf-token", required: true })]),
+    );
+    expect(spec).toHaveProperty([
+      "paths",
+      "/platform/organizations/{organizationId}/users/{userId}/permissions",
+      "put",
+      "responses",
+      "422",
     ]);
   });
 
