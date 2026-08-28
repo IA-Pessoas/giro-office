@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { platformAuthMock, platformUsersMock } = vi.hoisted(() => ({
   platformAuthMock: { validateSession: vi.fn() },
-  platformUsersMock: { list: vi.fn() },
+  platformUsersMock: { list: vi.fn(), getById: vi.fn(), listDepartments: vi.fn() },
 }));
 
 const { testEnv } = vi.hoisted(() => ({
@@ -117,6 +117,8 @@ describe("platform users routes", () => {
       total: 1,
       hasMore: false,
     });
+    platformUsersMock.getById.mockResolvedValue({ id: "user-1", name: "Ana" });
+    platformUsersMock.listDepartments.mockResolvedValue([{ id: "dep-1", name: "Fiscal" }]);
   });
 
   it("lists only the organization requested by a platform super admin", async () => {
@@ -143,6 +145,21 @@ describe("platform users routes", () => {
 
     expect(response.status).toBe(401);
     expect(platformUsersMock.list).not.toHaveBeenCalled();
+  });
+
+  it("reads details and department options only within the requested tenant", async () => {
+    const app = createApp();
+    const headers = platformGatewayHeaders();
+
+    const [detail, departments] = await Promise.all([
+      request(app).get("/platform/organizations/org-2/users/user-1").set(headers),
+      request(app).get("/platform/organizations/org-2/departments").set(headers),
+    ]);
+
+    expect(detail.status).toBe(200);
+    expect(departments.status).toBe(200);
+    expect(platformUsersMock.getById).toHaveBeenCalledWith("org-2", "user-1");
+    expect(platformUsersMock.listDepartments).toHaveBeenCalledWith("org-2");
   });
 
   it("returns 403 for an organizational identity", async () => {

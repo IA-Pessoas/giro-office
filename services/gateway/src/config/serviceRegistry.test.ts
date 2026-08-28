@@ -46,6 +46,23 @@ describe("user-service gateway registry", () => {
     expect(resolveGatewayService(env, "/platform/me/", "GET")?.key).toBe("user-service");
     expect(resolveGatewayService(env, "/platform/../user/me", "GET")).toBeNull();
   });
+
+  it.each([
+    "/platform/organizations/org-1/users/user-1",
+    "/platform/organizations/org-1/departments",
+  ])("encaminha %s exclusivamente ao user-service com sessão de plataforma", (path) => {
+    const env = {
+      userServiceUrl: "http://user-service:3030",
+      userServiceInternalToken: "gateway-user-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, path, "GET")).toMatchObject({
+      key: "user-service",
+      targetUrl: "http://user-service:3030",
+      internalServiceToken: "gateway-user-token",
+      forwardPlatformSessionCredentials: true,
+    });
+  });
 });
 
 describe("organization-service platform registry", () => {

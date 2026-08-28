@@ -4,8 +4,10 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     user: {
       findMany: vi.fn(),
+      findFirst: vi.fn(),
       count: vi.fn(),
     },
+    department: { findMany: vi.fn() },
   },
 }));
 
@@ -70,5 +72,28 @@ describe("PlatformUsersService", () => {
         take: 100,
       }),
     );
+  });
+
+  it("reads a user and departments through the selected organization only", async () => {
+    const service = new PlatformUsersService();
+    prismaMock.user.findFirst.mockResolvedValue({ id: "user-1", name: "Ana" });
+    prismaMock.department.findMany.mockResolvedValue([{ id: "dep-1", name: "Fiscal" }]);
+
+    await expect(service.getById("org-1", "user-1")).resolves.toEqual({
+      id: "user-1",
+      name: "Ana",
+    });
+    await expect(service.listDepartments("org-1")).resolves.toEqual([
+      { id: "dep-1", name: "Fiscal" },
+    ]);
+
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "user-1", organization_id: "org-1" } }),
+    );
+    expect(prismaMock.department.findMany).toHaveBeenCalledWith({
+      where: { organization_id: "org-1" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
   });
 });

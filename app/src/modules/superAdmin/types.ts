@@ -61,6 +61,11 @@ export interface PlatformUsersListResponse {
   hasMore: boolean;
 }
 
+export interface PlatformDepartmentOption {
+  id: string;
+  name: string;
+}
+
 export interface PlatformAuditRecord {
   id: string;
   requestId: string;

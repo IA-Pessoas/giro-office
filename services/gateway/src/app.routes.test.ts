@@ -436,18 +436,24 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
       "/platform/organizations",
       "/platform/organizations/org-1",
       "/platform/organizations/org-1/users",
+      "/platform/organizations/org-1/users/user-1",
+      "/platform/organizations/org-1/departments",
       "/platform/audit/requests",
     ]) {
       requests.push(await fetch(`${gatewayUrl}${path}`, { headers: forgedHeaders }));
     }
 
-    expect(requests.map((response) => response.status)).toEqual([200, 200, 200, 200, 200]);
+    expect(requests.map((response) => response.status)).toEqual([
+      200, 200, 200, 200, 200, 200, 200,
+    ]);
     const proxiedRequests = seen.filter(({ url }) => url !== "/internal/audit/requests");
     expect(proxiedRequests.map(({ service, url }) => ({ service, url }))).toEqual([
       { service: "user-service", url: "/platform/me" },
       { service: "organization-service", url: "/platform/organizations" },
       { service: "organization-service", url: "/platform/organizations/org-1" },
       { service: "user-service", url: "/platform/organizations/org-1/users" },
+      { service: "user-service", url: "/platform/organizations/org-1/users/user-1" },
+      { service: "user-service", url: "/platform/organizations/org-1/departments" },
       { service: "audit-service", url: "/audit/requests" },
     ]);
     for (const forwarded of proxiedRequests) {
@@ -462,13 +468,15 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
       });
       expect(forwarded.organizationId).toBeUndefined();
     }
-    expect(proxiedRequests.slice(0, 4).map(({ cookie }) => cookie)).toEqual([
+    expect(proxiedRequests.slice(0, 6).map(({ cookie }) => cookie)).toEqual([
+      `cw.session=${platformToken}`,
+      `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
     ]);
-    expect(proxiedRequests[4]?.cookie).toBeUndefined();
+    expect(proxiedRequests[6]?.cookie).toBeUndefined();
 
     const platformOnOrganizationRoute = await fetch(`${gatewayUrl}/organizations`, {
       headers: { Cookie: `cw.session=${platformToken}` },
@@ -488,7 +496,7 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
     expect(organizationOnPlatformRoute.status).toBe(403);
     expect(browserBearer.status).toBe(401);
     expect(internalValidation.status).toBe(404);
-    expect(proxiedRequests).toHaveLength(5);
+    expect(proxiedRequests).toHaveLength(7);
   } finally {
     await stopServer(gateway);
     await stopServer(userService);

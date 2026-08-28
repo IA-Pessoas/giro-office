@@ -219,6 +219,57 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/platform/organizations/{organizationId}/users/{userId}": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Consultar usuário de uma organização pela plataforma",
+          description:
+            "Consulta somente leitura por sessão HTTP-only; o usuário deve pertencer à organização do path.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+          ],
+          responses: {
+            "200": { description: "Detalhe de usuário sem campos sensíveis", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador da plataforma" },
+            "404": { description: "Usuário não pertence à organização do contexto" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/departments": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Listar departamentos de uma organização pela plataforma",
+          description:
+            "Consulta somente leitura por sessão HTTP-only; retorna exclusivamente id e name.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+          ],
+          responses: {
+            "200": { description: "Departamentos da organização", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador da plataforma" },
+          },
+        },
+      },
       "/platform/session/validate": {
         post: {
           tags: ["Platform auth"],

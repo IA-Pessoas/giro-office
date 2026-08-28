@@ -191,6 +191,18 @@ describe("buildForwardHeaders", () => {
       expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
       expectedCsrf: "proof",
     },
+    {
+      method: "GET",
+      path: "/platform/organizations/org-1/users/user-1",
+      expectedCookie: "cw.session=verified-platform-token",
+      expectedCsrf: null,
+    },
+    {
+      method: "GET",
+      path: "/platform/organizations/org-1/departments",
+      expectedCookie: "cw.session=verified-platform-token",
+      expectedCsrf: null,
+    },
   ])("encaminha somente as credenciais allowlisted em $method $path", (entry) => {
     const request = {
       ...authenticatedRequest,
@@ -219,6 +231,43 @@ describe("buildForwardHeaders", () => {
     expect(headers.get("x-csrf-token")).toBe(entry.expectedCsrf);
     expect(headers.get("authorization")).toBeNull();
     expect(headers.get(INTERNAL_SERVICE_TOKEN_HEADER)).toBe("trusted-internal-token");
+  });
+
+  it.each([
+    "/platform/organizations/org-1/users/user-1",
+    "/platform/organizations/org-1/departments",
+  ])("remove identidade enviada pelo cliente em %s", (path) => {
+    const request = {
+      ...authenticatedRequest,
+      method: "GET",
+      originalUrl: path,
+      headers: {
+        cookie: "cw.session=forged; cw.csrf=forged",
+        [FORWARDED_AUTH_USER_ID_HEADER]: "attacker-user",
+        [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "attacker-org",
+        [FORWARDED_AUTH_KIND_HEADER]: "organization",
+        [FORWARDED_AUTH_PLATFORM_ROLE_HEADER]: "owner",
+      },
+      auth: {
+        ...authenticatedRequest.auth,
+        token: "verified-platform-token",
+        userId: "real-platform-user",
+        organizationId: "",
+        actorKind: "platform",
+        isPlatformAdmin: true,
+      },
+    } as unknown as Request;
+
+    const headers = buildForwardHeaders(request, {
+      forwardPlatformSessionCredentials: true,
+      internalServiceToken: "trusted-internal-token",
+    });
+
+    expect(headers.get("cookie")).toBe("cw.session=verified-platform-token");
+    expect(headers.get(FORWARDED_AUTH_USER_ID_HEADER)).toBe("real-platform-user");
+    expect(headers.get(FORWARDED_AUTH_ORGANIZATION_ID_HEADER)).toBeNull();
+    expect(headers.get(FORWARDED_AUTH_KIND_HEADER)).toBe("platform");
+    expect(headers.get(FORWARDED_AUTH_PLATFORM_ROLE_HEADER)).toBe("super_admin");
   });
 });
 

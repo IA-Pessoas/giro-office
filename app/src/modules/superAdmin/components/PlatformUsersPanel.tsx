@@ -1,11 +1,11 @@
 import { Search, UserRound } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { Input } from "@shared/ui/newLayout/input";
 
-import { usePlatformUsers } from "../hooks/usePlatformUsers";
+import { usePlatformDepartments, usePlatformUserDetail, usePlatformUsers } from "../hooks/usePlatformUsers";
 import type { PlatformOrganization, PlatformOrganizationUser } from "../types";
 
 const PAGE_SIZE = 20;
@@ -20,6 +20,7 @@ function getProfileLabel(user: PlatformOrganizationUser): string {
 export function PlatformUsersPanel({ organization }: { organization: PlatformOrganization }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const usersQuery = usePlatformUsers(organization.id, {
     skip: (page - 1) * PAGE_SIZE,
@@ -29,6 +30,16 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const users = usersQuery.data?.users ?? [];
   const total = usersQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const userDetailQuery = usePlatformUserDetail(organization.id, selectedUserId);
+  const departmentsQuery = usePlatformDepartments(organization.id);
+  const departmentName = departmentsQuery.data?.find(
+    (department) => department.id === userDetailQuery.data?.department_id,
+  )?.name;
+
+  useEffect(() => {
+    if (!selectedUserId && users[0]) setSelectedUserId(users[0].id);
+    if (selectedUserId && !users.some((user) => user.id === selectedUserId)) setSelectedUserId(null);
+  }, [selectedUserId, users]);
 
   return (
     <section aria-labelledby="platform-users-title">
@@ -85,7 +96,9 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
             </p>
           </div>
         ) : (
-          <table className="w-full min-w-[660px] text-left text-sm">
+          <div className="grid gap-0 lg:grid-cols-[22rem_minmax(0,1fr)]">
+          <div className="overflow-x-auto border-b border-slate-200 dark:border-slate-800 lg:border-b-0 lg:border-r">
+          <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-[11px] uppercase tracking-[0.1em] text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 font-semibold" scope="col">Pessoa</th>
@@ -97,8 +110,15 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
               {users.map((user) => (
                 <tr className="text-slate-700 dark:text-slate-200" key={user.id}>
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-950 dark:text-white">{user.name}</p>
-                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{user.login}</p>
+                    <button
+                      aria-current={selectedUserId === user.id ? "true" : undefined}
+                      className="w-full rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                      onClick={() => setSelectedUserId(user.id)}
+                      type="button"
+                    >
+                      <p className="font-semibold text-slate-950 dark:text-white">{user.name}</p>
+                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{user.login}</p>
+                    </button>
                   </td>
                   <td className="px-4 py-3">{getProfileLabel(user)}</td>
                   <td className="px-4 py-3">
@@ -110,6 +130,25 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
               ))}
             </tbody>
           </table>
+          </div>
+          <aside aria-live="polite" className="min-h-72 p-5" aria-label="Detalhes do usuário">
+            {!selectedUserId ? (
+              <p className="text-sm text-slate-500">Selecione um usuário para consultar seus detalhes.</p>
+            ) : userDetailQuery.isLoading ? (
+              <p className="text-sm text-slate-500" role="status">Carregando detalhes do usuário...</p>
+            ) : userDetailQuery.isError ? (
+              <div role="alert" className="text-sm text-rose-900 dark:text-rose-100">
+                <p>Não foi possível carregar os detalhes do usuário.</p>
+                <button className="mt-3 font-semibold underline" onClick={() => void userDetailQuery.refetch()} type="button">Tentar novamente</button>
+              </div>
+            ) : userDetailQuery.data ? (
+              <div className="space-y-4">
+                <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Usuário selecionado</p><h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{userDetailQuery.data.name}</h3></div>
+                <dl className="space-y-3 text-sm"><div><dt className="text-slate-500">Login</dt><dd className="font-medium">{userDetailQuery.data.login}</dd></div><div><dt className="text-slate-500">Departamento</dt><dd className="font-medium">{departmentsQuery.isLoading ? "Carregando..." : departmentsQuery.isError ? <span className="text-rose-700 dark:text-rose-300" role="alert">Não foi possível carregar departamentos. <button className="font-semibold underline" onClick={() => void departmentsQuery.refetch()} type="button">Tentar novamente</button></span> : departmentName ?? "Sem departamento"}</dd></div><div><dt className="text-slate-500">Perfil</dt><dd className="font-medium">{getProfileLabel(userDetailQuery.data)}</dd></div></dl>
+              </div>
+            ) : null}
+          </aside>
+          </div>
         )}
       </div>
 

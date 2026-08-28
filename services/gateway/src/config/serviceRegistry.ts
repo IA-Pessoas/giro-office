@@ -90,7 +90,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
         { methods: ["GET"], path: /^\/platform\/me\/?$/ },
         {
           methods: ["GET"],
-          path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+          path: /^\/platform\/organizations\/[^/]+\/(?:users(?:\/[^/]+)?|departments)\/?$/,
         },
       ],
     },

@@ -178,6 +178,13 @@ describe("activityCatalog", () => {
       "consultou",
       "a lista global de usuários da organização",
     ],
+    ["GET", "/platform/organizations/org-1/users/user-1", "consultou", "um usuário da organização"],
+    [
+      "GET",
+      "/platform/organizations/org-1/departments",
+      "consultou",
+      "os departamentos da organização",
+    ],
   ])("traduz %s %s", (method, path, action, item) => {
     expect(describeActivity(method, path)).toEqual({ action, item });
   });

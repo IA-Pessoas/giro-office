@@ -190,7 +190,7 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/audit(?:\/|$)/, policy: authenticatedPolicy },
   {
     method: "GET",
-    path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+    path: /^\/platform\/organizations\/[^/]+\/(?:users(?:\/[^/]+)?|departments)\/?$/,
     policy: platformOnlyPolicy,
   },
   {
