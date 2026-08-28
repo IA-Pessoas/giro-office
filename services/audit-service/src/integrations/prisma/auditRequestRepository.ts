@@ -9,8 +9,8 @@ import {
   type OrganizationAuditStatus,
   type PlatformAuditRequestRecord,
   type PlatformAuditSearchResult,
-  type PlatformPermissionAuditChanges,
   type PlatformOrganizationAuditChanges,
+  type PlatformPermissionAuditChanges,
 } from "@workspace/shared/audit";
 import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 
