@@ -972,15 +972,17 @@ function createFiscalReportingGrant({ operation, source, fields, body }) {
     fields,
     issued_at: issuedAt,
     operation,
-    organization_id: FIXTURE_ORGANIZATION_ID,
+    organization_id: requireState("session").organization_id,
     request_id: requestId,
     source,
+    version: 1,
   };
   const canonical = canonicalJson(payload);
-  const signature = crypto.createHmac("sha256", secret).update(canonical).digest("hex");
+  const grant = Buffer.from(canonical).toString("base64url");
   return {
-    "x-reports-grant": Buffer.from(canonical).toString("base64url"),
-    "x-reports-grant-signature": signature,
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
   };
 }
 
