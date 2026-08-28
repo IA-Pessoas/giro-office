@@ -141,7 +141,7 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "Fiscal Service",
       buildSpec: () =>
         buildFiscalServiceOpenApiSpec({ port: getPortFromUrl(env.fiscalServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "contabil-service",
