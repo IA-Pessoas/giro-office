@@ -29,6 +29,9 @@ const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
 const PLATFORM_ORGANIZATIONS_PATH = "/platform/organizations";
+const PLATFORM_ORGANIZATION_SETTINGS_PATH =
+  /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i;
+const PLATFORM_ORGANIZATION_USER_PATH = /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i;
 const PLATFORM_ORGANIZATION_STATUSES = new Set([
   "trial",
   "past_due",
@@ -84,10 +87,18 @@ function requiresOrganizationMutationAudit(request: Request): boolean {
     (method === "POST" && path.toLowerCase() === "/platform/organizations") ||
     (method === "POST" && /^\/platform\/organizations\/[^/]+\/users$/i.test(path)) ||
     (method === "PATCH" &&
-      /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i.test(path)) ||
+      (PLATFORM_ORGANIZATION_SETTINGS_PATH.test(path) ||
+        PLATFORM_ORGANIZATION_USER_PATH.test(path))) ||
     (method === "DELETE" && /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i.test(path)) ||
     (method === "POST" &&
       /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path))
+  );
+}
+
+function usesExplicitPlatformActor(method: string, path: string): boolean {
+  return (
+    method.toUpperCase() === "PATCH" &&
+    PLATFORM_ORGANIZATION_USER_PATH.test(path.replace(/\/+$/u, ""))
   );
 }
 
@@ -128,6 +139,7 @@ export function buildAuditCapacityGuard({
     if (requiresAudit) {
       const publicPath = getPublicPath(request.originalUrl, request.path);
       const auditTarget = getPlatformOrganizationAuditTarget(publicPath);
+      const explicitPlatformActor = usesExplicitPlatformActor(request.method, publicPath);
       const controller = new AbortController();
       const abort = () => controller.abort();
       response.once("close", abort);
@@ -178,8 +190,9 @@ export function buildAuditCapacityGuard({
                   }
                 : undefined,
             metadata: {
-              auth_kind: "platform",
-              platform_user_id: request.auth?.userId,
+              ...(explicitPlatformActor
+                ? { actorKind: "platform", actorPlatformUserId: request.auth?.userId }
+                : { auth_kind: "platform", platform_user_id: request.auth?.userId }),
               business_outcome: "unknown",
               source_request_id_sha256: createHash("sha256")
                 .update(request.requestId)
@@ -374,6 +387,8 @@ export function buildAuditLifecycleMiddleware({
 
       const isPlatform = request.auth?.actorKind === "platform";
       const auditTarget = isPlatform ? getPlatformOrganizationAuditTarget(publicPath) : null;
+      const explicitPlatformActor =
+        isPlatform && usesExplicitPlatformActor(request.method, publicPath);
 
       const payload: CreateAuditRequestPayload = {
         requestId: request.requestId,
@@ -406,10 +421,9 @@ export function buildAuditLifecycleMiddleware({
           routeTarget: getRouteTarget(env, request),
           activityVisible: activity !== null,
           ...(isPlatform
-            ? {
-                auth_kind: "platform",
-                platform_user_id: request.auth?.userId,
-              }
+            ? explicitPlatformActor
+              ? { actorKind: "platform", actorPlatformUserId: request.auth?.userId }
+              : { auth_kind: "platform", platform_user_id: request.auth?.userId }
             : {}),
         },
         action: activity?.action,

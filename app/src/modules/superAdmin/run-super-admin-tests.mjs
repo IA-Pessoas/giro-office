@@ -327,14 +327,36 @@ await runTest("renderiza somente o contrato real de usuário da plataforma", () 
   const userContract =
     typesSource.match(/export interface PlatformOrganizationUser \{[\s\S]*?\n\}/)?.[0] ?? "";
 
-  for (const field of ["id", "name", "login", "status", "department_id", "photo_url", "type"]) {
+  for (const field of [
+    "id",
+    "name",
+    "login",
+    "status",
+    "department_id",
+    "photo_url",
+    "type",
+    "permission",
+    "version",
+  ]) {
     assert.match(userContract, new RegExp(`\\b${field}:`));
   }
   assert.match(userContract, /type: "owner" \| "admin" \| "user" \| null/);
-  assert.doesNotMatch(
-    userContract,
-    /permission:|joined_at:|organization_id:|first_owner_flag:|permission_id:/,
-  );
+  for (const field of [
+    "joined_at",
+    "organization_id",
+    "first_owner_flag",
+    "permission_id",
+    "password",
+    "password_hash",
+    "hashed_password",
+    "hash",
+    "access_token",
+    "refresh_token",
+    "session_token",
+    "csrf_token",
+  ]) {
+    assert.doesNotMatch(userContract, new RegExp(`\\b${field}:`));
+  }
   assert.match(usersPanelSource, /return "Sem perfil"/);
   assert.doesNotMatch(usersPanelSource, /Nível|Entrada|joined_at|user\.permission/);
 });
