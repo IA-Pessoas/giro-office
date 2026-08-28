@@ -1,6 +1,8 @@
 import type {
   ReportPreviewPayload,
   ReportPreviewResult,
+  ReportDownloadResult,
+  ReportHistoryPage,
   ReportsCatalog,
   ReportsCatalogField,
   ReportsCatalogSource,
@@ -10,6 +12,20 @@ import type {
 export const REPORTS_ENDPOINTS = {
   catalog: "/reports/catalog",
   preview: "/reports/preview",
+  models: "/reports/models/list",
+  sharedModels: "/reports/models/shared/list",
+  createModel: "/reports/models",
+  createSharedModel: "/reports/models/shared",
+  jobs: "/reports/jobs/list",
+  createJob: "/reports/jobs",
+  job: (id: string) => `/reports/jobs/${id}`,
+  cancelJob: (id: string) => `/reports/jobs/${id}/cancel`,
+  snapshot: (id: string) => `/reports/jobs/${id}/snapshot`,
+  download: (id: string) => `/reports/snapshots/${id}/export`,
+  model: (id: string) => `/reports/models/${id}`,
+  sharedModel: (id: string) => `/reports/models/shared/${id}`,
+  copySharedModel: (id: string) => `/reports/models/shared/${id}/copy`,
+  previewSharedModel: (id: string) => `/reports/models/shared/${id}/preview`,
 } as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -180,6 +196,55 @@ export function unwrapReportsPreviewEnvelope(body: unknown): ReportPreviewResult
     rows: result.rows,
     limit: result.limit,
     hasMore: result.hasMore,
+  };
+}
+
+export function buildReportJobListParams(
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => {
+      if (value === undefined || value === null) return false;
+      return typeof value !== "string" || value.trim().length > 0;
+    }),
+  );
+}
+
+export function unwrapReportJobListEnvelope(body: unknown): ReportHistoryPage {
+  const payload = unwrapReportsEnvelope<unknown>(body);
+  if (!isRecord(payload) || !Array.isArray(payload.items)) throw reportsError();
+  return {
+    items: payload.items as ReportHistoryPage["items"],
+    nextCursor: typeof payload.nextCursor === "number" ? payload.nextCursor : null,
+  };
+}
+
+export function parseReportFilename(header: string | undefined, fallback: string): string {
+  const encoded = header?.match(/filename\*=(?:UTF-8''|utf-8'')([^;]+)/i)?.[1];
+  const quoted = header?.match(/filename="([^"]+)"/i)?.[1];
+  const raw = encoded ?? quoted ?? header?.match(/filename=([^;]+)/i)?.[1];
+  if (!raw) return fallback;
+  let filename = raw.trim().replace(/^"|"$/g, "");
+  if (encoded) {
+    try {
+      filename = decodeURIComponent(filename);
+    } catch {
+      filename = raw.trim().replace(/^"|"$/g, "");
+    }
+  }
+  return filename.split(/[\\/]/u).pop()?.replace(/[\u0000-\u001f<>:"|?*]/gu, "_") || fallback;
+}
+
+export function unwrapReportDownload(
+  blob: Blob,
+  headers: Record<string, string | undefined>,
+  fallbackFilename: string,
+  fallbackMimeType = "application/octet-stream",
+): ReportDownloadResult {
+  return {
+    blob,
+    filename: parseReportFilename(headers["content-disposition"], fallbackFilename),
+    mimeType: headers["content-type"] ?? blob.type ?? fallbackMimeType,
   };
 }
 
