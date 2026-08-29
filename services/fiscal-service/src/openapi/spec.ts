@@ -158,7 +158,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       "/internal/reporting/catalog": {
         get: {
           tags: ["InternalReporting"],
-          summary: "Consultar catálogo interno de NCM fiscal",
+          summary: "Consultar catálogo interno de ICMS e NCM fiscal",
           security: [{ internalServiceToken: [] }],
           parameters: [
             {
@@ -190,7 +190,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       "/internal/reporting/extract": {
         post: {
           tags: ["InternalReporting"],
-          summary: "Extrair campos governados de NCM fiscal",
+          summary: "Extrair campos governados de ICMS ou NCM fiscal",
           security: [{ internalServiceToken: [] }],
           parameters: [
             {
@@ -217,7 +217,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                   required: ["source", "fields", "limit"],
                   additionalProperties: false,
                   properties: {
-                    source: { type: "string", enum: ["fiscal.ncm"] },
+                    source: { type: "string", enum: ["fiscal.icms", "fiscal.ncm"] },
                     fields: {
                       type: "array",
                       minItems: 1,

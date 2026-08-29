@@ -10,6 +10,7 @@ import {
 import { Router } from "express";
 
 import type { FiscalServiceEnv } from "../config/env.js";
+import { fiscalIcmsReportingCatalog } from "../reporting/fiscalIcmsReportingCatalog.js";
 import { fiscalNcmReportingCatalog } from "../reporting/fiscalNcmReportingCatalog.js";
 import type { InternalReportingService } from "../reporting/internalReportingService.js";
 import {
@@ -119,7 +120,12 @@ export function createInternalReportingRouter(options: {
       fields: [],
       body: {},
     });
-    response.json(createSuccessResponse(fiscalNcmReportingCatalog));
+    response.json(
+      createSuccessResponse({
+        sources: [...fiscalIcmsReportingCatalog.sources, ...fiscalNcmReportingCatalog.sources],
+        relations: [],
+      }),
+    );
   });
 
   router.post("/reporting/extract", async (request, response) => {

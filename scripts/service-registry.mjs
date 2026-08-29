@@ -68,8 +68,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3037",
     urlEnvKey: "FISCAL_SERVICE_URL",
     openapiSpecPath: "services/fiscal-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/fiscal-service/src/generated/prisma",
   },
   {

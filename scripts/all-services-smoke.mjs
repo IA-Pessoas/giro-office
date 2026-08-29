@@ -2800,19 +2800,24 @@ const handlers = {
   },
 
   async fiscalReportingExtract(op) {
-    const body = { source: "fiscal.ncm", fields: ["ncm_code"], limit: 1 };
-    await httpRequest(op, {
-      path: "/internal/reporting/extract",
-      json: body,
-      headers: isBadExpectation(op)
-        ? {}
-        : createFiscalReportingGrant({
-            operation: "extract",
-            source: body.source,
-            fields: body.fields,
-            body,
-          }),
-    });
+    const bodies = [
+      { source: "fiscal.icms", fields: ["state"], limit: 1 },
+      { source: "fiscal.ncm", fields: ["ncm_code"], limit: 1 },
+    ];
+    for (const body of bodies) {
+      await httpRequest(op, {
+        path: "/internal/reporting/extract",
+        json: body,
+        headers: isBadExpectation(op)
+          ? {}
+          : createFiscalReportingGrant({
+              operation: "extract",
+              source: body.source,
+              fields: body.fields,
+              body,
+            }),
+      });
+    }
   },
 
   async userStartConfig(op) {
