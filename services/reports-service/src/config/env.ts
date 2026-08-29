@@ -30,6 +30,8 @@ const reportsServiceEnvSchema = z
     jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o reports-service."),
     reportsInternalToken: z.string().optional().default("reports-service-token"),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
+    certificateReportingToken: z.string().optional().default(""),
+    certificateReportingGrantSecret: z.string().optional().default(""),
     auditEnabled: z
       .string()
       .optional()
@@ -101,6 +103,18 @@ const reportsServiceEnvSchema = z
       envName: "REPORTS_GRANT_SECRET",
       token: rest.reportsGrantSecret,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "reports-service",
+      envName: "CERTIFICATE_REPORTING_TOKEN",
+      token: rest.certificateReportingToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "reports-service",
+      envName: "CERTIFICATE_REPORTING_GRANT_SECRET",
+      token: rest.certificateReportingGrantSecret,
+    });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
       serviceName: "reports-service",
@@ -130,6 +144,8 @@ export function parseReportsServiceEnv(
     jwtSecret: source.JWT_SECRET,
     reportsInternalToken: source.REPORTS_INTERNAL_TOKEN,
     reportsGrantSecret: source.REPORTS_GRANT_SECRET,
+    certificateReportingToken: source.CERTIFICATE_REPORTING_TOKEN,
+    certificateReportingGrantSecret: source.CERTIFICATE_REPORTING_GRANT_SECRET,
     auditEnabled: source.AUDIT_ENABLED,
     auditServiceUrl: source.AUDIT_SERVICE_URL,
     auditServiceToken: source.AUDIT_SERVICE_TOKEN,

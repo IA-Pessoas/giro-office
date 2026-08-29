@@ -1,3 +1,4 @@
+export * from "./certificatePfReportingCatalog.js";
 export * from "./certificatePjReportingCatalog.js";
 export * from "./clientIntegrationReportingCatalog.js";
 export * from "./contabilControlReportingCatalog.js";

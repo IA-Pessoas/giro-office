@@ -933,9 +933,16 @@ function createContabilReportingGrant({ operation, source, fields, body }) {
   };
 }
 
-function createCertificateReportingGrant({ operation, source, fields, body }) {
-  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
-  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for certificate reporting smoke.");
+function createCertificateReportingGrant({
+  operation,
+  source,
+  fields,
+  body,
+  secretValue,
+  missingSecretMessage = "Missing REPORTS_GRANT_SECRET for certificate reporting smoke.",
+}) {
+  const secret = secretValue ?? process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error(missingSecretMessage);
 
   const issuedAt = Math.floor(Date.now() / 1000);
   const requestId = crypto.randomUUID();
@@ -2733,7 +2740,7 @@ const handlers = {
         ? {}
         : createCertificateReportingGrant({
             operation: "catalog",
-            source: "certificado.pj",
+            source: "certificado.catalog",
             fields: [],
             body: {},
           }),
@@ -2741,19 +2748,41 @@ const handlers = {
   },
 
   async certificateReportingExtract(op) {
-    const body = { source: "certificado.pj", fields: ["name"], limit: 1 };
-    await httpRequest(op, {
-      path: "/internal/reporting/extract",
-      json: body,
-      headers: isBadExpectation(op)
-        ? {}
-        : createCertificateReportingGrant({
-            operation: "extract",
-            source: body.source,
-            fields: body.fields,
-            body,
-          }),
-    });
+    const requests = [
+      {
+        body: { source: "certificado.pj", fields: ["name"], limit: 1 },
+        headers: {},
+      },
+      {
+        body: { source: "certificado.pf", fields: ["name"], limit: 1 },
+        headers: {
+          "x-internal-service-token": process.env.CERTIFICATE_REPORTING_TOKEN?.trim(),
+        },
+        secretValue: process.env.CERTIFICATE_REPORTING_GRANT_SECRET?.trim(),
+        missingSecretMessage:
+          "Missing CERTIFICATE_REPORTING_GRANT_SECRET for certificate PF reporting smoke.",
+      },
+    ];
+
+    for (const { body, headers, secretValue, missingSecretMessage } of requests) {
+      await httpRequest(op, {
+        path: "/internal/reporting/extract",
+        json: body,
+        headers: isBadExpectation(op)
+          ? {}
+          : {
+              ...headers,
+              ...createCertificateReportingGrant({
+                operation: "extract",
+                source: body.source,
+                fields: body.fields,
+                body,
+                secretValue,
+                missingSecretMessage,
+              }),
+            },
+      });
+    }
   },
 
   async fiscalReportingCatalog(op) {
