@@ -16,6 +16,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `AUDIT_SERVICE_URL`
 - `AUDIT_SERVICE_TOKEN`
 - `INTERNAL_SERVICE_TOKEN` (obrigatorio em producao; em dev/test usa `AUDIT_SERVICE_TOKEN` como fallback)
+- `REPORTS_GRANT_SECRET` (segredo compartilhado com o reports-service para grants de reporting)
 - `PESSOAL_PASSWORD_ENCRYPTION_KEY`
 - `PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION`
 - `PESSOAL_DOMAIN_AUDIT_ENABLED`
@@ -39,6 +40,8 @@ Exemplos de paths publicos planejados:
 ## Rotinas internas
 
 - `POST /internal/pessoal/union-notifications/run`
+- `GET /internal/reporting/catalog`
+- `POST /internal/reporting/extract`
 
 O servico nao agenda cron no processo Node. A rotina de notificacoes de sindicatos deve ser
 acionada por um scheduler externo, como Supabase/Vercel, usando `x-internal-service-token`.
