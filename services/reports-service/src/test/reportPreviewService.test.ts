@@ -69,5 +69,16 @@ describe("ReportPreviewService", () => {
       limit: 2,
       hasMore: false,
     });
+
+    vi.mocked(adapter.preview).mockResolvedValue({
+      rows: [{ balance: 1 }],
+      reachedLimit: true,
+    });
+    await expect(service.preview(definition, scope)).resolves.toEqual({
+      rows: [{ balance: 1 }],
+      presentation: { columns: [{ key: "balance", label: "balance" }] },
+      limit: 2,
+      hasMore: true,
+    });
   });
 });

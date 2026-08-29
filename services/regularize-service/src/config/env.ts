@@ -38,6 +38,8 @@ const regularizeServiceEnvSchema = z
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o regularize-service."),
     auditServiceToken: z.string().optional().default("audit-service-token"),
     internalServiceTokenEnv: z.string().optional(),
+    regularizeReportingToken: z.string().optional().default("regularize-reporting-token"),
+    regularizeReportingGrantSecret: z.string().optional().default(""),
     encryptionKey: z.string().min(1, "MTK_ENCRYPTION_KEY não definida."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
@@ -75,6 +77,18 @@ const regularizeServiceEnvSchema = z
       envName: "INTERNAL_SERVICE_TOKEN",
       token: internalServiceToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "regularize-service",
+      envName: "REGULARIZE_REPORTING_TOKEN",
+      token: rest.regularizeReportingToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "regularize-service",
+      envName: "REGULARIZE_REPORTING_GRANT_SECRET",
+      token: rest.regularizeReportingGrantSecret,
+    });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
       serviceName: "regularize-service",
@@ -103,6 +117,8 @@ export function getRegularizeServiceEnv(): RegularizeServiceEnv {
     jwtSecret: process.env.JWT_SECRET,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     internalServiceTokenEnv: process.env.INTERNAL_SERVICE_TOKEN,
+    regularizeReportingToken: process.env.REGULARIZE_REPORTING_TOKEN,
+    regularizeReportingGrantSecret: process.env.REGULARIZE_REPORTING_GRANT_SECRET,
     encryptionKey: process.env.MTK_ENCRYPTION_KEY,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,

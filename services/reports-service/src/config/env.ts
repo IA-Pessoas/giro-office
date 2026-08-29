@@ -69,6 +69,12 @@ const reportsServiceEnvSchema = z
       .string()
       .url("PESSOAL_SERVICE_URL invalida.")
       .default("http://localhost:3042"),
+    regularizeServiceUrl: z
+      .string()
+      .url("REGULARIZE_SERVICE_URL invalida.")
+      .default("http://localhost:3039"),
+    regularizeReportingToken: z.string().default(""),
+    regularizeReportingGrantSecret: z.string().default(""),
     workerPollIntervalMs: z.coerce.number().int().positive().default(5000),
     workerConcurrency: z.coerce.number().int().positive().default(2),
     workerLeaseSeconds: z.coerce.number().int().positive().default(120),
@@ -119,6 +125,18 @@ const reportsServiceEnvSchema = z
       envName: "CERTIFICATE_REPORTING_GRANT_SECRET",
       token: rest.certificateReportingGrantSecret,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "reports-service",
+      envName: "REGULARIZE_REPORTING_TOKEN",
+      token: rest.regularizeReportingToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "reports-service",
+      envName: "REGULARIZE_REPORTING_GRANT_SECRET",
+      token: rest.regularizeReportingGrantSecret,
+    });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
       serviceName: "reports-service",
@@ -162,6 +180,9 @@ export function parseReportsServiceEnv(
     certificateServiceUrl: source.CERTIFICATE_SERVICE_URL,
     fiscalServiceUrl: source.FISCAL_SERVICE_URL,
     pessoalServiceUrl: source.PESSOAL_SERVICE_URL,
+    regularizeServiceUrl: source.REGULARIZE_SERVICE_URL,
+    regularizeReportingToken: source.REGULARIZE_REPORTING_TOKEN,
+    regularizeReportingGrantSecret: source.REGULARIZE_REPORTING_GRANT_SECRET,
     workerPollIntervalMs: source.REPORTS_WORKER_POLL_INTERVAL_MS,
     workerConcurrency: source.REPORTS_WORKER_CONCURRENCY,
     workerLeaseSeconds: source.REPORTS_WORKER_LEASE_SECONDS,

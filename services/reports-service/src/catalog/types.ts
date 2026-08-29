@@ -90,9 +90,24 @@ export interface ReportPreviewAdapterInput {
   request_id: string;
 }
 
+export interface ReportPreviewAdapterResult {
+  rows: readonly Record<string, unknown>[];
+  reachedLimit: boolean;
+}
+
+export type ReportPreviewAdapterOutput =
+  | readonly Record<string, unknown>[]
+  | ReportPreviewAdapterResult;
+
+export function normalizeReportPreviewAdapterOutput(
+  output: ReportPreviewAdapterOutput,
+): ReportPreviewAdapterResult {
+  return "rows" in output ? output : { rows: output, reachedLimit: false };
+}
+
 export interface ReportSourceAdapter {
   readonly sources: readonly ReportCatalogSource[];
   readonly relations: readonly ReportCatalogRelation[];
   isEnabled(scope: ReportCatalogScope): boolean;
-  preview(input: ReportPreviewAdapterInput): Promise<readonly Record<string, unknown>[]>;
+  preview(input: ReportPreviewAdapterInput): Promise<ReportPreviewAdapterOutput>;
 }
