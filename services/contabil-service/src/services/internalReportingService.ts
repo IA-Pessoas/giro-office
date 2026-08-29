@@ -17,6 +17,7 @@ export class InternalReportingService {
     private readonly prisma: {
       controlContabil: ReportingDelegate;
       responsibleContabil: ReportingDelegate;
+      relationshipContabil: ReportingDelegate;
     },
   ) {}
 
@@ -34,7 +35,9 @@ export class InternalReportingService {
     const delegate =
       input.source === "contabil.control"
         ? this.prisma.controlContabil
-        : this.prisma.responsibleContabil;
+        : input.source === "contabil.responsibles"
+          ? this.prisma.responsibleContabil
+          : this.prisma.relationshipContabil;
     const rows = await delegate.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),

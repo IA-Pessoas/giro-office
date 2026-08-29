@@ -7,6 +7,7 @@ import { getReportsServiceEnv } from "./config/env.js";
 import { CertificatePjAdapter } from "./integrations/certificatePjAdapter.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
+import { ContabilRelationshipAdapter } from "./integrations/contabilRelationshipAdapter.js";
 import { ContabilResponsiblesAdapter } from "./integrations/contabilResponsiblesAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
@@ -31,6 +32,7 @@ const app = createReportsApp({
       new ParcelamentoAdapter(env),
       new ClientIntegrationAdapter(env),
       new ContabilControlAdapter(env),
+      new ContabilRelationshipAdapter(env),
       new ContabilResponsiblesAdapter(env),
       new TaskAdapter(env),
       new ProjectAdapter(env),

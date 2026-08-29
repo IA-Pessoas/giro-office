@@ -1,5 +1,8 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
-import type { contabilResponsiblesReportingCatalog } from "@workspace/shared";
+import type {
+  contabilRelationshipReportingCatalog,
+  contabilResponsiblesReportingCatalog,
+} from "@workspace/shared";
 import {
   contabilControlReportingCatalog,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -24,6 +27,7 @@ const relations: readonly ReportCatalogRelation[] = [];
 
 export type ContabilReportingCatalog =
   | typeof contabilControlReportingCatalog
+  | typeof contabilRelationshipReportingCatalog
   | typeof contabilResponsiblesReportingCatalog;
 
 function getReportSources(catalog: ContabilReportingCatalog): readonly ReportCatalogSource[] {
