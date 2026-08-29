@@ -33,7 +33,7 @@ describe("fiscal internal reporting OpenAPI", () => {
     expect(
       spec.paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
         ?.schema?.properties?.source,
-    ).toEqual({ type: "string", enum: ["fiscal.icms", "fiscal.ncm"] });
+    ).toEqual({ type: "string", enum: ["fiscal.icms", "fiscal.ncm", "fiscal.ipi"] });
     expect(
       spec.paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
         ?.schema?.properties,

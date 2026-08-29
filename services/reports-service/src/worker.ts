@@ -6,6 +6,7 @@ import { getReportsServiceEnv } from "./config/env.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
 import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
+import { FiscalIpiAdapter } from "./integrations/fiscalIpiAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
@@ -41,6 +42,7 @@ const catalog = new SourceCatalogService([
   new ProjectAdapter(env),
   new FiscalIcmsAdapter(env),
   new FiscalNcmAdapter(env),
+  new FiscalIpiAdapter(env),
 ]);
 const worker = new ReportWorkerService(
   new ReportJobRepository(prisma, env.workerLeaseSeconds, audit),

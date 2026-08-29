@@ -2803,6 +2803,7 @@ const handlers = {
     const bodies = [
       { source: "fiscal.icms", fields: ["state"], limit: 1 },
       { source: "fiscal.ncm", fields: ["ncm_code"], limit: 1 },
+      { source: "fiscal.ipi", fields: ["ncm"], limit: 1 },
     ];
     for (const body of bodies) {
       await httpRequest(op, {
