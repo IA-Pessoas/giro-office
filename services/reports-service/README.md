@@ -48,7 +48,7 @@ pnpm --filter @workspace/reports-service test
 ```
 
 O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas, Controle Contábil,
-relacionamentos e responsáveis contábeis, Certificados PF e PJ, ICMS fiscal e NCM fiscal.
+relacionamentos e responsáveis contábeis, Certificados PF e PJ, ICMS, IPI e NCM fiscal.
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
 
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
