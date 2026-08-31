@@ -56,6 +56,8 @@ Solicitações e Feriados de RH, Licenças e Processos do Regularize. Os adapter
 `/internal/reporting/extract` do rh-service, com grant HMAC curto e projeção dos campos seguros de
 `rh.requests` e `rh.holidays`.
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
+Os adapters de Tecnologia incluem inventário, chamados e ramais, sempre com projeção de campos
+seguros e sem chaves internas no catálogo público.
 
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.

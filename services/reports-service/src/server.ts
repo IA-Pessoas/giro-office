@@ -25,6 +25,7 @@ import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapte
 import { RhHolidayAdapter } from "./integrations/rhHolidayAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
+import { TiExtensionsAdapter } from "./integrations/tiExtensionsAdapter.js";
 import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
 import { TiRequestsAdapter } from "./integrations/tiRequestsAdapter.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
@@ -63,6 +64,7 @@ const app = createReportsApp({
       new RegularizeProcessAdapter(env),
       new RhRequestAdapter(env),
       new RhHolidayAdapter(env),
+      new TiExtensionsAdapter(env),
       new TiInventoryAdapter(env),
       new TiRequestsAdapter(env),
       new RegularizeMunicipalTaxesAdapter(env),

@@ -57,9 +57,10 @@ servico/VPS, junto com `SUPABASE_URL`.
 O `reports-service` acessa diretamente `GET /internal/reporting/catalog` e
 `POST /internal/reporting/extract`, fora do gateway. As duas operações exigem
 `REPORTS_INTERNAL_TOKEN`, grant HMAC de curta duração e `x-request-id`; o contrato publica apenas
-as fontes governadas `ti.inventory` e `ti.requests`. Para chamados, expõe somente título,
-categoria, urgência, status e datas de criação/atualização; solicitante e responsável ficam
-restritos às chaves internas do catálogo.
+as fontes governadas `ti.inventory`, `ti.requests` e `ti.extensions`. Para ramais, expõe somente
+ramal e datas de criação/atualização; usuário fica restrito à chave interna do catálogo. Para
+chamados, expõe somente título, categoria, urgência, status e datas de criação/atualização;
+solicitante e responsável ficam restritos às chaves internas do catálogo.
 
 ## Senhas de TI
 

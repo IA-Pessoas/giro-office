@@ -37,5 +37,18 @@ describe("ti internal reporting OpenAPI", () => {
         }
       ).post.requestBody.content["application/json"].schema.properties.source.enum,
     ).toContain("ti.requests");
+    expect(
+      (
+        spec.paths["/internal/reporting/extract"] as {
+          post: {
+            requestBody: {
+              content: {
+                "application/json": { schema: { properties: { source: { enum: string[] } } } };
+              };
+            };
+          };
+        }
+      ).post.requestBody.content["application/json"].schema.properties.source.enum,
+    ).toContain("ti.extensions");
   });
 });

@@ -20,5 +20,6 @@ export * from "./regularizeProcessReportingCatalog.js";
 export * from "./rhHolidayReportingCatalog.js";
 export * from "./rhRequestReportingCatalog.js";
 export * from "./taskReportingCatalog.js";
+export * from "./tiExtensionsReportingCatalog.js";
 export * from "./tiInventoryReportingCatalog.js";
 export * from "./tiRequestsReportingCatalog.js";
