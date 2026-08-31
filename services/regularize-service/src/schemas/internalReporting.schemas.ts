@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-import { REGULARIZE_LICENSE_REPORTING_SOURCES } from "../reporting/regularizeLicenseReportingCatalog.js";
+import { REGULARIZE_REPORTING_SOURCES } from "../reporting/regularizeReportingCatalog.js";
 
 const reportingFieldSchema = z.string().trim().min(1).max(64);
 
 export const internalReportingExtractBodySchema = z
   .object({
-    source: z.enum(REGULARIZE_LICENSE_REPORTING_SOURCES),
+    source: z.enum(REGULARIZE_REPORTING_SOURCES),
     fields: z.array(reportingFieldSchema).min(1).max(25),
     limit: z.number().int().min(1).max(101),
   })
@@ -48,6 +48,13 @@ export const internalReportingGrantSchema = z
         code: z.ZodIssueCode.custom,
         path: ["expires_at"],
         message: "TTL máximo é 60 segundos.",
+      });
+    }
+    if (value.expires_at <= value.issued_at) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["expires_at"],
+        message: "O grant deve expirar depois da emissão.",
       });
     }
   });

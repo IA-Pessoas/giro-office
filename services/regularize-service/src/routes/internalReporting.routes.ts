@@ -11,7 +11,7 @@ import { Router } from "express";
 
 import type { RegularizeServiceEnv } from "../config/env.js";
 import type { RegularizeLicenseReportingService } from "../reporting/internalReportingService.js";
-import { regularizeLicenseReportingCatalog } from "../reporting/regularizeLicenseReportingCatalog.js";
+import { regularizeReportingCatalog } from "../reporting/regularizeReportingCatalog.js";
 import {
   type InternalReportingGrant,
   internalReportingExtractBodySchema,
@@ -120,7 +120,7 @@ export function createInternalReportingRouter(options: {
       fields: [],
       body: {},
     });
-    response.json(createSuccessResponse(regularizeLicenseReportingCatalog));
+    response.json(createSuccessResponse(regularizeReportingCatalog));
   });
 
   router.post("/reporting/extract", async (request, response) => {

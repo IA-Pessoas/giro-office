@@ -684,7 +684,7 @@ export function buildRegularizeServiceOpenApiSpec(
       "/internal/reporting/extract": {
         post: {
           tags: ["Internal"],
-          summary: "Extrair licenças para o reports-service",
+          summary: "Extrair licenças e processos para o reports-service",
           security: [{ internalToken: [] }],
           parameters: [
             {
@@ -710,7 +710,10 @@ export function buildRegularizeServiceOpenApiSpec(
                   required: ["source", "fields", "limit"],
                   additionalProperties: false,
                   properties: {
-                    source: { type: "string", enum: ["regularize.licenses"] },
+                    source: {
+                      type: "string",
+                      enum: ["regularize.licenses", "regularize.processes"],
+                    },
                     fields: {
                       type: "array",
                       minItems: 1,

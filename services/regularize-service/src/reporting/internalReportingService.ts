@@ -4,6 +4,14 @@ import {
   getRegularizeLicenseReportingFields,
   type RegularizeLicenseReportingSource,
 } from "./regularizeLicenseReportingCatalog.js";
+import {
+  getRegularizeProcessReportingFields,
+  type RegularizeProcessReportingSource,
+} from "./regularizeProcessReportingCatalog.js";
+
+export type RegularizeReportingSource =
+  | RegularizeLicenseReportingSource
+  | RegularizeProcessReportingSource;
 
 type ReportingDelegate = {
   findMany(input: {
@@ -25,20 +33,34 @@ function projectRows(
 }
 
 export class RegularizeLicenseReportingService {
-  constructor(private readonly prisma: { license: ReportingDelegate }) {}
+  constructor(
+    private readonly prisma: {
+      license: ReportingDelegate;
+      process?: ReportingDelegate;
+    },
+  ) {}
 
   async extract(input: {
     organizationId: string;
-    source: RegularizeLicenseReportingSource;
+    source: RegularizeReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
-    const allowedFields = getRegularizeLicenseReportingFields(input.source);
+    const allowedFields =
+      input.source === "regularize.licenses"
+        ? getRegularizeLicenseReportingFields(input.source)
+        : getRegularizeProcessReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
 
-    const rows = await this.prisma.license.findMany({
+    const delegate =
+      input.source === "regularize.licenses" ? this.prisma.license : this.prisma.process;
+    if (!delegate) {
+      throw new ServiceError(500, "Fonte interna de relatórios não configurada.");
+    }
+
+    const rows = await delegate.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
       take: input.limit + 1,
