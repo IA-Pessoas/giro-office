@@ -53,6 +53,32 @@ export interface PlatformOrganizationUser {
   department_id: string;
   photo_url: string | null;
   type: "owner" | "admin" | "user" | null;
+  permission: number;
+  version: number;
+}
+
+export interface UpdatePlatformOrganizationUserPayload {
+  name?: string;
+  login?: string;
+  password?: string;
+  department_id?: string;
+  permission?: number;
+  status?: "active" | "inactive";
+  expected_version: number;
+}
+
+export type PreviousOwnerAction = "demote" | "deactivate";
+
+export interface TransferPlatformOwnershipPayload {
+  currentOwnerId: string;
+  successorUserId: string;
+  previousOwnerAction: PreviousOwnerAction;
+  justification: string;
+}
+
+export interface PlatformOwnershipTransferResult {
+  currentOwner: PlatformOrganizationUser;
+  successor: PlatformOrganizationUser;
 }
 
 export interface PlatformUsersListResponse {
@@ -88,6 +114,17 @@ export interface PlatformAuditRecord {
       to: PlatformOrganizationPlan | null;
     };
     logo_url?: { from: string | null; to: string | null };
+    ownership?: {
+      before: { ownerId: string; type: "owner"; status: "active" };
+      after: {
+        ownerId: string;
+        type: "owner";
+        status: "active";
+        previousOwner: { id: string; type: "owner" | "admin"; status: "active" | "inactive" };
+      };
+      previousOwnerAction: "demote" | "deactivate";
+      justification: string;
+    };
   };
 }
 

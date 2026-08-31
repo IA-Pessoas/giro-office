@@ -1,11 +1,20 @@
-import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
+import {
+  createSuccessResponse,
+  error as logError,
+  parseWithZod,
+  ServiceError,
+} from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
+import type { UserAuditRecorder } from "../integrations/audit.js";
+import { updatePermissionBodySchema } from "../schemas/permission.schemas.js";
 import {
   listPlatformUsersQuerySchema,
   platformOrganizationUserParamsSchema,
   platformOrganizationUsersParamsSchema,
+  transferPlatformOwnershipBodySchema,
+  updatePlatformUserBodySchema,
 } from "../schemas/platformUsers.schemas.js";
 import { createUserBodySchema } from "../schemas/user.schemas.js";
 import {
@@ -15,9 +24,43 @@ import {
 } from "../security/platformAuth.js";
 import { PlatformUsersService } from "../services/platformUsersService.js";
 
-export function createPlatformUsersRoutes(): ReturnType<typeof Router> {
+export function createPlatformUsersRoutes(
+  options: { audit?: UserAuditRecorder } = {},
+): ReturnType<typeof Router> {
   const router = Router();
-  const platformUsersService = new PlatformUsersService();
+  const platformUsersService = new PlatformUsersService(options.audit);
+
+  function parsePlatformPermissionUpdate(body: unknown): Record<string, number> {
+    const result = updatePermissionBodySchema.safeParse(body);
+    if (!result.success) {
+      throw new ServiceError(422, result.error.issues[0]?.message ?? "Permissões inválidas.");
+    }
+    return result.data;
+  }
+
+  router.post(
+    "/organizations/:organizationId/ownership-transfer",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId } = parseWithZod(
+          platformOrganizationUsersParamsSchema,
+          request.params,
+        );
+        const input = parseWithZod(transferPlatformOwnershipBodySchema, request.body);
+        response.json(
+          createSuccessResponse(
+            await platformUsersService.transferOwnership(organizationId, input),
+          ),
+        );
+      } catch (err) {
+        logError("Erro ao transferir ownership pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
 
   router.post(
     "/organizations/:organizationId/users",
@@ -59,6 +102,61 @@ export function createPlatformUsersRoutes(): ReturnType<typeof Router> {
         );
       } catch (err) {
         logError("Erro ao consultar usuario da organizacao pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/organizations/:organizationId/users/:userId/permissions",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId, userId } = parseWithZod(
+          platformOrganizationUserParamsSchema,
+          request.params,
+        );
+        response.json(
+          createSuccessResponse(
+            await platformUsersService.getPermissions(
+              organizationId,
+              userId,
+              request.platform_identity?.id ?? "",
+            ),
+          ),
+        );
+      } catch (err) {
+        logError("Erro ao consultar permissões do usuário pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.put(
+    "/organizations/:organizationId/users/:userId/permissions",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId, userId } = parseWithZod(
+          platformOrganizationUserParamsSchema,
+          request.params,
+        );
+        const modules = parsePlatformPermissionUpdate(request.body);
+        response.json(
+          createSuccessResponse(
+            await platformUsersService.updatePermissions(
+              organizationId,
+              userId,
+              modules,
+              request.platform_identity?.id ?? "",
+            ),
+          ),
+        );
+      } catch (err) {
+        logError("Erro ao atualizar permissões do usuário pela plataforma", { err });
         next(err);
       }
     },
@@ -121,6 +219,28 @@ export function createPlatformUsersRoutes(): ReturnType<typeof Router> {
         );
       } catch (err) {
         logError("Erro ao desativar usuario da organizacao pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.patch(
+    "/organizations/:organizationId/users/:userId",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId, userId } = parseWithZod(
+          platformOrganizationUserParamsSchema,
+          request.params,
+        );
+        const input = parseWithZod(updatePlatformUserBodySchema, request.body);
+        response.json(
+          createSuccessResponse(await platformUsersService.update(organizationId, userId, input)),
+        );
+      } catch (err) {
+        logError("Erro ao atualizar usuario da organizacao pela plataforma", { err });
         next(err);
       }
     },

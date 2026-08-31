@@ -1,3 +1,4 @@
+import type { ModulePermissionKey } from "../auth/modules.js";
 import type { AuthKind, PlatformRole } from "../auth/types.js";
 
 export type AuditOutcome = "success" | "error" | "aborted";
@@ -103,10 +104,40 @@ export type OrganizationAuditStatus = "trial" | "past_due" | "active" | "suspend
 export type OrganizationAuditPlan = "trial" | "pro" | "enterprise";
 export type PlatformAuditChange<T extends string> = { from: T | null; to: T | null };
 
+export interface PlatformOwnershipAuditUser {
+  id: string;
+  type: "owner" | "admin";
+  status: "active" | "inactive";
+}
+
+export interface PlatformOwnershipAuditChanges {
+  before: {
+    ownerId: string;
+    type: "owner";
+    status: "active";
+  };
+  after: {
+    ownerId: string;
+    type: "owner";
+    status: "active";
+    previousOwner: PlatformOwnershipAuditUser;
+  };
+  previousOwnerAction: "demote" | "deactivate";
+  justification: string;
+}
+
 export interface PlatformOrganizationAuditChanges {
   status?: PlatformAuditChange<OrganizationAuditStatus>;
   subscription_plan?: PlatformAuditChange<OrganizationAuditPlan>;
   logo_url?: PlatformAuditChange<string>;
+  ownership?: PlatformOwnershipAuditChanges;
+}
+
+export interface PlatformPermissionAuditChanges {
+  modules: {
+    before: Partial<Record<ModulePermissionKey, 0 | 1 | 2 | 3>>;
+    after: Partial<Record<ModulePermissionKey, 0 | 1 | 2 | 3>>;
+  };
 }
 
 export interface PlatformAuditRequestRecord {
@@ -124,7 +155,7 @@ export interface PlatformAuditRequestRecord {
   referring?: string | null;
   referringId?: string | null;
   actorPlatformUserId?: string;
-  changes?: PlatformOrganizationAuditChanges;
+  changes?: PlatformOrganizationAuditChanges | PlatformPermissionAuditChanges;
 }
 
 export interface PlatformAuditSearchResult {

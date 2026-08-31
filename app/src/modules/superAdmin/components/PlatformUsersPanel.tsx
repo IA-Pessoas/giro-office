@@ -1,22 +1,29 @@
+import { isAxiosError } from "axios";
 import { Search, UserRound } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ConfirmationDialog } from "@shared/components";
+import { Dialog } from "@shared/components/ui/Dialog";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { Input } from "@shared/ui/newLayout/input";
 import { CreateUserModal } from "@modules/users/components/CreateUserModal";
-import type { UserItem } from "@modules/users/types";
+import { AdminPermissionsEditor } from "@modules/users/components/AdminPermissionsEditor";
+import type { AdminUserPermissionsDataSource } from "@modules/users/types/adminUserContracts";
+import type { PermissionDraft, UserItem } from "@modules/users/types";
 
 import {
   usePlatformDepartments,
+  usePlatformOwnershipTransferMutation,
   usePlatformUserDetail,
   usePlatformUserLifecycleMutation,
+  usePlatformUserUpdateMutation,
   usePlatformUsers,
 } from "../hooks/usePlatformUsers";
 import { platformService } from "../services/platformService";
 import type { PlatformOrganization, PlatformOrganizationUser } from "../types";
+import { OwnershipTransferDialog } from "./OwnershipTransferDialog";
 
 const PAGE_SIZE = 20;
 
@@ -32,8 +39,11 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
+  const [isOwnershipTransferOpen, setIsOwnershipTransferOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<"deactivate" | "reactivate" | null>(null);
   const lifecycleActionRef = useRef<HTMLButtonElement>(null);
+  const permissionActionRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const usersQuery = usePlatformUsers(organization.id, {
@@ -42,11 +52,18 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
   const users = usersQuery.data?.users ?? [];
+  const ownershipCandidatesQuery = usePlatformUsers(organization.id, { skip: 0, take: 100 });
   const total = usersQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const userDetailQuery = usePlatformUserDetail(organization.id, selectedUserId);
   const departmentsQuery = usePlatformDepartments(organization.id);
   const userLifecycleMutation = usePlatformUserLifecycleMutation();
+  const ownershipTransferMutation = usePlatformOwnershipTransferMutation();
+  const userUpdateMutation = usePlatformUserUpdateMutation();
+  const [editMode, setEditMode] = useState(false);
+  const [passwordConfirmationOpen, setPasswordConfirmationOpen] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ name: "", login: "", department_id: "", password: "" });
   const departmentName = departmentsQuery.data?.find(
     (department) => department.id === userDetailQuery.data?.department_id,
   )?.name;
@@ -63,13 +80,73 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
 
   useEffect(() => {
     setSelectedUserId(null);
+    setIsOwnershipTransferOpen(false);
   }, [organization.id]);
   const selectedUser = userDetailQuery.data;
+  const permissionsDataSource = useMemo<AdminUserPermissionsDataSource>(
+    () => ({
+      listUsers: async () => {
+        const result = await platformService.listUsers(organization.id, { skip: 0, take: 100 });
+        return result.users.map((user) => ({ ...user, permission: 0 }));
+      },
+      loadPermissions: (userId, signal) =>
+        platformService.getUserPermissions(organization.id, userId, signal),
+      savePermissions: (userId, permissions) =>
+        platformService.updateUserPermissions(organization.id, userId, permissions),
+      syncDepartmentPermission: async (userId, payload) => {
+        await platformService.updateUserPermissions(
+          organization.id,
+          userId,
+          (payload.modules ?? {}) as PermissionDraft,
+        );
+      },
+    }),
+    [organization.id],
+  );
 
   useEffect(() => {
     if (!selectedUserId && users[0]) setSelectedUserId(users[0].id);
     if (selectedUserId && !users.some((user) => user.id === selectedUserId)) setSelectedUserId(null);
   }, [selectedUserId, users]);
+
+  useEffect(() => {
+    if (!selectedUser) return;
+    setDraft({
+      name: selectedUser.name,
+      login: selectedUser.login,
+      department_id: selectedUser.department_id,
+      password: "",
+    });
+    setEditMode(false);
+    setEditError(null);
+  }, [selectedUser]);
+
+  const saveUser = async () => {
+    if (!selectedUser) return;
+    setEditError(null);
+    try {
+      await userUpdateMutation.mutateAsync({
+        organizationId: organization.id,
+        userId: selectedUser.id,
+        data: {
+          name: draft.name,
+          login: draft.login,
+          department_id: draft.department_id,
+          ...(draft.password.trim() ? { password: draft.password } : {}),
+          expected_version: selectedUser.version,
+        },
+      });
+      setEditMode(false);
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 409) {
+        setEditError(
+          "Este usuário foi alterado por outra pessoa. Recarregue o estado atual antes de salvar.",
+        );
+        return;
+      }
+      setEditError("Não foi possível salvar as alterações do usuário.");
+    }
+  };
 
   return (
     <section aria-labelledby="platform-users-title">
@@ -181,7 +258,144 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
             ) : selectedUser ? (
               <div className="space-y-4">
                 <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Usuário selecionado</p><h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{selectedUser.name}</h3></div>
-                <dl className="space-y-3 text-sm"><div><dt className="text-slate-500">Login</dt><dd className="font-medium">{selectedUser.login}</dd></div><div><dt className="text-slate-500">Departamento</dt><dd className="font-medium">{departmentsQuery.isLoading ? "Carregando..." : departmentsQuery.isError ? <span className="text-rose-700 dark:text-rose-300" role="alert">Não foi possível carregar departamentos. <button className="font-semibold underline" onClick={() => void departmentsQuery.refetch()} type="button">Tentar novamente</button></span> : departmentName ?? "Sem departamento"}</dd></div><div><dt className="text-slate-500">Perfil</dt><dd className="font-medium">{getProfileLabel(selectedUser)}</dd></div></dl>
+                {editError ? (
+                  <div
+                    className={
+                      "rounded-lg bg-rose-50 p-3 text-sm text-rose-900 " +
+                      "dark:bg-rose-950/30 dark:text-rose-100"
+                    }
+                    role="alert"
+                  >
+                    {editError}{" "}
+                    <button
+                      className="font-semibold underline"
+                      onClick={() => void userDetailQuery.refetch()}
+                      type="button"
+                    >
+                      Recarregar
+                    </button>
+                  </div>
+                ) : null}
+                {editMode ? (
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium">
+                      Nome
+                      <Input
+                        value={draft.name}
+                        onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                      />
+                    </label>
+                    <label className="block text-sm font-medium">
+                      Login
+                      <Input
+                        value={draft.login}
+                        onChange={(event) => setDraft({ ...draft, login: event.target.value })}
+                      />
+                    </label>
+                    <label className="block text-sm font-medium">
+                      Departamento
+                      <select
+                        className={
+                          "mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 " +
+                          "dark:border-slate-700 dark:bg-slate-950"
+                        }
+                        value={draft.department_id}
+                        onChange={(event) =>
+                          setDraft({ ...draft, department_id: event.target.value })
+                        }
+                      >
+                        {departmentsQuery.data?.map((department) => (
+                          <option key={department.id} value={department.id}>
+                            {department.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block text-sm font-medium">
+                      Nova senha
+                      <Input
+                        autoComplete="new-password"
+                        type="password"
+                        value={draft.password}
+                        onChange={(event) =>
+                          setDraft({ ...draft, password: event.target.value })
+                        }
+                      />
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        className={
+                          "rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white " +
+                          "disabled:opacity-60"
+                        }
+                        disabled={userUpdateMutation.isPending}
+                        onClick={() =>
+                          draft.password.trim()
+                            ? setPasswordConfirmationOpen(true)
+                            : void saveUser()
+                        }
+                        type="button"
+                      >
+                        Salvar alterações
+                      </button>
+                      <button
+                        className="rounded-lg border px-3 py-2 text-sm font-semibold"
+                        disabled={userUpdateMutation.isPending}
+                        onClick={() => setEditMode(false)}
+                        type="button"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <dl className="space-y-3 text-sm">
+                      <div>
+                        <dt className="text-slate-500">Login</dt>
+                        <dd className="font-medium">{selectedUser.login}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-500">Departamento</dt>
+                        <dd className="font-medium">
+                          {departmentsQuery.isLoading
+                            ? "Carregando..."
+                            : departmentsQuery.isError
+                              ? "Não foi possível carregar departamentos."
+                              : departmentName ?? "Sem departamento"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-500">Perfil</dt>
+                        <dd className="font-medium">{getProfileLabel(selectedUser)}</dd>
+                      </div>
+                    </dl>
+                    <button
+                      className="rounded-lg border px-3 py-2 text-sm font-semibold"
+                      onClick={() => setEditMode(true)}
+                      type="button"
+                    >
+                      Editar dados
+                    </button>
+                  </>
+                )}
+                <button
+                  ref={permissionActionRef}
+                  className="rounded-lg border border-blue-700 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-200 dark:hover:bg-blue-950/30"
+                  onClick={() => setIsPermissionsOpen(true)}
+                  type="button"
+                >
+                  Editar permissões
+                </button>
+                {selectedUser.status === "active" && selectedUser.type === "owner" ? (
+                  <button
+                    className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onClick={() => setIsOwnershipTransferOpen(true)}
+                    type="button"
+                  >
+                    Transferir ownership
+                  </button>
+                ) : (
                 <button
                   ref={lifecycleActionRef}
                   className={selectedUser.status === "active" ? "rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600" : "rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"}
@@ -190,6 +404,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                 >
                   {selectedUser.status === "active" ? "Desativar usuário" : "Reativar usuário"}
                 </button>
+                )}
               </div>
             ) : null}
           </aside>
@@ -224,6 +439,29 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
         organizationId={organization.id}
       />
 
+      <Dialog
+        contentClassName="!w-[min(96vw,1120px)] !max-w-none"
+        description="Use o mesmo editor modular da Administração. As alterações se aplicam somente ao tenant selecionado."
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          permissionActionRef.current?.focus();
+        }}
+        onOpenChange={setIsPermissionsOpen}
+        open={isPermissionsOpen}
+        title="Permissões modulares"
+      >
+        {isPermissionsOpen && selectedUserId ? (
+          <AdminPermissionsEditor
+            dataSource={permissionsDataSource}
+            departments={departmentsQuery.data ?? []}
+            initialUserId={selectedUserId}
+            onPermissionsUpdated={() => undefined}
+            queryKey={["platform", "organizations", organization.id, "permissions"]}
+            syncDepartmentPermission={false}
+          />
+        ) : null}
+      </Dialog>
+
       <ConfirmationDialog
         cancelLabel="Cancelar"
         confirmLabel={pendingAction === "deactivate" ? "Desativar usuário" : "Reativar usuário"}
@@ -252,6 +490,39 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
         open={pendingAction !== null}
         title={pendingAction === "deactivate" ? "Desativar usuário" : "Reativar usuário"}
         variant={pendingAction === "deactivate" ? "destructive" : "neutral"}
+      />
+      <ConfirmationDialog
+        cancelLabel="Cancelar"
+        confirmLabel="Alterar senha"
+        description="A nova senha revogará todas as sessões atuais deste usuário."
+        errorMessage={null}
+        isConfirming={userUpdateMutation.isPending}
+        onConfirm={async () => {
+          setPasswordConfirmationOpen(false);
+          await saveUser();
+        }}
+        onOpenChange={setPasswordConfirmationOpen}
+        open={passwordConfirmationOpen}
+        title="Confirmar alteração de senha"
+        variant="destructive"
+      />
+      <OwnershipTransferDialog
+        currentOwner={selectedUser?.type === "owner" && selectedUser.status === "active" ? selectedUser : null}
+        isConfirming={ownershipTransferMutation.isPending}
+        onOpenChange={setIsOwnershipTransferOpen}
+        onTransfer={async ({ successorUserId, previousOwnerAction, justification }) => {
+          if (!selectedUser) return;
+          await ownershipTransferMutation.mutateAsync({
+            organizationId: organization.id,
+            currentOwnerId: selectedUser.id,
+            successorUserId,
+            previousOwnerAction,
+            justification,
+          });
+        }}
+        open={isOwnershipTransferOpen}
+        organization={organization}
+        users={ownershipCandidatesQuery.data?.users ?? []}
       />
     </section>
   );

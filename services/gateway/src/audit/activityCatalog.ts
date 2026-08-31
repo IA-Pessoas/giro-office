@@ -97,6 +97,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "um usuário da organização" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/,
+    description: { action: "consultou", item: "as permissões de um usuário da organização" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/,
+    description: { action: "atualizou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/,
+    description: { action: "alterou", item: "as permissões de um usuário da organização" },
+  },
+  {
     methods: ["DELETE"],
     pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/,
     description: { action: "desativou", item: "um usuário da organização" },
@@ -105,6 +120,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/,
     description: { action: "reativou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/ownership-transfer$/,
+    description: { action: "transferiu", item: "o ownership da organização" },
   },
   {
     methods: ["GET"],

@@ -8,12 +8,14 @@ import { buildAuditCapacityGuard, buildAuditLifecycleMiddleware } from "../middl
 
 const logger = { error: vi.fn(), warn: vi.fn(), debug: vi.fn() };
 const paths = [
-  ["POST", "/platform/organizations", null, null],
-  ["PATCH", "/platform/organizations/org-1/status", "org-1", null],
-  ["PATCH", "/platform/organizations/org-1/subscription-plan", "org-1", null],
-  ["PATCH", "/platform/organizations/org-1/logo-url", "org-1", null],
-  ["DELETE", "/platform/organizations/org-1/users/user-1", "org-1", "user-1"],
-  ["POST", "/platform/organizations/org-1/users/user-1/reactivate", "org-1", "user-1"],
+  ["POST", "/platform/organizations", null, null, false],
+  ["PATCH", "/platform/organizations/org-1/status", "org-1", null, false],
+  ["PATCH", "/platform/organizations/org-1/subscription-plan", "org-1", null, false],
+  ["PATCH", "/platform/organizations/org-1/logo-url", "org-1", null, false],
+  ["PATCH", "/platform/organizations/org-1/users/user-1", "org-1", "user-1", true],
+  ["PATCH", "/platform/organizations/org-1/users/user-1/", "org-1", "user-1", true],
+  ["DELETE", "/platform/organizations/org-1/users/user-1", "org-1", "user-1", false],
+  ["POST", "/platform/organizations/org-1/users/user-1/reactivate", "org-1", "user-1", false],
 ];
 
 function fixture(fetchImpl: typeof fetch, maxInFlight = 1) {
@@ -34,14 +36,22 @@ function fixture(fetchImpl: typeof fetch, maxInFlight = 1) {
     logger: logger as never,
     recordAuditRequest: recorder,
   });
-  function start(method = "POST", path = "/platform/organizations") {
+  function start(
+    method = "POST",
+    path = "/platform/organizations",
+    body: Record<string, unknown> = {
+      cnpj: "11222333000181",
+      logo_url: "https://secret.example/logo",
+    },
+    ownershipTransferAuditResult?: unknown,
+  ) {
     const request = {
       method,
       originalUrl: `${path}?token=query-secret`,
       path,
       requestId: "original-request-id",
       auth: { actorKind: "platform", userId: "platform-user-1", claims: {} },
-      body: { cnpj: "11222333000181", logo_url: "https://secret.example/logo" },
+      body,
       get: () => undefined,
       log: logger,
     } as unknown as Request;
@@ -56,7 +66,10 @@ function fixture(fetchImpl: typeof fetch, maxInFlight = 1) {
     lifecycle(request, response as unknown as Response, () => {});
     const pending = guard(request, response as unknown as Response, (failure?: unknown) => {
       error = failure;
-      if (!failure) upstreamCalls += 1;
+      if (!failure) {
+        upstreamCalls += 1;
+        response.locals = { ownershipTransferAuditResult };
+      }
       response.statusCode = failure ? 503 : 200;
       response.writableEnded = true;
       response.emit("finish");
@@ -100,7 +113,7 @@ describe("durable organization mutation audit barrier", () => {
 
   it.each(
     paths,
-  )("waits for ACK before %s %s with a distinct, safe attempt", async (method, path, organizationId, userId) => {
+  )("waits for ACK before %s %s with the correct actor contract", async (method, path, organizationId, userId, expectsExplicitActor) => {
     const records: CreateAuditRequestPayload[] = [];
     let release!: (response: globalThis.Response) => void;
     const { start, recorder } = fixture(async (_input, init) => {
@@ -116,6 +129,9 @@ describe("durable organization mutation audit barrier", () => {
     await Promise.resolve();
     expect(operation.upstreamCalls()).toBe(0);
     expect(records).toHaveLength(1);
+    const actorMetadata = expectsExplicitActor
+      ? { actorKind: "platform", actorPlatformUserId: "platform-user-1" }
+      : { auth_kind: "platform", platform_user_id: "platform-user-1" };
     expect(records[0]).toMatchObject({
       action: "organization.mutation.attempt",
       organizationId,
@@ -124,6 +140,7 @@ describe("durable organization mutation audit barrier", () => {
       outcome: "success",
       query: {},
       metadata: {
+        ...actorMetadata,
         business_outcome: "unknown",
         source_request_id_sha256: createHash("sha256").update("original-request-id").digest("hex"),
       },
@@ -134,7 +151,7 @@ describe("durable organization mutation audit barrier", () => {
     await vi.waitFor(() => expect(records).toHaveLength(2));
     expect(records[0].requestId).not.toBe(records[1].requestId);
     expect(records[1].requestId).toBe("original-request-id");
-    expect(records[1]).toMatchObject({ organizationId, userId });
+    expect(records[1]).toMatchObject({ organizationId, userId, metadata: actorMetadata });
     const serialized = JSON.stringify(records);
     for (const secret of ["query-secret", "11222333000181", "secret.example", "secret-token"]) {
       expect(serialized).not.toContain(secret);
@@ -142,6 +159,98 @@ describe("durable organization mutation audit barrier", () => {
     await Promise.resolve();
     expect(recorder.reserve("protected")).toBe("protected");
     expect(recorder.reserve("protected")).toBeUndefined();
+  });
+
+  it("atribui a alteração de permissões ao PlatformUser e registra apenas módulos allowlisted", async () => {
+    const records: CreateAuditRequestPayload[] = [];
+    const { start } = fixture(async (_input, init) => {
+      records.push(JSON.parse(String(init?.body)));
+      return new globalThis.Response(null, { status: 201 });
+    });
+    const operation = start("PUT", "/platform/organizations/org-1/users/user-1/permissions", {
+      rh: 3,
+      ignored: "secret",
+    });
+    await operation.pending;
+
+    expect(operation.upstreamCalls()).toBe(1);
+    expect(records[0]).toMatchObject({
+      action: "platform.user.permissions.update.attempt",
+      referring: "user",
+      referringId: "user-1",
+      changes: { before: null, after: { modules: { rh: 3 } } },
+      metadata: { actorPlatformUserId: "platform-user-1" },
+    });
+    expect(JSON.stringify(records[0])).not.toContain("secret");
+  });
+
+  it("registra before/after da transferência somente após a resposta confirmada", async () => {
+    const records: CreateAuditRequestPayload[] = [];
+    const { start } = fixture(async (_input, init) => {
+      records.push(JSON.parse(String(init?.body)));
+      return new globalThis.Response(null, { status: 201 });
+    });
+    const operation = start(
+      "POST",
+      "/platform/organizations/org-1/ownership-transfer",
+      {
+        currentOwnerId: "owner-1",
+        successorUserId: "successor-1",
+        previousOwnerAction: "deactivate",
+        justification: "Recuperação administrativa aprovada.",
+        password: "must-not-leak",
+      },
+      {
+        currentOwner: { id: "owner-1", type: "admin", status: "inactive" },
+        successor: { id: "successor-1", type: "owner", status: "active" },
+      },
+    );
+    await operation.pending;
+    await vi.waitFor(() => expect(records).toHaveLength(2));
+
+    expect(records[0]).toMatchObject({
+      action: "platform.organization.ownership.transfer.attempt",
+      organizationId: "org-1",
+      referring: "organization",
+      referringId: "org-1",
+      metadata: { actorPlatformUserId: "platform-user-1" },
+    });
+    expect(records[0].changes).toBeUndefined();
+    expect(records[1]).toMatchObject({
+      action: "platform.organization.ownership.transfer.completed",
+      organizationId: "org-1",
+      referring: "organization",
+      referringId: "org-1",
+      metadata: { actorPlatformUserId: "platform-user-1" },
+      changes: {
+        ownership: {
+          before: { ownerId: "owner-1", type: "owner", status: "active" },
+          after: {
+            ownerId: "successor-1",
+            previousOwner: { id: "owner-1", type: "admin", status: "inactive" },
+          },
+          justification: "Recuperação administrativa aprovada.",
+        },
+      },
+    });
+    expect(JSON.stringify(records)).not.toContain("must-not-leak");
+  });
+
+  it("bloqueia a transferência quando a auditoria obrigatória está indisponível", async () => {
+    const { start } = fixture(async () => {
+      throw new Error("audit unavailable");
+    });
+
+    const operation = start("POST", "/platform/organizations/org-1/ownership-transfer", {
+      currentOwnerId: "owner-1",
+      successorUserId: "successor-1",
+      previousOwnerAction: "demote",
+      justification: "Recuperação administrativa aprovada.",
+    });
+    await operation.pending;
+
+    expect(operation.error()).toMatchObject({ statusCode: 503 });
+    expect(operation.upstreamCalls()).toBe(0);
   });
 
   it.each([

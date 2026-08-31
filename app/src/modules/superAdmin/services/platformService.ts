@@ -6,12 +6,15 @@ import type {
   PlatformDepartmentOption,
   PlatformOrganization,
   PlatformOrganizationsListResponse,
+  PlatformOwnershipTransferResult,
   PlatformUsersListResponse,
+  TransferPlatformOwnershipPayload,
+  UpdatePlatformOrganizationUserPayload,
   UpdatePlatformOrganizationLogoPayload,
   UpdatePlatformOrganizationPlanPayload,
   UpdatePlatformOrganizationStatusPayload,
 } from "../types";
-import type { AdminCreateUserData, UserItem } from "@modules/users/types";
+import type { AdminCreateUserData, PermissionDraft, UserItem } from "@modules/users/types";
 
 function unwrapData<T>(response: { data?: { data?: T } }): T {
   return response.data?.data as T;
@@ -41,6 +44,30 @@ export const platformService = {
     return unwrapData<PlatformUsersListResponse["users"][number]>(response);
   },
 
+  async getUserPermissions(
+    organizationId: string,
+    userId: string,
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>> {
+    const response = await api.get(
+      `/platform/organizations/${organizationId}/users/${userId}/permissions`,
+      { signal },
+    );
+    return unwrapData<Record<string, unknown>>(response);
+  },
+
+  async updateUserPermissions(
+    organizationId: string,
+    userId: string,
+    permissions: PermissionDraft,
+  ): Promise<Record<string, unknown>> {
+    const response = await api.put(
+      `/platform/organizations/${organizationId}/users/${userId}/permissions`,
+      permissions,
+    );
+    return unwrapData<Record<string, unknown>>(response);
+  },
+
   async deactivateUser(
     organizationId: string,
     userId: string,
@@ -55,6 +82,29 @@ export const platformService = {
   ): Promise<PlatformUsersListResponse["users"][number]> {
     const response = await api.post(
       `/platform/organizations/${organizationId}/users/${userId}/reactivate`,
+    );
+    return unwrapData<PlatformUsersListResponse["users"][number]>(response);
+  },
+
+  async transferOwnership(
+    organizationId: string,
+    data: TransferPlatformOwnershipPayload,
+  ): Promise<PlatformOwnershipTransferResult> {
+    const response = await api.post(
+      `/platform/organizations/${organizationId}/ownership-transfer`,
+      data,
+    );
+    return unwrapData<PlatformOwnershipTransferResult>(response);
+  },
+
+  async updateUser(
+    organizationId: string,
+    userId: string,
+    data: UpdatePlatformOrganizationUserPayload,
+  ): Promise<PlatformUsersListResponse["users"][number]> {
+    const response = await api.patch(
+      `/platform/organizations/${organizationId}/users/${userId}`,
+      data,
     );
     return unwrapData<PlatformUsersListResponse["users"][number]>(response);
   },

@@ -1,3 +1,4 @@
+import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { UserServiceEnv } from "../config/env.js";
@@ -19,6 +20,15 @@ const csrfHeader = {
   required: true,
   description: "Prova CSRF vinculada à sessão, exigida em mutações autenticadas por cookie.",
   schema: { type: "string" },
+} as const;
+const modularPermissionsSchema = {
+  type: "object",
+  description: "Níveis modulares do editor compartilhado: 0 a 3, apenas módulos ativos.",
+  properties: Object.fromEntries(
+    ACTIVE_MODULE_KEYS.map((moduleKey) => [moduleKey, { type: "integer", minimum: 0, maximum: 3 }]),
+  ),
+  additionalProperties: false,
+  minProperties: 1,
 } as const;
 
 export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocument {
@@ -259,6 +269,56 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/platform/organizations/{organizationId}/ownership-transfer": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Transferir ownership de uma organização",
+          description:
+            "Ação excepcional e atômica. Promove um sucessor ativo do tenant, rebaixa ou desativa o owner anterior e invalida as sessões dos dois usuários.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: [
+                    "currentOwnerId",
+                    "successorUserId",
+                    "previousOwnerAction",
+                    "justification",
+                  ],
+                  properties: {
+                    currentOwnerId: { type: "string", minLength: 1 },
+                    successorUserId: { type: "string", minLength: 1 },
+                    previousOwnerAction: { type: "string", enum: ["demote", "deactivate"] },
+                    justification: { type: "string", minLength: 1, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Ownership transferido", ...successJson },
+            "400": { description: "Payload inválido" },
+            "401": { description: "Sessão de plataforma ausente ou inválida" },
+            "403": { description: "CSRF ou identidade inválida" },
+            "404": { description: "Owner atual ou sucessor fora do tenant" },
+            "409": { description: "Conflito de concorrência ou sucessor inelegível" },
+            "503": { description: "Auditoria durável indisponível antes da mutação" },
+          },
+        },
+      },
       "/platform/organizations/{organizationId}/users/{userId}": {
         get: {
           tags: ["Platform auth"],
@@ -285,6 +345,46 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
             "403": { description: "Identidade não é um super administrador da plataforma" },
             "404": { description: "Usuário não pertence à organização do contexto" },
+          },
+        },
+        patch: {
+          tags: ["Platform auth"],
+          summary: "Editar usuário de uma organização pela plataforma",
+          security: platformBrowserSession,
+          parameters: [
+            { name: "organizationId", in: "path", required: true, schema: { type: "string" } },
+            { name: "userId", in: "path", required: true, schema: { type: "string" } },
+            csrfHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["expected_version"],
+                  additionalProperties: false,
+                  properties: {
+                    name: { type: "string" },
+                    login: { type: "string" },
+                    password: { type: "string", writeOnly: true },
+                    department_id: { type: "string" },
+                    permission: { type: "integer", minimum: 0, maximum: 3 },
+                    status: { type: "string", enum: ["active", "inactive"] },
+                    expected_version: { type: "integer", minimum: 1 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Usuário atualizado sem credenciais", ...successJson },
+            "400": { description: "Payload inválido" },
+            "401": { description: "Sessão ausente" },
+            "403": { description: "CSRF ou identidade inválida" },
+            "404": { description: "Usuário ou departamento fora do tenant" },
+            "409": { description: "Login duplicado ou versão desatualizada" },
+            "503": { description: "Auditoria indisponível" },
           },
         },
         delete: {
@@ -348,6 +448,70 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             "403": { description: "Identidade não é um super administrador ou CSRF inválido" },
             "404": { description: "Usuário não pertence à organização do contexto" },
             "409": { description: "Versão desatualizada ou conflito de estado" },
+            "503": { description: "Auditoria durável indisponível antes da mutação" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/users/{userId}/permissions": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Ler permissões modulares pelo editor compartilhado",
+          description:
+            "Consulta as permissões do usuário exclusivamente dentro da organização selecionada.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+          ],
+          responses: {
+            "200": { description: "Permissões modulares atuais", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador da plataforma" },
+            "404": { description: "Usuário não pertence à organização do contexto" },
+          },
+        },
+        put: {
+          tags: ["Platform auth"],
+          summary: "Salvar permissões modulares pelo editor compartilhado",
+          description:
+            "Atualização atômica no tenant do path; invalida sessões do usuário e é bloqueada se a auditoria durável estiver indisponível.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: modularPermissionsSchema } },
+          },
+          responses: {
+            "200": { description: "Permissões modulares atualizadas", ...successJson },
+            "401": { description: "Sessão de plataforma ausente, inválida ou revogada" },
+            "403": { description: "Identidade não é um super administrador ou CSRF inválido" },
+            "404": { description: "Usuário não pertence à organização do contexto" },
+            "409": { description: "Conflito de estado ou último owner ativo" },
+            "422": { description: "Módulo ou nível de permissão incompatível" },
             "503": { description: "Auditoria durável indisponível antes da mutação" },
           },
         },

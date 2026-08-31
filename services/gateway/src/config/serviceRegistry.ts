@@ -94,7 +94,11 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
         },
         {
           methods: ["GET"],
-          path: /^\/platform\/organizations\/[^/]+\/(?:users\/[^/]+|departments)\/?$/,
+          path: /^\/platform\/organizations\/[^/]+\/(?:users\/[^/]+(?:\/permissions)?|departments)\/?$/,
+        },
+        {
+          methods: ["PUT"],
+          path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions\/?$/,
         },
         {
           methods: ["GET"],
@@ -105,8 +109,16 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
           path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/?$/,
         },
         {
+          methods: ["PATCH"],
+          path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/?$/,
+        },
+        {
           methods: ["POST"],
           path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/,
+        },
+        {
+          methods: ["POST"],
+          path: /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/,
         },
       ],
     },

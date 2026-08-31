@@ -124,6 +124,7 @@ const [
   createOrganizationDialogSource,
   organizationOverviewSource,
   usersPanelSource,
+  ownershipTransferDialogSource,
   auditPanelSource,
   superAdminPageSource,
   pageSource,
@@ -143,6 +144,7 @@ const [
   source("./components/CreateOrganizationDialog.tsx"),
   source("./components/OrganizationOverviewPanel.tsx"),
   source("./components/PlatformUsersPanel.tsx"),
+  source("./components/OwnershipTransferDialog.tsx"),
   source("./components/PlatformAuditPanel.tsx"),
   source("./components/SuperAdminPage.tsx"),
   source("../../pages/super-admin/index.tsx"),
@@ -164,6 +166,7 @@ const allSuperAdminSources = [
   createOrganizationDialogSource,
   organizationOverviewSource,
   usersPanelSource,
+  ownershipTransferDialogSource,
   auditPanelSource,
   superAdminPageSource,
   pageSource,
@@ -201,13 +204,46 @@ await runTest("consome contratos explícitos de gestão pela sessão HTTP-only",
     platformServiceSource,
     /api\.post\(\s*`\/platform\/organizations\/\$\{organizationId\}\/users\/\$\{userId\}\/reactivate`/,
   );
+  assert.match(
+    platformServiceSource,
+    /api\.get\(\s*`\/platform\/organizations\/\$\{organizationId\}\/users\/\$\{userId\}\/permissions`/,
+  );
+  assert.match(
+    platformServiceSource,
+    /api\.put\(\s*`\/platform\/organizations\/\$\{organizationId\}\/users\/\$\{userId\}\/permissions`,\s*permissions,?\s*\)/,
+  );
+  assert.match(
+    platformServiceSource,
+     /api\.post\(\s*`\/platform\/organizations\/\$\{organizationId\}\/ownership-transfer`/,
+  );
   assert.doesNotMatch(
     allSuperAdminSources,
     /cw\.token|jwtDecode|Authorization|Bearer|nookies|support_mode|support-sessions/,
   );
-  assert.doesNotMatch(platformServiceSource, /api\.put\(/);
   assert.doesNotMatch(platformServiceSource, /updateOrganization\s*\(/);
 });
+
+await runTest("reutiliza o editor compartilhado para permissões no tenant selecionado", () => {
+  assert.match(usersPanelSource, /AdminPermissionsEditor/);
+  assert.match(usersPanelSource, /getUserPermissions/);
+  assert.match(usersPanelSource, /updateUserPermissions/);
+  assert.match(usersPanelSource, /Editar permissões/);
+  assert.match(usersPanelSource, /permissionActionRef/);
+});
+
+ await runTest("separa a transferência de ownership com confirmação reforçada", () => {
+  assert.match(usersPanelSource, /Transferir ownership/);
+  assert.match(usersPanelSource, /OwnershipTransferDialog/);
+  assert.match(usersHookSource, /usePlatformOwnershipTransferMutation/);
+  assert.match(usersHookSource, /queryKey: \["platform", "audit"\]/);
+  assert.match(ownershipTransferDialogSource, /Organização/);
+  assert.match(ownershipTransferDialogSource, /Owner atual/);
+  assert.match(ownershipTransferDialogSource, /Sucessor ativo/);
+  assert.match(ownershipTransferDialogSource, /Consequência para o owner anterior/);
+  assert.match(ownershipTransferDialogSource, /Justificativa/);
+  assert.match(ownershipTransferDialogSource, /Confirmar transferência/);
+   assert.match(ownershipTransferDialogSource, /maxLength=\{500\}/);
+ });
 
 await runTest("usa React Query, detalhe condicionado e mutations sem retry automático", () => {
   assert.match(organizationsHookSource, /useQuery\(/);
@@ -327,14 +363,36 @@ await runTest("renderiza somente o contrato real de usuário da plataforma", () 
   const userContract =
     typesSource.match(/export interface PlatformOrganizationUser \{[\s\S]*?\n\}/)?.[0] ?? "";
 
-  for (const field of ["id", "name", "login", "status", "department_id", "photo_url", "type"]) {
+  for (const field of [
+    "id",
+    "name",
+    "login",
+    "status",
+    "department_id",
+    "photo_url",
+    "type",
+    "permission",
+    "version",
+  ]) {
     assert.match(userContract, new RegExp(`\\b${field}:`));
   }
   assert.match(userContract, /type: "owner" \| "admin" \| "user" \| null/);
-  assert.doesNotMatch(
-    userContract,
-    /permission:|joined_at:|organization_id:|first_owner_flag:|permission_id:/,
-  );
+  for (const field of [
+    "joined_at",
+    "organization_id",
+    "first_owner_flag",
+    "permission_id",
+    "password",
+    "password_hash",
+    "hashed_password",
+    "hash",
+    "access_token",
+    "refresh_token",
+    "session_token",
+    "csrf_token",
+  ]) {
+    assert.doesNotMatch(userContract, new RegExp(`\\b${field}:`));
+  }
   assert.match(usersPanelSource, /return "Sem perfil"/);
   assert.doesNotMatch(usersPanelSource, /Nível|Entrada|joined_at|user\.permission/);
 });

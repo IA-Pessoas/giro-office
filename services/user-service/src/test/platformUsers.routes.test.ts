@@ -19,9 +19,13 @@ const { platformAuthMock, platformUsersMock } = vi.hoisted(() => ({
     list: vi.fn(),
     getById: vi.fn(),
     listDepartments: vi.fn(),
+    getPermissions: vi.fn(),
+    updatePermissions: vi.fn(),
     create: vi.fn(),
     deactivate: vi.fn(),
     reactivate: vi.fn(),
+    transferOwnership: vi.fn(),
+    update: vi.fn(),
   },
 }));
 
@@ -127,7 +131,13 @@ describe("platform users routes", () => {
     });
     platformUsersMock.getById.mockResolvedValue({ id: "user-1", name: "Ana" });
     platformUsersMock.listDepartments.mockResolvedValue([{ id: "dep-1", name: "Fiscal" }]);
+    platformUsersMock.getPermissions.mockResolvedValue({ rh: 2, fiscal: 1 });
+    platformUsersMock.updatePermissions.mockResolvedValue({ rh: 3, fiscal: 1 });
     platformUsersMock.create.mockResolvedValue({ id: "user-2", name: "Nova", login: "nova" });
+    platformUsersMock.transferOwnership.mockResolvedValue({
+      currentOwner: { id: "owner-1", status: "inactive", type: "admin" },
+      successor: { id: "successor-1", status: "active", type: "owner" },
+    });
   });
 
   it("lists only the organization requested by a platform super admin", async () => {
@@ -171,6 +181,45 @@ describe("platform users routes", () => {
     expect(platformUsersMock.listDepartments).toHaveBeenCalledWith("org-2");
   });
 
+  it("lê permissões somente para o usuário da organização selecionada", async () => {
+    const response = await request(createApp())
+      .get("/platform/organizations/org-2/users/user-1/permissions")
+      .set(platformGatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ rh: 2, fiscal: 1 });
+    expect(platformUsersMock.getPermissions).toHaveBeenCalledWith(
+      "org-2",
+      "user-1",
+      platformIdentity.id,
+    );
+  });
+
+  it("salva permissões válidas com CSRF e rejeita níveis incompatíveis com 422", async () => {
+    const app = createApp();
+    const headers = platformGatewayHeaders();
+
+    const updated = await request(app)
+      .put("/platform/organizations/org-2/users/user-1/permissions")
+      .set(headers)
+      .send({ rh: 3, fiscal: 1 });
+    const invalid = await request(app)
+      .put("/platform/organizations/org-2/users/user-1/permissions")
+      .set(headers)
+      .send({ rh: 4 });
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.data).toEqual({ rh: 3, fiscal: 1 });
+    expect(platformUsersMock.updatePermissions).toHaveBeenCalledWith(
+      "org-2",
+      "user-1",
+      { rh: 3, fiscal: 1 },
+      platformIdentity.id,
+    );
+    expect(invalid.status).toBe(422);
+    expect(platformUsersMock.updatePermissions).toHaveBeenCalledTimes(1);
+  });
+
   it("cria usuário no tenant do path com sessão de plataforma e CSRF", async () => {
     const response = await request(createApp())
       .post("/platform/organizations/org-2/users")
@@ -196,6 +245,41 @@ describe("platform users routes", () => {
       }),
       platformIdentity.id,
     );
+  });
+
+  it("transfers ownership only after platform session and CSRF validation", async () => {
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/ownership-transfer")
+      .set(platformGatewayHeaders())
+      .send({
+        currentOwnerId: "owner-1",
+        successorUserId: "successor-1",
+        previousOwnerAction: "deactivate",
+        justification: "Recuperação administrativa aprovada.",
+      });
+
+    expect(response.status).toBe(200);
+    expect(platformUsersMock.transferOwnership).toHaveBeenCalledWith("org-2", {
+      currentOwnerId: "owner-1",
+      successorUserId: "successor-1",
+      previousOwnerAction: "deactivate",
+      justification: "Recuperação administrativa aprovada.",
+    });
+  });
+
+  it("rejects a transfer without a justification before reaching the platform service", async () => {
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/ownership-transfer")
+      .set(platformGatewayHeaders())
+      .send({
+        currentOwnerId: "owner-1",
+        successorUserId: "successor-1",
+        previousOwnerAction: "demote",
+        justification: "   ",
+      });
+
+    expect(response.status).toBe(400);
+    expect(platformUsersMock.transferOwnership).not.toHaveBeenCalled();
   });
 
   it("rejeita criação sem CSRF antes de chamar o serviço", async () => {
@@ -227,6 +311,54 @@ describe("platform users routes", () => {
 
     expect(response.status).toBe(200);
     expect(platformUsersMock.deactivate).toHaveBeenCalledWith("org-2", "user-1");
+  });
+
+  it("edita apenas o usuário do tenant do path com versão esperada", async () => {
+    platformUsersMock.update.mockResolvedValue({
+      id: "user-1",
+      name: "Ana atualizada",
+      version: 2,
+    });
+
+    const response = await request(createApp())
+      .patch("/platform/organizations/org-2/users/user-1")
+      .set(platformGatewayHeaders())
+      .send({ name: "Ana atualizada", expected_version: 1 });
+
+    expect(response.status).toBe(200);
+    expect(platformUsersMock.update).toHaveBeenCalledWith("org-2", "user-1", {
+      name: "Ana atualizada",
+      expected_version: 1,
+    });
+  });
+
+  it("rejeita payload de edição inválido e CSRF ausente antes da mutação", async () => {
+    const invalidPayload = await request(createApp())
+      .patch("/platform/organizations/org-2/users/user-1")
+      .set(platformGatewayHeaders())
+      .send({ name: "Ana" });
+    expect(invalidPayload.status).toBe(400);
+
+    const headers = platformGatewayHeaders();
+    delete headers[CSRF_HEADER_NAME];
+    const missingCsrf = await request(createApp())
+      .patch("/platform/organizations/org-2/users/user-1")
+      .set(headers)
+      .send({ name: "Ana", expected_version: 1 });
+    expect(missingCsrf.status).toBe(403);
+    expect(platformUsersMock.update).not.toHaveBeenCalled();
+  });
+
+  it("preserva o conflito de concorrência sem chamar outro tenant", async () => {
+    platformUsersMock.update.mockRejectedValue(
+      new ServiceError(409, "Usuario foi alterado por outra edicao. Recarregue e tente novamente."),
+    );
+    const response = await request(createApp())
+      .patch("/platform/organizations/org-2/users/user-1")
+      .set(platformGatewayHeaders())
+      .send({ name: "Ana", expected_version: 1 });
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain("Recarregue");
   });
 
   it("reactivates only future sessions after platform session and CSRF validation", async () => {
@@ -326,6 +458,35 @@ describe("platform users OpenAPI", () => {
     expect(spec.paths).toHaveProperty([
       "/platform/organizations/{organizationId}/users/{userId}/reactivate",
       "post",
+    ]);
+  });
+
+  it("documents the shared modular permissions contract with CSRF and 422 validation", () => {
+    const spec = buildUserServiceOpenApiSpec(testEnv);
+
+    expect(spec.paths).toHaveProperty([
+      "/platform/organizations/{organizationId}/users/{userId}/permissions",
+      "get",
+    ]);
+    expect(spec.paths).toHaveProperty([
+      "/platform/organizations/{organizationId}/users/{userId}/permissions",
+      "put",
+    ]);
+    expect(spec).toHaveProperty(
+      [
+        "paths",
+        "/platform/organizations/{organizationId}/users/{userId}/permissions",
+        "put",
+        "parameters",
+      ],
+      expect.arrayContaining([expect.objectContaining({ name: "x-csrf-token", required: true })]),
+    );
+    expect(spec).toHaveProperty([
+      "paths",
+      "/platform/organizations/{organizationId}/users/{userId}/permissions",
+      "put",
+      "responses",
+      "422",
     ]);
   });
 

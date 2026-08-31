@@ -15,5 +15,3 @@ END
 $$;
 
 ALTER TABLE "users" ADD COLUMN "version" INTEGER NOT NULL DEFAULT 1;
-
-CREATE UNIQUE INDEX "users_login_key" ON "users"("login");

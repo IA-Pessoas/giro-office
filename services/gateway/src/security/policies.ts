@@ -195,7 +195,12 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/audit(?:\/|$)/, policy: authenticatedPolicy },
   {
     method: "GET",
-    path: /^\/platform\/organizations\/[^/]+\/(?:users(?:\/[^/]+)?|departments)\/?$/,
+    path: /^\/platform\/organizations\/[^/]+\/(?:users(?:\/[^/]+(?:\/permissions)?)?|departments)\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "PUT",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions\/?$/,
     policy: platformOnlyPolicy,
   },
   {
@@ -204,8 +209,18 @@ const routePolicyMatchers: Array<{
     policy: platformOnlyPolicy,
   },
   {
+    method: "PATCH",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
     method: "POST",
     path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/,
     policy: platformOnlyPolicy,
   },
   {

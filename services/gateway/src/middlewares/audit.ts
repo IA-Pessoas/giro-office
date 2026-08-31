@@ -9,6 +9,7 @@ import type {
   ReservableAuditRecorder,
 } from "@workspace/shared";
 import { ServiceError } from "@workspace/shared";
+import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
 import { describeActivity } from "../audit/activityCatalog.js";
@@ -29,6 +30,13 @@ const AUDIT_EXCLUDED_PATHS = new Set(["/health", "/ready"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RESERVED_AUDIT_REQUESTS = new WeakMap<Request, AuditReservation>();
 const PLATFORM_ORGANIZATIONS_PATH = "/platform/organizations";
+const PLATFORM_OWNERSHIP_TRANSFER_PATH =
+  /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/i;
+const PLATFORM_ORGANIZATION_SETTINGS_PATH =
+  /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i;
+const PLATFORM_ORGANIZATION_USER_PATH = /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i;
+const PLATFORM_ORGANIZATION_USER_PERMISSIONS_PATH =
+  /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/i;
 const PLATFORM_ORGANIZATION_STATUSES = new Set([
   "trial",
   "past_due",
@@ -37,6 +45,24 @@ const PLATFORM_ORGANIZATION_STATUSES = new Set([
   "cancelled",
 ]);
 const NON_NEGATIVE_INTEGER_QUERY = /^(?:0|[1-9]\d*)$/u;
+const ACTIVE_MODULE_KEY_SET = new Set<string>(ACTIVE_MODULE_KEYS);
+
+function getAllowlistedModulePermissions(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([key, level]) =>
+        ACTIVE_MODULE_KEY_SET.has(key) &&
+        typeof level === "number" &&
+        Number.isInteger(level) &&
+        level >= 0 &&
+        level <= 3,
+    ),
+  );
+}
 
 function isIntegerInRange(value: string, minimum: number, maximum: number): boolean {
   if (!NON_NEGATIVE_INTEGER_QUERY.test(value)) {
@@ -67,7 +93,7 @@ function getPlatformOrganizationAuditTarget(path: string): {
     return null;
   }
   const userMatch = normalizedPath.match(
-    /^\/platform\/organizations\/[^/]+\/users\/([^/]+)(?:\/reactivate)?$/iu,
+    /^\/platform\/organizations\/[^/]+\/users\/([^/]+)(?:\/(?:reactivate|permissions))?$/iu,
   );
 
   return { organizationId: organizationMatch[1], userId: userMatch?.[1] ?? null };
@@ -83,11 +109,102 @@ function requiresOrganizationMutationAudit(request: Request): boolean {
   return (
     (method === "POST" && path.toLowerCase() === "/platform/organizations") ||
     (method === "POST" && /^\/platform\/organizations\/[^/]+\/users$/i.test(path)) ||
+    (method === "POST" && PLATFORM_OWNERSHIP_TRANSFER_PATH.test(path)) ||
     (method === "PATCH" &&
-      /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i.test(path)) ||
+      (PLATFORM_ORGANIZATION_SETTINGS_PATH.test(path) ||
+        PLATFORM_ORGANIZATION_USER_PATH.test(path))) ||
     (method === "DELETE" && /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i.test(path)) ||
     (method === "POST" &&
-      /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path))
+      /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path)) ||
+    (method === "PUT" &&
+      /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/i.test(path))
+  );
+}
+
+function getSafeAuditText(value: unknown, maximumLength: number): string | undefined {
+  if (typeof value !== "string" || value.length > maximumLength) {
+    return undefined;
+  }
+
+  return value.trim() || undefined;
+}
+
+function getOwnershipTransferAuditChanges(
+  request: Request,
+  ownershipTransferResult: unknown,
+): Record<string, unknown> | undefined {
+  const body = request.body;
+  if (
+    body === null ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    ownershipTransferResult === null ||
+    typeof ownershipTransferResult !== "object" ||
+    Array.isArray(ownershipTransferResult)
+  ) {
+    return undefined;
+  }
+
+  const input = body as Record<string, unknown>;
+  const result = ownershipTransferResult as Record<string, unknown>;
+  const currentOwner = result.currentOwner;
+  const successor = result.successor;
+  const justification = getSafeAuditText(input.justification, 500);
+  if (
+    currentOwner === null ||
+    typeof currentOwner !== "object" ||
+    Array.isArray(currentOwner) ||
+    successor === null ||
+    typeof successor !== "object" ||
+    Array.isArray(successor) ||
+    !justification
+  ) {
+    return undefined;
+  }
+
+  const currentOwnerRecord = currentOwner as Record<string, unknown>;
+  const successorRecord = successor as Record<string, unknown>;
+  const currentOwnerId = getSafeAuditText(currentOwnerRecord.id, 200);
+  const successorUserId = getSafeAuditText(successorRecord.id, 200);
+  const currentOwnerStatus = currentOwnerRecord.status;
+  if (
+    !currentOwnerId ||
+    !successorUserId ||
+    currentOwnerId === successorUserId ||
+    currentOwnerRecord.type !== "admin" ||
+    (currentOwnerStatus !== "active" && currentOwnerStatus !== "inactive") ||
+    successorRecord.type !== "owner" ||
+    successorRecord.status !== "active"
+  ) {
+    return undefined;
+  }
+  const previousOwnerAction = currentOwnerStatus === "inactive" ? "deactivate" : "demote";
+
+  return {
+    ownership: {
+      before: { ownerId: currentOwnerId, type: "owner", status: "active" },
+      after: {
+        ownerId: successorUserId,
+        type: "owner",
+        status: "active",
+        previousOwner: {
+          id: currentOwnerId,
+          type: "admin",
+          status: previousOwnerAction === "deactivate" ? "inactive" : "active",
+        },
+      },
+      previousOwnerAction,
+      justification,
+    },
+  };
+}
+
+function usesExplicitPlatformActor(method: string, path: string): boolean {
+  const normalizedPath = path.replace(/\/+$/u, "");
+  const normalizedMethod = method.toUpperCase();
+  return (
+    (normalizedMethod === "PATCH" && PLATFORM_ORGANIZATION_USER_PATH.test(normalizedPath)) ||
+    (normalizedMethod === "PUT" && PLATFORM_ORGANIZATION_USER_PERMISSIONS_PATH.test(normalizedPath))
   );
 }
 
@@ -128,6 +245,8 @@ export function buildAuditCapacityGuard({
     if (requiresAudit) {
       const publicPath = getPublicPath(request.originalUrl, request.path);
       const auditTarget = getPlatformOrganizationAuditTarget(publicPath);
+      const isOwnershipTransfer = PLATFORM_OWNERSHIP_TRANSFER_PATH.test(publicPath);
+      const explicitPlatformActor = usesExplicitPlatformActor(request.method, publicPath);
       const controller = new AbortController();
       const abort = () => controller.abort();
       response.once("close", abort);
@@ -147,39 +266,59 @@ export function buildAuditCapacityGuard({
             serviceSource: "gateway",
             createdAt: new Date().toISOString(),
             action:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
-                ? "platform.user.create.attempt"
-                : "organization.mutation.attempt",
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
+                ? "platform.user.permissions.update.attempt"
+                : isOwnershipTransfer
+                  ? "platform.organization.ownership.transfer.attempt"
+                  : method === "POST" &&
+                      /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                    ? "platform.user.create.attempt"
+                    : "organization.mutation.attempt",
             referring:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
                 ? "user"
-                : "organization",
+                : method === "POST" &&
+                    /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                  ? "user"
+                  : "organization",
             referringId:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
-                ? String(request.body?.login ?? "new-user")
-                : undefined,
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
+                ? (auditTarget?.userId ?? undefined)
+                : method === "POST" &&
+                    /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                  ? String(request.body?.login ?? "new-user")
+                  : auditTarget?.organizationId,
             changes:
-              method === "POST" &&
-              /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
                 ? {
                     before: null,
-                    after: {
-                      name: request.body?.name,
-                      login: request.body?.login,
-                      department_id: request.body?.department_id,
-                      permission: request.body?.permission,
-                      status: request.body?.status,
-                      type: request.body?.type,
-                      modules: request.body?.modules,
-                    },
+                    after: { modules: getAllowlistedModulePermissions(request.body) },
                   }
-                : undefined,
+                : method === "POST" &&
+                    /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                  ? {
+                      before: null,
+                      after: {
+                        name: request.body?.name,
+                        login: request.body?.login,
+                        department_id: request.body?.department_id,
+                        permission: request.body?.permission,
+                        status: request.body?.status,
+                        type: request.body?.type,
+                        modules: request.body?.modules,
+                      },
+                    }
+                  : undefined,
             metadata: {
-              auth_kind: "platform",
-              platform_user_id: request.auth?.userId,
+              ...(explicitPlatformActor
+                ? { actorKind: "platform", actorPlatformUserId: request.auth?.userId }
+                : isOwnershipTransfer
+                  ? {
+                      auth_kind: "platform",
+                      platform_user_id: request.auth?.userId,
+                      actorPlatformUserId: request.auth?.userId,
+                    }
+                  : { auth_kind: "platform", platform_user_id: request.auth?.userId }),
               business_outcome: "unknown",
               source_request_id_sha256: createHash("sha256")
                 .update(request.requestId)
@@ -374,6 +513,13 @@ export function buildAuditLifecycleMiddleware({
 
       const isPlatform = request.auth?.actorKind === "platform";
       const auditTarget = isPlatform ? getPlatformOrganizationAuditTarget(publicPath) : null;
+      const isOwnershipTransfer = isPlatform && PLATFORM_OWNERSHIP_TRANSFER_PATH.test(publicPath);
+      const ownershipChanges =
+        isOwnershipTransfer && statusCode !== null && statusCode < 400
+          ? getOwnershipTransferAuditChanges(request, response.locals.ownershipTransferAuditResult)
+          : undefined;
+      const explicitPlatformActor =
+        isPlatform && usesExplicitPlatformActor(request.method, publicPath);
 
       const payload: CreateAuditRequestPayload = {
         requestId: request.requestId,
@@ -406,14 +552,23 @@ export function buildAuditLifecycleMiddleware({
           routeTarget: getRouteTarget(env, request),
           activityVisible: activity !== null,
           ...(isPlatform
-            ? {
-                auth_kind: "platform",
-                platform_user_id: request.auth?.userId,
-              }
+            ? explicitPlatformActor
+              ? { actorKind: "platform", actorPlatformUserId: request.auth?.userId }
+              : isOwnershipTransfer
+                ? {
+                    auth_kind: "platform",
+                    platform_user_id: request.auth?.userId,
+                    actorPlatformUserId: request.auth?.userId,
+                  }
+                : { auth_kind: "platform", platform_user_id: request.auth?.userId }
             : {}),
         },
-        action: activity?.action,
-        referring: activity?.item,
+        action: ownershipChanges
+          ? "platform.organization.ownership.transfer.completed"
+          : activity?.action,
+        referring: ownershipChanges ? "organization" : activity?.item,
+        referringId: ownershipChanges ? auditTarget?.organizationId : undefined,
+        changes: ownershipChanges,
       };
 
       const reservation =

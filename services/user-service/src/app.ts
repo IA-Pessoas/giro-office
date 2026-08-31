@@ -63,7 +63,7 @@ export function createUserApp(
 
   app.use("/internal", createInternalReportingRouter(env));
   app.use("/platform", createPlatformAuthRoutes(env));
-  app.use("/platform", createPlatformUsersRoutes());
+  app.use("/platform", createPlatformUsersRoutes({ audit: options.audit }));
   app.use("/user", createAuthRoutes(env));
   app.post(
     "/user/:id/photo",

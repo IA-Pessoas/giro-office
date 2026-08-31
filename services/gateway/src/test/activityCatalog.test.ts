@@ -205,6 +205,24 @@ describe("activityCatalog", () => {
     ["GET", "/platform/organizations/org-1/users/user-1", "consultou", "um usuário da organização"],
     [
       "GET",
+      "/platform/organizations/org-1/users/user-1/permissions",
+      "consultou",
+      "as permissões de um usuário da organização",
+    ],
+    [
+      "PATCH",
+      "/platform/organizations/org-1/users/user-1",
+      "atualizou",
+      "um usuário da organização",
+    ],
+    [
+      "PUT",
+      "/platform/organizations/org-1/users/user-1/permissions",
+      "alterou",
+      "as permissões de um usuário da organização",
+    ],
+    [
+      "GET",
       "/platform/organizations/org-1/departments",
       "consultou",
       "os departamentos da organização",
