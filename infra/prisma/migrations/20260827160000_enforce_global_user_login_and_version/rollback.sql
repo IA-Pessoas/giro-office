@@ -1,3 +1,3 @@
--- Run manually only with application writers stopped. Keep `version` to avoid discarding
--- concurrency history; the prior application version safely ignores this additive column.
-DROP INDEX IF EXISTS "users_login_key";
+-- Keep `version` to avoid discarding concurrency history; the prior application version safely
+-- ignores this additive column. The global `users_login_key` constraint belongs to migration
+-- 20260819150000_user_service_tenant_rls and must remain intact.

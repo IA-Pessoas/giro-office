@@ -160,27 +160,31 @@ test("CLI retorna sucesso apenas com relatório pronto e sinaliza a migration bl
   assert.equal(JSON.parse(blockedOutput.text).migrationStatus, "BLOCKED_BY_GLOBAL_LOGIN_COLLISIONS");
 });
 
-test("migration bloqueia colisões, cria a constraint global e inicia a versão do usuário", async () => {
+test("migration bloqueia colisões e inicia a versão sem recriar a constraint global histórica", async () => {
   const migration = await readFile(
     new URL("../../migrations/20260827160000_enforce_global_user_login_and_version/migration.sql", import.meta.url),
+    "utf8",
+  );
+  const tenantRlsMigration = await readFile(
+    new URL("../../migrations/20260819150000_user_service_tenant_rls/migration.sql", import.meta.url),
     "utf8",
   );
 
   assert.match(migration, /GROUP BY "login"/);
   assert.match(migration, /HAVING COUNT\(\*\) > 1/);
-  assert.match(migration, /CREATE UNIQUE INDEX "users_login_key" ON "users"\("login"\)/);
   assert.match(migration, /ADD COLUMN "version" INTEGER NOT NULL DEFAULT 1/);
+  assert.doesNotMatch(migration, /CREATE UNIQUE INDEX "users_login_key"/);
+  assert.match(tenantRlsMigration, /ADD CONSTRAINT "users_login_key" UNIQUE \(login\)/);
   assert.doesNotMatch(migration, /password|hash|cookie|token/i);
 });
 
-test("rollback remove somente a constraint e preserva a versão dos usuários", async () => {
+test("rollback preserva a constraint histórica e a versão dos usuários", async () => {
   const rollback = await readFile(
     new URL("../../migrations/20260827160000_enforce_global_user_login_and_version/rollback.sql", import.meta.url),
     "utf8",
   );
 
-  assert.match(rollback, /DROP INDEX IF EXISTS "users_login_key"/);
-  assert.doesNotMatch(rollback, /DROP COLUMN|password|hash|cookie|token/i);
+  assert.doesNotMatch(rollback, /DROP INDEX|DROP CONSTRAINT|DROP COLUMN|password|hash|cookie|token/i);
 });
 
 function createClient(resultRows) {
