@@ -1,9 +1,14 @@
-import { TI_INVENTORY_REPORTING_SOURCES, TI_STOCK_REPORTING_SOURCES } from "@workspace/shared";
+import {
+  TI_INVENTORY_REPORTING_SOURCES,
+  TI_REQUESTS_REPORTING_SOURCES,
+  TI_STOCK_REPORTING_SOURCES,
+} from "@workspace/shared";
 import { z } from "zod";
 
 const reportingFieldSchema = z.string().trim().min(1).max(64);
 const TI_REPORTING_SOURCES = [
   ...TI_INVENTORY_REPORTING_SOURCES,
+  ...TI_REQUESTS_REPORTING_SOURCES,
   ...TI_STOCK_REPORTING_SOURCES,
 ] as const;
 

@@ -27,6 +27,7 @@ function createGrant(input: {
   fields: string[];
   body: unknown;
   expiresAt?: number;
+  organizationId?: string;
 }) {
   const issuedAt = Math.floor(Date.now() / 1000);
   const requestId = `request-${randomUUID()}`;
@@ -37,7 +38,7 @@ function createGrant(input: {
     fields: input.fields,
     issued_at: issuedAt,
     operation: input.operation,
-    organization_id: organizationId,
+    organization_id: input.organizationId ?? "10000000-0000-4000-8000-000000000001",
     request_id: requestId,
     source: input.source,
     version: 1,
@@ -75,6 +76,7 @@ describe("ti internal reporting routes", () => {
 
     expect(response.body.data.sources.map((source: { key: string }) => source.key)).toEqual([
       "ti.inventory",
+      "ti.requests",
       "ti.stock",
     ]);
     expect(response.body.data.sources.every((source: { keys?: unknown }) => !source.keys)).toBe(
@@ -189,5 +191,99 @@ describe("ti internal reporting routes", () => {
         "x-reports-grant-signature": signed.signature,
       })
       .expect(403);
+  });
+
+  it("extrai chamados apenas para a organização do grant e sem conteúdo sensível", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        title: "Notebook sem conexão",
+        category: { name: "Rede" },
+        urgency: "High",
+        status: "InProgress",
+        description: "never-returned",
+        attachment: "private/path.png",
+      },
+    ]);
+    const body = {
+      source: "ti.requests",
+      fields: ["title", "category", "urgency", "status"],
+      limit: 1,
+    };
+    const signed = createGrant({
+      operation: "extract",
+      source: body.source,
+      fields: body.fields,
+      body,
+    });
+    const app = createTestApp({
+      ...(await import("./tiServiceTestUtils.js")).createPrismaMock(),
+      tIRequest: { findMany },
+    } as never);
+
+    const response = await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
+      .set("x-request-id", signed.requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(response.body.data).toEqual({
+      rows: [
+        { title: "Notebook sem conexão", category: "Rede", urgency: "High", status: "InProgress" },
+      ],
+      reachedLimit: false,
+    });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: "10000000-0000-4000-8000-000000000001" },
+        take: 2,
+      }),
+    );
+  });
+
+  it("rejeita token, grant e tentativa de tenant cruzado para chamados antes da consulta", async () => {
+    const findMany = vi.fn();
+    const body = { source: "ti.requests", fields: ["title"], limit: 1 };
+    const signed = createGrant({
+      operation: "extract",
+      source: body.source,
+      fields: body.fields,
+      body,
+    });
+    const app = createTestApp({
+      ...(await import("./tiServiceTestUtils.js")).createPrismaMock(),
+      tIRequest: { findMany },
+    } as never);
+
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "invalid-token")
+      .set("x-request-id", signed.requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(403);
+
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
+      .set("x-request-id", signed.requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", "invalid-signature")
+      .send(body)
+      .expect(403);
+
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
+      .set("x-request-id", signed.requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send({ ...body, organization_id: "20000000-0000-4000-8000-000000000001" })
+      .expect(400);
+
+    expect(findMany).not.toHaveBeenCalled();
   });
 });

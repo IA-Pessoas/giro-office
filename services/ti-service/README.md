@@ -63,7 +63,9 @@ de curta duração, `x-request-id` e permanecem limitadas à organização do gr
 O `reports-service` acessa diretamente `GET /internal/reporting/catalog` e
 `POST /internal/reporting/extract`, fora do gateway. As duas operações exigem
 `REPORTS_INTERNAL_TOKEN`, grant HMAC de curta duração e `x-request-id`; o contrato publica apenas
-o inventário governado `ti.inventory`.
+as fontes governadas `ti.inventory` e `ti.requests`. Para chamados, expõe somente título,
+categoria, urgência, status e datas de criação/atualização; solicitante e responsável ficam
+restritos às chaves internas do catálogo.
 
 ## Senhas de TI
 

@@ -5,12 +5,10 @@ import {
   parseWithZod,
   REQUEST_ID_HEADER,
   ServiceError,
-  tiInventoryReportingCatalog,
 } from "@workspace/shared";
 import { Router } from "express";
 import type { TiServiceEnv } from "../config/env.js";
 import type { InternalReportingService } from "../reporting/internalReportingService.js";
-import { tiStockReportingCatalog } from "../reporting/tiStockReportingCatalog.js";
 import {
   type InternalReportingGrant,
   internalReportingExtractBodySchema,
@@ -20,12 +18,6 @@ import {
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
 const usedReportingGrants = new Map<string, number>();
-const publishedReportingCatalog = {
-  sources: [...tiInventoryReportingCatalog.sources, ...tiStockReportingCatalog.sources].map(
-    ({ keys: _keys, ...source }) => source,
-  ),
-  relations: [],
-};
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -131,7 +123,7 @@ export function createInternalReportingRouter(options: {
       fields: [],
       body: {},
     });
-    response.json(createSuccessResponse(publishedReportingCatalog));
+    response.json(createSuccessResponse(options.reportingService.catalog));
   });
   router.post("/reporting/extract", async (request, response) => {
     const body = parseWithZod(internalReportingExtractBodySchema, request.body);

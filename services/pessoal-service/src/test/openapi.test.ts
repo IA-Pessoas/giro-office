@@ -82,6 +82,7 @@ describe("pessoal-service OpenAPI", () => {
       "pessoal.ldd",
       "pessoal.payroll",
       "pessoal.obligations",
+      "pessoal.unions",
     ]);
   });
 

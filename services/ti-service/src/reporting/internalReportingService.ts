@@ -1,17 +1,23 @@
 import {
   ServiceError,
   type TiInventoryReportingSource,
+  type TiRequestsReportingSource,
   tiInventoryReportingCatalog,
+  tiRequestsReportingCatalog,
 } from "@workspace/shared";
 import { TiDepartmentResolverService } from "../services/tiDepartmentResolverService.js";
 import { TiInventoryReportingService } from "./tiInventoryReportingService.js";
+import { TiRequestsReportingService } from "./tiRequestsReportingService.js";
 import {
   getTiStockReportingFields,
   type TiStockReportingSource,
   tiStockReportingCatalog,
 } from "./tiStockReportingCatalog.js";
 
-type ReportingSource = TiInventoryReportingSource | TiStockReportingSource;
+type ReportingSource =
+  | TiInventoryReportingSource
+  | TiRequestsReportingSource
+  | TiStockReportingSource;
 
 type ReportingSelect = {
   name?: true;
@@ -45,6 +51,14 @@ type InventoryReportingDelegate = {
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
+type RequestsReportingDelegate = {
+  findMany(input: {
+    where: { organization_id: string };
+    select: Record<string, unknown>;
+    take: number;
+  }): Promise<readonly Record<string, unknown>[]>;
+};
+
 type DepartmentReportingDelegate = {
   findFirst(input: {
     where: { organization_id: string; name: { equals: string; mode: "insensitive" } };
@@ -60,6 +74,7 @@ function withoutKeys<T extends { keys: readonly unknown[] }>(source: T) {
 const publicCatalog = {
   sources: [
     ...tiInventoryReportingCatalog.sources.map(withoutKeys),
+    ...tiRequestsReportingCatalog.sources.map(withoutKeys),
     ...tiStockReportingCatalog.sources.map(withoutKeys),
   ],
   relations: [],
@@ -92,18 +107,21 @@ function projectStockRows(
 export class InternalReportingService {
   readonly catalog = publicCatalog;
   private readonly inventory: TiInventoryReportingService;
+  private readonly requests: TiRequestsReportingService;
   private readonly departmentResolver: TiDepartmentResolverService;
 
   constructor(
     private readonly prisma: {
       department: DepartmentReportingDelegate;
       inventoryTecnologia: InventoryReportingDelegate;
+      tIRequest: RequestsReportingDelegate;
       stock: ReportingDelegate;
     },
   ) {
     this.inventory = new TiInventoryReportingService({
       inventoryTecnologia: prisma.inventoryTecnologia,
     });
+    this.requests = new TiRequestsReportingService({ tIRequest: prisma.tIRequest });
     this.departmentResolver = new TiDepartmentResolverService(prisma);
   }
 
@@ -115,6 +133,15 @@ export class InternalReportingService {
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
     if (input.source === "ti.inventory") {
       return this.inventory.extract({
+        organizationId: input.organizationId,
+        source: input.source,
+        fields: input.fields,
+        limit: input.limit,
+      });
+    }
+
+    if (input.source === "ti.requests") {
+      return this.requests.extract({
         organizationId: input.organizationId,
         source: input.source,
         fields: input.fields,
