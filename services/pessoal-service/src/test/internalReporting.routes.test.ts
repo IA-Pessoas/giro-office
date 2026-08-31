@@ -26,7 +26,11 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function signedGrant(body: unknown, expiresAt = Math.floor(Date.now() / 1000) + 60) {
+function signedGrant(
+  body: unknown,
+  expiresAt = Math.floor(Date.now() / 1000) + 60,
+  overrides: Record<string, unknown> = {},
+) {
   const input = body as { fields?: string[]; source?: string };
   const payload = {
     audience: "pessoal-service",
@@ -39,6 +43,7 @@ function signedGrant(body: unknown, expiresAt = Math.floor(Date.now() / 1000) + 
     request_id: requestId,
     source: input.source ?? "pessoal.catalog",
     version: 1,
+    ...overrides,
   };
   const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
   return {
@@ -81,7 +86,7 @@ describe("pessoal internal reporting routes", () => {
       .set("x-reports-grant-signature", signed.signature)
       .expect(200);
 
-    expect(response.body.data.sources).toHaveLength(1);
+    expect(response.body.data.sources).toHaveLength(2);
     expect(response.body.data.sources[0]).toMatchObject({
       key: "pessoal.ldd",
       module: "pessoal",
@@ -93,6 +98,33 @@ describe("pessoal internal reporting routes", () => {
     expect(
       response.body.data.sources[0].fields.map((field: { key: string }) => field.key),
     ).not.toContain("id");
+
+    const payrollSource = response.body.data.sources.find(
+      (source: { key: string }) => source.key === "pessoal.payroll",
+    );
+    expect(payrollSource).toMatchObject({
+      module: "pessoal",
+      keys: [{ key: "client_id" }, { key: "responsible_id" }, { key: "union_id" }],
+    });
+    expect(payrollSource.fields.map((field: { key: string }) => field.key)).toEqual([
+      "advance",
+      "advance_type",
+      "advance_amount",
+      "onvio",
+      "group",
+      "vt",
+      "vt_value",
+      "vt_type",
+      "va",
+      "assistance_fee",
+      "bem_mais",
+      "bsf",
+      "reinf",
+      "employees",
+    ]);
+    expect(payrollSource.fields.map((field: { key: string }) => field.key)).not.toContain(
+      "contact",
+    );
   });
 
   it("valida token e grant e encaminha a organização assinada", async () => {
@@ -122,9 +154,12 @@ describe("pessoal internal reporting routes", () => {
     const body = { source: "pessoal.ldd", fields: ["type"], limit: 1 };
     const expired = signedGrant(body, Math.floor(Date.now() / 1000) - 1);
     const invalidSignature = { ...signedGrant(body), signature: "invalid" };
+    const incompatible = signedGrant(body, Math.floor(Date.now() / 1000) + 60, {
+      audience: "reports-service",
+    });
     const { app, extract } = createApp();
 
-    for (const signed of [expired, invalidSignature]) {
+    for (const signed of [expired, invalidSignature, incompatible]) {
       await request(app)
         .post("/internal/reporting/extract")
         .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
@@ -147,5 +182,36 @@ describe("pessoal internal reporting routes", () => {
       .expect(400);
 
     expect(extract).not.toHaveBeenCalled();
+  });
+
+  it("valida grant de payroll, encaminha a organização e preserva reachedLimit sem conteúdo sensível", async () => {
+    const body = { source: "pessoal.payroll", fields: ["advance", "employees"], limit: 1 };
+    const signed = signedGrant(body);
+    const extract = vi.fn().mockResolvedValue({
+      rows: [{ advance: true, employees: 12 }],
+      reachedLimit: true,
+    });
+    const { app } = createApp(extract);
+
+    const response = await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+      .set("x-request-id", requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(extract).toHaveBeenCalledWith({
+      organizationId,
+      source: "pessoal.payroll",
+      fields: ["advance", "employees"],
+      limit: 1,
+    });
+    expect(response.body.data).toEqual({
+      rows: [{ advance: true, employees: 12 }],
+      reachedLimit: true,
+    });
+    expect(JSON.stringify(response.body)).not.toContain("sensitive");
   });
 });

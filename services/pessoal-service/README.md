@@ -43,6 +43,9 @@ Exemplos de paths publicos planejados:
 - `GET /internal/reporting/catalog`
 - `POST /internal/reporting/extract`
 
+O reporting interno publica `pessoal.ldd` e `pessoal.payroll` com grants de curta duração; a
+configuração de folha mantém `client_id`, responsável e sindicato apenas como chaves de catálogo.
+
 O servico nao agenda cron no processo Node. A rotina de notificacoes de sindicatos deve ser
 acionada por um scheduler externo, como Supabase/Vercel, usando `x-internal-service-token`.
 Em VPS, configure `INTERNAL_SERVICE_TOKEN` em `.env.vps.pessoal-service` e use o mesmo valor nesse header. O fallback para `AUDIT_SERVICE_TOKEN` fica restrito a dev/test.

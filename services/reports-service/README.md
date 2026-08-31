@@ -73,3 +73,7 @@ O smoke fiscal fica desativado por padrão; exija `FISCAL_REPORTING_SMOKE_ENABLE
 O adapter de LDD de Departamento Pessoal usa `PESSOAL_SERVICE_URL`, `REPORTS_INTERNAL_TOKEN` e
 `REPORTS_GRANT_SECRET` para consultar exclusivamente o contrato interno governado do
 pessoal-service.
+
+O adapter de folha de Departamento Pessoal usa as mesmas credenciais e publica apenas os campos
+selecionáveis de `pessoal.payroll`; `client_id`, responsável e sindicato permanecem como chaves
+internas do catálogo.

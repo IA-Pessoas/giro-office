@@ -10,6 +10,7 @@ import { FiscalIpiAdapter } from "./integrations/fiscalIpiAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
+import { PessoalPayrollAdapter } from "./integrations/pessoalPayrollAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
@@ -46,6 +47,7 @@ const catalog = new SourceCatalogService([
   new FiscalNcmAdapter(env),
   new FiscalIpiAdapter(env),
   new PessoalLddAdapter(env),
+  new PessoalPayrollAdapter(env),
   new RegularizeLicenseAdapter(env),
 ]);
 const worker = new ReportWorkerService(
