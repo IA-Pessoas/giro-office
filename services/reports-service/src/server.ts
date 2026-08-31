@@ -18,6 +18,7 @@ import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
 import { PessoalPayrollAdapter } from "./integrations/pessoalPayrollAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
+import { RegularizeMunicipalTaxesAdapter } from "./integrations/regularizeMunicipalTaxesAdapter.js";
 import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
@@ -56,6 +57,7 @@ const app = createReportsApp({
       new RegularizeProcessAdapter(env),
       new RhRequestAdapter(env),
       new TiInventoryAdapter(env),
+      new RegularizeMunicipalTaxesAdapter(env),
     ],
   },
 });

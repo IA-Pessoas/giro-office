@@ -4,7 +4,7 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
   REQUEST_ID_HEADER,
-  regularizeLicenseReportingCatalog,
+  regularizeMunicipalTaxesReportingCatalog,
   ServiceError,
 } from "@workspace/shared";
 
@@ -26,10 +26,10 @@ import {
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
-const sources = publicReportingSources(regularizeLicenseReportingCatalog.sources);
+const sources = publicReportingSources(regularizeMunicipalTaxesReportingCatalog.sources);
 const relations: readonly ReportCatalogRelation[] = [];
 
-export class RegularizeLicenseAdapter implements ReportSourceAdapter {
+export class RegularizeMunicipalTaxesAdapter implements ReportSourceAdapter {
   readonly sources = sources;
   readonly relations = relations;
 
@@ -58,13 +58,16 @@ export class RegularizeLicenseAdapter implements ReportSourceAdapter {
     ) {
       throw new ServiceError(
         400,
-        "A prévia de Licenças do Regularize aceita somente colunas de uma fonte.",
+        "A prévia de Tributos Municipais do Regularize aceita somente colunas de uma fonte.",
       );
     }
     const source = definition.sources[0];
     const fields = definition.columns.map((column) => column.field);
     if (new Set(fields).size !== fields.length) {
-      throw new ServiceError(400, "As colunas de Licenças do Regularize devem usar campos únicos.");
+      throw new ServiceError(
+        400,
+        "As colunas de Tributos Municipais do Regularize devem usar campos únicos.",
+      );
     }
     const body = {
       source,
@@ -106,12 +109,12 @@ export class RegularizeLicenseAdapter implements ReportSourceAdapter {
         reachedLimit: payload.data.reachedLimit,
       };
     } catch (err: unknown) {
-      logError("Falha ao extrair licenças do Regularize para relatório", {
+      logError("Falha ao extrair tributos municipais do Regularize para relatório", {
         errorType: err instanceof Error ? err.name : typeof err,
       });
       throw new ServiceError(
         503,
-        "Não foi possível obter Licenças do Regularize para o relatório.",
+        "Não foi possível obter Tributos Municipais do Regularize para o relatório.",
       );
     }
   }
