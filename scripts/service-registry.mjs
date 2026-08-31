@@ -148,8 +148,8 @@ export const serviceRegistry = [
     defaultUrl: "http://localhost:3034",
     urlEnvKey: "RH_SERVICE_URL",
     openapiSpecPath: "services/rh-service/src/openapi/spec.ts",
-    authModes: ["public", "bearer", "admin-bearer"],
-    internalTokenEnvKey: null,
+    authModes: ["public", "bearer", "admin-bearer", "internal-token"],
+    internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/rh-service/src/generated/prisma",
   },
   {

@@ -12,6 +12,7 @@ Consulte [`src/config/env.ts`](src/config/env.ts).
 
 - Banco e autenticação: `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `JWT_SECRET`.
 - Tokens e segredo interno: `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`.
+- RH: `RH_SERVICE_URL` (default `http://localhost:3034`).
 - Regularize: `REGULARIZE_SERVICE_URL`, `REGULARIZE_REPORTING_TOKEN`, `REGULARIZE_REPORTING_GRANT_SECRET`.
 - Certificados PF: `CERTIFICATE_REPORTING_TOKEN`, `CERTIFICATE_REPORTING_GRANT_SECRET`.
 - URLs upstream: `USER_SERVICE_URL`, `PARCELAMENTO_SERVICE_URL`, `CLIENT_SERVICE_URL`,
@@ -49,7 +50,9 @@ pnpm --filter @workspace/reports-service test
 ```
 
 O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas, Controle Contábil,
-relacionamentos e responsáveis contábeis, Certificados PF e PJ, ICMS, IPI e NCM fiscal.
+relacionamentos e responsáveis contábeis, Certificados PF e PJ, ICMS, IPI, NCM fiscal, LDD e
+Solicitações de RH. O adapter de RH consulta exclusivamente `/internal/reporting/extract` do
+rh-service, com grant HMAC curto e projeção dos campos seguros de `rh.requests`.
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
 
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
