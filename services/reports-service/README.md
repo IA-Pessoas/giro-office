@@ -52,9 +52,9 @@ pnpm --filter @workspace/reports-service test
 
 O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas, Controle Contábil,
 relacionamentos e responsáveis contábeis, Certificados PF e PJ, ICMS, IPI, NCM fiscal, LDD,
-Solicitações de RH, Licenças e Processos do Regularize. O adapter de RH consulta exclusivamente
+Solicitações e Feriados de RH, Licenças e Processos do Regularize. Os adapters de RH consultam exclusivamente
 `/internal/reporting/extract` do rh-service, com grant HMAC curto e projeção dos campos seguros de
-`rh.requests`.
+`rh.requests` e `rh.holidays`.
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
 
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
