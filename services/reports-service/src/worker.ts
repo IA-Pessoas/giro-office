@@ -12,6 +12,7 @@ import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
 import { PessoalObligationsAdapter } from "./integrations/pessoalObligationsAdapter.js";
 import { PessoalPayrollAdapter } from "./integrations/pessoalPayrollAdapter.js";
+import { PessoalUnionsAdapter } from "./integrations/pessoalUnionsAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
 import { RegularizeMunicipalTaxesAdapter } from "./integrations/regularizeMunicipalTaxesAdapter.js";
@@ -55,6 +56,7 @@ const catalog = new SourceCatalogService([
   new PessoalLddAdapter(env),
   new PessoalObligationsAdapter(env),
   new PessoalPayrollAdapter(env),
+  new PessoalUnionsAdapter(env),
   new RegularizeLicenseAdapter(env),
   new RegularizeProcessAdapter(env),
   new RhRequestAdapter(env),
