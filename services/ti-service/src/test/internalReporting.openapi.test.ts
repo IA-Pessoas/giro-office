@@ -24,5 +24,8 @@ describe("ti internal reporting OpenAPI", () => {
     }
 
     expect(spec.paths["/internal/reporting/extract"]).toBeDefined();
+    const bodySchema = (spec.paths["/internal/reporting/extract"] as { post: { requestBody: { content: { "application/json": { schema: { properties: { source: { enum: string[] } } } } } } } }).post.requestBody.content["application/json"].schema;
+    expect(bodySchema.properties.source.enum).toEqual(["ti.inventory", "ti.stock"]);
+    expect(spec.paths["/ti/stock"]).toBeDefined();
   });
 });

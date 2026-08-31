@@ -51,6 +51,12 @@ servico/VPS, junto com `SUPABASE_URL`.
 - Exemplo: `GET /ti/requests/list`
 - Exemplo: `GET /ti/inventory/list`
 - Exemplo: `POST /ti/inventory`
+- Exemplo: `GET /ti/stock`
+
+As rotas diretas `/internal/reporting/catalog` e `/internal/reporting/extract` são consumidas
+exclusivamente pelo reports-service e não passam pelo gateway. O catálogo combinado publica
+`ti.inventory` e `ti.stock` sem expor chaves internas; as extrações exigem token interno, grant HMAC
+de curta duração, `x-request-id` e permanecem limitadas à organização do grant.
 
 ## Relatórios internos
 
