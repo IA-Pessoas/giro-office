@@ -13,6 +13,7 @@ import { ContabilResponsiblesAdapter } from "./integrations/contabilResponsibles
 import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
+import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
@@ -42,6 +43,7 @@ const app = createReportsApp({
       new FiscalIcmsAdapter(env),
       new CertificatePjAdapter(env),
       new FiscalNcmAdapter(env),
+      new PessoalLddAdapter(env),
     ],
   },
 });

@@ -123,6 +123,9 @@ const env = {
   fiscalReportingSmokeEnabled:
     process.env.FISCAL_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.FISCAL_REPORTING_SMOKE_ENABLED === "1",
+  pessoalReportingSmokeEnabled:
+    process.env.PESSOAL_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.PESSOAL_REPORTING_SMOKE_ENABLED === "1",
   projectReportingSmokeEnabled:
     process.env.PROJECT_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.PROJECT_REPORTING_SMOKE_ENABLED === "1",
@@ -986,6 +989,32 @@ function createFiscalReportingGrant({ operation, source, fields, body }) {
   };
   const canonical = canonicalJson(payload);
   const grant = Buffer.from(canonical).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createPessoalReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for pessoal reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "pessoal-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
   return {
     "x-request-id": requestId,
     "x-reports-grant": grant,
@@ -2818,6 +2847,36 @@ const handlers = {
             }),
       });
     }
+  },
+
+  async pessoalReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createPessoalReportingGrant({
+            operation: "catalog",
+            source: "pessoal.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async pessoalReportingExtract(op) {
+    const body = { source: "pessoal.ldd", fields: ["type"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createPessoalReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
   },
 
   async userStartConfig(op) {
@@ -5546,6 +5605,10 @@ function disabledConditionReason(condition) {
 
   if (condition === "fiscalReportingSmokeEnabled" && !env.fiscalReportingSmokeEnabled) {
     return "FISCAL_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "pessoalReportingSmokeEnabled" && !env.pessoalReportingSmokeEnabled) {
+    return "PESSOAL_REPORTING_SMOKE_ENABLED is false";
   }
 
   if (condition === "projectReportingSmokeEnabled" && !env.projectReportingSmokeEnabled) {
