@@ -16,6 +16,7 @@ import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapte
 import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
+import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
 import { UserAccessContextClient } from "./integrations/userAccessContextClient.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
 import { ReportJobRepository } from "./prisma/reportJobRepository.js";
@@ -53,6 +54,7 @@ const catalog = new SourceCatalogService([
   new RegularizeLicenseAdapter(env),
   new RegularizeProcessAdapter(env),
   new RhRequestAdapter(env),
+  new TiInventoryAdapter(env),
 ]);
 const worker = new ReportWorkerService(
   new ReportJobRepository(prisma, env.workerLeaseSeconds, audit),

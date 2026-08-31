@@ -798,6 +798,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
       { name: "TI Stock", description: "Estoque de TI filtrado pelo departamento Tecnologia" },
       { name: "TI Robots", description: "Robos e historico de execucao de TI" },
       { name: "TI Dashboard", description: "Resumo consolidado do modulo de TI" },
+      { name: "Internal", description: "Contratos internos entre serviços" },
     ],
     components: {
       securitySchemes: {
@@ -805,6 +806,11 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
+        },
+        internalToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
         },
       },
       schemas,
@@ -827,6 +833,75 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           summary: "Readiness",
           responses: {
             "200": successResponse("Servico pronto"),
+          },
+        },
+      },
+      "/internal/reporting/catalog": {
+        get: {
+          operationId: "getTiReportingCatalog",
+          tags: ["Internal"],
+          summary: "Obtém o catálogo interno de relatórios de Tecnologia",
+          security: [{ internalToken: [] }],
+          parameters: [
+            {
+              name: "x-request-id",
+              in: "header",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: { "200": successResponse("Catálogo seguro"), "403": errorResponse(403) },
+        },
+      },
+      "/internal/reporting/extract": {
+        post: {
+          operationId: "extractTiInventoryForReports",
+          tags: ["Internal"],
+          summary: "Extrai o inventário de Tecnologia para o reports-service",
+          security: [{ internalToken: [] }],
+          parameters: [
+            {
+              name: "x-request-id",
+              in: "header",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["source", "fields", "limit"],
+                  additionalProperties: false,
+                  properties: {
+                    source: { type: "string", enum: ["ti.inventory"] },
+                    fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
+                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": successResponse("Linhas projetadas e limite de origem"),
+            "400": errorResponse(400),
+            "403": errorResponse(403),
           },
         },
       },
