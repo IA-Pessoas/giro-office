@@ -19,6 +19,7 @@ import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapte
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
+import { TiRequestsAdapter } from "./integrations/tiRequestsAdapter.js";
 import { UserAccessContextClient } from "./integrations/userAccessContextClient.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
 import { ReportJobRepository } from "./prisma/reportJobRepository.js";
@@ -58,6 +59,7 @@ const catalog = new SourceCatalogService([
   new RegularizeProcessAdapter(env),
   new RhRequestAdapter(env),
   new TiInventoryAdapter(env),
+  new TiRequestsAdapter(env),
   new RegularizeMunicipalTaxesAdapter(env),
 ]);
 const worker = new ReportWorkerService(
