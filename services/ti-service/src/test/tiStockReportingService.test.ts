@@ -84,9 +84,9 @@ describe("TI stock internal reporting service", () => {
   });
 
   it("mantém a allowlist do inventário no serviço combinado", async () => {
-    const findMany = vi.fn().mockResolvedValue([
-      { asset_code: "NB-001", category: { name: "Notebook" } },
-    ]);
+    const findMany = vi
+      .fn()
+      .mockResolvedValue([{ asset_code: "NB-001", category: { name: "Notebook" } }]);
     const service = new InternalReportingService({
       inventoryTecnologia: { findMany },
       stock: { findMany: vi.fn() },

@@ -1,15 +1,14 @@
 import {
   ServiceError,
-  tiInventoryReportingCatalog,
   type TiInventoryReportingSource,
+  tiInventoryReportingCatalog,
 } from "@workspace/shared";
-
+import { TiInventoryReportingService } from "./tiInventoryReportingService.js";
 import {
   getTiStockReportingFields,
-  tiStockReportingCatalog,
   type TiStockReportingSource,
+  tiStockReportingCatalog,
 } from "./tiStockReportingCatalog.js";
-import { TiInventoryReportingService } from "./tiInventoryReportingService.js";
 
 type ReportingSource = TiInventoryReportingSource | TiStockReportingSource;
 

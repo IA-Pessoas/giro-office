@@ -1,16 +1,14 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-
 import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
   parseWithZod,
   REQUEST_ID_HEADER,
   ServiceError,
+  tiInventoryReportingCatalog,
 } from "@workspace/shared";
 import { Router } from "express";
-
 import type { TiServiceEnv } from "../config/env.js";
-import { tiInventoryReportingCatalog } from "@workspace/shared";
 import type { InternalReportingService } from "../reporting/internalReportingService.js";
 import { tiStockReportingCatalog } from "../reporting/tiStockReportingCatalog.js";
 import {
@@ -23,10 +21,9 @@ const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
 const usedReportingGrants = new Map<string, number>();
 const publishedReportingCatalog = {
-  sources: [
-    ...tiInventoryReportingCatalog.sources,
-    ...tiStockReportingCatalog.sources,
-  ].map(({ keys: _keys, ...source }) => source),
+  sources: [...tiInventoryReportingCatalog.sources, ...tiStockReportingCatalog.sources].map(
+    ({ keys: _keys, ...source }) => source,
+  ),
   relations: [],
 };
 

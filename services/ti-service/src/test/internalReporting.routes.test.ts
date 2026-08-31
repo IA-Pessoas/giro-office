@@ -148,7 +148,12 @@ describe("ti internal reporting routes", () => {
     prisma.stock.findMany = vi.fn(async () => []);
     const app = createTestApp(prisma as never);
     const body = { source: "ti.stock", fields: ["name"], limit: 1 };
-    const signed = createGrant({ operation: "extract", source: body.source, fields: body.fields, body });
+    const signed = createGrant({
+      operation: "extract",
+      source: body.source,
+      fields: body.fields,
+      body,
+    });
 
     await request(app)
       .post("/internal/reporting/extract")
