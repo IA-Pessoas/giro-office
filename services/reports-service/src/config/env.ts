@@ -65,6 +65,10 @@ const reportsServiceEnvSchema = z
       .string()
       .url("FISCAL_SERVICE_URL invalida.")
       .default("http://localhost:3037"),
+    pessoalServiceUrl: z
+      .string()
+      .url("PESSOAL_SERVICE_URL invalida.")
+      .default("http://localhost:3042"),
     workerPollIntervalMs: z.coerce.number().int().positive().default(5000),
     workerConcurrency: z.coerce.number().int().positive().default(2),
     workerLeaseSeconds: z.coerce.number().int().positive().default(120),
@@ -157,6 +161,7 @@ export function parseReportsServiceEnv(
     projectServiceUrl: source.PROJECT_SERVICE_URL,
     certificateServiceUrl: source.CERTIFICATE_SERVICE_URL,
     fiscalServiceUrl: source.FISCAL_SERVICE_URL,
+    pessoalServiceUrl: source.PESSOAL_SERVICE_URL,
     workerPollIntervalMs: source.REPORTS_WORKER_POLL_INTERVAL_MS,
     workerConcurrency: source.REPORTS_WORKER_CONCURRENCY,
     workerLeaseSeconds: source.REPORTS_WORKER_LEASE_SECONDS,
