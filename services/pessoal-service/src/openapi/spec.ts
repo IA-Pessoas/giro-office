@@ -1,6 +1,7 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { PessoalServiceEnv } from "../config/env.js";
+import { PESSOAL_REPORTING_SOURCES } from "../reporting/pessoalReportingCatalog.js";
 
 const successJson = {
   content: {
@@ -139,7 +140,7 @@ const competenceSchema = { type: "string", pattern: "^\\d{4}-\\d{2}$" } as const
 const reportingFieldSchema = { type: "string", minLength: 1, maxLength: 64 } as const;
 const internalReportingExtractRequestSchema = strictObjectSchema(
   {
-    source: { type: "string", enum: ["pessoal.ldd", "pessoal.payroll"] },
+    source: { type: "string", enum: PESSOAL_REPORTING_SOURCES },
     fields: {
       type: "array",
       minItems: 1,
@@ -862,7 +863,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
         post: {
           tags: ["Pessoal Internal"],
           security: internalSecurity,
-          summary: "Extrair fonte de pessoal para o reports-service",
+          summary: "Extrair dados de pessoal para o reports-service",
           operationId: "extractPessoalReportingData",
           parameters: [
             internalReportingHeader("x-request-id"),
