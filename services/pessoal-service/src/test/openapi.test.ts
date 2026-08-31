@@ -68,7 +68,7 @@ describe("pessoal-service OpenAPI", () => {
         paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
           ?.schema as { properties?: { source?: { enum?: string[] } } }
       ).properties?.source?.enum,
-    ).toEqual(["pessoal.ldd", "pessoal.payroll"]);
+    ).toEqual(["pessoal.ldd", "pessoal.payroll", "pessoal.situations"]);
   });
 
   it("documenta request bodies estritos para mutacoes do dominio", () => {

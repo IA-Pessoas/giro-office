@@ -86,7 +86,7 @@ describe("pessoal internal reporting routes", () => {
       .set("x-reports-grant-signature", signed.signature)
       .expect(200);
 
-    expect(response.body.data.sources).toHaveLength(2);
+    expect(response.body.data.sources).toHaveLength(3);
     expect(response.body.data.sources[0]).toMatchObject({
       key: "pessoal.ldd",
       module: "pessoal",
@@ -124,6 +124,23 @@ describe("pessoal internal reporting routes", () => {
     ]);
     expect(payrollSource.fields.map((field: { key: string }) => field.key)).not.toContain(
       "contact",
+    );
+
+    const situationsSource = response.body.data.sources.find(
+      (source: { key: string }) => source.key === "pessoal.situations",
+    );
+    expect(situationsSource).toMatchObject({
+      module: "pessoal",
+      keys: [{ key: "client_id" }, { key: "registered_by_id" }, { key: "completed_by_id" }],
+    });
+    expect(situationsSource.fields.map((field: { key: string }) => field.key)).toEqual([
+      "status",
+      "title",
+      "registration_date",
+      "completion_date",
+    ]);
+    expect(situationsSource.fields.map((field: { key: string }) => field.key)).not.toContain(
+      "description",
     );
   });
 
@@ -213,5 +230,45 @@ describe("pessoal internal reporting routes", () => {
       reachedLimit: true,
     });
     expect(JSON.stringify(response.body)).not.toContain("sensitive");
+  });
+
+  it("valida grant de situations e retorna reachedLimit sem chaves internas", async () => {
+    const body = {
+      source: "pessoal.situations",
+      fields: ["status", "title", "registration_date", "completion_date"],
+      limit: 1,
+    };
+    const signed = signedGrant(body);
+    const extract = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          status: "Finalizado",
+          title: "Folha",
+          registration_date: "2026-06-01T12:00:00.000Z",
+          completion_date: "2026-06-30T12:00:00.000Z",
+        },
+      ],
+      reachedLimit: true,
+    });
+    const { app } = createApp(extract);
+
+    const response = await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+      .set("x-request-id", requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(extract).toHaveBeenCalledWith({
+      organizationId,
+      source: "pessoal.situations",
+      fields: ["status", "title", "registration_date", "completion_date"],
+      limit: 1,
+    });
+    expect(response.body.data.reachedLimit).toBe(true);
+    expect(JSON.stringify(response.body)).not.toContain("registered_by_id");
+    expect(JSON.stringify(response.body)).not.toContain("completed_by_id");
   });
 });

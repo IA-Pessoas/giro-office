@@ -139,7 +139,7 @@ const competenceSchema = { type: "string", pattern: "^\\d{4}-\\d{2}$" } as const
 const reportingFieldSchema = { type: "string", minLength: 1, maxLength: 64 } as const;
 const internalReportingExtractRequestSchema = strictObjectSchema(
   {
-    source: { type: "string", enum: ["pessoal.ldd", "pessoal.payroll"] },
+    source: { type: "string", enum: ["pessoal.ldd", "pessoal.payroll", "pessoal.situations"] },
     fields: {
       type: "array",
       minItems: 1,

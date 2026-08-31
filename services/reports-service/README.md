@@ -51,7 +51,7 @@ pnpm --filter @workspace/reports-service test
 
 O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas, Controle Contábil,
 relacionamentos e responsáveis contábeis, Certificados PF e PJ, ICMS, IPI, NCM fiscal, LDD,
-Solicitações de RH, Licenças e Processos do Regularize. O adapter de RH consulta exclusivamente
+situações e folha de Departamento Pessoal, Solicitações de RH, Licenças e Processos do Regularize. O adapter de RH consulta exclusivamente
 `/internal/reporting/extract` do rh-service, com grant HMAC curto e projeção dos campos seguros de
 `rh.requests`.
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
@@ -80,4 +80,8 @@ pessoal-service.
 
 O adapter de folha de Departamento Pessoal usa as mesmas credenciais e publica apenas os campos
 selecionáveis de `pessoal.payroll`; `client_id`, responsável e sindicato permanecem como chaves
+internas do catálogo.
+
+O adapter de situações de Departamento Pessoal usa as mesmas credenciais e publica somente status,
+título e datas de registro/conclusão; `client_id`, registrador e concluidor permanecem como chaves
 internas do catálogo.
