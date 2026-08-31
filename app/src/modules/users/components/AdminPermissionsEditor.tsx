@@ -43,6 +43,8 @@ type PermissionQueryResult = {
 interface AdminPermissionsEditorProps {
   dataSource: AdminUserPermissionsDataSource;
   departments: ReadonlyArray<{ id: string; name: string }>;
+  initialUserId?: string;
+  syncDepartmentPermission?: boolean;
   currentUserId?: string;
   onAccessDenied?: () => void;
   onPermissionsUpdated: () => Promise<unknown> | unknown;
@@ -99,6 +101,8 @@ function getPermissionErrorMessage(error: unknown): string {
 export function AdminPermissionsEditor({
   dataSource,
   departments,
+  initialUserId,
+  syncDepartmentPermission = true,
   currentUserId,
   onAccessDenied,
   onPermissionsUpdated,
@@ -183,9 +187,11 @@ export function AdminPermissionsEditor({
     setSelectedUserId((currentUserId) =>
       currentUserId && users.some((candidate) => candidate.id === currentUserId)
         ? currentUserId
-        : users[0]?.id ?? null,
+        : (initialUserId && users.some((candidate) => candidate.id === initialUserId)
+            ? initialUserId
+            : currentUserId) ?? users[0]?.id ?? null,
     );
-  }, [users]);
+  }, [initialUserId, users]);
 
   useEffect(() => {
     if (!selectedUserId) {
@@ -242,11 +248,9 @@ export function AdminPermissionsEditor({
   const handleSave = async () => {
     if (!selectedUserId || !permissionSnapshot || isOwner || isSaving) return;
     const payload = buildPermissionUpdatePayload(permissionDraft, permissionExtraKeys);
-    const shouldSyncDepartmentPermission = needsDepartmentPermissionSync(
-      selectedDepartmentModule,
-      payload,
-      selectedUser,
-    );
+    const shouldSyncDepartmentPermission =
+      syncDepartmentPermission &&
+      needsDepartmentPermissionSync(selectedDepartmentModule, payload, selectedUser);
     if (arePermissionDraftsEqual(payload, permissionSnapshot) && !shouldSyncDepartmentPermission) return;
 
     setIsSaving(true);

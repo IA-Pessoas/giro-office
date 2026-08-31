@@ -1,14 +1,17 @@
 import { isAxiosError } from "axios";
 import { Search, UserRound } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ConfirmationDialog } from "@shared/components";
+import { Dialog } from "@shared/components/ui/Dialog";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { Input } from "@shared/ui/newLayout/input";
 import { CreateUserModal } from "@modules/users/components/CreateUserModal";
-import type { UserItem } from "@modules/users/types";
+import { AdminPermissionsEditor } from "@modules/users/components/AdminPermissionsEditor";
+import type { AdminUserPermissionsDataSource } from "@modules/users/types/adminUserContracts";
+import type { PermissionDraft, UserItem } from "@modules/users/types";
 
 import {
   usePlatformDepartments,
@@ -36,9 +39,11 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [isOwnershipTransferOpen, setIsOwnershipTransferOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<"deactivate" | "reactivate" | null>(null);
   const lifecycleActionRef = useRef<HTMLButtonElement>(null);
+  const permissionActionRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const usersQuery = usePlatformUsers(organization.id, {
@@ -78,6 +83,26 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
     setIsOwnershipTransferOpen(false);
   }, [organization.id]);
   const selectedUser = userDetailQuery.data;
+  const permissionsDataSource = useMemo<AdminUserPermissionsDataSource>(
+    () => ({
+      listUsers: async () => {
+        const result = await platformService.listUsers(organization.id, { skip: 0, take: 100 });
+        return result.users.map((user) => ({ ...user, permission: 0 }));
+      },
+      loadPermissions: (userId, signal) =>
+        platformService.getUserPermissions(organization.id, userId, signal),
+      savePermissions: (userId, permissions) =>
+        platformService.updateUserPermissions(organization.id, userId, permissions),
+      syncDepartmentPermission: async (userId, payload) => {
+        await platformService.updateUserPermissions(
+          organization.id,
+          userId,
+          (payload.modules ?? {}) as PermissionDraft,
+        );
+      },
+    }),
+    [organization.id],
+  );
 
   useEffect(() => {
     if (!selectedUserId && users[0]) setSelectedUserId(users[0].id);
@@ -354,6 +379,14 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                     </button>
                   </>
                 )}
+                <button
+                  ref={permissionActionRef}
+                  className="rounded-lg border border-blue-700 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-200 dark:hover:bg-blue-950/30"
+                  onClick={() => setIsPermissionsOpen(true)}
+                  type="button"
+                >
+                  Editar permissões
+                </button>
                 {selectedUser.status === "active" && selectedUser.type === "owner" ? (
                   <button
                     className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
@@ -363,14 +396,14 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                     Transferir ownership
                   </button>
                 ) : (
-                  <button
-                    ref={lifecycleActionRef}
-                    className={selectedUser.status === "active" ? "rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600" : "rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"}
-                    onClick={() => setPendingAction(selectedUser.status === "active" ? "deactivate" : "reactivate")}
-                    type="button"
-                  >
-                    {selectedUser.status === "active" ? "Desativar usuário" : "Reativar usuário"}
-                  </button>
+                <button
+                  ref={lifecycleActionRef}
+                  className={selectedUser.status === "active" ? "rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600" : "rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"}
+                  onClick={() => setPendingAction(selectedUser.status === "active" ? "deactivate" : "reactivate")}
+                  type="button"
+                >
+                  {selectedUser.status === "active" ? "Desativar usuário" : "Reativar usuário"}
+                </button>
                 )}
               </div>
             ) : null}
@@ -405,6 +438,29 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
         onUserCreated={(user: UserItem) => { setSelectedUserId(user.id); setIsCreateOpen(false); }}
         organizationId={organization.id}
       />
+
+      <Dialog
+        contentClassName="!w-[min(96vw,1120px)] !max-w-none"
+        description="Use o mesmo editor modular da Administração. As alterações se aplicam somente ao tenant selecionado."
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          permissionActionRef.current?.focus();
+        }}
+        onOpenChange={setIsPermissionsOpen}
+        open={isPermissionsOpen}
+        title="Permissões modulares"
+      >
+        {isPermissionsOpen && selectedUserId ? (
+          <AdminPermissionsEditor
+            dataSource={permissionsDataSource}
+            departments={departmentsQuery.data ?? []}
+            initialUserId={selectedUserId}
+            onPermissionsUpdated={() => undefined}
+            queryKey={["platform", "organizations", organization.id, "permissions"]}
+            syncDepartmentPermission={false}
+          />
+        ) : null}
+      </Dialog>
 
       <ConfirmationDialog
         cancelLabel="Cancelar"

@@ -1,3 +1,4 @@
+import type { ModulePermissionKey } from "../auth/modules.js";
 import type { AuthKind, PlatformRole } from "../auth/types.js";
 
 export type AuditOutcome = "success" | "error" | "aborted";
@@ -132,6 +133,13 @@ export interface PlatformOrganizationAuditChanges {
   ownership?: PlatformOwnershipAuditChanges;
 }
 
+export interface PlatformPermissionAuditChanges {
+  modules: {
+    before: Partial<Record<ModulePermissionKey, 0 | 1 | 2 | 3>>;
+    after: Partial<Record<ModulePermissionKey, 0 | 1 | 2 | 3>>;
+  };
+}
+
 export interface PlatformAuditRequestRecord {
   id: string;
   requestId: string;
@@ -147,7 +155,7 @@ export interface PlatformAuditRequestRecord {
   referring?: string | null;
   referringId?: string | null;
   actorPlatformUserId?: string;
-  changes?: PlatformOrganizationAuditChanges;
+  changes?: PlatformOrganizationAuditChanges | PlatformPermissionAuditChanges;
 }
 
 export interface PlatformAuditSearchResult {

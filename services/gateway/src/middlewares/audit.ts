@@ -9,6 +9,7 @@ import type {
   ReservableAuditRecorder,
 } from "@workspace/shared";
 import { ServiceError } from "@workspace/shared";
+import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 import type { ErrorRequestHandler, NextFunction, Request, Response } from "express";
 
 import { describeActivity } from "../audit/activityCatalog.js";
@@ -34,6 +35,8 @@ const PLATFORM_OWNERSHIP_TRANSFER_PATH =
 const PLATFORM_ORGANIZATION_SETTINGS_PATH =
   /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)$/i;
 const PLATFORM_ORGANIZATION_USER_PATH = /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i;
+const PLATFORM_ORGANIZATION_USER_PERMISSIONS_PATH =
+  /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/i;
 const PLATFORM_ORGANIZATION_STATUSES = new Set([
   "trial",
   "past_due",
@@ -42,6 +45,24 @@ const PLATFORM_ORGANIZATION_STATUSES = new Set([
   "cancelled",
 ]);
 const NON_NEGATIVE_INTEGER_QUERY = /^(?:0|[1-9]\d*)$/u;
+const ACTIVE_MODULE_KEY_SET = new Set<string>(ACTIVE_MODULE_KEYS);
+
+function getAllowlistedModulePermissions(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([key, level]) =>
+        ACTIVE_MODULE_KEY_SET.has(key) &&
+        typeof level === "number" &&
+        Number.isInteger(level) &&
+        level >= 0 &&
+        level <= 3,
+    ),
+  );
+}
 
 function isIntegerInRange(value: string, minimum: number, maximum: number): boolean {
   if (!NON_NEGATIVE_INTEGER_QUERY.test(value)) {
@@ -72,7 +93,7 @@ function getPlatformOrganizationAuditTarget(path: string): {
     return null;
   }
   const userMatch = normalizedPath.match(
-    /^\/platform\/organizations\/[^/]+\/users\/([^/]+)(?:\/reactivate)?$/iu,
+    /^\/platform\/organizations\/[^/]+\/users\/([^/]+)(?:\/(?:reactivate|permissions))?$/iu,
   );
 
   return { organizationId: organizationMatch[1], userId: userMatch?.[1] ?? null };
@@ -94,7 +115,9 @@ function requiresOrganizationMutationAudit(request: Request): boolean {
         PLATFORM_ORGANIZATION_USER_PATH.test(path))) ||
     (method === "DELETE" && /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/i.test(path)) ||
     (method === "POST" &&
-      /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path))
+      /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/i.test(path)) ||
+    (method === "PUT" &&
+      /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/i.test(path))
   );
 }
 
@@ -177,9 +200,11 @@ function getOwnershipTransferAuditChanges(
 }
 
 function usesExplicitPlatformActor(method: string, path: string): boolean {
+  const normalizedPath = path.replace(/\/+$/u, "");
+  const normalizedMethod = method.toUpperCase();
   return (
-    method.toUpperCase() === "PATCH" &&
-    PLATFORM_ORGANIZATION_USER_PATH.test(path.replace(/\/+$/u, ""))
+    (normalizedMethod === "PATCH" && PLATFORM_ORGANIZATION_USER_PATH.test(normalizedPath)) ||
+    (normalizedMethod === "PUT" && PLATFORM_ORGANIZATION_USER_PERMISSIONS_PATH.test(normalizedPath))
   );
 }
 
@@ -240,31 +265,50 @@ export function buildAuditCapacityGuard({
             outcome: "success",
             serviceSource: "gateway",
             createdAt: new Date().toISOString(),
-            action: isOwnershipTransfer
-              ? "platform.organization.ownership.transfer.attempt"
-              : method === "POST" && /\/users$/i.test(publicPath)
-                ? "platform.user.create.attempt"
-                : "organization.mutation.attempt",
-            referring: method === "POST" && /\/users$/i.test(publicPath) ? "user" : "organization",
+            action:
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
+                ? "platform.user.permissions.update.attempt"
+                : isOwnershipTransfer
+                  ? "platform.organization.ownership.transfer.attempt"
+                  : method === "POST" &&
+                      /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                    ? "platform.user.create.attempt"
+                    : "organization.mutation.attempt",
+            referring:
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
+                ? "user"
+                : method === "POST" &&
+                    /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                  ? "user"
+                  : "organization",
             referringId:
-              method === "POST" && /\/users$/i.test(publicPath)
-                ? String(request.body?.login ?? "new-user")
-                : auditTarget?.organizationId,
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
+                ? (auditTarget?.userId ?? undefined)
+                : method === "POST" &&
+                    /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                  ? String(request.body?.login ?? "new-user")
+                  : auditTarget?.organizationId,
             changes:
-              method === "POST" && /\/users$/i.test(publicPath)
+              method === "PUT" && /\/users\/[^/]+\/permissions$/i.test(publicPath)
                 ? {
                     before: null,
-                    after: {
-                      name: request.body?.name,
-                      login: request.body?.login,
-                      department_id: request.body?.department_id,
-                      permission: request.body?.permission,
-                      status: request.body?.status,
-                      type: request.body?.type,
-                      modules: request.body?.modules,
-                    },
+                    after: { modules: getAllowlistedModulePermissions(request.body) },
                   }
-                : undefined,
+                : method === "POST" &&
+                    /\/users$/i.test(getPublicPath(request.originalUrl, request.path))
+                  ? {
+                      before: null,
+                      after: {
+                        name: request.body?.name,
+                        login: request.body?.login,
+                        department_id: request.body?.department_id,
+                        permission: request.body?.permission,
+                        status: request.body?.status,
+                        type: request.body?.type,
+                        modules: request.body?.modules,
+                      },
+                    }
+                  : undefined,
             metadata: {
               ...(explicitPlatformActor
                 ? { actorKind: "platform", actorPlatformUserId: request.auth?.userId }

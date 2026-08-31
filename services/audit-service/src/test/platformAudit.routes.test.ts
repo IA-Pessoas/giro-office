@@ -344,6 +344,50 @@ describe("platform audit persistence", () => {
     ]);
   });
 
+  it("projeta before/after modular allowlisted atribuído ao PlatformUser", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: "permission-audit-1",
+        request_id: "permission-request-1",
+        organization_id: "org-1",
+        method: "ENTITY_CHANGE",
+        path: "/platform/organizations/org-1/users/user-1/permissions",
+        status_code: 200,
+        outcome: "success",
+        duration_ms: 3,
+        service_source: "user-service",
+        created_at: new Date("2026-08-28T12:00:00.000Z"),
+        metadata_json: { actorPlatformUserId: "platform-user-1", secret: "must-not-leak" },
+        action: "platform.user.permissions.updated",
+        referring: "user",
+        referring_id: "user-1",
+        changes_json: {
+          modules: {
+            before: { rh: 1, fiscal: 0, secret: 3 },
+            after: { rh: 3, fiscal: 1, secret: 3 },
+          },
+        },
+      },
+    ]);
+    const repository = createAuditRequestRepository({
+      auditRequest: { findMany, count: vi.fn().mockResolvedValue(1) },
+      $transaction: (operations: Array<Promise<unknown>>) => Promise.all(operations),
+    } as never);
+
+    const result = await repository.searchPlatform({ page: 1, pageSize: 25 });
+
+    expect(result.items[0]).toMatchObject({
+      actorPlatformUserId: "platform-user-1",
+      changes: {
+        modules: {
+          before: { rh: 1, fiscal: 0 },
+          after: { rh: 3, fiscal: 1 },
+        },
+      },
+    });
+    expect(JSON.stringify(result.items[0])).not.toContain("secret");
+  });
+
   it("usa select seguro e total limitado na busca contextual da plataforma", async () => {
     const organizationId = "918eeaf9-82db-4e46-930b-b2d8b50b2776";
     const findMany = vi.fn().mockResolvedValue([

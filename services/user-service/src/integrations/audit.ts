@@ -9,6 +9,7 @@ import type { Logger } from "@workspace/shared/logger";
 
 export interface CreateUserAuditParams {
   actorUserId: string;
+  platformActorUserId?: string;
   organizationId: string;
   action: string;
   referring: string;
@@ -45,6 +46,9 @@ export function createUserAudit(options: UserAuditOptions): UserAuditRecorder {
       referring: params.referring,
       referringId: params.referringId,
       changes: params.changes,
+      ...(params.platformActorUserId
+        ? { metadata: { actorPlatformUserId: params.platformActorUserId } }
+        : {}),
     };
 
     await recordAudit(payload);
