@@ -1,6 +1,6 @@
 # fiscal-service
 
-Microservico fiscal. Até a PR 2, este servico expoe CRUD de NCM, CRUD de ICMS e o health check. O gateway encaminha esse servico pelo prefixo publico **`/fiscal`**.
+Microservico fiscal. Este servico expoe CRUD de NCM, CRUD de ICMS, CRUD de IPI, catálogo/extração interna governada e o health check. O gateway encaminha esse servico pelo prefixo publico **`/fiscal`**.
 
 ## Porta local
 

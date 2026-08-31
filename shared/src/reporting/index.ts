@@ -6,6 +6,7 @@ export * from "./contabilRelationshipReportingCatalog.js";
 export * from "./contabilReportingCatalog.js";
 export * from "./contabilResponsiblesReportingCatalog.js";
 export * from "./fiscalIcmsReportingCatalog.js";
+export * from "./fiscalIpiReportingCatalog.js";
 export * from "./fiscalNcmReportingCatalog.js";
 export * from "./parcelamentoReportingCatalog.js";
 export * from "./pessoalLddReportingCatalog.js";

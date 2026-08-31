@@ -11,6 +11,7 @@ import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js
 import { ContabilRelationshipAdapter } from "./integrations/contabilRelationshipAdapter.js";
 import { ContabilResponsiblesAdapter } from "./integrations/contabilResponsiblesAdapter.js";
 import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
+import { FiscalIpiAdapter } from "./integrations/fiscalIpiAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
@@ -43,6 +44,7 @@ const app = createReportsApp({
       new FiscalIcmsAdapter(env),
       new CertificatePjAdapter(env),
       new FiscalNcmAdapter(env),
+      new FiscalIpiAdapter(env),
       new PessoalLddAdapter(env),
     ],
   },

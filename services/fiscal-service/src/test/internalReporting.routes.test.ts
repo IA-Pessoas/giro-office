@@ -87,6 +87,7 @@ describe("fiscal internal reporting routes", () => {
     expect(response.body.data.sources.map((source: { key: string }) => source.key)).toEqual([
       "fiscal.icms",
       "fiscal.ncm",
+      "fiscal.ipi",
     ]);
     expect(response.body.data.sources[0]).toMatchObject({
       key: "fiscal.icms",
@@ -95,6 +96,11 @@ describe("fiscal internal reporting routes", () => {
     });
     expect(response.body.data.sources[1]).toMatchObject({
       key: "fiscal.ncm",
+      module: "fiscal",
+      keys: [],
+    });
+    expect(response.body.data.sources[2]).toMatchObject({
+      key: "fiscal.ipi",
       module: "fiscal",
       keys: [],
     });
@@ -114,6 +120,10 @@ describe("fiscal internal reporting routes", () => {
     {
       source: "fiscal.ncm",
       fields: ["ncm_code"],
+    },
+    {
+      source: "fiscal.ipi",
+      fields: ["ncm"],
     },
   ])("exige grant válido e encaminha a organização assinada para $source", async (input) => {
     const body = { ...input, limit: 1 };
