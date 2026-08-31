@@ -75,10 +75,7 @@ O smoke de Tarefas fica desativado por padrão; exija `TASK_REPORTING_SMOKE_ENAB
 O smoke fiscal fica desativado por padrão; exija `FISCAL_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.
 
-O adapter de LDD de Departamento Pessoal usa `PESSOAL_SERVICE_URL`, `REPORTS_INTERNAL_TOKEN` e
-`REPORTS_GRANT_SECRET` para consultar exclusivamente o contrato interno governado do
-pessoal-service.
-
-O adapter de folha de Departamento Pessoal usa as mesmas credenciais e publica apenas os campos
-selecionáveis de `pessoal.payroll`; `client_id`, responsável e sindicato permanecem como chaves
+Os adapters de LDD, folha e obrigações de Departamento Pessoal usam `PESSOAL_SERVICE_URL`,
+`REPORTS_INTERNAL_TOKEN` e `REPORTS_GRANT_SECRET` para consultar exclusivamente o contrato interno
+governado do pessoal-service. Em folha, `client_id`, responsável e sindicato permanecem como chaves
 internas do catálogo.
