@@ -156,7 +156,6 @@ export class PlatformUsersService {
     const before = await management.getPermissions(userId);
     const after = await management.updatePermissions(userId, modules);
     await this.audit?.({
-      actorUserId: platformUserId,
       platformActorUserId: platformUserId,
       organizationId,
       action: "platform.user.permissions.updated",

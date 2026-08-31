@@ -8,7 +8,7 @@ import {
 import type { Logger } from "@workspace/shared/logger";
 
 export interface CreateUserAuditParams {
-  actorUserId: string;
+  actorUserId?: string;
   platformActorUserId?: string;
   organizationId: string;
   action: string;
@@ -35,7 +35,7 @@ export function createUserAudit(options: UserAuditOptions): UserAuditRecorder {
     const payload: CreateAuditRequestPayload = {
       requestId: randomUUID(),
       organizationId: params.organizationId,
-      userId: params.actorUserId,
+      ...(params.actorUserId ? { userId: params.actorUserId } : {}),
       method: "ENTITY_CHANGE",
       path: `/${params.referring}`,
       outcome: params.outcome,

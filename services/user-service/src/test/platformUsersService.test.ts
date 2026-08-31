@@ -184,7 +184,6 @@ describe("PlatformUsersService", () => {
     expect(managementMock.updatePermissions).toHaveBeenCalledWith("user-1", { rh: 3 });
     expect(audit).toHaveBeenCalledWith(
       expect.objectContaining({
-        actorUserId: "platform-user-1",
         platformActorUserId: "platform-user-1",
         action: "platform.user.permissions.updated",
         referring: "user",
@@ -192,6 +191,7 @@ describe("PlatformUsersService", () => {
         changes: { modules: { before: { rh: 2, fiscal: 1 }, after: { rh: 3, fiscal: 1 } } },
       }),
     );
+    expect(audit.mock.calls[0][0]).not.toHaveProperty("actorUserId");
   });
 
   it("delegates deactivation and reactivation to the transactional user lifecycle in the selected organization", async () => {
