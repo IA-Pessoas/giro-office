@@ -24,4 +24,27 @@ describe("regularize internal reporting OpenAPI", () => {
       });
     }
   });
+
+  it("documenta processos como fonte interna protegida", () => {
+    const spec = buildRegularizeServiceOpenApiSpec({ port: 3039 });
+    const operation = spec.paths["/internal/reporting/extract"] as {
+      post: {
+        security: unknown;
+        summary: string;
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: { properties: { source: { enum: string[] } } };
+            };
+          };
+        };
+      };
+    };
+
+    expect(operation.post.security).toEqual([{ internalToken: [] }]);
+    expect(operation.post.summary).toContain("processos");
+    expect(
+      operation.post.requestBody.content["application/json"].schema.properties.source.enum,
+    ).toContain("regularize.processes");
+  });
 });

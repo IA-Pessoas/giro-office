@@ -57,7 +57,8 @@ As rotas internas ficam montadas diretamente no servico sob `/internal` e exigem
 - `POST /internal/reconciliation/license-notifications/run`
 - `POST /internal/reconciliation/client-pf-status/run`
 - `POST /internal/reconciliation/client-pf-documents/run`
-- `GET /internal/reporting/catalog` e `POST /internal/reporting/extract` (somente reports-service, fora do gateway)
+- `GET /internal/reporting/catalog` e `POST /internal/reporting/extract` (fontes `regularize.licenses` e
+  `regularize.processes`, somente reports-service, fora do gateway; exigem token e grant de relatório)
 
 ## Reconciliacao agendada
 

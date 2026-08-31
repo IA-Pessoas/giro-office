@@ -12,6 +12,7 @@ import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
+import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { UserAccessContextClient } from "./integrations/userAccessContextClient.js";
@@ -48,6 +49,7 @@ const catalog = new SourceCatalogService([
   new FiscalIpiAdapter(env),
   new PessoalLddAdapter(env),
   new RegularizeLicenseAdapter(env),
+  new RegularizeProcessAdapter(env),
   new RhRequestAdapter(env),
 ]);
 const worker = new ReportWorkerService(
