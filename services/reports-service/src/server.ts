@@ -22,6 +22,7 @@ import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
 import { RegularizeMunicipalTaxesAdapter } from "./integrations/regularizeMunicipalTaxesAdapter.js";
 import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapter.js";
+import { RhHolidayAdapter } from "./integrations/rhHolidayAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
@@ -62,6 +63,7 @@ const app = createReportsApp({
       new RegularizeLicenseAdapter(env),
       new RegularizeProcessAdapter(env),
       new RhRequestAdapter(env),
+      new RhHolidayAdapter(env),
       new TiInventoryAdapter(env),
       new TiStockAdapter(env),
       new TiRequestsAdapter(env),

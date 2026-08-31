@@ -25,8 +25,9 @@ Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX
 `GET /internal/reporting/catalog` e `POST /internal/reporting/extract` são rotas internas chamadas
 diretamente pelo reports-service. Elas não passam pelo gateway público, exigem token interno e
 grant HMAC curto, filtram sempre por `organization_id` do grant e publicam somente os campos
-seguros de `rh.requests`. IDs de solicitante e responsável ficam disponíveis apenas como chaves
-de autorização no catálogo, nunca como colunas de saída.
+seguros de `rh.requests` e `rh.holidays`. IDs de solicitante e responsável ficam disponíveis
+apenas como chaves de autorização no catálogo, nunca como colunas de saída; `rh.holidays` não
+publica chaves nem relações e expõe somente nome e data.
 
 ## Desenvolvimento
 
