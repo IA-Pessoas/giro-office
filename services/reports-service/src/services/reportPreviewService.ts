@@ -1,7 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { SourceCatalogService } from "../catalog/sourceCatalogService.js";
-import type { ReportCatalogScope } from "../catalog/types.js";
+import { normalizeReportPreviewAdapterOutput, type ReportCatalogScope } from "../catalog/types.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import type { ReportDefinitionService } from "./reportDefinitionService.js";
 
@@ -30,15 +30,17 @@ export class ReportPreviewService {
     if (!adapter) {
       throw new ServiceError(403, "Nenhum adaptador autorizado pode executar este relatório.");
     }
-    const rows = await adapter.preview({
-      definition: validated.definition,
-      parameter_values: parameterValues,
-      organization_id: scope.organization_id,
-      limit: this.previewRowLimit + 1,
-      request_id: requestId,
-    });
+    const result = normalizeReportPreviewAdapterOutput(
+      await adapter.preview({
+        definition: validated.definition,
+        parameter_values: parameterValues,
+        organization_id: scope.organization_id,
+        limit: this.previewRowLimit + 1,
+        request_id: requestId,
+      }),
+    );
     return {
-      rows: rows.slice(0, this.previewRowLimit),
+      rows: result.rows.slice(0, this.previewRowLimit),
       presentation: {
         columns: validated.definition.columns.map((column) => ({
           key: column.alias,
@@ -46,7 +48,7 @@ export class ReportPreviewService {
         })),
       },
       limit: this.previewRowLimit,
-      hasMore: rows.length > this.previewRowLimit,
+      hasMore: result.reachedLimit || result.rows.length > this.previewRowLimit,
     };
   }
 }

@@ -17,6 +17,7 @@ Definicao e defaults em [`src/config/env.ts`](src/config/env.ts):
 - `MTK_ENCRYPTION_KEY` - chave usada para criptografar credenciais do legado
 - `AUDIT_SERVICE_TOKEN` - token usado na integracao de auditoria
 - `INTERNAL_SERVICE_TOKEN` - token exigido nas rotas `POST /internal/reconciliation/*` pelo header `x-internal-service-token` (opcional; se vazio, usa o mesmo valor que `AUDIT_SERVICE_TOKEN`)
+- `REGULARIZE_REPORTING_TOKEN` e `REGULARIZE_REPORTING_GRANT_SECRET` - credenciais exclusivas do adapter interno de relatórios
 - `SERVICE_ALLOWED_ORIGINS` - origens CORS aceitas; em producao nao pode ficar como `*`
 - `ENABLE_API_DOCS` - documentacao OpenAPI em `/docs` (default ligado fora de producao)
 - `LOG_LEVEL`, `LOG_PRETTY` - configuracao de logs
@@ -56,6 +57,7 @@ As rotas internas ficam montadas diretamente no servico sob `/internal` e exigem
 - `POST /internal/reconciliation/license-notifications/run`
 - `POST /internal/reconciliation/client-pf-status/run`
 - `POST /internal/reconciliation/client-pf-documents/run`
+- `GET /internal/reporting/catalog` e `POST /internal/reporting/extract` (somente reports-service, fora do gateway)
 
 ## Reconciliacao agendada
 
