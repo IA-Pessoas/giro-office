@@ -17,6 +17,10 @@ function canonicalJson(value: unknown): string {
 }
 
 describe("TiStockAdapter", () => {
+  it("não anuncia operadores de filtro que o adapter não executa", () => {
+    expect(adapterFields().every((field) => field.filter_operators.length === 0)).toBe(true);
+  });
+
   it("publica campos seguros, omite keys internas e assina a extração", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -136,3 +140,7 @@ describe("TiStockAdapter", () => {
     ).rejects.toMatchObject({ statusCode: 503 });
   });
 });
+
+function adapterFields() {
+  return tiStockReportingCatalog.sources[0]?.fields ?? [];
+}

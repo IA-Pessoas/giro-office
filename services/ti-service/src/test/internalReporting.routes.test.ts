@@ -105,7 +105,13 @@ describe("ti internal reporting routes", () => {
       expect.objectContaining({ where: { organization_id: organizationId }, take: 2 }),
     );
     expect(prisma.stock.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { organization_id: organizationId }, take: 2 }),
+      expect.objectContaining({
+        where: {
+          organization_id: organizationId,
+          department_id: "50000000-0000-4000-8000-000000000001",
+        },
+        take: 2,
+      }),
     );
   });
 

@@ -3,6 +3,7 @@ import {
   type TiInventoryReportingSource,
   tiInventoryReportingCatalog,
 } from "@workspace/shared";
+import { TiDepartmentResolverService } from "../services/tiDepartmentResolverService.js";
 import { TiInventoryReportingService } from "./tiInventoryReportingService.js";
 import {
   getTiStockReportingFields,
@@ -23,8 +24,9 @@ type ReportingSelect = {
 
 type ReportingWhere = {
   organization_id: string;
-  category?: { is: { organization_id: string } };
-  location?: { is: { organization_id: string } };
+  department_id: string;
+  category?: { is: { organization_id: string; department_id: string } };
+  location?: { is: { organization_id: string; department_id: string } };
 };
 
 type ReportingDelegate = {
@@ -41,6 +43,13 @@ type InventoryReportingDelegate = {
     select: Record<string, unknown>;
     take: number;
   }): Promise<readonly Record<string, unknown>[]>;
+};
+
+type DepartmentReportingDelegate = {
+  findFirst(input: {
+    where: { organization_id: string; name: { equals: string; mode: "insensitive" } };
+    select: { id: true };
+  }): Promise<{ id: string } | null>;
 };
 
 function withoutKeys<T extends { keys: readonly unknown[] }>(source: T) {
@@ -83,9 +92,11 @@ function projectStockRows(
 export class InternalReportingService {
   readonly catalog = publicCatalog;
   private readonly inventory: TiInventoryReportingService;
+  private readonly departmentResolver: TiDepartmentResolverService;
 
   constructor(
     private readonly prisma: {
+      department: DepartmentReportingDelegate;
       inventoryTecnologia: InventoryReportingDelegate;
       stock: ReportingDelegate;
     },
@@ -93,6 +104,7 @@ export class InternalReportingService {
     this.inventory = new TiInventoryReportingService({
       inventoryTecnologia: prisma.inventoryTecnologia,
     });
+    this.departmentResolver = new TiDepartmentResolverService(prisma);
   }
 
   async extract(input: {
@@ -115,18 +127,28 @@ export class InternalReportingService {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
 
+    const departmentId = await this.departmentResolver.resolveTechnologyDepartmentId(
+      input.organizationId,
+    );
     const select = Object.fromEntries(
       input.fields.map((field) => [
         field,
         field === "category" || field === "location" ? { select: { name: true } } : true,
       ]),
     ) as ReportingSelect;
-    const where: ReportingWhere = { organization_id: input.organizationId };
+    const where: ReportingWhere = {
+      organization_id: input.organizationId,
+      department_id: departmentId,
+    };
     if (input.fields.includes("category")) {
-      where.category = { is: { organization_id: input.organizationId } };
+      where.category = {
+        is: { organization_id: input.organizationId, department_id: departmentId },
+      };
     }
     if (input.fields.includes("location")) {
-      where.location = { is: { organization_id: input.organizationId } };
+      where.location = {
+        is: { organization_id: input.organizationId, department_id: departmentId },
+      };
     }
     const rows = await this.prisma.stock.findMany({
       where,

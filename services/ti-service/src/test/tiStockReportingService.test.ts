@@ -24,6 +24,7 @@ describe("TI stock internal reporting service", () => {
       { name: "Monitor", category: { name: "Hardware" }, location: { name: "Sala 1" } },
     ]);
     const service = new InternalReportingService({
+      department: { findFirst: vi.fn().mockResolvedValue({ id: "department-ti" }) },
       inventoryTecnologia: { findMany: vi.fn() },
       stock: { findMany },
     });
@@ -52,8 +53,9 @@ describe("TI stock internal reporting service", () => {
     expect(findMany).toHaveBeenCalledWith({
       where: {
         organization_id: organizationId,
-        category: { is: { organization_id: organizationId } },
-        location: { is: { organization_id: organizationId } },
+        department_id: "department-ti",
+        category: { is: { organization_id: organizationId, department_id: "department-ti" } },
+        location: { is: { organization_id: organizationId, department_id: "department-ti" } },
       },
       select: {
         name: true,
@@ -70,6 +72,7 @@ describe("TI stock internal reporting service", () => {
   it("rejeita chaves internas e IDs antes da consulta", async () => {
     const findMany = vi.fn();
     const service = new InternalReportingService({
+      department: { findFirst: vi.fn() },
       inventoryTecnologia: { findMany: vi.fn() },
       stock: { findMany },
     });
@@ -88,6 +91,7 @@ describe("TI stock internal reporting service", () => {
       .fn()
       .mockResolvedValue([{ asset_code: "NB-001", category: { name: "Notebook" } }]);
     const service = new InternalReportingService({
+      department: { findFirst: vi.fn() },
       inventoryTecnologia: { findMany },
       stock: { findMany: vi.fn() },
     });

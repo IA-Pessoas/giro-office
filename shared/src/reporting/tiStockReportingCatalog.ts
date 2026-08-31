@@ -1,14 +1,5 @@
-const stringOperators = ["eq", "neq", "contains", "in"] as const;
-const numberOperators = ["eq", "gt", "gte", "lt", "lte", "between"] as const;
-const booleanOperators = ["eq", "neq"] as const;
-
-function field(
-  key: string,
-  label: string,
-  value_type: "string" | "number" | "boolean",
-  filter_operators: readonly string[],
-) {
-  return { key, label, value_type, filter_operators, aggregations: [] as const };
+function field(key: string, label: string, value_type: "string" | "number" | "boolean") {
+  return { key, label, value_type, filter_operators: [] as const, aggregations: [] as const };
 }
 
 export const TI_STOCK_REPORTING_SOURCES = ["ti.stock"] as const;
@@ -22,17 +13,17 @@ export const tiStockReportingCatalog = {
       module: "ti",
       minimum_permission: 1,
       keys: [
-        field("department_id", "Departamento", "string", ["eq", "in"]),
-        field("category_id", "Categoria", "string", ["eq", "in"]),
-        field("location_id", "Localização", "string", ["eq", "in"]),
+        field("department_id", "Departamento", "string"),
+        field("category_id", "Categoria", "string"),
+        field("location_id", "Localização", "string"),
       ],
       fields: [
-        field("name", "Nome", "string", stringOperators),
-        field("category", "Categoria", "string", stringOperators),
-        field("location", "Localização", "string", stringOperators),
-        field("quantity", "Quantidade", "number", numberOperators),
-        field("description", "Descrição", "string", stringOperators),
-        field("status", "Status", "boolean", booleanOperators),
+        field("name", "Nome", "string"),
+        field("category", "Categoria", "string"),
+        field("location", "Localização", "string"),
+        field("quantity", "Quantidade", "number"),
+        field("description", "Descrição", "string"),
+        field("status", "Status", "boolean"),
       ],
     },
   ],
