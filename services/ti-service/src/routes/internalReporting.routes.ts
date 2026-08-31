@@ -10,7 +10,7 @@ import {
 import { Router } from "express";
 
 import type { TiServiceEnv } from "../config/env.js";
-import type { TiInventoryReportingService } from "../reporting/tiInventoryReportingService.js";
+import type { TiInternalReportingService } from "../reporting/tiInternalReportingService.js";
 import {
   type InternalReportingGrant,
   internalReportingExtractBodySchema,
@@ -93,7 +93,7 @@ function verifyGrant(input: {
 
 export function createInternalReportingRouter(options: {
   env: Pick<TiServiceEnv, "reportsInternalToken" | "reportsGrantSecret">;
-  reportingService: TiInventoryReportingService;
+  reportingService: TiInternalReportingService;
 }): ReturnType<typeof Router> {
   const router = Router();
   router.get("/reporting/catalog", (request, response) => {

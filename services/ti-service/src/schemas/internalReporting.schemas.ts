@@ -1,11 +1,11 @@
-import { TI_INVENTORY_REPORTING_SOURCES } from "@workspace/shared";
+import { TI_INVENTORY_REPORTING_SOURCES, TI_REQUESTS_REPORTING_SOURCES } from "@workspace/shared";
 import { z } from "zod";
 
 const reportingFieldSchema = z.string().trim().min(1).max(64);
 
 export const internalReportingExtractBodySchema = z
   .object({
-    source: z.enum(TI_INVENTORY_REPORTING_SOURCES),
+    source: z.enum([...TI_INVENTORY_REPORTING_SOURCES, ...TI_REQUESTS_REPORTING_SOURCES]),
     fields: z.array(reportingFieldSchema).min(1).max(25),
     limit: z.number().int().min(1).max(101),
   })

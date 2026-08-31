@@ -19,7 +19,7 @@ import {
   requestContext,
 } from "./middlewares/requestContext.js";
 import { buildTiServiceOpenApiSpec } from "./openapi/spec.js";
-import { TiInventoryReportingService } from "./reporting/tiInventoryReportingService.js";
+import { TiInternalReportingService } from "./reporting/tiInternalReportingService.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createTiDashboardRoutes } from "./routes/tiDashboard.routes.js";
 import { createTiExtensionRoutes } from "./routes/tiExtension.routes.js";
@@ -106,7 +106,7 @@ export function createTiApplication({
     "/internal",
     createInternalReportingRouter({
       env,
-      reportingService: new TiInventoryReportingService(prisma),
+      reportingService: new TiInternalReportingService(prisma),
     }),
   );
 

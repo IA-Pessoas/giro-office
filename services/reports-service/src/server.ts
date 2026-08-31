@@ -24,6 +24,7 @@ import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapte
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
+import { TiRequestsAdapter } from "./integrations/tiRequestsAdapter.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
 
 const env = getReportsServiceEnv();
@@ -59,6 +60,7 @@ const app = createReportsApp({
       new RegularizeProcessAdapter(env),
       new RhRequestAdapter(env),
       new TiInventoryAdapter(env),
+      new TiRequestsAdapter(env),
       new RegularizeMunicipalTaxesAdapter(env),
     ],
   },
