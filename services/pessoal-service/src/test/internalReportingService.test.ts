@@ -81,6 +81,44 @@ describe("pessoal internal reporting service", () => {
     expect(findMany).not.toHaveBeenCalled();
   });
 
+  it("extrai sindicatos somente do tenant assinado, sem IDs e com limite da origem", async () => {
+    const unionFindMany = vi.fn().mockResolvedValue([
+      { id: "hidden-id", name: "Sindicato A", base_date: new Date("2026-05-01") },
+      { id: "hidden-id-2", name: "Sindicato B", base_date: null },
+    ]);
+    const service = new InternalReportingService({
+      unionPessoal: { findMany: unionFindMany },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.unions",
+        fields: ["name", "base_date"],
+        limit: 1,
+      }),
+    ).resolves.toEqual({
+      rows: [{ name: "Sindicato A", base_date: new Date("2026-05-01") }],
+      reachedLimit: true,
+    });
+
+    expect(unionFindMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId },
+      select: { name: true, base_date: true },
+      take: 2,
+    });
+  });
+
+  it("recusa ID e CNPJ de sindicato antes de consultar o banco", async () => {
+    const findMany = vi.fn();
+    const service = new InternalReportingService({ unionPessoal: { findMany } } as never);
+
+    await expect(
+      service.extract({ organizationId, source: "pessoal.unions", fields: ["cnpj"], limit: 1 }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
   it("extrai obrigações pelo tenant assinado e retorna reachedLimit da origem", async () => {
     const findMany = vi.fn().mockResolvedValue([
       { competence: "2026-08", advance: false, payroll: true, id: "hidden-id" },

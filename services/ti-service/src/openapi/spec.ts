@@ -862,9 +862,9 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
       },
       "/internal/reporting/extract": {
         post: {
-          operationId: "extractTiInventoryForReports",
+          operationId: "extractTiReportingForReports",
           tags: ["Internal"],
-          summary: "Extrai o inventário de Tecnologia para o reports-service",
+          summary: "Extrai fonte de relatórios de Tecnologia para o reports-service",
           security: [{ internalToken: [] }],
           parameters: [
             {
@@ -890,7 +890,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
                   required: ["source", "fields", "limit"],
                   additionalProperties: false,
                   properties: {
-                    source: { type: "string", enum: ["ti.inventory"] },
+                    source: { type: "string", enum: ["ti.inventory", "ti.requests"] },
                     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
                     limit: { type: "integer", minimum: 1, maximum: 101 },
                   },
