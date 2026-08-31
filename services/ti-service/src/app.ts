@@ -102,8 +102,6 @@ export function createTiApplication({
     );
   });
 
-  app.use("/ti", createForwardedAuthContextMiddleware(env.internalServiceToken));
-
   app.use(
     "/internal",
     createInternalReportingRouter({
@@ -111,6 +109,8 @@ export function createTiApplication({
       reportingService: internalReportingService ?? new InternalReportingService(prisma),
     }),
   );
+
+  app.use("/ti", createForwardedAuthContextMiddleware(env.internalServiceToken));
 
   app.use("/ti/inventory", createTiInventoryRoutes(prisma));
   app.use("/ti/inventory-categories", createTiInventoryCategoryRoutes(prisma));
