@@ -17,6 +17,8 @@ As variaveis sao lidas em `src/config/env.ts`.
 - `AUDIT_SERVICE_URL`
 - `AUDIT_SERVICE_TOKEN`
 - `TI_SERVICE_INTERNAL_TOKEN`
+- `REPORTS_INTERNAL_TOKEN`
+- `REPORTS_GRANT_SECRET`
 - `MTK_ENCRYPTION_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
@@ -50,6 +52,8 @@ servico/VPS, junto com `SUPABASE_URL`.
 - Exemplo: `GET /ti/requests/list`
 - Exemplo: `GET /ti/inventory/list`
 - Exemplo: `POST /ti/inventory`
+- As rotas diretas `/internal/reporting/catalog` e `/internal/reporting/extract` são consumidas
+  exclusivamente pelo reports-service e não passam pelo gateway.
 
 ## Senhas de TI
 

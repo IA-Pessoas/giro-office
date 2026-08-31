@@ -478,6 +478,8 @@ export function createTestApp(
     auditServiceUrl: "http://localhost:3020",
     auditServiceToken: "audit-service-token-test",
     internalServiceToken: "ti-service-internal-token-test",
+    reportsInternalToken: "reports-internal-token-test",
+    reportsGrantSecret: "reports-grant-secret-test",
     passwordEncryptionKey: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
     supabaseUrl: "https://example.supabase.co",
     supabaseServiceRoleKey: "test-supabase-service-role-key",

@@ -26,6 +26,8 @@ const tiTestEnv = {
   auditServiceUrl: "http://localhost:3020",
   auditServiceToken: "audit-service-token-test",
   internalServiceToken: "ti-service-internal-token-test",
+  reportsInternalToken: "reports-internal-token-test",
+  reportsGrantSecret: "reports-grant-secret-test",
   passwordEncryptionKey: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
   supabaseUrl: "https://example.supabase.co",
   supabaseServiceRoleKey: "test-supabase-service-role-key",
@@ -68,6 +70,7 @@ const tiPublicOpenApiOperations = {
   "/ti/terms": ["post"],
   "/ti/terms/{id}": ["get", "patch"],
   "/ti/terms/{id}/sign": ["patch"],
+  "/ti/stock": ["get"],
   "/ti/stock/items/{id}/movements/list": ["get"],
 } as const;
 
@@ -160,6 +163,12 @@ describe("ti-service app", () => {
       success: false,
       code: "UNAUTHORIZED",
     });
+  });
+
+  it("mantém reporting interno fora do prefixo público e protegido", async () => {
+    const app = createTestApp();
+
+    await request(app).get("/internal/reporting/catalog").expect(403);
   });
 
   it("aceita contexto encaminhado com token interno valido", async () => {

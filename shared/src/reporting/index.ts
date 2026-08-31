@@ -16,3 +16,4 @@ export * from "./regularizeLicenseReportingCatalog.js";
 export * from "./regularizeProcessReportingCatalog.js";
 export * from "./rhRequestReportingCatalog.js";
 export * from "./taskReportingCatalog.js";
+export * from "./tiStockReportingCatalog.js";

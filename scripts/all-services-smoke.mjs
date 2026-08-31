@@ -138,6 +138,9 @@ const env = {
   rhReportingSmokeEnabled:
     process.env.RH_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.RH_REPORTING_SMOKE_ENABLED === "1",
+  tiReportingSmokeEnabled:
+    process.env.TI_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.TI_REPORTING_SMOKE_ENABLED === "1",
   reportsRetentionSmokeEnabled:
     process.env.REPORTS_RETENTION_SMOKE_ENABLED === "true" ||
     process.env.REPORTS_RETENTION_SMOKE_ENABLED === "1",
@@ -1106,6 +1109,32 @@ function createRhReportingGrant({ operation, source, fields, body }) {
   };
 }
 
+function createTiReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for TI reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "ti-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
 function createRegularizeReportingGrant({ operation, source, fields, body }) {
   const secret = process.env.REGULARIZE_REPORTING_GRANT_SECRET?.trim();
   if (!secret)
@@ -2050,6 +2079,10 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
+  async tiStockReportList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/ti/stock" });
+  },
+
   async tiStockItemCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],
@@ -2854,6 +2887,36 @@ const handlers = {
       headers: isBadExpectation(op)
         ? {}
         : createRhReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
+  },
+
+  async tiReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createTiReportingGrant({
+            operation: "catalog",
+            source: "ti.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async tiReportingExtract(op) {
+    const body = { source: "ti.stock", fields: ["name"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createTiReportingGrant({
             operation: "extract",
             source: body.source,
             fields: body.fields,
@@ -5786,6 +5849,10 @@ function disabledConditionReason(condition) {
 
   if (condition === "rhReportingSmokeEnabled" && !env.rhReportingSmokeEnabled) {
     return "RH_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "tiReportingSmokeEnabled" && !env.tiReportingSmokeEnabled) {
+    return "TI_REPORTING_SMOKE_ENABLED is false";
   }
 
   if (condition === "reportsRetentionSmokeEnabled" && !env.reportsRetentionSmokeEnabled) {

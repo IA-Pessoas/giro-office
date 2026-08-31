@@ -258,6 +258,34 @@ const schemas: Record<string, OpenApiSchema> = {
     },
     additionalProperties: true,
   },
+  ReportingGrantV1: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "version",
+      "audience",
+      "operation",
+      "source",
+      "organization_id",
+      "fields",
+      "request_id",
+      "issued_at",
+      "expires_at",
+      "body_sha256",
+    ],
+    properties: {
+      version: { type: "integer", enum: [1] },
+      audience: { type: "string", enum: ["ti-service"] },
+      operation: { type: "string", enum: ["catalog", "extract"] },
+      source: { type: "string" },
+      organization_id: { type: "string", format: "uuid" },
+      fields: { type: "array", uniqueItems: true, items: { type: "string" } },
+      request_id: { type: "string" },
+      issued_at: { type: "integer", minimum: 0 },
+      expires_at: { type: "integer", minimum: 0 },
+      body_sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+    },
+  },
   TiInventoryInput: {
     type: "object",
     required: ["asset_code", "category_id"],
@@ -798,6 +826,7 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
       { name: "TI Stock", description: "Estoque de TI filtrado pelo departamento Tecnologia" },
       { name: "TI Robots", description: "Robos e historico de execucao de TI" },
       { name: "TI Dashboard", description: "Resumo consolidado do modulo de TI" },
+      { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     components: {
       securitySchemes: {
@@ -805,6 +834,11 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
+        },
+        internalServiceToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
         },
       },
       schemas,
@@ -829,6 +863,102 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
             "200": successResponse("Servico pronto"),
           },
         },
+      },
+      "/internal/reporting/catalog": {
+        get: {
+          operationId: "getTiReportingCatalog",
+          tags: ["InternalReporting"],
+          summary: "Consultar catálogo interno de estoque de TI",
+          security: [{ internalServiceToken: [] }],
+          parameters: [
+            {
+              name: "x-internal-service-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": successResponse("Catálogo governado"),
+            "403": errorResponse(403),
+          },
+        },
+      },
+      "/internal/reporting/extract": {
+        post: {
+          operationId: "extractTiReportingStock",
+          tags: ["InternalReporting"],
+          summary: "Extrair campos governados do estoque de TI",
+          security: [{ internalServiceToken: [] }],
+          parameters: [
+            {
+              name: "x-internal-service-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["source", "fields", "limit"],
+                  additionalProperties: false,
+                  properties: {
+                    source: { type: "string", enum: ["ti.stock"] },
+                    fields: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 25,
+                      uniqueItems: true,
+                      items: { type: "string" },
+                    },
+                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": successResponse("Dados governados"),
+            "400": errorResponse(400),
+            "403": errorResponse(403),
+          },
+        },
+      },
+      "/ti/stock": {
+        get: publicTiOperation({
+          operationId: "getTiStockReport",
+          tags: ["TI Stock"],
+          summary: "Lista o estoque de TI para relatórios públicos autorizados",
+          parameters: [
+            uuidQueryParameter("category_id", "Filtra pela categoria de estoque"),
+            uuidQueryParameter("location_id", "Filtra pelo local de estoque"),
+            stringQueryParameter("name", "Filtra pelo nome do item"),
+            enumQueryParameter("status", "Filtra pelo status", ["true", "false"]),
+            ...paginationParameters(),
+          ],
+          successDescription: "Estoque de TI listado",
+          errors: [400, 401, 403],
+        }),
       },
       "/ti/dashboard": {
         get: publicTiOperation({
