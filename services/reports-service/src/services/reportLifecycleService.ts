@@ -53,6 +53,14 @@ type LifecycleTransaction = ReportAuditStore & {
     }): Promise<{ count: number }>;
   };
   reportSnapshot: {
+    findFirst(args: {
+      where: {
+        id?: string;
+        report_job_id?: string;
+        organization_id: string;
+        expires_at?: { lte: Date };
+      };
+    }): Promise<{ id: string; report_job_id: string } | null>;
     create(args: {
       data: {
         organization_id: string;
@@ -65,7 +73,7 @@ type LifecycleTransaction = ReportAuditStore & {
       where: { report_job_id: string };
       select: { id: true };
     }): Promise<Array<{ id: string }>>;
-    deleteMany(args: { where: { report_job_id: string } }): Promise<unknown>;
+    deleteMany(args: { where: { report_job_id?: string; id?: string } }): Promise<unknown>;
   };
   reportSnapshotRow: {
     createMany(args: {
@@ -84,8 +92,8 @@ type LifecycleTransaction = ReportAuditStore & {
   };
   reportModel: {
     findFirst(args: {
-      where: { id: string; is_ephemeral: boolean };
-    }): Promise<{ id: string } | null>;
+      where: { id: string; is_ephemeral: boolean; department_id?: string };
+    }): Promise<{ id: string; department_id?: string } | null>;
     delete(args: { where: { id: string } }): Promise<unknown>;
   };
 };
@@ -100,6 +108,8 @@ interface ReportLifecycleInput {
   actor_id: string;
   department_id?: string;
   counts?: ReportAuditEventInput["counts"];
+  reason?: "retention" | "requested";
+  justification?: string;
 }
 
 export interface TransitionReportJobInput extends ReportLifecycleInput {
@@ -115,6 +125,14 @@ export interface CompleteReportJobInput extends ReportLifecycleInput {
 
 export interface RemoveReportSnapshotInput extends ReportLifecycleInput {
   reason: "retention" | "requested";
+  justification?: string;
+}
+
+export interface DeleteReportSnapshotInput extends Omit<ReportLifecycleInput, "job_id"> {
+  snapshot_id: string;
+  department_id: string;
+  reason: "requested";
+  justification: string;
 }
 
 export const REPORT_LIFECYCLE_TRANSITIONS: Record<
@@ -270,11 +288,21 @@ export class ReportLifecycleService {
     if (input.reason !== "requested") {
       throw new ServiceError(400, "A exclusão exige a justificativa de solicitação.");
     }
+    if (!input.justification?.trim()) {
+      throw new ServiceError(400, "A exclusão exige uma justificativa.");
+    }
+    await this.removeSnapshotRows(input, "deleted", "report.deleted.requested");
+  }
+
+  async deleteSnapshot(input: DeleteReportSnapshotInput): Promise<void> {
+    if (!input.justification.trim()) {
+      throw new ServiceError(400, "A exclusão exige uma justificativa.");
+    }
     await this.removeSnapshotRows(input, "deleted", "report.deleted.requested");
   }
 
   private async removeSnapshotRows(
-    input: RemoveReportSnapshotInput,
+    input: RemoveReportSnapshotInput | DeleteReportSnapshotInput,
     status: "completed" | "deleted",
     eventType: Extract<
       ReportAuditEventType,
@@ -282,27 +310,74 @@ export class ReportLifecycleService {
     >,
   ): Promise<void> {
     const event = await this.prisma.$transaction(async (transaction) => {
-      const job = await this.getJob(transaction, input.job_id);
+      const requestedSnapshot =
+        "snapshot_id" in input
+          ? await transaction.reportSnapshot.findFirst({
+              where: { id: input.snapshot_id, organization_id: input.organization_id },
+            })
+          : null;
+      if ("snapshot_id" in input && !requestedSnapshot) {
+        throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+      }
+      const job = await this.getJob(
+        transaction,
+        requestedSnapshot?.report_job_id ?? ("job_id" in input ? input.job_id : ""),
+      );
       this.assertOrganization(job, input.organization_id);
+      if ("snapshot_id" in input) {
+        const version = await transaction.reportModelVersion.findFirst({
+          where: { id: job.report_model_version_id },
+        });
+        const model = version
+          ? await transaction.reportModel.findFirst({
+              where: {
+                id: version.report_model_id,
+                is_ephemeral: false,
+                department_id: input.department_id,
+              },
+            })
+          : null;
+        if (!model || model.department_id !== input.department_id) {
+          throw new ServiceError(403, "O snapshot não pertence ao departamento atual.");
+        }
+      }
+      const occurredAt = this.clock();
+      if (status === "completed") {
+        const dueSnapshot = await transaction.reportSnapshot.findFirst({
+          where: {
+            report_job_id: job.id,
+            organization_id: input.organization_id,
+            expires_at: { lte: occurredAt },
+          },
+        });
+        if (!dueSnapshot) {
+          throw new ServiceError(409, "O snapshot ainda não atingiu o prazo de retenção.");
+        }
+      }
       const nextStatus = status === "completed" ? "expired" : "deleted";
       assertTransition(job.status, nextStatus);
 
-      const occurredAt = this.clock();
       const result = await transaction.reportJob.updateMany({
         where: { id: job.id, status: job.status as ReportLifecycleStatus },
         data: { status: nextStatus, finished_at: occurredAt },
       });
       this.assertUpdated(result.count);
-      const snapshots = await transaction.reportSnapshot.findMany({
-        where: { report_job_id: job.id },
-        select: { id: true },
-      });
+      const snapshots = requestedSnapshot
+        ? [{ id: requestedSnapshot.id }]
+        : await transaction.reportSnapshot.findMany({
+            where: { report_job_id: job.id },
+            select: { id: true },
+          });
       if (snapshots.length > 0) {
         await transaction.reportSnapshotRow.deleteMany({
           where: { snapshot_id: { in: snapshots.map((snapshot) => snapshot.id) } },
         });
       }
-      await transaction.reportSnapshot.deleteMany({ where: { report_job_id: job.id } });
+      await transaction.reportSnapshot.deleteMany(
+        requestedSnapshot
+          ? { where: { id: requestedSnapshot.id } }
+          : { where: { report_job_id: job.id } },
+      );
       await this.removeEphemeralDefinition(transaction, job.report_model_version_id);
 
       const auditEvent = this.auditEvent(job, input, eventType, occurredAt);
@@ -389,7 +464,7 @@ export class ReportLifecycleService {
 
   private auditEvent(
     job: ReportJob,
-    input: ReportLifecycleInput,
+    input: Omit<ReportLifecycleInput, "job_id">,
     eventType: ReportAuditEventType,
     occurredAt: Date,
     counts: ReportAuditEventInput["counts"] = input.counts,
@@ -403,6 +478,7 @@ export class ReportLifecycleService {
       event_type: eventType,
       occurred_at: occurredAt,
       counts,
+      justification_provided: input.reason === "requested" && Boolean(input.justification?.trim()),
     });
   }
 }

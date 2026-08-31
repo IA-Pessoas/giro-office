@@ -20,11 +20,18 @@ describe("reports-service app", () => {
         jwtSecret: "test-jwt-secret",
         reportsInternalToken: "test-reports-internal-token",
         reportsGrantSecret: "test-reports-grant-secret",
+        certificateReportingToken: "test-certificate-reporting-token",
+        certificateReportingGrantSecret: "test-certificate-reporting-secret",
+        auditEnabled: false,
+        auditServiceUrl: "http://localhost:3020",
+        auditServiceToken: "test-audit-token",
         userServiceUrl: "http://localhost:3001",
         parcelamentoServiceUrl: "http://localhost:3043",
         clientServiceUrl: "http://localhost:3000",
         taskServiceUrl: "http://localhost:3032",
         projectServiceUrl: "http://localhost:3033",
+        certificateServiceUrl: "http://localhost:3041",
+        fiscalServiceUrl: "http://localhost:3037",
         workerPollIntervalMs: 5000,
         workerConcurrency: 2,
         workerLeaseSeconds: 120,
@@ -62,6 +69,9 @@ describe("reports-service app", () => {
     expect(openapi.body.paths["/reports/models/shared/{id}/preview"]).toBeDefined();
     expect(openapi.body.paths["/reports/jobs"]).toBeDefined();
     expect(openapi.body.paths["/reports/jobs/{id}/snapshot"]).toBeDefined();
+    expect(openapi.body.paths["/reports/jobs/list"]).toBeDefined();
+    expect(openapi.body.paths["/reports/snapshots/{id}/delete"]).toBeDefined();
+    expect(openapi.body.paths["/reports/retention"]).toBeDefined();
     expect(catalog.body.success).toBe(false);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
@@ -75,11 +85,18 @@ describe("reports-service app", () => {
         jwtSecret: "test-jwt-secret",
         reportsInternalToken: "test-reports-internal-token",
         reportsGrantSecret: "test-reports-grant-secret",
+        certificateReportingToken: "test-certificate-reporting-token",
+        certificateReportingGrantSecret: "test-certificate-reporting-secret",
+        auditEnabled: false,
+        auditServiceUrl: "http://localhost:3020",
+        auditServiceToken: "test-audit-token",
         userServiceUrl: "http://localhost:3001",
         parcelamentoServiceUrl: "http://localhost:3043",
         clientServiceUrl: "http://localhost:3000",
         taskServiceUrl: "http://localhost:3032",
         projectServiceUrl: "http://localhost:3033",
+        certificateServiceUrl: "http://localhost:3041",
+        fiscalServiceUrl: "http://localhost:3037",
         workerPollIntervalMs: 5000,
         workerConcurrency: 2,
         workerLeaseSeconds: 120,

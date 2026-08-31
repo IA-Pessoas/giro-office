@@ -1,6 +1,6 @@
 import {
-  type ContabilControlReportingSource,
-  getContabilControlReportingFields,
+  type ContabilReportingSource,
+  getContabilReportingFields,
   ServiceError,
 } from "@workspace/shared";
 
@@ -13,20 +13,32 @@ type ReportingDelegate = {
 };
 
 export class InternalReportingService {
-  constructor(private readonly prisma: { controlContabil: ReportingDelegate }) {}
+  constructor(
+    private readonly prisma: {
+      controlContabil: ReportingDelegate;
+      responsibleContabil: ReportingDelegate;
+      relationshipContabil: ReportingDelegate;
+    },
+  ) {}
 
   async extract(input: {
     organizationId: string;
-    source: ContabilControlReportingSource;
+    source: ContabilReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
-    const allowedFields = getContabilControlReportingFields(input.source);
+    const allowedFields = getContabilReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
 
-    const rows = await this.prisma.controlContabil.findMany({
+    const delegate =
+      input.source === "contabil.control"
+        ? this.prisma.controlContabil
+        : input.source === "contabil.responsibles"
+          ? this.prisma.responsibleContabil
+          : this.prisma.relationshipContabil;
+    const rows = await delegate.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
       take: input.limit + 1,

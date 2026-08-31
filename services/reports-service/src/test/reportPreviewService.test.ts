@@ -57,6 +57,7 @@ describe("ReportPreviewService", () => {
     await expect(service.preview(definition, scope)).resolves.toEqual({
       rows: [{ balance: 1 }, { balance: 2 }],
       presentation: { columns: [{ key: "balance", label: "balance" }] },
+      limit: 2,
       hasMore: true,
     });
     expect(adapter.preview).toHaveBeenCalledWith(expect.objectContaining({ limit: 3 }));
@@ -65,6 +66,7 @@ describe("ReportPreviewService", () => {
     await expect(service.preview(definition, scope)).resolves.toEqual({
       rows: [],
       presentation: { columns: [{ key: "balance", label: "balance" }] },
+      limit: 2,
       hasMore: false,
     });
   });

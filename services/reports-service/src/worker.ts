@@ -5,13 +5,16 @@ import { SourceCatalogService } from "./catalog/sourceCatalogService.js";
 import { getReportsServiceEnv } from "./config/env.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
+import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
+import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
+import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { UserAccessContextClient } from "./integrations/userAccessContextClient.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
 import { ReportJobRepository } from "./prisma/reportJobRepository.js";
-import { ReportAuditService } from "./services/reportAuditService.js";
+import { createReportAuditService } from "./services/reportAuditService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
 import { ReportExecutionService } from "./services/reportExecutionService.js";
 import { ReportLifecycleService } from "./services/reportLifecycleService.js";
@@ -25,13 +28,21 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 const prisma = createReportsPrismaClient(env.databaseUrl);
-const audit = new ReportAuditService(prisma as never, async () => undefined);
+const audit = createReportAuditService(prisma as never, {
+  enabled: env.auditEnabled,
+  serviceUrl: env.auditServiceUrl,
+  serviceToken: env.auditServiceToken,
+  logger,
+});
 const catalog = new SourceCatalogService([
   new ParcelamentoAdapter(env),
   new ClientIntegrationAdapter(env),
   new ContabilControlAdapter(env),
   new TaskAdapter(env),
   new ProjectAdapter(env),
+  new FiscalIcmsAdapter(env),
+  new FiscalNcmAdapter(env),
+  new PessoalLddAdapter(env),
 ]);
 const worker = new ReportWorkerService(
   new ReportJobRepository(prisma, env.workerLeaseSeconds, audit),

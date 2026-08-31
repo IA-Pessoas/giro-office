@@ -47,6 +47,18 @@ describe("pessoal-service OpenAPI", () => {
     ]);
   });
 
+  it("documenta o contrato interno de reporting pessoal", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const paths = spec.paths as Record<string, Record<string, { security?: unknown }>>;
+
+    expect(paths["/internal/reporting/catalog"]?.get?.security).toEqual([
+      { internalServiceToken: [] },
+    ]);
+    expect(paths["/internal/reporting/extract"]?.post?.security).toEqual([
+      { internalServiceToken: [] },
+    ]);
+  });
+
   it("documenta request bodies estritos para mutacoes do dominio", () => {
     const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
     const paths = spec.paths as Record<

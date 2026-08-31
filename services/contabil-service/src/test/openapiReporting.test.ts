@@ -46,5 +46,16 @@ describe("contabil-service OpenAPI reporting", () => {
       );
     }
     expect(schemas).toHaveProperty("ReportingGrantV1");
+    const extractBody = (
+      paths["/internal/reporting/extract"]?.post as {
+        requestBody?: {
+          content?: { "application/json"?: { schema?: { properties?: Record<string, unknown> } } };
+        };
+      }
+    ).requestBody?.content?.["application/json"]?.schema;
+    expect(extractBody?.properties?.source).toEqual({
+      type: "string",
+      enum: ["contabil.control", "contabil.responsibles", "contabil.relationship"],
+    });
   });
 });

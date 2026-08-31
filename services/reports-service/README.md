@@ -12,8 +12,11 @@ Consulte [`src/config/env.ts`](src/config/env.ts).
 
 - Banco e autenticação: `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `JWT_SECRET`.
 - Tokens e segredo interno: `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`.
+- Certificados PF: `CERTIFICATE_REPORTING_TOKEN`, `CERTIFICATE_REPORTING_GRANT_SECRET`.
 - URLs upstream: `USER_SERVICE_URL`, `PARCELAMENTO_SERVICE_URL`, `CLIENT_SERVICE_URL`,
-  `PROJECT_SERVICE_URL`, `TASK_SERVICE_URL`, `CONTABIL_SERVICE_URL`.
+  `PROJECT_SERVICE_URL`, `TASK_SERVICE_URL`, `CONTABIL_SERVICE_URL`, `CERTIFICATE_SERVICE_URL`,
+  `FISCAL_SERVICE_URL` (default `http://localhost:3037`), `PESSOAL_SERVICE_URL`
+  (default `http://localhost:3042`).
 - Timeout de fontes internas: `REPORTS_SOURCE_TIMEOUT_MS`.
 - Worker e CORS: `REPORTS_WORKER_POLL_INTERVAL_MS`, `REPORTS_WORKER_CONCURRENCY`,
   `REPORTS_WORKER_LEASE_SECONDS`, `SERVICE_ALLOWED_ORIGINS`.
@@ -31,6 +34,11 @@ amostra limitada; não cria job, snapshot, arquivo ou registro persistido.
 somente o autor. Cada criação ou edição revalida a definição declarativa contra o catálogo e as
 permissões atuais; a edição cria uma nova versão e nunca compartilha o modelo com departamento.
 
+`GET /reports/snapshots/:id/export?format=csv|xlsx` revalida o acesso atual e gera um arquivo
+efêmero somente das linhas materializadas no snapshot. O arquivo não é salvo em storage nem
+registrado como exportação persistida; a auditoria conserva apenas formato, resultado, job, versão
+e contagens seguras.
+
 ## Desenvolvimento
 
 ```bash
@@ -39,11 +47,17 @@ pnpm --filter @workspace/reports-service worker
 pnpm --filter @workspace/reports-service test
 ```
 
-O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas e Controle Contábil.
+O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas, Controle Contábil,
+relacionamentos e responsáveis contábeis, Certificados PF e PJ, ICMS fiscal e NCM fiscal.
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
 
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.
+
+`GET /reports/jobs/list` lista o histórico pessoal ou o acervo departamental com filtros. `GET` e
+`PUT /reports/retention` administram a retenção organizacional para jobs futuros e exigem owner.
+`POST /reports/snapshots/:id/delete` remove antecipadamente um snapshot com justificativa e exige
+Admin 3 do departamento do job.
 
 O smoke de Controle Contábil fica desativado por padrão; exija
 `CONTABIL_REPORTING_SMOKE_ENABLED=true` e `REPORTS_GRANT_SECRET` apenas em ambiente isolado com
@@ -51,3 +65,10 @@ os dois segredos configurados.
 
 O smoke de Tarefas fica desativado por padrão; exija `TASK_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.
+
+O smoke fiscal fica desativado por padrão; exija `FISCAL_REPORTING_SMOKE_ENABLED=true` e
+`REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.
+
+O adapter de LDD de Departamento Pessoal usa `PESSOAL_SERVICE_URL`, `REPORTS_INTERNAL_TOKEN` e
+`REPORTS_GRANT_SECRET` para consultar exclusivamente o contrato interno governado do
+pessoal-service.

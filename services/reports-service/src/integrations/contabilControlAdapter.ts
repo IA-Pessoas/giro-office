@@ -1,5 +1,8 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
-
+import type {
+  contabilRelationshipReportingCatalog,
+  contabilResponsiblesReportingCatalog,
+} from "@workspace/shared";
 import {
   contabilControlReportingCatalog,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -20,10 +23,18 @@ import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
 
-const sources = contabilControlReportingCatalog.sources.map(
-  ({ keys: _keys, ...source }) => source,
-) as readonly ReportCatalogSource[];
 const relations: readonly ReportCatalogRelation[] = [];
+
+export type ContabilReportingCatalog =
+  | typeof contabilControlReportingCatalog
+  | typeof contabilRelationshipReportingCatalog
+  | typeof contabilResponsiblesReportingCatalog;
+
+function getReportSources(catalog: ContabilReportingCatalog): readonly ReportCatalogSource[] {
+  return catalog.sources.map(
+    ({ keys: _keys, ...source }) => source,
+  ) as readonly ReportCatalogSource[];
+}
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -73,7 +84,7 @@ function isExtractResponse(
 }
 
 export class ContabilControlAdapter implements ReportSourceAdapter {
-  readonly sources = sources;
+  readonly sources: readonly ReportCatalogSource[];
   readonly relations = relations;
 
   constructor(
@@ -81,7 +92,10 @@ export class ContabilControlAdapter implements ReportSourceAdapter {
       ReportsServiceEnv,
       "contabilServiceUrl" | "reportsInternalToken" | "reportsGrantSecret" | "sourceTimeoutMs"
     >,
-  ) {}
+    catalog: ContabilReportingCatalog = contabilControlReportingCatalog,
+  ) {
+    this.sources = getReportSources(catalog);
+  }
 
   isEnabled(scope: { modules: Readonly<Record<string, number>> }): boolean {
     return (scope.modules.contabil ?? 0) >= 1;
@@ -96,15 +110,12 @@ export class ContabilControlAdapter implements ReportSourceAdapter {
       definition.aggregations.length > 0 ||
       definition.order_by.length > 0
     ) {
-      throw new ServiceError(
-        400,
-        "A prévia de Controle Contábil aceita somente colunas de uma fonte.",
-      );
+      throw new ServiceError(400, "A prévia contábil aceita somente colunas de uma fonte.");
     }
     const source = definition.sources[0];
     const fields = definition.columns.map((column) => column.field);
     if (new Set(fields).size !== fields.length) {
-      throw new ServiceError(400, "As colunas de Controle Contábil devem usar campos únicos.");
+      throw new ServiceError(400, "As colunas contábeis devem usar campos únicos.");
     }
     const body = { source, fields, limit: input.limit };
     const requestId = input.request_id || randomUUID();
@@ -138,13 +149,10 @@ export class ContabilControlAdapter implements ReportSourceAdapter {
         throw new Error("Resposta interna inválida.");
       return payload.data.rows;
     } catch (err: unknown) {
-      logError("Falha ao extrair dados de Controle Contábil para relatório", {
+      logError("Falha ao extrair dados contábeis para relatório", {
         errorType: err instanceof Error ? err.name : typeof err,
       });
-      throw new ServiceError(
-        503,
-        "Não foi possível obter dados de Controle Contábil para o relatório.",
-      );
+      throw new ServiceError(503, "Não foi possível obter dados contábeis para o relatório.");
     }
   }
 }

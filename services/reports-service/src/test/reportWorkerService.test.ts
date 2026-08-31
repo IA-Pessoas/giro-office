@@ -85,4 +85,57 @@ describe("ReportWorkerService", () => {
     await expect(worker.expireDue()).resolves.toBeUndefined();
     expect(expire).toHaveBeenCalledTimes(2);
   });
+
+  it("calcula o prazo do snapshot com a retenção capturada no job", async () => {
+    const now = new Date("2026-08-27T12:00:00.000Z");
+    vi.useFakeTimers({ now });
+    try {
+      const complete = vi.fn().mockResolvedValue(undefined);
+      const worker = new ReportWorkerService(
+        {
+          claimNext: vi.fn().mockResolvedValue({
+            id: "job-1",
+            organization_id: "org-1",
+            requester_id: "user-1",
+            report_model_version_id: "version-1",
+            lease_token: "lease-1",
+            payload_json: { retentionDays: 14 },
+          }),
+          renewLease: vi.fn().mockResolvedValue(true),
+        } as never,
+        {
+          reportModelVersion: {
+            findFirst: vi.fn().mockResolvedValue({
+              report_model_id: "model-1",
+              definition_json: { sources: [] },
+            }),
+          },
+          reportModel: {
+            findFirst: vi.fn().mockResolvedValue({
+              created_by_user_id: "user-1",
+              active: true,
+            }),
+          },
+          reportJob: { findFirst: vi.fn().mockResolvedValue({ id: "job-1" }) },
+        } as never,
+        {
+          getAccessContext: vi
+            .fn()
+            .mockResolvedValue({ organization: { id: "org-1" }, modules: {} }),
+        } as never,
+        { execute: vi.fn().mockResolvedValue([]) } as never,
+        { complete, transition: vi.fn() } as never,
+      );
+
+      await worker.processNext();
+
+      expect(complete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expires_at: new Date("2026-09-10T12:00:00.000Z"),
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

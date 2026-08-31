@@ -2296,6 +2296,16 @@ model ReportAuditEvent {
   @@map("reports.audit_events")
 }
 
+model ReportGrantUse {
+  id         String   @id @default(uuid())
+  grant_hash String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([expires_at])
+  @@map("reports.grant_uses")
+}
+
 enum status {
   trial
   past_due

@@ -151,6 +151,47 @@ test("contexto de relatórios do user-service permanece no smoke direto interno"
   assert.ok(loginIndex >= 0 && reportingIndex > loginIndex);
 });
 
+test("smoke do certificado PJ cobre reporting com token do reports-service", async () => {
+  const smoke = await readFile(path.join(repoRoot, "scripts", "all-services-smoke.mjs"), "utf8");
+  const reportingEntries = manifest.filter(
+    (entry) =>
+      entry.service === "certificate-service" && entry.path.startsWith("/internal/reporting/"),
+  );
+
+  assert.deepEqual(
+    reportingEntries.map((entry) => [entry.method, entry.path, entry.expectationKind]),
+    [
+      ["GET", "/internal/reporting/catalog", "good"],
+      ["GET", "/internal/reporting/catalog", "bad"],
+      ["POST", "/internal/reporting/extract", "good"],
+      ["POST", "/internal/reporting/extract", "bad"],
+    ],
+  );
+  assert.ok(
+    reportingEntries.every((entry) => entry.internalTokenEnvKey === "REPORTS_INTERNAL_TOKEN"),
+  );
+  assert.ok(
+    reportingEntries.every((entry) => entry.condition === "certificateReportingSmokeEnabled"),
+  );
+  assert.match(smoke, /certificateReportingSmokeEnabled/);
+  assert.match(smoke, /createCertificateReportingGrant/);
+});
+
+test("smoke fiscal assina o grant codificado e usa a organização da sessão", async () => {
+  const smoke = await readFile(path.join(repoRoot, "scripts", "all-services-smoke.mjs"), "utf8");
+  const grantFactory = smoke.match(
+    /function createFiscalReportingGrant\(\{([\s\S]*?)\n}\n\nfunction createProjectReportingGrant/,
+  );
+
+  assert.ok(grantFactory);
+  assert.match(grantFactory[1], /organization_id: requireState\("session"\)\.organization_id/);
+  assert.match(grantFactory[1], /version: 1/);
+  assert.match(grantFactory[1], /"x-request-id": requestId/);
+  assert.match(grantFactory[1], /const grant = Buffer\.from\(canonical\)\.toString\("base64url"\)/);
+  assert.match(grantFactory[1], /update\(grant\)/);
+  assert.doesNotMatch(grantFactory[1], /FIXTURE_ORGANIZATION_ID/);
+});
+
 test("smoke fiscal exclui cada fixture somente depois das operações que dependem dela", () => {
   for (const [deleteAction, prerequisiteActions] of [
     ["fiscalNcmDelete", ["fiscalNcmGet", "fiscalNcmList", "fiscalNcmPut", "fiscalNcmSearch"]],

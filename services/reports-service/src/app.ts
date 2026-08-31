@@ -18,15 +18,28 @@ import { buildReportsServiceOpenApiSpec } from "./openapi/spec.js";
 import type { ReportsPrismaClient } from "./prisma/index.js";
 import { createReportPreviewRouter } from "./routes/preview.routes.js";
 import { createReportCatalogRouter } from "./routes/reportCatalog.routes.js";
+import { createReportExportRouter } from "./routes/reportExport.routes.js";
 import type { ReportingAccessContextClient } from "./routes/reportingContext.js";
 import { createReportJobRouter } from "./routes/reportJob.routes.js";
 import { createReportModelRouter } from "./routes/reportModel.routes.js";
+import { createReportRetentionRouter } from "./routes/reportRetention.routes.js";
+import { createReportAuditService } from "./services/reportAuditService.js";
 import { ReportAuthorizationService } from "./services/reportAuthorizationService.js";
+import { ReportCsvService } from "./services/reportCsvService.js";
 import { ReportDefinitionService } from "./services/reportDefinitionService.js";
+import { ReportExportService } from "./services/reportExportService.js";
 import { ReportJobService } from "./services/reportJobService.js";
+import {
+  type ReportLetterheadAsset,
+  ReportLetterheadService,
+} from "./services/reportLetterheadService.js";
+import { ReportLifecycleService } from "./services/reportLifecycleService.js";
 import { ReportModelService } from "./services/reportModelService.js";
+import { ReportPdfService } from "./services/reportPdfService.js";
 import { ReportPreviewService } from "./services/reportPreviewService.js";
+import { ReportRetentionService } from "./services/reportRetentionService.js";
 import { ReportSnapshotService } from "./services/reportSnapshotService.js";
+import { ReportXlsxService } from "./services/reportXlsxService.js";
 
 export interface CreateReportsAppOptions {
   env: ReportsServiceEnv;
@@ -35,6 +48,7 @@ export interface CreateReportsAppOptions {
   reporting?: {
     adapters?: readonly ReportSourceAdapter[];
     accessContextClient?: ReportingAccessContextClient;
+    letterheads?: readonly ReportLetterheadAsset[];
   };
 }
 
@@ -89,14 +103,45 @@ export function createReportsApp({
   const modelService = new ReportModelService(prisma);
   const jobService = new ReportJobService(prisma);
   const snapshotService = new ReportSnapshotService(prisma);
+  const auditService = createReportAuditService(prisma as never, {
+    enabled: env.auditEnabled,
+    serviceUrl: env.auditServiceUrl,
+    serviceToken: env.auditServiceToken,
+    logger,
+  });
+  const letterheadService = new ReportLetterheadService(reporting?.letterheads ?? []);
+  const exportService = new ReportExportService(
+    snapshotService,
+    {
+      csv: new ReportCsvService(),
+      xlsx: new ReportXlsxService(),
+      pdf: new ReportPdfService(letterheadService),
+    },
+    auditService,
+    jobService,
+    authorizationService,
+  );
+  const retentionService = new ReportRetentionService(prisma, auditService);
+  const lifecycleService = new ReportLifecycleService(prisma as never, auditService);
 
   app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
   app.use("/reports", createReportPreviewRouter({ previewService, accessContextClient }));
+  app.use("/reports", createReportExportRouter({ exportService }));
   app.use(
     "/reports",
     createReportModelRouter({ modelService, authorizationService, previewService }),
   );
-  app.use("/reports", createReportJobRouter({ jobService, snapshotService, authorizationService }));
+  app.use(
+    "/reports",
+    createReportJobRouter({
+      jobService,
+      snapshotService,
+      authorizationService,
+      lifecycleService,
+      accessContextClient,
+    }),
+  );
+  app.use("/reports", createReportRetentionRouter({ retentionService, accessContextClient }));
   app.use(
     createExpressErrorHandler({
       logger,

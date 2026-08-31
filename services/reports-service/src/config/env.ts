@@ -30,6 +30,15 @@ const reportsServiceEnvSchema = z
     jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o reports-service."),
     reportsInternalToken: z.string().optional().default("reports-service-token"),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
+    certificateReportingToken: z.string().optional().default(""),
+    certificateReportingGrantSecret: z.string().optional().default(""),
+    auditEnabled: z
+      .string()
+      .optional()
+      .default("true")
+      .transform((value) => parseBoolean(value)),
+    auditServiceUrl: z.string().url().default("http://localhost:3020"),
+    auditServiceToken: z.string().default("audit-service-token"),
     userServiceUrl: z.string().url("USER_SERVICE_URL invalida.").default("http://localhost:3001"),
     parcelamentoServiceUrl: z
       .string()
@@ -48,6 +57,18 @@ const reportsServiceEnvSchema = z
       .string()
       .url("PROJECT_SERVICE_URL invalida.")
       .default("http://localhost:3033"),
+    certificateServiceUrl: z
+      .string()
+      .url("CERTIFICATE_SERVICE_URL invalida.")
+      .default("http://localhost:3041"),
+    fiscalServiceUrl: z
+      .string()
+      .url("FISCAL_SERVICE_URL invalida.")
+      .default("http://localhost:3037"),
+    pessoalServiceUrl: z
+      .string()
+      .url("PESSOAL_SERVICE_URL invalida.")
+      .default("http://localhost:3042"),
     workerPollIntervalMs: z.coerce.number().int().positive().default(5000),
     workerConcurrency: z.coerce.number().int().positive().default(2),
     workerLeaseSeconds: z.coerce.number().int().positive().default(120),
@@ -86,6 +107,18 @@ const reportsServiceEnvSchema = z
       envName: "REPORTS_GRANT_SECRET",
       token: rest.reportsGrantSecret,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "reports-service",
+      envName: "CERTIFICATE_REPORTING_TOKEN",
+      token: rest.certificateReportingToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "reports-service",
+      envName: "CERTIFICATE_REPORTING_GRANT_SECRET",
+      token: rest.certificateReportingGrantSecret,
+    });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
       serviceName: "reports-service",
@@ -115,12 +148,20 @@ export function parseReportsServiceEnv(
     jwtSecret: source.JWT_SECRET,
     reportsInternalToken: source.REPORTS_INTERNAL_TOKEN,
     reportsGrantSecret: source.REPORTS_GRANT_SECRET,
+    certificateReportingToken: source.CERTIFICATE_REPORTING_TOKEN,
+    certificateReportingGrantSecret: source.CERTIFICATE_REPORTING_GRANT_SECRET,
+    auditEnabled: source.AUDIT_ENABLED,
+    auditServiceUrl: source.AUDIT_SERVICE_URL,
+    auditServiceToken: source.AUDIT_SERVICE_TOKEN,
     userServiceUrl: source.USER_SERVICE_URL,
     parcelamentoServiceUrl: source.PARCELAMENTO_SERVICE_URL,
     clientServiceUrl: source.CLIENT_SERVICE_URL,
     contabilServiceUrl: source.CONTABIL_SERVICE_URL,
     taskServiceUrl: source.TASK_SERVICE_URL,
     projectServiceUrl: source.PROJECT_SERVICE_URL,
+    certificateServiceUrl: source.CERTIFICATE_SERVICE_URL,
+    fiscalServiceUrl: source.FISCAL_SERVICE_URL,
+    pessoalServiceUrl: source.PESSOAL_SERVICE_URL,
     workerPollIntervalMs: source.REPORTS_WORKER_POLL_INTERVAL_MS,
     workerConcurrency: source.REPORTS_WORKER_CONCURRENCY,
     workerLeaseSeconds: source.REPORTS_WORKER_LEASE_SECONDS,

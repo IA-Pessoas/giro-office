@@ -39,6 +39,7 @@ const pessoalServiceEnvSchema = z
     auditServiceUrl: z.string().url("AUDIT_SERVICE_URL invalida.").default("http://localhost:3020"),
     auditServiceToken: z.string().min(1, "AUDIT_SERVICE_TOKEN nao definido."),
     internalServiceTokenEnv: z.string().optional(),
+    reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     passwordEncryptionKey: z
       .string()
       .min(1, "PESSOAL_PASSWORD_ENCRYPTION_KEY nao definida.")
@@ -87,6 +88,12 @@ const pessoalServiceEnvSchema = z
       envName: "INTERNAL_SERVICE_TOKEN",
       token: internalServiceToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "pessoal-service",
+      envName: "REPORTS_GRANT_SECRET",
+      token: rest.reportsGrantSecret,
+    });
     if (!internalServiceToken) {
       throw new Error("pessoal-service: INTERNAL_SERVICE_TOKEN deve ser definido.");
     }
@@ -99,6 +106,7 @@ const pessoalServiceEnvSchema = z
 
     return {
       ...rest,
+      reportsGrantSecret: rest.reportsGrantSecret,
       internalServiceToken,
       enableApiDocs,
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,
@@ -118,6 +126,7 @@ export function parsePessoalServiceEnv(
     auditServiceUrl: source.AUDIT_SERVICE_URL,
     auditServiceToken: source.AUDIT_SERVICE_TOKEN,
     internalServiceTokenEnv: source.INTERNAL_SERVICE_TOKEN,
+    reportsGrantSecret: source.REPORTS_GRANT_SECRET,
     passwordEncryptionKey: source.PESSOAL_PASSWORD_ENCRYPTION_KEY,
     passwordEncryptionKeyVersion: source.PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION,
     domainAuditEnabled: source.PESSOAL_DOMAIN_AUDIT_ENABLED,

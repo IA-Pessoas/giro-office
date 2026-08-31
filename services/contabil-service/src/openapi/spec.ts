@@ -164,7 +164,10 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   type: "object",
                   required: ["source", "fields", "limit"],
                   properties: {
-                    source: { type: "string", enum: ["contabil.control"] },
+                    source: {
+                      type: "string",
+                      enum: ["contabil.control", "contabil.responsibles", "contabil.relationship"],
+                    },
                     fields: { type: "array", items: { type: "string" } },
                     limit: { type: "integer", minimum: 1, maximum: 101 },
                   },

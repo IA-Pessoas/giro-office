@@ -11,13 +11,16 @@ import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { FiscalServiceEnv } from "./config/env.js";
+import prismaClient from "./integrations/prisma.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildFiscalServiceOpenApiSpec } from "./openapi/spec.js";
+import { InternalReportingService } from "./reporting/internalReportingService.js";
 import {
   createFiscalSearchRoutes,
   type FiscalSearchRouteDeps,
 } from "./routes/fiscalSearch.routes.js";
 import { createIcmsRoutes, type IcmsRouteDeps } from "./routes/icms.routes.js";
+import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createIpiRoutes, type IpiRouteDeps } from "./routes/ipi.routes.js";
 import { createNcmRoutes, type NcmRouteDeps } from "./routes/ncm.routes.js";
 import { FiscalSearchService } from "./services/fiscalSearchService.js";
@@ -49,12 +52,15 @@ export function createFiscalApp(options: {
   icmsRouteDeps?: IcmsRouteDeps;
   ipiRouteDeps?: IpiRouteDeps;
   ncmRouteDeps?: NcmRouteDeps;
+  internalReportingService?: InternalReportingService;
 }): express.Express {
   const { env, logger } = options;
   const fiscalSearchRouteDeps = options.fiscalSearchRouteDeps ?? new FiscalSearchService();
   const icmsRouteDeps = options.icmsRouteDeps ?? new IcmsService();
   const ipiRouteDeps = options.ipiRouteDeps ?? new IpiService();
   const ncmRouteDeps = options.ncmRouteDeps ?? new NcmService();
+  const internalReportingService =
+    options.internalReportingService ?? new InternalReportingService(prismaClient);
 
   const app = express();
 
@@ -78,6 +84,10 @@ export function createFiscalApp(options: {
   app.use("/fiscal", createIcmsRoutes(icmsRouteDeps));
   app.use("/fiscal", createIpiRoutes(ipiRouteDeps));
   app.use("/fiscal", createFiscalSearchRoutes(fiscalSearchRouteDeps));
+  app.use(
+    "/internal",
+    createInternalReportingRouter({ env, reportingService: internalReportingService }),
+  );
 
   app.use(
     createExpressErrorHandler({

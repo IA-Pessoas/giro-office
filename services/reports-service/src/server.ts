@@ -4,9 +4,16 @@ import { createLogger } from "@workspace/shared/logger";
 
 import { createReportsApp } from "./app.js";
 import { getReportsServiceEnv } from "./config/env.js";
+import { CertificatePfAdapter } from "./integrations/certificatePfAdapter.js";
+import { CertificatePjAdapter } from "./integrations/certificatePjAdapter.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
+import { ContabilRelationshipAdapter } from "./integrations/contabilRelationshipAdapter.js";
+import { ContabilResponsiblesAdapter } from "./integrations/contabilResponsiblesAdapter.js";
+import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
+import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
+import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
@@ -28,8 +35,15 @@ const app = createReportsApp({
       new ParcelamentoAdapter(env),
       new ClientIntegrationAdapter(env),
       new ContabilControlAdapter(env),
+      new ContabilRelationshipAdapter(env),
+      new ContabilResponsiblesAdapter(env),
       new TaskAdapter(env),
       new ProjectAdapter(env),
+      new CertificatePfAdapter(env),
+      new FiscalIcmsAdapter(env),
+      new CertificatePjAdapter(env),
+      new FiscalNcmAdapter(env),
+      new PessoalLddAdapter(env),
     ],
   },
 });

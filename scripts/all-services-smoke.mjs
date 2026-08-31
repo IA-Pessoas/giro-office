@@ -117,12 +117,27 @@ const env = {
   contabilReportingSmokeEnabled:
     process.env.CONTABIL_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.CONTABIL_REPORTING_SMOKE_ENABLED === "1",
+  certificateReportingSmokeEnabled:
+    process.env.CERTIFICATE_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.CERTIFICATE_REPORTING_SMOKE_ENABLED === "1",
+  fiscalReportingSmokeEnabled:
+    process.env.FISCAL_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.FISCAL_REPORTING_SMOKE_ENABLED === "1",
+  pessoalReportingSmokeEnabled:
+    process.env.PESSOAL_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.PESSOAL_REPORTING_SMOKE_ENABLED === "1",
   projectReportingSmokeEnabled:
     process.env.PROJECT_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.PROJECT_REPORTING_SMOKE_ENABLED === "1",
   taskReportingSmokeEnabled:
     process.env.TASK_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.TASK_REPORTING_SMOKE_ENABLED === "1",
+  reportsRetentionSmokeEnabled:
+    process.env.REPORTS_RETENTION_SMOKE_ENABLED === "true" ||
+    process.env.REPORTS_RETENTION_SMOKE_ENABLED === "1",
+  reportsLifecycleSmokeEnabled:
+    process.env.REPORTS_LIFECYCLE_SMOKE_ENABLED === "true" ||
+    process.env.REPORTS_LIFECYCLE_SMOKE_ENABLED === "1",
   namespace:
     process.env.SMOKE_NAMESPACE?.trim() ||
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -232,6 +247,7 @@ const state = {
   tiRobotId: "",
   certificatePjId: "",
   certificatePfId: "",
+  reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
 };
 
 const cleanupTasks = [];
@@ -920,6 +936,92 @@ function createContabilReportingGrant({ operation, source, fields, body }) {
   };
 }
 
+function createCertificateReportingGrant({
+  operation,
+  source,
+  fields,
+  body,
+  secretValue,
+  missingSecretMessage = "Missing REPORTS_GRANT_SECRET for certificate reporting smoke.",
+}) {
+  const secret = secretValue ?? process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error(missingSecretMessage);
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "certificate-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createFiscalReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for fiscal reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "fiscal-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const canonical = canonicalJson(payload);
+  const grant = Buffer.from(canonical).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createPessoalReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for pessoal reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "pessoal-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
 function createProjectReportingGrant({ operation, source, fields, body }) {
   const secret = process.env.REPORTS_GRANT_SECRET?.trim();
   if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for project reporting smoke.");
@@ -1205,6 +1307,38 @@ const handlers = {
 
   async reportsCatalog(op) {
     await httpRequest(op);
+  },
+
+  async reportsSnapshotExport(op) {
+    const snapshotId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("reportsSnapshotId");
+    await httpRequest(op, {
+      path: `/reports/snapshots/${snapshotId}/export`,
+      query: { format: isBadExpectation(op) ? "pdf" : "csv" },
+      expectEnvelope: false,
+      expectedStatus: isBadExpectation(op) ? [400] : [200],
+    });
+  },
+
+  async reportsJobList(op) {
+    await httpRequest(op, { query: { scope: "personal", limit: 10 } });
+  },
+
+  async reportsRetentionGet(op) {
+    await httpRequest(op);
+  },
+
+  async reportsRetentionPut(op) {
+    await httpRequest(op, { json: { retention_days: 30 } });
+  },
+
+  async reportsSnapshotDelete(op) {
+    await httpRequest(op, {
+      path: `/reports/snapshots/${requireState("reportsSnapshotId")}/delete`,
+      json: { justification: "Smoke lifecycle cleanup with audit." },
+      expectEnvelope: false,
+    });
   },
 
   async reportsPreview(op) {
@@ -2661,6 +2795,123 @@ const handlers = {
       headers: isBadExpectation(op)
         ? {}
         : createContabilReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
+  },
+
+  async certificateReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createCertificateReportingGrant({
+            operation: "catalog",
+            source: "certificado.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async certificateReportingExtract(op) {
+    const requests = [
+      {
+        body: { source: "certificado.pj", fields: ["name"], limit: 1 },
+        headers: {},
+      },
+      {
+        body: { source: "certificado.pf", fields: ["name"], limit: 1 },
+        headers: {
+          "x-internal-service-token": process.env.CERTIFICATE_REPORTING_TOKEN?.trim(),
+        },
+        secretValue: process.env.CERTIFICATE_REPORTING_GRANT_SECRET?.trim(),
+        missingSecretMessage:
+          "Missing CERTIFICATE_REPORTING_GRANT_SECRET for certificate PF reporting smoke.",
+      },
+    ];
+
+    for (const { body, headers, secretValue, missingSecretMessage } of requests) {
+      await httpRequest(op, {
+        path: "/internal/reporting/extract",
+        json: body,
+        headers: isBadExpectation(op)
+          ? {}
+          : {
+              ...headers,
+              ...createCertificateReportingGrant({
+                operation: "extract",
+                source: body.source,
+                fields: body.fields,
+                body,
+                secretValue,
+                missingSecretMessage,
+              }),
+            },
+      });
+    }
+  },
+
+  async fiscalReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createFiscalReportingGrant({
+            operation: "catalog",
+            source: "fiscal.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async fiscalReportingExtract(op) {
+    const bodies = [
+      { source: "fiscal.icms", fields: ["state"], limit: 1 },
+      { source: "fiscal.ncm", fields: ["ncm_code"], limit: 1 },
+    ];
+    for (const body of bodies) {
+      await httpRequest(op, {
+        path: "/internal/reporting/extract",
+        json: body,
+        headers: isBadExpectation(op)
+          ? {}
+          : createFiscalReportingGrant({
+              operation: "extract",
+              source: body.source,
+              fields: body.fields,
+              body,
+            }),
+      });
+    }
+  },
+
+  async pessoalReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createPessoalReportingGrant({
+            operation: "catalog",
+            source: "pessoal.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async pessoalReportingExtract(op) {
+    const body = { source: "pessoal.ldd", fields: ["type"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createPessoalReportingGrant({
             operation: "extract",
             source: body.source,
             fields: body.fields,
@@ -5389,12 +5640,32 @@ function disabledConditionReason(condition) {
     return "CONTABIL_REPORTING_SMOKE_ENABLED is false";
   }
 
+  if (condition === "certificateReportingSmokeEnabled" && !env.certificateReportingSmokeEnabled) {
+    return "CERTIFICATE_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "fiscalReportingSmokeEnabled" && !env.fiscalReportingSmokeEnabled) {
+    return "FISCAL_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "pessoalReportingSmokeEnabled" && !env.pessoalReportingSmokeEnabled) {
+    return "PESSOAL_REPORTING_SMOKE_ENABLED is false";
+  }
+
   if (condition === "projectReportingSmokeEnabled" && !env.projectReportingSmokeEnabled) {
     return "PROJECT_REPORTING_SMOKE_ENABLED is false";
   }
 
   if (condition === "taskReportingSmokeEnabled" && !env.taskReportingSmokeEnabled) {
     return "TASK_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "reportsRetentionSmokeEnabled" && !env.reportsRetentionSmokeEnabled) {
+    return "REPORTS_RETENTION_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "reportsLifecycleSmokeEnabled" && !env.reportsLifecycleSmokeEnabled) {
+    return "REPORTS_LIFECYCLE_SMOKE_ENABLED is false";
   }
 
   return "";
