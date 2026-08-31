@@ -86,7 +86,7 @@ describe("pessoal internal reporting routes", () => {
       .set("x-reports-grant-signature", signed.signature)
       .expect(200);
 
-    expect(response.body.data.sources).toHaveLength(3);
+    expect(response.body.data.sources).toHaveLength(4);
     expect(response.body.data.sources[0]).toMatchObject({
       key: "pessoal.ldd",
       module: "pessoal",
@@ -144,6 +144,16 @@ describe("pessoal internal reporting routes", () => {
       "va",
       "vt",
     ]);
+
+    const unionsSource = response.body.data.sources.find(
+      (source: { key: string }) => source.key === "pessoal.unions",
+    );
+    expect(unionsSource).toMatchObject({ module: "pessoal", keys: [] });
+    expect(unionsSource.fields.map((field: { key: string }) => field.key)).toEqual([
+      "name",
+      "base_date",
+    ]);
+    expect(JSON.stringify(unionsSource)).not.toMatch(/id|cnpj/i);
   });
 
   it("valida token e grant e encaminha a organização assinada para obrigações", async () => {
@@ -227,6 +237,32 @@ describe("pessoal internal reporting routes", () => {
       reachedLimit: true,
     });
     expect(JSON.stringify(response.body)).not.toContain("sensitive");
+  });
+
+  it("encaminha somente a organização assinada ao extrator de sindicatos", async () => {
+    const body = { source: "pessoal.unions", fields: ["name", "base_date"], limit: 1 };
+    const signed = signedGrant(body);
+    const { app, extract } = createApp(
+      vi.fn().mockResolvedValue({
+        rows: [{ name: "Sindicato A", base_date: "2026-05-01" }],
+        reachedLimit: true,
+      }),
+    );
+
+    const response = await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+      .set("x-request-id", requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(extract).toHaveBeenCalledWith({ organizationId, ...body });
+    expect(response.body.data).toEqual({
+      rows: [{ name: "Sindicato A", base_date: "2026-05-01" }],
+      reachedLimit: true,
+    });
   });
 
   it("recusa grant de obrigações associado a outra fonte, corpo ou requisição", async () => {
