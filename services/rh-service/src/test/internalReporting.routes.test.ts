@@ -1,6 +1,10 @@
 import { createHash, createHmac } from "node:crypto";
 
-import { createExpressErrorHandler, INTERNAL_SERVICE_TOKEN_HEADER } from "@workspace/shared";
+import {
+  createExpressErrorHandler,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+  ServiceError,
+} from "@workspace/shared";
 import express from "express";
 import "express-async-errors";
 import request from "supertest";
@@ -57,14 +61,20 @@ function signedGrant(input: {
   };
 }
 
-function createApp(extract = vi.fn().mockResolvedValue({ rows: [], reachedLimit: false })) {
+function createApp(
+  extract = vi.fn().mockResolvedValue({ rows: [], reachedLimit: false }),
+  consumeGrant = vi.fn().mockResolvedValue(undefined),
+) {
   const app = express();
   app.use(express.json());
   app.use(
     "/internal",
     createInternalReportingRouter({
       env: { reportsInternalToken: internalToken, reportsGrantSecret: grantSecret },
-      reportingService: { extract } as never,
+      reportingService: {
+        consumeGrant,
+        extract,
+      },
     }),
   );
   app.use(
@@ -74,7 +84,7 @@ function createApp(extract = vi.fn().mockResolvedValue({ rows: [], reachedLimit:
       fallbackMessage: "Erro interno no rh-service.",
     }),
   );
-  return { app, extract };
+  return { app, consumeGrant, extract };
 }
 
 describe("rh internal reporting routes", () => {
@@ -135,6 +145,98 @@ describe("rh internal reporting routes", () => {
       "updated_at",
     ]);
     expect(source.fields.map((field: { key: string }) => field.key)).not.toContain("id");
+
+    const attendance = response.body.data.sources.find(
+      (candidate: { key: string }) => candidate.key === "rh.attendance",
+    );
+    expect(attendance.keys.map((field: { key: string }) => field.key)).toEqual([
+      "user_id",
+      "point_id",
+      "approver_user_id",
+    ]);
+    expect(attendance.fields.map((field: { key: string }) => field.key)).toEqual(
+      expect.arrayContaining([
+        "clock_in",
+        "workload_hours",
+        "balance_minutes",
+        "minutes",
+        "status",
+      ]),
+    );
+    expect(attendance.fields.map((field: { key: string }) => field.key)).not.toEqual(
+      expect.arrayContaining(["id", "user_id", "point_id", "approver_user_id", "attachment"]),
+    );
+  });
+
+  it("extrai attendance somente com grant correspondente e encaminha a organizacao", async () => {
+    const extract = vi.fn().mockResolvedValue({
+      rows: [{ minutes: 30 }],
+      reachedLimit: true,
+    });
+    const { app } = createApp(extract);
+    const body = { source: "rh.attendance", fields: ["minutes"], limit: 1 };
+    const signed = signedGrant({
+      operation: "extract",
+      source: body.source,
+      fields: body.fields,
+      body,
+    });
+
+    const response = await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+      .set("x-request-id", requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(response.body.data).toEqual({ rows: [{ minutes: 30 }], reachedLimit: true });
+    expect(extract).toHaveBeenCalledWith({
+      organizationId,
+      source: "rh.attendance",
+      fields: ["minutes"],
+      limit: 1,
+    });
+  });
+
+  it("rejeita o replay de um grant já consumido", async () => {
+    const extract = vi.fn().mockResolvedValue({ rows: [], reachedLimit: false });
+    const consumeGrant = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new ServiceError(403, "Grant de relatórios já utilizado."));
+    const { app } = createApp(extract, consumeGrant);
+    const body = { source: "rh.attendance", fields: ["minutes"], limit: 1 };
+    const signed = signedGrant({
+      operation: "extract",
+      source: body.source,
+      fields: body.fields,
+      body,
+      requestId: "request-851-replay",
+    });
+
+    const first = await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+      .set("x-request-id", "request-851-replay")
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(first.body.data).toEqual({ rows: [], reachedLimit: false });
+
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+      .set("x-request-id", "request-851-replay")
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(403);
+    expect(consumeGrant).toHaveBeenCalledTimes(2);
+    expect(extract).toHaveBeenCalledTimes(1);
   });
 
   it("encaminha a organização do grant e rejeita limite, fonte, campos e expiração inválidos", async () => {

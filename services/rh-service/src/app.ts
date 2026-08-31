@@ -67,7 +67,7 @@ export function createApp(
     createInternalReportingRouter({
       env,
       reportingService:
-        options.internalReportingService ?? new InternalReportingService(prismaClient),
+        options.internalReportingService ?? new InternalReportingService(prismaClient as never),
     }),
   );
 

@@ -134,7 +134,7 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "RH Service",
       buildSpec: () =>
         buildRhServiceOpenApiSpec({ port: getPortFromUrl(env.rhServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "fiscal-service",

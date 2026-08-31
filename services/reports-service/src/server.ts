@@ -19,6 +19,7 @@ import { PessoalPayrollAdapter } from "./integrations/pessoalPayrollAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
 import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapter.js";
+import { RhAttendanceAdapter } from "./integrations/rhAttendanceAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
@@ -54,6 +55,7 @@ const app = createReportsApp({
       new RegularizeLicenseAdapter(env),
       new RegularizeProcessAdapter(env),
       new RhRequestAdapter(env),
+      new RhAttendanceAdapter(env),
     ],
   },
 });

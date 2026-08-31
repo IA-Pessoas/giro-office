@@ -33,7 +33,7 @@ const internalReportingExtractRequestBody = createObjectRequestBody({
   example: { source: "rh.requests", fields: ["title", "status"], limit: 100 },
   required: ["source", "fields", "limit"],
   properties: {
-    source: { type: "string", enum: ["rh.requests"] },
+    source: { type: "string", enum: ["rh.requests", "rh.attendance"] },
     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
     limit: { type: "integer", minimum: 1, maximum: 101 },
   },
@@ -489,7 +489,7 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
       "/internal/reporting/extract": {
         post: {
           tags: ["ReportingInternal"],
-          summary: "Extrair dados seguros de solicitações RH",
+          summary: "Extrair dados seguros do RH",
           security: internalToken,
           parameters: internalReportingParameters,
           ...internalReportingExtractRequestBody,
