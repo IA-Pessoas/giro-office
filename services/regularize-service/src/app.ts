@@ -14,7 +14,9 @@ import type { RegularizeServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildRegularizeServiceOpenApiSpec } from "./openapi/spec.js";
+import { RegularizeLicenseReportingService } from "./reporting/internalReportingService.js";
 import { createRegularizeRoutes } from "./routes/index.js";
+import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createRegularizeInternalRoutes } from "./routes/regularizeInternal.routes.js";
 import type { RegularizeReconciliationService } from "./services/regularizeReconciliationService.js";
 
@@ -52,6 +54,7 @@ export interface CreateAppOptions {
   runLicenseNotificationReconciliation: () => Promise<Record<string, unknown>>;
   runClientPfStatusReconciliation: () => Promise<Record<string, unknown>>;
   runClientPfDocumentsReconciliation: () => Promise<Record<string, unknown>>;
+  internalReportingService?: RegularizeLicenseReportingService;
 }
 
 export function createApp({
@@ -63,6 +66,7 @@ export function createApp({
   runLicenseNotificationReconciliation,
   runClientPfStatusReconciliation,
   runClientPfDocumentsReconciliation,
+  internalReportingService: injectedInternalReportingService,
 }: CreateAppOptions): express.Express {
   const app = express();
 
@@ -96,6 +100,14 @@ export function createApp({
       runLicenseNotificationReconciliation,
       runClientPfStatusReconciliation,
       runClientPfDocumentsReconciliation,
+    }),
+  );
+  app.use(
+    "/internal",
+    createInternalReportingRouter({
+      env,
+      reportingService:
+        injectedInternalReportingService ?? new RegularizeLicenseReportingService(prisma),
     }),
   );
 

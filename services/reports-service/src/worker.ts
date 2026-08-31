@@ -11,6 +11,7 @@ import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
+import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { UserAccessContextClient } from "./integrations/userAccessContextClient.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
@@ -45,6 +46,7 @@ const catalog = new SourceCatalogService([
   new FiscalNcmAdapter(env),
   new FiscalIpiAdapter(env),
   new PessoalLddAdapter(env),
+  new RegularizeLicenseAdapter(env),
 ]);
 const worker = new ReportWorkerService(
   new ReportJobRepository(prisma, env.workerLeaseSeconds, audit),

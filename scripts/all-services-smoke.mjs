@@ -132,6 +132,9 @@ const env = {
   taskReportingSmokeEnabled:
     process.env.TASK_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.TASK_REPORTING_SMOKE_ENABLED === "1",
+  regularizeReportingSmokeEnabled:
+    process.env.REGULARIZE_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.REGULARIZE_REPORTING_SMOKE_ENABLED === "1",
   reportsRetentionSmokeEnabled:
     process.env.REPORTS_RETENTION_SMOKE_ENABLED === "true" ||
     process.env.REPORTS_RETENTION_SMOKE_ENABLED === "1",
@@ -1056,6 +1059,33 @@ function createTaskReportingGrant({ operation, source, fields, body }) {
   const requestId = crypto.randomUUID();
   const payload = {
     audience: "task-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createRegularizeReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REGULARIZE_REPORTING_GRANT_SECRET?.trim();
+  if (!secret)
+    throw new Error("Missing REGULARIZE_REPORTING_GRANT_SECRET for regularize reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "regularize-service",
     body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
     expires_at: issuedAt + 60,
     fields,
@@ -2913,6 +2943,36 @@ const handlers = {
       headers: isBadExpectation(op)
         ? {}
         : createPessoalReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
+  },
+
+  async regularizeReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createRegularizeReportingGrant({
+            operation: "catalog",
+            source: "regularize.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async regularizeReportingExtract(op) {
+    const body = { source: "regularize.licenses", fields: ["protocol"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createRegularizeReportingGrant({
             operation: "extract",
             source: body.source,
             fields: body.fields,
@@ -5659,6 +5719,10 @@ function disabledConditionReason(condition) {
 
   if (condition === "taskReportingSmokeEnabled" && !env.taskReportingSmokeEnabled) {
     return "TASK_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "regularizeReportingSmokeEnabled" && !env.regularizeReportingSmokeEnabled) {
+    return "REGULARIZE_REPORTING_SMOKE_ENABLED is false";
   }
 
   if (condition === "reportsRetentionSmokeEnabled" && !env.reportsRetentionSmokeEnabled) {
