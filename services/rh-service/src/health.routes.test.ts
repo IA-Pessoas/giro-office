@@ -18,6 +18,8 @@ describe("rh-service", () => {
       databaseUrl: "postgresql://localhost/rh_test",
       databasePoolMax: 5,
       jwtSecret: "test-jwt-secret",
+      reportsInternalToken: "test-reports-internal-token",
+      reportsGrantSecret: "test-reports-grant-secret",
       nodeEnv: "test",
       logLevel: "silent",
       logPretty: false,

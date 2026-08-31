@@ -12,10 +12,13 @@ import express, { type Request, type Response } from "express";
 import "express-async-errors";
 
 import type { RhEnv } from "./config/env.js";
+import { prismaClient } from "./integrations/prisma.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildRhServiceOpenApiSpec } from "./openapi/spec.js";
+import { InternalReportingService } from "./reporting/internalReportingService.js";
 import categoryRoutes from "./routes/category.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
+import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import messageRoutes from "./routes/message.routes.js";
 import operationalUserRoutes from "./routes/operationalUser.routes.js";
 import pointRoutes from "./routes/point.routes.js";
@@ -42,7 +45,11 @@ function rhErrorLogContext(request: Request): Record<string, unknown> | undefine
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export function createApp(logger: Logger, env: RhEnv): express.Express {
+export function createApp(
+  logger: Logger,
+  env: RhEnv,
+  options: { internalReportingService?: InternalReportingService } = {},
+): express.Express {
   const app = express();
 
   app.set("trust proxy", true);
@@ -54,6 +61,15 @@ export function createApp(logger: Logger, env: RhEnv): express.Express {
   app.get("/health", (_request: Request, response: Response) => {
     response.status(200).json(createSuccessResponse({ status: "ok", service: "rh-service" }));
   });
+
+  app.use(
+    "/internal",
+    createInternalReportingRouter({
+      env,
+      reportingService:
+        options.internalReportingService ?? new InternalReportingService(prismaClient),
+    }),
+  );
 
   app.use("/rh/point-config", pointConfigRoutes);
   app.use("/rh/point", pointRoutes);
