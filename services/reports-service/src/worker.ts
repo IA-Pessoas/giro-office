@@ -1,24 +1,7 @@
 import "dotenv/config";
 
 import { createLogger } from "@workspace/shared/logger";
-import { SourceCatalogService } from "./catalog/sourceCatalogService.js";
 import { getReportsServiceEnv } from "./config/env.js";
-import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
-import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
-import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
-import { FiscalIpiAdapter } from "./integrations/fiscalIpiAdapter.js";
-import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
-import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
-import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
-import { PessoalObligationsAdapter } from "./integrations/pessoalObligationsAdapter.js";
-import { PessoalPayrollAdapter } from "./integrations/pessoalPayrollAdapter.js";
-import { ProjectAdapter } from "./integrations/projectAdapter.js";
-import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
-import { RegularizeMunicipalTaxesAdapter } from "./integrations/regularizeMunicipalTaxesAdapter.js";
-import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapter.js";
-import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
-import { TaskAdapter } from "./integrations/taskAdapter.js";
-import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
 import { UserAccessContextClient } from "./integrations/userAccessContextClient.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
 import { ReportJobRepository } from "./prisma/reportJobRepository.js";
@@ -27,6 +10,7 @@ import { ReportDefinitionService } from "./services/reportDefinitionService.js";
 import { ReportExecutionService } from "./services/reportExecutionService.js";
 import { ReportLifecycleService } from "./services/reportLifecycleService.js";
 import { ReportWorkerService } from "./services/reportWorkerService.js";
+import { createWorkerSourceCatalog } from "./workerCatalog.js";
 
 const env = getReportsServiceEnv();
 const logger = createLogger({
@@ -42,24 +26,7 @@ const audit = createReportAuditService(prisma as never, {
   serviceToken: env.auditServiceToken,
   logger,
 });
-const catalog = new SourceCatalogService([
-  new ParcelamentoAdapter(env),
-  new ClientIntegrationAdapter(env),
-  new ContabilControlAdapter(env),
-  new TaskAdapter(env),
-  new ProjectAdapter(env),
-  new FiscalIcmsAdapter(env),
-  new FiscalNcmAdapter(env),
-  new FiscalIpiAdapter(env),
-  new PessoalLddAdapter(env),
-  new PessoalObligationsAdapter(env),
-  new PessoalPayrollAdapter(env),
-  new RegularizeLicenseAdapter(env),
-  new RegularizeProcessAdapter(env),
-  new RhRequestAdapter(env),
-  new TiInventoryAdapter(env),
-  new RegularizeMunicipalTaxesAdapter(env),
-]);
+const catalog = createWorkerSourceCatalog(env);
 const worker = new ReportWorkerService(
   new ReportJobRepository(prisma, env.workerLeaseSeconds, audit),
   prisma,
