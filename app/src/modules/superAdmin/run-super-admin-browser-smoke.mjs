@@ -50,8 +50,11 @@ const platformUser = {
   department_id: "department-safe-1",
   photo_url: null,
   type: "admin",
+  version: 1,
 };
 let platformUserPermissions = { rh: 1, fiscal: 1 };
+let createdUser = null;
+let createdUserOrganizationId = null;
 const currentOwner = {
   id: "owner-safe-1",
   name: "Owner atual",
@@ -60,9 +63,14 @@ const currentOwner = {
   department_id: "department-safe-1",
   photo_url: null,
   type: "owner",
+  version: 1,
 };
 const requests = [];
+const auditEvents = [];
 let forceConflict = false;
+let forceUserVersionConflict = false;
+let nextUserCreateError = null;
+let auditUnavailable = false;
 let revision = 1;
 let delayedDetailId = null;
 let delayedDetail;
@@ -77,6 +85,37 @@ function reply(response, status, data) {
   response.end(
     JSON.stringify(status < 400 ? { success: true, data } : { success: false, error: data }),
   );
+}
+
+function userBelongsToOrganization(user, organizationId) {
+  if (!user) return false;
+  if (user.id === createdUser?.id) return createdUserOrganizationId === organizationId;
+  return organizationId === organization.id && [platformUser.id, currentOwner.id].includes(user.id);
+}
+
+function usersForOrganization(organizationId) {
+  return [platformUser, currentOwner, createdUser].filter((user) =>
+    userBelongsToOrganization(user, organizationId),
+  );
+}
+
+function recordAuditEvent(organizationId, action, referringId, changes) {
+  auditEvents.unshift({
+    id: `audit-safe-${auditEvents.length + 2}`,
+    requestId: `request-safe-${auditEvents.length + 2}`,
+    organizationId,
+    method: "ENTITY_CHANGE",
+    path: `/platform/organizations/${organizationId}/users/${referringId}`,
+    outcome: "success",
+    statusCode: 200,
+    serviceSource: "user-service",
+    createdAt: "2026-08-25T12:01:00.000Z",
+    action,
+    referring: "user",
+    referringId,
+    actorPlatformUserId: identity.id,
+    changes,
+  });
 }
 
 function hasProcessExited(pid) {
@@ -124,26 +163,33 @@ const upstream = createServer(async (request, response) => {
     return reply(response, 201, created);
   }
   if (url.pathname === "/platform/audit/requests") {
+    if (auditUnavailable) return reply(response, 503, "Auditoria indisponível no teste.");
+    const organizationId = url.searchParams.get("organizationId");
+    const auditOrganization =
+      organizations.find((item) => item.id === organizationId) ?? organization;
+    const baselineEvent = {
+      id: "audit-safe-1",
+      requestId: "request-safe-1",
+      organizationId: auditOrganization.id,
+      method: "ENTITY_CHANGE",
+      path: `/platform/organizations/${auditOrganization.id}`,
+      outcome: "success",
+      statusCode: 200,
+      serviceSource: "organization-service",
+      createdAt: "2026-08-25T12:00:00.000Z",
+      action: "organization.subscription_plan.updated",
+      referring: "organization",
+      referringId: auditOrganization.id,
+      actorPlatformUserId: identity.id,
+      changes: { subscription_plan: { from: "trial", to: "pro" } },
+    };
+    const items = [
+      baselineEvent,
+      ...auditEvents.filter((event) => !organizationId || event.organizationId === organizationId),
+    ];
     return reply(response, 200, {
-      items: [
-        {
-          id: "audit-safe-1",
-          requestId: "request-safe-1",
-          organizationId: url.searchParams.get("organizationId") || organization.id,
-          method: "ENTITY_CHANGE",
-          path: `/platform/organizations/${organization.id}`,
-          outcome: "success",
-          statusCode: 200,
-          serviceSource: "organization-service",
-          createdAt: "2026-08-25T12:00:00.000Z",
-          action: "organization.subscription_plan.updated",
-          referring: "organization",
-          referringId: organization.id,
-          actorPlatformUserId: identity.id,
-          changes: { subscription_plan: { from: "trial", to: "pro" } },
-        },
-      ],
-      total: 1,
+      items,
+      total: items.length,
       page: 1,
       pageSize: 25,
     });
@@ -153,7 +199,13 @@ const upstream = createServer(async (request, response) => {
   );
   const permissionsOrganization =
     permissionsMatch && organizations.find((item) => item.id === permissionsMatch[1]);
-  if (permissionsOrganization && permissionsMatch[2] === platformUser.id) {
+  if (
+    permissionsOrganization &&
+    userBelongsToOrganization(
+      [platformUser, createdUser].find((user) => user?.id === permissionsMatch[2]),
+      permissionsOrganization.id,
+    )
+  ) {
     if (request.method === "GET") return reply(response, 200, platformUserPermissions);
     if (request.method === "PUT") {
       assert.equal(request.headers["x-csrf-token"], csrf);
@@ -161,14 +213,21 @@ const upstream = createServer(async (request, response) => {
       assert.ok(
         Object.values(body).every((level) => Number.isInteger(level) && level >= 0 && level <= 3),
       );
+      const previousPermissions = platformUserPermissions;
       platformUserPermissions = body;
+      recordAuditEvent(
+        permissionsOrganization.id,
+        "user.permissions.updated",
+        permissionsMatch[2],
+        { permissions: { from: previousPermissions, to: body } },
+      );
       return reply(response, 200, platformUserPermissions);
     }
   }
   const ownershipTransferMatch = url.pathname.match(
     /^\/platform\/organizations\/([^/]+)\/ownership-transfer$/,
   );
-  if (ownershipTransferMatch && organizations.some((item) => item.id === ownershipTransferMatch[1])) {
+  if (ownershipTransferMatch && ownershipTransferMatch[1] === organization.id) {
     assert.equal(request.method, "POST");
     assert.equal(request.headers["x-csrf-token"], csrf);
     assert.equal(request.headers.authorization, undefined);
@@ -182,20 +241,85 @@ const upstream = createServer(async (request, response) => {
     assert.equal(body.successorUserId, platformUser.id);
     assert.equal(body.previousOwnerAction, "demote");
     assert.equal(body.justification, "Recuperação de ownership aprovada.");
+    recordAuditEvent(organization.id, "organization.ownership.transferred", currentOwner.id, {
+      successor_user_id: { from: currentOwner.id, to: platformUser.id },
+      previous_owner_action: { from: "owner", to: "demote" },
+    });
     return reply(response, 200, { currentOwner, successor: platformUser });
+  }
+  const usersCollectionMatch = url.pathname.match(/^\/platform\/organizations\/([^/]+)\/users$/);
+  const usersOrganization =
+    usersCollectionMatch && organizations.find((item) => item.id === usersCollectionMatch[1]);
+  if (usersOrganization && request.method === "POST") {
+    if (request.headers["x-csrf-token"] !== csrf)
+      return reply(response, 403, "CSRF inválido no teste.");
+    assert.equal(request.headers.authorization, undefined);
+    assert.equal(Object.hasOwn(body, "organization_id"), false);
+    assert.equal(typeof body.password, "string");
+    if (body.name.length < 3) return reply(response, 400, "Payload inválido no teste.");
+    if (nextUserCreateError) {
+      const status = nextUserCreateError;
+      nextUserCreateError = null;
+      return reply(response, status, "Login já cadastrado no tenant.");
+    }
+    createdUser = {
+      id: "user-safe-created",
+      name: body.name,
+      login: body.login,
+      status: "active",
+      department_id: body.department_id,
+      photo_url: null,
+      type: body.type,
+      permission: body.permission,
+      version: 1,
+    };
+    createdUserOrganizationId = usersOrganization.id;
+    recordAuditEvent(usersOrganization.id, "user.created", createdUser.id, {
+      name: { from: null, to: createdUser.name },
+      login: { from: null, to: createdUser.login },
+    });
+    return reply(response, 201, createdUser);
   }
   const userMatch = url.pathname.match(
     /^\/platform\/organizations\/([^/]+)\/users\/([^/]+)(?:\/(reactivate))?$/,
   );
   const selectedUser = userMatch && organizations.find((item) => item.id === userMatch[1]);
-  const managedUser = userMatch && [platformUser, currentOwner].find((item) => item.id === userMatch[2]);
-  if (selectedUser && managedUser) {
+  const managedUser =
+    userMatch &&
+    usersForOrganization(userMatch[1]).find((item) => item.id === userMatch[2]);
+  if (selectedUser && managedUser && userBelongsToOrganization(managedUser, selectedUser.id)) {
     if (request.method === "GET" && !userMatch[3]) return reply(response, 200, managedUser);
+    if (request.method === "PATCH" && !userMatch[3]) {
+      assert.equal(request.headers["x-csrf-token"], csrf);
+      assert.equal(request.headers.authorization, undefined);
+      assert.equal(body.expected_version, managedUser.version);
+      if (Object.hasOwn(body, "password")) assert.equal(typeof body.password, "string");
+      if (forceUserVersionConflict) {
+        forceUserVersionConflict = false;
+        managedUser.version += 1;
+        return reply(response, 409, "Conflito de edição.");
+      }
+      const previousName = managedUser.name;
+      const previousLogin = managedUser.login;
+      managedUser.name = body.name;
+      managedUser.login = body.login;
+      managedUser.department_id = body.department_id;
+      managedUser.version += 1;
+      recordAuditEvent(selectedUser.id, "user.updated", managedUser.id, {
+        name: { from: previousName, to: managedUser.name },
+        login: { from: previousLogin, to: managedUser.login },
+      });
+      return reply(response, 200, managedUser);
+    }
     if (request.method === "DELETE" && !userMatch[3]) {
       assert.equal(request.headers["x-csrf-token"], csrf);
       assert.equal(request.headers.authorization, undefined);
+      if (managedUser.type === "owner") return reply(response, 409, "Último owner do tenant.");
       if (url.pathname === delayedUserLifecyclePath) await delayedUserLifecycle;
       managedUser.status = "inactive";
+      recordAuditEvent(selectedUser.id, "user.deactivated", managedUser.id, {
+        status: { from: "active", to: "inactive" },
+      });
       return reply(response, 200, managedUser);
     }
     if (request.method === "POST" && userMatch[3] === "reactivate") {
@@ -203,6 +327,9 @@ const upstream = createServer(async (request, response) => {
       assert.equal(request.headers.authorization, undefined);
       if (url.pathname === delayedUserLifecyclePath) await delayedUserLifecycle;
       managedUser.status = "active";
+      recordAuditEvent(selectedUser.id, "user.reactivated", managedUser.id, {
+        status: { from: "inactive", to: "active" },
+      });
       return reply(response, 200, managedUser);
     }
   }
@@ -215,9 +342,10 @@ const upstream = createServer(async (request, response) => {
     if (!match[2] && selected.id === failedDetailId)
       return reply(response, 403, "Detalhe indisponível no teste.");
     if (match[2] === "users") {
+      const users = usersForOrganization(selected.id);
       return reply(response, 200, {
-        users: [platformUser, currentOwner],
-        total: 1,
+        users,
+        total: users.length,
         hasMore: false,
       });
     }
@@ -340,7 +468,8 @@ try {
   page.on("console", (message) => {
     if (
       message.type() === "error" &&
-      !/server responded with a status of (401|409)/.test(message.text()) &&
+      !/server responded with a status of (400|401|403|404|409|503)/.test(message.text()) &&
+      !/AxiosError: Request failed with status code (400|403|409|503)/.test(message.text()) &&
       !(failedDetailId && /server responded with a status of 403/.test(message.text()))
     ) {
       consoleErrors.push(message.text());
@@ -358,8 +487,14 @@ try {
     organizations.splice(0, organizations.length, organization, secondOrganization);
     platformUser.status = "active";
     platformUserPermissions = { rh: 1, fiscal: 1 };
+    createdUser = null;
+    createdUserOrganizationId = null;
     platformUser.type = "admin";
     currentOwner.status = "active";
+    auditEvents.length = 0;
+    auditUnavailable = false;
+    forceUserVersionConflict = false;
+    nextUserCreateError = null;
     currentOwner.type = "owner";
     requests.length = 0;
     await page.goto("/super-admin", { waitUntil: "networkidle" });
@@ -454,6 +589,118 @@ try {
         (request) => request.path === `/platform/organizations/${organization.id}/users`,
       ),
     );
+    await page.getByRole("button", { name: "Criar usuário", exact: true }).click();
+    const invalidUserDialog = page.getByRole("dialog", {
+      name: "Cadastrar Novo Usuário",
+      exact: true,
+    });
+    await invalidUserDialog.getByLabel(/Nome/).fill("x");
+    await invalidUserDialog.getByLabel(/Login/).fill("invalido@example.test");
+    await invalidUserDialog.getByLabel(/Senha/).fill("Senha!2026");
+    await invalidUserDialog.getByLabel(/Departamento/).selectOption("department-safe-1");
+    await invalidUserDialog.getByRole("button", { name: "Criar Usuário", exact: true }).click();
+    await invalidUserDialog
+      .getByText("Não foi possível concluir o cadastro com os dados informados.", { exact: true })
+      .waitFor();
+    await invalidUserDialog.getByRole("button", { name: "Cancelar", exact: true }).click();
+    await invalidUserDialog.waitFor({ state: "hidden" });
+
+    await context.addCookies([{ name: "cw.csrf", value: "B".repeat(43), url: baseUrl }]);
+    await page.getByRole("button", { name: "Criar usuário", exact: true }).click();
+    const csrfUserDialog = page.getByRole("dialog", {
+      name: "Cadastrar Novo Usuário",
+      exact: true,
+    });
+    await csrfUserDialog.getByLabel(/Nome/).fill("CSRF inválido");
+    await csrfUserDialog.getByLabel(/Login/).fill("csrf@example.test");
+    await csrfUserDialog.getByLabel(/Senha/).fill("Senha!2026");
+    await csrfUserDialog.getByLabel(/Departamento/).selectOption("department-safe-1");
+    await csrfUserDialog.getByRole("button", { name: "Criar Usuário", exact: true }).click();
+    await csrfUserDialog
+      .getByText("Não foi possível concluir o cadastro com os dados informados.", { exact: true })
+      .waitFor();
+    await context.addCookies([{ name: "cw.csrf", value: csrf, url: baseUrl }]);
+    await csrfUserDialog.getByRole("button", { name: "Cancelar", exact: true }).click();
+    await csrfUserDialog.waitFor({ state: "hidden" });
+
+    await page.getByRole("button", { name: "Criar usuário", exact: true }).click();
+    const duplicateUserDialog = page.getByRole("dialog", {
+      name: "Cadastrar Novo Usuário",
+      exact: true,
+    });
+    await duplicateUserDialog.getByLabel(/Nome/).fill("Usuário duplicado");
+    await duplicateUserDialog.getByLabel(/Login/).fill("pessoa@example.test");
+    await duplicateUserDialog.getByLabel(/Senha/).fill("Senha!2026");
+    await duplicateUserDialog.getByLabel(/Departamento/).selectOption("department-safe-1");
+    nextUserCreateError = 409;
+    await duplicateUserDialog.getByRole("button", { name: "Criar Usuário", exact: true }).click();
+    await duplicateUserDialog
+      .getByText("Não foi possível concluir o cadastro com os dados informados.", { exact: true })
+      .waitFor();
+    await duplicateUserDialog.getByRole("button", { name: "Cancelar", exact: true }).click();
+    await duplicateUserDialog.waitFor({ state: "hidden" });
+
+    await page.getByRole("button", { name: "Criar usuário", exact: true }).click();
+    const createUserDialog = page.getByRole("dialog", {
+      name: "Cadastrar Novo Usuário",
+      exact: true,
+    });
+    await createUserDialog.getByLabel(/Nome/).fill("Usuário homologado");
+    await createUserDialog.getByLabel(/Login/).fill("homologado@example.test");
+    await createUserDialog.getByLabel(/Senha/).fill("Senha!2026");
+    await createUserDialog.getByLabel(/Departamento/).selectOption("department-safe-1");
+    await createUserDialog.getByRole("button", { name: "Criar Usuário", exact: true }).click();
+    await createUserDialog.waitFor({ state: "hidden" });
+    const createdUserTrigger = page.getByRole("button", {
+      name: /Usuário homologado homologado@example\.test/,
+    });
+    await createdUserTrigger.waitFor();
+    await createdUserTrigger.click();
+    const crossedUserStatus = await page.evaluate(async (path) => {
+      const response = await fetch(path);
+      return response.status;
+    }, `/api/platform/organizations/${secondOrganization.id}/users/user-safe-created`);
+    assert.equal(crossedUserStatus, 404, "tenant não pode consultar usuário de outra organização");
+    const lastOwnerStatus = await page.evaluate(async ({ path, csrfToken }) => {
+      const response = await fetch(path, {
+        method: "DELETE",
+        headers: { "x-csrf-token": csrfToken },
+      });
+      return response.status;
+    }, {
+      path: `/api/platform/organizations/${organization.id}/users/${currentOwner.id}`,
+      csrfToken: csrf,
+    });
+    assert.equal(lastOwnerStatus, 409, "último owner não pode ser desativado");
+    const userDetails = page.getByRole("complementary", { name: "Detalhes do usuário" });
+    await page.getByRole("button", { name: "Editar dados", exact: true }).click();
+    await userDetails.getByLabel("Nome", { exact: true }).fill("Versão desatualada");
+    forceUserVersionConflict = true;
+    await userDetails.getByRole("button", { name: "Salvar alterações", exact: true }).click();
+    await userDetails
+      .getByText(
+        "Este usuário foi alterado por outra pessoa. Recarregue o estado atual antes de salvar.",
+      )
+      .waitFor();
+    await userDetails.getByRole("button", { name: "Recarregar", exact: true }).click();
+    await page.getByRole("button", { name: "Editar dados", exact: true }).waitFor();
+    await page.getByRole("button", { name: "Editar dados", exact: true }).click();
+    await userDetails.getByLabel("Nome", { exact: true }).fill("Usuário homologado editado");
+    await userDetails.getByLabel("Nova senha", { exact: true }).fill("OutraSenha!2026");
+    await userDetails.getByRole("button", { name: "Salvar alterações", exact: true }).click();
+    const passwordDialog = page.getByRole("dialog", {
+      name: "Confirmar alteração de senha",
+      exact: true,
+    });
+    await passwordDialog.getByRole("button", { name: "Alterar senha", exact: true }).click();
+    await page.getByRole("heading", { name: "Usuário homologado editado", exact: true }).waitFor();
+    assert.ok(
+      requests.some(
+        (request) =>
+          request.method === "PATCH" &&
+          request.path === `/platform/organizations/${organization.id}/users/user-safe-created`,
+      ),
+    );
     const permissionsTrigger = page.getByRole("button", {
       name: "Editar permissões",
       exact: true,
@@ -474,7 +721,7 @@ try {
         (request) =>
           request.method === "PUT" &&
           request.path ===
-            `/platform/organizations/${organization.id}/users/${platformUser.id}/permissions`,
+            `/platform/organizations/${organization.id}/users/user-safe-created/permissions`,
       ),
     );
     if (screenshotDirectory) {
@@ -498,6 +745,10 @@ try {
     );
 
     await page.getByRole("button", { name: /Owner atual owner@example\.test/ }).click();
+    assert.equal(
+      await page.getByRole("button", { name: "Desativar usuário", exact: true }).count(),
+      0,
+    );
     const transferTrigger = page.getByRole("button", {
       name: "Transferir ownership",
       exact: true,
@@ -646,6 +897,37 @@ try {
         .query.get("organizationId"),
       null,
     );
+    assert.deepEqual(
+      auditEvents.map((event) => event.action).sort(),
+      [
+        "organization.ownership.transferred",
+        "user.created",
+        "user.deactivated",
+        "user.permissions.updated",
+        "user.reactivated",
+        "user.updated",
+      ],
+    );
+    const serializedAuditEvents = JSON.stringify(auditEvents);
+    assert.equal(
+      /Senha!2026|OutraSenha!2026|hash|cookie|token/i.test(serializedAuditEvents),
+      false,
+    );
+    assert.ok(auditEvents.every((event) => event.actorPlatformUserId === identity.id));
+    assert.ok(auditEvents.every((event) => event.referringId && event.changes));
+    assert.ok(
+      auditEvents.every((event) =>
+        Object.values(event.changes).every((change) =>
+          Object.hasOwn(change, "from") && Object.hasOwn(change, "to"),
+        ),
+      ),
+    );
+    auditUnavailable = true;
+    await page.getByLabel("Pesquisar rota").fill("/indisponivel");
+    await page.getByText("Não foi possível carregar a auditoria.", { exact: true }).waitFor();
+    auditUnavailable = false;
+    await page.getByRole("button", { name: "Tentar novamente", exact: true }).click();
+    await page.getByText("user.created", { exact: true }).waitFor();
     console.log("PASS seleção, usuários e auditoria contextual/global");
 
     await page.getByRole("button", { name: "Criar organização", exact: true }).click();
