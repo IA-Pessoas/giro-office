@@ -5,11 +5,15 @@ import {
   type RegularizeLicenseReportingSource,
 } from "./regularizeLicenseReportingCatalog.js";
 import {
+  getRegularizeMunicipalTaxesReportingFields,
+  type RegularizeMunicipalTaxesReportingSource,
+} from "./regularizeMunicipalTaxesReportingCatalog.js";
+import {
   getRegularizeProcessReportingFields,
   type RegularizeProcessReportingSource,
 } from "./regularizeProcessReportingCatalog.js";
 
-export type RegularizeReportingSource =
+type RegularizePrimaryReportingSource =
   | RegularizeLicenseReportingSource
   | RegularizeProcessReportingSource;
 
@@ -42,7 +46,7 @@ export class RegularizeLicenseReportingService {
 
   async extract(input: {
     organizationId: string;
-    source: RegularizeReportingSource;
+    source: RegularizePrimaryReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
@@ -61,6 +65,33 @@ export class RegularizeLicenseReportingService {
     }
 
     const rows = await delegate.findMany({
+      where: { organization_id: input.organizationId },
+      select: Object.fromEntries(input.fields.map((field) => [field, true])),
+      take: input.limit + 1,
+    });
+
+    return {
+      rows: projectRows(rows.slice(0, input.limit), input.fields),
+      reachedLimit: rows.length > input.limit,
+    };
+  }
+}
+
+export class RegularizeMunicipalTaxesReportingService {
+  constructor(private readonly prisma: { municipalTaxes: ReportingDelegate }) {}
+
+  async extract(input: {
+    organizationId: string;
+    source: RegularizeMunicipalTaxesReportingSource;
+    fields: readonly string[];
+    limit: number;
+  }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+    const allowedFields = getRegularizeMunicipalTaxesReportingFields(input.source);
+    if (input.fields.some((field) => !allowedFields.includes(field))) {
+      throw new ServiceError(403, "Campo não publicado para relatórios.");
+    }
+
+    const rows = await this.prisma.municipalTaxes.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
       take: input.limit + 1,

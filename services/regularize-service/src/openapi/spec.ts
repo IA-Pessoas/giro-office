@@ -684,7 +684,7 @@ export function buildRegularizeServiceOpenApiSpec(
       "/internal/reporting/extract": {
         post: {
           tags: ["Internal"],
-          summary: "Extrair licenças e processos para o reports-service",
+          summary: "Extrair licenças, processos e tributos municipais para o reports-service",
           security: [{ internalToken: [] }],
           parameters: [
             {
@@ -712,7 +712,11 @@ export function buildRegularizeServiceOpenApiSpec(
                   properties: {
                     source: {
                       type: "string",
-                      enum: ["regularize.licenses", "regularize.processes"],
+                      enum: [
+                        "regularize.licenses",
+                        "regularize.processes",
+                        "regularize.municipal_taxes",
+                      ],
                     },
                     fields: {
                       type: "array",
