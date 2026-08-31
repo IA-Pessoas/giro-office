@@ -139,7 +139,7 @@ const competenceSchema = { type: "string", pattern: "^\\d{4}-\\d{2}$" } as const
 const reportingFieldSchema = { type: "string", minLength: 1, maxLength: 64 } as const;
 const internalReportingExtractRequestSchema = strictObjectSchema(
   {
-    source: { type: "string", enum: ["pessoal.ldd"] },
+    source: { type: "string", enum: ["pessoal.ldd", "pessoal.payroll"] },
     fields: {
       type: "array",
       minItems: 1,
@@ -844,7 +844,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           ],
           responses: {
             "200": {
-              description: "Catálogo seguro de LDD de pessoal",
+              description: "Catálogo seguro de fontes de pessoal",
               ...successJsonWithData({
                 type: "object",
                 required: ["sources", "relations"],
@@ -862,7 +862,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
         post: {
           tags: ["Pessoal Internal"],
           security: internalSecurity,
-          summary: "Extrair LDD de pessoal para o reports-service",
+          summary: "Extrair fonte de pessoal para o reports-service",
           operationId: "extractPessoalReportingData",
           parameters: [
             internalReportingHeader("x-request-id"),
@@ -872,7 +872,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           requestBody: jsonRequestBody(internalReportingExtractRequestSchema),
           responses: {
             "200": {
-              description: "Linhas projetadas e indicação de limite atingido",
+              description: "Linhas projetadas e indicação de limite atingido, sem campos sensíveis",
               ...successJsonWithData({
                 type: "object",
                 required: ["rows", "reachedLimit"],

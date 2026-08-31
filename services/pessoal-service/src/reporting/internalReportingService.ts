@@ -1,10 +1,11 @@
-import { ServiceError } from "@workspace/shared";
+import { PESSOAL_LDD_REPORTING_SOURCES, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import {
-  getPessoalLddReportingFields,
-  type PessoalLddReportingSource,
-} from "./pessoalLddReportingCatalog.js";
+  getPessoalReportingFields,
+  PESSOAL_REPORTING_SOURCES,
+  type PessoalReportingSource,
+} from "./pessoalReportingCatalog.js";
 
 type ReportingDelegate = {
   findMany(input: {
@@ -15,20 +16,28 @@ type ReportingDelegate = {
 };
 
 export class InternalReportingService {
-  constructor(private readonly prisma: Pick<PrismaClient, "lddPessoal">) {}
+  constructor(private readonly prisma: Pick<PrismaClient, "lddPessoal" | "payroll">) {}
 
   async extract(input: {
     organizationId: string;
-    source: PessoalLddReportingSource;
+    source: PessoalReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
-    const allowedFields = getPessoalLddReportingFields(input.source);
+    if (!PESSOAL_REPORTING_SOURCES.includes(input.source)) {
+      throw new ServiceError(403, "Fonte não publicada para relatórios.");
+    }
+
+    const allowedFields = getPessoalReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
 
-    const rows = await (this.prisma.lddPessoal as unknown as ReportingDelegate).findMany({
+    const delegate =
+      input.source === PESSOAL_LDD_REPORTING_SOURCES[0]
+        ? this.prisma.lddPessoal
+        : this.prisma.payroll;
+    const rows = await (delegate as unknown as ReportingDelegate).findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
       take: input.limit + 1,

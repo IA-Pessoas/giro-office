@@ -15,6 +15,7 @@ import { FiscalIpiAdapter } from "./integrations/fiscalIpiAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
+import { PessoalPayrollAdapter } from "./integrations/pessoalPayrollAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
@@ -48,6 +49,7 @@ const app = createReportsApp({
       new FiscalNcmAdapter(env),
       new FiscalIpiAdapter(env),
       new PessoalLddAdapter(env),
+      new PessoalPayrollAdapter(env),
       new RegularizeLicenseAdapter(env),
       new RhRequestAdapter(env),
     ],

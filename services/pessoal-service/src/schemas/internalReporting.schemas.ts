@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-import { PESSOAL_LDD_REPORTING_SOURCES } from "../reporting/pessoalLddReportingCatalog.js";
+import { PESSOAL_REPORTING_SOURCES } from "../reporting/pessoalReportingCatalog.js";
 
 const reportingFieldSchema = z.string().trim().min(1).max(64);
 
 export const internalReportingExtractBodySchema = z
   .object({
-    source: z.enum(PESSOAL_LDD_REPORTING_SOURCES),
+    source: z.enum(PESSOAL_REPORTING_SOURCES),
     fields: z.array(reportingFieldSchema).min(1).max(25),
     limit: z.number().int().min(1).max(101),
   })

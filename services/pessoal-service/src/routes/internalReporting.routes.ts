@@ -11,7 +11,7 @@ import { Router } from "express";
 
 import type { PessoalServiceEnv } from "../config/env.js";
 import type { InternalReportingService } from "../reporting/internalReportingService.js";
-import { pessoalLddReportingCatalog } from "../reporting/pessoalLddReportingCatalog.js";
+import { pessoalReportingCatalog } from "../reporting/pessoalReportingCatalog.js";
 import {
   type InternalReportingGrant,
   internalReportingExtractBodySchema,
@@ -119,7 +119,7 @@ export function createInternalReportingRouter(options: {
       fields: [],
       body: {},
     });
-    response.json(createSuccessResponse(pessoalLddReportingCatalog));
+    response.json(createSuccessResponse(pessoalReportingCatalog));
   });
 
   router.post("/reporting/extract", async (request, response) => {
