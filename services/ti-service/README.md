@@ -17,6 +17,7 @@ As variaveis sao lidas em `src/config/env.ts`.
 - `AUDIT_SERVICE_URL`
 - `AUDIT_SERVICE_TOKEN`
 - `TI_SERVICE_INTERNAL_TOKEN`
+- `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` (contrato interno de relatórios)
 - `MTK_ENCRYPTION_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
@@ -50,6 +51,13 @@ servico/VPS, junto com `SUPABASE_URL`.
 - Exemplo: `GET /ti/requests/list`
 - Exemplo: `GET /ti/inventory/list`
 - Exemplo: `POST /ti/inventory`
+
+## Relatórios internos
+
+O `reports-service` acessa diretamente `GET /internal/reporting/catalog` e
+`POST /internal/reporting/extract`, fora do gateway. As duas operações exigem
+`REPORTS_INTERNAL_TOKEN`, grant HMAC de curta duração e `x-request-id`; o contrato publica apenas
+o inventário governado `ti.inventory`.
 
 ## Senhas de TI
 

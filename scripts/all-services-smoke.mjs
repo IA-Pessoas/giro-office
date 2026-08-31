@@ -132,6 +132,9 @@ const env = {
   taskReportingSmokeEnabled:
     process.env.TASK_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.TASK_REPORTING_SMOKE_ENABLED === "1",
+  tiReportingSmokeEnabled:
+    process.env.TI_REPORTING_SMOKE_ENABLED === "true" ||
+    process.env.TI_REPORTING_SMOKE_ENABLED === "1",
   regularizeReportingSmokeEnabled:
     process.env.REGULARIZE_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.REGULARIZE_REPORTING_SMOKE_ENABLED === "1",
@@ -1088,6 +1091,32 @@ function createRhReportingGrant({ operation, source, fields, body }) {
   const requestId = crypto.randomUUID();
   const payload = {
     audience: "rh-service",
+    body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
+    expires_at: issuedAt + 60,
+    fields,
+    issued_at: issuedAt,
+    operation,
+    organization_id: requireState("session").organization_id,
+    request_id: requestId,
+    source,
+    version: 1,
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  return {
+    "x-request-id": requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": crypto.createHmac("sha256", secret).update(grant).digest("hex"),
+  };
+}
+
+function createTiInventoryReportingGrant({ operation, source, fields, body }) {
+  const secret = process.env.REPORTS_GRANT_SECRET?.trim();
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for TI inventory reporting smoke.");
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = crypto.randomUUID();
+  const payload = {
+    audience: "ti-service",
     body_sha256: crypto.createHash("sha256").update(canonicalJson(body)).digest("hex"),
     expires_at: issuedAt + 60,
     fields,
@@ -3032,6 +3061,36 @@ const handlers = {
       headers: isBadExpectation(op)
         ? {}
         : createRegularizeReportingGrant({
+            operation: "extract",
+            source: body.source,
+            fields: body.fields,
+            body,
+          }),
+    });
+  },
+
+  async tiInventoryReportingCatalog(op) {
+    await httpRequest(op, {
+      path: "/internal/reporting/catalog",
+      headers: isBadExpectation(op)
+        ? {}
+        : createTiInventoryReportingGrant({
+            operation: "catalog",
+            source: "ti.catalog",
+            fields: [],
+            body: {},
+          }),
+    });
+  },
+
+  async tiInventoryReportingExtract(op) {
+    const body = { source: "ti.inventory", fields: ["asset_code"], limit: 1 };
+    await httpRequest(op, {
+      path: "/internal/reporting/extract",
+      json: body,
+      headers: isBadExpectation(op)
+        ? {}
+        : createTiInventoryReportingGrant({
             operation: "extract",
             source: body.source,
             fields: body.fields,
@@ -5778,6 +5837,10 @@ function disabledConditionReason(condition) {
 
   if (condition === "taskReportingSmokeEnabled" && !env.taskReportingSmokeEnabled) {
     return "TASK_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "tiReportingSmokeEnabled" && !env.tiReportingSmokeEnabled) {
+    return "TI_REPORTING_SMOKE_ENABLED is false";
   }
 
   if (condition === "regularizeReportingSmokeEnabled" && !env.regularizeReportingSmokeEnabled) {

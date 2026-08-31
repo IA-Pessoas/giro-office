@@ -73,6 +73,7 @@ const reportsServiceEnvSchema = z
       .string()
       .url("REGULARIZE_SERVICE_URL invalida.")
       .default("http://localhost:3039"),
+    tiServiceUrl: z.string().url("TI_SERVICE_URL invalida.").default("http://localhost:3040"),
     regularizeReportingToken: z.string().default(""),
     regularizeReportingGrantSecret: z.string().default(""),
     rhServiceUrl: z.string().url("RH_SERVICE_URL invalida.").default("http://localhost:3034"),
@@ -182,6 +183,7 @@ export function parseReportsServiceEnv(
     fiscalServiceUrl: source.FISCAL_SERVICE_URL,
     pessoalServiceUrl: source.PESSOAL_SERVICE_URL,
     regularizeServiceUrl: source.REGULARIZE_SERVICE_URL,
+    tiServiceUrl: source.TI_SERVICE_URL,
     regularizeReportingToken: source.REGULARIZE_REPORTING_TOKEN,
     regularizeReportingGrantSecret: source.REGULARIZE_REPORTING_GRANT_SECRET,
     rhServiceUrl: source.RH_SERVICE_URL,

@@ -19,6 +19,8 @@ import {
   requestContext,
 } from "./middlewares/requestContext.js";
 import { buildTiServiceOpenApiSpec } from "./openapi/spec.js";
+import { TiInventoryReportingService } from "./reporting/tiInventoryReportingService.js";
+import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createTiDashboardRoutes } from "./routes/tiDashboard.routes.js";
 import { createTiExtensionRoutes } from "./routes/tiExtension.routes.js";
 import { createTiInventoryRoutes } from "./routes/tiInventory.routes.js";
@@ -99,6 +101,14 @@ export function createTiApplication({
   });
 
   app.use("/ti", createForwardedAuthContextMiddleware(env.internalServiceToken));
+
+  app.use(
+    "/internal",
+    createInternalReportingRouter({
+      env,
+      reportingService: new TiInventoryReportingService(prisma),
+    }),
+  );
 
   app.use("/ti/inventory", createTiInventoryRoutes(prisma));
   app.use("/ti/inventory-categories", createTiInventoryCategoryRoutes(prisma));
