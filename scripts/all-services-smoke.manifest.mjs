@@ -2417,6 +2417,14 @@ const baseManifest = [
     expectedLabel: "invalid reporting grant",
   }),
   op({
+    service: "ti-service",
+    method: "GET",
+    path: "/ti/stock",
+    action: "tiStockReportList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
     service: "rh-service",
     method: "GET",
     path: "/rh/categories",

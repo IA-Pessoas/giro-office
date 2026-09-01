@@ -11,10 +11,9 @@ import { Router } from "express";
 
 import type { RhEnv } from "../config/env.js";
 import type { InternalReportingService } from "../reporting/internalReportingService.js";
-import {
-  getRhRequestReportingFields,
-  rhRequestReportingCatalog,
-} from "../reporting/rhRequestReportingCatalog.js";
+import { getRhHolidayReportingFields } from "../reporting/rhHolidayReportingCatalog.js";
+import { rhReportingCatalog } from "../reporting/rhReportingCatalog.js";
+import { getRhRequestReportingFields } from "../reporting/rhRequestReportingCatalog.js";
 import {
   type InternalReportingGrant,
   internalReportingExtractBodySchema,
@@ -123,12 +122,16 @@ export function createInternalReportingRouter(options: {
       fields: [],
       body: {},
     });
-    response.json(createSuccessResponse(rhRequestReportingCatalog));
+    response.json(createSuccessResponse(rhReportingCatalog));
   });
 
   router.post("/reporting/extract", async (request, response) => {
     const body = parseWithZod(internalReportingExtractBodySchema, request.body);
-    if (body.fields.some((field) => !getRhRequestReportingFields(body.source).includes(field))) {
+    const allowedFields =
+      body.source === "rh.holidays"
+        ? getRhHolidayReportingFields(body.source)
+        : getRhRequestReportingFields(body.source);
+    if (body.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
     const grant = verifyGrant({

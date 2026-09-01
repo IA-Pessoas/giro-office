@@ -43,8 +43,11 @@ Exemplos de paths publicos planejados:
 - `GET /internal/reporting/catalog`
 - `POST /internal/reporting/extract`
 
-O reporting interno publica `pessoal.ldd`, `pessoal.payroll` e `pessoal.situations` com grants de curta
-duração; as chaves internas de situações e configuração de folha ficam somente em `keys` no catálogo.
+O catálogo interno publica `pessoal.ldd`, `pessoal.payroll`, `pessoal.situations`,
+`pessoal.obligations` e `pessoal.unions`. Os identificadores de cliente, responsável e sindicato
+ficam exclusivamente em `keys`; as chaves internas de situações e configuração de folha também
+ficam fora dos campos públicos. A extração só aceita campos publicados e usa a organização contida
+no grant HMAC de curta duração.
 
 O servico nao agenda cron no processo Node. A rotina de notificacoes de sindicatos deve ser
 acionada por um scheduler externo, como Supabase/Vercel, usando `x-internal-service-token`.

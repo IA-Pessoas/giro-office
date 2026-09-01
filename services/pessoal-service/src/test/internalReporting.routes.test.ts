@@ -39,9 +39,9 @@ function signedGrant(
     fields: input.fields ?? [],
     issued_at: Math.floor(Date.now() / 1000),
     operation: input.source ? "extract" : "catalog",
-    organization_id: organizationId,
-    request_id: requestId,
-    source: input.source ?? "pessoal.catalog",
+    organization_id: overrides.organization_id ?? organizationId,
+    request_id: overrides.request_id ?? requestId,
+    source: overrides.source ?? input.source ?? "pessoal.catalog",
     version: 1,
     ...overrides,
   };
@@ -73,7 +73,7 @@ function createApp(extract = vi.fn().mockResolvedValue({ rows: [], reachedLimit:
 }
 
 describe("pessoal internal reporting routes", () => {
-  it("protege o catálogo e publica somente campos seguros e a chave em keys", async () => {
+  it("protege o catálogo e publica somente campos seguros e chaves", async () => {
     const signed = signedGrant({});
     const { app } = createApp();
 
@@ -86,7 +86,7 @@ describe("pessoal internal reporting routes", () => {
       .set("x-reports-grant-signature", signed.signature)
       .expect(200);
 
-    expect(response.body.data.sources).toHaveLength(3);
+    expect(response.body.data.sources).toHaveLength(5);
     expect(response.body.data.sources[0]).toMatchObject({
       key: "pessoal.ldd",
       module: "pessoal",
@@ -142,10 +142,39 @@ describe("pessoal internal reporting routes", () => {
     expect(situationsSource.fields.map((field: { key: string }) => field.key)).not.toContain(
       "description",
     );
+
+    const obligationsSource = response.body.data.sources.find(
+      (source: { key: string }) => source.key === "pessoal.obligations",
+    );
+    expect(obligationsSource).toMatchObject({
+      module: "pessoal",
+      keys: [{ key: "client_id" }, { key: "responsavel_id" }],
+    });
+    expect(obligationsSource.fields.map((field: { key: string }) => field.key)).toEqual([
+      "competence",
+      "advance",
+      "payroll",
+      "charges",
+      "assistance_fee",
+      "bem_mais",
+      "bsf",
+      "va",
+      "vt",
+    ]);
+
+    const unionsSource = response.body.data.sources.find(
+      (source: { key: string }) => source.key === "pessoal.unions",
+    );
+    expect(unionsSource).toMatchObject({ module: "pessoal", keys: [] });
+    expect(unionsSource.fields.map((field: { key: string }) => field.key)).toEqual([
+      "name",
+      "base_date",
+    ]);
+    expect(JSON.stringify(unionsSource)).not.toMatch(/id|cnpj/i);
   });
 
-  it("valida token e grant e encaminha a organização assinada", async () => {
-    const body = { source: "pessoal.ldd", fields: ["type"], limit: 1 };
+  it("valida token e grant e encaminha a organização assinada para obrigações", async () => {
+    const body = { source: "pessoal.obligations", fields: ["competence"], limit: 1 };
     const signed = signedGrant(body);
     const { app, extract } = createApp();
 
@@ -161,8 +190,8 @@ describe("pessoal internal reporting routes", () => {
 
     expect(extract).toHaveBeenCalledWith({
       organizationId,
-      source: "pessoal.ldd",
-      fields: ["type"],
+      source: "pessoal.obligations",
+      fields: ["competence"],
       limit: 1,
     });
   });
@@ -201,7 +230,7 @@ describe("pessoal internal reporting routes", () => {
     expect(extract).not.toHaveBeenCalled();
   });
 
-  it("valida grant de payroll, encaminha a organização e preserva reachedLimit sem conteúdo sensível", async () => {
+  it("valida grant de payroll e preserva reachedLimit sem conteúdo sensível", async () => {
     const body = { source: "pessoal.payroll", fields: ["advance", "employees"], limit: 1 };
     const signed = signedGrant(body);
     const extract = vi.fn().mockResolvedValue({
@@ -219,12 +248,7 @@ describe("pessoal internal reporting routes", () => {
       .send(body)
       .expect(200);
 
-    expect(extract).toHaveBeenCalledWith({
-      organizationId,
-      source: "pessoal.payroll",
-      fields: ["advance", "employees"],
-      limit: 1,
-    });
+    expect(extract).toHaveBeenCalledWith({ organizationId, ...body });
     expect(response.body.data).toEqual({
       rows: [{ advance: true, employees: 12 }],
       reachedLimit: true,
@@ -270,5 +294,54 @@ describe("pessoal internal reporting routes", () => {
     expect(response.body.data.reachedLimit).toBe(true);
     expect(JSON.stringify(response.body)).not.toContain("registered_by_id");
     expect(JSON.stringify(response.body)).not.toContain("completed_by_id");
+  });
+
+  it("encaminha somente a organização assinada ao extrator de sindicatos", async () => {
+    const body = { source: "pessoal.unions", fields: ["name", "base_date"], limit: 1 };
+    const signed = signedGrant(body);
+    const { app, extract } = createApp(
+      vi.fn().mockResolvedValue({
+        rows: [{ name: "Sindicato A", base_date: "2026-05-01" }],
+        reachedLimit: true,
+      }),
+    );
+
+    const response = await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+      .set("x-request-id", requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(extract).toHaveBeenCalledWith({ organizationId, ...body });
+    expect(response.body.data).toEqual({
+      rows: [{ name: "Sindicato A", base_date: "2026-05-01" }],
+      reachedLimit: true,
+    });
+  });
+
+  it("recusa grant de obrigações associado a outra fonte, corpo ou requisição", async () => {
+    const body = { source: "pessoal.obligations", fields: ["competence"], limit: 1 };
+    const { app, extract } = createApp();
+    const invalidGrants = [
+      signedGrant(body, undefined, { source: "pessoal.ldd" }),
+      signedGrant(body, undefined, { request_id: "other-request" }),
+      signedGrant({ ...body, fields: ["payroll"] }),
+    ];
+
+    for (const signed of invalidGrants) {
+      await request(app)
+        .post("/internal/reporting/extract")
+        .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+        .set("x-request-id", requestId)
+        .set("x-reports-grant", signed.grant)
+        .set("x-reports-grant-signature", signed.signature)
+        .send(body)
+        .expect(403);
+    }
+
+    expect(extract).not.toHaveBeenCalled();
   });
 });

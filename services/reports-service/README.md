@@ -13,6 +13,7 @@ Consulte [`src/config/env.ts`](src/config/env.ts).
 - Banco e autenticação: `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `JWT_SECRET`.
 - Tokens e segredo interno: `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`.
 - RH: `RH_SERVICE_URL` (default `http://localhost:3034`).
+- Tecnologia: `TI_SERVICE_URL` (default `http://localhost:3040`).
 - Regularize: `REGULARIZE_SERVICE_URL`, `REGULARIZE_REPORTING_TOKEN`, `REGULARIZE_REPORTING_GRANT_SECRET`.
 - Certificados PF: `CERTIFICATE_REPORTING_TOKEN`, `CERTIFICATE_REPORTING_GRANT_SECRET`.
 - URLs upstream: `USER_SERVICE_URL`, `PARCELAMENTO_SERVICE_URL`, `CLIENT_SERVICE_URL`,
@@ -49,12 +50,16 @@ pnpm --filter @workspace/reports-service worker
 pnpm --filter @workspace/reports-service test
 ```
 
-O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas, Controle Contábil,
+O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas, Inventário de TI,
+Estoque de TI, Controle Contábil,
 relacionamentos e responsáveis contábeis, Certificados PF e PJ, ICMS, IPI, NCM fiscal, LDD,
-situações e folha de Departamento Pessoal, Solicitações de RH, Licenças e Processos do Regularize. O adapter de RH consulta exclusivamente
+situações e folha de Departamento Pessoal, Solicitações e Feriados de RH, Licenças e Processos do
+Regularize. Os adapters de RH consultam exclusivamente
 `/internal/reporting/extract` do rh-service, com grant HMAC curto e projeção dos campos seguros de
-`rh.requests`.
+`rh.requests` e `rh.holidays`.
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
+Os adapters de Inventário e Estoque de TI usam o contrato combinado do ti-service e publicam somente
+campos selecionáveis, sem as chaves internas do catálogo.
 
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.
@@ -74,12 +79,9 @@ O smoke de Tarefas fica desativado por padrão; exija `TASK_REPORTING_SMOKE_ENAB
 O smoke fiscal fica desativado por padrão; exija `FISCAL_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.
 
-O adapter de LDD de Departamento Pessoal usa `PESSOAL_SERVICE_URL`, `REPORTS_INTERNAL_TOKEN` e
-`REPORTS_GRANT_SECRET` para consultar exclusivamente o contrato interno governado do
-pessoal-service.
-
-O adapter de folha de Departamento Pessoal usa as mesmas credenciais e publica apenas os campos
-selecionáveis de `pessoal.payroll`; `client_id`, responsável e sindicato permanecem como chaves
+Os adapters de LDD, folha e obrigações de Departamento Pessoal usam `PESSOAL_SERVICE_URL`,
+`REPORTS_INTERNAL_TOKEN` e `REPORTS_GRANT_SECRET` para consultar exclusivamente o contrato interno
+governado do pessoal-service. Em folha, `client_id`, responsável e sindicato permanecem como chaves
 internas do catálogo.
 
 O adapter de situações de Departamento Pessoal usa as mesmas credenciais e publica somente status,

@@ -17,6 +17,7 @@ As variaveis sao lidas em `src/config/env.ts`.
 - `AUDIT_SERVICE_URL`
 - `AUDIT_SERVICE_TOKEN`
 - `TI_SERVICE_INTERNAL_TOKEN`
+- `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` (contrato interno de relatórios)
 - `MTK_ENCRYPTION_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
@@ -50,6 +51,21 @@ servico/VPS, junto com `SUPABASE_URL`.
 - Exemplo: `GET /ti/requests/list`
 - Exemplo: `GET /ti/inventory/list`
 - Exemplo: `POST /ti/inventory`
+- Exemplo: `GET /ti/stock`
+
+As rotas diretas `/internal/reporting/catalog` e `/internal/reporting/extract` são consumidas
+exclusivamente pelo reports-service e não passam pelo gateway. O catálogo combinado publica
+`ti.inventory` e `ti.stock` sem expor chaves internas; as extrações exigem token interno, grant HMAC
+de curta duração, `x-request-id` e permanecem limitadas à organização do grant.
+
+## Relatórios internos
+
+O `reports-service` acessa diretamente `GET /internal/reporting/catalog` e
+`POST /internal/reporting/extract`, fora do gateway. As duas operações exigem
+`REPORTS_INTERNAL_TOKEN`, grant HMAC de curta duração e `x-request-id`; o contrato publica apenas
+as fontes governadas `ti.inventory` e `ti.requests`. Para chamados, expõe somente título,
+categoria, urgência, status e datas de criação/atualização; solicitante e responsável ficam
+restritos às chaves internas do catálogo.
 
 ## Senhas de TI
 

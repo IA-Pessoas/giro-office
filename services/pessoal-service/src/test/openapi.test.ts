@@ -63,12 +63,28 @@ describe("pessoal-service OpenAPI", () => {
     expect(paths["/internal/reporting/extract"]?.post?.security).toEqual([
       { internalServiceToken: [] },
     ]);
-    expect(
-      (
-        paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
-          ?.schema as { properties?: { source?: { enum?: string[] } } }
-      ).properties?.source?.enum,
-    ).toEqual(["pessoal.ldd", "pessoal.payroll", "pessoal.situations"]);
+    const extractSchema = (
+      spec.paths as Record<
+        string,
+        {
+          post?: {
+            requestBody?: {
+              content?: Record<
+                string,
+                { schema?: { properties?: { source?: { enum?: unknown } } } }
+              >;
+            };
+          };
+        }
+      >
+    )["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]?.schema;
+    expect(extractSchema?.properties?.source?.enum).toEqual([
+      "pessoal.ldd",
+      "pessoal.payroll",
+      "pessoal.situations",
+      "pessoal.obligations",
+      "pessoal.unions",
+    ]);
   });
 
   it("documenta request bodies estritos para mutacoes do dominio", () => {
