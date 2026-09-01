@@ -18,6 +18,7 @@ export * from "./projectReportingCatalog.js";
 export * from "./regularizeLicenseReportingCatalog.js";
 export * from "./regularizeMunicipalTaxesReportingCatalog.js";
 export * from "./regularizeProcessReportingCatalog.js";
+export * from "./rhAttendanceReportingCatalog.js";
 export * from "./rhHolidayReportingCatalog.js";
 export * from "./rhRequestReportingCatalog.js";
 export * from "./taskReportingCatalog.js";

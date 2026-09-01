@@ -33,7 +33,7 @@ const internalReportingExtractRequestBody = createObjectRequestBody({
   example: { source: "rh.holidays", fields: ["name", "date"], limit: 100 },
   required: ["source", "fields", "limit"],
   properties: {
-    source: { type: "string", enum: ["rh.requests", "rh.holidays"] },
+    source: { type: "string", enum: ["rh.requests", "rh.attendance", "rh.holidays"] },
     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
     limit: { type: "integer", minimum: 1, maximum: 101 },
   },

@@ -15,6 +15,7 @@ import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
 import { RegularizeMunicipalTaxesAdapter } from "./integrations/regularizeMunicipalTaxesAdapter.js";
 import { RegularizeProcessAdapter } from "./integrations/regularizeProcessAdapter.js";
+import { RhAttendanceAdapter } from "./integrations/rhAttendanceAdapter.js";
 import { RhHolidayAdapter } from "./integrations/rhHolidayAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
@@ -40,6 +41,7 @@ export function createWorkerSourceCatalog(env: ReportsServiceEnv): SourceCatalog
     new RegularizeLicenseAdapter(env),
     new RegularizeProcessAdapter(env),
     new RhRequestAdapter(env),
+    new RhAttendanceAdapter(env),
     new RhHolidayAdapter(env),
     new TiInventoryAdapter(env),
     new TiRequestsAdapter(env),

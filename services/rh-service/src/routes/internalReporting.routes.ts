@@ -11,9 +11,7 @@ import { Router } from "express";
 
 import type { RhEnv } from "../config/env.js";
 import type { InternalReportingService } from "../reporting/internalReportingService.js";
-import { getRhHolidayReportingFields } from "../reporting/rhHolidayReportingCatalog.js";
-import { rhReportingCatalog } from "../reporting/rhReportingCatalog.js";
-import { getRhRequestReportingFields } from "../reporting/rhRequestReportingCatalog.js";
+import { getRhReportingFields, rhReportingCatalog } from "../reporting/rhReportingCatalog.js";
 import {
   type InternalReportingGrant,
   internalReportingExtractBodySchema,
@@ -61,7 +59,7 @@ function decodeGrant(value: string | undefined): InternalReportingGrant {
   }
 }
 
-function verifyGrant(input: {
+async function verifyGrant(input: {
   env: Pick<RhEnv, "reportsInternalToken" | "reportsGrantSecret">;
   token: string | undefined;
   grant: string | undefined;
@@ -71,7 +69,8 @@ function verifyGrant(input: {
   source: string;
   fields: readonly string[];
   body: unknown;
-}): InternalReportingGrant {
+  consumeGrant: (grant: string, expiresAt: number) => Promise<void>;
+}): Promise<InternalReportingGrant> {
   if (!equalSecret(input.token, input.env.reportsInternalToken)) {
     throw new ServiceError(403, "Acesso negado.");
   }
@@ -101,57 +100,64 @@ function verifyGrant(input: {
     throw new ServiceError(403, "Grant de relatórios inválido.");
   }
 
+  await input.consumeGrant(grant, payload.expires_at);
   return payload;
 }
 
 export function createInternalReportingRouter(options: {
   env: Pick<RhEnv, "reportsInternalToken" | "reportsGrantSecret">;
-  reportingService: Pick<InternalReportingService, "extract">;
+  reportingService: Pick<InternalReportingService, "consumeGrant" | "extract">;
 }): ReturnType<typeof Router> {
   const router = Router();
 
-  router.get("/reporting/catalog", (request, response) => {
-    verifyGrant({
-      env: options.env,
-      token: request.get(INTERNAL_SERVICE_TOKEN_HEADER),
-      grant: request.get(REPORTS_GRANT_HEADER),
-      signature: request.get(REPORTS_GRANT_SIGNATURE_HEADER),
-      requestId: request.get(REQUEST_ID_HEADER) ?? "",
-      operation: "catalog",
-      source: "rh.catalog",
-      fields: [],
-      body: {},
-    });
-    response.json(createSuccessResponse(rhReportingCatalog));
+  router.get("/reporting/catalog", async (request, response, next) => {
+    try {
+      await verifyGrant({
+        env: options.env,
+        token: request.get(INTERNAL_SERVICE_TOKEN_HEADER),
+        grant: request.get(REPORTS_GRANT_HEADER),
+        signature: request.get(REPORTS_GRANT_SIGNATURE_HEADER),
+        requestId: request.get(REQUEST_ID_HEADER) ?? "",
+        operation: "catalog",
+        source: "rh.catalog",
+        fields: [],
+        body: {},
+        consumeGrant: (grant, expiresAt) => options.reportingService.consumeGrant(grant, expiresAt),
+      });
+      response.json(createSuccessResponse(rhReportingCatalog));
+    } catch (error: unknown) {
+      next(error);
+    }
   });
 
-  router.post("/reporting/extract", async (request, response) => {
-    const body = parseWithZod(internalReportingExtractBodySchema, request.body);
-    const allowedFields =
-      body.source === "rh.holidays"
-        ? getRhHolidayReportingFields(body.source)
-        : getRhRequestReportingFields(body.source);
-    if (body.fields.some((field) => !allowedFields.includes(field))) {
-      throw new ServiceError(403, "Campo não publicado para relatórios.");
+  router.post("/reporting/extract", async (request, response, next) => {
+    try {
+      const body = parseWithZod(internalReportingExtractBodySchema, request.body);
+      if (body.fields.some((field) => !getRhReportingFields(body.source).includes(field))) {
+        throw new ServiceError(403, "Campo não publicado para relatórios.");
+      }
+      const grant = await verifyGrant({
+        env: options.env,
+        token: request.get(INTERNAL_SERVICE_TOKEN_HEADER),
+        grant: request.get(REPORTS_GRANT_HEADER),
+        signature: request.get(REPORTS_GRANT_SIGNATURE_HEADER),
+        requestId: request.get(REQUEST_ID_HEADER) ?? "",
+        operation: "extract",
+        source: body.source,
+        fields: body.fields,
+        body,
+        consumeGrant: (grant, expiresAt) => options.reportingService.consumeGrant(grant, expiresAt),
+      });
+      const result = await options.reportingService.extract({
+        organizationId: grant.organization_id,
+        source: body.source,
+        fields: body.fields,
+        limit: body.limit,
+      });
+      response.json(createSuccessResponse(result));
+    } catch (error: unknown) {
+      next(error);
     }
-    const grant = verifyGrant({
-      env: options.env,
-      token: request.get(INTERNAL_SERVICE_TOKEN_HEADER),
-      grant: request.get(REPORTS_GRANT_HEADER),
-      signature: request.get(REPORTS_GRANT_SIGNATURE_HEADER),
-      requestId: request.get(REQUEST_ID_HEADER) ?? "",
-      operation: "extract",
-      source: body.source,
-      fields: body.fields,
-      body,
-    });
-    const result = await options.reportingService.extract({
-      organizationId: grant.organization_id,
-      source: body.source,
-      fields: body.fields,
-      limit: body.limit,
-    });
-    response.json(createSuccessResponse(result));
   });
 
   return router;

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildRhServiceOpenApiSpec } from "../openapi/spec.js";
 
 describe("rh internal reporting OpenAPI", () => {
-  it("documenta catálogo, extração, headers e somente fontes seguras", () => {
+  it("documenta catálogo, extração, headers e apenas fontes seguras", () => {
     const spec = buildRhServiceOpenApiSpec({
       port: 3034,
       reportsInternalToken: "token",
@@ -36,7 +36,10 @@ describe("rh internal reporting OpenAPI", () => {
     expect(
       spec.paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
         ?.schema?.properties?.source,
-    ).toEqual({ type: "string", enum: ["rh.requests", "rh.holidays"] });
+    ).toEqual({
+      type: "string",
+      enum: ["rh.requests", "rh.attendance", "rh.holidays"],
+    });
     expect(
       spec.paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
         ?.schema?.properties,
