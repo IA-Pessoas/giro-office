@@ -1,13 +1,14 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 
 import { INTERNAL_SERVICE_TOKEN_HEADER } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { createTestApp } from "./tiServiceTestUtils.js";
+import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 
 const grantSecret = "test-reports-grant-secret";
-const requestId = "request-853";
+const internalToken = "test-reports-internal-token";
+const organizationId = "10000000-0000-4000-8000-000000000001";
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -29,6 +30,7 @@ function createGrant(input: {
   organizationId?: string;
 }) {
   const issuedAt = Math.floor(Date.now() / 1000);
+  const requestId = `request-${randomUUID()}`;
   const payload = {
     audience: "ti-service",
     body_sha256: createHash("sha256").update(canonicalJson(input.body)).digest("hex"),
@@ -44,12 +46,22 @@ function createGrant(input: {
   const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
   return {
     grant,
+    requestId,
     signature: createHmac("sha256", grantSecret).update(grant).digest("hex"),
   };
 }
 
+function reportingHeaders(signed: ReturnType<typeof createGrant>) {
+  return {
+    [INTERNAL_SERVICE_TOKEN_HEADER]: internalToken,
+    "x-request-id": signed.requestId,
+    "x-reports-grant": signed.grant,
+    "x-reports-grant-signature": signed.signature,
+  };
+}
+
 describe("ti internal reporting routes", () => {
-  it("exige token interno e grant válido para o catálogo", async () => {
+  it("publica o catálogo combinado sem expor chaves internas", async () => {
     const signed = createGrant({
       operation: "catalog",
       source: "ti.catalog",
@@ -57,38 +69,58 @@ describe("ti internal reporting routes", () => {
       body: {},
     });
 
-    await request(createTestApp()).get("/internal/reporting/catalog").expect(403);
-
     const response = await request(createTestApp())
       .get("/internal/reporting/catalog")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
-      .set("x-request-id", requestId)
-      .set("x-reports-grant", signed.grant)
-      .set("x-reports-grant-signature", signed.signature)
+      .set(reportingHeaders(signed))
       .expect(200);
 
-    expect(response.body.data.sources[0].keys.map((field: { key: string }) => field.key)).toEqual([
-      "user_id",
-      "location_id",
-      "category_id",
-      "responsible_it_staff_id",
+    expect(response.body.data.sources.map((source: { key: string }) => source.key)).toEqual([
+      "ti.extensions",
+      "ti.inventory",
+      "ti.requests",
+      "ti.stock",
     ]);
-    expect(response.body.data.sources).toContainEqual(
+    expect(response.body.data.sources.every((source: { keys?: unknown }) => !source.keys)).toBe(
+      true,
+    );
+  });
+
+  it("roteia as extrações de inventário e estoque", async () => {
+    const prisma = createPrismaMock();
+    prisma.stock.findMany = vi.fn(async () => []);
+    const app = createTestApp(prisma as never);
+    const requests = [
+      { source: "ti.inventory", fields: ["asset_code"] },
+      { source: "ti.stock", fields: ["name"] },
+    ] as const;
+
+    for (const { source, fields } of requests) {
+      const body = { source, fields: [...fields], limit: 1 };
+      const signed = createGrant({ operation: "extract", source, fields: [...fields], body });
+      await request(app)
+        .post("/internal/reporting/extract")
+        .set(reportingHeaders(signed))
+        .send(body)
+        .expect(200);
+    }
+
+    expect(prisma.inventoryTecnologia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: organizationId }, take: 2 }),
+    );
+    expect(prisma.stock.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: "ti.requests",
-        keys: [
-          expect.objectContaining({ key: "requester_id" }),
-          expect.objectContaining({ key: "assigned_to_id" }),
-        ],
+        where: {
+          organization_id: organizationId,
+          department_id: "50000000-0000-4000-8000-000000000001",
+        },
+        take: 2,
       }),
     );
   });
 
-  it("rejeita grant expirado e fonte não publicada sem consultar o inventário", async () => {
-    const prisma = {
-      ...(await import("./tiServiceTestUtils.js")).createPrismaMock(),
-      inventoryTecnologia: { findMany: vi.fn() },
-    };
+  it("rejeita grant expirado e campos não publicados antes de consultar o banco", async () => {
+    const prisma = createPrismaMock();
+    const app = createTestApp(prisma as never);
     const expiredBody = { source: "ti.inventory", fields: ["asset_code"], limit: 1 };
     const expired = createGrant({
       operation: "extract",
@@ -97,7 +129,7 @@ describe("ti internal reporting routes", () => {
       body: expiredBody,
       expiresAt: Math.floor(Date.now() / 1000) - 1,
     });
-    const invalidBody = { source: "ti.inventory", fields: ["id"], limit: 1 };
+    const invalidBody = { source: "ti.stock", fields: ["id"], limit: 1 };
     const invalid = createGrant({
       operation: "extract",
       source: invalidBody.source,
@@ -105,22 +137,61 @@ describe("ti internal reporting routes", () => {
       body: invalidBody,
     });
 
-    const app = createTestApp(prisma as never);
-    for (const [body, signed] of [
-      [expiredBody, expired],
-      [invalidBody, invalid],
-    ] as const) {
-      await request(app)
-        .post("/internal/reporting/extract")
-        .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
-        .set("x-request-id", requestId)
-        .set("x-reports-grant", signed.grant)
-        .set("x-reports-grant-signature", signed.signature)
-        .send(body)
-        .expect(403);
-    }
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(reportingHeaders(expired))
+      .send(expiredBody)
+      .expect(403);
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(reportingHeaders(invalid))
+      .send(invalidBody)
+      .expect(403);
 
     expect(prisma.inventoryTecnologia.findMany).not.toHaveBeenCalled();
+    expect(prisma.stock.findMany).not.toHaveBeenCalled();
+  });
+
+  it("rejeita o replay do mesmo grant para ambos os sources", async () => {
+    const prisma = createPrismaMock();
+    prisma.stock.findMany = vi.fn(async () => []);
+    const app = createTestApp(prisma as never);
+    const body = { source: "ti.stock", fields: ["name"], limit: 1 };
+    const signed = createGrant({
+      operation: "extract",
+      source: body.source,
+      fields: body.fields,
+      body,
+    });
+
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(reportingHeaders(signed))
+      .send(body)
+      .expect(200);
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(reportingHeaders(signed))
+      .send(body)
+      .expect(403);
+  });
+
+  it("rejeita token interno ausente", async () => {
+    const signed = createGrant({
+      operation: "catalog",
+      source: "ti.catalog",
+      fields: [],
+      body: {},
+    });
+
+    await request(createTestApp())
+      .get("/internal/reporting/catalog")
+      .set({
+        "x-request-id": signed.requestId,
+        "x-reports-grant": signed.grant,
+        "x-reports-grant-signature": signed.signature,
+      })
+      .expect(403);
   });
 
   it("extrai chamados apenas para a organização do grant e sem conteúdo sensível", async () => {
@@ -153,7 +224,7 @@ describe("ti internal reporting routes", () => {
     const response = await request(app)
       .post("/internal/reporting/extract")
       .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
-      .set("x-request-id", requestId)
+      .set("x-request-id", signed.requestId)
       .set("x-reports-grant", signed.grant)
       .set("x-reports-grant-signature", signed.signature)
       .send(body)
@@ -206,10 +277,7 @@ describe("ti internal reporting routes", () => {
 
     const response = await request(app)
       .post("/internal/reporting/extract")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
-      .set("x-request-id", requestId)
-      .set("x-reports-grant", signed.grant)
-      .set("x-reports-grant-signature", signed.signature)
+      .set(reportingHeaders(signed))
       .send(body)
       .expect(200);
 
@@ -247,7 +315,7 @@ describe("ti internal reporting routes", () => {
     await request(app)
       .post("/internal/reporting/extract")
       .set(INTERNAL_SERVICE_TOKEN_HEADER, "invalid-token")
-      .set("x-request-id", requestId)
+      .set("x-request-id", signed.requestId)
       .set("x-reports-grant", signed.grant)
       .set("x-reports-grant-signature", signed.signature)
       .send(body)
@@ -256,7 +324,7 @@ describe("ti internal reporting routes", () => {
     await request(app)
       .post("/internal/reporting/extract")
       .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
-      .set("x-request-id", requestId)
+      .set("x-request-id", signed.requestId)
       .set("x-reports-grant", signed.grant)
       .set("x-reports-grant-signature", "invalid-signature")
       .send(body)
@@ -265,7 +333,7 @@ describe("ti internal reporting routes", () => {
     await request(app)
       .post("/internal/reporting/extract")
       .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
-      .set("x-request-id", requestId)
+      .set("x-request-id", signed.requestId)
       .set("x-reports-grant", signed.grant)
       .set("x-reports-grant-signature", signed.signature)
       .send({ ...body, organization_id: "20000000-0000-4000-8000-000000000001" })

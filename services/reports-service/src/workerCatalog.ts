@@ -20,6 +20,7 @@ import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { TiExtensionsAdapter } from "./integrations/tiExtensionsAdapter.js";
 import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
 import { TiRequestsAdapter } from "./integrations/tiRequestsAdapter.js";
+import { TiStockAdapter } from "./integrations/tiStockAdapter.js";
 
 export function createWorkerSourceCatalog(env: ReportsServiceEnv): SourceCatalogService {
   return new SourceCatalogService([
@@ -42,6 +43,7 @@ export function createWorkerSourceCatalog(env: ReportsServiceEnv): SourceCatalog
     new TiExtensionsAdapter(env),
     new TiInventoryAdapter(env),
     new TiRequestsAdapter(env),
+    new TiStockAdapter(env),
     new RegularizeMunicipalTaxesAdapter(env),
   ]);
 }
