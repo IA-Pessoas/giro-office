@@ -53,7 +53,8 @@ pnpm --filter @workspace/reports-service test
 O bootstrap registra adapters internos de Parcelamento, Clientes, Projetos, Tarefas, Inventário de TI,
 Estoque de TI, Controle Contábil,
 relacionamentos e responsáveis contábeis, Certificados PF e PJ, ICMS, IPI, NCM fiscal, LDD,
-Solicitações e Feriados de RH, Licenças e Processos do Regularize. Os adapters de RH consultam exclusivamente
+situações e folha de Departamento Pessoal, Solicitações e Feriados de RH, Licenças e Processos do
+Regularize. Os adapters de RH consultam exclusivamente
 `/internal/reporting/extract` do rh-service, com grant HMAC curto e projeção dos campos seguros de
 `rh.requests` e `rh.holidays`.
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
@@ -81,4 +82,8 @@ O smoke fiscal fica desativado por padrão; exija `FISCAL_REPORTING_SMOKE_ENABLE
 Os adapters de LDD, folha e obrigações de Departamento Pessoal usam `PESSOAL_SERVICE_URL`,
 `REPORTS_INTERNAL_TOKEN` e `REPORTS_GRANT_SECRET` para consultar exclusivamente o contrato interno
 governado do pessoal-service. Em folha, `client_id`, responsável e sindicato permanecem como chaves
+internas do catálogo.
+
+O adapter de situações de Departamento Pessoal usa as mesmas credenciais e publica somente status,
+título e datas de registro/conclusão; `client_id`, registrador e concluidor permanecem como chaves
 internas do catálogo.

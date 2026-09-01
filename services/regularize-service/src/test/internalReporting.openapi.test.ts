@@ -46,10 +46,6 @@ describe("regularize internal reporting OpenAPI", () => {
     expect(operation.post.summary).toContain("tributos municipais");
     expect(
       operation.post.requestBody.content["application/json"].schema.properties.source.enum,
-    ).toEqual([
-      "regularize.licenses",
-      "regularize.processes",
-      "regularize.municipal_taxes",
-    ]);
+    ).toEqual(["regularize.licenses", "regularize.processes", "regularize.municipal_taxes"]);
   });
 });

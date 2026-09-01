@@ -17,6 +17,7 @@ import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
 import { PessoalObligationsAdapter } from "./integrations/pessoalObligationsAdapter.js";
 import { PessoalPayrollAdapter } from "./integrations/pessoalPayrollAdapter.js";
+import { PessoalSituationsAdapter } from "./integrations/pessoalSituationsAdapter.js";
 import { PessoalUnionsAdapter } from "./integrations/pessoalUnionsAdapter.js";
 import { ProjectAdapter } from "./integrations/projectAdapter.js";
 import { RegularizeLicenseAdapter } from "./integrations/regularizeLicenseAdapter.js";
@@ -58,6 +59,7 @@ const app = createReportsApp({
       new FiscalIpiAdapter(env),
       new PessoalLddAdapter(env),
       new PessoalPayrollAdapter(env),
+      new PessoalSituationsAdapter(env),
       new PessoalObligationsAdapter(env),
       new PessoalUnionsAdapter(env),
       new RegularizeLicenseAdapter(env),

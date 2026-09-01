@@ -154,4 +154,79 @@ describe("pessoal internal reporting service", () => {
     ).rejects.toMatchObject({ statusCode: 403 });
     expect(findMany).not.toHaveBeenCalled();
   });
+
+  it("extrai situations filtradas por organização e mantém registrador e concluidor fora da projeção", async () => {
+    const situationsFindMany = vi.fn().mockResolvedValue([
+      {
+        status: "Finalizado",
+        title: "Folha",
+        registration_date: new Date("2026-06-01T12:00:00.000Z"),
+        completion_date: new Date("2026-06-30T12:00:00.000Z"),
+        id: "hidden-id",
+        registered_by_id: "hidden-registrador",
+        completed_by_id: "hidden-concluidor",
+        organization_id: organizationId,
+      },
+      {
+        status: "Em andamento",
+        title: "Férias",
+        registration_date: new Date("2026-06-02T12:00:00.000Z"),
+        completion_date: null,
+        id: "hidden-id-2",
+        registered_by_id: "hidden-registrador-2",
+        completed_by_id: null,
+        organization_id: organizationId,
+      },
+    ]);
+    const service = new InternalReportingService({
+      situationsPessoal: { findMany: situationsFindMany },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.situations" as never,
+        fields: ["status", "title", "registration_date", "completion_date"],
+        limit: 1,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          status: "Finalizado",
+          title: "Folha",
+          registration_date: new Date("2026-06-01T12:00:00.000Z"),
+          completion_date: new Date("2026-06-30T12:00:00.000Z"),
+        },
+      ],
+      reachedLimit: true,
+    });
+
+    expect(situationsFindMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId },
+      select: {
+        status: true,
+        title: true,
+        registration_date: true,
+        completion_date: true,
+      },
+      take: 2,
+    });
+  });
+
+  it("rejeita chaves internas de situations antes de consultar o banco", async () => {
+    const situationsFindMany = vi.fn();
+    const service = new InternalReportingService({
+      situationsPessoal: { findMany: situationsFindMany },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.situations" as never,
+        fields: ["registered_by_id"],
+        limit: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(situationsFindMany).not.toHaveBeenCalled();
+  });
 });

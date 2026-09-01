@@ -12,6 +12,7 @@ export * from "./parcelamentoReportingCatalog.js";
 export * from "./pessoalLddReportingCatalog.js";
 export * from "./pessoalObligationsReportingCatalog.js";
 export * from "./pessoalPayrollReportingCatalog.js";
+export * from "./pessoalSituationsReportingCatalog.js";
 export * from "./pessoalUnionsReportingCatalog.js";
 export * from "./projectReportingCatalog.js";
 export * from "./regularizeLicenseReportingCatalog.js";

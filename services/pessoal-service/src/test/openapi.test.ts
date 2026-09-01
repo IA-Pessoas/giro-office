@@ -81,6 +81,7 @@ describe("pessoal-service OpenAPI", () => {
     expect(extractSchema?.properties?.source?.enum).toEqual([
       "pessoal.ldd",
       "pessoal.payroll",
+      "pessoal.situations",
       "pessoal.obligations",
       "pessoal.unions",
     ]);

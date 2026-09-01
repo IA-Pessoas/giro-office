@@ -1,4 +1,9 @@
-import { PESSOAL_LDD_REPORTING_SOURCES, ServiceError } from "@workspace/shared";
+import {
+  PESSOAL_LDD_REPORTING_SOURCES,
+  PESSOAL_PAYROLL_REPORTING_SOURCES,
+  PESSOAL_SITUATIONS_REPORTING_SOURCES,
+  ServiceError,
+} from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import {
@@ -19,7 +24,7 @@ export class InternalReportingService {
   constructor(
     private readonly prisma: Pick<
       PrismaClient,
-      "lddPessoal" | "payroll" | "obrigationsPessoal" | "unionPessoal"
+      "lddPessoal" | "payroll" | "situationsPessoal" | "obrigationsPessoal" | "unionPessoal"
     >,
   ) {}
 
@@ -41,11 +46,13 @@ export class InternalReportingService {
     const delegate =
       input.source === PESSOAL_LDD_REPORTING_SOURCES[0]
         ? this.prisma.lddPessoal
-        : input.source === "pessoal.payroll"
+        : input.source === PESSOAL_PAYROLL_REPORTING_SOURCES[0]
           ? this.prisma.payroll
-          : input.source === "pessoal.unions"
-            ? this.prisma.unionPessoal
-            : this.prisma.obrigationsPessoal;
+          : input.source === PESSOAL_SITUATIONS_REPORTING_SOURCES[0]
+            ? this.prisma.situationsPessoal
+            : input.source === "pessoal.unions"
+              ? this.prisma.unionPessoal
+              : this.prisma.obrigationsPessoal;
     const rows = await (delegate as unknown as ReportingDelegate).findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
