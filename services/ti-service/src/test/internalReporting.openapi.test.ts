@@ -35,7 +35,12 @@ describe("ti internal reporting OpenAPI", () => {
         };
       }
     ).post.requestBody.content["application/json"].schema;
-    expect(bodySchema.properties.source.enum).toEqual(["ti.inventory", "ti.requests", "ti.stock"]);
+    expect(bodySchema.properties.source.enum).toEqual([
+      "ti.extensions",
+      "ti.inventory",
+      "ti.requests",
+      "ti.stock",
+    ]);
     expect(spec.paths["/ti/stock"]).toBeDefined();
   });
 });

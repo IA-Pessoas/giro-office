@@ -58,8 +58,8 @@ Regularize. Os adapters de RH consultam exclusivamente
 `/internal/reporting/extract` do rh-service, com grant HMAC curto e projeção dos campos seguros de
 `rh.requests` e `rh.holidays`.
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
-Os adapters de Inventário e Estoque de TI usam o contrato combinado do ti-service e publicam somente
-campos selecionáveis, sem as chaves internas do catálogo.
+Os adapters de Tecnologia, incluindo inventário, estoque, chamados e ramais, usam o contrato combinado
+do ti-service e publicam somente campos selecionáveis, sem as chaves internas do catálogo.
 
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.

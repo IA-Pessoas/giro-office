@@ -918,7 +918,10 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
                   required: ["source", "fields", "limit"],
                   additionalProperties: false,
                   properties: {
-                    source: { type: "string", enum: ["ti.inventory", "ti.requests", "ti.stock"] },
+                    source: {
+                      type: "string",
+                      enum: ["ti.extensions", "ti.inventory", "ti.requests", "ti.stock"],
+                    },
                     fields: {
                       type: "array",
                       minItems: 1,

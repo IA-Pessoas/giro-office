@@ -1,11 +1,14 @@
 import {
   ServiceError,
+  type TiExtensionsReportingSource,
   type TiInventoryReportingSource,
   type TiRequestsReportingSource,
+  tiExtensionsReportingCatalog,
   tiInventoryReportingCatalog,
   tiRequestsReportingCatalog,
 } from "@workspace/shared";
 import { TiDepartmentResolverService } from "../services/tiDepartmentResolverService.js";
+import { TiExtensionsReportingService } from "./tiExtensionsReportingService.js";
 import { TiInventoryReportingService } from "./tiInventoryReportingService.js";
 import { TiRequestsReportingService } from "./tiRequestsReportingService.js";
 import {
@@ -15,6 +18,7 @@ import {
 } from "./tiStockReportingCatalog.js";
 
 type ReportingSource =
+  | TiExtensionsReportingSource
   | TiInventoryReportingSource
   | TiRequestsReportingSource
   | TiStockReportingSource;
@@ -73,6 +77,7 @@ function withoutKeys<T extends { keys: readonly unknown[] }>(source: T) {
 
 const publicCatalog = {
   sources: [
+    ...tiExtensionsReportingCatalog.sources.map(withoutKeys),
     ...tiInventoryReportingCatalog.sources.map(withoutKeys),
     ...tiRequestsReportingCatalog.sources.map(withoutKeys),
     ...tiStockReportingCatalog.sources.map(withoutKeys),
@@ -106,6 +111,7 @@ function projectStockRows(
 
 export class InternalReportingService {
   readonly catalog = publicCatalog;
+  private readonly extensions: TiExtensionsReportingService;
   private readonly inventory: TiInventoryReportingService;
   private readonly requests: TiRequestsReportingService;
   private readonly departmentResolver: TiDepartmentResolverService;
@@ -113,11 +119,15 @@ export class InternalReportingService {
   constructor(
     private readonly prisma: {
       department: DepartmentReportingDelegate;
+      extensionsTecnologia: InventoryReportingDelegate;
       inventoryTecnologia: InventoryReportingDelegate;
       tIRequest: RequestsReportingDelegate;
       stock: ReportingDelegate;
     },
   ) {
+    this.extensions = new TiExtensionsReportingService({
+      extensionsTecnologia: prisma.extensionsTecnologia,
+    });
     this.inventory = new TiInventoryReportingService({
       inventoryTecnologia: prisma.inventoryTecnologia,
     });
@@ -133,6 +143,15 @@ export class InternalReportingService {
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
     if (input.source === "ti.inventory") {
       return this.inventory.extract({
+        organizationId: input.organizationId,
+        source: input.source,
+        fields: input.fields,
+        limit: input.limit,
+      });
+    }
+
+    if (input.source === "ti.extensions") {
+      return this.extensions.extract({
         organizationId: input.organizationId,
         source: input.source,
         fields: input.fields,

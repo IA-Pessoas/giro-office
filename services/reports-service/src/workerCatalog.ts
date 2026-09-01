@@ -19,6 +19,7 @@ import { RhAttendanceAdapter } from "./integrations/rhAttendanceAdapter.js";
 import { RhHolidayAdapter } from "./integrations/rhHolidayAdapter.js";
 import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
+import { TiExtensionsAdapter } from "./integrations/tiExtensionsAdapter.js";
 import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
 import { TiRequestsAdapter } from "./integrations/tiRequestsAdapter.js";
 import { TiStockAdapter } from "./integrations/tiStockAdapter.js";
@@ -43,6 +44,7 @@ export function createWorkerSourceCatalog(env: ReportsServiceEnv): SourceCatalog
     new RhRequestAdapter(env),
     new RhAttendanceAdapter(env),
     new RhHolidayAdapter(env),
+    new TiExtensionsAdapter(env),
     new TiInventoryAdapter(env),
     new TiRequestsAdapter(env),
     new TiStockAdapter(env),

@@ -75,6 +75,7 @@ describe("ti internal reporting routes", () => {
       .expect(200);
 
     expect(response.body.data.sources.map((source: { key: string }) => source.key)).toEqual([
+      "ti.extensions",
       "ti.inventory",
       "ti.requests",
       "ti.stock",
@@ -241,6 +242,60 @@ describe("ti internal reporting routes", () => {
         take: 2,
       }),
     );
+  });
+
+  it("extrai ramais somente para a organização do grant e sem IDs internos", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: "never-returned",
+        user_id: "never-returned",
+        number: "1234",
+        createdAt: new Date("2026-08-01T10:00:00.000Z"),
+        updatedAt: new Date("2026-08-02T10:00:00.000Z"),
+      },
+      {
+        number: "5678",
+        createdAt: new Date("2026-08-03T10:00:00.000Z"),
+        updatedAt: new Date("2026-08-04T10:00:00.000Z"),
+      },
+    ]);
+    const body = {
+      source: "ti.extensions",
+      fields: ["number", "created_at", "updated_at"],
+      limit: 1,
+    };
+    const signed = createGrant({
+      operation: "extract",
+      source: body.source,
+      fields: body.fields,
+      body,
+    });
+    const app = createTestApp({
+      ...(await import("./tiServiceTestUtils.js")).createPrismaMock(),
+      extensionsTecnologia: { findMany },
+    } as never);
+
+    const response = await request(app)
+      .post("/internal/reporting/extract")
+      .set(reportingHeaders(signed))
+      .send(body)
+      .expect(200);
+
+    expect(response.body.data).toEqual({
+      rows: [
+        {
+          number: "1234",
+          created_at: "2026-08-01T10:00:00.000Z",
+          updated_at: "2026-08-02T10:00:00.000Z",
+        },
+      ],
+      reachedLimit: true,
+    });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { organization_id: "10000000-0000-4000-8000-000000000001" },
+      select: { number: true, createdAt: true, updatedAt: true },
+      take: 2,
+    });
   });
 
   it("rejeita token, grant e tentativa de tenant cruzado para chamados antes da consulta", async () => {

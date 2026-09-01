@@ -20,4 +20,21 @@ describe("createWorkerSourceCatalog", () => {
       }),
     ).toBeDefined();
   });
+
+  it("registra ramais de TI para execução assíncrona", () => {
+    const catalog = createWorkerSourceCatalog(
+      parseReportsServiceEnv({
+        DATABASE_URL: "postgresql://reports:reports@localhost:5432/reports",
+        JWT_SECRET: "test-jwt-secret",
+      }),
+    );
+
+    expect(
+      catalog.findAdapterForSources(["ti.extensions"], {
+        organization_id: "10000000-0000-0000-0000-000000000001",
+        modules: { ti: 1 },
+        grant: { sources: { "ti.extensions": ["number"] }, relations: [] },
+      }),
+    ).toBeDefined();
+  });
 });
