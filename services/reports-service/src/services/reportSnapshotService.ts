@@ -85,6 +85,7 @@ export class ReportSnapshotService {
     organizationId: string;
     userId: string;
     snapshotId: string;
+    allowShared?: boolean;
   }): Promise<{
     snapshot: { id: string; created_at: Date };
     job: { id: string; report_model_version_id: string };
@@ -103,7 +104,7 @@ export class ReportSnapshotService {
       where: {
         id: snapshot.report_job_id,
         organization_id: input.organizationId,
-        requester_id: input.userId,
+        ...(input.allowShared ? {} : { requester_id: input.userId }),
         status: "completed",
       },
     });

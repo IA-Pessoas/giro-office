@@ -167,6 +167,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "um snapshot de relatório" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/reports\/snapshots\/[^/]+\/export$/,
+    description: { action: "exportou", item: "um snapshot de relatório" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/reports\/snapshots\/[^/]+\/delete$/,
     description: { action: "excluiu", item: "um snapshot de relatório" },

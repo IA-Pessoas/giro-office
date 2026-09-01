@@ -110,6 +110,7 @@ describe("ReportExportService", () => {
       snapshotId: "snapshot-1",
       userId: "user-1",
       organizationId: "org-1",
+      allowShared: false,
     });
     expect(jobs.getVersion).not.toHaveBeenCalled();
     expect(authorizationService.validateDefinition).not.toHaveBeenCalled();
@@ -189,11 +190,12 @@ describe("ReportExportService", () => {
     };
     const jobs = {
       getVersion: vi.fn().mockResolvedValue({
+        version: { definition_json: { sources: ["source"], columns: [] } },
         model: { created_by_user_id: null, department_id: "department-1" },
       }),
     };
     const authorization = {
-      getSharedDepartment: vi.fn().mockResolvedValue({ id: "department-1" }),
+      validateSharedDefinition: vi.fn().mockResolvedValue({ department_id: "department-1" }),
     };
     const service = new ReportExportService(
       snapshotService as never,
@@ -218,10 +220,11 @@ describe("ReportExportService", () => {
       modelVersionId: "version-1",
       includeEphemeral: true,
     });
-    expect(authorization.getSharedDepartment).toHaveBeenCalledWith({
+    expect(authorization.validateSharedDefinition).toHaveBeenCalledWith({
       userId: "user-1",
       organizationId: "org-1",
       requestId: "request-1",
+      definition: expect.anything(),
     });
     expect(render).toHaveBeenCalledWith(
       expect.objectContaining({

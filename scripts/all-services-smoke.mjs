@@ -257,6 +257,7 @@ const state = {
   certificatePjId: "",
   certificatePfId: "",
   reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
+  reportsJobId: "",
 };
 
 const cleanupTasks = [];
@@ -856,6 +857,12 @@ function requireState(key) {
   return value;
 }
 
+function requireEnv(key) {
+  const value = process.env[key]?.trim();
+  if (!value) throw new Error(`Required smoke environment variable ${key} is missing.`);
+  return value;
+}
+
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value && typeof value === "object") {
@@ -1398,15 +1405,150 @@ const handlers = {
   },
 
   async reportsSnapshotExport(op) {
-    const snapshotId = isBadExpectation(op)
-      ? "00000000-0000-4000-8000-000000000003"
-      : requireState("reportsSnapshotId");
+    const invalidFormat = op.action === "reportsSnapshotExportInvalidFormat";
+    const expired = op.action === "reportsSnapshotExportExpired";
+    const format = invalidFormat ? "html" : "csv";
+    const snapshotId = expired
+      ? requireEnv("SMOKE_REPORT_EXPIRED_SNAPSHOT_ID")
+      : isBadExpectation(op)
+        ? "00000000-0000-4000-8000-000000000003"
+        : requireState("reportsSnapshotId");
     await httpRequest(op, {
       path: `/reports/snapshots/${snapshotId}/export`,
-      query: { format: isBadExpectation(op) ? "pdf" : "csv" },
+      query: { format },
       expectEnvelope: false,
-      expectedStatus: isBadExpectation(op) ? [400] : [200],
+      expectedStatus: invalidFormat ? [400] : expired ? [404] : op.expectedStatus,
     });
+    if (op.action === "reportsSnapshotExport" && op.expectationKind === "good") {
+      for (const exportFormat of ["xlsx", "pdf"]) {
+        await helperCall(`reports-snapshot-export-${exportFormat}`, {
+          method: "GET",
+          path: `/reports/snapshots/${snapshotId}/export`,
+          target: "gateway",
+          service: "reports-service",
+          auth: "session",
+          query: { format: exportFormat },
+          expectedStatus: [200],
+          expectEnvelope: false,
+        });
+      }
+    }
+  },
+
+  async reportsJobCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      json: {
+        definition: {
+          sources: ["parcelamento.installments"],
+          columns: [
+            {
+              source: "parcelamento.installments",
+              field: "agreement_number",
+              alias: "agreement_number",
+            },
+          ],
+        },
+        format: "json",
+      },
+    });
+    if (op.expectationKind === "good") {
+      state.reportsJobId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    }
+  },
+
+  async reportsJobGet(op) {
+    const jobId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000004"
+      : requireState("reportsJobId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/jobs/${jobId}`,
+    });
+  },
+
+  async reportsJobCancel(op) {
+    if (isBadExpectation(op)) {
+      await httpRequest(op, {
+        expectedStatus: op.expectedStatus,
+        path: "/reports/jobs/00000000-0000-4000-8000-000000000005/cancel",
+        expectEnvelope: false,
+      });
+      return;
+    }
+
+    const response = await helperCall("reports-job-cancel-fixture-create", {
+      method: "POST",
+      path: "/reports/jobs",
+      target: "gateway",
+      service: "reports-service",
+      auth: "session",
+      expectedStatus: [201],
+      json: {
+        definition: {
+          sources: ["parcelamento.installments"],
+          columns: [
+            {
+              source: "parcelamento.installments",
+              field: "agreement_number",
+              alias: "agreement_number",
+            },
+          ],
+        },
+        format: "json",
+      },
+    });
+    const jobId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (!jobId) throw new Error("Reports cancel fixture did not return a job id.");
+
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/jobs/${jobId}/cancel`,
+      expectEnvelope: false,
+    });
+  },
+
+  async reportsJobSnapshot(op) {
+    const jobId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000006"
+      : requireState("reportsJobId");
+    if (!isBadExpectation(op)) {
+      const timeoutMs = Number(process.env.SMOKE_REPORT_JOB_WAIT_MS) || 30_000;
+      const deadline = Date.now() + timeoutMs;
+      let completed = false;
+      while (Date.now() < deadline) {
+        const statusResponse = await helperCall("reports-job-status", {
+          method: "GET",
+          path: `/reports/jobs/${jobId}`,
+          target: "gateway",
+          service: "reports-service",
+          auth: "session",
+          expectedStatus: [200],
+        });
+        const status = statusResponse.body?.data?.status;
+        if (status === "completed") {
+          completed = true;
+          break;
+        }
+        if (["failed", "cancelled", "expired", "deleted"].includes(status)) {
+          throw new Error(`Reports smoke job ${jobId} reached ${status}.`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
+      }
+      if (!completed) {
+        throw new Error(`Reports smoke job ${jobId} did not complete within ${timeoutMs}ms.`);
+      }
+    }
+
+    const response = await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/jobs/${jobId}/snapshot`,
+      query: { scope: "personal", limit: 10 },
+    });
+    if (op.expectationKind === "good") {
+      state.reportsSnapshotId =
+        pickFirst(response.body, "data.snapshot.id") ?? findFirstId(response.body?.data?.snapshot);
+    }
   },
 
   async reportsJobList(op) {
@@ -1422,9 +1564,15 @@ const handlers = {
   },
 
   async reportsSnapshotDelete(op) {
+    const snapshotId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000007"
+      : requireState("reportsSnapshotId");
     await httpRequest(op, {
-      path: `/reports/snapshots/${requireState("reportsSnapshotId")}/delete`,
-      json: { justification: "Smoke lifecycle cleanup with audit." },
+      path: `/reports/snapshots/${snapshotId}/delete`,
+      json:
+        op.action === "reportsSnapshotDeleteInvalid"
+          ? {}
+          : { justification: "Smoke lifecycle cleanup with audit." },
       expectEnvelope: false,
     });
   },

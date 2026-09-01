@@ -113,6 +113,34 @@ test("reports smoke atravessa o gateway sem cabeçalhos de identidade forjados",
   assert.doesNotMatch(handler[1], /x-auth-(?:user|organization)-id/);
 });
 
+test("reports smoke cobre jobs, exportação expirada e exclusão com justificativa", () => {
+  const actions = new Map(manifest.map((entry) => [entry.action, entry]));
+  for (const action of [
+    "reportsJobCreate",
+    "reportsJobGet",
+    "reportsJobCancel",
+    "reportsJobSnapshot",
+    "reportsSnapshotExport",
+    "reportsSnapshotExportInvalidFormat",
+    "reportsSnapshotExportExpired",
+    "reportsSnapshotDelete",
+    "reportsSnapshotDeleteInvalid",
+  ]) {
+    assert.ok(actions.has(action), `${action} deve existir no manifest`);
+  }
+
+  assert.equal(actions.get("reportsJobCreate").expectedStatus[0], 201);
+  assert.equal(actions.get("reportsJobCancel").expectedStatus[0], 204);
+  assert.equal(actions.get("reportsSnapshotDelete").expectedStatus[0], 204);
+  assert.equal(actions.get("reportsSnapshotExportExpired").expectedStatus[0], 404);
+  assert.equal(
+    actions.get("reportsSnapshotExportExpired").condition,
+    "reportsLifecycleSmokeEnabled",
+  );
+  assert.equal(actions.get("reportsSnapshotDeleteInvalid").expectedStatus[0], 400);
+  assert.equal(actions.get("reportsSnapshotDeleteInvalid").specOperation, false);
+});
+
 test("gateway smoke usa sessão quando a compatibilidade Bearer está desligada", async () => {
   const legacyGatewayAuth = manifest.filter(
     (entry) =>

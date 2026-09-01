@@ -3656,6 +3656,46 @@ it("records parcelamento-service route targets when audit is enabled", async () 
   }
 });
 
+it("records reports-service route targets when audit is enabled", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+  });
+  const auditService = await startAuditIngestServer();
+  const upstream = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { sources: [] } }));
+  });
+  const reportsServiceUrl = await startServer(upstream);
+
+  const app = createApp(
+    createEnv({
+      auditEnabled: true,
+      auditServiceUrl: auditService.url,
+      reportsServiceUrl,
+    }),
+    createTestLogger(),
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/reports/catalog`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    await waitForRecords(auditService.records, 1);
+    expect(auditService.records[0]?.metadata?.routeTarget).toBe("reports-service");
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+    await stopServer(auditService.server);
+  }
+});
+
 it("records unauthorized requests when audit is enabled", async () => {
   const auditService = await startAuditIngestServer();
   const app = createApp(

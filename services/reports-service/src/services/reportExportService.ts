@@ -46,7 +46,7 @@ export class ReportExportService {
     private readonly renderers: ReportExportRenderers = createDefaultRenderers(),
     private readonly audit?: Pick<ReportAuditService, "record">,
     private readonly jobs?: Pick<ReportJobService, "getVersion">,
-    private readonly authorization?: Pick<ReportAuthorizationService, "getSharedDepartment">,
+    private readonly authorization?: Pick<ReportAuthorizationService, "validateSharedDefinition">,
   ) {}
 
   async export(input: {
@@ -62,6 +62,7 @@ export class ReportExportService {
         snapshotId: input.snapshotId,
         userId: input.userId,
         organizationId: input.organizationId,
+        allowShared: Boolean(this.jobs && this.authorization),
       });
       const exportContext = await this.reauthorizeSnapshot(input, source);
       const table = createTable(source.rows);
@@ -143,15 +144,16 @@ export class ReportExportService {
     });
     if (version.model.created_by_user_id === input.userId) return { scope: "personal" };
 
-    const department = await this.authorization.getSharedDepartment({
+    const authorized = await this.authorization.validateSharedDefinition({
       userId: input.userId,
       organizationId: input.organizationId,
       requestId: input.requestId,
+      definition: version.version.definition_json as never,
     });
-    if (version.model.department_id !== department.id) {
+    if (version.model.department_id !== authorized.department_id) {
       throw new ServiceError(403, "O modelo compartilhado não pertence ao departamento atual.");
     }
-    return { scope: "shared", departmentId: department.id };
+    return { scope: "shared", departmentId: authorized.department_id };
   }
 }
 
