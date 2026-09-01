@@ -265,6 +265,12 @@ describe("Central de Relatórios — regressões de segurança", () => {
         }),
       },
       reportJob: { findFirst: reportJobFindFirst },
+      reportModelVersion: {
+        findFirst: vi.fn().mockResolvedValue({ report_model_id: "model-1" }),
+      },
+      reportModel: {
+        findFirst: vi.fn().mockResolvedValue({ created_by_user_id: null }),
+      },
       reportSnapshotRow: { findMany: vi.fn().mockResolvedValue([]) },
     } as never);
 
@@ -273,7 +279,7 @@ describe("Central de Relatórios — regressões de segurança", () => {
         organizationId,
         userId,
         snapshotId: "snapshot-1",
-        allowShared: true,
+        allowSharedLookup: true,
       }),
     ).resolves.toMatchObject({ job: { id: "job-1" } });
     expect(reportJobFindFirst).toHaveBeenCalledWith({
@@ -283,6 +289,74 @@ describe("Central de Relatórios — regressões de segurança", () => {
         status: "completed",
       },
     });
+  });
+
+  it("mantém snapshot pessoal restrito ao requester", async () => {
+    const reportJobFindFirst = vi.fn().mockResolvedValue(null);
+    const service = new ReportSnapshotService({
+      reportSnapshot: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "snapshot-personal",
+          report_job_id: "job-personal",
+          created_at: new Date(),
+        }),
+      },
+      reportJob: { findFirst: reportJobFindFirst },
+      reportSnapshotRow: { findMany: vi.fn() },
+    } as never);
+
+    await expect(
+      service.getForExport({
+        organizationId,
+        userId,
+        snapshotId: "snapshot-personal",
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(reportJobFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: "job-personal",
+        organization_id: organizationId,
+        requester_id: userId,
+        status: "completed",
+      },
+    });
+  });
+
+  it("não carrega linhas de snapshot pessoal para requester distinto no lookup compartilhado", async () => {
+    const findMany = vi.fn();
+    const service = new ReportSnapshotService({
+      reportSnapshot: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "snapshot-personal",
+          report_job_id: "job-personal",
+          created_at: new Date(),
+        }),
+      },
+      reportJob: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "job-personal",
+          report_model_version_id: "version-personal",
+          requester_id: "author-1",
+        }),
+      },
+      reportModelVersion: {
+        findFirst: vi.fn().mockResolvedValue({ report_model_id: "model-personal" }),
+      },
+      reportModel: {
+        findFirst: vi.fn().mockResolvedValue({ created_by_user_id: "author-1" }),
+      },
+      reportSnapshotRow: { findMany },
+    } as never);
+
+    await expect(
+      service.getForExport({
+        organizationId,
+        userId,
+        snapshotId: "snapshot-personal",
+        allowSharedLookup: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(findMany).not.toHaveBeenCalled();
   });
 
   it("bloqueia exportação compartilhada quando a permissão atual foi revogada", async () => {
@@ -314,7 +388,7 @@ describe("Central de Relatórios — regressões de segurança", () => {
       {
         getVersion: vi.fn().mockResolvedValue({
           version: { definition_json: definition },
-          model: { created_by_user_id: "another-user", department_id: "department-1" },
+          model: { created_by_user_id: null, department_id: "department-1" },
         }),
       } as never,
       authorization,
@@ -333,8 +407,63 @@ describe("Central de Relatórios — regressões de segurança", () => {
       snapshotId: "snapshot-1",
       userId,
       organizationId,
-      allowShared: true,
+      allowSharedLookup: true,
     });
     expect(render).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia exportação compartilhada quando a permissão é revogada durante o render", async () => {
+    const render = vi.fn().mockResolvedValue(Buffer.from("csv"));
+    const getForExport = vi.fn().mockResolvedValue({
+      snapshot: { id: "snapshot-1", created_at: new Date() },
+      job: { id: "job-1", report_model_version_id: "version-1", requester_id: "author-1" },
+      rows: [{ label: "sensitive" }],
+    });
+    const authorization = new ReportAuthorizationService(
+      {
+        getAccessContext: vi
+          .fn()
+          .mockResolvedValueOnce(
+            accessContext({
+              department: { id: "department-1" },
+              departmentModule: "security",
+              modules: { security: 1 },
+            }),
+          )
+          .mockResolvedValueOnce(
+            accessContext({
+              department: { id: "department-1" },
+              departmentModule: "security",
+              modules: {},
+            }),
+          ),
+      },
+      new ReportDefinitionService(new SourceCatalogService([adapter])),
+    );
+    const assertExportable = vi.fn();
+    const exporter = new ReportExportService(
+      { getForExport, assertExportable } as never,
+      { csv: { render } } as never,
+      { record: vi.fn() } as never,
+      {
+        getVersion: vi.fn().mockResolvedValue({
+          version: { definition_json: definition },
+          model: { created_by_user_id: null, department_id: "department-1" },
+        }),
+      } as never,
+      authorization,
+    );
+
+    await expect(
+      exporter.export({
+        snapshotId: "snapshot-1",
+        userId,
+        organizationId,
+        requestId: "request-export-revoked-during-render",
+        format: "csv",
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(render).toHaveBeenCalledOnce();
+    expect(assertExportable).not.toHaveBeenCalled();
   });
 });

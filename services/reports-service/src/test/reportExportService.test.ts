@@ -110,7 +110,7 @@ describe("ReportExportService", () => {
       snapshotId: "snapshot-1",
       userId: "user-1",
       organizationId: "org-1",
-      allowShared: false,
+      allowSharedLookup: false,
     });
     expect(jobs.getVersion).not.toHaveBeenCalled();
     expect(authorizationService.validateDefinition).not.toHaveBeenCalled();
@@ -176,6 +176,12 @@ describe("ReportExportService", () => {
     });
     expect(snapshotService.getForExport).toHaveBeenCalledOnce();
     expect(snapshotService.assertExportable).toHaveBeenCalledOnce();
+    expect(snapshotService.assertExportable).toHaveBeenCalledWith({
+      snapshotId: "snapshot-1",
+      userId: "user-1",
+      organizationId: "org-1",
+      allowShared: false,
+    });
   });
 
   it("revalida o departamento atual para snapshots de modelos compartilhados", async () => {
@@ -232,6 +238,54 @@ describe("ReportExportService", () => {
         departmentId: "department-1",
       }),
     );
+    expect(snapshotService.assertExportable).toHaveBeenCalledWith({
+      snapshotId: "snapshot-1",
+      userId: "user-1",
+      organizationId: "org-1",
+      allowShared: true,
+    });
+  });
+
+  it("mantém snapshot pessoal restrito ao requester no wiring com autorização compartilhada", async () => {
+    const render = vi.fn();
+    const validateSharedDefinition = vi.fn();
+    const assertExportable = vi.fn();
+    const service = new ReportExportService(
+      {
+        getForExport: vi.fn().mockResolvedValue({
+          snapshot: { id: "snapshot-1", created_at: new Date() },
+          job: {
+            id: "job-1",
+            report_model_version_id: "version-1",
+            requester_id: "author-1",
+          },
+          rows: [{ name: "Ana" }],
+        }),
+        assertExportable,
+      } as never,
+      { csv: { render } } as never,
+      { record: vi.fn() } as never,
+      {
+        getVersion: vi.fn().mockResolvedValue({
+          version: { definition_json: { sources: ["source"], columns: [] } },
+          model: { created_by_user_id: "author-1", department_id: null },
+        }),
+      } as never,
+      { validateSharedDefinition } as never,
+    );
+
+    await expect(
+      service.export({
+        snapshotId: "snapshot-1",
+        userId: "member-1",
+        organizationId: "org-1",
+        requestId: "request-personal-owner",
+        format: "csv",
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(validateSharedDefinition).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+    expect(assertExportable).not.toHaveBeenCalled();
   });
 
   it("cria uma resposta nova em cada tentativa de exportação", async () => {
@@ -295,6 +349,7 @@ describe("ReportExportService", () => {
       snapshotId: "snapshot-1",
       userId: "user-1",
       organizationId: "org-1",
+      allowShared: false,
     });
     expect(record).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -62,7 +62,7 @@ export class ReportExportService {
         snapshotId: input.snapshotId,
         userId: input.userId,
         organizationId: input.organizationId,
-        allowShared: Boolean(this.jobs && this.authorization),
+        allowSharedLookup: Boolean(this.jobs && this.authorization),
       });
       const exportContext = await this.reauthorizeSnapshot(input, source);
       const table = createTable(source.rows);
@@ -86,10 +86,12 @@ export class ReportExportService {
               rows: table.rows,
             })
           : await (renderer as ReportTableRenderer).render(table);
+      const finalExportContext = await this.reauthorizeSnapshot(input, source);
       await this.snapshots.assertExportable({
         snapshotId: input.snapshotId,
         userId: input.userId,
         organizationId: input.organizationId,
+        allowShared: finalExportContext.scope === "shared",
       });
       await this.audit?.record({
         actor_id: input.userId,
@@ -142,7 +144,12 @@ export class ReportExportService {
       modelVersionId: source.job.report_model_version_id,
       includeEphemeral: true,
     });
-    if (version.model.created_by_user_id === input.userId) return { scope: "personal" };
+    if (version.model.created_by_user_id !== null) {
+      if (source.job.requester_id !== input.userId) {
+        throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+      }
+      return { scope: "personal" };
+    }
 
     const authorized = await this.authorization.validateSharedDefinition({
       userId: input.userId,
