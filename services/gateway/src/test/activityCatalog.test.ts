@@ -28,6 +28,12 @@ describe("activityCatalog", () => {
       "um snapshot de relatório",
     ],
     [
+      "GET",
+      "/reports/snapshots/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/export?format=csv",
+      "exportou",
+      "um snapshot de relatório",
+    ],
+    [
       "POST",
       "/reports/snapshots/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/delete",
       "excluiu",

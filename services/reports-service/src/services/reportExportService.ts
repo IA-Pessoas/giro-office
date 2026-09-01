@@ -46,7 +46,7 @@ export class ReportExportService {
     private readonly renderers: ReportExportRenderers = createDefaultRenderers(),
     private readonly audit?: Pick<ReportAuditService, "record">,
     private readonly jobs?: Pick<ReportJobService, "getVersion">,
-    private readonly authorization?: Pick<ReportAuthorizationService, "getSharedDepartment">,
+    private readonly authorization?: Pick<ReportAuthorizationService, "validateSharedDefinition">,
   ) {}
 
   async export(input: {
@@ -62,6 +62,7 @@ export class ReportExportService {
         snapshotId: input.snapshotId,
         userId: input.userId,
         organizationId: input.organizationId,
+        allowSharedLookup: Boolean(this.jobs && this.authorization),
       });
       const exportContext = await this.reauthorizeSnapshot(input, source);
       const table = createTable(source.rows);
@@ -85,10 +86,12 @@ export class ReportExportService {
               rows: table.rows,
             })
           : await (renderer as ReportTableRenderer).render(table);
+      const finalExportContext = await this.reauthorizeSnapshot(input, source);
       await this.snapshots.assertExportable({
         snapshotId: input.snapshotId,
         userId: input.userId,
         organizationId: input.organizationId,
+        allowShared: finalExportContext.scope === "shared",
       });
       await this.audit?.record({
         actor_id: input.userId,
@@ -141,17 +144,23 @@ export class ReportExportService {
       modelVersionId: source.job.report_model_version_id,
       includeEphemeral: true,
     });
-    if (version.model.created_by_user_id === input.userId) return { scope: "personal" };
+    if (version.model.created_by_user_id !== null) {
+      if (source.job.requester_id !== input.userId) {
+        throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+      }
+      return { scope: "personal" };
+    }
 
-    const department = await this.authorization.getSharedDepartment({
+    const authorized = await this.authorization.validateSharedDefinition({
       userId: input.userId,
       organizationId: input.organizationId,
       requestId: input.requestId,
+      definition: version.version.definition_json as never,
     });
-    if (version.model.department_id !== department.id) {
+    if (version.model.department_id !== authorized.department_id) {
       throw new ServiceError(403, "O modelo compartilhado não pertence ao departamento atual.");
     }
-    return { scope: "shared", departmentId: department.id };
+    return { scope: "shared", departmentId: authorized.department_id };
   }
 }
 
