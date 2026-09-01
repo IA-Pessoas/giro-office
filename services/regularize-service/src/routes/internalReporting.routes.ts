@@ -4,14 +4,19 @@ import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
   parseWithZod,
+  REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCE,
   REQUEST_ID_HEADER,
   ServiceError,
 } from "@workspace/shared";
 import { Router } from "express";
 
 import type { RegularizeServiceEnv } from "../config/env.js";
-import type { RegularizeLicenseReportingService } from "../reporting/internalReportingService.js";
-import { regularizeReportingCatalog } from "../reporting/regularizeReportingCatalog.js";
+import type {
+  RegularizeLicenseReportingService,
+  RegularizeMunicipalTaxesReportingService,
+} from "../reporting/internalReportingService.js";
+import { regularizeMunicipalTaxesReportingCatalog } from "../reporting/regularizeMunicipalTaxesReportingCatalog.js";
+import { regularizeReportingCatalog as regularizeProcessesReportingCatalog } from "../reporting/regularizeReportingCatalog.js";
 import {
   type InternalReportingGrant,
   internalReportingExtractBodySchema,
@@ -20,6 +25,13 @@ import {
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
+const regularizeReportingCatalog = {
+  sources: [
+    ...regularizeProcessesReportingCatalog.sources,
+    ...regularizeMunicipalTaxesReportingCatalog.sources,
+  ],
+  relations: [],
+} as const;
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -105,6 +117,7 @@ function verifyGrant(input: {
 export function createInternalReportingRouter(options: {
   env: Pick<RegularizeServiceEnv, "regularizeReportingToken" | "regularizeReportingGrantSecret">;
   reportingService: RegularizeLicenseReportingService;
+  municipalTaxesReportingService: RegularizeMunicipalTaxesReportingService;
 }): ReturnType<typeof Router> {
   const router = Router();
 
@@ -136,12 +149,20 @@ export function createInternalReportingRouter(options: {
       fields: body.fields,
       body,
     });
-    const result = await options.reportingService.extract({
-      organizationId: grant.organization_id,
-      source: body.source,
-      fields: body.fields,
-      limit: body.limit,
-    });
+    const result =
+      body.source === REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCE
+        ? await options.municipalTaxesReportingService.extract({
+            organizationId: grant.organization_id,
+            source: body.source,
+            fields: body.fields,
+            limit: body.limit,
+          })
+        : await options.reportingService.extract({
+            organizationId: grant.organization_id,
+            source: body.source,
+            fields: body.fields,
+            limit: body.limit,
+          });
     response.json(createSuccessResponse(result));
   });
 

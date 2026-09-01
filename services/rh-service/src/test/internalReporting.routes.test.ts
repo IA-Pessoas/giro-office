@@ -114,7 +114,7 @@ describe("rh internal reporting routes", () => {
     expect(extract).not.toHaveBeenCalled();
   });
 
-  it("publica campos e chaves internas separadamente no catálogo", async () => {
+  it("publica somente campos seguros e mantém chaves separadas no catálogo", async () => {
     const { app } = createApp();
     const signed = signedGrant({
       operation: "catalog",
@@ -130,13 +130,17 @@ describe("rh internal reporting routes", () => {
       .set("x-reports-grant-signature", signed.signature)
       .expect(200);
 
-    const source = response.body.data.sources[0];
-    expect(source.key).toBe("rh.requests");
-    expect(source.keys.map((field: { key: string }) => field.key)).toEqual([
+    const requestSource = response.body.data.sources.find(
+      (source: { key: string }) => source.key === "rh.requests",
+    );
+    const holidaySource = response.body.data.sources.find(
+      (source: { key: string }) => source.key === "rh.holidays",
+    );
+    expect(requestSource.keys.map((field: { key: string }) => field.key)).toEqual([
       "requester_user_id",
       "assigned_to_user_id",
     ]);
-    expect(source.fields.map((field: { key: string }) => field.key)).toEqual([
+    expect(requestSource.fields.map((field: { key: string }) => field.key)).toEqual([
       "title",
       "category",
       "urgency",
@@ -144,7 +148,7 @@ describe("rh internal reporting routes", () => {
       "created_at",
       "updated_at",
     ]);
-    expect(source.fields.map((field: { key: string }) => field.key)).not.toContain("id");
+    expect(requestSource.fields.map((field: { key: string }) => field.key)).not.toContain("id");
 
     const attendance = response.body.data.sources.find(
       (candidate: { key: string }) => candidate.key === "rh.attendance",
@@ -166,6 +170,22 @@ describe("rh internal reporting routes", () => {
     expect(attendance.fields.map((field: { key: string }) => field.key)).not.toEqual(
       expect.arrayContaining(["id", "user_id", "point_id", "approver_user_id", "attachment"]),
     );
+    expect(holidaySource).toMatchObject({ key: "rh.holidays", keys: [] });
+    expect(holidaySource.fields.map((field: { key: string }) => field.key)).toEqual([
+      "name",
+      "date",
+    ]);
+    expect(Object.keys(holidaySource)).toEqual([
+      "key",
+      "label",
+      "module",
+      "minimum_permission",
+      "keys",
+      "fields",
+    ]);
+    expect(
+      [...holidaySource.keys, ...holidaySource.fields].map((field: { key: string }) => field.key),
+    ).not.toContain("id");
   });
 
   it("extrai attendance somente com grant correspondente e encaminha a organizacao", async () => {

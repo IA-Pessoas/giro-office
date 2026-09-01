@@ -1,20 +1,37 @@
 import {
   PESSOAL_LDD_REPORTING_SOURCES,
+  PESSOAL_OBLIGATIONS_REPORTING_SOURCES,
   PESSOAL_PAYROLL_REPORTING_SOURCES,
+  PESSOAL_UNIONS_REPORTING_SOURCES,
   type PessoalLddReportingSource,
+  type PessoalObligationsReportingSource,
   type PessoalPayrollReportingSource,
+  type PessoalUnionsReportingSource,
   pessoalLddReportingCatalog,
+  pessoalObligationsReportingCatalog,
   pessoalPayrollReportingCatalog,
+  pessoalUnionsReportingCatalog,
 } from "@workspace/shared";
 
 export const PESSOAL_REPORTING_SOURCES = [
   ...PESSOAL_LDD_REPORTING_SOURCES,
   ...PESSOAL_PAYROLL_REPORTING_SOURCES,
+  ...PESSOAL_OBLIGATIONS_REPORTING_SOURCES,
+  ...PESSOAL_UNIONS_REPORTING_SOURCES,
 ] as const;
-export type PessoalReportingSource = PessoalLddReportingSource | PessoalPayrollReportingSource;
+export type PessoalReportingSource =
+  | PessoalLddReportingSource
+  | PessoalPayrollReportingSource
+  | PessoalUnionsReportingSource
+  | PessoalObligationsReportingSource;
 
 export const pessoalReportingCatalog = {
-  sources: [...pessoalLddReportingCatalog.sources, ...pessoalPayrollReportingCatalog.sources],
+  sources: [
+    ...pessoalLddReportingCatalog.sources,
+    ...pessoalPayrollReportingCatalog.sources,
+    ...pessoalObligationsReportingCatalog.sources,
+    ...pessoalUnionsReportingCatalog.sources,
+  ],
   relations: [],
 } as const;
 

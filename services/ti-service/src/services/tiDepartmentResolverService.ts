@@ -1,9 +1,16 @@
 import { ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+type DepartmentResolverClient = {
+  department: {
+    findFirst(input: {
+      where: { organization_id: string; name: { equals: string; mode: "insensitive" } };
+      select: { id: true };
+    }): Promise<{ id: string } | null>;
+  };
+};
 
 export class TiDepartmentResolverService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: DepartmentResolverClient) {}
 
   async resolveTechnologyDepartmentId(organizationId: string): Promise<string> {
     const department = await this.prisma.department.findFirst({

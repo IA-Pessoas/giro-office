@@ -265,3 +265,12 @@ test("task reporting smoke stays disabled without its explicit gate", () => {
   assert.match(output, /TASK_REPORTING_SMOKE_ENABLED is false/);
   assert.doesNotMatch(output, /Missing REPORTS_GRANT_SECRET for task reporting smoke/);
 });
+
+test("TI inventory reporting smoke stays disabled without its explicit gate", () => {
+  const result = runSmoke(["--dry-run", "--filter=tiInventoryReporting"]);
+  const output = `${result.stdout}\n${result.stderr}`;
+
+  assert.equal(result.status, 0);
+  assert.match(output, /TI_REPORTING_SMOKE_ENABLED is false/);
+  assert.doesNotMatch(output, /Missing REPORTS_GRANT_SECRET for TI inventory reporting smoke/);
+});

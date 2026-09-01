@@ -36,7 +36,10 @@ describe("rh internal reporting OpenAPI", () => {
     expect(
       spec.paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
         ?.schema?.properties?.source,
-    ).toEqual({ type: "string", enum: ["rh.requests", "rh.attendance"] });
+    ).toEqual({
+      type: "string",
+      enum: ["rh.requests", "rh.attendance", "rh.holidays"],
+    });
     expect(
       spec.paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
         ?.schema?.properties,

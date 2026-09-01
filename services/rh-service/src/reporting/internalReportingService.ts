@@ -6,11 +6,18 @@ import {
   type RhAttendanceReportingSource,
 } from "./rhAttendanceReportingCatalog.js";
 import {
+  getRhHolidayReportingFields,
+  type RhHolidayReportingSource,
+} from "./rhHolidayReportingCatalog.js";
+import {
   getRhRequestReportingFields,
   type RhRequestReportingSource,
 } from "./rhRequestReportingCatalog.js";
 
-type RhReportingSource = RhRequestReportingSource | RhAttendanceReportingSource;
+type RhReportingSource =
+  | RhRequestReportingSource
+  | RhAttendanceReportingSource
+  | RhHolidayReportingSource;
 
 type ReportingSelect = {
   title?: true;
@@ -34,8 +41,17 @@ type ReportGrantUseDelegate = {
   create(input: { data: { grant_hash: string; expires_at: Date } }): Promise<unknown>;
 };
 
+type HolidayReportingDelegate = {
+  findMany(input: {
+    where: { organization_id: string };
+    select: { name: true; date: true };
+    take: number;
+  }): Promise<readonly Record<string, unknown>[]>;
+};
+
 type AttendanceReportingPrisma = {
   rhRequest?: ReportingDelegate;
+  holidays?: HolidayReportingDelegate;
   point?: ReportingDelegate;
   timeSheets?: ReportingDelegate;
   timeBankReleases?: ReportingDelegate;
@@ -80,6 +96,8 @@ const reportingSelect: ReportingSelect = {
   updated_at: true,
 };
 
+const holidayReportingSelect = { name: true, date: true } as const;
+
 export class InternalReportingService {
   constructor(private readonly prisma: AttendanceReportingPrisma) {}
 
@@ -113,11 +131,29 @@ export class InternalReportingService {
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
     const allowedFields =
-      input.source === "rh.requests"
-        ? getRhRequestReportingFields(input.source)
-        : getRhAttendanceReportingFields(input.source);
+      input.source === "rh.holidays"
+        ? getRhHolidayReportingFields(input.source)
+        : input.source === "rh.requests"
+          ? getRhRequestReportingFields(input.source)
+          : getRhAttendanceReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
+    }
+
+    if (input.source === "rh.holidays") {
+      if (!this.prisma.holidays) {
+        throw new ServiceError(500, "Fonte de relatórios indisponível.");
+      }
+      const rows = await this.prisma.holidays.findMany({
+        where: { organization_id: input.organizationId },
+        select: holidayReportingSelect,
+        take: input.limit + 1,
+      });
+
+      return {
+        rows: projectRows(rows.slice(0, input.limit), input.fields),
+        reachedLimit: rows.length > input.limit,
+      };
     }
 
     if (input.source === "rh.requests") {
@@ -129,6 +165,7 @@ export class InternalReportingService {
         select: reportingSelect,
         take: input.limit + 1,
       });
+
       return {
         rows: projectRows(rows.slice(0, input.limit), input.fields),
         reachedLimit: rows.length > input.limit,

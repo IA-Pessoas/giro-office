@@ -1,12 +1,16 @@
+import { REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCES } from "@workspace/shared";
 import { z } from "zod";
 
 import { REGULARIZE_REPORTING_SOURCES } from "../reporting/regularizeReportingCatalog.js";
-
 const reportingFieldSchema = z.string().trim().min(1).max(64);
+const regularizeReportingSources = [
+  ...REGULARIZE_REPORTING_SOURCES,
+  ...REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCES,
+] as const;
 
 export const internalReportingExtractBodySchema = z
   .object({
-    source: z.enum(REGULARIZE_REPORTING_SOURCES),
+    source: z.enum(regularizeReportingSources),
     fields: z.array(reportingFieldSchema).min(1).max(25),
     limit: z.number().int().min(1).max(101),
   })

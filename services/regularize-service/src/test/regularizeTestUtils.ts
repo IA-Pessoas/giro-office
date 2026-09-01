@@ -9,7 +9,10 @@ import { vi } from "vitest";
 import { createApp } from "../app.js";
 import type { RegularizeServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import type { RegularizeLicenseReportingService } from "../reporting/internalReportingService.js";
+import type {
+  RegularizeLicenseReportingService,
+  RegularizeMunicipalTaxesReportingService,
+} from "../reporting/internalReportingService.js";
 import { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
 
 export const regularizeTestEnv: RegularizeServiceEnv = {
@@ -62,6 +65,7 @@ export function createLoggerMock() {
 export function createTestApp(
   prisma: PrismaClient = {} as PrismaClient,
   internalReportingService?: RegularizeLicenseReportingService,
+  municipalTaxesReportingService?: RegularizeMunicipalTaxesReportingService,
 ) {
   return createApp({
     env: regularizeTestEnv,
@@ -73,5 +77,6 @@ export function createTestApp(
     runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
     runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     internalReportingService,
+    municipalTaxesReportingService,
   });
 }
