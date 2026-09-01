@@ -22,3 +22,4 @@ export * from "./rhRequestReportingCatalog.js";
 export * from "./taskReportingCatalog.js";
 export * from "./tiInventoryReportingCatalog.js";
 export * from "./tiRequestsReportingCatalog.js";
+export * from "./tiStockReportingCatalog.js";

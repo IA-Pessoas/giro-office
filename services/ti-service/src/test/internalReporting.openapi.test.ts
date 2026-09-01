@@ -24,18 +24,18 @@ describe("ti internal reporting OpenAPI", () => {
     }
 
     expect(spec.paths["/internal/reporting/extract"]).toBeDefined();
-    expect(
-      (
-        spec.paths["/internal/reporting/extract"] as {
-          post: {
-            requestBody: {
-              content: {
-                "application/json": { schema: { properties: { source: { enum: string[] } } } };
-              };
+    const bodySchema = (
+      spec.paths["/internal/reporting/extract"] as {
+        post: {
+          requestBody: {
+            content: {
+              "application/json": { schema: { properties: { source: { enum: string[] } } } };
             };
           };
-        }
-      ).post.requestBody.content["application/json"].schema.properties.source.enum,
-    ).toContain("ti.requests");
+        };
+      }
+    ).post.requestBody.content["application/json"].schema;
+    expect(bodySchema.properties.source.enum).toEqual(["ti.inventory", "ti.requests", "ti.stock"]);
+    expect(spec.paths["/ti/stock"]).toBeDefined();
   });
 });

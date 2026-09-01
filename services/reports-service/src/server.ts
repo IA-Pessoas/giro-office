@@ -27,6 +27,7 @@ import { RhRequestAdapter } from "./integrations/rhRequestAdapter.js";
 import { TaskAdapter } from "./integrations/taskAdapter.js";
 import { TiInventoryAdapter } from "./integrations/tiInventoryAdapter.js";
 import { TiRequestsAdapter } from "./integrations/tiRequestsAdapter.js";
+import { TiStockAdapter } from "./integrations/tiStockAdapter.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
 
 const env = getReportsServiceEnv();
@@ -64,6 +65,7 @@ const app = createReportsApp({
       new RhRequestAdapter(env),
       new RhHolidayAdapter(env),
       new TiInventoryAdapter(env),
+      new TiStockAdapter(env),
       new TiRequestsAdapter(env),
       new RegularizeMunicipalTaxesAdapter(env),
     ],

@@ -1,5 +1,4 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-
 import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -8,9 +7,8 @@ import {
   ServiceError,
 } from "@workspace/shared";
 import { Router } from "express";
-
 import type { TiServiceEnv } from "../config/env.js";
-import type { TiInternalReportingService } from "../reporting/tiInternalReportingService.js";
+import type { InternalReportingService } from "../reporting/internalReportingService.js";
 import {
   type InternalReportingGrant,
   internalReportingExtractBodySchema,
@@ -19,6 +17,7 @@ import {
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
+const usedReportingGrants = new Map<string, number>();
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -36,6 +35,20 @@ function equalSecret(left: string | undefined, right: string): boolean {
   const actual = Buffer.from(left, "utf8");
   const expected = Buffer.from(right, "utf8");
   return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function bodyHash(body: unknown): string {
+  return createHash("sha256").update(canonicalJson(body)).digest("hex");
+}
+
+function rejectReplayedGrant(grant: string, expiresAt: number, now: number): void {
+  for (const [cachedGrant, cachedExpiry] of usedReportingGrants) {
+    if (cachedExpiry <= now) usedReportingGrants.delete(cachedGrant);
+  }
+  if (usedReportingGrants.has(grant)) {
+    throw new ServiceError(403, "Grant de relatórios inválido.");
+  }
+  usedReportingGrants.set(grant, expiresAt);
 }
 
 function decodeGrant(value: string | undefined): InternalReportingGrant {
@@ -82,18 +95,20 @@ function verifyGrant(input: {
     payload.source !== input.source ||
     !fieldsMatch ||
     payload.request_id !== input.requestId ||
-    payload.body_sha256 !== createHash("sha256").update(canonicalJson(input.body)).digest("hex") ||
+    payload.body_sha256 !== bodyHash(input.body) ||
     payload.issued_at > now ||
-    payload.expires_at <= now
+    payload.expires_at <= now ||
+    payload.expires_at <= payload.issued_at
   ) {
     throw new ServiceError(403, "Grant de relatórios inválido.");
   }
+  rejectReplayedGrant(grant, payload.expires_at, now);
   return payload;
 }
 
 export function createInternalReportingRouter(options: {
   env: Pick<TiServiceEnv, "reportsInternalToken" | "reportsGrantSecret">;
-  reportingService: TiInternalReportingService;
+  reportingService: Pick<InternalReportingService, "catalog" | "extract">;
 }): ReturnType<typeof Router> {
   const router = Router();
   router.get("/reporting/catalog", (request, response) => {

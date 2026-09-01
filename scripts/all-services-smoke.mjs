@@ -1109,9 +1109,9 @@ function createRhReportingGrant({ operation, source, fields, body }) {
   };
 }
 
-function createTiInventoryReportingGrant({ operation, source, fields, body }) {
+function createTiReportingGrant({ operation, source, fields, body }) {
   const secret = process.env.REPORTS_GRANT_SECRET?.trim();
-  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for TI inventory reporting smoke.");
+  if (!secret) throw new Error("Missing REPORTS_GRANT_SECRET for TI reporting smoke.");
 
   const issuedAt = Math.floor(Date.now() / 1000);
   const requestId = crypto.randomUUID();
@@ -2077,6 +2077,10 @@ const handlers = {
 
   async tiStockItemList(op) {
     await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async tiStockReportList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/ti/stock" });
   },
 
   async tiStockItemCreate(op) {
@@ -3074,7 +3078,7 @@ const handlers = {
       path: "/internal/reporting/catalog",
       headers: isBadExpectation(op)
         ? {}
-        : createTiInventoryReportingGrant({
+        : createTiReportingGrant({
             operation: "catalog",
             source: "ti.catalog",
             fields: [],
@@ -3084,19 +3088,24 @@ const handlers = {
   },
 
   async tiInventoryReportingExtract(op) {
-    const body = { source: "ti.inventory", fields: ["asset_code"], limit: 1 };
-    await httpRequest(op, {
-      path: "/internal/reporting/extract",
-      json: body,
-      headers: isBadExpectation(op)
-        ? {}
-        : createTiInventoryReportingGrant({
-            operation: "extract",
-            source: body.source,
-            fields: body.fields,
-            body,
-          }),
-    });
+    const bodies = [
+      { source: "ti.inventory", fields: ["asset_code"], limit: 1 },
+      { source: "ti.stock", fields: ["name"], limit: 1 },
+    ];
+    for (const body of bodies) {
+      await httpRequest(op, {
+        path: "/internal/reporting/extract",
+        json: body,
+        headers: isBadExpectation(op)
+          ? {}
+          : createTiReportingGrant({
+              operation: "extract",
+              source: body.source,
+              fields: body.fields,
+              body,
+            }),
+      });
+    }
   },
 
   async userStartConfig(op) {

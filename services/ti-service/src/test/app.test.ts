@@ -70,6 +70,7 @@ const tiPublicOpenApiOperations = {
   "/ti/terms": ["post"],
   "/ti/terms/{id}": ["get", "patch"],
   "/ti/terms/{id}/sign": ["patch"],
+  "/ti/stock": ["get"],
   "/ti/stock/items/{id}/movements/list": ["get"],
 } as const;
 
