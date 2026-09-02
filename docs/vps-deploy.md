@@ -41,6 +41,15 @@ Para o ambiente single-slot publicado em `useoffice.com.br`, consulte
 docker compose -f docker-compose.vps.yml up -d --build
 ```
 
+O reverse-proxy é a única borda da stack. Ele encaminha `/` e assets para `web:3000`,
+`/api/*` para `gateway:3010` removendo `/api`, e `/docs/*`/`/openapi.json` para o gateway.
+O Caddy ou proxy existente da VPS deve encaminhar o endpoint HTTPS para
+`127.0.0.1:${REVERSE_PROXY_PORT}`. Em produção, use `API_DOMAIN=useoffice.com.br` e mantenha
+`AUTH_COOKIE_SECURE=true`; em develop, configure o endpoint e a origem reais do ambiente sem
+introduzir um hostname de develop no código.
+Quando `NGINX_TLS_ENABLED=true`, o TLS fica disponível no bind loopback
+`127.0.0.1:${REVERSE_PROXY_TLS_PORT}`; configure o proxy externo para usar HTTPS nesse upstream.
+
 6. `certificate-service`, `pessoal-service` and `audit-service` are part of the default stack. Configure `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` and `PESSOAL_SERVICE_URL=http://pessoal-service:3042` in `.env.vps.gateway`; control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
 7. Configure `PROJECT_SERVICE_URL=http://project-service:3033` and
    `TASK_SERVICE_URL=http://task-service:3032` for `reports-service`. Keep
@@ -183,7 +192,7 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
   - `test/deploy-develop` → `test-deploy-develop-cicd.yml` — `/data/workspace-teste-develop`, `DEPLOY_SLOT=test-develop`, projeto `workspace-teste-develop` — portas **8087** (proxy) / **3013** (gateway) / **3002** (web UI), ficheiro `docker-compose.vps.slot-test-develop.yml`.
   - `test/deploy-staging` → `test-deploy-staging-cicd.yml` — `/data/workspace-teste-staging`, `DEPLOY_SLOT=test-staging`, projeto `workspace-teste-staging` — portas **8086** (proxy) / **3012** (gateway) / **3003** (web UI), ficheiro `docker-compose.vps.slot-test-staging.yml`.
 
-  Slots **reais**: develop **8086**/**3011**/**3001** (web), staging **8085**/**3010**/**3000** (web no host 3000), ver `vps-remote-deploy.sh`. Os slots de teste usam portas acima para reduzir choque com produção; ainda assim **8086** no teste-staging coincide com o proxy do **develop** real — não corras os dois no mesmo host sem ajustar um deles.
+  Slots **reais**: develop **8086** (proxy; gateway **3011** e web **3001** permanecem loopback), staging **8085** (proxy; gateway **3010** e web **3000** permanecem loopback), ver `vps-remote-deploy.sh`. Os slots de teste usam portas acima para reduzir choque com produção; ainda assim **8086** no teste-staging coincide com o proxy do **develop** real — não corras os dois no mesmo host sem ajustar um deles.
 
 Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em falha.
 
@@ -233,7 +242,7 @@ Workflows que **não** definem `environment` (ex.: `test-cicd.yml` em branch de 
    - **teste develop:** `/data/workspace-teste-develop` (branch `test/deploy-develop`)
    - **teste staging:** `/data/workspace-teste-staging` (branch `test/deploy-staging`)
 
-3. Com **develop** e **staging** na mesma VPS: **staging** usa só `docker-compose.vps.yml` (proxy **8085**, gateway **3010**). **develop** usa `docker-compose.vps.yml` + `docker-compose.vps.slot-develop.yml` (proxy **8086**, gateway **3011**). O `vps-remote-deploy.sh` aplica o override quando `DEPLOY_SLOT=develop`.
+3. Com **develop** e **staging** na mesma VPS: **staging** usa só `docker-compose.vps.yml` (proxy **8085**, gateway **3010**). **develop** usa `docker-compose.vps.yml` + `docker-compose.vps.slot-develop.yml` (proxy **8086**, gateway **3011**). O `vps-remote-deploy.sh` aplica o override quando `DEPLOY_SLOT=develop`; em ambos os casos o endpoint da borda aponta para o proxy em loopback.
 
 ### Healthchecks (VPS persistente vs CI/DAST)
 

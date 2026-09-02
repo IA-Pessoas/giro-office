@@ -38,8 +38,11 @@ checks=(
   "backend|http://reports-service:3044/health"
   "backend|http://audit-service:3020/ready"
   "backend|http://gateway:3010/ready"
-  "public-edge|http://web:3000/"
-  "public-edge|http://web:3000/api/health"
+  "backend|http://web:3000/"
+  "backend|http://web:3000/api/health"
+  "public-edge|http://reverse-proxy:80/"
+  "public-edge|http://reverse-proxy:80/api/health"
+  "public-edge|http://reverse-proxy:80/api/ready"
 )
 
 run_checks() {

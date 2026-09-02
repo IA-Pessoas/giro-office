@@ -42,8 +42,54 @@ server {
 
   client_max_body_size ${client_max_body_size};
 
-  location / {
+  location /api/ {
+    proxy_pass http://gateway:3010/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$http_host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$remote_addr;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection \$connection_upgrade;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+  }
+
+  location = /openapi.json {
     proxy_pass http://gateway:3010;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$http_host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$remote_addr;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+  }
+
+  location = /docs {
+    proxy_pass http://gateway:3010;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$http_host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$remote_addr;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+  }
+
+  location /docs/ {
+    proxy_pass http://gateway:3010;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$http_host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$remote_addr;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+  }
+
+  location / {
+    proxy_pass http://web:3000;
     proxy_http_version 1.1;
     proxy_set_header Host \$http_host;
     proxy_set_header X-Real-IP \$remote_addr;
@@ -70,8 +116,54 @@ server {
 
   client_max_body_size ${client_max_body_size};
 
-  location / {
+  location /api/ {
+    proxy_pass http://gateway:3010/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$http_host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$remote_addr;
+    proxy_set_header X-Forwarded-Proto http;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection \$connection_upgrade;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+  }
+
+  location = /openapi.json {
     proxy_pass http://gateway:3010;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$http_host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$remote_addr;
+    proxy_set_header X-Forwarded-Proto http;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+  }
+
+  location = /docs {
+    proxy_pass http://gateway:3010;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$http_host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$remote_addr;
+    proxy_set_header X-Forwarded-Proto http;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+  }
+
+  location /docs/ {
+    proxy_pass http://gateway:3010;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$http_host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$remote_addr;
+    proxy_set_header X-Forwarded-Proto http;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+  }
+
+  location / {
+    proxy_pass http://web:3000;
     proxy_http_version 1.1;
     proxy_set_header Host \$http_host;
     proxy_set_header X-Real-IP \$remote_addr;

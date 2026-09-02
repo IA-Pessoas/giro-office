@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   checkComposeSecurity,
+  checkProductionComposeSecurity,
   checkResolvedProductionSecurity,
 } from "./check-compose-security.mjs";
 
@@ -150,10 +151,17 @@ networks:
   assert.match(result.errors.join("\n"), /backend.*internal/);
 });
 
-test("production security accepts only web on public-edge without published ports", () => {
+test("production security accepts only loopback reverse-proxy ports on public-edge", () => {
   const result = checkResolvedProductionSecurity({
     services: {
-      web: { networks: { edge: null, backend: null, "public-edge": null } },
+      "reverse-proxy": {
+        networks: { edge: null, backend: null, "public-edge": null },
+        ports: [
+          { host_ip: "127.0.0.1", published: "8080", target: 80 },
+          { host_ip: "127.0.0.1", published: "8443", target: 443 },
+        ],
+      },
+      web: { networks: { edge: null, backend: null } },
       gateway: { networks: { edge: null, backend: null } },
       "user-service": { networks: { backend: null, egress: null } },
     },
@@ -166,12 +174,12 @@ test("production security accepts only web on public-edge without published port
   assert.deepEqual(result.errors, []);
 });
 
-test("production security rejects host ports and backend services on public-edge", () => {
+test("production security rejects public reverse-proxy ports and backend services on public-edge", () => {
   const result = checkResolvedProductionSecurity({
     services: {
-      web: {
+      "reverse-proxy": {
         networks: { edge: null, backend: null, "public-edge": null },
-        ports: [{ published: "3000", target: 3000 }],
+        ports: [{ host_ip: "0.0.0.0", published: "3000", target: 3000 }],
       },
       gateway: { networks: { edge: null, backend: null, "public-edge": null } },
     },
@@ -181,6 +189,12 @@ test("production security rejects host ports and backend services on public-edge
     },
   });
 
-  assert.match(result.errors.join("\n"), /web.*host ports/);
+  assert.match(result.errors.join("\n"), /reverse-proxy.*host ports/);
   assert.match(result.errors.join("\n"), /gateway.*public-edge/);
+});
+
+test("production security validates the repository Compose topology", async () => {
+  const result = await checkProductionComposeSecurity();
+
+  assert.deepEqual(result.errors, []);
 });

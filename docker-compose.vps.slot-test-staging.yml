@@ -5,6 +5,7 @@ services:
   reverse-proxy:
     ports: !override
       - "127.0.0.1:8088:80"
+      - "127.0.0.1:8448:443"
   gateway:
     ports: !override
       - "127.0.0.1:3012:3010"

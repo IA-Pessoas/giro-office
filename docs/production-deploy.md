@@ -19,8 +19,12 @@ pnpm deploy:production
 - Compose base: `docker-compose.vps.yml`.
 - Override: `docker-compose.production.yml`.
 - Entrada pública: Caddy existente nas portas 80/443.
-- UI: serviço `web` na rede Docker externa `public-edge`.
-- API: `/api/*` passa pelo rewrite do Next.js para `gateway:3010`.
+- Borda: `reverse-proxy` na rede Docker externa `public-edge`, publicado somente em
+  `127.0.0.1:${REVERSE_PROXY_PORT:-8080}` (HTTP) e
+  `127.0.0.1:${REVERSE_PROXY_TLS_PORT:-8443}` (TLS, quando habilitado).
+- UI: `/` e assets são encaminhados pelo reverse-proxy para `web:3000`.
+- API: `/api/*` é encaminhado ao `gateway:3010` com o prefixo `/api` removido.
+- Documentação: `/docs/*` e `/openapi.json` são encaminhados ao gateway sem remover o prefixo.
 - Gateway e serviços de domínio não publicam portas no host.
 
 O DNS deve ter o registro A `useoffice.com.br` apontando para `187.77.48.15`. O host `www`
@@ -36,7 +40,10 @@ permanece CNAME do domínio raiz e o Caddy o redireciona para `https://useoffice
 
 2. Materialize todos os `.env.vps.*` listados em `scripts/ci/vps-secrets.manifest` e aplique
    modo `0600`.
-3. Conecte o Caddy à rede externa e configure os dois hosts.
+3. Com `NGINX_TLS_ENABLED=false`, configure o Caddy existente para encaminhar
+   `useoffice.com.br` ao endpoint local `127.0.0.1:${REVERSE_PROXY_PORT:-8080}`.
+   Com TLS no Nginx, use `https://127.0.0.1:${REVERSE_PROXY_TLS_PORT:-8443}` como upstream.
+   Não altere o apontamento DNS do domínio.
 4. Execute `pnpm deploy:production`.
 5. Confira o runtime:
 
@@ -49,6 +56,11 @@ permanece CNAME do domínio raiz e o Caddy o redireciona para `https://useoffice
 O script valida os envs e o Compose, constrói as 17 imagens sequencialmente antes da troca,
 aplica migrations, recria a stack e aguarda endpoints. Em falha, restaura as tags anteriores e
 tenta reiniciar a versão anterior.
+
+Para expor a documentação deliberadamente, configure `ENABLE_API_DOCS=true`,
+`GATEWAY_PUBLIC_URL=https://useoffice.com.br` e `GATEWAY_ALLOWED_ORIGINS=https://useoffice.com.br`
+no `.env.vps.gateway`. O web continua usando `NEXT_PUBLIC_API_URL=/api` e
+`API_INTERNAL_URL=http://gateway:3010`; `AUTH_COOKIE_SECURE` permanece `true`.
 
 ## Logs e diagnóstico
 
