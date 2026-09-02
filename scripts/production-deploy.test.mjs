@@ -21,6 +21,7 @@ const poolBudgetValidator = path.join(
   "validate-database-pool-budget.mjs",
 );
 const vpsCompose = path.join(repoRoot, "docker-compose.vps.yml");
+const productionCompose = path.join(repoRoot, "docker-compose.production.yml");
 
 function createPoolEnvRoot(databasePoolMax = "1") {
   const envRoot = mkdtempSync(path.join(tmpdir(), "database-pool-budget-"));
@@ -106,6 +107,23 @@ test("production web env is exported for Docker build arguments", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, "/api|http://gateway:3010");
   assert.doesNotMatch(readFileSync(appDockerfile, "utf8"), /NEXT_PUBLIC_AUTH_COOKIE_SECURE/);
+  assert.match(readFileSync(appDockerfile, "utf8"), /ARG NEXT_PUBLIC_API_URL=\/api/u);
+  assert.match(
+    readFileSync(path.join(repoRoot, "scripts", "ci", "compose-vps-buildx-push.sh"), "utf8"),
+    /NEXT_PUBLIC_API_URL=\$\{NEXT_PUBLIC_API_URL:-\/api\}/u,
+  );
+});
+
+test("production routes the existing edge through a loopback reverse proxy", () => {
+  const compose = readFileSync(productionCompose, "utf8");
+  const reverseProxy = compose.match(/  reverse-proxy:[\s\S]*?(?=^  \S)/mu)?.[0] ?? "";
+  const web = compose.match(/  web:[\s\S]*?(?=^  \S)/mu)?.[0] ?? "";
+
+  assert.match(reverseProxy, /ports: !override[\s\S]*?127\.0\.0\.1:\$\{REVERSE_PROXY_PORT:-8080\}:80/u);
+  assert.match(reverseProxy, /127\.0\.0\.1:\$\{REVERSE_PROXY_TLS_PORT:-8443\}:443/u);
+  assert.doesNotMatch(compose, /profiles:/u);
+  assert.match(reverseProxy, /public-edge/u);
+  assert.doesNotMatch(web, /public-edge/u);
 });
 
 test("production deploy plans validation and build before replacing containers", () => {
