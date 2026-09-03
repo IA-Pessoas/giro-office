@@ -56,6 +56,9 @@ importers:
 
   app:
     dependencies:
+      '@launchdarkly/js-client-sdk':
+        specifier: ^4.10.0
+        version: 4.10.0
       '@radix-ui/react-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -1388,6 +1391,9 @@ importers:
 
   shared:
     dependencies:
+      '@launchdarkly/node-server-sdk':
+        specifier: ^9.13.1
+        version: 9.13.1
       '@supabase/supabase-js':
         specifier: ^2.99.1
         version: 2.102.1
@@ -2171,6 +2177,37 @@ packages:
 
   '@js-sdsl/ordered-map@4.4.2':
     resolution: {integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==}
+
+  '@launchdarkly/js-client-sdk-common@1.30.2':
+    resolution: {integrity: sha512-qpO5gSNX5WbqM03LMCKxOh8dR7Rl1iPxcsXXY//XUNlVbZ1YLrJfqVkSrOYfZHxO8PQMSPa/GFwNWSCwfapjPw==}
+
+  '@launchdarkly/js-client-sdk@4.10.0':
+    resolution: {integrity: sha512-m6bHhyM5qVHol6DsdBUVXZJ8sFpbn5yJwudBHtj/BbO/6DYshGeOMJkZbbHWvXKU48vvan0HwNoGijIoIYgKzQ==}
+
+  '@launchdarkly/js-sdk-common@2.25.2':
+    resolution: {integrity: sha512-l/OJiIGnLS6Qt6J/Lc3KgUXL4vAES5wsxIgNZcw3yCUbDEuTyVR9Qya9Aqy1klg2kF1VsHiY2wvaKimlIZK7+g==}
+
+  '@launchdarkly/js-server-sdk-common@2.20.1':
+    resolution: {integrity: sha512-EJqkXMtr/mIupsBw3PI/nxdmxYPD3kdCwyozgiCz41fG1PXcbT9tlymqNi0znqHGDH99Ru4vSG5YzoP8uqqMZg==}
+
+  '@launchdarkly/node-server-sdk@9.13.1':
+    resolution: {integrity: sha512-ZVp0PVxns8K8bH9Wd7vtp3GrvSgZK/F88wixB3yl92/4ytYCjyFIQWh3rtbSByNIXC1Ct92JMvDzyTcZdzUnOQ==}
+
+  launchdarkly-eventsource@2.2.0:
+    resolution: {integrity: sha512-u38fYlLSq/m6oFz0MS1/76Sj2xzlYhTKZ+sf/vju6PA86PMc6fPlY5k8CdU79edLXjNwsvIQTDvDNy3llDqB8A==}
+    engines: {node: '>=0.12.0'}
+
+  lru-cache@6.0.0:
+    resolution: {integrity: sha512-Jo6dJ04CmSjuznwJSS3pUeWmd/H0ffTlkXXgwZi+eq1UCmqQwCh+eLsYOYCwY991i2Fah4h1BEMCx4qThGbsiA==}
+    engines: {node: '>=10'}
+
+  semver@7.5.4:
+    resolution: {integrity: sha512-1bCSESV6Pv+i21Hvpxp3Dx+pSD8lIPt8uVjRrxAUt/nbswYc+tK6Y2btiULjd4+fnq15PX+nqQDC7Oft7WkwcA==}
+    engines: {node: '>=10'}
+    hasBin: true
+
+  yallist@4.0.0:
+    resolution: {integrity: sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==}
 
   '@next/env@16.3.0':
     resolution: {integrity: sha512-o9r1S0BNiNreHP9Vs+Qnqd9kviDkJh8xIACY7UFZSmiGbbQRzPBBosvHzAU4TULHOIuOj/18RSsyz2qrREmIFw==}
@@ -5944,6 +5981,41 @@ packages:
     resolution: {integrity: sha512-x7bc76x0bm4prf1VLg79uhAzKw8DVboClSN5VxJuQ+LKDOVEW9CdH+VY7SP+vX7xCYQqzzgQpFqz15zeLvAtZQ==}
 
 snapshots:
+
+  '@launchdarkly/js-client-sdk-common@1.30.2':
+    dependencies:
+      '@launchdarkly/js-sdk-common': 2.25.2
+
+  '@launchdarkly/js-client-sdk@4.10.0':
+    dependencies:
+      '@launchdarkly/js-client-sdk-common': 1.30.2
+
+  '@launchdarkly/js-sdk-common@2.25.2': {}
+
+  '@launchdarkly/js-server-sdk-common@2.20.1':
+    dependencies:
+      '@launchdarkly/js-sdk-common': 2.25.2
+      semver: 7.5.4
+
+  '@launchdarkly/node-server-sdk@9.13.1':
+    dependencies:
+      '@launchdarkly/js-server-sdk-common': 2.20.1
+      https-proxy-agent: 7.0.6
+      launchdarkly-eventsource: 2.2.0
+    transitivePeerDependencies:
+      - supports-color
+
+  launchdarkly-eventsource@2.2.0: {}
+
+  lru-cache@6.0.0:
+    dependencies:
+      yallist: 4.0.0
+
+  semver@7.5.4:
+    dependencies:
+      lru-cache: 6.0.0
+
+  yallist@4.0.0: {}
 
   buffer-indexof-polyfill@1.0.2: {}
 

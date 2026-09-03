@@ -21,6 +21,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `ORGANIZATION_SERVICE_URL`
 - `RH_SERVICE_URL`
 - `USER_SERVICE_URL`, `USER_SERVICE_INTERNAL_TOKEN` (token exclusivo do contexto gateway -> user-service; obrigatório em produção)
+- `FEATURE_FLAGS_ENABLED`, `LAUNCHDARKLY_SDK_KEY` (segredo server-side) e `LAUNCHDARKLY_INIT_TIMEOUT_MS` — camada base de flags; consulte [`docs/feature-flags.md`](../../docs/feature-flags.md).
 - `DEPARTMENT_SERVICE_URL`
 - `TASK_SERVICE_URL`
 - `PROJECT_SERVICE_URL`

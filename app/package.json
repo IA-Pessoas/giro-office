@@ -18,6 +18,7 @@
     "test:contabil": "node --experimental-strip-types src/modules/contabil/run-contabil-tests.mjs",
     "test:projects": "node --experimental-strip-types src/modules/integracao/run-project-tests.mjs",
     "test:socket": "node --experimental-strip-types src/context/run-socket-context-tests.mjs",
+    "test:feature-flags": "node --experimental-strip-types src/shared/featureFlags/run-feature-flags-tests.mjs",
     "test:chat-context": "node --experimental-strip-types src/modules/chat/run-chat-context-tests.mjs",
     "test:chat-window": "node --experimental-strip-types src/modules/chat/run-conversation-window-tests.mjs",
     "test:chat": "pnpm run test:socket && pnpm run test:chat-context && pnpm run test:chat-window",
@@ -55,6 +56,7 @@
     "typecheck:usefetch": "tsc -p tsconfig.usefetch-types.json --noEmit"
   },
   "dependencies": {
+    "@launchdarkly/js-client-sdk": "^4.10.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-separator": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.2",

@@ -38,6 +38,7 @@ Thumbs.db
 
 # docs
 docs/*
+!docs/feature-flags.md
 !docs/vps-deploy.md
 !docs/migration/
 !docs/migration/**
