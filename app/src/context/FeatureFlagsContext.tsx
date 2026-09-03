@@ -58,7 +58,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
     if (serviceRef.current.status === "ready") {
       void serviceRef.current.identify(context);
     }
-  }, [context]);
+  }, [context, service]);
 
   const value = useMemo<FeatureFlagsContextValue>(
     () => ({ status: service.status, isEnabled: service.isEnabled }),
