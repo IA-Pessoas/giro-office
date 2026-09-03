@@ -22,9 +22,11 @@ import { createCertificateNotificationRoutes } from "./routes/certificateNotific
 import { createCertificatePfRoutes } from "./routes/certificatePf.routes.js";
 import { createCertificatePjRoutes } from "./routes/certificatePj.routes.js";
 import { createInternalNotificationRoutes } from "./routes/internalNotification.routes.js";
+import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import type { createCertificateFileCrypto } from "./services/certificateFileCrypto.js";
 import type { CertificateFileStorage } from "./services/certificateFileStorage.js";
 import { createCertificatePasswordCrypto } from "./services/certificatePasswordCrypto.js";
+import { InternalReportingService } from "./services/internalReportingService.js";
 
 function certificateServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const out: Record<string, unknown> = {};
@@ -48,6 +50,7 @@ export interface CreateCertificateApplicationOptions {
   prisma: PrismaClient;
   certificateFileStorage?: CertificateFileStorage;
   certificateFileCrypto?: ReturnType<typeof createCertificateFileCrypto>;
+  internalReportingService?: InternalReportingService;
 }
 
 export function createCertificateApplication({
@@ -56,8 +59,11 @@ export function createCertificateApplication({
   prisma: _prisma,
   certificateFileStorage,
   certificateFileCrypto,
+  internalReportingService: providedInternalReportingService,
 }: CreateCertificateApplicationOptions): express.Express {
   const app = express();
+  const internalReportingService =
+    providedInternalReportingService ?? new InternalReportingService(_prisma);
   const certificatePasswordCrypto = createCertificatePasswordCrypto({
     keyBase64: env.certificatePasswordEncryptionKey,
     keyVersion: env.certificatePasswordEncryptionKeyVersion,
@@ -127,6 +133,10 @@ export function createCertificateApplication({
     }),
   );
   app.use("/internal/notifications", createInternalNotificationRoutes(_prisma, env));
+  app.use(
+    "/internal",
+    createInternalReportingRouter({ env, reportingService: internalReportingService }),
+  );
 
   if (env.enableApiDocs) {
     mountOpenApiDocs(app, {

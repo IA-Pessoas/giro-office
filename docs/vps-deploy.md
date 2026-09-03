@@ -16,6 +16,8 @@ Para o ambiente single-slot publicado em `useoffice.com.br`, consulte
 - `.env.vps.task-service`
 - `.env.vps.project-service`
 - `.env.vps.client-service`
+- `.env.vps.parcelamento-service`
+- `.env.vps.reports-service`
 - `.env.vps.rh-service`
 - `.env.vps.department-service`
 - `.env.vps.fiscal-service`
@@ -30,16 +32,30 @@ Para o ambiente single-slot publicado em `useoffice.com.br`, consulte
 ## First start
 
 1. Fill the `.env.vps.*` files with the real VPS values.
-2. If `NGINX_TLS_ENABLED=true`, place the certificate files in `docker/nginx/certs` on the VPS.
+2. Termine TLS no Caddy compartilhado do host ou, com `NGINX_TLS_ENABLED=true`, monte os certificados em `docker/nginx/certs`.
 3. Configure o secret **`ENV_VPS_WEB`** (corpo = ficheiro `.env.vps.web`): `NEXT_PUBLIC_API_URL=/api` e `API_INTERNAL_URL=http://gateway:3010` para manter browser e API na mesma origem.
-4. If you keep `NGINX_TLS_ENABLED=false`, use `http://api.seu-dominio` instead.
+4. Com `NGINX_TLS_ENABLED=false`, as portas HTTP permanecem vinculadas apenas ao loopback e devem ficar atrás do terminador TLS do host; nunca publique login de plataforma em HTTP.
 5. Start the stable stack:
 
 ```bash
 docker compose -f docker-compose.vps.yml up -d --build
 ```
 
+O reverse-proxy é a única borda da stack. Ele encaminha `/` e assets para `web:3000`,
+`/api/*` para `gateway:3010` removendo `/api`, e `/docs/*`/`/openapi.json` para o gateway.
+O Caddy ou proxy existente da VPS deve encaminhar o endpoint HTTPS para
+`127.0.0.1:${REVERSE_PROXY_PORT}`. Em produção, use `API_DOMAIN=useoffice.com.br` e mantenha
+`AUTH_COOKIE_SECURE=true`; em develop, configure o endpoint e a origem reais do ambiente sem
+introduzir um hostname de develop no código.
+Quando `NGINX_TLS_ENABLED=true`, o TLS fica disponível no bind loopback
+`127.0.0.1:${REVERSE_PROXY_TLS_PORT}`; configure o proxy externo para usar HTTPS nesse upstream.
+
 6. `certificate-service`, `pessoal-service` and `audit-service` are part of the default stack. Configure `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` and `PESSOAL_SERVICE_URL=http://pessoal-service:3042` in `.env.vps.gateway`; control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
+7. Configure `PROJECT_SERVICE_URL=http://project-service:3033` and
+   `TASK_SERVICE_URL=http://task-service:3032` for `reports-service`. Keep
+   `REPORTS_INTERNAL_TOKEN` and `REPORTS_GRANT_SECRET` equal in `.env.vps.project-service`,
+   `.env.vps.task-service` and `.env.vps.reports-service`; do not place their values in Compose
+   or versioned files.
 
 ## Orcamento de conexoes e Supabase Pooler
 
@@ -96,7 +112,7 @@ permite encaminhamento pelo canal de incidentes existente.
 `AUTH_COOKIE_SECURE` é uma configuração exclusiva do gateway e do user-service; nunca deve ser exposta como `NEXT_PUBLIC_*`.
 
 - Produção HTTPS: `AUTH_COOKIE_SECURE=true`, `GATEWAY_ALLOWED_ORIGINS=https://useoffice.com.br` e `GATEWAY_BEARER_AUTH_COMPATIBILITY=false`.
-- Slots locais/develop sem TLS: os overlays Compose definem `AUTH_COOKIE_SECURE=false` somente nos dois serviços que emitem ou expiram cookies.
+- Todos os slots com `NODE_ENV=production` mantêm `AUTH_COOKIE_SECURE=true`; execute-os atrás de HTTPS. Gateway e user-service falham no bootstrap se a flag for desabilitada.
 - O browser usa `NEXT_PUBLIC_API_URL=/api`; SSR usa `API_INTERNAL_URL=http://gateway:3010`.
 
 O procedimento de rollout, validação, telemetria e rollback está em [http-only-session-rollout.md](security/http-only-session-rollout.md).
@@ -106,7 +122,7 @@ O procedimento de rollout, validação, telemetria e rollback está em [http-onl
 Nginx in this stack does not provision certificates automatically.
 
 - `NGINX_TLS_ENABLED=true`: listens on `80` and `443`, redirects HTTP to HTTPS and requires mounted cert files.
-- `NGINX_TLS_ENABLED=false`: serves the API only over plain HTTP on port `80`.
+- `NGINX_TLS_ENABLED=false`: serve HTTP somente no bind de loopback do host, para uso atrás de um terminador TLS externo.
 
 ## Update one service without touching the others
 
@@ -176,7 +192,7 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
   - `test/deploy-develop` → `test-deploy-develop-cicd.yml` — `/data/workspace-teste-develop`, `DEPLOY_SLOT=test-develop`, projeto `workspace-teste-develop` — portas **8087** (proxy) / **3013** (gateway) / **3002** (web UI), ficheiro `docker-compose.vps.slot-test-develop.yml`.
   - `test/deploy-staging` → `test-deploy-staging-cicd.yml` — `/data/workspace-teste-staging`, `DEPLOY_SLOT=test-staging`, projeto `workspace-teste-staging` — portas **8086** (proxy) / **3012** (gateway) / **3003** (web UI), ficheiro `docker-compose.vps.slot-test-staging.yml`.
 
-  Slots **reais**: develop **8086**/**3011**/**3001** (web), staging **8085**/**3010**/**3000** (web no host 3000), ver `vps-remote-deploy.sh`. Os slots de teste usam portas acima para reduzir choque com produção; ainda assim **8086** no teste-staging coincide com o proxy do **develop** real — não corras os dois no mesmo host sem ajustar um deles.
+  Slots **reais**: develop **8086** (proxy; gateway **3011** e web **3001** permanecem loopback), staging **8085** (proxy; gateway **3010** e web **3000** permanecem loopback), ver `vps-remote-deploy.sh`. Os slots de teste usam portas acima para reduzir choque com produção; ainda assim **8086** no teste-staging coincide com o proxy do **develop** real — não corras os dois no mesmo host sem ajustar um deles.
 
 Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em falha.
 
@@ -184,8 +200,9 @@ Em ambos: build/push de imagens para o registry e deploy por SSH com rollback em
 
 | Segredo | Uso |
 |---------|-----|
-| `ENV_VPS_GATEWAY` | Inclua `AUTH_COOKIE_SECURE=true`, `GATEWAY_ALLOWED_ORIGINS=https://useoffice.com.br`, `GATEWAY_BEARER_AUTH_COMPATIBILITY=false`, `REGULARIZE_SERVICE_URL=http://regularize-service:3039`, `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` e `PESSOAL_SERVICE_URL=http://pessoal-service:3042`. |
-| `ENV_VPS_USER_SERVICE` | Inclua `AUTH_COOKIE_SECURE=true` além dos segredos existentes do user-service. |
+| `ENV_VPS_GATEWAY` | Inclua `AUTH_COOKIE_SECURE=true`, `USER_SERVICE_INTERNAL_TOKEN`, `GATEWAY_ALLOWED_ORIGINS=https://useoffice.com.br`, `GATEWAY_BEARER_AUTH_COMPATIBILITY=false`, `REGULARIZE_SERVICE_URL=http://regularize-service:3039`, `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` e `PESSOAL_SERVICE_URL=http://pessoal-service:3042`. |
+| `ENV_VPS_ORGANIZATION_SERVICE` | Corpo de `.env.vps.organization-service`; inclua `DATABASE_URL`, `JWT_SECRET`, `AUDIT_SERVICE_URL=http://audit-service:3020`, `AUDIT_SERVICE_TOKEN`, `ORGANIZATION_DOMAIN_AUDIT_ENABLED=true` e `SERVICE_ALLOWED_ORIGINS`. O token deve coincidir com o audit-service e com o token interno usado pelo gateway para este serviço. |
+| `ENV_VPS_USER_SERVICE` | Inclua `AUTH_COOKIE_SECURE=true` e o mesmo `USER_SERVICE_INTERNAL_TOKEN` exclusivo do gateway, além dos segredos existentes do user-service. |
 | `ENV_VPS_CERTIFICATE_SERVICE` | Corpo de `.env.vps.certificate-service`; alem das variaveis base do service, inclua `CERTIFICATE_STORAGE_MODE=supabase`, `CERTIFICATE_STORAGE_BUCKET`, `CERTIFICATE_FILE_MAX_SIZE_BYTES`, `CERTIFICATE_FILE_ENCRYPTION_KEY`, `CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `UPLOAD_RATE_LIMIT_MAX` e `UPLOAD_RATE_LIMIT_WINDOW_MS` para upload/download criptografado de arquivos. |
 | `ENV_VPS_PESSOAL_SERVICE` | Corpo de `.env.vps.pessoal-service`; inclua `DATABASE_URL`, `JWT_SECRET`, `AUDIT_SERVICE_URL=http://audit-service:3020`, `AUDIT_SERVICE_TOKEN`, `INTERNAL_SERVICE_TOKEN`, `PESSOAL_PASSWORD_ENCRYPTION_KEY`, `PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION` e `PESSOAL_DOMAIN_AUDIT_ENABLED`. |
 | `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | URL **com namespace** (ex.: `ghcr.io/meu-org`, `docker.io/meuuser` — não use só `ghcr.io`). Push/pull normalizam em minúsculas. |
@@ -225,7 +242,7 @@ Workflows que **não** definem `environment` (ex.: `test-cicd.yml` em branch de 
    - **teste develop:** `/data/workspace-teste-develop` (branch `test/deploy-develop`)
    - **teste staging:** `/data/workspace-teste-staging` (branch `test/deploy-staging`)
 
-3. Com **develop** e **staging** na mesma VPS: **staging** usa só `docker-compose.vps.yml` (proxy **8085**, gateway **3010**). **develop** usa `docker-compose.vps.yml` + `docker-compose.vps.slot-develop.yml` (proxy **8086**, gateway **3011**). O `vps-remote-deploy.sh` aplica o override quando `DEPLOY_SLOT=develop`.
+3. Com **develop** e **staging** na mesma VPS: **staging** usa só `docker-compose.vps.yml` (proxy **8085**, gateway **3010**). **develop** usa `docker-compose.vps.yml` + `docker-compose.vps.slot-develop.yml` (proxy **8086**, gateway **3011**). O `vps-remote-deploy.sh` aplica o override quando `DEPLOY_SLOT=develop`; em ambos os casos o endpoint da borda aponta para o proxy em loopback.
 
 ### Healthchecks (VPS persistente vs CI/DAST)
 

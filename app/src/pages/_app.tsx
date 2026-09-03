@@ -9,6 +9,7 @@ import '../styles/global.css'
 
 import { useAccessStoreSync } from "@modules/auth";
 import { AuthProvider, useAuth } from "../context/AuthContext";
+import { FeatureFlagsProvider } from "../context/FeatureFlagsContext";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { SocketProvider } from '../context/SocketContext'
 import { AppShell } from "../shared/components/newLayout/AppShell";
@@ -19,6 +20,7 @@ function AppLayout({ children, isIframeView = false }) {
   useAccessStoreSync();
   const isPublicRoute =
     router.pathname === "/login" ||
+    router.pathname === "/super-admin/login" ||
     router.pathname === "/" ||
     router.pathname === "/solicitar-acesso";
 
@@ -109,17 +111,19 @@ function MyApp({ Component, pageProps }: AppProps) {
       <ThemeBridge />
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <SocketProvider>
-            <AppLayout isIframeView={isIframeView}>
-              <Component {...pageProps} />
-            </AppLayout>
-            <ToastContainer
-              position="bottom-right"
-              autoClose={5000}
-              pauseOnHover
-              closeOnClick={false}
-            />
-          </SocketProvider>
+          <FeatureFlagsProvider>
+            <SocketProvider>
+              <AppLayout isIframeView={isIframeView}>
+                <Component {...pageProps} />
+              </AppLayout>
+              <ToastContainer
+                position="bottom-right"
+                autoClose={5000}
+                pauseOnHover
+                closeOnClick={false}
+              />
+            </SocketProvider>
+          </FeatureFlagsProvider>
         </AuthProvider>
       </QueryClientProvider>
     </>

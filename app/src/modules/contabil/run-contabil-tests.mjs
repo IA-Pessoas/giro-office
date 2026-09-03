@@ -86,14 +86,16 @@ const contabilServiceSources = {
 };
 
 await (async () => {
-  await runTest("contabil page filters the client picker by accounting department", () => {
+  await runTest("contabil page lists every active client from the organization", () => {
     const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
 
     assert.match(source, /ClientPickerModal/);
     assert.match(source, /headerAction=\{/);
     assert.doesNotMatch(source, /clientPickerContent=/);
-    assert.match(source, /ref:\s*"deps"/);
-    assert.match(source, /status:\s*"Departamento contabil"/);
+    assert.match(source, /status:\s*"Ativo"/);
+    assert.match(source, /legacyIntegrationStatusFilter:\s*false/);
+    assert.doesNotMatch(source, /ref:\s*"deps"/);
+    assert.doesNotMatch(source, /Departamento contabil/);
     assert.doesNotMatch(source, /useClients\(/);
     assert.doesNotMatch(source, /page:\s*1/);
   });

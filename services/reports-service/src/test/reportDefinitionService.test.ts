@@ -55,6 +55,55 @@ describe("SourceCatalogService", () => {
       }).sources,
     ).toEqual([]);
   });
+
+  it("mantém fonte sem campo quando ela é necessária para relação concedida", () => {
+    const service = new SourceCatalogService([
+      {
+        ...adapter,
+        sources: [
+          ...adapter.sources,
+          {
+            key: "finance.accounts",
+            label: "Contas",
+            module: "financeiro",
+            minimum_permission: 1,
+            fields: [
+              {
+                key: "id",
+                label: "Id",
+                value_type: "string",
+                filter_operators: ["eq"],
+                aggregations: [],
+              },
+            ],
+          },
+        ],
+        relations: [
+          {
+            key: "ledger-account",
+            sources: ["finance.ledger", "finance.accounts"],
+            cardinality: "many_to_one",
+          },
+        ],
+      },
+    ]);
+
+    expect(
+      service.getAuthorizedCatalog({
+        ...scope,
+        grant: {
+          sources: { "finance.ledger": ["balance"], "finance.accounts": [] },
+          relations: ["ledger-account"],
+        },
+      }),
+    ).toMatchObject({
+      sources: [
+        { key: "finance.ledger", fields: [{ key: "balance" }] },
+        { key: "finance.accounts", fields: [] },
+      ],
+      relations: [{ key: "ledger-account" }],
+    });
+  });
 });
 
 describe("ReportDefinitionService", () => {

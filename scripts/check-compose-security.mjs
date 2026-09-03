@@ -37,6 +37,7 @@ export function parseComposeSecurityMetadata(contents) {
   const networks = new Map();
   let topLevelSection = null;
   let currentService = null;
+  let currentServiceProperty = null;
   let currentNetwork = null;
 
   for (const rawLine of contents.split(/\r?\n/)) {
@@ -52,6 +53,7 @@ export function parseComposeSecurityMetadata(contents) {
       const topLevelMatch = /^([A-Za-z0-9_.-]+):/.exec(trimmed);
       topLevelSection = topLevelMatch?.[1] ?? null;
       currentService = null;
+      currentServiceProperty = null;
       currentNetwork = null;
       continue;
     }
@@ -62,16 +64,45 @@ export function parseComposeSecurityMetadata(contents) {
         if (serviceMatch) {
           currentService = serviceMatch[1];
           if (!services.has(currentService)) {
-            services.set(currentService, { hasPorts: false });
+            services.set(currentService, {
+              hasPorts: false,
+              publishedPorts: [],
+              networks: [],
+              authCookieSecure: undefined,
+            });
           }
+          currentServiceProperty = null;
         }
         continue;
       }
 
       if (indent === 4 && currentService) {
         const propertyMatch = /^([A-Za-z0-9_.-]+):/.exec(trimmed);
+        currentServiceProperty = propertyMatch?.[1] ?? null;
         if (propertyMatch?.[1] === "ports") {
           services.get(currentService).hasPorts = true;
+        }
+        continue;
+      }
+
+      if (indent === 6 && currentService && currentServiceProperty === "ports") {
+        const portMatch = /^-\s*["']?([^"']+)["']?$/.exec(trimmed);
+        if (portMatch) {
+          services.get(currentService).publishedPorts.push(portMatch[1]);
+        }
+      }
+
+      if (indent === 6 && currentService && currentServiceProperty === "networks") {
+        const networkMatch = /^-\s*["']?([^"'\s]+)["']?$/.exec(trimmed);
+        if (networkMatch) {
+          services.get(currentService).networks.push(networkMatch[1]);
+        }
+      }
+
+      if (indent === 6 && currentService && currentServiceProperty === "environment") {
+        const envMatch = /^AUTH_COOKIE_SECURE:\s*(.*)$/.exec(trimmed);
+        if (envMatch) {
+          services.get(currentService).authCookieSecure = parseScalarBoolean(envMatch[1]);
         }
       }
     }
@@ -82,7 +113,11 @@ export function parseComposeSecurityMetadata(contents) {
         if (networkMatch) {
           currentNetwork = networkMatch[1];
           if (!networks.has(currentNetwork)) {
-            networks.set(currentNetwork, { internal: undefined });
+            networks.set(currentNetwork, {
+              internal: undefined,
+              external: undefined,
+              name: undefined,
+            });
           }
         }
         continue;
@@ -93,6 +128,12 @@ export function parseComposeSecurityMetadata(contents) {
         if (propertyMatch?.[1] === "internal") {
           networks.get(currentNetwork).internal = parseScalarBoolean(propertyMatch[2]);
         }
+        if (propertyMatch?.[1] === "external") {
+          networks.get(currentNetwork).external = parseScalarBoolean(propertyMatch[2]);
+        }
+        if (propertyMatch?.[1] === "name") {
+          networks.get(currentNetwork).name = propertyMatch[2].replace(/^['"]|['"]$/g, "");
+        }
       }
     }
   }
@@ -100,9 +141,68 @@ export function parseComposeSecurityMetadata(contents) {
   return { services, networks };
 }
 
+export async function checkProductionComposeSecurity({ baseFile, productionFile } = {}) {
+  const basePath = baseFile ?? path.join(rootDir, "docker-compose.vps.yml");
+  const productionPath =
+    productionFile ?? path.join(rootDir, "docker-compose.production.yml");
+  const base = parseComposeSecurityMetadata(await readFile(basePath, "utf8"));
+  const production = parseComposeSecurityMetadata(await readFile(productionPath, "utf8"));
+  const errors = [];
+  const serviceNames = new Set([...base.services.keys(), ...production.services.keys()]);
+
+  for (const serviceName of serviceNames) {
+    const baseService = base.services.get(serviceName);
+    const productionService = production.services.get(serviceName);
+    const service = productionService ?? baseService;
+    const networks = productionService?.networks.length
+      ? productionService.networks
+      : (baseService?.networks ?? []);
+    const publishedPorts = productionService?.hasPorts
+      ? productionService.publishedPorts
+      : baseService?.publishedPorts ?? [];
+
+    if (networks.includes("public-edge") && serviceName !== "reverse-proxy") {
+      errors.push(`production service "${serviceName}" must not join public-edge.`);
+    }
+    if (
+      publishedPorts.some(
+        (port) => !port.startsWith("127.0.0.1:") && !port.startsWith("[::1]:"),
+      )
+    ) {
+      errors.push(`production service "${serviceName}" host ports must bind to loopback.`);
+    }
+    if (service?.authCookieSecure === false) {
+      errors.push(`production service "${serviceName}" must not disable AUTH_COOKIE_SECURE.`);
+    }
+  }
+
+  const reverseProxyNetworks = production.services.get("reverse-proxy")?.networks.length
+    ? production.services.get("reverse-proxy").networks
+    : (base.services.get("reverse-proxy")?.networks ?? []);
+  if (!reverseProxyNetworks.includes("public-edge")) {
+    errors.push('production service "reverse-proxy" must join public-edge.');
+  }
+
+  const backend = production.networks.get("backend") ?? base.networks.get("backend");
+  if (backend?.internal !== true) {
+    errors.push('production network "backend" must remain internal.');
+  }
+
+  const publicEdge = production.networks.get("public-edge") ?? base.networks.get("public-edge");
+  if (!publicEdge || publicEdge.external !== true || publicEdge.name !== "public-edge") {
+    errors.push('production network "public-edge" must be external and named public-edge.');
+  }
+
+  return { errors };
+}
+
 function resolvedNetworkNames(service) {
   if (Array.isArray(service.networks)) return service.networks;
   return Object.keys(service.networks ?? {});
+}
+
+function isLoopbackPublishedPort(port) {
+  return ["127.0.0.1", "::1", "[::1]"].includes(port.host_ip ?? port.hostIP);
 }
 
 export function checkResolvedProductionSecurity(config) {
@@ -110,17 +210,22 @@ export function checkResolvedProductionSecurity(config) {
   const services = config.services ?? {};
 
   for (const [serviceName, service] of Object.entries(services)) {
-    if ((service.ports ?? []).length > 0) {
+    const publishedPorts = service.ports ?? [];
+    if (
+      publishedPorts.length > 0 &&
+      (serviceName !== "reverse-proxy" ||
+        publishedPorts.some((port) => !isLoopbackPublishedPort(port)))
+    ) {
       errors.push(`production service "${serviceName}" must not publish host ports.`);
     }
 
-    if (serviceName !== "web" && resolvedNetworkNames(service).includes("public-edge")) {
+    if (serviceName !== "reverse-proxy" && resolvedNetworkNames(service).includes("public-edge")) {
       errors.push(`production service "${serviceName}" must not join public-edge.`);
     }
   }
 
-  if (!resolvedNetworkNames(services.web ?? {}).includes("public-edge")) {
-    errors.push('production service "web" must join public-edge.');
+  if (!resolvedNetworkNames(services["reverse-proxy"] ?? {}).includes("public-edge")) {
+    errors.push('production service "reverse-proxy" must join public-edge.');
   }
 
   if (config.networks?.backend?.internal !== true) {
@@ -155,6 +260,10 @@ export async function checkComposeSecurity({ composeFiles, registry = serviceReg
     const displayPath = path.relative(rootDir, file) || file;
 
     for (const [serviceName, service] of metadata.services) {
+      if (service.authCookieSecure === false) {
+        errors.push(`${displayPath}: service "${serviceName}" must not disable AUTH_COOKIE_SECURE.`);
+      }
+
       if (!service.hasPorts) {
         continue;
       }
@@ -168,12 +277,26 @@ export async function checkComposeSecurity({ composeFiles, registry = serviceReg
           `${displayPath}: workspace service "${serviceName}" must use expose, not ports.`,
         );
       }
+
+      if (
+        ["gateway", "reverse-proxy", "web"].includes(serviceName) &&
+        service.publishedPorts.some(
+          (port) => !port.startsWith("127.0.0.1:") && !port.startsWith("[::1]:"),
+        )
+      ) {
+        errors.push(`${displayPath}: service "${serviceName}" host ports must bind to loopback.`);
+      }
     }
 
     const backendNetwork = metadata.networks.get("backend");
     if (backendNetwork && backendNetwork.internal !== true) {
       errors.push(`${displayPath}: network "backend" must set internal: true.`);
     }
+  }
+
+  if (!composeFiles) {
+    const productionResult = await checkProductionComposeSecurity();
+    errors.push(...productionResult.errors);
   }
 
   return { checkedFiles: files, errors };

@@ -1,9 +1,16 @@
 import "dotenv/config";
 
 import { createLogger } from "@workspace/shared/logger";
-
 import { getReportsServiceEnv } from "./config/env.js";
+import { UserAccessContextClient } from "./integrations/userAccessContextClient.js";
 import { createReportsPrismaClient } from "./prisma/index.js";
+import { ReportJobRepository } from "./prisma/reportJobRepository.js";
+import { createReportAuditService } from "./services/reportAuditService.js";
+import { ReportDefinitionService } from "./services/reportDefinitionService.js";
+import { ReportExecutionService } from "./services/reportExecutionService.js";
+import { ReportLifecycleService } from "./services/reportLifecycleService.js";
+import { ReportWorkerService } from "./services/reportWorkerService.js";
+import { createWorkerSourceCatalog } from "./workerCatalog.js";
 
 const env = getReportsServiceEnv();
 const logger = createLogger({
@@ -13,8 +20,41 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 const prisma = createReportsPrismaClient(env.databaseUrl);
+const audit = createReportAuditService(prisma as never, {
+  enabled: env.auditEnabled,
+  serviceUrl: env.auditServiceUrl,
+  serviceToken: env.auditServiceToken,
+  logger,
+});
+const catalog = createWorkerSourceCatalog(env);
+const worker = new ReportWorkerService(
+  new ReportJobRepository(prisma, env.workerLeaseSeconds, audit),
+  prisma,
+  new UserAccessContextClient(env),
+  new ReportExecutionService(catalog, new ReportDefinitionService(catalog)),
+  new ReportLifecycleService(prisma as never, audit),
+  Math.max(1_000, Math.floor((env.workerLeaseSeconds * 1000) / 2)),
+);
+
+let polling = false;
 
 setInterval(() => {
-  void prisma;
-  logger.debug({ event: "worker.idle" }, "reports-service worker sem jobs pendentes");
+  if (polling) return;
+  polling = true;
+  void worker
+    .expireDue()
+    .then(() =>
+      Promise.all(Array.from({ length: env.workerConcurrency }, () => worker.processNext())),
+    )
+    .then((processed) => {
+      if (!processed.some(Boolean)) {
+        logger.debug({ event: "worker.idle" }, "reports-service worker sem jobs pendentes");
+      }
+    })
+    .catch((error: unknown) => {
+      logger.error({ event: "worker.error", error }, "falha ao processar job de relatório");
+    })
+    .finally(() => {
+      polling = false;
+    });
 }, env.workerPollIntervalMs);

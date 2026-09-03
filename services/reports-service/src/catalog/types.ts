@@ -46,6 +46,36 @@ export interface ReportCatalogGrant {
   relations: readonly string[];
 }
 
+export function deriveReportCatalogGrant(definition: {
+  sources: readonly string[];
+  columns: readonly { source: string; field: string }[];
+  filters: readonly { source: string; field: string }[];
+  aggregations: readonly { source: string; field: string }[];
+  order_by: readonly { source: string; field: string }[];
+  joins: readonly { relation: string }[];
+}): ReportCatalogGrant {
+  const fieldsBySource = new Map<string, Set<string>>();
+  const addField = (source: string, field: string) => {
+    const fields = fieldsBySource.get(source) ?? new Set<string>();
+    fields.add(field);
+    fieldsBySource.set(source, fields);
+  };
+
+  for (const source of definition.sources) fieldsBySource.set(source, new Set());
+  for (const column of definition.columns) addField(column.source, column.field);
+  for (const filter of definition.filters) addField(filter.source, filter.field);
+  for (const aggregation of definition.aggregations)
+    addField(aggregation.source, aggregation.field);
+  for (const orderBy of definition.order_by) addField(orderBy.source, orderBy.field);
+
+  return {
+    sources: Object.fromEntries(
+      Array.from(fieldsBySource, ([source, fields]) => [source, Array.from(fields)]),
+    ),
+    relations: definition.joins.map((join) => join.relation),
+  };
+}
+
 export interface ReportCatalogScope {
   organization_id: string;
   modules: Readonly<Record<string, number>>;
@@ -54,13 +84,30 @@ export interface ReportCatalogScope {
 
 export interface ReportPreviewAdapterInput {
   definition: unknown;
+  parameter_values?: Readonly<Record<string, unknown>>;
   organization_id: string;
   limit: number;
+  request_id: string;
+}
+
+export interface ReportPreviewAdapterResult {
+  rows: readonly Record<string, unknown>[];
+  reachedLimit: boolean;
+}
+
+export type ReportPreviewAdapterOutput =
+  | readonly Record<string, unknown>[]
+  | ReportPreviewAdapterResult;
+
+export function normalizeReportPreviewAdapterOutput(
+  output: ReportPreviewAdapterOutput,
+): ReportPreviewAdapterResult {
+  return "rows" in output ? output : { rows: output, reachedLimit: false };
 }
 
 export interface ReportSourceAdapter {
   readonly sources: readonly ReportCatalogSource[];
   readonly relations: readonly ReportCatalogRelation[];
   isEnabled(scope: ReportCatalogScope): boolean;
-  preview(input: ReportPreviewAdapterInput): Promise<readonly Record<string, unknown>[]>;
+  preview(input: ReportPreviewAdapterInput): Promise<ReportPreviewAdapterOutput>;
 }

@@ -83,6 +83,10 @@ function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
   return value === "owner" || value === "admin" || value === "user" ? value : undefined;
 }
 
+function allowsOrganizationAuthentication(status: string): boolean {
+  return status === "active" || status === "trial";
+}
+
 function getActiveOrganizationId(user: PersistedAuthContext): string | undefined {
   const organizationId = user.organization_id ?? user.department.organization_id;
   const organization = user.organization_id ? user.organization : user.department.organization;
@@ -92,7 +96,7 @@ function getActiveOrganizationId(user: PersistedAuthContext): string | undefined
     user.department.organization_id !== organizationId ||
     !organization ||
     organization.id !== organizationId ||
-    organization.status !== "active"
+    !allowsOrganizationAuthentication(organization.status)
   ) {
     return undefined;
   }
@@ -123,7 +127,7 @@ function getLoginFailureReason(
   ) {
     return "invalid_membership";
   }
-  if (organization.status !== "active") {
+  if (!allowsOrganizationAuthentication(organization.status)) {
     return "inactive_organization";
   }
 

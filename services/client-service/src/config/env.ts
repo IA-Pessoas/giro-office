@@ -53,6 +53,8 @@ const rawClientServiceEnvSchema = z
     historyStorageBucket: z.string().optional().default("ClientHistory"),
     historyStorageDir: z.string().optional().default(".data/client-history-uploads"),
     internalServiceToken: z.string().optional(),
+    reportsInternalToken: z.string().optional(),
+    reportsGrantSecret: z.string().optional(),
     enableApiDocsEnv: z.string().optional(),
     allowedOrigins: z
       .string()
@@ -107,6 +109,18 @@ const clientServiceEnvSchema = rawClientServiceEnvSchema.transform((env) => {
     envName: "CLIENT_SERVICE_INTERNAL_TOKEN",
     token: rest.internalServiceToken,
   });
+  validateProductionInternalServiceToken({
+    nodeEnv: rest.nodeEnv,
+    serviceName: "client-service",
+    envName: "REPORTS_INTERNAL_TOKEN",
+    token: rest.reportsInternalToken,
+  });
+  validateProductionInternalServiceToken({
+    nodeEnv: rest.nodeEnv,
+    serviceName: "client-service",
+    envName: "REPORTS_GRANT_SECRET",
+    token: rest.reportsGrantSecret,
+  });
   validateProductionCorsOrigins({
     nodeEnv: rest.nodeEnv,
     serviceName: "client-service",
@@ -128,25 +142,33 @@ export type ClientServiceEnv = z.infer<typeof clientServiceEnvSchema> & {
   logPretty: boolean;
 };
 
-export function getClientServiceEnv(): ClientServiceEnv {
+export function parseClientServiceEnv(
+  source: NodeJS.ProcessEnv | Record<string, string | undefined>,
+): ClientServiceEnv {
   return clientServiceEnvSchema.parse({
-    port: process.env.PORT,
-    nodeEnv: process.env.NODE_ENV,
-    databaseUrl: process.env.DATABASE_URL,
-    jwtSecret: process.env.JWT_SECRET,
-    logLevel: process.env.LOG_LEVEL,
-    logPretty: process.env.LOG_PRETTY,
-    supabaseUrl: process.env.SUPABASE_URL,
-    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    historyStorageMode: process.env.CLIENT_HISTORY_STORAGE_MODE,
-    historyStorageBucket: process.env.CLIENT_HISTORY_STORAGE_BUCKET,
-    historyStorageDir: process.env.CLIENT_HISTORY_STORAGE_DIR,
+    port: source.PORT,
+    nodeEnv: source.NODE_ENV,
+    databaseUrl: source.DATABASE_URL,
+    jwtSecret: source.JWT_SECRET,
+    logLevel: source.LOG_LEVEL,
+    logPretty: source.LOG_PRETTY,
+    supabaseUrl: source.SUPABASE_URL,
+    supabaseServiceRoleKey: source.SUPABASE_SERVICE_ROLE_KEY,
+    historyStorageMode: source.CLIENT_HISTORY_STORAGE_MODE,
+    historyStorageBucket: source.CLIENT_HISTORY_STORAGE_BUCKET,
+    historyStorageDir: source.CLIENT_HISTORY_STORAGE_DIR,
     internalServiceToken:
-      process.env.CLIENT_SERVICE_INTERNAL_TOKEN ||
-      (process.env.NODE_ENV === "production" ? undefined : process.env.AUDIT_SERVICE_TOKEN),
-    enableApiDocsEnv: process.env.ENABLE_API_DOCS,
-    allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
-    uploadRateLimitMax: process.env.UPLOAD_RATE_LIMIT_MAX,
-    uploadRateLimitWindowMs: process.env.UPLOAD_RATE_LIMIT_WINDOW_MS,
+      source.CLIENT_SERVICE_INTERNAL_TOKEN ||
+      (source.NODE_ENV === "production" ? undefined : source.AUDIT_SERVICE_TOKEN),
+    reportsInternalToken: source.REPORTS_INTERNAL_TOKEN,
+    reportsGrantSecret: source.REPORTS_GRANT_SECRET,
+    enableApiDocsEnv: source.ENABLE_API_DOCS,
+    allowedOrigins: source.SERVICE_ALLOWED_ORIGINS,
+    uploadRateLimitMax: source.UPLOAD_RATE_LIMIT_MAX,
+    uploadRateLimitWindowMs: source.UPLOAD_RATE_LIMIT_WINDOW_MS,
   });
+}
+
+export function getClientServiceEnv(): ClientServiceEnv {
+  return parseClientServiceEnv(process.env);
 }

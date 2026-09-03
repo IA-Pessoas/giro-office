@@ -56,10 +56,13 @@ export async function isAuthenticated(
   const forwardedType = normalizeHeaderValue(request.get(FORWARDED_AUTH_TYPE_HEADER));
   const forwardedModules = normalizeHeaderValue(request.get(FORWARDED_AUTH_MODULES_HEADER));
   const internalToken = request.get(INTERNAL_SERVICE_TOKEN_HEADER);
-  const { auditServiceToken } = getUserServiceEnv();
+  const { userServiceInternalToken } = getUserServiceEnv();
 
   const isFromGateway =
-    internalToken && internalToken === auditServiceToken && forwardedUserId && forwardedOrgId;
+    internalToken &&
+    internalToken === userServiceInternalToken &&
+    forwardedUserId &&
+    forwardedOrgId;
 
   if (isFromGateway) {
     request.user_id = forwardedUserId;
@@ -90,7 +93,7 @@ export async function isAuthenticated(
     const claims = verifyJwtToken(token, jwtSecret);
 
     const allowLegacyBearer =
-      internalToken === auditServiceToken &&
+      internalToken === userServiceInternalToken &&
       request.get(AUTH_SESSION_TRANSPORT_HEADER) === "bearer";
     await new AuthService().validateSession(claims, { allowLegacyBearer });
 

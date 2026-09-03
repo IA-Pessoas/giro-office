@@ -95,6 +95,13 @@ test("certificate-service registry entry exposes OpenAPI and internal smoke meta
   });
 });
 
+test("contabil-service registry entry exposes reports internal smoke metadata", () => {
+  const entry = getServiceRegistryEntry("contabil-service");
+
+  assert.deepEqual(entry?.authModes, ["public", "bearer", "internal-token"]);
+  assert.equal(entry?.internalTokenEnvKey, "REPORTS_INTERNAL_TOKEN");
+});
+
 test("extractOpenApiOperationsFromSource discovers path operations from spec source", () => {
   const operations = extractOpenApiOperationsFromSource(`
     export const spec = {
@@ -239,4 +246,31 @@ test("all-services smoke dry-run still exits successfully", () => {
 
   assert.equal(result.status, 0);
   assert.match(output, /Smoke run completed successfully/);
+});
+
+test("project reporting smoke stays disabled without its explicit gate", () => {
+  const result = runSmoke(["--dry-run", "--filter=projectReporting"]);
+  const output = `${result.stdout}\n${result.stderr}`;
+
+  assert.equal(result.status, 0);
+  assert.match(output, /PROJECT_REPORTING_SMOKE_ENABLED is false/);
+  assert.doesNotMatch(output, /Missing REPORTS_GRANT_SECRET for project reporting smoke/);
+});
+
+test("task reporting smoke stays disabled without its explicit gate", () => {
+  const result = runSmoke(["--dry-run", "--filter=taskReporting"]);
+  const output = `${result.stdout}\n${result.stderr}`;
+
+  assert.equal(result.status, 0);
+  assert.match(output, /TASK_REPORTING_SMOKE_ENABLED is false/);
+  assert.doesNotMatch(output, /Missing REPORTS_GRANT_SECRET for task reporting smoke/);
+});
+
+test("TI inventory reporting smoke stays disabled without its explicit gate", () => {
+  const result = runSmoke(["--dry-run", "--filter=tiInventoryReporting"]);
+  const output = `${result.stdout}\n${result.stderr}`;
+
+  assert.equal(result.status, 0);
+  assert.match(output, /TI_REPORTING_SMOKE_ENABLED is false/);
+  assert.doesNotMatch(output, /Missing REPORTS_GRANT_SECRET for TI inventory reporting smoke/);
 });

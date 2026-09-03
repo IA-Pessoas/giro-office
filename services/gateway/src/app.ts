@@ -6,6 +6,7 @@ import {
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
+  type FeatureFlagService,
   type Logger,
   type LogLevel,
   ServiceError,
@@ -17,6 +18,7 @@ import { isGatewayRouteDisabled } from "./config/disabledRoutes.js";
 import type { GatewayEnv } from "./config/env.js";
 import { getGatewayServiceDefinitions, resolveGatewayService } from "./config/serviceRegistry.js";
 import {
+  buildAuditCapacityGuard,
   buildAuditErrorCaptureMiddleware,
   buildAuditLifecycleMiddleware,
 } from "./middlewares/audit.js";
@@ -39,6 +41,7 @@ type GatewayProxy = ReturnType<typeof buildHttpProxyMiddleware>;
 
 export interface GatewayAppDeps {
   dashboardStatsService?: DashboardStatsProvider;
+  featureFlags?: FeatureFlagService;
   sessionValidator?: SessionValidator;
 }
 
@@ -214,7 +217,7 @@ function normalizeJsonBodyError(
 }
 
 function configureExpress(app: express.Express, env: GatewayEnv): void {
-  app.set("trust proxy", true);
+  app.set("trust proxy", env.nodeEnv === "production" ? 1 : false);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
 }
 
@@ -309,13 +312,18 @@ function mountAuthRateLimits(app: express.Express, env: GatewayEnv): void {
     methods: ["POST"],
   });
 
-  app.use("/user/session", authRateLimit);
-  app.use("/user/start-config", authRateLimit);
+  app.post("/user/session", authRateLimit);
+  app.post("/platform/session", authRateLimit);
+  app.post("/user/start-config", authRateLimit);
 }
 
 function mountPublicBlockedRoutes(app: express.Express, env: GatewayEnv): void {
+  app.use("/platform/session/validate", (_request, _response, next) => {
+    next(new ServiceError(404, "Recurso não encontrado."));
+  });
+
   if (!env.auditEnabled) {
-    app.use("/audit", (_request, _response, next) => {
+    app.use(["/audit", "/platform/audit"], (_request, _response, next) => {
       next(new ServiceError(404, "Recurso não encontrado."));
     });
   }
@@ -325,6 +333,7 @@ function mountAuthenticationBoundary(
   app: express.Express,
   env: GatewayEnv,
   logger: Logger,
+  recordAuditRequest: AuditRecorder,
   sessionValidator?: SessionValidator,
 ): void {
   const generalRateLimit = createRateLimitMiddleware({
@@ -346,6 +355,12 @@ function mountAuthenticationBoundary(
   app.use(generalRateLimit);
   mountProtectedBlockedRoutes(app);
   app.use(buildAuthorizeMiddleware(env.authorizationMode, logger));
+  app.use(
+    buildAuditCapacityGuard({
+      enabled: env.auditEnabled,
+      recordAuditRequest,
+    }),
+  );
 }
 
 function mountProtectedBlockedRoutes(app: express.Express): void {
@@ -381,6 +396,8 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
         permissionModule: service.permissionModule,
         forwardSessionBinding: service.forwardSessionBinding,
         forwardValidatedAuthorization: service.forwardValidatedAuthorization,
+        forwardPlatformSessionCredentials: service.forwardPlatformSessionCredentials,
+        stripPathPrefix: service.stripPathPrefix,
       }),
     );
   }
@@ -405,14 +422,16 @@ function mountServiceRoutes(app: express.Express, env: GatewayEnv): void {
     }
   }
 
-  if (env.auditEnabled) {
-    app.use(
-      "/audit",
-      buildHttpProxyMiddleware(env.auditServiceUrl, {
-        internalServiceToken: env.auditServiceToken,
-      }),
-    );
-  }
+  app.use("/platform", (request, response, next) => {
+    const service = resolveGatewayService(env, request.originalUrl, request.method);
+    const proxy = service ? proxyByServiceKey.get(service.key) : undefined;
+    if (!proxy) {
+      next(new ServiceError(404, "Rota não mapeada no gateway."));
+      return;
+    }
+
+    proxy(request, response, next);
+  });
 }
 
 function mountFallbackRoute(app: express.Express): void {
@@ -429,7 +448,7 @@ function mountErrorHandlers(app: express.Express, env: GatewayEnv, logger: Logge
       event: "gateway.error",
       fallbackMessage: "Erro interno no gateway.",
       getContext: (request) => {
-        const service = resolveGatewayService(env, request.originalUrl);
+        const service = resolveGatewayService(env, request.originalUrl, request.method);
         return {
           auth: getAuthLogContext(request),
           upstream: service ? getUpstreamContext(service.targetUrl, request) : undefined,
@@ -445,6 +464,9 @@ export function createApp(
   deps: GatewayAppDeps = {},
 ): express.Express {
   const app = express();
+  if (deps.featureFlags) {
+    app.locals.featureFlags = deps.featureFlags;
+  }
   const gatewayOpenApiSpec = buildGatewayOpenApiSpec(env);
   const dashboardStatsService =
     deps.dashboardStatsService ?? new DashboardStatsService({ databaseUrl: env.databaseUrl });
@@ -453,6 +475,8 @@ export function createApp(
     serviceUrl: env.auditServiceUrl,
     serviceToken: env.auditServiceToken,
     logger,
+    maxInFlight: 100,
+    protectedCapacity: 75,
   });
 
   configureExpress(app, env);
@@ -465,8 +489,8 @@ export function createApp(
     deps.sessionValidator ??
     (env.nodeEnv === "test"
       ? undefined
-      : createUserServiceSessionValidator(env.userServiceUrl, env.auditServiceToken));
-  mountAuthenticationBoundary(app, env, logger, sessionValidator);
+      : createUserServiceSessionValidator(env.userServiceUrl, env.userServiceInternalToken));
+  mountAuthenticationBoundary(app, env, logger, recordAuditRequest, sessionValidator);
   mountDashboardRoutes(app, dashboardStatsService);
   mountServiceRoutes(app, env);
   mountFallbackRoute(app);

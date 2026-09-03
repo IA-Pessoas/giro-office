@@ -22,6 +22,7 @@ function setUserServiceEnv(overrides: NodeJS.ProcessEnv) {
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
   process.env.AUDIT_SERVICE_TOKEN = "secure-internal-token-with-at-least-32-chars";
+  process.env.USER_SERVICE_INTERNAL_TOKEN = "secure-user-service-token-with-at-least-32-chars";
   process.env.REPORTS_INTERNAL_TOKEN = "reports-internal-token-with-at-least-32-chars";
   process.env.SERVICE_ALLOWED_ORIGINS = "https://app.example.com";
   Object.assign(process.env, overrides);
@@ -50,12 +51,33 @@ describe("user-service env security validation", () => {
     expect(getUserServiceEnv().authCookieSecure).toBe(true);
   });
 
-  it("allows an explicit HTTP slot override and rejects ambiguous values", () => {
-    setUserServiceEnv({ AUTH_COOKIE_SECURE: "false" });
+  it("allows an explicit HTTP override outside production and rejects ambiguous values", () => {
+    setUserServiceEnv({ NODE_ENV: "development", AUTH_COOKIE_SECURE: "false" });
     expect(getUserServiceEnv().authCookieSecure).toBe(false);
 
     setUserServiceEnv({ AUTH_COOKIE_SECURE: "maybe" });
     expect(() => getUserServiceEnv()).toThrow();
+  });
+
+  it("rejects insecure auth cookies in production", () => {
+    setUserServiceEnv({ AUTH_COOKIE_SECURE: "false" });
+
+    expect(() => getUserServiceEnv()).toThrow(/AUTH_COOKIE_SECURE/);
+  });
+
+  it("requires a dedicated gateway token in production", () => {
+    setUserServiceEnv({});
+    delete process.env.USER_SERVICE_INTERNAL_TOKEN;
+
+    expect(() => getUserServiceEnv()).toThrow(/USER_SERVICE_INTERNAL_TOKEN/);
+  });
+
+  it("rejects reusing the audit token for gateway authentication in production", () => {
+    setUserServiceEnv({
+      USER_SERVICE_INTERNAL_TOKEN: "secure-internal-token-with-at-least-32-chars",
+    });
+
+    expect(() => getUserServiceEnv()).toThrow(/USER_SERVICE_INTERNAL_TOKEN.*AUDIT_SERVICE_TOKEN/);
   });
 
   it("rejects the reports internal token in production when it is not secure", () => {

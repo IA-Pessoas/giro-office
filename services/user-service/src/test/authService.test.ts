@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { prismaMock, passwordHashMock, jwtMock } = vi.hoisted(() => ({
   prismaMock: {
     $executeRaw: vi.fn(),
+    $transaction: vi.fn(async (callback) => callback(prismaMock)),
     user: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
@@ -71,6 +72,7 @@ describe("AuthService", () => {
       type: "user",
       status: "active",
       session_version: 1,
+      version: 1,
       department_id: "dep-1",
       organization_id: "org-1",
       organization: { id: "org-1", status: "active" },
@@ -218,6 +220,35 @@ describe("AuthService", () => {
     );
   });
 
+  it("login permite organização em trial", async () => {
+    // Quebra detectada: tratar trial como inativo impede um usuário elegível de autenticar.
+    prismaMock.user.findFirst.mockResolvedValue(
+      activeUser({ organization: { id: "org-1", status: "trial" } }),
+    );
+    passwordHashMock.verifyPassword.mockResolvedValue({ valid: true, needsRehash: false });
+    jwtMock.sign.mockReturnValue("jwt-token");
+
+    await expect(
+      new AuthService().login({ login: "account", password: "secret" }),
+    ).resolves.toMatchObject({ organization_id: "org-1", token: "jwt-token" });
+  });
+
+  it.each([
+    "past_due",
+    "suspended",
+    "cancelled",
+  ])("login bloqueia organização com status %s", async (status) => {
+    // Quebra detectada: ampliar demais a regra permite login de organizações bloqueadas.
+    prismaMock.user.findFirst.mockResolvedValue(
+      activeUser({ organization: { id: "org-1", status } }),
+    );
+    passwordHashMock.verifyPassword.mockResolvedValue({ valid: true, needsRehash: false });
+
+    await expect(
+      new AuthService().login({ login: "account", password: "secret" }),
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
   it("login assina sessão de um dia vinculada ao CSRF retornado", async () => {
     prismaMock.user.findFirst.mockResolvedValue(activeUser());
     passwordHashMock.verifyPassword.mockResolvedValue({ valid: true, needsRehash: false });
@@ -275,6 +306,46 @@ describe("AuthService", () => {
       expect.any(Object),
     );
     expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("refresh permite organização em trial", async () => {
+    // Quebra detectada: tratar trial como inativo invalida uma sessão ainda elegível.
+    prismaMock.user.findUnique.mockResolvedValue(
+      activeUser({ organization: { id: "org-1", status: "trial" } }),
+    );
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+    jwtMock.sign.mockReturnValue("jwt-token");
+
+    await expect(
+      new AuthService().refreshSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+      }),
+    ).resolves.toMatchObject({ organization_id: "org-1", token: "jwt-token" });
+  });
+
+  it.each([
+    "past_due",
+    "suspended",
+    "cancelled",
+  ])("refresh bloqueia organização com status %s", async (status) => {
+    // Quebra detectada: ampliar demais a regra renova sessões de organizações bloqueadas.
+    prismaMock.user.findUnique.mockResolvedValue(
+      activeUser({ organization: { id: "org-1", status } }),
+    );
+
+    await expect(
+      new AuthService().refreshSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+      }),
+    ).rejects.toMatchObject({ statusCode: 401 });
   });
 
   it("refresh rejeita replay concorrente da versão já rotacionada", async () => {
@@ -408,10 +479,14 @@ describe("AuthService", () => {
       permissions: [{ organization_id: "org-1" }],
     });
     prismaMock.user.findFirst.mockResolvedValue(user);
-    prismaMock.user.update.mockImplementation(
+    prismaMock.user.updateMany.mockImplementation(
       async ({ data }: { data: Record<string, unknown> }) => {
-        Object.assign(user, data);
-        return user;
+        const { version, ...fields } = data;
+        Object.assign(user, fields);
+        if (typeof version === "object" && version !== null && "increment" in version) {
+          user.version = (typeof user.version === "number" ? user.version : 1) + 1;
+        }
+        return { count: 1 };
       },
     );
     passwordHashMock.hashPassword.mockImplementation(
@@ -525,6 +600,48 @@ describe("AuthService", () => {
       }),
     ).resolves.toBeUndefined();
     expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("aceita sessão para organização em trial", async () => {
+    // Quebra detectada: tratar trial como inativo derruba uma sessão ainda elegível.
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      user: activeUser({ organization: { id: "org-1", status: "trial" } }),
+    });
+
+    await expect(
+      new AuthService().validateSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it.each([
+    "past_due",
+    "suspended",
+    "cancelled",
+  ])("rejeita sessão para organização com status %s", async (status) => {
+    // Quebra detectada: ampliar demais a regra mantém sessões de organizações bloqueadas.
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      user: activeUser({ organization: { id: "org-1", status } }),
+    });
+
+    await expect(
+      new AuthService().validateSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+      }),
+    ).rejects.toMatchObject({ statusCode: 401 });
   });
 
   it("classifica o JWT anterior como sessão substituída sem aceitá-lo", async () => {
