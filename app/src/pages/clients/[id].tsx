@@ -26,8 +26,12 @@ import {
   useUpdateClientMutation,
 } from "@modules/clients/hooks/useClients";
 import type { ClientFormValues } from "@modules/clients/types";
+import {
+  buildUpdateClientPayload,
+  createClientFormInitialValues,
+} from "@modules/clients/utils/clientForm";
 import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
-import { mapClientStatusFromApi, mapClientStatusToApi } from "@modules/clients/utils/statusMapper";
+import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -53,17 +57,6 @@ function formatCpfCnpj(value: string): string {
   return value;
 }
 
-function createInitialFormValues(): ClientFormValues {
-  return {
-    name: "",
-    company_name: "",
-    fantasy_name: "",
-    cpf_cnpj: "",
-    status: "Ativo",
-    service_unique: false,
-  };
-}
-
 export default function ClientDetailPage() {
   const router = useRouter();
   const clientId = typeof router.query.id === "string" ? router.query.id : undefined;
@@ -73,7 +66,7 @@ export default function ClientDetailPage() {
   const deactivateClientMutation = useDeactivateClientMutation(clientId ?? "");
   const { canViewContabil, isLoading: isContabilAccessLoading } = useContabilPermissions();
   const { access: integracaoAccess } = useModuleAccess("integracao");
-  const [formValues, setFormValues] = useState<ClientFormValues>(createInitialFormValues());
+  const [formValues, setFormValues] = useState<ClientFormValues>(createClientFormInitialValues());
 
   const canEditClient = integracaoAccess.canEdit;
   const canAdminClient = integracaoAccess.isAdmin;
@@ -89,14 +82,7 @@ export default function ClientDetailPage() {
       return;
     }
 
-    setFormValues({
-      name: client.name ?? "",
-      company_name: client.company_name ?? "",
-      fantasy_name: client.fantasy_name ?? "",
-      cpf_cnpj: client.cpf_cnpj ?? "",
-      status: mapClientStatusFromApi(client.status),
-      service_unique: client.service_unique ?? false,
-    });
+    setFormValues(createClientFormInitialValues(client));
   }, [client]);
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -127,14 +113,7 @@ export default function ClientDetailPage() {
     }
 
     try {
-      await updateClientMutation.mutateAsync({
-        name: formValues.name.trim(),
-        company_name: formValues.company_name.trim() || null,
-        fantasy_name: formValues.fantasy_name.trim() || null,
-        cpf_cnpj: formValues.cpf_cnpj.replace(/\D/g, ""),
-        status: mapClientStatusToApi(formValues.status),
-        service_unique: formValues.service_unique,
-      });
+      await updateClientMutation.mutateAsync(buildUpdateClientPayload(formValues, client.regime));
 
       toast.success("Cliente atualizado com sucesso.");
       await clientQuery.refetch();
@@ -327,17 +306,11 @@ export default function ClientDetailPage() {
 
                 <ClientForm
                   values={formValues}
+                  legacyTaxRegime={client.regime}
                   onChange={handleInputChange}
                   onSubmit={() => void handleUpdate()}
                   onCancel={() =>
-                    setFormValues({
-                      name: client.name ?? "",
-                      company_name: client.company_name ?? "",
-                      fantasy_name: client.fantasy_name ?? "",
-                      cpf_cnpj: client.cpf_cnpj ?? "",
-                      status: mapClientStatusFromApi(client.status),
-                      service_unique: client.service_unique ?? false,
-                    })
+                    setFormValues(createClientFormInitialValues(client))
                   }
                   submitLabel={updateClientMutation.isPending ? "Salvando..." : "Salvar alterações"}
                   disabled={updateClientMutation.isPending}
