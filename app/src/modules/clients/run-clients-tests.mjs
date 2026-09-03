@@ -133,6 +133,23 @@ runTest("client form sends the selected tax regime on creation and update", () =
   assert.equal(buildUpdateClientPayload({ ...values, regime: "" }).regime, null);
 });
 
+runTest("client regime is constrained and bound in both shared client flows", () => {
+  const types = readFileSync("src/modules/clients/types/index.ts", "utf8");
+  const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+  const createModal = readFileSync("src/modules/clients/components/ClientCreateModal.tsx", "utf8");
+  const detailPage = readFileSync("src/pages/clients/[id].tsx", "utf8");
+
+  assert.match(
+    types,
+    /export type ClientTaxRegime = "Simples Nacional" \| "Lucro Presumido" \| "Lucro Real"/,
+  );
+  assert.match(types, /regime: ClientTaxRegime \| "";/);
+  assert.match(form, /name="regime"[\s\S]*?CLIENT_TAX_REGIME_OPTIONS/);
+  assert.match(createModal, /buildCreateClientPayload\(formValues, organizationId\)/);
+  assert.match(detailPage, /createClientFormInitialValues\(client\)/);
+  assert.match(detailPage, /buildUpdateClientPayload\(formValues\)/);
+});
+
 runTest("mapClientStatusToApi converts Prospect to API status", () => {
   assert.equal(mapClientStatusToApi("Prospect"), "Prospecção");
 });

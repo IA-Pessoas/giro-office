@@ -1,6 +1,7 @@
 import type {
   Client,
   ClientFormValues,
+  ClientTaxRegime,
   CreateClientPayload,
   UpdateClientPayload,
 } from "../types";
@@ -12,12 +13,16 @@ export const CLIENT_TAX_REGIME_OPTIONS = [
   "Simples Nacional",
   "Lucro Presumido",
   "Lucro Real",
-] as const;
+] as const satisfies readonly ClientTaxRegime[];
 
-function normalizeTaxRegime(value: string | null | undefined): string | null {
-  const normalizedValue = value?.trim();
+function normalizeTaxRegime(value: ClientTaxRegime | ""): ClientTaxRegime | null {
+  return value || null;
+}
 
-  return normalizedValue ? normalizedValue : null;
+function getClientTaxRegime(value: string | null | undefined): ClientTaxRegime | "" {
+  return CLIENT_TAX_REGIME_OPTIONS.includes(value as ClientTaxRegime)
+    ? (value as ClientTaxRegime)
+    : "";
 }
 
 export function createClientFormInitialValues(client?: Partial<Client>): ClientFormValues {
@@ -28,7 +33,7 @@ export function createClientFormInitialValues(client?: Partial<Client>): ClientF
     fantasy_name: client?.fantasy_name ?? "",
     cpf_cnpj: client?.cpf_cnpj ?? "",
     status: mapClientStatusFromApi(client?.status),
-    regime: client?.regime ?? "",
+    regime: getClientTaxRegime(client?.regime),
     service_unique: client?.service_unique ?? false,
   };
 }

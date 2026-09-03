@@ -58,6 +58,7 @@ export interface Client {
 }
 
 export type ClientStatus = "Ativo" | "Inativo" | "Prospect" | "Prospecção" | "Fechado" | string;
+export type ClientTaxRegime = "Simples Nacional" | "Lucro Presumido" | "Lucro Real";
 
 export interface ClientItem {
   id: string;
@@ -115,7 +116,7 @@ export interface ClientFormValues {
   fantasy_name: string;
   cpf_cnpj: string;
   status: string;
-  regime: string;
+  regime: ClientTaxRegime | "";
   service_unique: boolean;
 }
 
@@ -265,7 +266,7 @@ export interface CreateClientPayload {
   cpf_cnpj: string;
   company_name?: string | null;
   fantasy_name?: string | null;
-  regime?: string | null;
+  regime?: ClientTaxRegime | null;
   service_unique?: boolean;
 }
 
@@ -301,7 +302,7 @@ export interface UpdateClientPayload {
   cpf_cnpj?: string;
   company_name?: string | null;
   fantasy_name?: string | null;
-  regime?: string | null;
+  regime?: ClientTaxRegime | null;
   service_unique?: boolean;
 }
 
