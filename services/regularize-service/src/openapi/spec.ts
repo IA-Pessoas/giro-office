@@ -392,6 +392,18 @@ export function buildRegularizeServiceOpenApiSpec(
           responses: { "200": { description: "Socio atualizado", ...successEnvelopeContent() } },
         },
       },
+      "/regularize/partners/{id}": {
+        delete: {
+          tags: ["Partners"],
+          summary: "Remover vinculo de socio",
+          description: "Remove somente o vinculo entre PF e PJ, preservando a Pessoa Fisica.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: { "200": { description: "Vinculo removido", ...successEnvelopeContent() } },
+        },
+      },
       "/regularize/partner": {
         get: {
           tags: ["Partners"],
