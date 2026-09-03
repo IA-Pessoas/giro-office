@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 
-import { createLogger } from "@workspace/shared";
+import { createFeatureFlags, createLogger, getFeatureFlagConfig } from "@workspace/shared";
 
 import { createApp } from "./app.js";
 import { getGatewayEnv } from "./config/env.js";
@@ -26,11 +26,19 @@ const logger = createLogger({
   level: env.logLevel,
   pretty: env.logPretty,
 });
+const featureFlags = await createFeatureFlags(getFeatureFlagConfig(process.env, "gateway"));
+
+logger.info({
+  event: "feature_flags.initialized",
+  message: "Feature flags initialized",
+  data: { status: featureFlags.status },
+});
 const app = createApp(env, logger, {
   sessionValidator: createUserServiceSessionValidator(
     env.userServiceUrl,
     env.userServiceInternalToken,
   ),
+  featureFlags,
 });
 const server = createServer(app);
 
@@ -73,3 +81,15 @@ server.on("error", (err) => {
     err,
   });
 });
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    void featureFlags.close().catch((error: unknown) => {
+      logger.error({
+        event: "feature_flags.shutdown.error",
+        message: "Feature flags shutdown failed",
+        err: error,
+      });
+    });
+  });
+}

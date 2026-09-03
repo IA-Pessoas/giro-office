@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # Next.js (app/) — UI na porta 3000.
-# Build args: NEXT_PUBLIC_API_URL (browser), API_INTERNAL_URL (SSR → gateway).
+# Build args: NEXT_PUBLIC_API_URL (browser), API_INTERNAL_URL (SSR → gateway) and optional
+# client-side feature flag settings. Never pass a server-side LaunchDarkly SDK key here.
 FROM node:22-bookworm-slim AS base
 
 ENV PNPM_HOME=/pnpm
@@ -20,8 +21,14 @@ WORKDIR /workspace
 
 ARG NEXT_PUBLIC_API_URL=/api
 ARG API_INTERNAL_URL=http://gateway:3010
+ARG NEXT_PUBLIC_FEATURE_FLAGS_ENABLED=false
+ARG NEXT_PUBLIC_LAUNCHDARKLY_CLIENT_ID=
+ARG NEXT_PUBLIC_LAUNCHDARKLY_INIT_TIMEOUT_MS=3000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV API_INTERNAL_URL=$API_INTERNAL_URL
+ENV NEXT_PUBLIC_FEATURE_FLAGS_ENABLED=$NEXT_PUBLIC_FEATURE_FLAGS_ENABLED
+ENV NEXT_PUBLIC_LAUNCHDARKLY_CLIENT_ID=$NEXT_PUBLIC_LAUNCHDARKLY_CLIENT_ID
+ENV NEXT_PUBLIC_LAUNCHDARKLY_INIT_TIMEOUT_MS=$NEXT_PUBLIC_LAUNCHDARKLY_INIT_TIMEOUT_MS
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json biome.json .npmrc ./
 COPY packages/api ./packages/api

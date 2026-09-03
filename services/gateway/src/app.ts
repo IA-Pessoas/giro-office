@@ -6,6 +6,7 @@ import {
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
+  type FeatureFlagService,
   type Logger,
   type LogLevel,
   ServiceError,
@@ -40,6 +41,7 @@ type GatewayProxy = ReturnType<typeof buildHttpProxyMiddleware>;
 
 export interface GatewayAppDeps {
   dashboardStatsService?: DashboardStatsProvider;
+  featureFlags?: FeatureFlagService;
   sessionValidator?: SessionValidator;
 }
 
@@ -461,6 +463,9 @@ export function createApp(
   deps: GatewayAppDeps = {},
 ): express.Express {
   const app = express();
+  if (deps.featureFlags) {
+    app.locals.featureFlags = deps.featureFlags;
+  }
   const gatewayOpenApiSpec = buildGatewayOpenApiSpec(env);
   const dashboardStatsService =
     deps.dashboardStatsService ?? new DashboardStatsService({ databaseUrl: env.databaseUrl });
