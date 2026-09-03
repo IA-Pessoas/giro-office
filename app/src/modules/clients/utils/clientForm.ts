@@ -15,14 +15,16 @@ export const CLIENT_TAX_REGIME_OPTIONS = [
   "Lucro Real",
 ] as const satisfies readonly ClientTaxRegime[];
 
+function isClientTaxRegime(value: string | null | undefined): value is ClientTaxRegime {
+  return CLIENT_TAX_REGIME_OPTIONS.includes(value as ClientTaxRegime);
+}
+
 function normalizeTaxRegime(value: ClientTaxRegime | ""): ClientTaxRegime | null {
   return value || null;
 }
 
 function getClientTaxRegime(value: string | null | undefined): ClientTaxRegime | "" {
-  return CLIENT_TAX_REGIME_OPTIONS.includes(value as ClientTaxRegime)
-    ? (value as ClientTaxRegime)
-    : "";
+  return isClientTaxRegime(value) ? value : "";
 }
 
 export function createClientFormInitialValues(client?: Partial<Client>): ClientFormValues {
@@ -55,14 +57,20 @@ export function buildCreateClientPayload(
   };
 }
 
-export function buildUpdateClientPayload(values: ClientFormValues): UpdateClientPayload {
+export function buildUpdateClientPayload(
+  values: ClientFormValues,
+  currentRegime?: string | null,
+): UpdateClientPayload {
+  const regime = normalizeTaxRegime(values.regime);
+  const preservesLegacyRegime = regime === null && currentRegime && !isClientTaxRegime(currentRegime);
+
   return {
     name: values.name.trim(),
     company_name: values.company_name.trim() || null,
     fantasy_name: values.fantasy_name.trim() || null,
     cpf_cnpj: normalizeDocumentValue(values.cpf_cnpj),
     status: mapClientStatusToApi(values.status),
-    regime: normalizeTaxRegime(values.regime),
+    ...(preservesLegacyRegime ? {} : { regime }),
     service_unique: values.service_unique,
   };
 }

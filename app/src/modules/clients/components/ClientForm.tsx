@@ -12,6 +12,7 @@ interface ClientFormProps {
   disabled?: boolean;
   showPersonType?: boolean;
   showDocumentError?: boolean;
+  legacyTaxRegime?: string | null;
   submitLabel: string;
   onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   onSubmit: () => void;
@@ -23,6 +24,7 @@ export function ClientForm({
   disabled = false,
   showPersonType = false,
   showDocumentError = false,
+  legacyTaxRegime = null,
   submitLabel,
   onChange,
   onSubmit,
@@ -142,6 +144,11 @@ export function ClientForm({
               </option>
             ))}
           </ClientNativeSelect>
+          {legacyTaxRegime && values.regime === "" ? (
+            <span className="block text-xs text-slate-500 dark:text-slate-400">
+              Regime atual: {legacyTaxRegime}
+            </span>
+          ) : null}
         </label>
 
         <label className="flex items-center gap-2 md:col-span-2">

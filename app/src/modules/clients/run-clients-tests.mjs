@@ -131,6 +131,10 @@ runTest("client form sends the selected tax regime on creation and update", () =
     "Lucro Presumido",
   );
   assert.equal(buildUpdateClientPayload({ ...values, regime: "" }).regime, null);
+  assert.equal(
+    "regime" in buildUpdateClientPayload({ ...values, regime: "" }, "MEI"),
+    false,
+  );
 });
 
 runTest("client regime is constrained and bound in both shared client flows", () => {
@@ -145,9 +149,12 @@ runTest("client regime is constrained and bound in both shared client flows", ()
   );
   assert.match(types, /regime: ClientTaxRegime \| "";/);
   assert.match(form, /name="regime"[\s\S]*?CLIENT_TAX_REGIME_OPTIONS/);
+  assert.match(form, /legacyTaxRegime && values\.regime === ""/);
+  assert.match(form, /Regime atual:/);
   assert.match(createModal, /buildCreateClientPayload\(formValues, organizationId\)/);
   assert.match(detailPage, /createClientFormInitialValues\(client\)/);
-  assert.match(detailPage, /buildUpdateClientPayload\(formValues\)/);
+  assert.match(detailPage, /buildUpdateClientPayload\(formValues, client\.regime\)/);
+  assert.match(detailPage, /legacyTaxRegime=\{client\.regime\}/);
 });
 
 runTest("mapClientStatusToApi converts Prospect to API status", () => {
