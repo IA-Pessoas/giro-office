@@ -4,6 +4,7 @@ import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import type { ClientFormValues } from "../types";
+import { CLIENT_TAX_REGIME_OPTIONS } from "../utils/clientForm";
 import { validateCpfCnpjDocument } from "../utils/documentValidation";
 
 interface ClientFormProps {
@@ -126,6 +127,20 @@ export function ClientForm({
             <option value="Prospect">Prospect</option>
             <option value="Inativo">Inativo</option>
             <option value="Fechado">Fechado</option>
+          </ClientNativeSelect>
+        </label>
+
+        <label className="space-y-1.5">
+          <span className="block text-sm font-medium text-slate-700 dark:text-white">
+            Regime tributário
+          </span>
+          <ClientNativeSelect name="regime" value={values.regime} onChange={onChange} disabled={disabled}>
+            <option value="">Selecione um regime</option>
+            {CLIENT_TAX_REGIME_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </ClientNativeSelect>
         </label>
 

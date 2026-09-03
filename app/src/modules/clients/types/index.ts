@@ -28,7 +28,7 @@ export interface Client {
   opening_date: Date | null;
   instagram: string;
   indication: string;
-  regime: string;
+  regime: string | null;
   size: string;
   segment: string;
   contabil: boolean;
@@ -115,6 +115,7 @@ export interface ClientFormValues {
   fantasy_name: string;
   cpf_cnpj: string;
   status: string;
+  regime: string;
   service_unique: boolean;
 }
 
@@ -264,6 +265,7 @@ export interface CreateClientPayload {
   cpf_cnpj: string;
   company_name?: string | null;
   fantasy_name?: string | null;
+  regime?: string | null;
   service_unique?: boolean;
 }
 
@@ -299,6 +301,7 @@ export interface UpdateClientPayload {
   cpf_cnpj?: string;
   company_name?: string | null;
   fantasy_name?: string | null;
+  regime?: string | null;
   service_unique?: boolean;
 }
 

@@ -5,13 +5,12 @@ import { Dialog } from "@shared/components";
 import { useMe } from "@shared/hooks/useMe";
 
 import { useCreateClientMutation } from "../hooks/useClients";
-import { mapClientStatusToApi } from "../utils/statusMapper";
 import {
   formatCpfCnpjInput,
-  normalizeDocumentValue,
   validateCpfCnpjDocument,
 } from "../utils/documentValidation";
 import type { Client, ClientFormValues } from "../types";
+import { buildCreateClientPayload, createClientFormInitialValues } from "../utils/clientForm";
 import { ClientForm } from "./ClientForm";
 
 interface CreateModalProps {
@@ -24,15 +23,7 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
   const meQuery = useMe();
   const createClientMutation = useCreateClientMutation();
   const initialValues = useMemo<ClientFormValues>(
-    () => ({
-      type: "PJ",
-      name: "",
-      company_name: "",
-      fantasy_name: "",
-      cpf_cnpj: "",
-      status: "Ativo",
-      service_unique: false,
-    }),
+    () => createClientFormInitialValues(),
     [],
   );
   const [formValues, setFormValues] = useState<ClientFormValues>(initialValues);
@@ -104,16 +95,9 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
     }
 
     try {
-      const createdClient = await createClientMutation.mutateAsync({
-        organization_id: organizationId,
-        type: formValues.type,
-        name: formValues.name.trim(),
-        company_name: formValues.company_name.trim() || null,
-        fantasy_name: formValues.fantasy_name.trim() || null,
-        cpf_cnpj: normalizeDocumentValue(formValues.cpf_cnpj),
-        status: mapClientStatusToApi(formValues.status),
-        service_unique: formValues.service_unique,
-      });
+      const createdClient = await createClientMutation.mutateAsync(
+        buildCreateClientPayload(formValues, organizationId),
+      );
 
       toast.success("Cliente cadastrado com sucesso.");
       onCreated?.(createdClient);

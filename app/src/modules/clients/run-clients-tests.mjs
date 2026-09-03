@@ -50,6 +50,12 @@ import {
   createTerminationInitialValues,
   isValidCompetenceOutput,
 } from "./utils/terminationForm.ts";
+import {
+  buildCreateClientPayload,
+  buildUpdateClientPayload,
+  CLIENT_TAX_REGIME_OPTIONS,
+  createClientFormInitialValues,
+} from "./utils/clientForm.ts";
 
 function runTest(name, fn) {
   try {
@@ -99,6 +105,32 @@ function assertFormattedInputEventContract(format, rawValue, expectedValue) {
 
 runTest("mapClientStatusFromApi converts prospecting status to Prospect", () => {
   assert.equal(mapClientStatusFromApi("Prospecção"), "Prospect");
+});
+
+runTest("client form sends the selected tax regime on creation and update", () => {
+  assert.deepEqual(CLIENT_TAX_REGIME_OPTIONS, [
+    "Simples Nacional",
+    "Lucro Presumido",
+    "Lucro Real",
+  ]);
+  assert.equal(createClientFormInitialValues({ regime: null }).regime, "");
+
+  const values = {
+    ...createClientFormInitialValues(),
+    type: "PJ",
+    name: "Acme",
+    company_name: "Acme LTDA",
+    fantasy_name: "Acme",
+    cpf_cnpj: "12.345.678/0001-90",
+    regime: "Simples Nacional",
+  };
+
+  assert.equal(buildCreateClientPayload(values, "organization-1").regime, "Simples Nacional");
+  assert.equal(
+    buildUpdateClientPayload({ ...values, regime: "Lucro Presumido" }).regime,
+    "Lucro Presumido",
+  );
+  assert.equal(buildUpdateClientPayload({ ...values, regime: "" }).regime, null);
 });
 
 runTest("mapClientStatusToApi converts Prospect to API status", () => {
@@ -713,12 +745,12 @@ runTest("client create modal binds person type to document validation and payloa
   const modal = readFileSync("src/modules/clients/components/ClientCreateModal.tsx", "utf8");
   const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
 
-  assert.match(modal, /type: "PJ"/);
+  assert.match(modal, /createClientFormInitialValues/);
   assert.match(modal, /setShowDocumentError\(true\)/);
   assert.match(modal, /setShowDocumentError\(false\)/);
   assert.match(modal, /formatCpfCnpjInput/);
   assert.match(modal, /validateCpfCnpjDocument\(formValues\.cpf_cnpj,\s*formValues\.type\)/);
-  assert.match(modal, /type: formValues\.type/);
+  assert.match(modal, /buildCreateClientPayload\(formValues, organizationId\)/);
   assert.match(modal, /showPersonType/);
   assert.match(modal, /showDocumentError/);
   assert.match(form, /name="type"/);
