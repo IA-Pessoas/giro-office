@@ -79,6 +79,7 @@ export default function ClientDetailPage() {
   const canEditClient = integracaoAccess.canEdit;
   const canAdminClient = integracaoAccess.isAdmin;
   const client = clientQuery.data;
+  const isCompanyClient = (client?.cpf_cnpj ?? "").replace(/\D/g, "").length === 14;
   const uiStatus = mapClientStatusFromApi(client?.status);
   const contabilCardState = getContabilCardState(client?.contabil, canViewContabil);
   const organizationName =
@@ -346,7 +347,7 @@ export default function ClientDetailPage() {
               </section>
             ) : null}
 
-            {client.type === "PJ" ? (
+            {isCompanyClient ? (
               <section className={`${PANEL_CLASSNAME} p-6`}>
                 <ClientPartnersSection client={client} perms={integracaoAccess} />
               </section>
