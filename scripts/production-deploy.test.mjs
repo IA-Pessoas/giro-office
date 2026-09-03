@@ -20,6 +20,12 @@ const poolBudgetValidator = path.join(
   "ops",
   "validate-database-pool-budget.mjs",
 );
+const internalTokenValidator = path.join(
+  repoRoot,
+  "scripts",
+  "ops",
+  "validate-internal-service-tokens.mjs",
+);
 const vpsCompose = path.join(repoRoot, "docker-compose.vps.yml");
 const productionCompose = path.join(repoRoot, "docker-compose.production.yml");
 
@@ -30,6 +36,19 @@ function createPoolEnvRoot(databasePoolMax = "1") {
   for (const name of new Set(names)) {
     writeFileSync(path.join(envRoot, `.env.vps.${name}`), `DATABASE_POOL_MAX=${databasePoolMax}\n`);
   }
+  return envRoot;
+}
+
+function createInternalTokenEnvRoot(contabilInternalToken) {
+  const envRoot = mkdtempSync(path.join(tmpdir(), "internal-service-tokens-"));
+  writeFileSync(path.join(envRoot, ".env.vps.gateway"), "AUDIT_SERVICE_TOKEN=shared-token\n");
+  writeFileSync(
+    path.join(envRoot, ".env.vps.contabil-service"),
+    [
+      "AUDIT_SERVICE_TOKEN=shared-token",
+      contabilInternalToken === undefined ? "" : `INTERNAL_SERVICE_TOKEN=${contabilInternalToken}`,
+    ].join("\n"),
+  );
   return envRoot;
 }
 
@@ -137,6 +156,7 @@ test("production deploy plans validation and build before replacing containers",
 
   const expectedOrder = [
     "validate-env",
+    "internal-service-tokens",
     "database-pool-budget",
     "compose-config",
     "build-images-sequentially",
@@ -171,6 +191,23 @@ test("production pool preflight validates actual envs against rollout capacity",
   });
   assert.equal(oversized.status, 1);
   assert.match(oversized.stderr, /rollout requer 44 slots.*pooler possui 40/u);
+});
+
+test("production token preflight rejects a contabil token that differs from the gateway", () => {
+  const fallbackEnvRoot = createInternalTokenEnvRoot(undefined);
+  const fallback = spawnSync("node", [internalTokenValidator, fallbackEnvRoot], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(fallback.status, 0, fallback.stderr);
+
+  const mismatchedEnvRoot = createInternalTokenEnvRoot("different-token");
+  const mismatched = spawnSync("node", [internalTokenValidator, mismatchedEnvRoot], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(mismatched.status, 1);
+  assert.match(mismatched.stderr, /contabil-service.*token interno diverge do gateway/u);
 });
 
 test("production deploy preserves rollback image tags before overwriting production tags", () => {
