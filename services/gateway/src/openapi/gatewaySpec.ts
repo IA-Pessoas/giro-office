@@ -42,6 +42,7 @@ const browserAuthentication: Array<Record<string, string[]>> = [
   { cookieAuth: [] },
   { bearerAuth: [] },
 ];
+const platformBrowserAuthentication: Array<Record<string, string[]>> = [{ cookieAuth: [] }];
 
 function cloneDocument<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -70,7 +71,10 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       buildSpec: () =>
         buildUserServiceOpenApiSpec({ port: getPortFromUrl(env.userServiceUrl) } as never),
       includePath: (path) =>
-        path !== "/health" && path !== "/user/session/validate" && !path.startsWith("/internal/"),
+        path !== "/health" &&
+        path !== "/user/session/validate" &&
+        path !== "/platform/session/validate" &&
+        !path.startsWith("/internal/"),
     },
     {
       key: "department-service",
@@ -93,7 +97,7 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "Project Service",
       buildSpec: () =>
         buildProjectServiceOpenApiSpec({ port: getPortFromUrl(env.projectServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "client-service",
@@ -130,21 +134,21 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       label: "RH Service",
       buildSpec: () =>
         buildRhServiceOpenApiSpec({ port: getPortFromUrl(env.rhServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "fiscal-service",
       label: "Fiscal Service",
       buildSpec: () =>
         buildFiscalServiceOpenApiSpec({ port: getPortFromUrl(env.fiscalServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "contabil-service",
       label: "Contabil Service",
       buildSpec: () =>
         buildContabilServiceOpenApiSpec({ port: getPortFromUrl(env.contabilServiceUrl) } as never),
-      includePath: (path) => path !== "/health",
+      includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
     },
     {
       key: "ti-service",
@@ -182,7 +186,8 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
         buildParcelamentoServiceOpenApiSpec({
           port: getPortFromUrl(env.parcelamentoServiceUrl),
         } as never),
-      includePath: (path) => path !== "/health" && path !== "/ready",
+      includePath: (path) =>
+        path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
     },
     {
       key: "reports-service",
@@ -260,15 +265,27 @@ function transformSecurity(
 
 function isGatewayVisibleSecurityScheme(name: string): boolean {
   return (
-    name !== "forwardedAuthUserId" && name !== "internalServiceToken" && name !== "internalToken"
+    name !== "forwardedAuthUserId" &&
+    name !== "internalServiceToken" &&
+    name !== "internalToken" &&
+    name !== "gatewayInternalToken"
   );
 }
 
 function getGatewayOperationSecurity(
   path: string,
+  method: string,
   definition: ServiceSpecDefinition,
   security: Array<Record<string, string[]>> | undefined,
 ): Array<Record<string, string[]>> | undefined {
+  if (path === "/platform/session" && method.toLowerCase() === "post") {
+    return undefined;
+  }
+
+  if (path.startsWith("/platform/") && security) {
+    return platformBrowserAuthentication;
+  }
+
   if (path === "/user/me") {
     return browserAuthentication;
   }
@@ -290,6 +307,23 @@ function getGatewayOperationSecurity(
     .filter((entry) => Object.keys(entry).length > 0);
 
   return filtered.length > 0 ? browserAuthentication : undefined;
+}
+
+function addPlatformAuditPath(aggregateSpec: AggregatedOpenApiDocument): void {
+  const auditRequests = aggregateSpec.paths["/audit/requests"] as JsonObject | undefined;
+  const getOperation = auditRequests?.get;
+  if (!getOperation || typeof getOperation !== "object") {
+    return;
+  }
+
+  aggregateSpec.paths["/platform/audit/requests"] = {
+    get: {
+      ...(getOperation as JsonObject),
+      summary: "Consultar auditoria global da plataforma",
+      security: platformBrowserAuthentication,
+      "x-origin-service": "audit-service",
+    },
+  };
 }
 
 function mergeSecuritySchemes(
@@ -511,7 +545,12 @@ function mergeServicePaths(
           operationRecord.security,
           securitySchemeNameMap,
         );
-        const gatewaySecurity = getGatewayOperationSecurity(path, definition, transformedSecurity);
+        const gatewaySecurity = getGatewayOperationSecurity(
+          path,
+          method,
+          definition,
+          transformedSecurity,
+        );
         if (gatewaySecurity) {
           operationRecord.security = gatewaySecurity;
         } else {
@@ -600,6 +639,8 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       tagNameMap,
     );
   }
+
+  addPlatformAuditPath(aggregateSpec);
 
   return aggregateSpec;
 }

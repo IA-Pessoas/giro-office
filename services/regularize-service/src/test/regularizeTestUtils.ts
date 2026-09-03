@@ -9,6 +9,10 @@ import { vi } from "vitest";
 import { createApp } from "../app.js";
 import type { RegularizeServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import type {
+  RegularizeLicenseReportingService,
+  RegularizeMunicipalTaxesReportingService,
+} from "../reporting/internalReportingService.js";
 import { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
 
 export const regularizeTestEnv: RegularizeServiceEnv = {
@@ -18,6 +22,8 @@ export const regularizeTestEnv: RegularizeServiceEnv = {
   jwtSecret: "secret",
   auditServiceToken: "audit-service-token",
   internalServiceToken: "internal-token",
+  regularizeReportingToken: "regularize-reporting-token",
+  regularizeReportingGrantSecret: "regularize-reporting-grant-secret",
   encryptionKey: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
   logLevel: "info",
   logPretty: false,
@@ -56,7 +62,11 @@ export function createLoggerMock() {
   } as never;
 }
 
-export function createTestApp(prisma: PrismaClient = {} as PrismaClient) {
+export function createTestApp(
+  prisma: PrismaClient = {} as PrismaClient,
+  internalReportingService?: RegularizeLicenseReportingService,
+  municipalTaxesReportingService?: RegularizeMunicipalTaxesReportingService,
+) {
   return createApp({
     env: regularizeTestEnv,
     logger: createLoggerMock(),
@@ -66,5 +76,7 @@ export function createTestApp(prisma: PrismaClient = {} as PrismaClient) {
     runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 0 })),
     runClientPfStatusReconciliation: vi.fn(async () => ({ updated: 0 })),
     runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
+    internalReportingService,
+    municipalTaxesReportingService,
   });
 }

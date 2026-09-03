@@ -184,3 +184,85 @@ test("createAuditRecorder limita entregas pendentes", async () => {
   releaseFirst?.();
   await first;
 });
+
+test("retry publico preserva capacidade protegida e a auditoria obrigatoria falha sem retry", async () => {
+  let releaseRetry!: () => void;
+  let retryStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    retryStarted = resolve;
+  });
+  const held = new Promise<void>((resolve) => {
+    releaseRetry = resolve;
+  });
+  const attempts = new Map<string, number>();
+  const recorder = createAuditRecorder({
+    enabled: true,
+    serviceUrl: "http://audit-service:3020",
+    serviceToken: "test-token",
+    logger: createLogger(),
+    maxInFlight: 2,
+    protectedCapacity: 1,
+    maxPending: 1,
+    retryMaxAttempts: 2,
+    sleep: async () => {
+      retryStarted();
+      await held;
+    },
+    fetchImpl: async (_input, init) => {
+      const id = JSON.parse(String(init?.body)).requestId as string;
+      const count = (attempts.get(id) ?? 0) + 1;
+      attempts.set(id, count);
+      return new Response(null, { status: id === "public" && count === 2 ? 204 : 503 });
+    },
+  });
+  const publicRecord = recorder(createPayload("public"));
+  try {
+    await started;
+    assert.equal(recorder.reserve("public"), undefined);
+    const protectedSlot = recorder.reserve("protected");
+    assert.equal(protectedSlot, "protected");
+    await assert.rejects(recorder.recordRequired(createPayload("required"), protectedSlot), {
+      message: "Audit persistence unavailable",
+    });
+    assert.equal(attempts.get("required"), 1);
+    const releasedSlot = recorder.reserve("protected");
+    assert.equal(releasedSlot, "protected");
+    await assert.rejects(recorder.recordRequired(createPayload("required-again"), releasedSlot));
+  } finally {
+    releaseRetry();
+    await publicRecord;
+  }
+  assert.equal(attempts.get("public"), 2);
+  const publicSlot = recorder.reserve("public");
+  assert.equal(publicSlot, "public");
+  await assert.rejects(recorder.recordRequired(createPayload("cleanup"), publicSlot));
+});
+
+test("buffer cheio libera a reserva publica rejeitada", async () => {
+  let release!: () => void;
+  const held = new Promise<Response>((resolve) => {
+    release = () => resolve(new Response(null, { status: 204 }));
+  });
+  const recorder = createAuditRecorder({
+    enabled: true,
+    serviceUrl: "http://audit-service:3020",
+    serviceToken: "test-token",
+    logger: createLogger(),
+    maxInFlight: 3,
+    protectedCapacity: 1,
+    maxPending: 1,
+    fetchImpl: async () => held,
+  });
+  const first = recorder(createPayload("first"));
+  try {
+    const rejected = recorder.reserve("public");
+    assert.equal(rejected, "public");
+    await recorder(createPayload("discarded"), rejected);
+    const next = recorder.reserve("public");
+    assert.equal(next, "public");
+    await recorder(createPayload("discarded-again"), next);
+  } finally {
+    release();
+    await first;
+  }
+});

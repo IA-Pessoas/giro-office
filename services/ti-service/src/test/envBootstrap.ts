@@ -4,6 +4,8 @@ process.env.DATABASE_URL = "postgresql://localhost/ti_service_test";
 process.env.AUDIT_SERVICE_URL = "http://localhost:3020";
 process.env.AUDIT_SERVICE_TOKEN = "audit-service-token-test";
 process.env.TI_SERVICE_INTERNAL_TOKEN = "ti-service-internal-token-test";
+process.env.REPORTS_INTERNAL_TOKEN = "reports-internal-token-test";
+process.env.REPORTS_GRANT_SECRET = "reports-grant-secret-test";
 process.env.MTK_ENCRYPTION_KEY = "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=";
 process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-supabase-service-role-key";

@@ -45,6 +45,10 @@ const certificateServiceEnvSchema = z
     auditServiceUrl: z.string().url("AUDIT_SERVICE_URL invalida."),
     auditServiceToken: z.string().min(1, "AUDIT_SERVICE_TOKEN nao definido."),
     internalServiceToken: z.string().min(1, "CERTIFICATE_SERVICE_INTERNAL_TOKEN nao definido."),
+    certificateReportingToken: z.string().optional().default(""),
+    certificateReportingGrantSecret: z.string().optional().default(""),
+    reportsInternalToken: z.string().optional().default("reports-service-token"),
+    reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     notificationWindowDays: z.coerce.number().int().positive().default(30),
     allowedOrigins: z
       .string()
@@ -143,6 +147,30 @@ const certificateServiceEnvSchema = z
       envName: "CERTIFICATE_SERVICE_INTERNAL_TOKEN",
       token: rest.internalServiceToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "certificate-service",
+      envName: "CERTIFICATE_REPORTING_TOKEN",
+      token: rest.certificateReportingToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "certificate-service",
+      envName: "REPORTS_INTERNAL_TOKEN",
+      token: rest.reportsInternalToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "certificate-service",
+      envName: "CERTIFICATE_REPORTING_GRANT_SECRET",
+      token: rest.certificateReportingGrantSecret,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "certificate-service",
+      envName: "REPORTS_GRANT_SECRET",
+      token: rest.reportsGrantSecret,
+    });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
       serviceName: "certificate-service",
@@ -170,6 +198,10 @@ export function getCertificateServiceEnv(): CertificateServiceEnv {
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     internalServiceToken: process.env.CERTIFICATE_SERVICE_INTERNAL_TOKEN,
+    certificateReportingToken: process.env.CERTIFICATE_REPORTING_TOKEN,
+    certificateReportingGrantSecret: process.env.CERTIFICATE_REPORTING_GRANT_SECRET,
+    reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,
+    reportsGrantSecret: process.env.REPORTS_GRANT_SECRET,
     notificationWindowDays: process.env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,

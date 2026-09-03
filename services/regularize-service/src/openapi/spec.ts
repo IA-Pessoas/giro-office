@@ -655,6 +655,91 @@ export function buildRegularizeServiceOpenApiSpec(
           },
         },
       },
+      "/internal/reporting/catalog": {
+        get: {
+          tags: ["Internal"],
+          summary: "Obter catálogo interno de relatórios do Regularize",
+          security: [{ internalToken: [] }],
+          parameters: [
+            {
+              name: "x-request-id",
+              in: "header",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": { description: "Catálogo seguro", ...successEnvelopeContent() },
+            "403": { description: "Token ou grant inválido" },
+          },
+        },
+      },
+      "/internal/reporting/extract": {
+        post: {
+          tags: ["Internal"],
+          summary: "Extrair licenças, processos e tributos municipais para o reports-service",
+          security: [{ internalToken: [] }],
+          parameters: [
+            {
+              name: "x-request-id",
+              in: "header",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["source", "fields", "limit"],
+                  additionalProperties: false,
+                  properties: {
+                    source: {
+                      type: "string",
+                      enum: [
+                        "regularize.licenses",
+                        "regularize.processes",
+                        "regularize.municipal_taxes",
+                      ],
+                    },
+                    fields: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 25,
+                      items: { type: "string" },
+                    },
+                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Linhas projetadas e limite de origem",
+              ...successEnvelopeContent(),
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Token, grant ou campo inválido" },
+          },
+        },
+      },
       "/internal/reconciliation/license-notifications/run": {
         post: {
           tags: ["Internal"],

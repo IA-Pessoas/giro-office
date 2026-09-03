@@ -30,6 +30,7 @@ function gatewayHeaders(permission: number): Record<string, string> {
 
 describe("ti stock routes", () => {
   it.each([
+    "/ti/stock",
     "/ti/stock/items/list",
     `/ti/stock/items/${stockId}`,
     `/ti/stock/items/${stockId}/movements/list`,
@@ -63,6 +64,18 @@ describe("ti stock routes", () => {
         limit: 50,
         hasMore: false,
       },
+    });
+  });
+
+  it("GET /ti/stock exposes the report-compatible stock listing", async () => {
+    const response = await request(createTestApp())
+      .get("/ti/stock")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: { data: [], total: 0, page: 1, limit: 50, hasMore: false },
     });
   });
 

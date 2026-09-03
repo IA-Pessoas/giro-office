@@ -12,9 +12,12 @@ import express, { type Request, type Response } from "express";
 import "express-async-errors";
 
 import type { OrganizationEnv } from "./config/env.js";
+import { createOrganizationAudit } from "./integrations/audit.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildOrganizationServiceOpenApiSpec } from "./openapi/spec.js";
 import organizationRoutes from "./routes/organization.routes.js";
+import { createPlatformOrganizationRoutes } from "./routes/platformOrganization.routes.js";
+import { OrganizationService } from "./services/organizationService.js";
 
 function organizationErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -31,6 +34,13 @@ function organizationErrorLogContext(request: Request): Record<string, unknown> 
 
 export function createOrganizationApp(env: OrganizationEnv, logger: Logger): express.Express {
   const app = express();
+  const organizationAudit = createOrganizationAudit({
+    enabled: env.organizationDomainAuditEnabled,
+    serviceUrl: env.auditServiceUrl,
+    serviceToken: env.auditServiceToken,
+    logger,
+  });
+  const platformOrganizationService = new OrganizationService(organizationAudit);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "organization-service")));
@@ -51,6 +61,7 @@ export function createOrganizationApp(env: OrganizationEnv, logger: Logger): exp
   }
 
   app.use("/organizations", organizationRoutes);
+  app.use("/platform", createPlatformOrganizationRoutes(platformOrganizationService));
 
   app.use(
     createExpressErrorHandler({

@@ -7,6 +7,7 @@ export interface RateLimitOptions {
   windowMs: number;
   message?: string;
   methods?: string[];
+  maxEntries?: number;
   now?: () => number;
   keyGenerator?: (request: Request) => string;
 }
@@ -74,12 +75,14 @@ export function createRateLimitMiddleware({
   windowMs,
   message = "Muitas requisições. Tente novamente em instantes.",
   methods,
+  maxEntries = 10_000,
   now = () => Date.now(),
   keyGenerator = defaultRateLimitKey,
 }: RateLimitOptions) {
   const hits = new Map<string, RateLimitEntry>();
   const limitedMethods = normalizeMethods(methods);
   const safeMax = Math.max(1, max);
+  const safeMaxEntries = Number.isFinite(maxEntries) ? Math.max(1, Math.floor(maxEntries)) : 10_000;
   const safeWindowMs = Math.max(1, windowMs);
 
   return function rateLimit(request: Request, response: Response, next: NextFunction): void {
@@ -90,11 +93,18 @@ export function createRateLimitMiddleware({
 
     const currentTime = now();
     const requestKey = `${key}:${keyGenerator(request)}`;
-    const current = hits.get(requestKey);
-    const entry =
-      current && current.resetAt > currentTime
-        ? current
-        : { count: 0, resetAt: currentTime + safeWindowMs };
+    let current = hits.get(requestKey);
+    if (current && current.resetAt <= currentTime) {
+      hits.delete(requestKey);
+      current = undefined;
+    }
+    if (!current && hits.size >= safeMaxEntries) {
+      const oldestKey = hits.keys().next().value;
+      if (oldestKey !== undefined) {
+        hits.delete(oldestKey);
+      }
+    }
+    const entry = current ?? { count: 0, resetAt: currentTime + safeWindowMs };
 
     if (entry.count >= safeMax) {
       const retryAfterSeconds = Math.max(1, Math.ceil((entry.resetAt - currentTime) / 1000));

@@ -27,6 +27,12 @@
       "import": "./dist/datetime/index.js",
       "default": "./dist/datetime/index.js"
     },
+    "./featureFlags": {
+      "types": "./dist/featureFlags/index.d.ts",
+      "development": "./src/featureFlags/index.ts",
+      "import": "./dist/featureFlags/index.js",
+      "default": "./dist/featureFlags/index.js"
+    },
     "./database": {
       "types": "./dist/database/index.d.ts",
       "development": "./src/database/index.ts",
@@ -100,6 +106,7 @@
     "check": "biome check ."
   },
   "dependencies": {
+    "@launchdarkly/node-server-sdk": "^9.13.1",
     "@supabase/supabase-js": "^2.99.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",

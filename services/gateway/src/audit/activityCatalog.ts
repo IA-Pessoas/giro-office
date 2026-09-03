@@ -44,12 +44,93 @@ const TECHNICAL_RULES = [
   /^\/audit(?:\/|$)/,
   /^\/internal(?:\/|$)/,
   /^\/user\/(?:session|start-config|me)(?:\/|$)/,
+  /^\/platform\/(?:session|me|audit)(?:\/|$)/,
   /^\/project\/metrics$/,
   /^\/ti\/dashboard\/?$/,
   /^\/pessoal\/overview\/?$/,
 ] as const;
 
 const EXPLICIT_RULES: ExplicitRule[] = [
+  {
+    methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users$/,
+    description: { action: "criou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/platform\/organizations$/,
+    description: { action: "criou", item: "uma organização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations$/,
+    description: { action: "consultou", item: "a lista global de organizações" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+$/,
+    description: { action: "consultou", item: "uma organização" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/organizations\/[^/]+\/status$/,
+    description: { action: "alterou", item: "o status de uma organização" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/organizations\/[^/]+\/subscription-plan$/,
+    description: { action: "alterou", item: "o plano de uma organização" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/organizations\/[^/]+\/logo-url$/,
+    description: { action: "atualizou", item: "a marca de uma organização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users$/,
+    description: { action: "consultou", item: "a lista global de usuários da organização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/,
+    description: { action: "consultou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/,
+    description: { action: "consultou", item: "as permissões de um usuário da organização" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/,
+    description: { action: "atualizou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions$/,
+    description: { action: "alterou", item: "as permissões de um usuário da organização" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+$/,
+    description: { action: "desativou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/,
+    description: { action: "reativou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/ownership-transfer$/,
+    description: { action: "transferiu", item: "o ownership da organização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/platform\/organizations\/[^/]+\/departments$/,
+    description: { action: "consultou", item: "os departamentos da organização" },
+  },
   {
     methods: ["GET"],
     pattern: /^\/reports\/catalog$/,
@@ -59,6 +140,76 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/reports\/preview$/,
     description: { action: "gerou", item: "uma prévia de relatório" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/reports\/jobs\/list$/,
+    description: { action: "consultou", item: "o histórico de relatórios" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/reports\/jobs\/[^/]+$/,
+    description: { action: "consultou", item: "um job de relatório" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/jobs$/,
+    description: { action: "gerou", item: "um relatório" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/jobs\/[^/]+\/cancel$/,
+    description: { action: "cancelou", item: "um job de relatório" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/reports\/jobs\/[^/]+\/snapshot$/,
+    description: { action: "consultou", item: "um snapshot de relatório" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/reports\/snapshots\/[^/]+\/export$/,
+    description: { action: "exportou", item: "um snapshot de relatório" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/snapshots\/[^/]+\/delete$/,
+    description: { action: "excluiu", item: "um snapshot de relatório" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/reports\/retention$/,
+    description: { action: "consultou", item: "a política de retenção de relatórios" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/reports\/retention$/,
+    description: { action: "alterou", item: "a política de retenção de relatórios" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/models\/shared$/,
+    description: { action: "cadastrou", item: "um modelo compartilhado de relatório" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/reports\/models\/shared\/list$/,
+    description: { action: "consultou", item: "a lista de modelos compartilhados de relatório" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/reports\/models\/shared\/[^/]+$/,
+    description: { action: "atualizou", item: "um modelo compartilhado de relatório" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/models\/shared\/[^/]+\/copy$/,
+    description: { action: "copiou", item: "um modelo compartilhado de relatório" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/models\/shared\/[^/]+\/preview$/,
+    description: { action: "gerou", item: "uma prévia de modelo compartilhado de relatório" },
   },
   {
     methods: ["PATCH", "PUT"],
@@ -471,6 +622,18 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 ];
 
 const RESOURCE_RULES: ResourceRule[] = [
+  {
+    pattern: /^\/reports\/models\/shared(?:\/|$)/,
+    singular: "um modelo compartilhado de relatório",
+    newSingular: "um novo modelo compartilhado de relatório",
+    plural: "modelos compartilhados de relatório",
+  },
+  {
+    pattern: /^\/reports\/models(?:\/|$)/,
+    singular: "um modelo pessoal de relatório",
+    newSingular: "um novo modelo pessoal de relatório",
+    plural: "modelos pessoais de relatório",
+  },
   {
     pattern: /^\/task\/project-plan\/task(?:\/|$)/,
     singular: "uma tarefa do plano de projeto",

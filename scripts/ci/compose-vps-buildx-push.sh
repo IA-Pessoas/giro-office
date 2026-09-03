@@ -51,7 +51,7 @@ service_build_command() {
         docker buildx build
         --push
         --file docker/app.Dockerfile
-        --build-arg "NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3010}"
+        --build-arg "NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}"
         --build-arg "API_INTERNAL_URL=${API_INTERNAL_URL:-http://gateway:3010}"
         --cache-from "type=registry,ref=$cache_ref"
         --cache-to "type=registry,ref=$cache_ref,mode=max"

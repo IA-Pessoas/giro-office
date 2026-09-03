@@ -11,6 +11,7 @@ export interface UserItem {
   permission: number;
   department_id: string;
   status: string;
+  version: number;
   photo?: string | null;
   photo_url?: string | null;
   department?: ApiUserDepartment;

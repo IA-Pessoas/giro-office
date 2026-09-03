@@ -38,7 +38,7 @@ export default function ContabilPage() {
               <ClientPickerModal
                 selectedClient={selectedClient}
                 onSelectClient={setSelectedClient}
-                filters={{ ref: "deps", status: "Departamento contabil" }}
+                filters={{ status: "Ativo", legacyIntegrationStatusFilter: false }}
               />
             }
           />

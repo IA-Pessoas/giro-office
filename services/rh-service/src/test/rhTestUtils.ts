@@ -225,6 +225,8 @@ export function createTestApp(options: { rhPermission?: number } = {}) {
     databaseUrl: "postgresql://localhost/rh_test",
     databasePoolMax: 5,
     jwtSecret: "test-secret",
+    reportsInternalToken: "test-reports-internal-token",
+    reportsGrantSecret: "test-reports-grant-secret",
     nodeEnv: "test",
     logLevel: "silent",
     logPretty: false,

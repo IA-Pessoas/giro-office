@@ -14,6 +14,7 @@ Ver `src/config/env.ts`:
 - `CLIENT_HISTORY_STORAGE_DIR` - diretorio base para uploads de historico (alternativa ao Firebase do legado)
 - `CLIENT_SERVICE_INTERNAL_TOKEN` - token compartilhado com o gateway para o contexto encaminhado e para `POST /internal/competence-output-update` (header `x-internal-service-token`); obrigatório em produção
 - `AUDIT_SERVICE_TOKEN` - fallback local do token interno apenas fora de produção, quando `CLIENT_SERVICE_INTERNAL_TOKEN` não é informado
+- `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` - token e segredo HMAC compartilhados com `reports-service` para `/internal/reporting/*`; obrigatórios e fortes em produção
 
 ## Gateway
 

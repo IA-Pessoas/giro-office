@@ -8,6 +8,8 @@
     "typecheck": "tsc --noEmit && pnpm run typecheck:usefetch",
     "test:auth": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/auth/run-auth-tests.mjs",
     "test:session-security": "node src/modules/auth/run-session-transport-tests.mjs",
+    "test:platform-session": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/auth/run-platform-session-tests.mjs",
+    "test:super-admin": "node src/modules/superAdmin/run-super-admin-tests.mjs",
     "test:auth-sidebar": "node src/modules/auth/run-auth-sidebar-browser-smoke.mjs",
     "test:auth-session": "pnpm run build && node src/modules/auth/run-auth-session-browser-smoke.mjs",
     "test:users": "node --experimental-strip-types src/modules/users/run-users-tests.mjs",
@@ -16,6 +18,7 @@
     "test:contabil": "node --experimental-strip-types src/modules/contabil/run-contabil-tests.mjs",
     "test:projects": "node --experimental-strip-types src/modules/integracao/run-project-tests.mjs",
     "test:socket": "node --experimental-strip-types src/context/run-socket-context-tests.mjs",
+    "test:feature-flags": "node --experimental-strip-types src/shared/featureFlags/run-feature-flags-tests.mjs",
     "test:chat-context": "node --experimental-strip-types src/modules/chat/run-chat-context-tests.mjs",
     "test:chat-window": "node --experimental-strip-types src/modules/chat/run-conversation-window-tests.mjs",
     "test:chat": "pnpm run test:socket && pnpm run test:chat-context && pnpm run test:chat-window",
@@ -41,7 +44,7 @@
     "test:input-formatting": "node --experimental-strip-types src/shared/run-input-formatting-tests.mjs",
     "test:pagination": "node --experimental-strip-types src/shared/run-pagination-tests.mjs",
     "test:summary-items": "node --experimental-strip-types src/shared/run-summary-items-tests.mjs",
-    "test": "pnpm run test:session-security && pnpm run test:auth-session && pnpm run test:auth && pnpm run test:auth-sidebar && pnpm run test:users && pnpm run test:clients && pnpm run test:departments && pnpm run test:contabil && pnpm run test:projects && pnpm run test:chat && pnpm run test:iframe && pnpm run test:certificates && pnpm run test:pessoal && pnpm run test:a11y-overlays && pnpm run test:organization-modal && pnpm run test:status-badge && pnpm run test:regularize && pnpm run test:parcelamento && pnpm run test:fiscal && pnpm run test:commercial && pnpm run test:dashboard && pnpm run test:recharts-lazy && pnpm run test:reports && pnpm run test:react-query-cache && pnpm run test:field-help && pnpm run test:me-password-update && pnpm run test:input-formatting && pnpm run test:pagination && pnpm run test:summary-items && pnpm run test:image-optimization",
+    "test": "pnpm run test:session-security && pnpm run test:platform-session && pnpm run test:super-admin && pnpm run test:auth-session && pnpm run test:auth && pnpm run test:auth-sidebar && pnpm run test:users && pnpm run test:clients && pnpm run test:departments && pnpm run test:contabil && pnpm run test:projects && pnpm run test:chat && pnpm run test:iframe && pnpm run test:certificates && pnpm run test:pessoal && pnpm run test:a11y-overlays && pnpm run test:organization-modal && pnpm run test:status-badge && pnpm run test:regularize && pnpm run test:parcelamento && pnpm run test:fiscal && pnpm run test:commercial && pnpm run test:dashboard && pnpm run test:recharts-lazy && pnpm run test:reports && pnpm run test:react-query-cache && pnpm run test:field-help && pnpm run test:me-password-update && pnpm run test:input-formatting && pnpm run test:pagination && pnpm run test:summary-items && pnpm run test:image-optimization",
     "images:audit": "node scripts/audit-public-images.mjs",
     "start": "next start",
     "migration:audit:chakra": "node scripts/audit-chakra-usage.mjs",
@@ -53,6 +56,7 @@
     "typecheck:usefetch": "tsc -p tsconfig.usefetch-types.json --noEmit"
   },
   "dependencies": {
+    "@launchdarkly/js-client-sdk": "^4.10.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-separator": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.2",

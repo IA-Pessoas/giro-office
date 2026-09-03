@@ -1,0 +1,92 @@
+name: Super Admin V2 CI
+
+on:
+  pull_request:
+    branches:
+      - feature/super-admin-v2-develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: super-admin-v2-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: super-admin-v2/gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/giro_ci
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          test "$(corepack pnpm --version)" = "10.26.0"
+
+      - name: Install frozen dependencies without lifecycle scripts
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Test legacy platform auth reconciliation in memory
+        run: node --test scripts/reconcile-platform-auth-sessions.test.mjs
+
+      - name: Build shared package
+        run: corepack pnpm --filter @workspace/shared build
+
+      - name: Validate, build, and test the shared API client
+        run: |
+          corepack pnpm --filter @workspace/api check
+          corepack pnpm --filter @workspace/api typecheck
+          corepack pnpm --filter @workspace/api build
+          corepack pnpm --filter @workspace/api test
+
+      - name: Run supply-chain gates
+        run: |
+          node --test scripts/super-admin-session-regression.test.mjs \
+            scripts/supply-chain-security.test.mjs \
+            scripts/supply-chain-integrity.test.mjs
+          node scripts/supply-chain-integrity.mjs
+          node scripts/pnpm-security-policy.mjs --root .
+          corepack pnpm audit --audit-level moderate
+
+      - name: Check shared and Super Admin services
+        run: >-
+          corepack pnpm --filter @workspace/shared --filter @workspace/gateway
+          --filter @workspace/user-service --filter @workspace/organization-service
+          --filter @workspace/audit-service check
+
+      - name: Typecheck shared and Super Admin services
+        run: >-
+          corepack pnpm --filter @workspace/shared --filter @workspace/gateway
+          --filter @workspace/user-service --filter @workspace/organization-service
+          --filter @workspace/audit-service typecheck
+
+      - name: Test shared and Super Admin services
+        run: >-
+          corepack pnpm --filter @workspace/shared --filter @workspace/gateway
+          --filter @workspace/user-service --filter @workspace/organization-service
+          --filter @workspace/audit-service test
+
+      - name: Validate smoke coverage and Prisma schema
+        run: |
+          corepack pnpm smoke:coverage
+          corepack pnpm --filter @workspace/infra exec prisma validate --schema prisma/schema.prisma
+
+      - name: Verify the browser application
+        run: |
+          corepack pnpm --filter @workspace/app typecheck
+          corepack pnpm --filter @workspace/app test:session-security
+          corepack pnpm --filter @workspace/app test:platform-session
+          corepack pnpm --filter @workspace/app test:super-admin
+          corepack pnpm --filter @workspace/app build

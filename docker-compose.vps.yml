@@ -23,8 +23,8 @@ services:
     env_file:
       - .env.vps.reverse-proxy
     ports:
-      - "8085:80"
-      # - "443:443"
+      - "127.0.0.1:8085:80"
+      - "127.0.0.1:${REVERSE_PROXY_TLS_PORT:-8443}:443"
     volumes:
       - ./docker/nginx/generate-nginx-config.sh:/opt/generate-nginx-config.sh:ro
       - ./docker/nginx/certs:/etc/nginx/certs:ro
@@ -42,10 +42,13 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
         API_INTERNAL_URL: ${API_INTERNAL_URL:-http://gateway:3010}
+        NEXT_PUBLIC_FEATURE_FLAGS_ENABLED: ${NEXT_PUBLIC_FEATURE_FLAGS_ENABLED:-false}
+        NEXT_PUBLIC_LAUNCHDARKLY_CLIENT_ID: ${NEXT_PUBLIC_LAUNCHDARKLY_CLIENT_ID:-}
+        NEXT_PUBLIC_LAUNCHDARKLY_INIT_TIMEOUT_MS: ${NEXT_PUBLIC_LAUNCHDARKLY_INIT_TIMEOUT_MS:-3000}
     env_file:
       - .env.vps.web
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     healthcheck:
       test:
         [
@@ -84,7 +87,7 @@ services:
       PARCELAMENTO_SERVICE_URL: http://parcelamento-service:3043
       REPORTS_SERVICE_URL: http://reports-service:3044
     ports:
-      - "3010:3010"
+      - "127.0.0.1:3010:3010"
     depends_on:
       organization-service:
         condition: service_healthy
@@ -571,6 +574,13 @@ services:
       - .env.vps.reports-service
     environment:
       USER_SERVICE_URL: http://user-service:3030
+      CONTABIL_SERVICE_URL: http://contabil-service:3038
+      CERTIFICATE_SERVICE_URL: http://certificate-service:3041
+      PROJECT_SERVICE_URL: http://project-service:3033
+      TASK_SERVICE_URL: http://task-service:3032
+      FISCAL_SERVICE_URL: http://fiscal-service:3037
+      REGULARIZE_SERVICE_URL: http://regularize-service:3039
+      RH_SERVICE_URL: http://rh-service:3034
     expose:
       - "3044"
     healthcheck:
@@ -604,6 +614,11 @@ services:
       - .env.vps.reports-service
     environment:
       USER_SERVICE_URL: http://user-service:3030
+      CONTABIL_SERVICE_URL: http://contabil-service:3038
+      CERTIFICATE_SERVICE_URL: http://certificate-service:3041
+      FISCAL_SERVICE_URL: http://fiscal-service:3037
+      REGULARIZE_SERVICE_URL: http://regularize-service:3039
+      RH_SERVICE_URL: http://rh-service:3034
     depends_on:
       reports-service:
         condition: service_healthy

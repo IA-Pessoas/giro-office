@@ -3,9 +3,9 @@ import test from "node:test";
 
 import {
   ACTIVE_MODULE_KEYS,
-  RETIRED_MODULE_KEYS,
   normalizeModulePermission,
   normalizeModulePermissions,
+  RETIRED_MODULE_KEYS,
 } from "../src/auth/modules.js";
 
 test("mantém os 13 módulos ativos e separa os módulos aposentados", () => {

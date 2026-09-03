@@ -1,6 +1,6 @@
 # fiscal-service
 
-Microservico fiscal. Até a PR 2, este servico expoe CRUD de NCM, CRUD de ICMS e o health check. O gateway encaminha esse servico pelo prefixo publico **`/fiscal`**.
+Microservico fiscal. Este servico expoe CRUD de NCM, CRUD de ICMS, CRUD de IPI, catálogo/extração interna governada e o health check. O gateway encaminha esse servico pelo prefixo publico **`/fiscal`**.
 
 ## Porta local
 
@@ -14,6 +14,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `DATABASE_POOL_MAX` (default `1`)
 - `JWT_SECRET`
 - `AUDIT_*` quando a auditoria estiver ativa
+- `REPORTS_INTERNAL_TOKEN` e `REPORTS_GRANT_SECRET` para as rotas internas de relatórios
 
 ## Gateway
 
@@ -27,6 +28,9 @@ Exemplos de paths publicos:
 - `/fiscal/icms`
 - `/fiscal/icms/list`
 - `/health`
+
+As rotas `/internal/reporting/catalog` e `/internal/reporting/extract` são internas, não passam
+pelo gateway e exigem token de serviço e grant HMAC emitido pelo `reports-service`.
 
 ## Desenvolvimento
 

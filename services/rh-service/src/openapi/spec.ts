@@ -11,6 +11,33 @@ const successJson = {
 } as const;
 
 const bearer: Array<Record<string, string[]>> = [{ bearerAuth: [] }];
+const internalToken: Array<Record<string, string[]>> = [{ internalToken: [] }];
+const internalReportingParameters = [
+  {
+    name: "x-internal-service-token",
+    in: "header",
+    required: true,
+    schema: { type: "string" },
+  },
+  { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
+  { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+  {
+    name: "x-reports-grant-signature",
+    in: "header",
+    required: true,
+    schema: { type: "string" },
+  },
+] as const;
+
+const internalReportingExtractRequestBody = createObjectRequestBody({
+  example: { source: "rh.holidays", fields: ["name", "date"], limit: 100 },
+  required: ["source", "fields", "limit"],
+  properties: {
+    source: { type: "string", enum: ["rh.requests", "rh.attendance", "rh.holidays"] },
+    fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
+    limit: { type: "integer", minimum: 1, maximum: 101 },
+  },
+});
 
 function createObjectRequestBody(options: {
   example: Record<string, unknown>;
@@ -414,6 +441,7 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
       { name: "BancoDeHoras", description: "Lancamentos de banco de horas" },
       { name: "TimeSheets", description: "Folhas de ponto" },
       { name: "ScoreNitro", description: "Atualizacao de metricas Nitro" },
+      { name: "ReportingInternal", description: "Publicacao interna governada para relatórios" },
     ],
     components: {
       securitySchemes: {
@@ -421,6 +449,11 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
+        },
+        internalToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
         },
       },
       schemas: {
@@ -438,6 +471,32 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           summary: "Health check",
           responses: {
             "200": { description: "Servico disponivel", ...successJson },
+          },
+        },
+      },
+      "/internal/reporting/catalog": {
+        get: {
+          tags: ["ReportingInternal"],
+          summary: "Obter catálogo interno de relatórios RH",
+          security: internalToken,
+          parameters: internalReportingParameters,
+          responses: {
+            "200": { description: "Catálogo seguro", ...successJson },
+            "403": { description: "Credenciais ou grant inválido" },
+          },
+        },
+      },
+      "/internal/reporting/extract": {
+        post: {
+          tags: ["ReportingInternal"],
+          summary: "Extrair dados seguros de fontes RH",
+          security: internalToken,
+          parameters: internalReportingParameters,
+          ...internalReportingExtractRequestBody,
+          responses: {
+            "200": { description: "Dados extraídos", ...successJson },
+            "400": { description: "Payload inválido" },
+            "403": { description: "Credenciais, grant ou campo inválido" },
           },
         },
       },

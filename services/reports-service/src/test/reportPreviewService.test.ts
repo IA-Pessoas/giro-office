@@ -39,6 +39,16 @@ const scope = {
 };
 
 describe("ReportPreviewService", () => {
+  it("não extrai quando a definição não está autorizada", async () => {
+    const catalog = new SourceCatalogService([adapter]);
+    const service = new ReportPreviewService(catalog, new ReportDefinitionService(catalog), 2);
+
+    await expect(
+      service.preview(definition, { ...scope, modules: { financeiro: 0 } }),
+    ).rejects.toThrow("fonte não está autorizada");
+    expect(adapter.preview).not.toHaveBeenCalled();
+  });
+
   it("limita linhas, informa hasMore e aceita preview vazio", async () => {
     const catalog = new SourceCatalogService([adapter]);
     const service = new ReportPreviewService(catalog, new ReportDefinitionService(catalog), 2);
@@ -46,11 +56,29 @@ describe("ReportPreviewService", () => {
 
     await expect(service.preview(definition, scope)).resolves.toEqual({
       rows: [{ balance: 1 }, { balance: 2 }],
+      presentation: { columns: [{ key: "balance", label: "balance" }] },
+      limit: 2,
       hasMore: true,
     });
     expect(adapter.preview).toHaveBeenCalledWith(expect.objectContaining({ limit: 3 }));
 
     vi.mocked(adapter.preview).mockResolvedValue([]);
-    await expect(service.preview(definition, scope)).resolves.toEqual({ rows: [], hasMore: false });
+    await expect(service.preview(definition, scope)).resolves.toEqual({
+      rows: [],
+      presentation: { columns: [{ key: "balance", label: "balance" }] },
+      limit: 2,
+      hasMore: false,
+    });
+
+    vi.mocked(adapter.preview).mockResolvedValue({
+      rows: [{ balance: 1 }],
+      reachedLimit: true,
+    });
+    await expect(service.preview(definition, scope)).resolves.toEqual({
+      rows: [{ balance: 1 }],
+      presentation: { columns: [{ key: "balance", label: "balance" }] },
+      limit: 2,
+      hasMore: true,
+    });
   });
 });

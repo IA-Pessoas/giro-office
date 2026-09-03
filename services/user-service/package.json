@@ -13,6 +13,7 @@
     "typecheck": "pnpm prisma:generate && tsc --noEmit",
     "check": "biome check .",
     "start": "node dist/server.js",
+    "bootstrap:platform-admin": "tsx src/scripts/bootstrapPlatformAdmin.ts",
     "test": "pnpm exec vitest run",
     "test:watch": "pnpm exec vitest"
   },
