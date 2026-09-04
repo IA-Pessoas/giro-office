@@ -102,6 +102,19 @@ const PLATFORM_ORGANIZATION_SELECT = {
   updated_at: true,
 } as const;
 
+const ACTIVE_DEPARTMENT_STATUS: status = "active";
+
+const DEFAULT_PLATFORM_DEPARTMENTS = [
+  { name: "Administração", color: "#6B7280", status: ACTIVE_DEPARTMENT_STATUS, solution: false },
+  { name: "Contábil", color: "#3B82F6", status: ACTIVE_DEPARTMENT_STATUS, solution: true },
+  { name: "Fiscal", color: "#10B981", status: ACTIVE_DEPARTMENT_STATUS, solution: true },
+  { name: "Pessoal", color: "#F59E0B", status: ACTIVE_DEPARTMENT_STATUS, solution: true },
+  { name: "Recursos Humanos", color: "#EC4899", status: ACTIVE_DEPARTMENT_STATUS, solution: false },
+  { name: "Tecnologia", color: "#8B5CF6", status: ACTIVE_DEPARTMENT_STATUS, solution: false },
+  { name: "Comercial", color: "#EF4444", status: ACTIVE_DEPARTMENT_STATUS, solution: false },
+  { name: "Financeiro", color: "#14B8A6", status: ACTIVE_DEPARTMENT_STATUS, solution: false },
+];
+
 const ORGANIZATION_CREATE_SELECT = {
   id: true,
   name: true,
@@ -294,6 +307,7 @@ class OrganizationService {
           cnpj,
           status: "active",
           subscription_plan: "trial",
+          departments: { create: DEFAULT_PLATFORM_DEPARTMENTS },
         },
         select: PLATFORM_ORGANIZATION_SELECT,
       });

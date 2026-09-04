@@ -195,7 +195,7 @@ describe("OrganizationService", () => {
     await expect(service.findById("org-1")).rejects.toMatchObject({ statusCode: 404 });
   });
 
-  it("createPlatform persiste defaults seguros e audita sem CNPJ ou e-mail", async () => {
+  it("createPlatform provisiona departamentos padrão atomicamente e audita sem CNPJ ou e-mail", async () => {
     // Falha detectada: criação aceita defaults implícitos ou vaza identidade/CNPJ na auditoria.
     const createdAt = new Date("2026-08-25T12:00:00.000Z");
     const organization = {
@@ -230,6 +230,18 @@ describe("OrganizationService", () => {
         cnpj: "11222333000181",
         status: "active",
         subscription_plan: "trial",
+        departments: {
+          create: [
+            { name: "Administração", color: "#6B7280", status: "active", solution: false },
+            { name: "Contábil", color: "#3B82F6", status: "active", solution: true },
+            { name: "Fiscal", color: "#10B981", status: "active", solution: true },
+            { name: "Pessoal", color: "#F59E0B", status: "active", solution: true },
+            { name: "Recursos Humanos", color: "#EC4899", status: "active", solution: false },
+            { name: "Tecnologia", color: "#8B5CF6", status: "active", solution: false },
+            { name: "Comercial", color: "#EF4444", status: "active", solution: false },
+            { name: "Financeiro", color: "#14B8A6", status: "active", solution: false },
+          ],
+        },
       },
       select: {
         id: true,
