@@ -14,6 +14,18 @@ const partnerSelect = {
   exit: true,
 } as const;
 
+const partnerListSelect = {
+  ...partnerSelect,
+  clientPF: {
+    select: {
+      id: true,
+      name: true,
+      cpf: true,
+      date_of_birth: true,
+    },
+  },
+} as const;
+
 export class PartnersService {
   readonly #logs: RegularizeLogService;
 
@@ -132,13 +144,40 @@ export class PartnersService {
         organization_id: organizationId,
         ...(type === "pf" ? { pf_id: clientId } : { pj_id: clientId }),
       },
-      select: partnerSelect,
+      select: partnerListSelect,
       orderBy: {
         entry: "asc",
       },
     });
 
     return list as unknown as Record<string, unknown>[];
+  }
+
+  async remove(input: {
+    organizationId: string;
+    userId: string;
+    id: string;
+  }): Promise<{ ok: true }> {
+    const existing = await this.prisma.partners.findFirst({
+      where: { id: input.id, organization_id: input.organizationId },
+      select: partnerSelect,
+    });
+    if (!existing) {
+      throw new ServiceError(404, "Socio nao encontrado.");
+    }
+
+    await this.prisma.partners.delete({ where: { id: existing.id } });
+    await this.#logs.createLog({
+      userId: input.userId,
+      organizationId: input.organizationId,
+      action: "Exclusao",
+      referring: "regularize.partners",
+      referringId: existing.id,
+      changes: "{}",
+    });
+    await this.reconciliationService.handlePartnersChanged(input.organizationId, existing.pf_id);
+
+    return { ok: true };
   }
 
   private async ensureClientPfExists(organizationId: string, pfId: string): Promise<void> {

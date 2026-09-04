@@ -160,6 +160,15 @@ const regularizeOpenApiOperations = [
   },
   {
     service,
+    method: "DELETE",
+    path: "/regularize/partners/{id}",
+    action: "regularizePartnerDelete",
+    target: "gateway",
+    auth: "bearer",
+    expectedStatus: [200],
+  },
+  {
+    service,
     method: "GET",
     path: "/regularize/partner",
     action: "regularizePartnerDetail",

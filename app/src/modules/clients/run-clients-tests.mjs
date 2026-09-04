@@ -192,6 +192,13 @@ runTest("client endpoints use only /client contract", () => {
   assert.equal(CLIENT_ENDPOINTS.updatePa("123"), "/client/123/pa");
 });
 
+runTest("client detail exposes partners management in the main Clients module", () => {
+  const detailPage = readFileSync("src/pages/clients/[id].tsx", "utf8");
+
+  assert.match(detailPage, /ClientPartnersSection/);
+  assert.match(detailPage, /isCompanyClient.*cpf_cnpj.*length === 14/);
+});
+
 runTest("buildClientListParams forwards search, ref, status, page and limit", () => {
   const filters = {
     search: "acme",
