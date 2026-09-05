@@ -10,6 +10,10 @@ const administracaoSource = await readFile(
   join(srcRootPath, "shared", "components", "newLayout", "Administracao.tsx"),
   "utf8",
 );
+const adminPermissionsEditorSource = await readFile(
+  join(srcRootPath, "modules", "users", "components", "AdminPermissionsEditor.tsx"),
+  "utf8",
+);
 
 async function runTest(name, fn) {
   try {
@@ -128,19 +132,21 @@ await runTest("administracao invalidates user lists after user mutations", () =>
 
 await runTest("explicit retry refetch paths are preserved", () => {
   assert.match(administracaoSource, /refetch: refetchDepartments,/);
-  assert.match(administracaoSource, /refetch: refetchPermissionUsers,/);
   assert.match(getFunctionSource(administracaoSource, "handleOpenCreateModal"), /void refetchDepartments\(\);/);
   assert.match(getFunctionSource(administracaoSource, "handleRetryDepartments"), /void refetchDepartments\(\);/);
-  assert.match(administracaoSource, /onClick=\{\(\) => void refetchPermissionUsers\(\)\}/);
-  assert.match(administracaoSource, /onClick=\{\(\) => void permissionQuery\.refetch\(\)\}/);
+  assert.match(adminPermissionsEditorSource, /onClick=\{\(\) => void usersQuery\.refetch\(\)\}/);
+  assert.match(
+    adminPermissionsEditorSource,
+    /onClick=\{\(\) => void permissionQuery\.refetch\(\)\}/,
+  );
 });
 
 await runTest("permission save keeps precise cache update without manual list refetch", () => {
-  const handleSavePermissionsSource = getFunctionSource(administracaoSource, "handleSavePermissions");
+  const handleSaveSource = getFunctionSource(adminPermissionsEditorSource, "handleSave");
 
   assert.match(
-    handleSavePermissionsSource,
-    /queryClient\.setQueryData\(\["admin", "permissions", selectedPermissionUserId\], \{/,
+    handleSaveSource,
+    /queryClient\.setQueryData\(\[\.\.\.queryKey, "user", selectedUserId\], \{/,
   );
-  assert.equal(handleSavePermissionsSource.includes("refetchPermissionUsers"), false);
+  assert.equal(handleSaveSource.includes("usersQuery.refetch"), false);
 });

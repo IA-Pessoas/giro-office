@@ -22,19 +22,32 @@ const REPOSITORY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}\/[A-Za-z0-9][A-Za-z
 const REF_PATTERN = /^refs\/(?:heads|tags|pull)\/[A-Za-z0-9._/-]+$/u;
 const OBJECT_ID_PATTERN = /^[a-f0-9]{40,64}$/u;
 const SAFE_PATH_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[\x20-\x7e]{1,1024}$/u;
-const ELIGIBLE_PATH_PATTERN = /(?:^|\/)(?:\.github\/(?:actions|workflows)\/.+|\.husky\/.+|\.vscode\/.+|\.cursor\/.+|\.agents\/.+|scripts\/.+|docker\/.+|\.npmrc|package\.json|(?:babel|biome|eslint|next|nuxt|postcss|prettier|tailwind|tsup|vite|webpack)\.config\.(?:cjs|cts|js|json|mjs|mts|ts)|Dockerfile|[^/]+\.(?:woff|woff2))$/iu;
+const ELIGIBLE_PATH_PATTERN =
+  /(?:^|\/)(?:\.github\/(?:actions|workflows)\/.+|\.husky\/.+|\.vscode\/.+|\.cursor\/.+|\.agents\/.+|scripts\/.+|docker\/.+|\.npmrc|package\.json|(?:babel|biome|eslint|next|nuxt|postcss|prettier|tailwind|tsup|vite|webpack)\.config\.(?:cjs|cts|js|json|mjs|mts|ts)|Dockerfile|[^/]+\.(?:woff|woff2))$/iu;
 
 function fail(message) {
   throw new Error(message);
 }
 
-function validateOptions({ organization, token, workspace, maxRepositories, concurrency, maxBlobBytes, maxRefsPerRepository }) {
+function validateOptions({
+  organization,
+  token,
+  workspace,
+  maxRepositories,
+  concurrency,
+  maxBlobBytes,
+  maxRefsPerRepository,
+}) {
   if (typeof organization !== "string" || !OWNER_PATTERN.test(organization)) {
     fail("invalid organization");
   }
   if (typeof token !== "string" || token.trim() === "") fail("missing token");
   if (typeof workspace !== "string" || workspace.trim() === "") fail("missing workspace");
-  if (!Number.isInteger(maxRepositories) || maxRepositories < 1 || maxRepositories > MAX_REPOSITORIES) {
+  if (
+    !Number.isInteger(maxRepositories) ||
+    maxRepositories < 1 ||
+    maxRepositories > MAX_REPOSITORIES
+  ) {
     fail("invalid repository limit");
   }
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > MAX_CONCURRENCY) {
@@ -103,9 +116,11 @@ function projectRepository(value) {
 
 function retryDelay(response, attempt, now = Date.now()) {
   const retryAfter = Number(response.headers.get("retry-after"));
-  if (Number.isFinite(retryAfter) && retryAfter >= 0) return Math.min(retryAfter * 1000, MAX_BACKOFF_MS);
+  if (Number.isFinite(retryAfter) && retryAfter >= 0)
+    return Math.min(retryAfter * 1000, MAX_BACKOFF_MS);
   const resetAt = Number(response.headers.get("x-ratelimit-reset"));
-  if (Number.isFinite(resetAt) && resetAt * 1000 > now) return Math.min(resetAt * 1000 - now, MAX_BACKOFF_MS);
+  if (Number.isFinite(resetAt) && resetAt * 1000 > now)
+    return Math.min(resetAt * 1000 - now, MAX_BACKOFF_MS);
   return Math.min(100 * 2 ** attempt, MAX_BACKOFF_MS);
 }
 
@@ -113,7 +128,8 @@ async function fetchInventoryPage(fetchImpl, url, headers, sleep) {
   for (let attempt = 0; attempt < MAX_FETCH_ATTEMPTS; attempt += 1) {
     try {
       const response = await fetchImpl(url, { headers });
-      if (response?.ok || !response || ![429, 500, 502, 503, 504].includes(response.status)) return response;
+      if (response?.ok || !response || ![429, 500, 502, 503, 504].includes(response.status))
+        return response;
       if (attempt === MAX_FETCH_ATTEMPTS - 1) return response;
       await sleep(retryDelay(response, attempt));
     } catch {
@@ -128,31 +144,55 @@ async function listRepositories({ organization, token, fetchImpl, maxRepositorie
   const repositories = [];
   let coverageLimited = false;
   let pages = 0;
-  let next = safeApiUrl(`${API_ORIGIN}/orgs/${encodeURIComponent(organization)}/repos?type=all&per_page=100`, organization).toString();
+  let next = safeApiUrl(
+    `${API_ORIGIN}/orgs/${encodeURIComponent(organization)}/repos?type=all&per_page=100`,
+    organization,
+  ).toString();
 
   while (next && repositories.length < maxRepositories && pages < MAX_REPOSITORY_PAGES) {
     pages += 1;
     let response;
     try {
-      response = await fetchInventoryPage(fetchImpl, next, {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-      }, sleep);
+      response = await fetchInventoryPage(
+        fetchImpl,
+        next,
+        {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${token}`,
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+        sleep,
+      );
     } catch {
-      return { repositories, errors: [{ code: "inventory_request_failed" }], coverageLimited: true };
+      return {
+        repositories,
+        errors: [{ code: "inventory_request_failed" }],
+        coverageLimited: true,
+      };
     }
     if (!response || !response.ok) {
-      return { repositories, errors: [{ code: "inventory_request_failed" }], coverageLimited: true };
+      return {
+        repositories,
+        errors: [{ code: "inventory_request_failed" }],
+        coverageLimited: true,
+      };
     }
     let body;
     try {
       body = await response.json();
     } catch {
-      return { repositories, errors: [{ code: "inventory_response_invalid" }], coverageLimited: true };
+      return {
+        repositories,
+        errors: [{ code: "inventory_response_invalid" }],
+        coverageLimited: true,
+      };
     }
     if (!Array.isArray(body)) {
-      return { repositories, errors: [{ code: "inventory_response_invalid" }], coverageLimited: true };
+      return {
+        repositories,
+        errors: [{ code: "inventory_response_invalid" }],
+        coverageLimited: true,
+      };
     }
     for (const item of body) {
       if (repositories.length === maxRepositories) {
@@ -163,7 +203,8 @@ async function listRepositories({ organization, token, fetchImpl, maxRepositorie
       if (repository) repositories.push(repository);
     }
     next = nextPageUrl(response, organization);
-    if (next && (repositories.length === maxRepositories || pages === MAX_REPOSITORY_PAGES)) coverageLimited = true;
+    if (next && (repositories.length === maxRepositories || pages === MAX_REPOSITORY_PAGES))
+      coverageLimited = true;
   }
   return {
     repositories,
@@ -298,7 +339,16 @@ function safeDedupeKey({ repository, ref, blobSha, path: relativePath, ruleId })
     .digest("hex");
 }
 
-async function scanRepository({ repository, workspace, token, commandRunner, now, previousReport, maxBlobBytes, maxRefsPerRepository }) {
+async function scanRepository({
+  repository,
+  workspace,
+  token,
+  commandRunner,
+  now,
+  previousReport,
+  maxBlobBytes,
+  maxRefsPerRepository,
+}) {
   let mirrorDirectory;
   let largeBlobsSkipped = 0;
   try {
@@ -310,17 +360,34 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
       GIT_CONFIG_VALUE_0: `Authorization: Bearer ${token}`,
       GIT_TERMINAL_PROMPT: "0",
     };
-    await runGit(commandRunner, ["clone", "--mirror", "--no-local", "--", `https://github.com/${repository.fullName}.git`, mirrorDirectory], { env: cloneHeader });
-    await runGit(commandRunner, [
-      "-C",
-      mirrorDirectory,
-      "fetch",
-      "origin",
-      "+refs/pull/*/head:refs/pull/*/head",
-    ], { env: cloneHeader });
+    await runGit(
+      commandRunner,
+      [
+        "clone",
+        "--mirror",
+        "--no-local",
+        "--",
+        `https://github.com/${repository.fullName}.git`,
+        mirrorDirectory,
+      ],
+      { env: cloneHeader },
+    );
+    await runGit(
+      commandRunner,
+      ["-C", mirrorDirectory, "fetch", "origin", "+refs/pull/*/head:refs/pull/*/head"],
+      { env: cloneHeader },
+    );
     await runGit(commandRunner, ["-C", mirrorDirectory, "remote", "remove", "origin"]);
     const parsedRefs = parseRefs(
-      await runGit(commandRunner, ["-C", mirrorDirectory, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(creatordate:unix)", "refs/heads", "refs/tags", "refs/pull"]),
+      await runGit(commandRunner, [
+        "-C",
+        mirrorDirectory,
+        "for-each-ref",
+        "--format=%(refname)%00%(objectname)%00%(creatordate:unix)",
+        "refs/heads",
+        "refs/tags",
+        "refs/pull",
+      ]),
       repository,
       now,
       maxRefsPerRepository,
@@ -329,7 +396,15 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
     const blobs = new Map();
     for (const ref of refs) {
       const entries = parseTree(
-        await runGit(commandRunner, ["-C", mirrorDirectory, "ls-tree", "-r", "-z", "--full-tree", ref.name]),
+        await runGit(commandRunner, [
+          "-C",
+          mirrorDirectory,
+          "ls-tree",
+          "-r",
+          "-z",
+          "--full-tree",
+          ref.name,
+        ]),
       );
       for (const entry of entries) {
         const mapped = blobs.get(entry.blobSha) ?? [];
@@ -339,12 +414,22 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
     }
     const findings = [];
     for (const [blobSha, mappings] of blobs) {
-      const size = Number((await runGit(commandRunner, ["-C", mirrorDirectory, "cat-file", "-s", blobSha])).toString("utf8").trim());
+      const size = Number(
+        (await runGit(commandRunner, ["-C", mirrorDirectory, "cat-file", "-s", blobSha]))
+          .toString("utf8")
+          .trim(),
+      );
       if (!Number.isSafeInteger(size) || size < 0 || size > maxBlobBytes) {
         largeBlobsSkipped += 1;
         continue;
       }
-      const bytes = await runGit(commandRunner, ["-C", mirrorDirectory, "cat-file", "blob", blobSha]);
+      const bytes = await runGit(commandRunner, [
+        "-C",
+        mirrorDirectory,
+        "cat-file",
+        "blob",
+        blobSha,
+      ]);
       for (const mapping of mappings) {
         for (const finding of scanBlob(mapping.path, bytes)) {
           findings.push({
@@ -367,10 +452,20 @@ async function scanRepository({ repository, workspace, token, commandRunner, now
     return {
       repository: { ...repository, refs, scanStatus: "scanned" },
       findings,
-      refChanges: await refChangesFor(repository, refs, previousReport, commandRunner, mirrorDirectory),
+      refChanges: await refChangesFor(
+        repository,
+        refs,
+        previousReport,
+        commandRunner,
+        mirrorDirectory,
+      ),
       errors: [
-        ...(largeBlobsSkipped > 0 ? [{ repository: repository.fullName, code: "blob_size_limit_reached" }] : []),
-        ...(parsedRefs.limited ? [{ repository: repository.fullName, code: "ref_limit_reached" }] : []),
+        ...(largeBlobsSkipped > 0
+          ? [{ repository: repository.fullName, code: "blob_size_limit_reached" }]
+          : []),
+        ...(parsedRefs.limited
+          ? [{ repository: repository.fullName, code: "ref_limit_reached" }]
+          : []),
       ],
       blobs: blobs.size,
       largeBlobsSkipped,
@@ -417,22 +512,49 @@ export async function scanOrganization({
   maxRefsPerRepository = MAX_REFS_PER_REPOSITORY,
   sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay)),
 } = {}) {
-  validateOptions({ organization, token, workspace, maxRepositories, concurrency, maxBlobBytes, maxRefsPerRepository });
+  validateOptions({
+    organization,
+    token,
+    workspace,
+    maxRepositories,
+    concurrency,
+    maxBlobBytes,
+    maxRefsPerRepository,
+  });
   const generatedAt = new Date(now).toISOString();
   if (Number.isNaN(Date.parse(generatedAt))) fail("invalid timestamp");
-  const inventory = await listRepositories({ organization, token, fetchImpl, maxRepositories, sleep });
+  const inventory = await listRepositories({
+    organization,
+    token,
+    fetchImpl,
+    maxRepositories,
+    sleep,
+  });
   const results = await mapWithConcurrency(inventory.repositories, concurrency, (repository) =>
-    scanRepository({ repository, workspace, token, commandRunner, now: Date.parse(generatedAt), previousReport, maxBlobBytes, maxRefsPerRepository }),
+    scanRepository({
+      repository,
+      workspace,
+      token,
+      commandRunner,
+      now: Date.parse(generatedAt),
+      previousReport,
+      maxBlobBytes,
+      maxRefsPerRepository,
+    }),
   );
   const repositories = results.map(({ repository }) => repository);
-  const findings = results.flatMap(({ findings: entries }) => entries).sort((left, right) =>
-    `${left.repository}\0${left.ref}\0${left.path}\0${left.ruleId}`.localeCompare(
-      `${right.repository}\0${right.ref}\0${right.path}\0${right.ruleId}`,
-    ),
-  );
-  const refChanges = results.flatMap(({ refChanges }) => refChanges).sort((left, right) =>
-    `${left.repository}\0${left.ref}`.localeCompare(`${right.repository}\0${right.ref}`),
-  );
+  const findings = results
+    .flatMap(({ findings: entries }) => entries)
+    .sort((left, right) =>
+      `${left.repository}\0${left.ref}\0${left.path}\0${left.ruleId}`.localeCompare(
+        `${right.repository}\0${right.ref}\0${right.path}\0${right.ruleId}`,
+      ),
+    );
+  const refChanges = results
+    .flatMap(({ refChanges }) => refChanges)
+    .sort((left, right) =>
+      `${left.repository}\0${left.ref}`.localeCompare(`${right.repository}\0${right.ref}`),
+    );
   const errors = [...inventory.errors, ...results.flatMap(({ errors: entries }) => entries)];
   const remediation = findings.map((finding) => ({
     repository: finding.repository,
@@ -447,8 +569,10 @@ export async function scanOrganization({
     generatedAt,
     inventory: {
       repositoriesDiscovered: inventory.repositories.length,
-      repositoriesScanned: results.filter(({ repository }) => repository.scanStatus === "scanned").length,
-      repositoriesSkipped: results.filter(({ repository }) => repository.scanStatus === "skipped").length,
+      repositoriesScanned: results.filter(({ repository }) => repository.scanStatus === "scanned")
+        .length,
+      repositoriesSkipped: results.filter(({ repository }) => repository.scanStatus === "skipped")
+        .length,
       coverageLimited: inventory.coverageLimited,
     },
     repositories,
@@ -496,11 +620,15 @@ export async function main(
         : undefined;
     if (requirePreviousReport && !previousReportBytes) return 2;
     if (previousReportBytes) {
-      if (!Buffer.isBuffer(previousReportBytes) || previousReportBytes.length > MAX_PREVIOUS_REPORT_BYTES) {
+      if (
+        !Buffer.isBuffer(previousReportBytes) ||
+        previousReportBytes.length > MAX_PREVIOUS_REPORT_BYTES
+      ) {
         return 2;
       }
       previousReport = JSON.parse(previousReportBytes.toString("utf8"));
-      if (!previousReport || typeof previousReport !== "object" || Array.isArray(previousReport)) return 2;
+      if (!previousReport || typeof previousReport !== "object" || Array.isArray(previousReport))
+        return 2;
     }
     const report = await scan({
       organization,

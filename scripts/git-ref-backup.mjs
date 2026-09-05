@@ -1,8 +1,8 @@
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const BUNDLE_FILE = "repository.bundle";
@@ -107,9 +107,11 @@ function parseBundleRefs(output) {
   for (const line of output.split(/\r?\n/u)) {
     if (!line) continue;
     const [objectId, name] = line.split(" ");
-    if (!REF_NAME_PATTERN.test(name) || !OBJECT_ID_PATTERN.test(objectId)) {
+    if (!OBJECT_ID_PATTERN.test(objectId)) {
       throw new Error("git returned invalid refs");
     }
+    if (name === "HEAD") continue;
+    if (!REF_NAME_PATTERN.test(name)) throw new Error("git returned invalid refs");
     refs.push({ name, objectId });
   }
   return refs;
@@ -151,7 +153,9 @@ function validateManifest(value) {
 
 async function readManifest(snapshotDirectory) {
   try {
-    return validateManifest(JSON.parse(await readFile(path.join(snapshotDirectory, MANIFEST_FILE), "utf8")));
+    return validateManifest(
+      JSON.parse(await readFile(path.join(snapshotDirectory, MANIFEST_FILE), "utf8")),
+    );
   } catch (error) {
     if (error.message === "snapshot manifest is invalid") throw error;
     throw new Error("snapshot manifest is invalid");
@@ -260,16 +264,26 @@ async function mapBounded(items, limit, mapper) {
 }
 
 async function captureMetadata(repository, commandRunner) {
-  const rulesets = await readMetadataCollection(repository, "rulesets", (value) => {
-    const id = positiveId(value?.id);
-    const name = stringField(value?.name);
-    return id && name ? { id, name } : undefined;
-  }, commandRunner);
-  const releases = await readMetadataCollection(repository, "releases", (value) => {
-    const id = positiveId(value?.id);
-    const tag = stringField(value?.tag_name);
-    return id && tag ? { id, tag } : undefined;
-  }, commandRunner);
+  const rulesets = await readMetadataCollection(
+    repository,
+    "rulesets",
+    (value) => {
+      const id = positiveId(value?.id);
+      const name = stringField(value?.name);
+      return id && name ? { id, name } : undefined;
+    },
+    commandRunner,
+  );
+  const releases = await readMetadataCollection(
+    repository,
+    "releases",
+    (value) => {
+      const id = positiveId(value?.id);
+      const tag = stringField(value?.tag_name);
+      return id && tag ? { id, tag } : undefined;
+    },
+    commandRunner,
+  );
   const issues = await readMetadataCollection(
     repository,
     "issues",
@@ -295,11 +309,16 @@ async function captureMetadata(repository, commandRunner) {
     commandRunner,
     { state: "all" },
   );
-  const deployments = await readMetadataCollection(repository, "deployments", (value) => {
-    const id = positiveId(value?.id);
-    const environment = stringField(value?.environment);
-    return id && environment ? { id, environment } : undefined;
-  }, commandRunner);
+  const deployments = await readMetadataCollection(
+    repository,
+    "deployments",
+    (value) => {
+      const id = positiveId(value?.id);
+      const environment = stringField(value?.environment);
+      return id && environment ? { id, environment } : undefined;
+    },
+    commandRunner,
+  );
   const deploymentMetadata = await mapBounded(
     deployments,
     DEPLOYMENT_STATUS_CONCURRENCY,
@@ -424,7 +443,11 @@ export async function verifySnapshot({ snapshotDirectory, commandRunner } = {}) 
   return { ok: true, manifest };
 }
 
-export async function runRecoveryDrill({ snapshotDirectory, quarantineDirectory, commandRunner } = {}) {
+export async function runRecoveryDrill({
+  snapshotDirectory,
+  quarantineDirectory,
+  commandRunner,
+} = {}) {
   if (typeof quarantineDirectory !== "string" || !quarantineDirectory) {
     throw new Error("quarantine directory is required");
   }

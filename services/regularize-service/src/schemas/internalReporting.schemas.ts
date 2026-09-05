@@ -2,6 +2,7 @@ import { REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCES } from "@workspace/shared"
 import { z } from "zod";
 
 import { REGULARIZE_REPORTING_SOURCES } from "../reporting/regularizeReportingCatalog.js";
+
 const reportingFieldSchema = z.string().trim().min(1).max(64);
 const regularizeReportingSources = [
   ...REGULARIZE_REPORTING_SOURCES,

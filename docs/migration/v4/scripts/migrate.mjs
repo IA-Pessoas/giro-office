@@ -4,7 +4,11 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-
+import {
+  parseExcludedDomains,
+  partitionMappingsByPolicy,
+  resolveMigrationSourceDir,
+} from "./lib/exclude-scope.mjs";
 import { CASTELO_ORGANIZATION_ID } from "./lib/mapping-contract.mjs";
 import { runMigration } from "./lib/migration-runner.mjs";
 import { createReadOnlyClient, withReadOnlyTransaction } from "./lib/pg-readonly.mjs";
@@ -13,11 +17,6 @@ import {
   createRuntimeOptionsFromRows,
   loadRuntimeSourceRows,
 } from "./lib/runtime-options.mjs";
-import {
-  partitionMappingsByPolicy,
-  parseExcludedDomains,
-  resolveMigrationSourceDir,
-} from "./lib/exclude-scope.mjs";
 
 const DEFAULT_SOURCE_DIR = "/home/bruno/Documents/03.08.2026";
 const EXPECTED_SOURCE_TABLES = 312;
@@ -161,7 +160,10 @@ async function createPostgresClient(connectionString) {
       modulePath = createRequire(import.meta.url).resolve("pg");
     } catch {
       for (const packageUrl of [
-        new URL("../../../../../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/package.json", import.meta.url),
+        new URL(
+          "../../../../../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/package.json",
+          import.meta.url,
+        ),
         new URL("../../../../../../node_modules/pg/package.json", import.meta.url),
       ]) {
         try {
@@ -302,12 +304,14 @@ export function createDestinationReader(client, prismaCatalog, organizationId) {
     let offset = 0;
     let cursor = null;
     for (;;) {
-      const cursorClause = cursorColumn === null || cursor === null
-        ? `\"organization_id\" = $1`
-        : `\"organization_id\" = $1 AND ${quoteIdentifier(cursorColumn)} > $2`;
-      const values = cursorColumn === null || cursor === null
-        ? [organizationId, batchSize, offset]
-        : [organizationId, cursor, batchSize];
+      const cursorClause =
+        cursorColumn === null || cursor === null
+          ? `"organization_id" = $1`
+          : `"organization_id" = $1 AND ${quoteIdentifier(cursorColumn)} > $2`;
+      const values =
+        cursorColumn === null || cursor === null
+          ? [organizationId, batchSize, offset]
+          : [organizationId, cursor, batchSize];
       const limitParameter = cursorColumn === null || cursor === null ? "$2" : "$3";
       const offsetClause = cursorColumn === null || cursor === null ? " OFFSET $3" : "";
       const result = await client.query(
@@ -340,7 +344,12 @@ function executeDryRun({
   });
 }
 
-async function buildProductionDryRunReport(capabilities, destinationClient, reportStep, options = {}) {
+async function buildProductionDryRunReport(
+  capabilities,
+  destinationClient,
+  reportStep,
+  options = {},
+) {
   const fastMode = options.fastMode === true;
   const sourceDir = resolveMigrationSourceDir(options.env ?? process.env, DEFAULT_SOURCE_DIR);
   const excludedDomains = parseExcludedDomains(options.env?.MIGRATION_EXCLUDE_DOMAINS);

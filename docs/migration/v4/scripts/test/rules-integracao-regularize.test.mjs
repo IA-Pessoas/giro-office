@@ -467,7 +467,9 @@ test("ClientPF usa o corpus real completo e exige preflight do estado atual", as
     "CLIENT_PF_MARITAL_STATUS_INVALID",
   );
 
-  const missingIndex = rows.findIndex((candidate) => String(candidate.profissao ?? "").trim() === "");
+  const missingIndex = rows.findIndex(
+    (candidate) => String(candidate.profissao ?? "").trim() === "",
+  );
   assert.ok(missingIndex >= 0);
   assert.notEqual(
     mappingRule.emitRows(rows[missingIndex], verifiedContexts[missingIndex])[0].reasonCode,

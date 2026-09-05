@@ -218,9 +218,7 @@ function cleanupForStep(step) {
     )
     .map(({ destinationColumn }) => destinationColumn);
   const resetValue = (column) =>
-    step.destinationTable === "permissions.specific" && column === "task_completion"
-      ? null
-      : 0;
+    step.destinationTable === "permissions.specific" && column === "task_completion" ? null : 0;
   return {
     kind: "reset_owned_columns",
     identityColumns: ["user_id", "organization_id"],
@@ -235,10 +233,7 @@ function classifyRuntimeRow(rule, row, context) {
   }
   const classification = rule.classifySourceRow(row, context);
   if (classification.status !== "prepared") return classification;
-  if (
-    isPermissionSource(rule.sourceTable) ||
-    USER_REFERENCE_COLUMNS.has(rule.sourceTable)
-  ) {
+  if (isPermissionSource(rule.sourceTable) || USER_REFERENCE_COLUMNS.has(rule.sourceTable)) {
     const tenantUser = classifyTenantResolution(context.userTenantResolution, "USER");
     if (tenantUser !== null) return tenantUser;
   }
@@ -279,9 +274,10 @@ function emitRuntimeRows(rule, row, context) {
       let identityRef = emission.identityRef;
       if (classification.status === "prepared") {
         if (isPermissionSource(rule.sourceTable)) {
-          const target = rule.sourceTable === DYNAMIC_PERMISSION_SOURCE_TABLE
-            ? "permissions.specific"
-            : "permissions";
+          const target =
+            rule.sourceTable === DYNAMIC_PERMISSION_SOURCE_TABLE
+              ? "permissions.specific"
+              : "permissions";
           identityRef = `${target}:${context.resolvedUserId}:${CASTELO_ORGANIZATION_ID}`;
         } else {
           identityRef = uuidV5(
@@ -370,7 +366,9 @@ function buildPermissionContextIndex(rowsBySource, userResolver) {
 }
 
 function isPermissionSource(sourceTable) {
-  return sourceTable === DYNAMIC_PERMISSION_SOURCE_TABLE || sourceTable.startsWith(PERMISSION_PREFIX);
+  return (
+    sourceTable === DYNAMIC_PERMISSION_SOURCE_TABLE || sourceTable.startsWith(PERMISSION_PREFIX)
+  );
 }
 
 function indexContextsByLegacyId(rows, contexts) {

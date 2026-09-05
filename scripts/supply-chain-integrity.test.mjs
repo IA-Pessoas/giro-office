@@ -8,15 +8,12 @@ import { scanBlob, scanRepository } from "./supply-chain-integrity.mjs";
 const decode = (value) => Buffer.from(value, "base64").toString("utf8");
 
 test("scans a detached executable-config blob without returning its source", () => {
-  const report = scanBlob(
-    "postcss.config.js",
-    Buffer.from("For only test\nglobal.o='abc'"),
-  );
+  const report = scanBlob("postcss.config.js", Buffer.from("For only test\nglobal.o='abc'"));
 
-  assert.deepEqual(report.map(({ ruleId }) => ruleId), [
-    "ioc.incident-marker",
-    "ioc.global-assignment",
-  ]);
+  assert.deepEqual(
+    report.map(({ ruleId }) => ruleId),
+    ["ioc.incident-marker", "ioc.global-assignment"],
+  );
   assert.doesNotMatch(JSON.stringify(report), /For only test|global\.o=/u);
 });
 

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
-import { promisify } from "node:util";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import {
   buildCredentialReport,
@@ -17,25 +17,14 @@ const execFileAsync = promisify(execFile);
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("permite workflow com permissao explicita somente leitura", () => {
-  assert.deepEqual(
-    scanWorkflowText("good.yml", "permissions:\n  contents: read\n"),
-    [],
-  );
+  assert.deepEqual(scanWorkflowText("good.yml", "permissions:\n  contents: read\n"), []);
 });
 
 test("exige permissoes de topo e rejeita escopos de escrita", () => {
+  assert.match(JSON.stringify(scanWorkflowText("missing.yml", "jobs:\n  test:\n")), /permissions/u);
+  assert.match(JSON.stringify(scanWorkflowText("write.yml", "permissions: write-all\n")), /write/u);
   assert.match(
-    JSON.stringify(scanWorkflowText("missing.yml", "jobs:\n  test:\n")),
-    /permissions/u,
-  );
-  assert.match(
-    JSON.stringify(scanWorkflowText("write.yml", "permissions: write-all\n")),
-    /write/u,
-  );
-  assert.match(
-    JSON.stringify(
-      scanWorkflowText("nested-write.yml", "permissions:\n  contents: write\n"),
-    ),
+    JSON.stringify(scanWorkflowText("nested-write.yml", "permissions:\n  contents: write\n")),
     /write/u,
   );
 });
@@ -106,7 +95,7 @@ test("detecta impressao de secrets e padroes de credencial sem exfiltrar valores
       "          TOKEN: ${{ secrets.TOKEN }}",
       "        with:",
       "          token: ${{ secrets.OTHER_TOKEN }}",
-      "      - run: echo \"${{ secrets.TOKEN }}\"",
+      '      - run: echo "${{ secrets.TOKEN }}"',
       `      - run: echo "${token}"`,
       `      - run: echo "${bearer}"`,
       `      - run: echo "${privateKeyHeader}"`,
@@ -247,12 +236,9 @@ test("analisa permissions do workflow e dos jobs e falha fechado para mapas ambi
 
   const duplicate = scanWorkflowText(
     "duplicate.yml",
-    [
-      "permissions: { contents: read }",
-      "permissions: { actions: none }",
-      "jobs:",
-      "  build:",
-    ].join("\n"),
+    ["permissions: { contents: read }", "permissions: { actions: none }", "jobs:", "  build:"].join(
+      "\n",
+    ),
   );
   assert.match(JSON.stringify(duplicate), /permissions-duplicate/u);
 
@@ -290,7 +276,7 @@ test("detecta secrets diretos em comandos HTTP e headers sem env intermediario",
       "    steps:",
       "      - name: Direct HTTP secret",
       '        command: curl -H "Authorization: ${{ secrets.DOT_TOKEN }}" https://example.invalid',
-      '        args: wget --header "X-Token: ${{ secrets[\'SINGLE_TOKEN\'] }}" https://example.invalid',
+      "        args: wget --header \"X-Token: ${{ secrets['SINGLE_TOKEN'] }}\" https://example.invalid",
       '        headers: Authorization: ${{ secrets["DOUBLE_TOKEN"] }}',
     ].join("\n"),
   );
@@ -328,7 +314,10 @@ test("varre o repositorio sem entrar em diretorios e arquivos excluidos", async 
   const findings = await scanRepositoryCredentials(root);
   const serialized = JSON.stringify(findings);
 
-  assert.equal(findings.some(({ path: findingPath }) => findingPath === "README.md"), true);
+  assert.equal(
+    findings.some(({ path: findingPath }) => findingPath === "README.md"),
+    true,
+  );
   assert.doesNotMatch(serialized, new RegExp(token, "u"));
   for (const excluded of [".env.local", "node_modules", "dist", "graphify-out"]) {
     assert.equal(

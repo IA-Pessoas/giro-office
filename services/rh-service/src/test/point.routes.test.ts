@@ -1,5 +1,5 @@
-import request from "supertest";
 import { FORWARDED_AUTH_PERMISSION_HEADER } from "@workspace/shared";
+import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createTestApp, pointServiceMock, resetRhRouteMocks } from "./rhTestUtils.js";

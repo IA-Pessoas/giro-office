@@ -102,7 +102,7 @@ describe("request routes", () => {
       .set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify({ contabil: 3, rh: 0 }));
 
     expect(res.status).toBe(200);
-    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
+    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId, undefined);
   });
 
   it("GET /rh/operational-users aceita modulo Pessoal para seletores de responsavel", async () => {
@@ -113,7 +113,7 @@ describe("request routes", () => {
       .set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify({ pessoal: 1, rh: 0 }));
 
     expect(res.status).toBe(200);
-    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
+    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId, undefined);
   });
 
   it.each([
@@ -127,7 +127,7 @@ describe("request routes", () => {
       .set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify({ [moduleKey]: 1, rh: 0 }));
 
     expect(res.status).toBe(200);
-    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId);
+    expect(operationalUserServiceMock.list).toHaveBeenCalledWith(organizationId, undefined);
   });
 
   it("GET /rh/requests lista solicitacoes", async () => {

@@ -2,6 +2,8 @@ import "./envBootstrap.js";
 
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("../integrations/audit.js", () => ({ createLog: vi.fn() }));
+
 import type { ProjectProgressPrisma } from "../services/projectProgressService.js";
 import { ProjectProgressService } from "../services/projectProgressService.js";
 

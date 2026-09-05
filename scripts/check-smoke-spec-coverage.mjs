@@ -59,8 +59,7 @@ const malformedEntries = manifest.filter(
 );
 const gatewayBearerEntries = manifest.filter(
   (entry) =>
-    entry.target === "gateway" &&
-    (entry.auth === "bearer" || entry.auth === "admin-bearer"),
+    entry.target === "gateway" && (entry.auth === "bearer" || entry.auth === "admin-bearer"),
 );
 
 const routeGroups = new Map();
