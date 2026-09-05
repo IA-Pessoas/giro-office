@@ -1,3 +1,7 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const workspaceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const apiInternalBase = (process.env.API_INTERNAL_URL || "http://127.0.0.1:3010").replace(/\/$/, "");
 
 const contentSecurityPolicy = [
@@ -30,6 +34,8 @@ export const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: workspaceRoot,
   reactStrictMode: true,
   transpilePackages: ["@workspace/api"],
   async headers() {

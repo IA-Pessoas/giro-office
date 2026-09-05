@@ -8,12 +8,13 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 ENV CI=1
 ENV HUSKY=0
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates openssl \
   && rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.26.0 --activate
 
 FROM base AS build
 
@@ -30,14 +31,18 @@ ENV NEXT_PUBLIC_FEATURE_FLAGS_ENABLED=$NEXT_PUBLIC_FEATURE_FLAGS_ENABLED
 ENV NEXT_PUBLIC_LAUNCHDARKLY_CLIENT_ID=$NEXT_PUBLIC_LAUNCHDARKLY_CLIENT_ID
 ENV NEXT_PUBLIC_LAUNCHDARKLY_INIT_TIMEOUT_MS=$NEXT_PUBLIC_LAUNCHDARKLY_INIT_TIMEOUT_MS
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json biome.json .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY packages/api/package.json ./packages/api/package.json
+COPY app/package.json ./app/package.json
+
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+COPY turbo.json tsconfig.base.json biome.json ./
 COPY packages/api ./packages/api
 COPY app ./app
 
-RUN pnpm install --frozen-lockfile --ignore-scripts
-RUN pnpm turbo run build --filter=@workspace/app
-RUN rm -rf node_modules \
-  && npm_config_ignore_scripts=true pnpm install --frozen-lockfile --prod --filter "@workspace/app..."
+RUN --mount=type=cache,id=workspace-next-cache,target=/workspace/app/.next/cache \
+  pnpm turbo run build --filter=@workspace/app
 
 FROM base AS runner
 
@@ -47,13 +52,13 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-COPY --from=build /workspace/package.json /workspace/pnpm-lock.yaml /workspace/pnpm-workspace.yaml ./
-COPY --from=build /workspace/node_modules ./node_modules
-COPY --from=build /workspace/packages/api ./packages/api
-COPY --from=build /workspace/app ./app
+COPY --from=build --chown=node:node /workspace/app/.next/standalone ./
+COPY --from=build --chown=node:node /workspace/app/.next/static ./app/.next/static
+COPY --from=build --chown=node:node /workspace/app/public ./app/public
 
+USER node
 WORKDIR /workspace/app
 
 EXPOSE 3000
 
-CMD ["pnpm", "exec", "next", "start", "-H", "0.0.0.0", "-p", "3000"]
+CMD ["node", "server.js"]

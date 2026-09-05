@@ -13,6 +13,7 @@ const endpointWaiter = path.join(repoRoot, "scripts", "ops", "wait-production-en
 const turboConfig = path.join(repoRoot, "turbo.json");
 const serviceDockerfile = path.join(repoRoot, "docker", "service.Dockerfile");
 const appDockerfile = path.join(repoRoot, "docker", "app.Dockerfile");
+const prismaGenerator = path.join(repoRoot, "scripts", "prisma-generate.mjs");
 const reportsWorker = path.join(repoRoot, "services", "reports-service", "src", "worker.ts");
 const poolBudgetValidator = path.join(
   repoRoot,
@@ -28,6 +29,7 @@ const internalTokenValidator = path.join(
 );
 const vpsCompose = path.join(repoRoot, "docker-compose.vps.yml");
 const productionCompose = path.join(repoRoot, "docker-compose.production.yml");
+const dockerIgnore = path.join(repoRoot, ".dockerignore");
 
 function createPoolEnvRoot(databasePoolMax = "1") {
   const envRoot = mkdtempSync(path.join(tmpdir(), "database-pool-budget-"));
@@ -57,15 +59,15 @@ test("production service image invalidates copied TypeScript incremental state b
   const appDockerfileContents = readFileSync(appDockerfile, "utf8");
   const installIndex = dockerfile.indexOf("RUN pnpm install --frozen-lockfile");
   const buildArgumentIndex = dockerfile.indexOf("ARG WORKSPACE_PACKAGE");
-  const cleanupIndex = dockerfile.indexOf(
-    'rm -rf "${SERVICE_DIR}/dist" "${SERVICE_DIR}/tsconfig.tsbuildinfo"',
+  const cleanupIndex = dockerfile.search(
+    /rm -rf "\$\{SERVICE_DIR\}\/dist" "\$\{SERVICE_DIR\}\/tsconfig\.tsbuildinfo"/u,
   );
-  const buildIndex = dockerfile.indexOf('pnpm turbo run build --filter="${WORKSPACE_PACKAGE}"');
+  const buildIndex = dockerfile.search(/pnpm turbo run build --filter="\$\{WORKSPACE_PACKAGE\}"/u);
 
   assert.ok(installIndex >= 0, "frozen install must remain present");
   assert.match(
     dockerfile,
-    /pnpm install --frozen-lockfile --ignore-scripts/u,
+    /pnpm install --frozen-lockfile(?: --offline)? --ignore-scripts/u,
     "service dependency install must explicitly ignore dependency build scripts",
   );
   assert.match(
@@ -80,6 +82,72 @@ test("production service image invalidates copied TypeScript incremental state b
   assert.ok(cleanupIndex >= 0, "service build must remove copied incremental state");
   assert.ok(buildIndex >= 0, "service build command must remain present");
   assert.ok(cleanupIndex < buildIndex, "incremental state must be removed before tsc runs");
+});
+
+test("production Docker builds reuse common work and exclude local artifacts", () => {
+  const dockerfile = readFileSync(serviceDockerfile, "utf8");
+  const appDockerfileContents = readFileSync(appDockerfile, "utf8");
+  const compose = readFileSync(vpsCompose, "utf8");
+  const worker = compose.match(/ {2}reports-worker:[\s\S]*?(?=^ {2}\S)/mu)?.[0] ?? "";
+  const ignore = readFileSync(dockerIgnore, "utf8");
+  const turbo = JSON.parse(readFileSync(turboConfig, "utf8"));
+  const fetchIndex = dockerfile.indexOf("RUN pnpm fetch --frozen-lockfile");
+  const turboCopyIndex = dockerfile.indexOf("COPY turbo.json tsconfig.base.json biome.json ./");
+  const sourceCopyIndex = dockerfile.indexOf("COPY packages ./packages");
+  const prismaScriptsCopyIndex = dockerfile.indexOf(
+    "COPY scripts/prisma-generate.mjs scripts/service-registry.mjs ./scripts/",
+  );
+  const installIndex = dockerfile.indexOf("RUN pnpm install --frozen-lockfile");
+  const prismaIndex = dockerfile.indexOf("pnpm prisma:generate");
+  const sharedIndex = dockerfile.indexOf("pnpm turbo run build --filter=@workspace/shared");
+  const serviceArgumentIndex = dockerfile.indexOf("ARG WORKSPACE_PACKAGE");
+
+  assert.match(dockerfile, /corepack prepare pnpm@10\.26\.0 --activate/u);
+  assert.match(appDockerfileContents, /corepack prepare pnpm@10\.26\.0 --activate/u);
+  assert.ok(fetchIndex < turboCopyIndex, "dependency fetch must survive build-config changes");
+  assert.ok(turboCopyIndex < sourceCopyIndex, "build config must exist before workspace sources");
+  assert.ok(prismaScriptsCopyIndex > installIndex, "script changes must not invalidate install");
+  assert.doesNotMatch(dockerfile, /COPY scripts \.\/scripts/u);
+  assert.ok(sourceCopyIndex < installIndex, "workspace sources must exist before offline install");
+  assert.match(dockerfile, /pnpm install --frozen-lockfile --offline --ignore-scripts/u);
+  assert.ok(installIndex < prismaIndex, "Prisma generation must run after dependency install");
+  assert.ok(prismaIndex < sharedIndex, "shared build must reuse the generated common layer");
+  assert.ok(sharedIndex < serviceArgumentIndex, "service args must not invalidate common work");
+  assert.match(dockerfile, /--filter="\$\{WORKSPACE_PACKAGE\}" --only/u);
+  assert.match(dockerfile, /id=workspace-turbo-cache,target=\/workspace\/\.turbo\/cache/u);
+  assert.match(
+    dockerfile,
+    /--config\.inject-workspace-packages=true[\s\S]*--filter "\$\{WORKSPACE_PACKAGE\}" deploy --prod \/prod/u,
+  );
+  assert.doesNotMatch(dockerfile, /rm -rf node_modules/u);
+  assert.match(dockerfile, /COPY --from=build --chown=node:node \/prod \.\//u);
+  assert.ok(turbo.tasks.build.outputs.includes("tsconfig.tsbuildinfo"));
+  assert.doesNotMatch(worker, /^\s+build:/mu);
+  assert.match(worker, /image: workspace-reports-service:/u);
+  assert.match(ignore, /^\*\*\/graphify-out$/mu);
+  assert.match(ignore, /^\*\*\/generated\/prisma$/mu);
+  assert.match(ignore, /^\*\*\/\.env\*$/mu);
+  assert.match(ignore, /^\.worktrees$/mu);
+  assert.match(ignore, /^\.codex$/mu);
+  assert.match(ignore, /^\.agents$/mu);
+});
+
+test("production builds minimize Prisma generation and preserve the Next cache", () => {
+  const prisma = readFileSync(prismaGenerator, "utf8");
+  const app = readFileSync(appDockerfile, "utf8");
+  const installIndex = app.indexOf("RUN pnpm install --frozen-lockfile --ignore-scripts");
+  const sourceIndex = app.indexOf("COPY app ./app");
+
+  assert.match(prisma, /prisma generate --generator infraClient --generator userServiceClient/u);
+  assert.match(prisma, /cp\(canonicalServiceOutputDir, outputDir, \{ recursive: true \}\)/u);
+  assert.ok(installIndex < sourceIndex, "app source changes must reuse the dependency install");
+  assert.match(
+    app,
+    /--mount=type=cache,id=workspace-next-cache,target=\/workspace\/app\/\.next\/cache/u,
+  );
+  assert.match(app, /\/workspace\/app\/\.next\/standalone/u);
+  assert.doesNotMatch(app, /pnpm install[^\n]*--prod/u);
+  assert.match(app, /USER node[\s\S]*CMD \["node", "server\.js"\]/u);
 });
 
 test("reports worker keeps its polling timer referenced", () => {
@@ -135,10 +203,13 @@ test("production web env is exported for Docker build arguments", () => {
 
 test("production routes the existing edge through a loopback reverse proxy", () => {
   const compose = readFileSync(productionCompose, "utf8");
-  const reverseProxy = compose.match(/  reverse-proxy:[\s\S]*?(?=^  \S)/mu)?.[0] ?? "";
-  const web = compose.match(/  web:[\s\S]*?(?=^  \S)/mu)?.[0] ?? "";
+  const reverseProxy = compose.match(/ {2}reverse-proxy:[\s\S]*?(?=^ {2}\S)/mu)?.[0] ?? "";
+  const web = compose.match(/ {2}web:[\s\S]*?(?=^ {2}\S)/mu)?.[0] ?? "";
 
-  assert.match(reverseProxy, /ports: !override[\s\S]*?127\.0\.0\.1:\$\{REVERSE_PROXY_PORT:-8080\}:80/u);
+  assert.match(
+    reverseProxy,
+    /ports: !override[\s\S]*?127\.0\.0\.1:\$\{REVERSE_PROXY_PORT:-8080\}:80/u,
+  );
   assert.match(reverseProxy, /127\.0\.0\.1:\$\{REVERSE_PROXY_TLS_PORT:-8443\}:443/u);
   assert.doesNotMatch(compose, /profiles:/u);
   assert.match(reverseProxy, /public-edge/u);
@@ -159,7 +230,7 @@ test("production deploy plans validation and build before replacing containers",
     "internal-service-tokens",
     "database-pool-budget",
     "compose-config",
-    "build-images-sequentially",
+    "build-images",
     "database-migrate",
     "compose-up",
     "wait-endpoints",
@@ -213,11 +284,14 @@ test("production token preflight rejects a contabil token that differs from the 
 test("production deploy preserves rollback image tags before overwriting production tags", () => {
   const script = readFileSync(deployScript, "utf8");
   const snapshotIndex = script.indexOf('docker image tag "$image" "$backup_image"');
-  const buildIndex = script.lastIndexOf("phase build-images-sequentially");
+  const buildIndex = script.lastIndexOf("phase build-images");
   const restoreIndex = script.indexOf('docker image tag "$backup_image" "$image"');
 
   assert.ok(snapshotIndex >= 0, "current images must receive durable rollback tags");
-  assert.ok(buildIndex >= 0, "sequential build phase must remain present");
+  assert.ok(buildIndex >= 0, "build phase must remain present");
+  assert.match(script, /build_parallelism="\$\{COMPOSE_PARALLEL_LIMIT:-2\}"/u);
+  assert.match(script, /build_batch=\("\$\{services\[@\]:build_offset:build_parallelism\}"\)/u);
+  assert.match(script, /build "\$\{build_batch\[@\]\}"/u);
   assert.ok(
     snapshotIndex < buildIndex,
     "rollback tags must exist before builds overwrite production tags",

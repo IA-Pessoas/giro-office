@@ -1,6 +1,9 @@
 .git
 .cursor
 .vscode
+.codex
+.agents
+.worktrees
 .turbo
 .pnpm-store
 node_modules
@@ -8,8 +11,10 @@ node_modules
 **/dist
 **/.next
 **/.turbo
-**/.env
-**/.env.local
+**/.env*
+**/generated/prisma
+**/graphify-out
+**/*.tsbuildinfo
 coverage
 docs
 docker/nginx/certs/*
