@@ -209,6 +209,7 @@ model Organization {
   triageMonthlys                TriageMonthly[]
   triageResponsibles            TriageResponsible[]
 
+  @@index([name, id], map: "idx_organizations_name_id")
   @@map("organizations")
 }
 
@@ -261,6 +262,7 @@ model User {
   type                        enumType?
   first_owner_flag            Boolean?               @default(false)
   session_version             Int                    @default(0)
+  version                     Int                    @default(1)
   permission_id               String?                @unique
   department_id               String
   invited_by                  String?
@@ -344,6 +346,8 @@ model User {
   responsiblesTriage          TriageResponsible[]
   department                  Department             @relation(fields: [department_id], references: [id])
 
+  @@unique([login], map: "users_login_key")
+  @@index([organization_id, name, id])
   @@map("users")
 }
 
@@ -360,6 +364,35 @@ model AuthSession {
   @@index([user_id])
   @@index([expires_at])
   @@map("auth_sessions")
+}
+
+model PlatformUser {
+  id              String                @id @default(uuid())
+  name            String
+  email           String                @unique
+  password        String
+  platform_role   PlatformRole          @default(super_admin)
+  status          String                @default("active")
+  session_version Int                   @default(0)
+  created_at      DateTime              @default(now())
+  updated_at      DateTime              @updatedAt
+  authSessions    PlatformAuthSession[]
+
+  @@map("platform_users")
+}
+
+model PlatformAuthSession {
+  id               String       @id @default(uuid())
+  platform_user_id String
+  csrf_hash        String
+  expires_at       DateTime
+  revoked_at       DateTime?
+  created_at       DateTime     @default(now())
+  platformUser     PlatformUser @relation(fields: [platform_user_id], references: [id], onDelete: Cascade)
+
+  @@index([platform_user_id, revoked_at, expires_at], map: "idx_platform_auth_sessions_user_state")
+  @@index([expires_at], map: "idx_platform_auth_sessions_expiry")
+  @@map("platform_auth_sessions")
 }
 
 model Permission {
@@ -456,6 +489,8 @@ model AuditRequest {
   @@index([path, created_at(sort: Desc)])
   @@index([status_code, created_at(sort: Desc)])
   @@index([organization_id, referring, referring_id, created_at(sort: Desc)])
+  @@index([created_at(sort: Desc), id(sort: Desc)], map: "idx_audit_requests_created_id_desc")
+  @@index([path(ops: raw("gin_trgm_ops"))], type: Gin, map: "idx_audit_requests_path_trgm")
   @@map("audit_requests")
 }
 
@@ -2166,14 +2201,16 @@ model TriageResponsible {
 }
 
 model ReportModel {
-  id              String   @id @default(uuid())
-  organization_id String
-  department_id   String?
-  name            String
-  description     String?
-  active          Boolean  @default(true)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  organization_id    String
+  created_by_user_id String?
+  department_id      String?
+  name               String
+  description        String?
+  active             Boolean  @default(true)
+  is_ephemeral       Boolean  @default(false)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
 
   @@map("reports.models")
 }
@@ -2186,6 +2223,7 @@ model ReportModelVersion {
   definition_json Json
   created_at      DateTime @default(now())
 
+  @@unique([report_model_id, version])
   @@map("reports.model_versions")
 }
 
@@ -2194,13 +2232,15 @@ model ReportJob {
   organization_id         String
   requester_id            String
   report_model_version_id String
-  status                  String   @default("pending")
+  status                  String   @default("queued")
   payload_json            Json?
   requested_at            DateTime @default(now())
   started_at              DateTime?
   finished_at             DateTime?
   lease_token             String?
   lease_expires_at        DateTime?
+  cancel_requested_at     DateTime?
+  materialization_token   String?
   error_message           String?
   created_at              DateTime @default(now())
   updated_at              DateTime @updatedAt
@@ -2217,6 +2257,7 @@ model ReportSnapshot {
   created_at              DateTime @default(now())
   expires_at              DateTime?
 
+  @@unique([report_job_id])
   @@map("reports.snapshots")
 }
 
@@ -2255,12 +2296,26 @@ model ReportAuditEvent {
   @@map("reports.audit_events")
 }
 
+model ReportGrantUse {
+  id         String   @id @default(uuid())
+  grant_hash String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([expires_at])
+  @@map("reports.grant_uses")
+}
+
 enum status {
   trial
   past_due
   active
   suspended
   cancelled
+}
+
+enum PlatformRole {
+  super_admin
 }
 
 enum enumType {

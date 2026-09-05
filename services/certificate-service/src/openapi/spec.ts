@@ -352,6 +352,87 @@ function internalCertificateNotificationRunOperation() {
   };
 }
 
+function internalCertificateReportingParameters() {
+  return [
+    {
+      in: "header",
+      name: "x-request-id",
+      required: true,
+      schema: { type: "string", minLength: 1 },
+    },
+    {
+      in: "header",
+      name: "x-reports-grant",
+      required: true,
+      schema: { type: "string", minLength: 1 },
+    },
+    {
+      in: "header",
+      name: "x-reports-grant-signature",
+      required: true,
+      schema: { type: "string", pattern: "^[a-f0-9]{64}$" },
+    },
+  ];
+}
+
+function internalCertificateReportingCatalogOperation() {
+  return {
+    operationId: "getCertificateReportingCatalog",
+    tags: ["Internal"],
+    summary: "Publica os catálogos internos de Certificados PF e PJ para relatórios",
+    "x-internal": true,
+    security: [{ internalToken: [] }],
+    parameters: internalCertificateReportingParameters(),
+    responses: {
+      "200": successResponse("Catálogos internos de Certificados PF e PJ", {
+        type: "object",
+        additionalProperties: true,
+      }),
+      "403": errorResponse("Acesso interno ou grant inválido"),
+    },
+  };
+}
+
+function internalCertificateReportingExtractOperation() {
+  return {
+    operationId: "extractCertificateReportingData",
+    tags: ["Internal"],
+    summary: "Extrai campos publicados de Certificados PF e PJ para relatórios",
+    "x-internal": true,
+    security: [{ internalToken: [] }],
+    parameters: internalCertificateReportingParameters(),
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["source", "fields", "limit"],
+            properties: {
+              source: { type: "string", enum: ["certificado.pf", "certificado.pj"] },
+              fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
+              limit: { type: "integer", minimum: 1, maximum: 101 },
+            },
+          },
+        },
+      },
+    },
+    responses: {
+      "200": successResponse("Dados internos de Certificados PF ou PJ", {
+        type: "object",
+        required: ["rows", "reachedLimit"],
+        properties: {
+          rows: { type: "array", items: { type: "object", additionalProperties: true } },
+          reachedLimit: { type: "boolean" },
+        },
+      }),
+      "400": errorResponse("Requisição inválida"),
+      "403": errorResponse("Acesso interno, grant ou campo inválido"),
+    },
+  };
+}
+
 function certificatePjRequestBody(required = true) {
   return {
     required,
@@ -617,6 +698,12 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
       },
       "/internal/notifications/run": {
         post: internalCertificateNotificationRunOperation(),
+      },
+      "/internal/reporting/catalog": {
+        get: internalCertificateReportingCatalogOperation(),
+      },
+      "/internal/reporting/extract": {
+        post: internalCertificateReportingExtractOperation(),
       },
     },
     components: {

@@ -133,6 +133,19 @@ export function useUpdateRegularizePartnerMutation(): UseMutationResult<
   });
 }
 
+export function useDeleteRegularizePartnerMutation(): UseMutationResult<
+  { ok: true },
+  Error,
+  RegularizeId
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => regularizeService.deletePartner(id),
+    onSuccess: () => invalidateRegularizePeople(queryClient),
+  });
+}
+
 export function useRegularizePartnerDetail(
   id: RegularizeId | undefined | null,
   options?: RegularizeReadQueryOptions,

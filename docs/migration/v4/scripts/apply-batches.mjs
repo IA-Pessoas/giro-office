@@ -4,15 +4,15 @@ import { readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
-import { chunkSources, filterPlanSteps, orderSourcesForApply } from "./lib/apply-batch.mjs";
+import { chunkSources, orderSourcesForApply } from "./lib/apply-batch.mjs";
 import { createApplyBatchLogger, serializeMigrationError } from "./lib/apply-batch-log.mjs";
-import { CASTELO_ORGANIZATION_ID } from "./lib/mapping-contract.mjs";
-import { runMigration } from "./lib/migration-runner.mjs";
 import {
-  partitionMappingsByPolicy,
   parseExcludedDomains,
+  partitionMappingsByPolicy,
   resolveMigrationSourceDir,
 } from "./lib/exclude-scope.mjs";
+import { CASTELO_ORGANIZATION_ID } from "./lib/mapping-contract.mjs";
+import { runMigration } from "./lib/migration-runner.mjs";
 import {
   createCryptoCapabilities,
   createRuntimeOptionsFromRows,
@@ -20,10 +20,7 @@ import {
 } from "./lib/runtime-options.mjs";
 
 const DEFAULT_SOURCE_DIR = "/home/bruno/Documents/03.08.2026";
-const DRY_RUN_REPORT_PATH = new URL(
-  "../reports/dry-run-connected-excluded.json",
-  import.meta.url,
-);
+const DRY_RUN_REPORT_PATH = new URL("../reports/dry-run-connected-excluded.json", import.meta.url);
 const SNAPSHOT_PATH = new URL("../reports/snapshot-before-apply.json", import.meta.url);
 const DEFAULT_LOG_PATH = new URL("../reports/apply-batches.log", import.meta.url);
 
@@ -92,9 +89,7 @@ async function buildMigrationRuntimePackage({
   let activeTableMappings = partitioned.tableMappings;
   if (Array.isArray(sourceTablesFilter)) {
     const allowed = new Set(sourceTablesFilter);
-    activeTableMappings = activeTableMappings.filter(({ sourceTable }) =>
-      allowed.has(sourceTable),
-    );
+    activeTableMappings = activeTableMappings.filter(({ sourceTable }) => allowed.has(sourceTable));
   }
 
   const activeDestinationMappings = partitioned.destinationMappings.filter(({ sourceTable }) =>
@@ -223,10 +218,14 @@ function createDestinationReader(client, prismaCatalog, organizationId) {
       )
       .map(({ databaseName }) => databaseName)
       .sort();
+    if (primaryColumns.length === 0) throw new Error("MIGRATION_DESTINATION_PRIMARY_KEY_MISSING");
     const requestedColumns = Array.isArray(request.columns) ? request.columns : [];
     const columns = [
       ...new Set([...primaryColumns, "organization_id", ...requestedColumns]),
     ].sort();
+    if (columns.some((column) => !scalarColumns.has(column))) {
+      throw new Error("MIGRATION_SQL_IDENTIFIER_NOT_IN_CATALOG");
+    }
     const batchSize = Math.min(
       Number.isSafeInteger(request.batchSize) ? request.batchSize : 500,
       500,
@@ -385,9 +384,7 @@ async function main() {
     const filteredMappings =
       sourceTableFilter === null
         ? partitioned.tableMappings
-        : partitioned.tableMappings.filter(({ sourceTable }) =>
-            sourceTableFilter.has(sourceTable),
-          );
+        : partitioned.tableMappings.filter(({ sourceTable }) => sourceTableFilter.has(sourceTable));
     const orderedSources = orderSourcesForApply(filteredMappings);
     const batches = chunkSources(orderedSources, chunkSize);
     await logger.info("plan", {
@@ -397,9 +394,7 @@ async function main() {
       sourceTableFilter: sourceTableFilter === null ? null : [...sourceTableFilter].sort(),
     });
 
-    const indices = runAll
-      ? batches.map((_, index) => index)
-      : [batchIndex];
+    const indices = runAll ? batches.map((_, index) => index) : [batchIndex];
 
     if (indices.some((index) => index < 0 || index >= batches.length)) {
       throw new Error(`Batch inválido. Use --batch=0..${batches.length - 1}`);

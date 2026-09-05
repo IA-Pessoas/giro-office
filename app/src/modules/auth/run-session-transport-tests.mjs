@@ -15,7 +15,17 @@ async function runTest(name, test) {
   }
 }
 
-const [apiSource, apiClientSource, authSource, authGuardSource, guestGuardSource, adminGuardSource, packageSource] =
+const [
+  apiSource,
+  apiClientSource,
+  authSource,
+  authGuardSource,
+  guestGuardSource,
+  adminGuardSource,
+  platformGuardSource,
+  platformLoginSource,
+  packageSource,
+] =
   await Promise.all([
     source("../../shared/services/api.ts"),
     source("../../shared/services/apiClient.ts"),
@@ -23,6 +33,8 @@ const [apiSource, apiClientSource, authSource, authGuardSource, guestGuardSource
     source("./utils/canSSRAuth.ts"),
     source("./utils/canSSRGuest.ts"),
     source("./utils/canSSRAdmin.ts"),
+    source("./utils/canSSRPlatformAdmin.ts"),
+    source("../../pages/super-admin/login.tsx"),
     source("../../../package.json"),
   ]);
 const appPackage = JSON.parse(packageSource);
@@ -36,9 +48,12 @@ await runTest("API uses credentials, SSR cookies and browser CSRF without JWT", 
 });
 
 await runTest("AuthContext lifecycle is server-driven and token-free", () => {
-  assert.match(authSource, /api\.get\("\/user\/me"\)/);
+  assert.match(authSource, /platformApi\.get\("\/user\/me"\)/);
+  assert.match(authSource, /platformApi\.get\("\/platform\/me"\)/);
   assert.match(authSource, /api\.post\("\/user\/session\/refresh"\)/);
+  assert.match(authSource, /platformApi\.post\("\/platform\/session\/refresh"\)/);
   assert.match(authSource, /api\.delete\("\/user\/session"\)/);
+  assert.match(authSource, /platformApi\.delete\("\/platform\/session"\)/);
   assert.doesNotMatch(
     authSource,
     /cw\.token|jwtDecode|getModulePermissionsFromToken|setCookie|destroyCookie|Authorization|Bearer/,
@@ -57,6 +72,10 @@ await runTest("SSR guards treat the signed cookie as opaque", () => {
   assert.match(adminGuardSource, /setupAPIClient\(ctx\)/);
   assert.match(adminGuardSource, /\.get\("\/user\/me"\)/);
   assert.doesNotMatch(adminGuardSource, /jwtDecode|cw\.token/);
+  assert.match(platformGuardSource, /setupAPIClient\(ctx\)/);
+  assert.match(platformGuardSource, /\.get\("\/platform\/me"\)/);
+  assert.doesNotMatch(platformGuardSource, /cw\.session|parseCookies|jwtDecode|cw\.token/);
+  assert.doesNotMatch(platformLoginSource, /setCookie|destroyCookie|cw\.token|jwtDecode/);
 });
 
 await runTest("browser bundle no longer depends on jwt-decode", () => {
@@ -65,6 +84,7 @@ await runTest("browser bundle no longer depends on jwt-decode", () => {
 
 await runTest("session security tests belong to the aggregate and build before browser proof", () => {
   assert.match(appPackage.scripts.test, /test:session-security/);
+  assert.match(appPackage.scripts.test, /test:platform-session/);
   assert.match(appPackage.scripts.test, /test:auth-session/);
   assert.match(appPackage.scripts["test:auth-session"], /^pnpm run build && /);
 });

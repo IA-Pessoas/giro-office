@@ -14,6 +14,8 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `DATABASE_POOL_MAX` (default `1`)
 - `JWT_SECRET`
 - `AUDIT_*` quando a auditoria estiver ativa
+- `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` para `/internal/reporting/*`; ambos devem
+  coincidir com o reports-service.
 
 ## Gateway
 
@@ -25,6 +27,9 @@ Exemplos de paths publicos:
 - `/project`
 - `/project/list`
 - `/project/progress`
+
+As rotas internas `/internal/reporting/catalog` e `/internal/reporting/extract` não passam pelo
+gateway; exigem token interno e grant HMAC de curta duração emitido pelo reports-service.
 
 ## Desenvolvimento
 

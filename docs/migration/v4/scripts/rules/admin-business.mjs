@@ -584,7 +584,8 @@ function createDynamicPermissionRule() {
           ),
           mapped("user_id", "user_id", "resolve_user_reference", referenceOptions()),
           mapped("nivel", "task_completion", "normalize_dynamic_permission_boolean", {
-            reason: "A presença dinâmica integracao/ref=0 controla a conclusão de tarefas no contrato atual.",
+            reason:
+              "A presença dinâmica integracao/ref=0 controla a conclusão de tarefas no contrato atual.",
           }),
         ],
         constants: { organization_id: ORGANIZATION_ID },

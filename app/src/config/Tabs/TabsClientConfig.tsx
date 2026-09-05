@@ -1,6 +1,6 @@
 import React from 'react';
 import { IconType } from 'react-icons';
-import { LuFolder, LuPlug, LuBriefcase, LuFileText } from 'react-icons/lu';
+import { LuFolder, LuPlug, LuBriefcase, LuFileText, LuUsers } from 'react-icons/lu';
 import dynamic from 'next/dynamic';
 
 import type { Client, Perms } from '@modules/clients';
@@ -16,6 +16,9 @@ const ComercialTab = dynamic(() => import('../../components/Tabs/Client/Comercia
   loading: () => <LoadingSpinner />,
 });
 const RegularizeTab = dynamic(() => import('../../components/Tabs/Client/Regularize').then(mod => mod.regularizeTab), {
+  loading: () => <LoadingSpinner />,
+});
+const PartnersTab = dynamic(() => import('../../modules/clients/components/ClientPartnersSection').then(mod => mod.ClientPartnersSection), {
   loading: () => <LoadingSpinner />,
 });
 
@@ -55,6 +58,13 @@ export const tabsConfig: TabConfig[] = [
     title: 'Regularize',
     icon: LuFileText,
     component: RegularizeTab,
+    permissionKey: 'regularize',
+  },
+  {
+    id: 'partners',
+    title: 'Sócios',
+    icon: LuUsers,
+    component: PartnersTab,
     permissionKey: 'regularize',
   },
 ];

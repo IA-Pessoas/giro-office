@@ -20,9 +20,10 @@ phase() {
 
 if [[ "${DEPLOY_DRY_RUN:-0}" == "1" ]]; then
   phase validate-env
+  phase internal-service-tokens
   phase database-pool-budget
   phase compose-config
-  phase build-images-sequentially
+  phase build-images
   phase database-migrate
   phase compose-up
   phase wait-endpoints
@@ -44,6 +45,9 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     exit 1
   fi
 done <"$MANIFEST"
+
+phase internal-service-tokens
+node "$ROOT/scripts/ops/validate-internal-service-tokens.mjs" "$ENV_ROOT"
 
 phase database-pool-budget
 node "$ROOT/scripts/ops/validate-database-pool-budget.mjs" "$ENV_ROOT"
@@ -91,14 +95,21 @@ cleanup_rollback_images() {
 }
 
 services=(
-  organization-service user-service department-service task-service project-service
+  web organization-service user-service department-service task-service project-service
   client-service fiscal-service contabil-service regularize-service rh-service ti-service
-  certificate-service pessoal-service parcelamento-service reports-service audit-service gateway web
+  certificate-service pessoal-service parcelamento-service reports-service audit-service gateway
 )
 
-phase build-images-sequentially
-for service in "${services[@]}"; do
-  if ! "${COMPOSE[@]}" build "$service"; then
+phase build-images
+build_parallelism="${COMPOSE_PARALLEL_LIMIT:-2}"
+if [[ ! "$build_parallelism" =~ ^[1-9][0-9]*$ ]]; then
+  echo "COMPOSE_PARALLEL_LIMIT deve ser um inteiro positivo." >&2
+  restore_images
+  exit 1
+fi
+for ((build_offset = 0; build_offset < ${#services[@]}; build_offset += build_parallelism)); do
+  build_batch=("${services[@]:build_offset:build_parallelism}")
+  if ! COMPOSE_PARALLEL_LIMIT="$build_parallelism" "${COMPOSE[@]}" build "${build_batch[@]}"; then
     restore_images
     exit 1
   fi

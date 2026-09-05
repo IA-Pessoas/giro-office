@@ -11,8 +11,8 @@ import type { Prisma } from "../generated/prisma/client.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import { TaskWorkflowService } from "./taskWorkflowService.js";
 import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
+import { TaskWorkflowService } from "./taskWorkflowService.js";
 
 const TASK_DETAIL_SELECT = {
   id: true,

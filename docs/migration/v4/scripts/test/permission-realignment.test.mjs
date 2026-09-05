@@ -1,12 +1,12 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 
 import {
+  buildPermissionRealignment,
   mapLegacyModuleLevel,
   mapLegacyUserStatus,
-  REALIGNMENT_USER_TYPE,
   REALIGNMENT_GLOBAL_PERMISSION,
-  buildPermissionRealignment,
+  REALIGNMENT_USER_TYPE,
 } from "../lib/permission-realignment.mjs";
 
 test("mapeia níveis gerais de módulo para o padrão novo", () => {

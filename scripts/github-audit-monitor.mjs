@@ -135,8 +135,16 @@ export const EVENT_RULES = Object.freeze({
   "repo.remove_member": { severity: "high", category: "repository-access-change", alert: true },
   "org.add_member": { severity: "high", category: "organization-access-change", alert: true },
   "org.remove_member": { severity: "high", category: "organization-access-change", alert: true },
-  "org.add_outside_collaborator": { severity: "high", category: "organization-access-change", alert: true },
-  "org.remove_outside_collaborator": { severity: "high", category: "organization-access-change", alert: true },
+  "org.add_outside_collaborator": {
+    severity: "high",
+    category: "organization-access-change",
+    alert: true,
+  },
+  "org.remove_outside_collaborator": {
+    severity: "high",
+    category: "organization-access-change",
+    alert: true,
+  },
   "org.required_workflow_create": { severity: "high", category: "workflow-security", alert: true },
   "org.required_workflow_delete": { severity: "high", category: "workflow-security", alert: true },
   "org.required_workflow_update": { severity: "high", category: "workflow-security", alert: true },
@@ -149,11 +157,31 @@ export const EVENT_RULES = Object.freeze({
   "integration.transfer": { severity: "high", category: "integration-change", alert: true },
   "integration.manager_added": { severity: "high", category: "integration-change", alert: true },
   "integration.manager_removed": { severity: "high", category: "integration-change", alert: true },
-  "integration.remove_client_secret": { severity: "high", category: "credential-change", alert: true },
-  "integration_installation.create": { severity: "high", category: "integration-change", alert: true },
-  "integration_installation.destroy": { severity: "high", category: "integration-change", alert: true },
-  "integration_installation.repositories_added": { severity: "high", category: "integration-change", alert: true },
-  "integration_installation.repositories_removed": { severity: "high", category: "integration-change", alert: true },
+  "integration.remove_client_secret": {
+    severity: "high",
+    category: "credential-change",
+    alert: true,
+  },
+  "integration_installation.create": {
+    severity: "high",
+    category: "integration-change",
+    alert: true,
+  },
+  "integration_installation.destroy": {
+    severity: "high",
+    category: "integration-change",
+    alert: true,
+  },
+  "integration_installation.repositories_added": {
+    severity: "high",
+    category: "integration-change",
+    alert: true,
+  },
+  "integration_installation.repositories_removed": {
+    severity: "high",
+    category: "integration-change",
+    alert: true,
+  },
   "protected_branch.update_signature_requirement_enforcement_level": {
     severity: "high",
     category: "protected-ref-policy-change",
@@ -204,23 +232,51 @@ export const EVENT_RULES = Object.freeze({
     category: "workflow-activity",
     alert: true,
   },
-  "workflows.prepared_workflow_job": { severity: "high", category: "workflow-security", alert: true },
-  "workflows.completed_workflow_run": { severity: "low", category: "workflow-activity", alert: true },
+  "workflows.prepared_workflow_job": {
+    severity: "high",
+    category: "workflow-security",
+    alert: true,
+  },
+  "workflows.completed_workflow_run": {
+    severity: "low",
+    category: "workflow-activity",
+    alert: true,
+  },
   "workflows.disable_workflow": { severity: "high", category: "workflow-security", alert: true },
   "workflows.enable_workflow": { severity: "medium", category: "workflow-security", alert: true },
   "workflows.delete_workflow_run": { severity: "high", category: "workflow-security", alert: true },
   "workflows.reject_workflow_job": { severity: "high", category: "workflow-security", alert: true },
-  "workflows.rerun_workflow_run": { severity: "medium", category: "workflow-security", alert: true },
-  "workflows.cancel_workflow_run": { severity: "medium", category: "workflow-security", alert: true },
-  "workflows.actions_policy_violation": { severity: "high", category: "workflow-security", alert: true },
-  "workflows.approve_workflow_job": { severity: "high", category: "workflow-security", alert: true },
+  "workflows.rerun_workflow_run": {
+    severity: "medium",
+    category: "workflow-security",
+    alert: true,
+  },
+  "workflows.cancel_workflow_run": {
+    severity: "medium",
+    category: "workflow-security",
+    alert: true,
+  },
+  "workflows.actions_policy_violation": {
+    severity: "high",
+    category: "workflow-security",
+    alert: true,
+  },
+  "workflows.approve_workflow_job": {
+    severity: "high",
+    category: "workflow-security",
+    alert: true,
+  },
   "workflows.pin_workflow": { severity: "medium", category: "workflow-security", alert: true },
   "workflows.unpin_workflow": { severity: "medium", category: "workflow-security", alert: true },
   "public_key.create": { severity: "high", category: "deploy-key-change", alert: true },
   "public_key.delete": { severity: "high", category: "deploy-key-change", alert: true },
   "public_key.update": { severity: "high", category: "deploy-key-change", alert: true },
   "public_key.unverify": { severity: "high", category: "deploy-key-change", alert: true },
-  "public_key.unverification_failure": { severity: "high", category: "deploy-key-change", alert: true },
+  "public_key.unverification_failure": {
+    severity: "high",
+    category: "deploy-key-change",
+    alert: true,
+  },
   "repo.access": {
     severity: "high",
     category: "repository-access-change",
@@ -233,7 +289,15 @@ const SENSITIVE_VALUE = /(?:gh[pousr]_|github_pat_|bearer\s+|authorization\b|tok
 const EMAIL_VALUE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const IPV4_VALUE = /^(?:\d{1,3}\.){3}\d{1,3}$/u;
 const SHA_VALUE = /^[a-f0-9]{7,64}$/iu;
-const ALLOWED_NEXT_QUERY_KEYS = new Set(["after", "before", "include", "order", "page", "per_page", "phrase"]);
+const ALLOWED_NEXT_QUERY_KEYS = new Set([
+  "after",
+  "before",
+  "include",
+  "order",
+  "page",
+  "per_page",
+  "phrase",
+]);
 const HMAC_SIGNATURE = /^sha256=([a-f0-9]{64})$/iu;
 
 export class AuditMonitorError extends Error {
@@ -248,7 +312,12 @@ function safeString(value, { sensitive = true, maxLength = 256 } = {}) {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim();
   if (!normalized) return undefined;
-  if (sensitive && (SENSITIVE_VALUE.test(normalized) || EMAIL_VALUE.test(normalized) || IPV4_VALUE.test(normalized))) {
+  if (
+    sensitive &&
+    (SENSITIVE_VALUE.test(normalized) ||
+      EMAIL_VALUE.test(normalized) ||
+      IPV4_VALUE.test(normalized))
+  ) {
     return "[redacted]";
   }
   return normalized.slice(0, maxLength);
@@ -273,7 +342,10 @@ function readActor(event) {
 function readActorType(event) {
   if (event?.actor_is_agent === true) return "Agent";
   if (event?.actor_is_bot === true) return "Bot";
-  if (event?.oauth_application_id || /github\s*app|oauth\s*application|integration/iu.test(event?.programmatic_access_type ?? "")) {
+  if (
+    event?.oauth_application_id ||
+    /github\s*app|oauth\s*application|integration/iu.test(event?.programmatic_access_type ?? "")
+  ) {
     return "App";
   }
   const actor = event?.actor;
@@ -426,7 +498,8 @@ export function normalizeAuditEvent(event) {
     alert: classification.alert,
     category: classification.category,
     createdAt: toIsoTimestamp(readTimestamp(event)),
-    metadataStatus: classification.category === "metadata-insufficient" ? "insufficient" : "complete",
+    metadataStatus:
+      classification.category === "metadata-insufficient" ? "insufficient" : "complete",
     newSha: readSha(event?.new_sha, event?.new_oid, event?.new_commit, event?.new_commit_id),
     oldSha: readSha(event?.old_sha, event?.old_oid, event?.old_commit, event?.old_commit_id),
     organization: readOrganization(event) ?? "[unknown]",
@@ -437,7 +510,9 @@ export function normalizeAuditEvent(event) {
     source: firstString(event?.source, event?.source_name, event?.origin) ?? "github-audit-log",
   };
 
-  const sanitized = Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== undefined));
+  const sanitized = Object.fromEntries(
+    Object.entries(normalized).filter(([, value]) => value !== undefined),
+  );
   const rulesetName = readRulesetName(event);
   if (rulesetName) sanitized.rulesetName = rulesetName;
   sanitized.alertKey = buildAlertKey(sanitized);
@@ -482,8 +557,16 @@ export function correlateAuditEvents(events, options = {}) {
     DEFAULT_CORRELATION_WINDOW_MINUTES,
     24 * 60,
   );
-  const maxEvents = parseCorrelationOption(options.maxEvents, MAX_CORRELATION_EVENTS, MAX_CORRELATION_EVENTS);
-  const maxGroups = parseCorrelationOption(options.maxGroups, MAX_CORRELATION_GROUPS, MAX_CORRELATION_GROUPS);
+  const maxEvents = parseCorrelationOption(
+    options.maxEvents,
+    MAX_CORRELATION_EVENTS,
+    MAX_CORRELATION_EVENTS,
+  );
+  const maxGroups = parseCorrelationOption(
+    options.maxGroups,
+    MAX_CORRELATION_GROUPS,
+    MAX_CORRELATION_GROUPS,
+  );
   const normalizedEvents = (Array.isArray(events) ? events : [])
     .map(normalizeAuditEvent)
     .filter(
@@ -498,10 +581,18 @@ export function correlateAuditEvents(events, options = {}) {
   const groups = [];
 
   for (const event of normalizedEvents) {
-    const key = [event.actorType, event.actor, event.repository, event.ref, event.requestId ?? ""].join("|");
+    const key = [
+      event.actorType,
+      event.actor,
+      event.repository,
+      event.ref,
+      event.requestId ?? "",
+    ].join("|");
     const timestamp = Date.parse(event.createdAt);
     const group = groups.find(
-      (candidate) => candidate.key === key && timestamp - Date.parse(candidate.firstAt) <= windowMinutes * 60_000,
+      (candidate) =>
+        candidate.key === key &&
+        timestamp - Date.parse(candidate.firstAt) <= windowMinutes * 60_000,
     );
     if (group) {
       group.lastAt = event.createdAt;
@@ -614,7 +705,8 @@ function validateNextPage(link, organization, baseUrl, since) {
   }
   if (next.searchParams.get("include") !== "all") throw new AuditMonitorError("invalid_next_link");
   const expectedPhrase = since ? `created:>=${since}` : null;
-  if (next.searchParams.get("phrase") !== expectedPhrase) throw new AuditMonitorError("invalid_next_link");
+  if (next.searchParams.get("phrase") !== expectedPhrase)
+    throw new AuditMonitorError("invalid_next_link");
   return next;
 }
 
@@ -746,10 +838,14 @@ export function buildAuditReport(events, options = {}) {
     high: alerts.filter((alert) => alert.severity === "high").length,
     medium: alerts.filter((alert) => alert.severity === "medium").length,
     low: alerts.filter((alert) => alert.severity === "low").length,
-    metadataInsufficient: normalizedEvents.filter((event) => event.metadataStatus === "insufficient").length,
+    metadataInsufficient: normalizedEvents.filter(
+      (event) => event.metadataStatus === "insufficient",
+    ).length,
     health: error ? "failed" : "ok",
   };
-  const blockingAlerts = alerts.some((alert) => alert.severity === "high" || alert.severity === "medium");
+  const blockingAlerts = alerts.some(
+    (alert) => alert.severity === "high" || alert.severity === "medium",
+  );
   const collection = {
     startedAt,
     completedAt,
@@ -788,13 +884,15 @@ function usage() {
 function parseInputMaxAge(value) {
   if (value === undefined) return DEFAULT_INPUT_MAX_AGE_MINUTES;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 60) throw new AuditMonitorError("invalid_input_max_age");
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 60)
+    throw new AuditMonitorError("invalid_input_max_age");
   return parsed;
 }
 
 function verifyInputSignature(bytes, signature, secret) {
   if (!signature) throw new AuditMonitorError("input_signature_required");
-  if (!secret || typeof secret !== "string") throw new AuditMonitorError("input_signature_secret_missing");
+  if (!secret || typeof secret !== "string")
+    throw new AuditMonitorError("input_signature_secret_missing");
   const match = HMAC_SIGNATURE.exec(signature);
   if (!match) throw new AuditMonitorError("input_signature_invalid");
   const actual = Buffer.from(match[1].toLowerCase(), "hex");
@@ -825,7 +923,8 @@ async function readInput(filePath, { signature, secret, now, maxAgeMinutes } = {
     }
     const issuedAt = toIsoTimestamp(parsed.issuedAt ?? parsed.issued_at);
     const nonce = safeString(parsed.nonce, { sensitive: false, maxLength: 128 });
-    if (!issuedAt || !nonce || /[\r\n]/u.test(nonce)) throw new AuditMonitorError("input_envelope_invalid");
+    if (!issuedAt || !nonce || /[\r\n]/u.test(nonce))
+      throw new AuditMonitorError("input_envelope_invalid");
     const ageMs = Date.parse(safeNow(now)) - Date.parse(issuedAt);
     if (ageMs < 0 || ageMs > parseInputMaxAge(maxAgeMinutes) * 60_000) {
       throw new AuditMonitorError("input_replay_window");
@@ -859,7 +958,11 @@ export async function main(args = process.argv.slice(2), environment = process.e
   const inputSignature = argumentValue(args, "--input-signature");
   const inputMaxAge = argumentValue(args, "--input-max-age");
 
-  if (!reportPath || (hasArgument(args, "--input") && !inputPath) || (!inputPath && !organization)) {
+  if (
+    !reportPath ||
+    (hasArgument(args, "--input") && !inputPath) ||
+    (!inputPath && !organization)
+  ) {
     process.stderr.write(`${usage()}\n`);
     return 2;
   }
@@ -900,7 +1003,8 @@ export async function main(args = process.argv.slice(2), environment = process.e
       });
     }
   } catch (error) {
-    const safeError = error instanceof AuditMonitorError ? error : new AuditMonitorError("collection_failed");
+    const safeError =
+      error instanceof AuditMonitorError ? error : new AuditMonitorError("collection_failed");
     report = {
       ok: false,
       generatedAt: new Date().toISOString(),

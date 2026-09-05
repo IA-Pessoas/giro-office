@@ -1,6 +1,7 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { PessoalServiceEnv } from "../config/env.js";
+import { PESSOAL_REPORTING_SOURCES } from "../reporting/pessoalReportingCatalog.js";
 
 const successJson = {
   content: {
@@ -35,6 +36,14 @@ const queryParam = (name: string, format?: string, required = true) =>
     in: "query",
     required,
     schema: format ? { type: "string", format } : { type: "string" },
+  }) as const;
+
+const internalReportingHeader = (name: string) =>
+  ({
+    name,
+    in: "header",
+    required: true,
+    schema: { type: "string", minLength: 1 },
   }) as const;
 
 const mutationResponses = {
@@ -128,6 +137,20 @@ const nullableDateSchema = { type: "string", format: "date-time", nullable: true
 const nullableNonNegativeNumberSchema = { type: "number", minimum: 0, nullable: true } as const;
 const nullableBooleanSchema = { type: "boolean", nullable: true } as const;
 const competenceSchema = { type: "string", pattern: "^\\d{4}-\\d{2}$" } as const;
+const reportingFieldSchema = { type: "string", minLength: 1, maxLength: 64 } as const;
+const internalReportingExtractRequestSchema = strictObjectSchema(
+  {
+    source: { type: "string", enum: PESSOAL_REPORTING_SOURCES },
+    fields: {
+      type: "array",
+      minItems: 1,
+      maxItems: 25,
+      items: reportingFieldSchema,
+    },
+    limit: { type: "integer", minimum: 1, maximum: 101 },
+  },
+  ["source", "fields", "limit"],
+);
 
 const createLddRequestSchema = strictObjectSchema(
   {
@@ -806,6 +829,62 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
             "401": { description: "Unauthorized", ...errorJson },
             "403": { description: "Forbidden", ...errorJson },
             "500": { description: "Internal error", ...errorJson },
+          },
+        },
+      },
+      "/internal/reporting/catalog": {
+        get: {
+          tags: ["Pessoal Internal"],
+          security: internalSecurity,
+          summary: "Consultar catálogo interno de reporting de pessoal",
+          operationId: "getPessoalReportingCatalog",
+          parameters: [
+            internalReportingHeader("x-request-id"),
+            internalReportingHeader("x-reports-grant"),
+            internalReportingHeader("x-reports-grant-signature"),
+          ],
+          responses: {
+            "200": {
+              description: "Catálogo seguro de fontes de pessoal",
+              ...successJsonWithData({
+                type: "object",
+                required: ["sources", "relations"],
+                properties: {
+                  sources: { type: "array", items: { type: "object" } },
+                  relations: { type: "array", items: { type: "object" } },
+                },
+              }),
+            },
+            "403": { description: "Forbidden", ...errorJson },
+          },
+        },
+      },
+      "/internal/reporting/extract": {
+        post: {
+          tags: ["Pessoal Internal"],
+          security: internalSecurity,
+          summary: "Extrair dados de pessoal para o reports-service",
+          operationId: "extractPessoalReportingData",
+          parameters: [
+            internalReportingHeader("x-request-id"),
+            internalReportingHeader("x-reports-grant"),
+            internalReportingHeader("x-reports-grant-signature"),
+          ],
+          requestBody: jsonRequestBody(internalReportingExtractRequestSchema),
+          responses: {
+            "200": {
+              description: "Linhas projetadas e indicação de limite atingido, sem campos sensíveis",
+              ...successJsonWithData({
+                type: "object",
+                required: ["rows", "reachedLimit"],
+                properties: {
+                  rows: { type: "array", items: { type: "object" } },
+                  reachedLimit: { type: "boolean" },
+                },
+              }),
+            },
+            "400": { description: "Bad request", ...errorJson },
+            "403": { description: "Forbidden", ...errorJson },
           },
         },
       },

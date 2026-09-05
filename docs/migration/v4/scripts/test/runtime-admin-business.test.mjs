@@ -163,9 +163,7 @@ test("projeção inclui somente mapped, defaults e Castelo; cleanup de merge pos
       kind: "reset_owned_columns",
       identityColumns: ["user_id", "organization_id"],
       ownedColumns:
-        entry.destinationTable === "permissions.specific"
-          ? ["task_completion"]
-          : [module],
+        entry.destinationTable === "permissions.specific" ? ["task_completion"] : [module],
       resetValues:
         entry.destinationTable === "permissions.specific"
           ? { task_completion: null }

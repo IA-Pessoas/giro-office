@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
-import fs from "node:fs/promises";
 import { accessSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import fs from "node:fs/promises";
 import { createRequire } from "node:module";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-
+import { loadPrismaCatalog } from "./lib/prisma-catalog.mjs";
 import { iterateSqlRows } from "./lib/sql-dump-parser.mjs";
-import { loadPrismaCatalog, getModelByDatabaseName } from "./lib/prisma-catalog.mjs";
 
 const CASTELO_ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
 
@@ -157,13 +156,7 @@ function buildCandidateList({
   return candidates;
 }
 
-function buildBatchInsert({
-  destinationTable,
-  columns,
-  values,
-  onConflictIgnore,
-  startIndex,
-}) {
+function buildBatchInsert({ destinationTable, columns, values, onConflictIgnore, startIndex }) {
   const quotedTable = quoteIdentifier(destinationTable);
   const quotedColumns = columns.map(quoteIdentifier).join(", ");
   const placeholders = [];
@@ -334,7 +327,10 @@ async function main() {
   }
 
   const { Client } = resolvePgDependency();
-  const client = new Client({ connectionString: dbUrl, application_name: "migration-v4-equal-copy" });
+  const client = new Client({
+    connectionString: dbUrl,
+    application_name: "migration-v4-equal-copy",
+  });
   await client.connect();
   try {
     await client.query("BEGIN");
@@ -439,8 +435,6 @@ function resolvePgDependency() {
     }
   }
 }
-
-const { Client } = resolvePgDependency();
 
 try {
   await main();

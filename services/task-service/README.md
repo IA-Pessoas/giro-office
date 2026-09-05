@@ -14,6 +14,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `DATABASE_POOL_MAX` (default `1`)
 - `JWT_SECRET`
 - `PROJECT_SERVICE_URL`
+- `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` para fonte interna de relatórios
 - `AUDIT_*` quando a auditoria estiver ativa
 
 ## Gateway
@@ -30,6 +31,8 @@ Exemplos de paths publicos:
 - `/task/project-plan`
 - `/task/project-plan/list`
 - `/task/deps/list`
+
+`/internal/reporting` é contrato direto interno, não roteado pelo gateway.
 
 ## Desenvolvimento
 

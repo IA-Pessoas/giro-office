@@ -155,6 +155,8 @@ build_check_plan() {
     add_edge_check gateway 3010 /ready
     add_edge_check web 3000 /
     add_edge_check reverse-proxy 80 /
+    add_edge_check reverse-proxy 80 /api/health
+    add_edge_check reverse-proxy 80 /api/ready
     for item in "${EDGE_CHECKS[@]}"; do
       CHECKS+=("$item|edge")
     done
@@ -201,6 +203,8 @@ build_check_plan() {
   fi
   if [[ "$need_proxy" -eq 1 ]]; then
     add_edge_check reverse-proxy 80 /
+    add_edge_check reverse-proxy 80 /api/health
+    add_edge_check reverse-proxy 80 /api/ready
   fi
   for item in "${EDGE_CHECKS[@]}"; do
     CHECKS+=("$item|edge")

@@ -17,6 +17,7 @@ import {
   type PermissionLevel,
 } from '../constants/permissionConfig';
 import type { UserItem } from '../types';
+import type { CreateAdminUserHandler } from '../types/adminUserContracts';
 import {
   buildAdminCreateUserPayload,
   type CreateUserFormState,
@@ -26,6 +27,7 @@ interface CreateUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUserCreated: (newUser: UserItem) => void;
+  onCreateUser: CreateAdminUserHandler;
   departments?: ReadonlyArray<{ id: string; name: string }>;
   departmentsLoading?: boolean;
   departmentsError?: boolean;
@@ -115,6 +117,7 @@ export function CreateUserModal({
   isOpen,
   onClose,
   onUserCreated,
+  onCreateUser,
   departments = [],
   departmentsLoading = false,
   departmentsError = false,
@@ -211,7 +214,6 @@ export function CreateUserModal({
     setIsLoading(true);
 
     try {
-      const { userService } = await import('../services/userService');
       const payload = buildAdminCreateUserPayload({
         formData,
         moduleSelections,
@@ -221,7 +223,7 @@ export function CreateUserModal({
         canCreateOrganizationOwner,
       });
 
-      const newUser = await userService.create(payload);
+      const newUser = await onCreateUser(payload);
       toast.success('Usuário cadastrado com sucesso!');
       onUserCreated(newUser);
       handleClose();

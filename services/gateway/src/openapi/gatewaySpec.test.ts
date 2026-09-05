@@ -46,4 +46,47 @@ it("agrega o catálogo público do reports-service", () => {
 
   expect(spec.paths["/reports/catalog"]?.get?.["x-origin-service"]).toBe("reports-service");
   expect(spec.paths["/internal/reporting/access-context"]).toBeUndefined();
+  expect(
+    spec.paths["/platform/organizations/{organizationId}/users/{userId}/permissions"]?.get
+      ?.security,
+  ).toEqual([{ cookieAuth: [] }]);
+  const permissionUpdate =
+    spec.paths["/platform/organizations/{organizationId}/users/{userId}/permissions"]?.put;
+  expect(permissionUpdate?.security).toEqual([{ cookieAuth: [] }]);
+  expect(permissionUpdate?.parameters).toEqual(
+    expect.arrayContaining([expect.objectContaining({ name: "x-csrf-token", required: true })]),
+  );
+  expect(permissionUpdate?.responses).toHaveProperty("422");
+
+  for (const [path, method] of [
+    ["/platform/organizations", "get"],
+    ["/platform/organizations", "post"],
+    ["/platform/organizations/{id}", "get"],
+    ["/platform/organizations/{id}/status", "patch"],
+    ["/platform/organizations/{id}/subscription-plan", "patch"],
+    ["/platform/organizations/{id}/logo-url", "patch"],
+  ] as const) {
+    const operation = spec.paths[path]?.[method];
+    expect(operation?.security, `${method.toUpperCase()} ${path}`).toEqual([{ cookieAuth: [] }]);
+    expect(operation?.["x-origin-service"]).toBe("organization-service");
+    if (method === "post" || method === "patch") {
+      expect(operation?.parameters).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: "x-csrf-token", required: true })]),
+      );
+      expect(operation?.requestBody?.content?.["application/json"]?.schema).toMatchObject({
+        additionalProperties: false,
+      });
+    }
+  }
+
+  expect(spec.paths["/platform/audit/requests"]?.get?.parameters).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        name: "organizationId",
+        schema: expect.objectContaining({ format: "uuid" }),
+      }),
+    ]),
+  );
+  expect(spec.paths["/internal/reporting/catalog"]).toBeUndefined();
+  expect(spec.paths["/internal/reporting/extract"]).toBeUndefined();
 });

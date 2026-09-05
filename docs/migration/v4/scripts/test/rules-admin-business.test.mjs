@@ -409,7 +409,8 @@ test("permissão dinâmica só ganha regra para a combinação com contrato atua
     "tb_admin.permissoes_atendimento",
     "tb_admin.permissoes_pec",
     "tb_admin.permissoes_wiki",
-  ]) assert.equal(registry.has(sourceTable), false, sourceTable);
+  ])
+    assert.equal(registry.has(sourceTable), false, sourceTable);
 
   const dynamicPairs = new Set();
   for await (const row of iterateSqlRows(path.join(LEGACY_DUMP_ROOT, "tb_admin.permissoes.sql"))) {

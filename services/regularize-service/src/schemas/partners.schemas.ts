@@ -20,6 +20,12 @@ export const updatePartnerBodySchema = createPartnerBodySchema
 
 export const partnerDetailQuerySchema = idQuerySchema;
 
+export const partnerIdParamsSchema = z
+  .object({
+    id: z.string().uuid("id invalido."),
+  })
+  .strict();
+
 export const listPartnersQuerySchema = z
   .object({
     type: z.enum(["pf", "pj"]),

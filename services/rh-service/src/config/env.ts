@@ -1,6 +1,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseAllowedOrigins, validateProductionCorsOrigins } from "@workspace/shared";
+import {
+  parseAllowedOrigins,
+  validateProductionCorsOrigins,
+  validateProductionInternalServiceToken,
+} from "@workspace/shared";
 import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -42,6 +46,8 @@ const rhEnvSchema = z
         return parsed;
       }),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o rh-service."),
+    reportsInternalToken: z.string().optional().default("reports-internal-token"),
+    reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     nodeEnv: z.string().optional().default("development"),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
@@ -79,6 +85,18 @@ const rhEnvSchema = z
       envName: "SERVICE_ALLOWED_ORIGINS",
       allowedOrigins: rest.allowedOrigins,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "rh-service",
+      envName: "REPORTS_INTERNAL_TOKEN",
+      token: rest.reportsInternalToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "rh-service",
+      envName: "REPORTS_GRANT_SECRET",
+      token: rest.reportsGrantSecret,
+    });
     return {
       ...rest,
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,
@@ -94,6 +112,8 @@ export function getRhEnv(): RhEnv {
     databaseUrl: process.env.DATABASE_URL,
     databasePoolMax: process.env.DATABASE_POOL_MAX,
     jwtSecret: process.env.JWT_SECRET,
+    reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,
+    reportsGrantSecret: process.env.REPORTS_GRANT_SECRET,
     nodeEnv: process.env.NODE_ENV,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,

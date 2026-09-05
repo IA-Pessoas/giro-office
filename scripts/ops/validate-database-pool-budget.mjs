@@ -11,6 +11,8 @@ const poolConstructorPattern = /new\s+(?:PrismaPg|Pool)\s*\(/u;
 const ignoredDirectories = new Set(["dist", "generated", "node_modules", "test", "tests"]);
 
 function containsRuntimePool(directory) {
+  if (!fs.existsSync(directory)) return false;
+
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (

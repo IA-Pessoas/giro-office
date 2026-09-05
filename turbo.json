@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "concurrency": "2",
   "globalDependencies": [
     ".env",
     ".env.*",
@@ -13,7 +14,7 @@
     "build": {
       "dependsOn": ["^build"],
       "env": ["NODE_ENV", "NEXT_PUBLIC_*", "API_INTERNAL_URL", "DATABASE_URL"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "tsconfig.tsbuildinfo"]
     },
     "dev": {
       "cache": false,

@@ -6,6 +6,7 @@ import {
   createPartnerBodySchema,
   listPartnersQuerySchema,
   partnerDetailQuerySchema,
+  partnerIdParamsSchema,
   updatePartnerBodySchema,
 } from "../schemas/partners.schemas.js";
 import { PartnersService } from "../services/partnersService.js";
@@ -82,6 +83,25 @@ export function createPartnersRoutes(deps: RegularizeRouteDeps): Router {
         response.json(createSuccessResponse(list));
       } catch (err) {
         logError("Erro ao listar socios do regularize", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.delete(
+    "/partners/:id",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const params = parseWithZod(partnerIdParamsSchema, request.params);
+        const deleted = await partnersService.remove({
+          organizationId: request.organization_id,
+          userId: request.user_id,
+          id: params.id,
+        });
+        response.json(createSuccessResponse(deleted));
+      } catch (err) {
+        logError("Erro ao remover socio do regularize", { err });
         next(err);
       }
     },

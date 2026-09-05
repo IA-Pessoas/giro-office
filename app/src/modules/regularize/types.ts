@@ -187,6 +187,12 @@ export type RegularizePartner = {
   part?: number | string | null;
   entry?: string | null;
   exit?: string | null;
+  clientPF?: {
+    id: RegularizeId;
+    name: string;
+    cpf: string;
+    date_of_birth: string | null;
+  } | null;
 };
 
 export type CreateRegularizePartnerPayload = {

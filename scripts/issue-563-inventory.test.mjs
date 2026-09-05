@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 const inventoryPath = new URL("../docs/security/permissions-0-3-inventory.md", import.meta.url);

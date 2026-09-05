@@ -61,6 +61,11 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           scheme: "bearer",
           bearerFormat: "JWT",
         },
+        internalServiceToken: {
+          type: "apiKey",
+          in: "header",
+          name: "x-internal-service-token",
+        },
       },
       schemas: {
         SuccessEnvelope: {
@@ -68,9 +73,119 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           description: "Resposta de sucesso padrão do workspace",
           additionalProperties: true,
         },
+        ReportingGrantV1: {
+          type: "object",
+          required: [
+            "version",
+            "audience",
+            "operation",
+            "source",
+            "organization_id",
+            "fields",
+            "request_id",
+            "issued_at",
+            "expires_at",
+            "body_sha256",
+          ],
+          properties: {
+            version: { type: "integer", enum: [1] },
+            audience: { type: "string", enum: ["contabil-service"] },
+            operation: { type: "string", enum: ["catalog", "extract"] },
+            source: { type: "string" },
+            organization_id: { type: "string", format: "uuid" },
+            fields: { type: "array", items: { type: "string" } },
+            request_id: { type: "string" },
+            issued_at: { type: "integer" },
+            expires_at: { type: "integer", description: "Máximo de 60 segundos após issued_at." },
+            body_sha256: { type: "string" },
+          },
+        },
       },
     },
     paths: {
+      "/internal/reporting/catalog": {
+        get: {
+          tags: ["Health"],
+          summary: "Catálogo interno de Controle Contábil",
+          security: [{ internalServiceToken: [] }],
+          parameters: [
+            {
+              name: "x-internal-service-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Catálogo",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "403": { description: "Grant inválido" },
+          },
+        },
+      },
+      "/internal/reporting/extract": {
+        post: {
+          tags: ["Health"],
+          summary: "Extrair Controle Contábil para relatórios",
+          security: [{ internalServiceToken: [] }],
+          parameters: [
+            {
+              name: "x-internal-service-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
+            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-reports-grant-signature",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["source", "fields", "limit"],
+                  properties: {
+                    source: {
+                      type: "string",
+                      enum: ["contabil.control", "contabil.responsibles", "contabil.relationship"],
+                    },
+                    fields: { type: "array", items: { type: "string" } },
+                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Linhas limitadas",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "403": { description: "Grant ou campo inválido" },
+          },
+        },
+      },
       "/health": {
         get: {
           tags: ["Health"],

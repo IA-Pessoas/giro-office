@@ -1,7 +1,23 @@
+import type { ModulePermissionKey } from "../auth/modules.js";
+import type { AuthKind, PlatformRole } from "../auth/types.js";
+
 export type AuditOutcome = "success" | "error" | "aborted";
 export type AuditQueryValue = string | string[];
 export type AuditQuery = Record<string, AuditQueryValue>;
-export type AuditRecorder = (payload: CreateAuditRequestPayload) => Promise<void>;
+export type AuditReservation = "protected" | "public";
+export type AuditRecorder = (
+  payload: CreateAuditRequestPayload,
+  reservation?: AuditReservation,
+) => Promise<void>;
+export type ReservableAuditRecorder = AuditRecorder & {
+  reserve(kind: AuditReservation): AuditReservation | undefined;
+  /** Resolves only after persistence ACK; consumes and releases any supplied reservation. */
+  recordRequired(
+    payload: CreateAuditRequestPayload,
+    reservation?: AuditReservation,
+    signal?: AbortSignal,
+  ): Promise<void>;
+};
 
 export interface CreateAuditRequestPayload {
   requestId: string;
@@ -39,7 +55,7 @@ export interface AuditRequestRecord {
   permission?: number | null;
   method: string;
   path: string;
-  query: AuditQuery;
+  query?: AuditQuery;
   statusCode?: number | null;
   outcome: AuditOutcome;
   durationMs?: number | null;
@@ -61,7 +77,7 @@ export interface AuditRequestRecord {
 }
 
 export interface AuditSearchFilters {
-  organizationId: string;
+  organizationId?: string;
   requestId?: string;
   userId?: string;
   method?: string;
@@ -84,8 +100,75 @@ export interface AuditSearchResult {
   pageSize: number;
 }
 
+export type OrganizationAuditStatus = "trial" | "past_due" | "active" | "suspended" | "cancelled";
+export type OrganizationAuditPlan = "trial" | "pro" | "enterprise";
+export type PlatformAuditChange<T extends string> = { from: T | null; to: T | null };
+
+export interface PlatformOwnershipAuditUser {
+  id: string;
+  type: "owner" | "admin";
+  status: "active" | "inactive";
+}
+
+export interface PlatformOwnershipAuditChanges {
+  before: {
+    ownerId: string;
+    type: "owner";
+    status: "active";
+  };
+  after: {
+    ownerId: string;
+    type: "owner";
+    status: "active";
+    previousOwner: PlatformOwnershipAuditUser;
+  };
+  previousOwnerAction: "demote" | "deactivate";
+  justification: string;
+}
+
+export interface PlatformOrganizationAuditChanges {
+  status?: PlatformAuditChange<OrganizationAuditStatus>;
+  subscription_plan?: PlatformAuditChange<OrganizationAuditPlan>;
+  logo_url?: PlatformAuditChange<string>;
+  ownership?: PlatformOwnershipAuditChanges;
+}
+
+export interface PlatformPermissionAuditChanges {
+  modules: {
+    before: Partial<Record<ModulePermissionKey, 0 | 1 | 2 | 3>>;
+    after: Partial<Record<ModulePermissionKey, 0 | 1 | 2 | 3>>;
+  };
+}
+
+export interface PlatformAuditRequestRecord {
+  id: string;
+  requestId: string;
+  organizationId?: string | null;
+  method: string;
+  path: string;
+  statusCode?: number | null;
+  outcome: AuditOutcome;
+  durationMs?: number | null;
+  serviceSource: string;
+  createdAt: string;
+  action?: string | null;
+  referring?: string | null;
+  referringId?: string | null;
+  actorPlatformUserId?: string;
+  changes?: PlatformOrganizationAuditChanges | PlatformPermissionAuditChanges;
+}
+
+export interface PlatformAuditSearchResult {
+  items: PlatformAuditRequestRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface ForwardedAuditAuthContext {
   userId: string;
-  organizationId: string;
+  organizationId?: string;
   permission?: number;
+  authKind?: AuthKind;
+  platformRole?: PlatformRole;
 }

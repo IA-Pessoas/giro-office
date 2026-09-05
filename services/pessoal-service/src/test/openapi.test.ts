@@ -47,6 +47,46 @@ describe("pessoal-service OpenAPI", () => {
     ]);
   });
 
+  it("documenta o contrato interno de reporting pessoal", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const paths = spec.paths as Record<
+      string,
+      Record<
+        string,
+        { security?: unknown; requestBody?: { content?: Record<string, { schema?: unknown }> } }
+      >
+    >;
+
+    expect(paths["/internal/reporting/catalog"]?.get?.security).toEqual([
+      { internalServiceToken: [] },
+    ]);
+    expect(paths["/internal/reporting/extract"]?.post?.security).toEqual([
+      { internalServiceToken: [] },
+    ]);
+    const extractSchema = (
+      spec.paths as Record<
+        string,
+        {
+          post?: {
+            requestBody?: {
+              content?: Record<
+                string,
+                { schema?: { properties?: { source?: { enum?: unknown } } } }
+              >;
+            };
+          };
+        }
+      >
+    )["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]?.schema;
+    expect(extractSchema?.properties?.source?.enum).toEqual([
+      "pessoal.ldd",
+      "pessoal.payroll",
+      "pessoal.situations",
+      "pessoal.obligations",
+      "pessoal.unions",
+    ]);
+  });
+
   it("documenta request bodies estritos para mutacoes do dominio", () => {
     const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
     const paths = spec.paths as Record<

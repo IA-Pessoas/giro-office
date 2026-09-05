@@ -1,5 +1,5 @@
-import { createRuntimeEntry } from "../lib/execution-registry.mjs";
 import { normalizeRequiredScalarText } from "../lib/empty-scalar-policy.mjs";
+import { createRuntimeEntry } from "../lib/execution-registry.mjs";
 import { CASTELO_ORGANIZATION_ID, REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
 import { uuidV5 } from "../lib/uuid-v5.mjs";
 import { isStrictLegacyInteger, REGULARIZE_CREDENTIAL_SLOTS, V2_RULES } from "../rules/v2.mjs";

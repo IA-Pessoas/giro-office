@@ -4,6 +4,7 @@ import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import type { ClientFormValues } from "../types";
+import { CLIENT_TAX_REGIME_OPTIONS } from "../utils/clientForm";
 import { validateCpfCnpjDocument } from "../utils/documentValidation";
 
 interface ClientFormProps {
@@ -11,6 +12,7 @@ interface ClientFormProps {
   disabled?: boolean;
   showPersonType?: boolean;
   showDocumentError?: boolean;
+  legacyTaxRegime?: string | null;
   submitLabel: string;
   onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   onSubmit: () => void;
@@ -22,6 +24,7 @@ export function ClientForm({
   disabled = false,
   showPersonType = false,
   showDocumentError = false,
+  legacyTaxRegime = null,
   submitLabel,
   onChange,
   onSubmit,
@@ -127,6 +130,25 @@ export function ClientForm({
             <option value="Inativo">Inativo</option>
             <option value="Fechado">Fechado</option>
           </ClientNativeSelect>
+        </label>
+
+        <label className="space-y-1.5">
+          <span className="block text-sm font-medium text-slate-700 dark:text-white">
+            Regime tributário
+          </span>
+          <ClientNativeSelect name="regime" value={values.regime} onChange={onChange} disabled={disabled}>
+            <option value="">Selecione um regime</option>
+            {CLIENT_TAX_REGIME_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </ClientNativeSelect>
+          {legacyTaxRegime && values.regime === "" ? (
+            <span className="block text-xs text-slate-500 dark:text-slate-400">
+              Regime atual: {legacyTaxRegime}
+            </span>
+          ) : null}
         </label>
 
         <label className="flex items-center gap-2 md:col-span-2">

@@ -6,10 +6,7 @@ import { pathToFileURL } from "node:url";
 
 import { computeDatabaseIdentity } from "./lib/database-identity.mjs";
 
-const REPORT_PATH = new URL(
-  "../reports/dry-run-connected-excluded.json",
-  import.meta.url,
-);
+const REPORT_PATH = new URL("../reports/dry-run-connected-excluded.json", import.meta.url);
 const SNAPSHOT_PATH = new URL("../reports/snapshot-before-apply.json", import.meta.url);
 
 async function createPostgresClient(connectionString) {

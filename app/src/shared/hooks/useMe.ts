@@ -6,8 +6,9 @@ import { useFetch } from "./useFetch";
 
 export const ME_QUERY_KEY = ["me"] as const;
 
-export function useMe(): UseQueryResult<MeSessionUser, Error> {
+export function useMe(options?: { enabled?: boolean }): UseQueryResult<MeSessionUser, Error> {
   return useFetch(ME_QUERY_KEY, () => getMe(api), {
     retry: false,
+    ...options,
   });
 }

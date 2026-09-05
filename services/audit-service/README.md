@@ -31,18 +31,28 @@ Testes do pacote: `pnpm --filter @workspace/audit-service test`.
 
 ## Consulta operacional
 
-Os registros ficam na tabela `audit_requests` e podem ser consultados, sempre
-limitados à organização enviada na autenticação encaminhada, por:
+Os registros ficam na tabela `audit_requests` e podem ser consultados por:
 
 - `GET /audit/requests` para pesquisa paginada;
 - `GET /audit/requests/:requestId` para consultar um evento específico.
 
 As consultas exigem o token interno do serviço e uma permissão de administrador
-de auditoria. A pesquisa aceita filtros de `requestId`, `userId`, `method`,
-`path`, `statusCode`, intervalo de datas, `referring`, `referringId` e
-`department`. Alterações de entidade preservam `action`, `referring`,
-`referringId` e `changes_json`, permitindo investigar quem alterou o recurso,
-qual foi o resultado e qual era o diff.
+de auditoria. A consulta organizacional usa a organização encaminhada pelo gateway,
+não aceita troca de tenant pela query e mantém o DTO completo para o administrador
+da própria organização.
+
+A consulta de plataforma usa a mesma rota interna `GET /audit/requests`, mas somente
+com a identidade validada `platform/super_admin`. Sem `organizationId`, a busca é
+global; com `organizationId` UUID, retorna somente o histórico contextual daquela
+organização. Em ambos os casos a resposta é uma projeção allowlisted: nunca inclui
+`metadata_json`, `changes_json`, query, IP, user-agent, mensagens de erro ou outros
+campos brutos. Para eventos válidos do `organization-service`, somente o ator de
+plataforma e as mudanças permitidas de status, plano e logo são reconstruídos.
+O detalhe por `requestId` continua restrito a uma organização.
+
+A pesquisa aceita filtros de `requestId`, `userId`, `method`, `path`, `statusCode`,
+intervalo de datas, `referring`, `referringId` e `department`. Na busca de plataforma,
+`organizationId` é um filtro UUID opcional adicional.
 
 ## Retenção
 

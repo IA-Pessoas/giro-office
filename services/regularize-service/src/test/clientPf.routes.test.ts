@@ -209,4 +209,81 @@ describe("regularize client PF and partners routes", () => {
       "e0000000-0000-4000-8000-000000000001",
     );
   });
+
+  it("GET /regularize/partners returns the PF summary in the same scoped query", async () => {
+    const prisma = {
+      partners: {
+        findMany: vi.fn(async () => [
+          {
+            id: "partner-1",
+            pj_id: "d0000000-0000-4000-8000-000000000001",
+            pf_id: "e0000000-0000-4000-8000-000000000001",
+            part: 50,
+            entry: new Date("2024-01-01"),
+            exit: null,
+            clientPF: {
+              id: "e0000000-0000-4000-8000-000000000001",
+              name: "Ana Silva",
+              cpf: "12345678901",
+              date_of_birth: new Date("1990-01-01"),
+            },
+          },
+        ]),
+      },
+    } as unknown as PrismaClient;
+    const app = createTestApp(prisma);
+
+    const response = await request(app)
+      .get("/regularize/partners")
+      .query({ type: "pj", client_id: "d0000000-0000-4000-8000-000000000001" })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.data[0]).toMatchObject({
+      clientPF: { name: "Ana Silva", cpf: "12345678901" },
+    });
+    expect(prisma.partners.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organization_id: "a0000000-0000-4000-8000-000000000001" }),
+        select: expect.objectContaining({ clientPF: expect.any(Object) }),
+      }),
+    );
+  });
+
+  it("DELETE /regularize/partners/:id deletes only the organization-scoped link", async () => {
+    vi.spyOn(RegularizeReconciliationService.prototype, "handlePartnersChanged").mockResolvedValue(
+      undefined,
+    );
+    const partnerId = "f0000000-0000-4000-8000-000000000001";
+    const prisma = {
+      partners: {
+        findFirst: vi.fn(async () => ({
+          id: partnerId,
+          pj_id: "d0000000-0000-4000-8000-000000000001",
+          pf_id: "e0000000-0000-4000-8000-000000000001",
+          part: 50,
+          entry: new Date("2024-01-01"),
+          exit: null,
+          clientPF: {
+            id: "e0000000-0000-4000-8000-000000000001",
+            name: "Ana",
+            cpf: "123",
+            date_of_birth: new Date("1990-01-01"),
+          },
+        })),
+        delete: vi.fn(async () => ({ id: partnerId })),
+      },
+      logs: { create: vi.fn(async () => ({})) },
+    } as unknown as PrismaClient;
+    const app = createTestApp(prisma);
+
+    const response = await request(app)
+      .delete(`/regularize/partners/${partnerId}`)
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ ok: true });
+    expect(prisma.partners.delete).toHaveBeenCalledWith({ where: { id: partnerId } });
+    expect((prisma as unknown as { clientPF?: unknown }).clientPF).toBeUndefined();
+  });
 });

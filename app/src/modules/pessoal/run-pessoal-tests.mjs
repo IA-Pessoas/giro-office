@@ -605,7 +605,7 @@ runTest("password list items are treated as non-secret summaries", () => {
   );
 });
 
-runTest("pessoal shell wires access, client selector, and functional tabs", () => {
+runTest("pessoal shell wires access, active client selector, and functional tabs", () => {
   const shell = readFileSync("src/modules/pessoal/components/PessoalShell.tsx", "utf8");
   const clientSelector = readFileSync(
     "src/modules/pessoal/components/PessoalClientSelector.tsx",
@@ -621,8 +621,10 @@ runTest("pessoal shell wires access, client selector, and functional tabs", () =
   assert.match(shell, /PessoalPasswordsSection\s+key=\{selectedClientId\}/);
   assert.match(shell, /PessoalOverviewSection onSelectTab=\{setActiveTab\}/);
   assert.match(clientSelector, /ClientPickerModal/);
-  assert.match(clientSelector, /ref: "deps"/);
-  assert.match(clientSelector, /status: "Departamento pessoal"/);
+  assert.match(clientSelector, /status: "Ativo"/);
+  assert.match(clientSelector, /legacyIntegrationStatusFilter: false/);
+  assert.doesNotMatch(clientSelector, /ref: "deps"/);
+  assert.doesNotMatch(clientSelector, /Departamento pessoal/);
   assert.match(clientSelector, /allowClearSelection/);
   assert.doesNotMatch(clientSelector, /useClients\(/);
 });

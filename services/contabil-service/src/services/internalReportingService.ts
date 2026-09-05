@@ -1,0 +1,49 @@
+import {
+  type ContabilReportingSource,
+  getContabilReportingFields,
+  ServiceError,
+} from "@workspace/shared";
+
+type ReportingDelegate = {
+  findMany(input: {
+    where: { organization_id: string };
+    select: Record<string, true>;
+    take: number;
+  }): Promise<readonly Record<string, unknown>[]>;
+};
+
+export class InternalReportingService {
+  constructor(
+    private readonly prisma: {
+      controlContabil: ReportingDelegate;
+      responsibleContabil: ReportingDelegate;
+      relationshipContabil: ReportingDelegate;
+    },
+  ) {}
+
+  async extract(input: {
+    organizationId: string;
+    source: ContabilReportingSource;
+    fields: readonly string[];
+    limit: number;
+  }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+    const allowedFields = getContabilReportingFields(input.source);
+    if (input.fields.some((field) => !allowedFields.includes(field))) {
+      throw new ServiceError(403, "Campo não publicado para relatórios.");
+    }
+
+    const delegate =
+      input.source === "contabil.control"
+        ? this.prisma.controlContabil
+        : input.source === "contabil.responsibles"
+          ? this.prisma.responsibleContabil
+          : this.prisma.relationshipContabil;
+    const rows = await delegate.findMany({
+      where: { organization_id: input.organizationId },
+      select: Object.fromEntries(input.fields.map((field) => [field, true])),
+      take: input.limit + 1,
+    });
+
+    return { rows: rows.slice(0, input.limit), reachedLimit: rows.length > input.limit };
+  }
+}

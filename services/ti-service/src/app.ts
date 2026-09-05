@@ -19,6 +19,8 @@ import {
   requestContext,
 } from "./middlewares/requestContext.js";
 import { buildTiServiceOpenApiSpec } from "./openapi/spec.js";
+import { InternalReportingService } from "./reporting/internalReportingService.js";
+import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createTiDashboardRoutes } from "./routes/tiDashboard.routes.js";
 import { createTiExtensionRoutes } from "./routes/tiExtension.routes.js";
 import { createTiInventoryRoutes } from "./routes/tiInventory.routes.js";
@@ -56,6 +58,7 @@ export interface CreateTiApplicationOptions {
   logger: Logger;
   prisma: PrismaClient;
   requestImageStorage?: TiRequestImageStorage;
+  internalReportingService?: InternalReportingService;
 }
 
 export function createTiApplication({
@@ -63,6 +66,7 @@ export function createTiApplication({
   logger,
   prisma,
   requestImageStorage,
+  internalReportingService,
 }: CreateTiApplicationOptions): express.Express {
   const app = express();
   const encryptionService = new EncryptionService(env.passwordEncryptionKey);
@@ -97,6 +101,14 @@ export function createTiApplication({
       }),
     );
   });
+
+  app.use(
+    "/internal",
+    createInternalReportingRouter({
+      env,
+      reportingService: internalReportingService ?? new InternalReportingService(prisma),
+    }),
+  );
 
   app.use("/ti", createForwardedAuthContextMiddleware(env.internalServiceToken));
 

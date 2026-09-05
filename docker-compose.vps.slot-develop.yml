@@ -8,15 +8,11 @@ services:
   reverse-proxy:
     # Evitar concatenação com docker-compose.vps.yml (Compose junta listas `ports`).
     ports: !override
-      - "8086:80"
+      - "127.0.0.1:8086:80"
+      - "127.0.0.1:8446:443"
   gateway:
-    environment:
-      AUTH_COOKIE_SECURE: "false"
     ports: !override
-      - "3011:3010"
-  user-service:
-    environment:
-      AUTH_COOKIE_SECURE: "false"
+      - "127.0.0.1:3011:3010"
   web:
     ports: !override
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"

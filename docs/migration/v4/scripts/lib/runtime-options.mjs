@@ -72,17 +72,16 @@ export function createRuntimeOptionsFromRows({
   const legacyUsers = source("tb_admin.usuarios");
   const departments = source("tb_admin.departamentos");
   const departmentIds = new Set(
-    departments
-      .map((row) => normalizeKey(row.id))
-      .filter((value) => value !== null),
+    departments.map((row) => normalizeKey(row.id)).filter((value) => value !== null),
   );
   const regularizeClients = source("tb_regularize.clientes");
   const integrationClients = source("tb_integracao.clientes");
-  const migratableLegacyUsers = legacyUsers.filter((row) =>
-    departmentIds.has(normalizeKey(row.departamento_id)) &&
-    row.password !== null &&
-    row.password !== undefined &&
-    String(row.password).trim().length > 0,
+  const migratableLegacyUsers = legacyUsers.filter(
+    (row) =>
+      departmentIds.has(normalizeKey(row.departamento_id)) &&
+      row.password !== null &&
+      row.password !== undefined &&
+      String(row.password).trim().length > 0,
   );
   const plannedUsers = migratableLegacyUsers.map((row) => ({
     ...plannedStandardCandidate("tb_admin.usuarios", row),
@@ -131,10 +130,7 @@ export function createRuntimeOptionsFromRows({
     migrationOrigin: "native",
     legacyId: row.legacyId ?? legacyUserIdByCanonicalId.get(row.id) ?? null,
   }));
-  const userCandidates = mergeCandidatesById([
-    ...plannedUsers,
-    ...existingDestinationUsers,
-  ]);
+  const userCandidates = mergeCandidatesById([...plannedUsers, ...existingDestinationUsers]);
   const collaboratorUserCandidates = source("tb_rh.colaboradores")
     .filter((row) => legacyUserIds.has(normalizeKey(row.user_id)))
     .map((row) => ({

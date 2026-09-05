@@ -92,7 +92,10 @@ test("reports malformed settings without returning their content", async (t) => 
 
   const report = await auditDeveloperEndpoint({ homeDirectory: root, platform: "darwin" });
 
-  assert.deepEqual(report.findings.map(({ ruleId }) => ruleId), ["editor.settings-invalid"]);
+  assert.deepEqual(
+    report.findings.map(({ ruleId }) => ruleId),
+    ["editor.settings-invalid"],
+  );
   assert.doesNotMatch(JSON.stringify(report), /private-value|credentials/u);
 });
 
@@ -105,9 +108,10 @@ test("fails closed when a settings path is a directory", async (t) => {
 
   const report = await auditDeveloperEndpoint({ homeDirectory: root, platform: "win32" });
 
-  assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
-    { ruleId: "audit.profile-data-unreadable", scope: "vscode-user-settings" },
-  ]);
+  assert.deepEqual(
+    report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })),
+    [{ ruleId: "audit.profile-data-unreadable", scope: "vscode-user-settings" }],
+  );
   assert.doesNotMatch(JSON.stringify(report), new RegExp(escapeRegex(root), "u"));
 });
 
@@ -126,9 +130,10 @@ test("fails closed when profile data is a symbolic link", async (t) => {
     workspace: path.join(root, "clean-workspace"),
   });
 
-  assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
-    { ruleId: "audit.profile-data-unreadable", scope: "editor-extensions" },
-  ]);
+  assert.deepEqual(
+    report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })),
+    [{ ruleId: "audit.profile-data-unreadable", scope: "editor-extensions" }],
+  );
 });
 
 test("fails closed when an extension directory is irregular", async (t) => {
@@ -140,9 +145,10 @@ test("fails closed when an extension directory is irregular", async (t) => {
 
   const report = await auditDeveloperEndpoint({ homeDirectory: root, platform: "darwin" });
 
-  assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
-    { ruleId: "audit.profile-data-unreadable", scope: "editor-extensions" },
-  ]);
+  assert.deepEqual(
+    report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })),
+    [{ ruleId: "audit.profile-data-unreadable", scope: "editor-extensions" }],
+  );
 });
 
 test("fails closed when profile paths cannot be read", async (t) => {
@@ -155,12 +161,15 @@ test("fails closed when profile paths cannot be read", async (t) => {
     workspace,
   });
 
-  assert.deepEqual(report.findings.map(({ ruleId }) => ruleId), [
-    "audit.profile-data-unreadable",
-    "audit.profile-data-unreadable",
-    "audit.profile-data-unreadable",
-    "audit.profile-data-unreadable",
-  ]);
+  assert.deepEqual(
+    report.findings.map(({ ruleId }) => ruleId),
+    [
+      "audit.profile-data-unreadable",
+      "audit.profile-data-unreadable",
+      "audit.profile-data-unreadable",
+      "audit.profile-data-unreadable",
+    ],
+  );
   assert.doesNotMatch(JSON.stringify(report), /\\u0000/u);
 });
 
@@ -176,7 +185,12 @@ test("fails closed when workspace git metadata is a symbolic link", async (t) =>
   await mkdir(path.dirname(gitConfigPath), { recursive: true });
   await mkdir(targetPath);
   await symlink(targetPath, gitConfigPath, "junction");
-  t.after(() => Promise.all([rm(root, { recursive: true, force: true }), rm(workspace, { recursive: true, force: true })]));
+  t.after(() =>
+    Promise.all([
+      rm(root, { recursive: true, force: true }),
+      rm(workspace, { recursive: true, force: true }),
+    ]),
+  );
 
   const report = await auditDeveloperEndpoint({
     homeDirectory: root,
@@ -185,9 +199,10 @@ test("fails closed when workspace git metadata is a symbolic link", async (t) =>
   });
 
   assert.equal(report.ok, false);
-  assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
-    { ruleId: "audit.workspace-metadata-unreadable", scope: "git-config" },
-  ]);
+  assert.deepEqual(
+    report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })),
+    [{ ruleId: "audit.workspace-metadata-unreadable", scope: "git-config" }],
+  );
   assert.doesNotMatch(
     JSON.stringify(report),
     new RegExp(`${escapeRegex(root)}|${escapeRegex(workspace)}`, "u"),
@@ -219,10 +234,13 @@ test("fails closed when the .git ancestor is a symbolic link", async (t) => {
   });
 
   assert.equal(report.ok, false);
-  assert.deepEqual(report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })), [
-    { ruleId: "audit.workspace-metadata-unreadable", scope: "git-hooks" },
-    { ruleId: "audit.workspace-metadata-unreadable", scope: "git-config" },
-  ]);
+  assert.deepEqual(
+    report.findings.map(({ ruleId, scope }) => ({ ruleId, scope })),
+    [
+      { ruleId: "audit.workspace-metadata-unreadable", scope: "git-hooks" },
+      { ruleId: "audit.workspace-metadata-unreadable", scope: "git-config" },
+    ],
+  );
   assert.doesNotMatch(
     JSON.stringify(report),
     new RegExp(`${escapeRegex(root)}|${escapeRegex(workspace)}|external-git-metadata`, "u"),
@@ -261,7 +279,10 @@ test("fails closed for invalid policy fields without returning policy values", a
     policyPath,
   });
 
-  assert.deepEqual(report.findings.map(({ ruleId }) => ruleId), ["policy.invalid"]);
+  assert.deepEqual(
+    report.findings.map(({ ruleId }) => ruleId),
+    ["policy.invalid"],
+  );
   assert.doesNotMatch(JSON.stringify(report), /2026-02-31/u);
 });
 
@@ -275,7 +296,10 @@ test("reports an approved extension below its minimum version", async (t) => {
 
   const report = await auditDeveloperEndpoint({ homeDirectory: root, platform: "linux" });
 
-  assert.deepEqual(report.findings.map(({ ruleId }) => ruleId), ["extension.unapproved"]);
+  assert.deepEqual(
+    report.findings.map(({ ruleId }) => ruleId),
+    ["extension.unapproved"],
+  );
 });
 
 test("documents the read-only endpoint control rollout", async () => {

@@ -150,6 +150,7 @@ describe("TaskLifecycleService", () => {
         user_id: "user-1",
         organization_id: "org-1",
         integracaoLevel: 2,
+        isOwner: true,
         body: {
           task_id: "task-1",
           status: "Em Andamento",

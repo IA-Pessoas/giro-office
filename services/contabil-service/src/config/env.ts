@@ -49,6 +49,8 @@ const envSchema = z
     auditServiceToken: z.string().default("audit-service-token"),
     /** Quando vazio, reutiliza `auditServiceToken` (compatível com deploys que só definem AUDIT_SERVICE_TOKEN). */
     internalServiceTokenEnv: z.string().optional(),
+    reportsInternalToken: z.string().optional().default("reports-service-token"),
+    reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     enableApiDocsEnv: z.string().optional(),
     allowedOrigins: z
       .string()
@@ -78,6 +80,18 @@ const envSchema = z
       envName: "INTERNAL_SERVICE_TOKEN",
       token: internalServiceToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "contabil-service",
+      envName: "REPORTS_INTERNAL_TOKEN",
+      token: rest.reportsInternalToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "contabil-service",
+      envName: "REPORTS_GRANT_SECRET",
+      token: rest.reportsGrantSecret,
+    });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
       serviceName: "contabil-service",
@@ -106,6 +120,8 @@ export function getContabilServiceEnv(): ContabilServiceEnv {
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     internalServiceTokenEnv: process.env.INTERNAL_SERVICE_TOKEN,
+    reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,
+    reportsGrantSecret: process.env.REPORTS_GRANT_SECRET,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
   });

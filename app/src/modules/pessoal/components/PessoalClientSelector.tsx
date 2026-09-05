@@ -19,7 +19,7 @@ export function PessoalClientSelector({
     <ClientPickerModal
       selectedClient={selectedClient}
       onSelectClient={handleSelectClient}
-      filters={{ ref: "deps", status: "Departamento pessoal" }}
+      filters={{ status: "Ativo", legacyIntegrationStatusFilter: false }}
       allowClearSelection
     />
   );

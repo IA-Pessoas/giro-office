@@ -4,7 +4,7 @@ import {
   parseWithZod,
   ServiceError,
 } from "@workspace/shared";
-import { type Request, Router } from "express";
+import { type NextFunction, type Request, type Response, Router } from "express";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { requireTiPermission, TiPermissionLevel } from "../middlewares/requireTiPermission.js";
@@ -41,22 +41,21 @@ export function createTiStockRoutes(prisma: PrismaClient): Router {
   const router = Router();
   const service = new TiStockService(prisma);
 
-  router.get(
-    "/items/list",
-    requireTiPermission(TiPermissionLevel.Technician),
-    async (request, response, next) => {
-      try {
-        const context = getContext(request);
-        const query = parseWithZod(listTiStockItemsQuerySchema, request.query);
-        const result = await service.listItems(context, query);
+  const listItems = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const context = getContext(request);
+      const query = parseWithZod(listTiStockItemsQuerySchema, request.query);
+      const result = await service.listItems(context, query);
 
-        response.status(200).json(createSuccessResponse(result));
-      } catch (err: unknown) {
-        logError("Erro ao listar itens de estoque de TI", { err });
-        next(err);
-      }
-    },
-  );
+      response.status(200).json(createSuccessResponse(result));
+    } catch (err: unknown) {
+      logError("Erro ao listar itens de estoque de TI", { err });
+      next(err);
+    }
+  };
+
+  router.get("/", requireTiPermission(TiPermissionLevel.Technician), listItems);
+  router.get("/items/list", requireTiPermission(TiPermissionLevel.Technician), listItems);
 
   router.get(
     "/items/:id",

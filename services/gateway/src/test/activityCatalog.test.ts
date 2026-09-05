@@ -7,6 +7,56 @@ describe("activityCatalog", () => {
     ["GET", "/task/list", "consultou", "a lista de tarefas"],
     ["GET", "/reports/catalog", "consultou", "o catálogo de relatórios"],
     ["POST", "/reports/preview", "gerou", "uma prévia de relatório"],
+    ["GET", "/reports/jobs/list", "consultou", "o histórico de relatórios"],
+    [
+      "GET",
+      "/reports/jobs/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+      "consultou",
+      "um job de relatório",
+    ],
+    ["POST", "/reports/jobs", "gerou", "um relatório"],
+    [
+      "POST",
+      "/reports/jobs/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/cancel",
+      "cancelou",
+      "um job de relatório",
+    ],
+    [
+      "GET",
+      "/reports/jobs/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/snapshot",
+      "consultou",
+      "um snapshot de relatório",
+    ],
+    [
+      "GET",
+      "/reports/snapshots/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/export?format=csv",
+      "exportou",
+      "um snapshot de relatório",
+    ],
+    [
+      "POST",
+      "/reports/snapshots/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/delete",
+      "excluiu",
+      "um snapshot de relatório",
+    ],
+    ["GET", "/reports/retention", "consultou", "a política de retenção de relatórios"],
+    ["PUT", "/reports/retention", "alterou", "a política de retenção de relatórios"],
+    ["GET", "/reports/models/list", "consultou", "a lista de modelos pessoais de relatório"],
+    ["POST", "/reports/models", "cadastrou", "um novo modelo pessoal de relatório"],
+    [
+      "GET",
+      "/reports/models/shared/list",
+      "consultou",
+      "a lista de modelos compartilhados de relatório",
+    ],
+    ["PATCH", "/reports/models/shared/42", "atualizou", "um modelo compartilhado de relatório"],
+    ["POST", "/reports/models/shared/42/copy", "copiou", "um modelo compartilhado de relatório"],
+    [
+      "POST",
+      "/reports/models/shared/42/preview",
+      "gerou",
+      "uma prévia de modelo compartilhado de relatório",
+    ],
     ["POST", "/user", "cadastrou", "um novo usuário"],
     [
       "PATCH",
@@ -115,6 +165,7 @@ describe("activityCatalog", () => {
       "alterou",
       "o status de uma solicitação de TI",
     ],
+    ["GET", "/ti/stock", "consultou", "o estoque de TI"],
     [
       "GET",
       "/ti/requests/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/transfer-candidates",
@@ -140,6 +191,49 @@ describe("activityCatalog", () => {
       "gerou",
       "obrigações da competência",
     ],
+    ["GET", "/platform/organizations", "consultou", "a lista global de organizações"],
+    ["POST", "/platform/organizations", "criou", "uma organização"],
+    ["POST", "/platform/organizations/org-1/users", "criou", "um usuário da organização"],
+    ["GET", "/platform/organizations/org-1", "consultou", "uma organização"],
+    ["PATCH", "/platform/organizations/org-1/status", "alterou", "o status de uma organização"],
+    [
+      "PATCH",
+      "/platform/organizations/org-1/subscription-plan",
+      "alterou",
+      "o plano de uma organização",
+    ],
+    ["PATCH", "/platform/organizations/org-1/logo-url", "atualizou", "a marca de uma organização"],
+    [
+      "GET",
+      "/platform/organizations/org-1/users",
+      "consultou",
+      "a lista global de usuários da organização",
+    ],
+    ["GET", "/platform/organizations/org-1/users/user-1", "consultou", "um usuário da organização"],
+    [
+      "GET",
+      "/platform/organizations/org-1/users/user-1/permissions",
+      "consultou",
+      "as permissões de um usuário da organização",
+    ],
+    [
+      "PATCH",
+      "/platform/organizations/org-1/users/user-1",
+      "atualizou",
+      "um usuário da organização",
+    ],
+    [
+      "PUT",
+      "/platform/organizations/org-1/users/user-1/permissions",
+      "alterou",
+      "as permissões de um usuário da organização",
+    ],
+    [
+      "GET",
+      "/platform/organizations/org-1/departments",
+      "consultou",
+      "os departamentos da organização",
+    ],
   ])("traduz %s %s", (method, path, action, item) => {
     expect(describeActivity(method, path)).toEqual({ action, item });
   });
@@ -153,6 +247,11 @@ describe("activityCatalog", () => {
     ["GET", "/audit/requests"],
     ["POST", "/user/session"],
     ["GET", "/user/me"],
+    ["POST", "/platform/session"],
+    ["DELETE", "/platform/session"],
+    ["POST", "/platform/session/refresh"],
+    ["GET", "/platform/me"],
+    ["GET", "/platform/audit/requests"],
   ])("classifica %s %s como técnico", (method, path) => {
     expect(classifyActivity(method, path)).toEqual({ kind: "technical" });
     expect(describeActivity(method, path)).toBeNull();

@@ -254,9 +254,7 @@ function permissionFinding(relativePath, rule, line, remediation) {
 }
 
 function findJobsBlock(lines) {
-  const index = lines.findIndex(
-    (line) => indentation(line) === 0 && /^jobs\s*:/u.test(line),
-  );
+  const index = lines.findIndex((line) => indentation(line) === 0 && /^jobs\s*:/u.test(line));
   if (index === -1) return null;
 
   const rawValue = stripYamlComment(lines[index].slice(lines[index].indexOf(":") + 1));
@@ -524,7 +522,8 @@ function scanPermissions(relativePath, lines, findings) {
     if (declaration.scope === "job") {
       const key = jobs.find(
         ({ start, end, indent: jobIndent }) =>
-          declaration.index > start && declaration.index <= end &&
+          declaration.index > start &&
+          declaration.index <= end &&
           indentation(lines[declaration.index]) === jobIndent + 2,
       );
       const jobKey = key?.start ?? declaration.index;
@@ -643,11 +642,7 @@ function scanSecretShell(relativePath, lines, findings) {
     }
 
     const derivedVariables = [
-      ...new Set([
-        ...globalSecretVariables,
-        ...jobSecretVariables,
-        ...stepSecretVariables,
-      ]),
+      ...new Set([...globalSecretVariables, ...jobSecretVariables, ...stepSecretVariables]),
     ];
 
     if (/^run\s*:\s*[|>][-+]?\s*$/u.test(trimmed)) {
@@ -699,8 +694,10 @@ export function scanWorkflowText(relativePath, source) {
 
 function isExcluded(relativePath) {
   const segments = normalizePath(relativePath).split("/");
-  return segments.some((segment) => EXCLUDED_DIRECTORIES.has(segment)) ||
-    segments.some((segment) => segment.startsWith(".env"));
+  return (
+    segments.some((segment) => EXCLUDED_DIRECTORIES.has(segment)) ||
+    segments.some((segment) => segment.startsWith(".env"))
+  );
 }
 
 function shouldReadFile(relativePath) {

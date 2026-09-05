@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
@@ -66,8 +66,14 @@ test("classifica os eventos oficiais de alto risco e conserva desconhecidos sem 
 
   assert.equal(classifyAuditEvent({ action: "git.push", force_push: true }).severity, "high");
   assert.equal(classifyAuditEvent({ action: "git.push", deleted: true }).category, "ref-deletion");
-  assert.equal(classifyAuditEvent({ action: "protected_branch.authorized_users_teams" }).severity, "high");
-  assert.equal(classifyAuditEvent({ action: "protected_branch.branch_allowances" }).severity, "high");
+  assert.equal(
+    classifyAuditEvent({ action: "protected_branch.authorized_users_teams" }).severity,
+    "high",
+  );
+  assert.equal(
+    classifyAuditEvent({ action: "protected_branch.branch_allowances" }).severity,
+    "high",
+  );
   for (const action of [
     "repository_ruleset.create",
     "repository_ruleset.update",
@@ -134,8 +140,14 @@ test("classifica os eventos oficiais de alto risco e conserva desconhecidos sem 
     assert.match(result.severity, /high|medium/u, action);
     assert.equal(result.alert, true, action);
   }
-  assert.match(classifyAuditEvent({ action: "personal_access_token.access_granted" }).severity, /high|medium/u);
-  assert.match(classifyAuditEvent({ action: "personal_access_token.access_revoked" }).severity, /high|medium/u);
+  assert.match(
+    classifyAuditEvent({ action: "personal_access_token.access_granted" }).severity,
+    /high|medium/u,
+  );
+  assert.match(
+    classifyAuditEvent({ action: "personal_access_token.access_revoked" }).severity,
+    /high|medium/u,
+  );
   assert.equal(classifyAuditEvent({ action: "workflows.created_workflow_run" }).severity, "low");
   assert.equal(classifyAuditEvent({ action: "workflows.completed_workflow_run" }).severity, "low");
   assert.equal(classifyAuditEvent({ action: "repo.access" }).alert, true);
@@ -190,7 +202,10 @@ test("normaliza somente campos permitidos e elimina dados sensíveis", () => {
     normalized.alertKey,
     normalizeAuditEvent(auditEvent({ actor: "person@example.com", actor_type: "Bot" })).alertKey,
   );
-  assert.doesNotMatch(JSON.stringify(normalized), /synthetic|authorization|example\.com|192\.0\.2\.10|payload|unknown_field/iu);
+  assert.doesNotMatch(
+    JSON.stringify(normalized),
+    /synthetic|authorization|example\.com|192\.0\.2\.10|payload|unknown_field/iu,
+  );
 });
 
 test("normaliza flags oficiais de ator e nome de protected branch", () => {
@@ -353,7 +368,11 @@ test("rejeita Link rel=next externo antes da segunda chamada e sem vazar token",
   };
   try {
     await assert.rejects(
-      fetchAuditEvents({ organization: "IA-Pessoas", token: "ghp_secret-must-not-leak", pageLimit: 2 }),
+      fetchAuditEvents({
+        organization: "IA-Pessoas",
+        token: "ghp_secret-must-not-leak",
+        pageLimit: 2,
+      }),
       (error) => error.code === "invalid_next_link" && !error.message.includes("ghp_secret"),
     );
     assert.equal(calls, 1);
@@ -373,7 +392,12 @@ test("rejeita userinfo e parâmetros de credencial em Link rel=next", async () =
     let calls = 0;
     globalThis.fetch = async () => {
       calls += 1;
-      return { ok: true, status: 200, headers: { get: () => link }, json: async () => [auditEvent()] };
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => link },
+        json: async () => [auditEvent()],
+      };
     };
     try {
       await assert.rejects(
@@ -398,7 +422,12 @@ test("rejeita downgrade de include e phrase em Link rel=next antes da segunda ch
     let calls = 0;
     globalThis.fetch = async () => {
       calls += 1;
-      return { ok: true, status: 200, headers: { get: () => link }, json: async () => [auditEvent()] };
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => link },
+        json: async () => [auditEvent()],
+      };
     };
     try {
       await assert.rejects(
@@ -481,17 +510,18 @@ test("CLI grava relatório sanitizado e retorna falha somente com alerta relevan
   await writeFile(inputPath, input.body);
 
   try {
-    const exitCode = await main([
-      "--input",
-      inputPath,
-      "--report",
-      reportPath,
-      "--fail-on-alert",
-      "--input-signature",
-      input.signature,
-      "--now",
-      "2026-08-14T10:01:00Z",
-    ],
+    const exitCode = await main(
+      [
+        "--input",
+        inputPath,
+        "--report",
+        reportPath,
+        "--fail-on-alert",
+        "--input-signature",
+        input.signature,
+        "--now",
+        "2026-08-14T10:01:00Z",
+      ],
       { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
     );
     assert.equal(exitCode, 1);
@@ -516,10 +546,22 @@ test("input complementar exige HMAC, janela de replay e limite de eventos", asyn
       { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
     );
     assert.equal(missingSignature, 1);
-    assert.equal(JSON.parse(await readFile(reportPath, "utf8")).error.code, "input_signature_required");
+    assert.equal(
+      JSON.parse(await readFile(reportPath, "utf8")).error.code,
+      "input_signature_required",
+    );
 
     const expired = await main(
-      ["--input", inputPath, "--report", reportPath, "--input-signature", input.signature, "--now", "2026-08-14T10:01:00Z"],
+      [
+        "--input",
+        inputPath,
+        "--report",
+        reportPath,
+        "--input-signature",
+        input.signature,
+        "--now",
+        "2026-08-14T10:01:00Z",
+      ],
       { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
     );
     assert.equal(expired, 1);
@@ -528,11 +570,23 @@ test("input complementar exige HMAC, janela de replay e limite de eventos", asyn
     const tooMany = signedInput(Array.from({ length: 1001 }, () => auditEvent()));
     await writeFile(inputPath, tooMany.body);
     const tooManyExit = await main(
-      ["--input", inputPath, "--report", reportPath, "--input-signature", tooMany.signature, "--now", "2026-08-14T10:01:00Z"],
+      [
+        "--input",
+        inputPath,
+        "--report",
+        reportPath,
+        "--input-signature",
+        tooMany.signature,
+        "--now",
+        "2026-08-14T10:01:00Z",
+      ],
       { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
     );
     assert.equal(tooManyExit, 1);
-    assert.equal(JSON.parse(await readFile(reportPath, "utf8")).error.code, "input_too_many_events");
+    assert.equal(
+      JSON.parse(await readFile(reportPath, "utf8")).error.code,
+      "input_too_many_events",
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -546,7 +600,16 @@ test("input complementar rejeita envelope acima do limite de bytes antes do pars
   await writeFile(inputPath, input.body);
   try {
     const exitCode = await main(
-      ["--input", inputPath, "--report", reportPath, "--input-signature", input.signature, "--now", "2026-08-14T10:01:00Z"],
+      [
+        "--input",
+        inputPath,
+        "--report",
+        reportPath,
+        "--input-signature",
+        input.signature,
+        "--now",
+        "2026-08-14T10:01:00Z",
+      ],
       { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
     );
     assert.equal(exitCode, 1);
@@ -557,8 +620,14 @@ test("input complementar rejeita envelope acima do limite de bytes antes do pars
 });
 
 test("workflow e fixture mantêm coleta somente leitura", async () => {
-  const workflow = await readFile(path.join(repositoryRoot, ".github/workflows/github-audit-monitor.yml"), "utf8");
-  const fixture = await readFile(path.join(repositoryRoot, "scripts/fixtures/github-audit-events.json"), "utf8");
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github/workflows/github-audit-monitor.yml"),
+    "utf8",
+  );
+  const fixture = await readFile(
+    path.join(repositoryRoot, "scripts/fixtures/github-audit-events.json"),
+    "utf8",
+  );
 
   assert.match(workflow, /cron:\s*["']?\*\/5 \* \* \* \*["']?/u);
   assert.match(workflow, /permissions:\s*\n\s+contents:\s+read/u);
@@ -581,7 +650,10 @@ test("workflow e fixture mantêm coleta somente leitura", async () => {
 
 test("payload oficial mínimo de git.push não inventa metadados ausentes", async () => {
   const official = JSON.parse(
-    await readFile(path.join(repositoryRoot, "scripts/fixtures/github-audit-events-official.json"), "utf8"),
+    await readFile(
+      path.join(repositoryRoot, "scripts/fixtures/github-audit-events-official.json"),
+      "utf8",
+    ),
   );
   const gitPush = official.find((event) => event.action === "git.push");
   const normalized = normalizeAuditEvent(gitPush);
@@ -592,17 +664,42 @@ test("payload oficial mínimo de git.push não inventa metadados ausentes", asyn
   assert.equal(normalized.metadataStatus, "insufficient");
   assert.equal(normalized.category, "metadata-insufficient");
   assert.equal(report.error.code, "metadata_insufficient");
-  assert.doesNotMatch(JSON.stringify(report), /token_id|hashed_token|request_access_security_header/iu);
+  assert.doesNotMatch(
+    JSON.stringify(report),
+    /token_id|hashed_token|request_access_security_header/iu,
+  );
 });
 
 test("correlaciona eventos sanitizados por ator/repo/ref/request em janela e tamanho limitados", () => {
   const events = [
-    auditEvent({ action: "workflows.created_workflow_run", request_id: "req-1", created_at: "2026-08-14T10:00:00Z" }),
-    auditEvent({ action: "protected_branch.policy_override", request_id: "req-1", created_at: "2026-08-14T10:04:00Z" }),
-    auditEvent({ action: "git.push", request_id: "req-1", force_push: true, created_at: "2026-08-14T10:06:00Z" }),
-    auditEvent({ action: "git.push", request_id: "req-1", force_push: true, created_at: "2026-08-14T10:20:00Z" }),
+    auditEvent({
+      action: "workflows.created_workflow_run",
+      request_id: "req-1",
+      created_at: "2026-08-14T10:00:00Z",
+    }),
+    auditEvent({
+      action: "protected_branch.policy_override",
+      request_id: "req-1",
+      created_at: "2026-08-14T10:04:00Z",
+    }),
+    auditEvent({
+      action: "git.push",
+      request_id: "req-1",
+      force_push: true,
+      created_at: "2026-08-14T10:06:00Z",
+    }),
+    auditEvent({
+      action: "git.push",
+      request_id: "req-1",
+      force_push: true,
+      created_at: "2026-08-14T10:20:00Z",
+    }),
   ];
-  const correlations = correlateAuditEvents(events, { windowMinutes: 10, maxEvents: 10, maxGroups: 10 });
+  const correlations = correlateAuditEvents(events, {
+    windowMinutes: 10,
+    maxEvents: 10,
+    maxGroups: 10,
+  });
   assert.equal(correlations.length, 2);
   assert.equal(correlations[0].eventCount, 3);
   assert.deepEqual(correlations[0].actions, [
@@ -619,11 +716,28 @@ test("correlaciona eventos sanitizados por ator/repo/ref/request em janela e tam
 
 test("correlação limitada mantém somente a cauda mais recente", () => {
   const events = [
-    auditEvent({ action: "protected_branch.policy_override", request_id: "old", created_at: "2026-08-14T09:00:00Z" }),
-    auditEvent({ action: "workflows.created_workflow_run", request_id: "new", created_at: "2026-08-14T10:00:00Z" }),
-    auditEvent({ action: "git.push", request_id: "new", force_push: true, created_at: "2026-08-14T10:01:00Z" }),
+    auditEvent({
+      action: "protected_branch.policy_override",
+      request_id: "old",
+      created_at: "2026-08-14T09:00:00Z",
+    }),
+    auditEvent({
+      action: "workflows.created_workflow_run",
+      request_id: "new",
+      created_at: "2026-08-14T10:00:00Z",
+    }),
+    auditEvent({
+      action: "git.push",
+      request_id: "new",
+      force_push: true,
+      created_at: "2026-08-14T10:01:00Z",
+    }),
   ];
-  const correlations = correlateAuditEvents(events, { windowMinutes: 10, maxEvents: 2, maxGroups: 10 });
+  const correlations = correlateAuditEvents(events, {
+    windowMinutes: 10,
+    maxEvents: 2,
+    maxGroups: 10,
+  });
   assert.equal(correlations.length, 1);
   assert.equal(correlations[0].requestId, "new");
 });
@@ -636,7 +750,16 @@ test("input normalizado complementar identifica a fonte sem alegar que REST forn
   await writeFile(inputPath, input.body);
   try {
     const exitCode = await main(
-      ["--input", inputPath, "--report", reportPath, "--input-signature", input.signature, "--now", "2026-08-14T10:01:00Z"],
+      [
+        "--input",
+        inputPath,
+        "--report",
+        reportPath,
+        "--input-signature",
+        input.signature,
+        "--now",
+        "2026-08-14T10:01:00Z",
+      ],
       { GITHUB_AUDIT_INGEST_HMAC_SECRET: inputSecret },
     );
     const report = JSON.parse(await readFile(reportPath, "utf8"));

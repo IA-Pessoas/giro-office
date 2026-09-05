@@ -249,6 +249,13 @@ export const regularizeService = {
     return unwrapRegularizeEnvelope<RegularizePartner>(response.data);
   },
 
+  async deletePartner(id: RegularizeId): Promise<{ ok: true }> {
+    const api = setupAPIClient();
+    const response = await api.delete(REGULARIZE_ENDPOINTS.deletePartner(id));
+
+    return unwrapRegularizeEnvelope<{ ok: true }>(response.data);
+  },
+
   async listMunicipalTaxes(
     filters: RegularizeMunicipalTaxesListFilters,
   ): Promise<RegularizeMunicipalTaxesPage> {

@@ -499,14 +499,11 @@ test("aggregate coloca em quarentena JSON legado inválido", () => {
     state,
   );
 
-  assert.deepEqual(
-    (({ status, field, reasonCode }) => ({ status, field, reasonCode }))(emission),
-    {
-      status: "quarantine",
-      field: "emergency_contacts",
-      reasonCode: "USER_JSON_READ_FAILED",
-    },
-  );
+  assert.deepEqual((({ status, field, reasonCode }) => ({ status, field, reasonCode }))(emission), {
+    status: "quarantine",
+    field: "emergency_contacts",
+    reasonCode: "USER_JSON_READ_FAILED",
+  });
 });
 
 test("aggregate deduplica replay da mesma identidade de origem", () => {

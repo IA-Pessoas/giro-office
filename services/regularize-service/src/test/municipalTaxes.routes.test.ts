@@ -20,16 +20,20 @@ describe("municipal taxes routes", () => {
     vi.restoreAllMocks();
   });
 
-  it.each(["TFF", "TLP", "TLL"])(
-    "forwards validated %s municipal tax type filters and pagination to the service",
-    async (type) => {
+  it.each([
+    "TFF",
+    "TLP",
+    "TLL",
+  ])("forwards validated %s municipal tax type filters and pagination to the service", async (type) => {
     const list = vi
       .spyOn(MunicipalTaxesService.prototype, "list")
       .mockResolvedValue(municipalTaxesPage);
     const app = createTestApp({} as PrismaClient);
 
     const response = await request(app)
-      .get(`/regularize/municipal-taxes?year=2026&search=Castelo&status=Criado&type=${type}&page=2&limit=20`)
+      .get(
+        `/regularize/municipal-taxes?year=2026&search=Castelo&status=Criado&type=${type}&page=2&limit=20`,
+      )
       .set(gatewayHeaders());
 
     expect(response.status).toBe(200);
@@ -43,8 +47,7 @@ describe("municipal taxes routes", () => {
       limit: 20,
     });
     expect(response.body).toEqual({ success: true, data: municipalTaxesPage });
-    },
-  );
+  });
 
   it.each([
     ["status", "Invalido"],
