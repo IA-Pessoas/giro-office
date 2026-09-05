@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getPrismaOutputPaths } from "./service-registry.mjs";
@@ -11,18 +11,27 @@ const infraDir = join(rootDir, "infra");
 const stateDir = join(rootDir, ".turbo", "prisma");
 const lockDir = join(stateDir, "generate.lock");
 const stampFile = join(stateDir, "generate.stamp");
+const infraOutputDir = join(rootDir, "infra", "generated", "prisma");
+const canonicalServiceOutputDir = join(
+  rootDir,
+  "services",
+  "user-service",
+  "src",
+  "generated",
+  "prisma",
+);
+const serviceOutputDirs = getPrismaOutputPaths().map((outputPath) => join(rootDir, outputPath));
 
 const schemaInputs = [
   join(rootDir, "infra", "prisma", "schema.prisma"),
   join(rootDir, "infra", "prisma.config.ts"),
   join(rootDir, "infra", "package.json"),
   join(rootDir, "pnpm-lock.yaml"),
+  join(__dirname, "prisma-generate.mjs"),
+  join(__dirname, "service-registry.mjs"),
 ];
 
-const outputDirs = [
-  join(rootDir, "infra", "generated", "prisma"),
-  ...getPrismaOutputPaths().map((outputPath) => join(rootDir, outputPath)),
-];
+const outputDirs = [infraOutputDir, ...serviceOutputDirs];
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -71,12 +80,16 @@ async function cleanOutputs() {
 
 async function runPrismaGenerate() {
   await new Promise((resolve, reject) => {
-    const child = spawn("corepack pnpm exec prisma generate", [], {
-      cwd: infraDir,
-      stdio: "inherit",
-      shell: true,
-      env: process.env,
-    });
+    const child = spawn(
+      "corepack pnpm exec prisma generate --generator infraClient --generator userServiceClient",
+      [],
+      {
+        cwd: infraDir,
+        stdio: "inherit",
+        shell: true,
+        env: process.env,
+      },
+    );
 
     child.on("exit", (code) => {
       if (code === 0) {
@@ -89,6 +102,12 @@ async function runPrismaGenerate() {
 
     child.on("error", reject);
   });
+
+  await Promise.all(
+    serviceOutputDirs
+      .filter((outputDir) => outputDir !== canonicalServiceOutputDir)
+      .map((outputDir) => cp(canonicalServiceOutputDir, outputDir, { recursive: true })),
+  );
 }
 
 async function tryAcquireLock() {
