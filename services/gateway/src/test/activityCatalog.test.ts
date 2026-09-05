@@ -165,6 +165,7 @@ describe("activityCatalog", () => {
       "alterou",
       "o status de uma solicitação de TI",
     ],
+    ["GET", "/ti/stock", "consultou", "o estoque de TI"],
     [
       "GET",
       "/ti/requests/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/transfer-candidates",

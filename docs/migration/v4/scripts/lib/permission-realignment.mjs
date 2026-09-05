@@ -42,7 +42,12 @@ export function normalizeDepartmentKey(value) {
   return DEPARTMENT_KEYS[normalizeKey(value)] ?? null;
 }
 
-export function buildPermissionRealignment({ users, departments, moduleRowsByModule, dynamicRows }) {
+export function buildPermissionRealignment({
+  users,
+  departments,
+  moduleRowsByModule,
+  dynamicRows,
+}) {
   const departmentsById = new Map(
     departments
       .map((department) => [normalizeKey(department.id), normalizeDepartmentKey(department.nome)])

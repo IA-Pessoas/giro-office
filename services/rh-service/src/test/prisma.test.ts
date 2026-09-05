@@ -16,6 +16,7 @@ it("configura o limite de conexoes do adapter PrismaPg", async () => {
 
   expect(prismaPgMock).toHaveBeenCalledWith({
     connectionString: "postgres://test",
+    connectionTimeoutMillis: 5000,
     max: 5,
   });
 });

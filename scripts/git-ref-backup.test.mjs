@@ -1,15 +1,11 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import {
-  createSnapshot,
-  runRecoveryDrill,
-  verifySnapshot,
-} from "./git-ref-backup.mjs";
+import { createSnapshot, runRecoveryDrill, verifySnapshot } from "./git-ref-backup.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -81,11 +77,16 @@ function createFixtureRunner(responseForRoute, seenRoutes = []) {
 
 function runProgram(args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, args, { shell: false, stdio: ["ignore", "ignore", "pipe"] });
+    const child = spawn(process.execPath, args, {
+      shell: false,
+      stdio: ["ignore", "ignore", "pipe"],
+    });
     const chunks = [];
 
     child.once("error", () => reject(new Error("program fixture command failed")));
-    child.once("close", (status) => resolve({ status, stderr: Buffer.concat(chunks).toString("utf8") }));
+    child.once("close", (status) =>
+      resolve({ status, stderr: Buffer.concat(chunks).toString("utf8") }),
+    );
     child.stderr.on("data", (chunk) => chunks.push(chunk));
   });
 }
@@ -101,7 +102,10 @@ test("creates a mirror-only bundle and a checksum manifest", async () => {
 
     assert.match(result.manifest.bundle.sha256, /^[a-f0-9]{64}$/u);
     assert.ok(result.manifest.refs.some(({ name }) => name === "refs/heads/main"));
-    assert.doesNotMatch(JSON.stringify(result.manifest), new RegExp(escapeRegex(fixture.root), "u"));
+    assert.doesNotMatch(
+      JSON.stringify(result.manifest),
+      new RegExp(escapeRegex(fixture.root), "u"),
+    );
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
   }
@@ -193,7 +197,9 @@ test("verifies a snapshot and restores it only to a new quarantine mirror", asyn
     });
     const quarantineDirectory = path.join(fixture.root, "quarantine.git");
 
-    await assert.doesNotReject(() => verifySnapshot({ snapshotDirectory: snapshot.snapshotDirectory }));
+    await assert.doesNotReject(() =>
+      verifySnapshot({ snapshotDirectory: snapshot.snapshotDirectory }),
+    );
     const drill = await runRecoveryDrill({
       snapshotDirectory: snapshot.snapshotDirectory,
       quarantineDirectory,
@@ -349,9 +355,17 @@ test("does not retain source locations in snapshot or quarantine mirror configur
     await runRecoveryDrill({ snapshotDirectory: snapshot.snapshotDirectory, quarantineDirectory });
 
     await assert.rejects(() =>
-      runGit(["-C", path.join(snapshot.snapshotDirectory, "mirror.git"), "config", "--get", "remote.origin.url"]),
+      runGit([
+        "-C",
+        path.join(snapshot.snapshotDirectory, "mirror.git"),
+        "config",
+        "--get",
+        "remote.origin.url",
+      ]),
     );
-    await assert.rejects(() => runGit(["-C", quarantineDirectory, "config", "--get", "remote.origin.url"]));
+    await assert.rejects(() =>
+      runGit(["-C", quarantineDirectory, "config", "--get", "remote.origin.url"]),
+    );
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
   }
@@ -463,7 +477,11 @@ test("limits GitHub metadata pagination before writing the metadata file", async
           html_url: `https://github.com/owner/repo/issues/${page * 100 + index + 1}`,
         }));
       }
-      if (route.includes("/rulesets?") || route.includes("/releases?") || route.includes("/pulls?")) {
+      if (
+        route.includes("/rulesets?") ||
+        route.includes("/releases?") ||
+        route.includes("/pulls?")
+      ) {
         return [];
       }
       if (route.includes("/deployments?")) return [];
@@ -492,7 +510,11 @@ test("keeps pull requests out of the issues metadata collection", async () => {
   const fixture = await createBareFixture();
   try {
     const commandRunner = createFixtureRunner((route) => {
-      if (route.includes("/rulesets?") || route.includes("/releases?") || route.includes("/deployments?")) {
+      if (
+        route.includes("/rulesets?") ||
+        route.includes("/releases?") ||
+        route.includes("/deployments?")
+      ) {
         return [];
       }
       if (route.includes("/issues?")) {
@@ -535,7 +557,10 @@ test("keeps pull requests out of the issues metadata collection", async () => {
 });
 
 test("documents external immutable storage and quarantine-only recovery prerequisites", async () => {
-  const guide = await readFile(path.join(repositoryRoot, "docs/security/git-ref-backups.md"), "utf8");
+  const guide = await readFile(
+    path.join(repositoryRoot, "docs/security/git-ref-backups.md"),
+    "utf8",
+  );
 
   assert.match(guide, /object lock|write-once/iu);
   assert.match(guide, /quarentena/iu);

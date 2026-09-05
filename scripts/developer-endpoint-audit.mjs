@@ -26,7 +26,8 @@ const WORKSPACE_METADATA_DIRECTORIES = [
 const REMEDIATION = {
   "audit.invalid-arguments": "Use apenas as opções documentadas para executar a auditoria.",
   "audit.profile-data-unreadable": "Revise o perfil selecionado sem seguir links simbólicos.",
-  "audit.workspace-metadata-unreadable": "Revise os metadados do workspace sem seguir links simbólicos.",
+  "audit.workspace-metadata-unreadable":
+    "Revise os metadados do workspace sem seguir links simbólicos.",
   "editor.automatic-tasks-enabled": "Defina task.allowAutomaticTasks como off.",
   "editor.settings-invalid": "Restaure settings.json a partir de uma configuração revisada.",
   "editor.workspace-trust-disabled": "Habilite security.workspace.trust.enabled.",
@@ -66,7 +67,10 @@ async function readDirectoryNames(directoryPath) {
     if (!stats.isDirectory() || stats.isSymbolicLink()) return { state: "unreadable" };
     const entries = await readdir(directoryPath, { withFileTypes: true });
     if (entries.some((entry) => entry.isSymbolicLink())) return { state: "unreadable" };
-    return { state: "found", value: entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name) };
+    return {
+      state: "found",
+      value: entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+    };
   } catch (error) {
     return { state: error?.code === "ENOENT" ? "missing" : "unreadable" };
   }
@@ -138,7 +142,9 @@ function isValidPolicy(policy) {
     policy.requiredSettings &&
     typeof policy.requiredSettings === "object" &&
     !Array.isArray(policy.requiredSettings) &&
-    SETTING_RULES.every(([name]) => ["boolean", "string"].includes(typeof policy.requiredSettings[name])) &&
+    SETTING_RULES.every(([name]) =>
+      ["boolean", "string"].includes(typeof policy.requiredSettings[name]),
+    ) &&
     Array.isArray(policy.approvedExtensions) &&
     policy.approvedExtensions.every(
       (extension) =>
@@ -231,7 +237,11 @@ export async function auditDeveloperEndpoint({
       for (const extensionDirectory of extensions.value) {
         const extension = parseExtension(extensionDirectory);
         const approved = policy.approvedExtensions.find(({ id }) => id === extension?.id);
-        if (!extension || !approved || !versionAtLeast(extension.version, approved.minimumVersion)) {
+        if (
+          !extension ||
+          !approved ||
+          !versionAtLeast(extension.version, approved.minimumVersion)
+        ) {
           findings.push(finding("extension.unapproved", "editor-extensions"));
         }
       }
@@ -269,7 +279,14 @@ function invalidArgumentsReport() {
 
 function parseArguments(args) {
   const options = {};
-  const supported = new Set(["--home", "--machine-id", "--platform", "--policy", "--report", "--workspace"]);
+  const supported = new Set([
+    "--home",
+    "--machine-id",
+    "--platform",
+    "--policy",
+    "--report",
+    "--workspace",
+  ]);
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index];
     const value = args[index + 1];
@@ -286,9 +303,7 @@ function parseArguments(args) {
 
 export async function main(args = process.argv.slice(2)) {
   const options = parseArguments(args);
-  const report = options
-    ? await auditDeveloperEndpoint(options)
-    : invalidArgumentsReport();
+  const report = options ? await auditDeveloperEndpoint(options) : invalidArgumentsReport();
   const output = `${JSON.stringify(report, null, 2)}\n`;
 
   if (options?.reportPath) await writeFile(path.resolve(options.reportPath), output, "utf8");

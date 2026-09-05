@@ -105,7 +105,11 @@ function fixtureRunner(fixture, calls = [], { failClone = false } = {}) {
     if (failClone && args[0] === "clone") throw new Error("credential and stderr leak");
     const actualArgs = [...args];
     if (actualArgs[0] === "clone") {
-      const repository = actualArgs.at(-2).split("/").at(-1).replace(/\.git$/u, "");
+      const repository = actualArgs
+        .at(-2)
+        .split("/")
+        .at(-1)
+        .replace(/\.git$/u, "");
       actualArgs[actualArgs.length - 2] = repository === "fixture" ? fixture.source : fixture.empty;
     }
     return { stdout: await runGit(actualArgs, options.input, { cwd: options.cwd }) };
@@ -149,9 +153,7 @@ test("inventories repository kinds and scans each eligible bare blob once", asyn
     assert.ok(
       report.repositories
         .find(({ fullName }) => fullName === "IA-Pessoas/fixture")
-        .refs.some(
-          ({ name, status }) => name === "refs/pull/1/head" && status === "evidence-only",
-        ),
+        .refs.some(({ name, status }) => name === "refs/pull/1/head" && status === "evidence-only"),
     );
     assert.match(report.remediation.items[0].dedupeKey, /^[a-f0-9]{64}$/u);
     assert.doesNotMatch(
@@ -360,7 +362,13 @@ test("scans dangerous command surfaces under GitHub actions", async () => {
 
     assert.deepEqual(
       report.repositories[0].refs.map(({ name }) => name),
-      ["refs/heads/action", "refs/heads/main", "refs/heads/stale", "refs/pull/1/head", "refs/tags/v1.0.0"],
+      [
+        "refs/heads/action",
+        "refs/heads/main",
+        "refs/heads/stale",
+        "refs/pull/1/head",
+        "refs/tags/v1.0.0",
+      ],
     );
     assert.ok(
       report.findings.some(
@@ -452,7 +460,9 @@ test("uses only git with the fixed read-only argument allowlist", async () => {
     assert.ok(calls.every(({ command }) => command === "git"));
     const mirror = calls[0].args.at(-1);
     assert.deepEqual(
-      calls.map(({ args }) => args.map((argument) => (argument === mirror ? "<mirror>" : argument))),
+      calls.map(({ args }) =>
+        args.map((argument) => (argument === mirror ? "<mirror>" : argument)),
+      ),
       [
         [
           "clone",

@@ -271,10 +271,13 @@ test("usuário preserva bcrypt, transforma plaintext e usa marcador para senha v
   assert.equal(passwordRules[0].transformation, "select_bcrypt_migration_strategy");
 
   const bcrypt = "$2b$12$01234567890123456789012345678901234567890123456789012";
-  assert.deepEqual(mappingRule.classifySourceRow({ id: 1, password: bcrypt, departamento_id: 7 }, {}), {
-    status: "prepared",
-    selectedTransformation: "bcrypt_passthrough_if_valid",
-  });
+  assert.deepEqual(
+    mappingRule.classifySourceRow({ id: 1, password: bcrypt, departamento_id: 7 }, {}),
+    {
+      status: "prepared",
+      selectedTransformation: "bcrypt_passthrough_if_valid",
+    },
+  );
   assert.equal(
     mappingRule.emitRows({ id: 1, password: bcrypt, departamento_id: 7 }, {})[0].status,
     "prepared",
@@ -298,10 +301,13 @@ test("usuário preserva bcrypt, transforma plaintext e usa marcador para senha v
   assert.doesNotMatch(JSON.stringify(plaintextEmissions), new RegExp(legacyPlaintext));
   assert.doesNotMatch(JSON.stringify(mappingRule.evidence), new RegExp(legacyPlaintext));
 
-  assert.deepEqual(mappingRule.classifySourceRow({ id: 3, password: "   ", departamento_id: 7 }, {}), {
-    status: "prepared",
-    selectedTransformation: "bcrypt_hash_legacy_plaintext",
-  });
+  assert.deepEqual(
+    mappingRule.classifySourceRow({ id: 3, password: "   ", departamento_id: 7 }, {}),
+    {
+      status: "prepared",
+      selectedTransformation: "bcrypt_hash_legacy_plaintext",
+    },
+  );
   const emptyEmission = mappingRule.emitRows({ id: 3, password: "   ", departamento_id: 7 }, {})[0];
   assert.equal(emptyEmission.status, "prepared");
 });

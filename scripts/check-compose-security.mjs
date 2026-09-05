@@ -143,8 +143,7 @@ export function parseComposeSecurityMetadata(contents) {
 
 export async function checkProductionComposeSecurity({ baseFile, productionFile } = {}) {
   const basePath = baseFile ?? path.join(rootDir, "docker-compose.vps.yml");
-  const productionPath =
-    productionFile ?? path.join(rootDir, "docker-compose.production.yml");
+  const productionPath = productionFile ?? path.join(rootDir, "docker-compose.production.yml");
   const base = parseComposeSecurityMetadata(await readFile(basePath, "utf8"));
   const production = parseComposeSecurityMetadata(await readFile(productionPath, "utf8"));
   const errors = [];
@@ -159,15 +158,13 @@ export async function checkProductionComposeSecurity({ baseFile, productionFile 
       : (baseService?.networks ?? []);
     const publishedPorts = productionService?.hasPorts
       ? productionService.publishedPorts
-      : baseService?.publishedPorts ?? [];
+      : (baseService?.publishedPorts ?? []);
 
     if (networks.includes("public-edge") && serviceName !== "reverse-proxy") {
       errors.push(`production service "${serviceName}" must not join public-edge.`);
     }
     if (
-      publishedPorts.some(
-        (port) => !port.startsWith("127.0.0.1:") && !port.startsWith("[::1]:"),
-      )
+      publishedPorts.some((port) => !port.startsWith("127.0.0.1:") && !port.startsWith("[::1]:"))
     ) {
       errors.push(`production service "${serviceName}" host ports must bind to loopback.`);
     }
@@ -261,7 +258,9 @@ export async function checkComposeSecurity({ composeFiles, registry = serviceReg
 
     for (const [serviceName, service] of metadata.services) {
       if (service.authCookieSecure === false) {
-        errors.push(`${displayPath}: service "${serviceName}" must not disable AUTH_COOKIE_SECURE.`);
+        errors.push(
+          `${displayPath}: service "${serviceName}" must not disable AUTH_COOKIE_SECURE.`,
+        );
       }
 
       if (!service.hasPorts) {

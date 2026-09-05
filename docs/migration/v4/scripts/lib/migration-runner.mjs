@@ -314,9 +314,7 @@ export async function loadMappedData(client, executionSession, organizationId, b
         const insertColumns = Object.keys(insertPayload).sort(compareText);
         const insertValues = insertColumns.map((column) => insertPayload[column]);
         const conflictColumns =
-          step.destinationTable === "permissions"
-            ? ["user_id", "organization_id"]
-            : ["user_id"];
+          step.destinationTable === "permissions" ? ["user_id", "organization_id"] : ["user_id"];
         const updateColumns = Object.keys(valuesToWrite).filter(
           (column) => !conflictColumns.includes(column),
         );
@@ -330,7 +328,9 @@ export async function loadMappedData(client, executionSession, organizationId, b
         const upsertResult = await client.query(
           `INSERT INTO ${step.tableSql} (${insertColumns
             .map(quoteIdentifier)
-            .join(", ")}) VALUES (${insertColumns.map((_, index) => `$${index + 1}`).join(", ")}) ON CONFLICT (${conflictColumns
+            .join(
+              ", ",
+            )}) VALUES (${insertColumns.map((_, index) => `$${index + 1}`).join(", ")}) ON CONFLICT (${conflictColumns
             .map(quoteIdentifier)
             .join(", ")}) ${conflictSql}`,
           insertValues,
@@ -388,7 +388,9 @@ async function filterRowsWithMissingForeignKeys(client, step, rows, organization
       `SELECT "${foreignKey.targetColumn}" FROM "${foreignKey.targetTable}" WHERE ${tenantPredicate}`,
       organizationsTarget ? values : [organizationId, ...values],
     );
-    const existing = new Set((result.rows ?? []).map((row) => String(row[foreignKey.targetColumn])));
+    const existing = new Set(
+      (result.rows ?? []).map((row) => String(row[foreignKey.targetColumn])),
+    );
     for (const [index, row] of rows.entries()) {
       const value = row[foreignKey.column];
       if (value !== null && value !== undefined && !existing.has(String(value))) keep.delete(index);
@@ -438,13 +440,11 @@ export async function reconcileMappedData(client, dryRunReport, organizationId, 
     const step = targets[0].step;
     for (let offset = 0; offset < targets.length; offset += MAX_RECONCILIATION_TARGETS) {
       const targetBatch = targets.slice(offset, offset + MAX_RECONCILIATION_TARGETS);
-      const expected = targetBatch.map(
-        ({ aggregateColumn, expectedAggregateCount, identity }) => ({
-          aggregateColumn,
-          expectedAggregateCount,
-          identity,
-        }),
-      );
+      const expected = targetBatch.map(({ aggregateColumn, expectedAggregateCount, identity }) => ({
+        aggregateColumn,
+        expectedAggregateCount,
+        identity,
+      }));
       const query = buildReconciliationQuery(step);
       const result = await client.query(query, [JSON.stringify(expected), organizationId]);
       databaseQueries += 1;
@@ -623,7 +623,12 @@ function applyInsertTimestampDefaults(step, payload) {
   const now = new Date();
   for (const column of step.fields) {
     if (enriched[column] !== undefined && enriched[column] !== null) continue;
-    if (column === "created_at" || column === "createdAt" || column === "updated_at" || column === "updatedAt") {
+    if (
+      column === "created_at" ||
+      column === "createdAt" ||
+      column === "updated_at" ||
+      column === "updatedAt"
+    ) {
       enriched[column] = now;
     }
   }
@@ -877,9 +882,7 @@ async function insertRows(client, step, columns, rows, options = {}) {
   if (!Array.isArray(result.rows)) {
     throw migrationError("MIGRATION_INSERT_RECONCILIATION_UNAVAILABLE");
   }
-  const insertedKeys = new Set(
-    result.rows.map((row) => identityKey(row, identityColumns)),
-  );
+  const insertedKeys = new Set(result.rows.map((row) => identityKey(row, identityColumns)));
   return {
     writes: result.rowCount ?? 0,
     insertedRows: rows.filter((row) => insertedKeys.has(identityKey(row, identityColumns))),

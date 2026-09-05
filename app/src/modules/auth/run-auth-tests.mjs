@@ -204,6 +204,10 @@ const administracaoSource = await readFile(
   new URL("../../shared/components/newLayout/Administracao.tsx", import.meta.url),
   "utf8",
 );
+const adminPermissionsEditorSource = await readFile(
+  new URL("../users/components/AdminPermissionsEditor.tsx", import.meta.url),
+  "utf8",
+);
 const rhPermissionsSource = await readFile(
   new URL("../rh/hooks/useRhPermissions.ts", import.meta.url),
   "utf8",
@@ -762,9 +766,14 @@ await (async () => {
       assert.match(authContextSource, /refreshSession,\s*refreshPlatformSession,\s*loading/);
       assert.match(administracaoSource, /import \{ signOut, useAuth \} from "@\/context\/AuthContext";/);
       assert.match(administracaoSource, /const \{ user \} = useAuth\(\);/);
+      assert.match(administracaoSource, /currentUserId=\{user\?\.id\}/);
       assert.match(
         administracaoSource,
-        /if \(selectedPermissionUserId === user\?\.id\) \{[\s\S]*signOut\("Permissões atualizadas\. Entre novamente para aplicar os novos acessos\."\);[\s\S]*return;[\s\S]*\}/,
+        /onCurrentUserPermissionsUpdated=\{\(\) =>[\s\S]*signOut\("Permissões atualizadas\. Entre novamente para aplicar os novos acessos\."\)/,
+      );
+      assert.match(
+        adminPermissionsEditorSource,
+        /if \(selectedUserId === currentUserId\) \{[\s\S]*onCurrentUserPermissionsUpdated\?\.\(\);[\s\S]*\}/,
       );
       assert.doesNotMatch(administracaoSource, /refreshSession/);
       assert.match(
@@ -781,16 +790,13 @@ await (async () => {
 
   await runTest("admin permission updates invalidate cached permission data after save", () => {
     assert.match(
-      administracaoSource,
-      /queryClient\.invalidateQueries\(\{[\s\S]*queryKey:\s*\["admin", "permissions", selectedPermissionUserId\],[\s\S]*\}\)/,
+      adminPermissionsEditorSource,
+      /queryClient\.setQueryData\(\[\.\.\.queryKey, "user", selectedUserId\],[\s\S]*\)/,
     );
     assert.match(administracaoSource, /invalidateAdminUserLists\(\)/);
-    const handleSavePermissionsSource = getFunctionSource(
-      administracaoSource,
-      "handleSavePermissions",
-    );
+    const handleSaveSource = getFunctionSource(adminPermissionsEditorSource, "handleSave");
 
-    assert.equal(handleSavePermissionsSource.includes("refetchPermissionUsers"), false);
+    assert.equal(handleSaveSource.includes("usersQuery.refetch"), false);
   });
 
   await runTest("admin permissions tab is available only to organization owners", () => {
@@ -815,7 +821,7 @@ await (async () => {
   await runTest("admin dashboard uses real permission metrics", () => {
     assert.equal(administracaoSource.includes('title: "Perfis de Acesso"'), false);
     assert.equal(administracaoSource.includes("value: 12"), false);
-    assert.match(administracaoSource, /const managedModulesCount = useMemo\(\(\) => \{/);
+    assert.match(administracaoSource, /const managedModulesCount = useMemo\(\s*\(\) =>/);
     assert.match(administracaoSource, /PERMISSION_MODULE_GROUPS\.reduce/);
     assert.match(administracaoSource, /title: "Módulos gerenciados"/);
     assert.match(administracaoSource, /value: managedModulesCount/);
@@ -823,30 +829,30 @@ await (async () => {
 
   await runTest("admin permissions list supports scoped user search", () => {
     assert.match(
-      administracaoSource,
-      /const \[permissionSearchTerm, setPermissionSearchTerm\] = useState\(""\);/,
+      adminPermissionsEditorSource,
+      /const \[searchTerm, setSearchTerm\] = useState\(""\);/,
     );
-    assert.match(administracaoSource, /const filteredPermissionUsers = useMemo\(\(\) => \{/);
-    assert.match(administracaoSource, /normalizeSearchText\(permissionSearchTerm\)/);
-    assert.match(administracaoSource, /filteredPermissionUsers\.length/);
-    assert.match(administracaoSource, /filteredPermissionUsers\.map/);
-    assert.match(administracaoSource, /placeholder="Buscar usuário ativo"/);
+    assert.match(adminPermissionsEditorSource, /const filteredUsers = useMemo\(\(\) => \{/);
+    assert.match(adminPermissionsEditorSource, /normalizeSearchText\(searchTerm\)/);
+    assert.match(adminPermissionsEditorSource, /filteredUsers\.length/);
+    assert.match(adminPermissionsEditorSource, /filteredUsers\.map/);
+    assert.match(adminPermissionsEditorSource, /placeholder="Buscar usuário ativo"/);
     assert.match(
-      administracaoSource,
-      /onChange=\{\(event\) => setPermissionSearchTerm\(event\.target\.value\)\}/,
+      adminPermissionsEditorSource,
+      /onChange=\{\(event\) => setSearchTerm\(event\.target\.value\)\}/,
     );
   });
 
   await runTest("admin permissions editor uses explicit save copy and stable saving state", () => {
     assert.match(
-      administracaoSource,
-      /\{filteredPermissionUsers\.length\} de \{permissionUsers\.length\} usuário/,
+      adminPermissionsEditorSource,
+      /\{filteredUsers\.length\} de \{users\.length\} usuário/,
     );
-    assert.match(administracaoSource, /Salvar permissões/);
-    assert.equal(administracaoSource.includes(': "Salvar"'), false);
+    assert.match(adminPermissionsEditorSource, /Salvar permissões/);
+    assert.equal(adminPermissionsEditorSource.includes(': "Salvar"'), false);
     assert.match(
-      administracaoSource,
-      /<select[\s\S]*disabled=\{isSelectedPermissionOwner \|\| isSavingPermissions\}/,
+      adminPermissionsEditorSource,
+      /<select[\s\S]*disabled=\{isOwner \|\| isSaving\}/,
     );
   });
   await runTest("RH permissions hook delegates to the shared capability contract", () => {

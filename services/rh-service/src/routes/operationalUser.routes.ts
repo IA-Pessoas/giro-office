@@ -2,8 +2,8 @@ import {
   createSuccessResponse,
   FORWARDED_AUTH_MODULES_HEADER,
   error as logError,
-  parseWithZod,
   parseModulePermissions,
+  parseWithZod,
   requireAuthenticatedRequestContext,
   ServiceError,
 } from "@workspace/shared";
@@ -16,8 +16,8 @@ import {
   RH_MANAGEMENT_PERMISSION,
   RH_SELF_SERVICE_PERMISSION,
 } from "../middlewares/requireRhPermission.js";
-import { OperationalUserService } from "../services/operationalUserService.js";
 import { operationalUserListQuerySchema } from "../schemas/operationalUser.schemas.js";
+import { OperationalUserService } from "../services/operationalUserService.js";
 
 const router: ReturnType<typeof Router> = Router();
 const operationalUserService = new OperationalUserService();

@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 
-import { readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { CASTELO_ORGANIZATION_ID, REQUIRED_IDENTITY_NAMESPACE } from "./lib/mapping-contract.mjs";
-import { iterateSqlRows } from "./lib/sql-dump-parser.mjs";
 import {
   buildPermissionRealignment,
   MODULE_COLUMNS,
   REALIGNMENT_GLOBAL_PERMISSION,
   REALIGNMENT_USER_TYPE,
 } from "./lib/permission-realignment.mjs";
+import { iterateSqlRows } from "./lib/sql-dump-parser.mjs";
 import { uuidV5 } from "./lib/uuid-v5.mjs";
 
 const DEFAULT_SOURCE_DIR = "/home/bruno/Documents/03.08.2026";
@@ -156,9 +156,9 @@ async function applyRealignment(client, actions, organizationId) {
         ...MODULE_COLUMNS.map((column) => action.modules[column]),
         organizationId,
       ];
-      const assignments = MODULE_COLUMNS.map(
-        (column) => `"${column}" = EXCLUDED."${column}"`,
-      ).join(", ");
+      const assignments = MODULE_COLUMNS.map((column) => `"${column}" = EXCLUDED."${column}"`).join(
+        ", ",
+      );
       const permissionResult = await client.query(
         `INSERT INTO "permissions" ("id", ${permissionColumns.map((column) => `"${column}"`).join(", ")})
          VALUES ($1, ${permissionValues.map((_, index) => `$${index + 2}`).join(", ")})
@@ -186,7 +186,8 @@ async function readDestinationUsers(client, organizationId) {
 
 async function readRows(sourceDir, sourceTable) {
   const rows = [];
-  for await (const row of iterateSqlRows(path.join(sourceDir, `${sourceTable}.sql`))) rows.push(row);
+  for await (const row of iterateSqlRows(path.join(sourceDir, `${sourceTable}.sql`)))
+    rows.push(row);
   return rows;
 }
 
@@ -194,10 +195,14 @@ async function createPostgresClient(connectionString) {
   if (typeof connectionString !== "string" || connectionString.trim().length === 0) {
     throw new Error("MIGRATION_DATABASE_URL é obrigatório.");
   }
-  const requireFromInfra = createRequire(new URL("../../../../infra/package.json", import.meta.url));
+  const requireFromInfra = createRequire(
+    new URL("../../../../infra/package.json", import.meta.url),
+  );
   const modulePath = requireFromInfra.resolve("pg");
   const pg = await import(pathToFileURL(modulePath).href);
-  const client = new (pg.Client ?? pg.default?.Client)({ connectionString });
+  const Client = pg.Client ?? pg.default?.Client;
+  if (typeof Client !== "function") throw new Error("MIGRATION_POSTGRES_CLIENT_UNAVAILABLE");
+  const client = new Client({ connectionString });
   await client.connect();
   return client;
 }
@@ -214,7 +219,8 @@ function parseArguments(args) {
     if (arg === "--tenant") options.tenant = args[++index];
     else if (arg === "--source-dir") options.sourceDir = args[++index];
     else if (arg === "--report") options.reportPath = args[++index];
-    else if (arg !== "--apply" && arg !== "--dry-run") throw new Error(`Argumento inválido: ${arg}`);
+    else if (arg !== "--apply" && arg !== "--dry-run")
+      throw new Error(`Argumento inválido: ${arg}`);
   }
   return options;
 }

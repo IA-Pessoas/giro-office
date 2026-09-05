@@ -3,8 +3,8 @@ import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLicenseBody, UpdateLicenseBody } from "../schemas/license.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
-import { ensureRegularizeResponsible } from "./regularizeResponsibleService.js";
 import type { RegularizeReconciliationService } from "./regularizeReconciliationService.js";
+import { ensureRegularizeResponsible } from "./regularizeResponsibleService.js";
 
 const licenseSelect = {
   id: true,

@@ -10,8 +10,6 @@ export async function computeDatabaseIdentity(client) {
     ].join(" "),
     ["public"],
   );
-  const digest = createHash("sha256")
-    .update(JSON.stringify(result.rows), "utf8")
-    .digest("hex");
+  const digest = createHash("sha256").update(JSON.stringify(result.rows), "utf8").digest("hex");
   return `sha256:${digest}`;
 }

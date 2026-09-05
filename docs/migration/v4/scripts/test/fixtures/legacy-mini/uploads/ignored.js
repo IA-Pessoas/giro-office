@@ -1,1 +1,1 @@
-const query = "SELECT * FROM tb_admin.usuarios";
+const _query = "SELECT * FROM tb_admin.usuarios";
