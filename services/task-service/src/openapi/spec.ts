@@ -347,7 +347,7 @@ const createProjectWizardRequestBody = createObjectRequestBody({
       },
     ],
   },
-  required: ["client_id", "name", "start_date", "objective", "tasks"],
+  required: ["client_id", "name", "start_date", "objective"],
   properties: {
     client_id: { type: "string", format: "uuid" },
     name: { type: "string" },

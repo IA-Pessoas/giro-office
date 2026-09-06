@@ -20,7 +20,7 @@ export const projectWizardCreateBodySchema = z
     start_date: zIsoDate("start_date"),
     end_date: zIsoDate("end_date").optional(),
     objective: zNonEmptyText("objective"),
-    tasks: z.array(projectWizardTaskSchema),
+    tasks: z.array(projectWizardTaskSchema).default([]),
   })
   .strict()
   .superRefine((value, context) => {

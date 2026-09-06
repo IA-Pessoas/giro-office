@@ -121,10 +121,9 @@ describe("project wizard routes", () => {
     start_date: "2026-09-01T00:00:00.000Z",
     end_date: "2026-09-30T00:00:00.000Z",
     objective: "Objetivo do projeto",
-    tasks: [],
   };
 
-  it("documenta a chave obrigatória no OpenAPI", () => {
+  it("documenta o contrato público do wizard no OpenAPI", () => {
     const operation = buildTaskServiceOpenApiSpec(env).paths["/task/project-wizard"].post;
 
     expect(operation.parameters).toContainEqual(
@@ -135,7 +134,6 @@ describe("project wizard routes", () => {
       "name",
       "start_date",
       "objective",
-      "tasks",
     ]);
     expect(operation.requestBody.content["application/json"].schema.properties.tasks).toMatchObject(
       {
@@ -163,7 +161,7 @@ describe("project wizard routes", () => {
       .post("/task/project-wizard")
       .set(gatewayHeaders())
       .set("Idempotency-Key", "wizard-empty")
-      .send(validBody);
+      .send({ ...validBody, tasks: [] });
 
     expect(emptyResponse.status).toBe(201);
     expect(service.create).toHaveBeenCalledWith(expect.objectContaining({ tasks: [] }));
@@ -272,7 +270,7 @@ describe("project wizard routes", () => {
     expect(forwardedRequest).toBeNull();
   });
 
-  it("POST /task/project-wizard cria projeto sem tarefas", async () => {
+  it("POST /task/project-wizard cria projeto quando tasks é omitido", async () => {
     const response = await request(createApp())
       .post("/task/project-wizard")
       .set(gatewayHeaders())

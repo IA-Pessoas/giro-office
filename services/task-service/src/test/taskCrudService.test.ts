@@ -411,6 +411,60 @@ describe("TaskCrudService", () => {
     expect(prismaMock.taskDependent.findMany).not.toHaveBeenCalled();
   });
 
+  it("createTask mantém a expansão de dependências por padrão", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    prismaMock.taskModel.findFirst
+      .mockResolvedValueOnce({
+        name: "Modelo principal",
+        department_id: "dep-1",
+        billing: "Realizar",
+        responsible_id: "leader-1",
+        responsible2_id: null,
+        responsible3_id: null,
+      })
+      .mockResolvedValueOnce({
+        name: "Modelo dependente",
+        department_id: "dep-1",
+        billing: "Realizar",
+        responsible_id: "leader-1",
+        responsible2_id: null,
+        responsible3_id: null,
+      });
+    prismaMock.taskDependent.findMany.mockResolvedValue([
+      { dependent_id: "model-2", wait: false, observation: "Dependência padrão" },
+    ]);
+    prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
+
+    await new TaskCrudService().createTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      observations: "",
+      urgency: "Alta",
+      integracaoLevel: 2,
+    });
+
+    expect(prismaMock.taskDependent.findMany).toHaveBeenCalledWith({
+      where: { task_id: "model-1", organization_id: "org-1" },
+      select: { dependent_id: true, wait: true, observation: true },
+    });
+    expect(prismaMock.task.create).toHaveBeenCalledTimes(2);
+    expect(prismaMock.task.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          model_id: "model-2",
+          project_id: "project-1",
+          client_id: "client-1",
+        }),
+      }),
+    );
+  });
+
   it("updateTask permite editar outros campos de tarefa não atribuída sem migrar vínculos legados", async () => {
     prismaMock.department.findFirst.mockResolvedValue(null);
     prismaMock.task.findFirst.mockResolvedValue({
