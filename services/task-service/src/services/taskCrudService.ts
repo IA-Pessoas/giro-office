@@ -181,6 +181,20 @@ function taskAuthorization(data: {
   };
 }
 
+async function assertTaskDepartmentInOrganization(
+  prisma: Pick<Prisma.TransactionClient, "department">,
+  organizationId: string,
+  departmentId: string,
+): Promise<void> {
+  const department = await prisma.department.findFirst({
+    where: { id: departmentId, organization_id: organizationId },
+    select: { id: true },
+  });
+  if (!department) {
+    throw new ServiceError(422, "Departamento não pertence à organização informada.");
+  }
+}
+
 export class TaskCrudService {
   readonly #workflow = new TaskWorkflowService();
 
@@ -332,6 +346,7 @@ export class TaskCrudService {
             : data.prevision_date;
 
       const { create, dependentCreates } = await this.#runTransaction(async (tx) => {
+        await assertTaskDepartmentInOrganization(tx, data.organization_id, departmentId);
         await assertResponsibleUsersInDepartment(tx, data.organization_id, departmentId, [
           responsibleId,
           responsible2Id,
@@ -631,6 +646,9 @@ export class TaskCrudService {
       const responsible3_id =
         data.responsible3_id !== undefined ? data.responsible3_id : exists.responsible3_id;
 
+      if (department_id !== exists.department_id) {
+        await assertTaskDepartmentInOrganization(prismaClient, data.organization_id, department_id);
+      }
       await assertResponsibleUsersInDepartment(prismaClient, data.organization_id, department_id, [
         department_id !== exists.department_id || responsible_id !== exists.responsible_id
           ? responsible_id
