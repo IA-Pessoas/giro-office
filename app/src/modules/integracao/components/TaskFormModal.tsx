@@ -264,7 +264,7 @@ export function TaskFormModal({
     projectCount: createProjectsCount,
   });
   const editUrgencyOptions = getTaskUrgencyOptions(editValues.urgency);
-  const hasInvalidFullEditValues = getTaskEditValidationMessage(editValues);
+  const taskEditValidationMessage = getTaskEditValidationMessage(editValues);
 
   function shouldRenderCurrentUserOption(userId: string) {
     return Boolean(userId) && !users.some((user) => user.id === userId);
@@ -282,7 +282,7 @@ export function TaskFormModal({
     return "Selecione";
   }
 
-  function getUserPlaceholder(optional: boolean) {
+  function getOptionalUserPlaceholder() {
     if (usersQuery.isLoading) {
       return "Carregando usuários...";
     }
@@ -291,7 +291,7 @@ export function TaskFormModal({
       return "Usuários indisponíveis";
     }
 
-    return optional ? "Opcional" : "Selecione";
+    return "Opcional";
   }
 
   function updateCreateValue<Key extends keyof CreateFormState>(
@@ -368,8 +368,8 @@ export function TaskFormModal({
       return;
     }
 
-    if (!isRestrictedEdit && hasInvalidFullEditValues) {
-      toast.warning(hasInvalidFullEditValues);
+    if (!isRestrictedEdit && taskEditValidationMessage) {
+      toast.warning(taskEditValidationMessage);
       return;
     }
 
@@ -629,7 +629,7 @@ export function TaskFormModal({
                     style={PROJECT_SELECT_ARROW_STYLE}
                     disabled={usersQuery.isLoading || usersQuery.isError}
                   >
-                    <option value="">{getUserPlaceholder(true)}</option>
+                    <option value="">{getOptionalUserPlaceholder()}</option>
                     {shouldRenderCurrentUserOption(editValues.responsible2_id) ? (
                       <option value={editValues.responsible2_id}>Responsável 2 atual</option>
                     ) : null}
@@ -652,7 +652,7 @@ export function TaskFormModal({
                     style={PROJECT_SELECT_ARROW_STYLE}
                     disabled={usersQuery.isLoading || usersQuery.isError}
                   >
-                    <option value="">{getUserPlaceholder(true)}</option>
+                    <option value="">{getOptionalUserPlaceholder()}</option>
                     {shouldRenderCurrentUserOption(editValues.responsible3_id) ? (
                       <option value={editValues.responsible3_id}>Responsável 3 atual</option>
                     ) : null}

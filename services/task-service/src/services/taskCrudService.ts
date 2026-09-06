@@ -646,17 +646,16 @@ export class TaskCrudService {
       const responsible3_id =
         data.responsible3_id !== undefined ? data.responsible3_id : exists.responsible3_id;
 
-      if (department_id !== exists.department_id) {
+      const departmentChanged = department_id !== exists.department_id;
+      if (departmentChanged) {
         await assertTaskDepartmentInOrganization(prismaClient, data.organization_id, department_id);
       }
       await assertResponsibleUsersInDepartment(prismaClient, data.organization_id, department_id, [
-        department_id !== exists.department_id || responsible_id !== exists.responsible_id
-          ? responsible_id
-          : undefined,
-        department_id !== exists.department_id || responsible2_id !== exists.responsible2_id
+        departmentChanged || responsible_id !== exists.responsible_id ? responsible_id : undefined,
+        departmentChanged || responsible2_id !== exists.responsible2_id
           ? responsible2_id
           : undefined,
-        department_id !== exists.department_id || responsible3_id !== exists.responsible3_id
+        departmentChanged || responsible3_id !== exists.responsible3_id
           ? responsible3_id
           : undefined,
       ]);
