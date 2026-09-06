@@ -61,7 +61,7 @@ export interface IntegracaoTaskDetail {
   observations: string | null;
   billing: string;
   urgency: string;
-  responsible_id: string;
+  responsible_id: string | null;
   responsible2_id: string | null;
   responsible3_id: string | null;
   start_date: string | null;
@@ -91,7 +91,7 @@ export interface CreateIntegracaoTaskBody {
   observations?: string;
   billing?: TaskBilling;
   urgency: string;
-  responsible_id?: string;
+  responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
   prevision_date?: string | null;
@@ -105,7 +105,7 @@ export interface UpdateIntegracaoTaskBody {
   observations?: string;
   billing?: TaskBilling;
   urgency?: string;
-  responsible_id?: string;
+  responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
   prevision_date?: string | null;

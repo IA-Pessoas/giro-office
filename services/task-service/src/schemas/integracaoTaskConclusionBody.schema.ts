@@ -18,7 +18,7 @@ export const integracaoTaskConclusionBodySchema = z
     status: integracaoTaskStatusZod,
     prevision_date: optionalDateOrNull,
     end_date: optionalDateOrNull,
-    responsible_id: zNonEmptyText("responsible_id"),
+    responsible_id: zNonEmptyText("responsible_id").nullable(),
     responsible2_id: z.union([z.string(), z.null()]).optional(),
     responsible3_id: z.union([z.string(), z.null()]).optional(),
     observations: z.string().optional().default(""),

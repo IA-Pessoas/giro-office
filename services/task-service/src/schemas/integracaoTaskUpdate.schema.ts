@@ -24,7 +24,7 @@ export const integracaoTaskUpdateBodySchema = z
     observations: z.string().optional(),
     billing: taskBillingZod.optional(),
     urgency: z.string().optional(),
-    responsible_id: z.string().optional(),
+    responsible_id: zNonEmptyText("responsible_id").nullable().optional(),
     responsible2_id: z.union([z.string(), z.null()]).optional(),
     responsible3_id: z.union([z.string(), z.null()]).optional(),
     prevision_date: z.union([z.string(), z.null(), z.date()]).optional(),

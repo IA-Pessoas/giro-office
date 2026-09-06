@@ -2,6 +2,8 @@
 
 Microservico de tarefas. O gateway encaminha esse servico pelo prefixo publico **`/task`**.
 
+Tarefas aceitam `responsible_id: null` na criação, edição e conclusão. Na criação, omitir responsáveis mantém os defaults do modelo; `null` explícito remove a atribuição. Modelos continuam exigindo responsável. A expansão não altera atribuições ou vínculos legados.
+
 ## Porta local
 
 Por defeito: **3032** (`PORT`).

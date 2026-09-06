@@ -6,6 +6,7 @@ import {
   ServiceError,
 } from "@workspace/shared";
 
+import type { Prisma } from "../generated/prisma/client.js";
 import {
   type CreateLogParams,
   createLog,
@@ -33,6 +34,7 @@ export interface CreateProjectCrudRequest extends ProjectCrudAuthContext {
   name: string;
   client_id: string;
   start_date: Date;
+  end_date?: Date;
   objective: string;
   sponsor_id?: string;
 }
@@ -56,6 +58,7 @@ const CREATE_SELECT = {
   client_id: true,
   status: true,
   start_date: true,
+  end_date: true,
   objective: true,
   sponsor_id: true,
 } as const;
@@ -93,16 +96,44 @@ export class ProjectCrudService {
   ) {}
 
   async create(data: CreateProjectCrudRequest): Promise<{ create: unknown }> {
+    const result = await this.prisma.$transaction((tx) => this.createInTransaction(data, tx));
+
+    try {
+      await this.audit.createLog({
+        userId: data.userId,
+        organizationId: data.organizationId,
+        permission: data.permission ?? null,
+        action: "Cadastro",
+        referring: "integracao.projects",
+        referringId: result.create.id,
+        changes: "{}",
+      });
+    } catch (err) {
+      logError("Erro ao auditar criação de projeto", { err, projectId: result.create.id });
+    }
+
+    return result;
+  }
+
+  /** O chamador controla commit/rollback e emite auditoria somente após o commit. */
+  async createInTransaction(
+    data: CreateProjectCrudRequest,
+    tx: Prisma.TransactionClient,
+  ): Promise<{ create: Prisma.ProjectGetPayload<{ select: typeof CREATE_SELECT }> }> {
     requireIntegracaoRouteAccess("POST", "/project", {
       userId: data.userId,
       level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
       organizationId: data.organizationId,
       resourceOrganizationId: data.organizationId,
       isOwner: data.isOwner === true,
-      requestedFields: ["name", "client_id", "start_date", "objective", "sponsor_id"],
+      requestedFields: ["name", "client_id", "start_date", "end_date", "objective", "sponsor_id"],
     });
 
-    const client = await this.prisma.client.findFirst({
+    if (data.end_date && data.end_date < data.start_date) {
+      throw new ServiceError(400, "A data final não pode ser anterior à data inicial.");
+    }
+
+    const client = await tx.client.findFirst({
       where: { id: data.client_id, organization_id: data.organizationId },
     });
 
@@ -110,7 +141,7 @@ export class ProjectCrudService {
       throw new ServiceError(404, "Cliente não encontrado.");
     }
 
-    const duplicate = await this.prisma.project.findFirst({
+    const duplicate = await tx.project.findFirst({
       where: {
         name: data.name,
         client_id: data.client_id,
@@ -122,28 +153,19 @@ export class ProjectCrudService {
       throw new ServiceError(409, "Um objetivo com esse nome nesse cliente já foi cadastrada");
     }
 
-    const create = await this.prisma.project.create({
+    const create = await tx.project.create({
       data: {
         name: data.name,
         client_id: data.client_id,
         organization_id: data.organizationId,
         status: "Em andamento",
         start_date: data.start_date,
+        end_date: data.end_date ?? null,
         objective: data.objective,
         sponsor_id: data.sponsor_id ?? null,
         porcentage: 0,
       },
       select: CREATE_SELECT,
-    });
-
-    await this.audit.createLog({
-      userId: data.userId,
-      organizationId: data.organizationId,
-      permission: data.permission ?? null,
-      action: "Cadastro",
-      referring: "integracao.projects",
-      referringId: create.id,
-      changes: "{}",
     });
 
     return { create };
