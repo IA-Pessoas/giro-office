@@ -373,6 +373,44 @@ describe("TaskCrudService", () => {
     expect(result.create).toMatchObject({ responsible_id: null });
   });
 
+  it("createTask permite ao wizard desativar somente a expansão de dependências", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      name: "Modelo",
+      department_id: "dep-1",
+      billing: "Realizar",
+      responsible_id: "leader-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "leader-1" }]);
+    prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
+
+    const result = await new TaskCrudService().createTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      name: "Tarefa do wizard",
+      status: "A Realizar",
+      department_id: "dep-1",
+      observations: "",
+      urgency: "",
+      integracaoLevel: 2,
+      createDependencies: false,
+    });
+
+    expect(result.create).toMatchObject({
+      project_id: "project-1",
+      client_id: "client-1",
+      status: "A Realizar",
+    });
+    expect(prismaMock.taskDependent.findMany).not.toHaveBeenCalled();
+  });
+
   it("updateTask permite editar outros campos de tarefa não atribuída sem migrar vínculos legados", async () => {
     prismaMock.department.findFirst.mockResolvedValue(null);
     prismaMock.task.findFirst.mockResolvedValue({

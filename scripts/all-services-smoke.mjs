@@ -4611,6 +4611,7 @@ const handlers = {
         name: uniqueText("Smoke Project Wizard"),
         start_date: new Date().toISOString(),
         objective: "Validate project creation without tasks.",
+        tasks: [],
       },
     });
   },

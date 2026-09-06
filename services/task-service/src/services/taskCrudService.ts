@@ -134,6 +134,7 @@ export interface CreateTaskCrudRequest {
   responsible2_id?: string | null;
   responsible3_id?: string | null;
   prevision_date?: Date | string | null;
+  createDependencies?: boolean;
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
 }
@@ -474,13 +475,16 @@ export class TaskCrudService {
           select: TASK_CREATE_SELECT,
         });
 
-        const dependents = await tx.taskDependent.findMany({
-          where: {
-            task_id: data.model_id,
-            organization_id: data.organization_id,
-          },
-          select: DEPENDENTS_FOR_CREATE_SELECT,
-        });
+        const dependents =
+          data.createDependencies === false
+            ? []
+            : await tx.taskDependent.findMany({
+                where: {
+                  task_id: data.model_id,
+                  organization_id: data.organization_id,
+                },
+                select: DEPENDENTS_FOR_CREATE_SELECT,
+              });
 
         const dependentCreates = await Promise.all(
           dependents.map((dep: (typeof dependents)[number]) => {

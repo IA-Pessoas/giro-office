@@ -337,14 +337,37 @@ const createProjectWizardRequestBody = createObjectRequestBody({
     start_date: "2026-09-01T00:00:00.000Z",
     end_date: "2026-09-30T00:00:00.000Z",
     objective: "Objetivo do projeto",
+    tasks: [
+      {
+        name: "Revisar documentação",
+        department_id: "department-uuid",
+        model_id: "task-model-uuid",
+        prevision_date: "2026-09-15",
+        responsible_id: "user-uuid",
+      },
+    ],
   },
-  required: ["client_id", "name", "start_date", "objective"],
+  required: ["client_id", "name", "start_date", "objective", "tasks"],
   properties: {
     client_id: { type: "string", format: "uuid" },
     name: { type: "string" },
     start_date: { type: "string", format: "date-time" },
     end_date: { type: "string", format: "date-time" },
     objective: { type: "string" },
+    tasks: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["name", "department_id", "model_id"],
+        properties: {
+          name: { type: "string" },
+          department_id: { type: "string" },
+          model_id: { type: "string" },
+          prevision_date: { type: "string", format: "date" },
+          responsible_id: { type: ["string", "null"] },
+        },
+      },
+    },
   },
 });
 
@@ -367,7 +390,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       { name: "IntegracaoTasks", description: "CRUD tarefas de integracao" },
       { name: "TaskModel", description: "Modelos de tarefa" },
       { name: "ProjectPlan", description: "Planos de projeto" },
-      { name: "ProjectWizard", description: "Criação de projeto sem tarefas" },
+      { name: "ProjectWizard", description: "Criação de projeto com tarefas manuais" },
       { name: "TaskDependent", description: "Dependencias entre modelos" },
       { name: "TaskIntegration", description: "Vinculos integracao Regularize" },
       { name: "Financeiro", description: "Cobranca financeira" },
@@ -866,7 +889,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       "/task/project-wizard": {
         post: {
           tags: ["ProjectWizard"],
-          summary: "Criar projeto sem tarefas pelo wizard",
+          summary: "Criar projeto com tarefas manuais pelo wizard",
           security: bearer,
           parameters: [
             {
@@ -878,7 +901,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           ],
           ...createProjectWizardRequestBody,
           responses: {
-            "201": { description: "Projeto criado sem tarefas", ...successJson },
+            "201": { description: "Projeto e tarefas principais criados", ...successJson },
             "400": { description: "Entrada ou chave inválida" },
             "401": { description: "Não autenticado" },
             "403": { description: "Sem permissão de Integração" },

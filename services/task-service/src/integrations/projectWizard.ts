@@ -26,8 +26,10 @@ export interface CreateProjectFromWizardParams {
   objective: string;
 }
 
+export type CreatedProject = Record<string, unknown> & { id: string };
+
 export interface ProjectWizardIntegration {
-  createProject(params: CreateProjectFromWizardParams): Promise<Record<string, unknown>>;
+  createProject(params: CreateProjectFromWizardParams): Promise<CreatedProject>;
 }
 
 interface CreateHttpProjectWizardIntegrationOptions {
@@ -36,7 +38,7 @@ interface CreateHttpProjectWizardIntegrationOptions {
   fetchImpl?: typeof fetch;
 }
 
-function getCreatedProject(payload: unknown): Record<string, unknown> {
+function getCreatedProject(payload: unknown): CreatedProject {
   if (
     typeof payload !== "object" ||
     payload === null ||
@@ -45,12 +47,15 @@ function getCreatedProject(payload: unknown): Record<string, unknown> {
     payload.data === null ||
     !("create" in payload.data) ||
     typeof payload.data.create !== "object" ||
-    payload.data.create === null
+    payload.data.create === null ||
+    !("id" in payload.data.create) ||
+    typeof payload.data.create.id !== "string" ||
+    !payload.data.create.id.trim()
   ) {
     throw new ServiceError(502, "Resposta inválida do project-service.");
   }
 
-  return payload.data.create as Record<string, unknown>;
+  return payload.data.create as CreatedProject;
 }
 
 class HttpProjectWizardIntegration implements ProjectWizardIntegration {
@@ -64,7 +69,7 @@ class HttpProjectWizardIntegration implements ProjectWizardIntegration {
     this.#fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  async createProject(params: CreateProjectFromWizardParams): Promise<Record<string, unknown>> {
+  async createProject(params: CreateProjectFromWizardParams): Promise<CreatedProject> {
     let response: Response;
 
     try {

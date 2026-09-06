@@ -1,6 +1,18 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
+import { integracaoTaskCreateBodySchema } from "./integracaoTaskCreate.schema.js";
+
+const projectWizardTaskSchema = integracaoTaskCreateBodySchema
+  .pick({
+    name: true,
+    department_id: true,
+    model_id: true,
+    prevision_date: true,
+    responsible_id: true,
+  })
+  .extend({ name: zNonEmptyText("name") });
+
 export const projectWizardCreateBodySchema = z
   .object({
     client_id: z.string().uuid({ message: "client_id inválido." }),
@@ -8,6 +20,7 @@ export const projectWizardCreateBodySchema = z
     start_date: zIsoDate("start_date"),
     end_date: zIsoDate("end_date").optional(),
     objective: zNonEmptyText("objective"),
+    tasks: z.array(projectWizardTaskSchema),
   })
   .strict()
   .superRefine((value, context) => {

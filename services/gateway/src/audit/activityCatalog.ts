@@ -53,6 +53,11 @@ const TECHNICAL_RULES = [
 const EXPLICIT_RULES: ExplicitRule[] = [
   {
     methods: ["POST"],
+    pattern: /^\/task\/project-wizard$/,
+    description: { action: "criou", item: "um projeto com tarefas" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/platform\/organizations\/[^/]+\/users$/,
     description: { action: "criou", item: "um usuário da organização" },
   },

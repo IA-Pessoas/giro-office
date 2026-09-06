@@ -9,11 +9,12 @@ import {
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTaskApp } from "../app.js";
 import type { TaskServiceEnv } from "../config/env.js";
 import { buildTaskServiceOpenApiSpec } from "../openapi/spec.js";
+import type { ProjectWizardRouteDeps } from "../routes/projectWizard.routes.js";
 import { projectWizardCreateBodySchema } from "../schemas/projectWizard.schemas.js";
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
@@ -93,7 +94,7 @@ describe("project wizard routes", () => {
     forwardedRequest = null;
   });
 
-  function createApp() {
+  function createApp(projectWizardService?: ProjectWizardRouteDeps) {
     return createTaskApp(
       { ...env, projectServiceUrl },
       createLogger({
@@ -102,8 +103,17 @@ describe("project wizard routes", () => {
         level: "silent",
         destination: new MemoryLogStream(),
       }),
+      projectWizardService ? { projectWizardService } : undefined,
     );
   }
+
+  const validTask = {
+    name: "Revisar documentação",
+    department_id: "department-1",
+    model_id: "model-1",
+    prevision_date: "2026-09-15",
+    responsible_id: "user-1",
+  };
 
   const validBody = {
     client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
@@ -111,6 +121,7 @@ describe("project wizard routes", () => {
     start_date: "2026-09-01T00:00:00.000Z",
     end_date: "2026-09-30T00:00:00.000Z",
     objective: "Objetivo do projeto",
+    tasks: [],
   };
 
   it("documenta a chave obrigatória no OpenAPI", () => {
@@ -124,7 +135,82 @@ describe("project wizard routes", () => {
       "name",
       "start_date",
       "objective",
+      "tasks",
     ]);
+    expect(operation.requestBody.content["application/json"].schema.properties.tasks).toMatchObject(
+      {
+        type: "array",
+        items: {
+          required: ["name", "department_id", "model_id"],
+          properties: {
+            prevision_date: { type: "string", format: "date" },
+            responsible_id: { type: ["string", "null"] },
+          },
+        },
+      },
+    );
+  });
+
+  it("POST /task/project-wizard aceita lista vazia", async () => {
+    const service: ProjectWizardRouteDeps = {
+      create: vi.fn().mockResolvedValue({
+        project: { id: "project-1" },
+        counts: { main: 0, dependencies: 0, unassigned: 0 },
+      }),
+    };
+
+    const emptyResponse = await request(createApp(service))
+      .post("/task/project-wizard")
+      .set(gatewayHeaders())
+      .set("Idempotency-Key", "wizard-empty")
+      .send(validBody);
+
+    expect(emptyResponse.status).toBe(201);
+    expect(service.create).toHaveBeenCalledWith(expect.objectContaining({ tasks: [] }));
+  });
+
+  it("POST /task/project-wizard aceita prazo opcional e responsável anulável", async () => {
+    const service: ProjectWizardRouteDeps = {
+      create: vi.fn().mockResolvedValue({
+        project: { id: "project-1" },
+        counts: { main: 2, dependencies: 0, unassigned: 1 },
+      }),
+    };
+
+    const tasksResponse = await request(createApp(service))
+      .post("/task/project-wizard")
+      .set(gatewayHeaders())
+      .set("Idempotency-Key", "wizard-tasks")
+      .send({
+        ...validBody,
+        tasks: [validTask, { ...validTask, prevision_date: undefined, responsible_id: null }],
+      });
+
+    expect(tasksResponse.status).toBe(201);
+    expect(service.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tasks: [validTask, { ...validTask, prevision_date: undefined, responsible_id: null }],
+      }),
+    );
+  });
+
+  it.each([
+    "name",
+    "department_id",
+    "model_id",
+  ] as const)("POST /task/project-wizard rejeita Tarefa sem %s antes do service", async (field) => {
+    const service: ProjectWizardRouteDeps = { create: vi.fn() };
+    const invalidTask = { ...validTask };
+    delete invalidTask[field];
+
+    const response = await request(createApp(service))
+      .post("/task/project-wizard")
+      .set(gatewayHeaders())
+      .set("Idempotency-Key", `wizard-invalid-${field}`)
+      .send({ ...validBody, tasks: [invalidTask] });
+
+    expect(response.status).toBe(400);
+    expect(service.create).not.toHaveBeenCalled();
   });
 
   it("POST /task/project-wizard sem autenticação retorna 401", async () => {
@@ -206,7 +292,13 @@ describe("project wizard routes", () => {
       },
     });
     expect(forwardedRequest).toMatchObject({
-      body: validBody,
+      body: {
+        client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        name: "Novo projeto",
+        start_date: "2026-09-01T00:00:00.000Z",
+        end_date: "2026-09-30T00:00:00.000Z",
+        objective: "Objetivo do projeto",
+      },
       headers: {
         "idempotency-key": "wizard-open-1",
         [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
