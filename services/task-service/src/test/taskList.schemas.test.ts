@@ -32,9 +32,11 @@ describe("task list query schema", () => {
   });
 
   it.each([
-    { client_id: "cliente-invalido" },
-    { assignment: "anyone" },
-  ])("rejeita filtros inválidos com 400: %o", (query) => {
-    expect(() => parseWithZod(taskListQuerySchema, query)).toThrow(ServiceError);
+    { query: { client_id: "cliente-invalido" }, message: "client_id inválido." },
+    { query: { assignment: "anyone" }, message: "assignment inválido." },
+  ])("rejeita filtro inválido com mensagem específica: $message", ({ query, message }) => {
+    expect(() => parseWithZod(taskListQuerySchema, query)).toThrowError(
+      expect.objectContaining({ statusCode: 400, message }),
+    );
   });
 });

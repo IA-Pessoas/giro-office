@@ -5,7 +5,12 @@ import {
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
-import type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracaoTask.js";
+import {
+  type IntegracaoTaskStatus,
+  TASK_ASSIGNMENT_FILTER,
+  type TaskAssignmentFilter,
+  type TaskBilling,
+} from "../constants/integracaoTask.js";
 import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
@@ -168,7 +173,7 @@ export interface ListTaskCrudParams {
   ref_id: string;
   search: string;
   client_id?: string;
-  assignment?: "assigned" | "unassigned";
+  assignment?: TaskAssignmentFilter;
   page: number;
   limit: number;
   integracaoLevel?: IntegracaoPermissionLevel;
@@ -606,9 +611,9 @@ export class TaskCrudService {
         where.client_id = params.client_id;
       }
 
-      if (params.assignment === "assigned") {
+      if (params.assignment === TASK_ASSIGNMENT_FILTER.ASSIGNED) {
         where.responsible_id = { not: null };
-      } else if (params.assignment === "unassigned") {
+      } else if (params.assignment === TASK_ASSIGNMENT_FILTER.UNASSIGNED) {
         where.responsible_id = null;
       }
       const isBasicAccess =

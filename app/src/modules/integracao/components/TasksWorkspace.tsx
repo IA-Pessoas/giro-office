@@ -29,9 +29,8 @@ import {
   PROJECT_INPUT_CLASSNAME,
   PROJECT_PANEL_CLASSNAME,
   PROJECT_PRIMARY_BUTTON_CLASSNAME,
-  PROJECT_SELECT_ARROW_STYLE,
-  PROJECT_SELECT_CLASSNAME,
   PROJECT_SUBPANEL_CLASSNAME,
+  ProjectSelect,
 } from "./projectUi";
 import {
   TASK_TABLE_ACTION_BUTTON_CLASSNAME,
@@ -358,18 +357,16 @@ export function TasksWorkspace() {
               <Filter className="h-4 w-4 text-slate-400" />
               Atribuição
             </span>
-            <select
+            <ProjectSelect
               value={assignmentFilter}
               onChange={(event) =>
                 setAssignmentFilter(event.target.value as typeof assignmentFilter)
               }
-              className={PROJECT_SELECT_CLASSNAME}
-              style={PROJECT_SELECT_ARROW_STYLE}
             >
               <option value="all">Todas</option>
               <option value="assigned">Com responsável</option>
               <option value="unassigned">Sem responsável</option>
-            </select>
+            </ProjectSelect>
           </label>
 
           <label className="space-y-2">
@@ -377,11 +374,9 @@ export function TasksWorkspace() {
               <Filter className="h-4 w-4 text-slate-400" />
               Status
             </span>
-            <select
+            <ProjectSelect
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              className={PROJECT_SELECT_CLASSNAME}
-              style={PROJECT_SELECT_ARROW_STYLE}
             >
               <option value="Todos">Todos</option>
               {INTEGRACAO_TASK_STATUS_VALUES.map((status) => (
@@ -389,7 +384,7 @@ export function TasksWorkspace() {
                   {status}
                 </option>
               ))}
-            </select>
+            </ProjectSelect>
           </label>
 
           <label className="space-y-2">
@@ -397,18 +392,16 @@ export function TasksWorkspace() {
               <Filter className="h-4 w-4 text-slate-400" />
               Origem
             </span>
-            <select
+            <ProjectSelect
               value={refFilter}
               onChange={(event) => setRefFilter(event.target.value)}
-              className={PROJECT_SELECT_CLASSNAME}
-              style={PROJECT_SELECT_ARROW_STYLE}
             >
               {TASK_REF_OPTIONS.map((option) => (
                 <option key={option.value || "all"} value={option.value}>
                   {option.label}
                 </option>
               ))}
-            </select>
+            </ProjectSelect>
           </label>
         </div>
       </section>

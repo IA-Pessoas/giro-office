@@ -17,3 +17,12 @@ export const INTEGRACAO_TASK_STATUS_VALUES = [
 ] as const;
 
 export type IntegracaoTaskStatus = (typeof INTEGRACAO_TASK_STATUS_VALUES)[number];
+
+export const TASK_ASSIGNMENT_FILTER_VALUES = ["assigned", "unassigned"] as const;
+
+export const TASK_ASSIGNMENT_FILTER = {
+  ASSIGNED: TASK_ASSIGNMENT_FILTER_VALUES[0],
+  UNASSIGNED: TASK_ASSIGNMENT_FILTER_VALUES[1],
+} as const;
+
+export type TaskAssignmentFilter = (typeof TASK_ASSIGNMENT_FILTER_VALUES)[number];

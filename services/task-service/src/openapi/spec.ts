@@ -1,6 +1,7 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { TaskServiceEnv } from "../config/env.js";
+import { TASK_ASSIGNMENT_FILTER_VALUES } from "../constants/integracaoTask.js";
 
 const successJson = {
   content: {
@@ -545,7 +546,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             {
               name: "assignment",
               in: "query",
-              schema: { type: "string", enum: ["assigned", "unassigned"] },
+              schema: { type: "string", enum: TASK_ASSIGNMENT_FILTER_VALUES },
             },
             { name: "page", in: "query", schema: { type: "integer" } },
             { name: "limit", in: "query", schema: { type: "integer" } },

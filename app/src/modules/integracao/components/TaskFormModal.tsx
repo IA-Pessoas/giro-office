@@ -28,8 +28,7 @@ import {
   PROJECT_INPUT_CLASSNAME,
   PROJECT_PRIMARY_BUTTON_CLASSNAME,
   PROJECT_SECONDARY_BUTTON_CLASSNAME,
-  PROJECT_SELECT_ARROW_STYLE,
-  PROJECT_SELECT_CLASSNAME,
+  ProjectSelect,
 } from "./projectUi";
 import {
   TASK_FORM_AUXILIARY_WARNING_CLASSNAME,
@@ -249,7 +248,8 @@ export function TaskFormModal({
     (model) => model.department_id === editValues.department_id,
   );
   const selectedEditTaskModel = editTaskModels.find((model) => model.id === editValues.model_id);
-  const editResponsibleCandidates = selectedEditTaskModel?.department?.users ?? [];
+  const editResponsibleCandidates =
+    selectedEditTaskModel?.department?.users ?? editTaskModels[0]?.department?.users ?? [];
   const shouldRenderCurrentDepartmentOption =
     Boolean(editValues.department_id) &&
     !departments.some((department) => department.id === editValues.department_id);
@@ -531,13 +531,11 @@ export function TaskFormModal({
             <>
               <label className={TASK_FORM_LABEL_CLASSNAME}>
                 <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
-                <select
+                <ProjectSelect
                   value={editValues.status}
                   onChange={(event) =>
                     updateEditValue("status", event.target.value as IntegracaoTaskStatus | "")
                   }
-                  className={PROJECT_SELECT_CLASSNAME}
-                  style={PROJECT_SELECT_ARROW_STYLE}
                 >
                   <option value="">Selecione</option>
                   {INTEGRACAO_TASK_STATUS_VALUES.map((status) => (
@@ -545,7 +543,7 @@ export function TaskFormModal({
                       {status}
                     </option>
                   ))}
-                </select>
+                </ProjectSelect>
               </label>
 
               <label className={TASK_FORM_LABEL_CLASSNAME}>
@@ -580,11 +578,9 @@ export function TaskFormModal({
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Modelo de tarefa
                   </span>
-                  <select
+                  <ProjectSelect
                     value={editValues.model_id}
                     onChange={(event) => updateEditValue("model_id", event.target.value)}
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                     disabled={
                       !editValues.department_id ||
                       taskModelsQuery.isLoading ||
@@ -600,18 +596,16 @@ export function TaskFormModal({
                         {model.name}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
 
                 <label className={TASK_FORM_LABEL_CLASSNAME}>
                   <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
-                  <select
+                  <ProjectSelect
                     value={editValues.status}
                     onChange={(event) =>
                       updateEditValue("status", event.target.value as IntegracaoTaskStatus | "")
                     }
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                   >
                     <option value="">Selecione</option>
                     {INTEGRACAO_TASK_STATUS_VALUES.map((status) => (
@@ -619,7 +613,7 @@ export function TaskFormModal({
                         {status}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
               </div>
 
@@ -628,11 +622,9 @@ export function TaskFormModal({
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Departamento
                   </span>
-                  <select
+                  <ProjectSelect
                     value={editValues.department_id}
                     onChange={(event) => updateEditValue("department_id", event.target.value)}
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                     disabled={departmentsQuery.isLoading || departmentsQuery.isError}
                   >
                     <option value="">{getDepartmentPlaceholder()}</option>
@@ -644,27 +636,25 @@ export function TaskFormModal({
                         {department.name}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
 
                 <label className={TASK_FORM_LABEL_CLASSNAME}>
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Cobrança
                   </span>
-                  <select
+                  <ProjectSelect
                     value={editValues.billing}
                     onChange={(event) =>
                       updateEditValue("billing", event.target.value as TaskBilling)
                     }
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                   >
                     {TASK_BILLING_OPTIONS.map((billing) => (
                       <option key={billing} value={billing}>
                         {billing}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
               </div>
 
@@ -673,11 +663,9 @@ export function TaskFormModal({
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Responsável
                   </span>
-                  <select
+                  <ProjectSelect
                     value={editValues.responsible_id}
                     onChange={(event) => updateEditValue("responsible_id", event.target.value)}
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                     disabled={!editValues.model_id || taskModelsQuery.isLoading || taskModelsQuery.isError}
                   >
                     <option
@@ -696,7 +684,7 @@ export function TaskFormModal({
                         {candidate.name}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
               </div>
 
@@ -720,11 +708,9 @@ export function TaskFormModal({
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Urgência
                   </span>
-                  <select
+                  <ProjectSelect
                     value={editValues.urgency}
                     onChange={(event) => updateEditValue("urgency", event.target.value)}
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                   >
                     <option value="">Selecione</option>
                     {editUrgencyOptions.map((urgency) => (
@@ -732,7 +718,7 @@ export function TaskFormModal({
                         {urgency}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
               </div>
 
@@ -769,11 +755,9 @@ export function TaskFormModal({
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Projeto</span>
-              <select
+              <ProjectSelect
                 value={createValues.project_id}
                 onChange={(event) => updateCreateValue("project_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={
                   !createValues.client_id ||
                   projectsQuery.isLoading ||
@@ -786,7 +770,7 @@ export function TaskFormModal({
                     {project.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
 
@@ -795,11 +779,9 @@ export function TaskFormModal({
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Departamento
               </span>
-              <select
+              <ProjectSelect
                 value={createValues.department_id}
                 onChange={(event) => updateCreateValue("department_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={departmentsQuery.isLoading || departmentsQuery.isError}
               >
                 <option value="">{getDepartmentPlaceholder()}</option>
@@ -808,18 +790,16 @@ export function TaskFormModal({
                     {department.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Modelo de tarefa
               </span>
-              <select
+              <ProjectSelect
                 value={createValues.model_id}
                 onChange={(event) => updateCreateValue("model_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={
                   !createValues.department_id ||
                   taskModelsQuery.isLoading ||
@@ -832,7 +812,7 @@ export function TaskFormModal({
                     {model.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
 
@@ -841,38 +821,34 @@ export function TaskFormModal({
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Status de prospecção
               </span>
-              <select
+              <ProjectSelect
                 value={createValues.prospecting_status}
                 onChange={(event) =>
                   updateCreateValue("prospecting_status", event.target.value as ProspectingStatus)
                 }
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
               >
                 {PROSPECTING_STATUS_VALUES.map((status) => (
                   <option key={status} value={status}>
                     {status}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Urgência</span>
-              <select
+              <ProjectSelect
                 value={createValues.urgency}
                 onChange={(event) =>
                   updateCreateValue("urgency", event.target.value as TaskUrgencyOption)
                 }
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
               >
                 {TASK_URGENCY_OPTIONS.map((urgency) => (
                   <option key={urgency} value={urgency}>
                     {urgency}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
 
@@ -888,13 +864,11 @@ export function TaskFormModal({
             </label>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
-              <select
+              <ProjectSelect
                 value={createValues.status}
                 onChange={(event) =>
                   updateCreateValue("status", event.target.value as IntegracaoTaskStatus | "")
                 }
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
               >
                 <option value="">Usar regra de criação</option>
                 {INTEGRACAO_TASK_STATUS_VALUES.map((status) => (
@@ -902,19 +876,17 @@ export function TaskFormModal({
                     {status}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Cobrança</span>
-              <select
+              <ProjectSelect
                 value={createValues.billing}
                 onChange={(event) =>
                   updateCreateValue("billing", event.target.value as TaskBilling | "")
                 }
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
               >
                 <option value="">Usar cobrança do modelo</option>
                 {TASK_BILLING_OPTIONS.map((billing) => (
@@ -922,7 +894,7 @@ export function TaskFormModal({
                     {billing}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Previsão</span>
@@ -940,11 +912,9 @@ export function TaskFormModal({
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Responsável</span>
-              <select
+              <ProjectSelect
                 value={createValues.responsible_id}
                 onChange={(event) => updateCreateValue("responsible_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={
                   !createValues.model_id ||
                   taskModelsQuery.isLoading ||
@@ -962,7 +932,7 @@ export function TaskFormModal({
                     {candidate.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
 
