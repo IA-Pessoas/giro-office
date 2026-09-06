@@ -25,7 +25,7 @@ describe("ProjectWizardService", () => {
     expect(integration.createProject).toHaveBeenCalledWith(request);
     expect(result).toEqual({
       project: { id: "project-1", name: "Novo projeto" },
-      counters: { main: 0, dependencies: 0, unassigned: 0 },
+      counts: { main: 0, dependencies: 0, unassigned: 0 },
     });
   });
 

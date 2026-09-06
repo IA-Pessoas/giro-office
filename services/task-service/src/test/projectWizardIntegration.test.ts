@@ -8,9 +8,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createHttpProjectWizardIntegration } from "../integrations/projectWizard.js";
 
-process.env.DATABASE_URL ??= "postgresql://localhost:5432/task-service-test";
-process.env.JWT_SECRET ??= "task-service-secret";
-
 const params = {
   userId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
   organizationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -19,6 +16,7 @@ const params = {
   client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
   name: "Novo projeto",
   start_date: new Date("2026-09-01T00:00:00.000Z"),
+  end_date: new Date("2026-09-30T00:00:00.000Z"),
   objective: "Objetivo do projeto",
 };
 
@@ -59,6 +57,7 @@ describe("project wizard integration", () => {
           client_id: params.client_id,
           name: params.name,
           start_date: params.start_date,
+          end_date: params.end_date,
           objective: params.objective,
         }),
       }),

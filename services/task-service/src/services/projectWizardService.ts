@@ -32,7 +32,7 @@ export class ProjectWizardService {
 
   async create(data: CreateProjectWizardRequest): Promise<{
     project: Record<string, unknown>;
-    counters: { main: 0; dependencies: 0; unassigned: 0 };
+    counts: { main: 0; dependencies: 0; unassigned: 0 };
   }> {
     requireIntegracaoRouteAccess("POST", "/task/project-wizard", {
       userId: data.userId,
@@ -45,6 +45,6 @@ export class ProjectWizardService {
 
     const project = await this.projectIntegration.createProject(data);
 
-    return { project, counters: { main: 0, dependencies: 0, unassigned: 0 } };
+    return { project, counts: { main: 0, dependencies: 0, unassigned: 0 } };
   }
 }

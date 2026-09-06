@@ -118,6 +118,14 @@ class HttpProjectWizardIntegration implements ProjectWizardIntegration {
 export function createHttpProjectWizardIntegration(
   options?: Partial<CreateHttpProjectWizardIntegrationOptions>,
 ): ProjectWizardIntegration {
+  if (options?.serviceUrl && options.serviceToken) {
+    return new HttpProjectWizardIntegration({
+      serviceUrl: options.serviceUrl,
+      serviceToken: options.serviceToken,
+      fetchImpl: options.fetchImpl,
+    });
+  }
+
   const env = getTaskServiceEnv();
 
   return new HttpProjectWizardIntegration({

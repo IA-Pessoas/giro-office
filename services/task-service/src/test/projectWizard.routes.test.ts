@@ -108,6 +108,7 @@ describe("project wizard routes", () => {
     client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
     name: "Novo projeto",
     start_date: "2026-09-01T00:00:00.000Z",
+    end_date: "2026-09-30T00:00:00.000Z",
     objective: "Objetivo do projeto",
   };
 
@@ -158,6 +159,21 @@ describe("project wizard routes", () => {
     expect(forwardedRequest).toBeNull();
   });
 
+  it.each([
+    "",
+    "   ",
+    "x".repeat(256),
+  ])("POST /task/project-wizard rejeita Idempotency-Key inválida: %j", async (idempotencyKey) => {
+    const response = await request(createApp())
+      .post("/task/project-wizard")
+      .set(gatewayHeaders())
+      .set("Idempotency-Key", idempotencyKey)
+      .send(validBody);
+
+    expect(response.status).toBe(400);
+    expect(forwardedRequest).toBeNull();
+  });
+
   it("POST /task/project-wizard rejeita corpo inválido", async () => {
     const response = await request(createApp())
       .post("/task/project-wizard")
@@ -185,7 +201,7 @@ describe("project wizard routes", () => {
           name: "Novo projeto",
           client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
         },
-        counters: { main: 0, dependencies: 0, unassigned: 0 },
+        counts: { main: 0, dependencies: 0, unassigned: 0 },
       },
     });
     expect(forwardedRequest).toMatchObject({
