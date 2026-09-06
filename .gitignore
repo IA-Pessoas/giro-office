@@ -44,6 +44,8 @@ docs/*
 !docs/migration/**
 !docs/security/
 !docs/security/*.md
+!docs/adr/
+!docs/adr/**
 # Figma reference project (local only)
 novo layout/
 .cursor/plans/
