@@ -52,6 +52,7 @@ const GOOD_STATUS_OVERRIDES = new Map([
   ["taskModelDependentCreate", [201]],
   ["taskIntegrationCreate", [201]],
   ["taskCreate", [201]],
+  ["taskProjectWizardCreate", [201]],
   ["taskProjectPlanCreate", [201]],
   ["taskProjectPlanTaskCreate", [201]],
   ["rhPointRegister", [200, 400]],
@@ -115,6 +116,7 @@ const ROUTE_NEGATIVE_CASE_OVERRIDES = new Map([
   ["task-service|PUT|/task/financeiro", "unauthorized401"],
   ["task-service|PUT|/task/comercial", "unauthorized401"],
   ["task-service|PUT|/task/conclusion", "unauthorized401"],
+  ["task-service|POST|/task/project-wizard", "lowPermission403"],
 ]);
 
 const GENERATED_BAD_CASES_BEFORE = new Set([
@@ -2281,6 +2283,14 @@ const baseManifest = [
     method: "DELETE",
     path: "/task/model/dependent",
     action: "taskModelDependentDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/project-wizard",
+    action: "taskProjectWizardCreate",
     target: "gateway",
     auth: "admin-bearer",
   }),

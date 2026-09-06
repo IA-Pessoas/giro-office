@@ -11,6 +11,7 @@ import express, { type Express, type Request } from "express";
 import "express-async-errors";
 
 import type { TaskServiceEnv } from "./config/env.js";
+import { createHttpProjectWizardIntegration } from "./integrations/projectWizard.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
 import prismaClient from "./prisma/index.js";
@@ -25,6 +26,10 @@ import {
   type ProjectPlanRouteDeps,
   projectPlanRoutes,
 } from "./routes/projectPlan.routes.js";
+import {
+  createProjectWizardRoutes,
+  type ProjectWizardRouteDeps,
+} from "./routes/projectWizard.routes.js";
 import { taskComercialRoutes } from "./routes/taskComercial.routes.js";
 import { taskCrudRoutes } from "./routes/taskCrud.routes.js";
 import { taskDependentRoutes } from "./routes/taskDependent.routes.js";
@@ -32,6 +37,7 @@ import { taskFinanceiroRoutes } from "./routes/taskFinanceiro.routes.js";
 import { taskIntegrationRegularizeRoutes } from "./routes/taskIntegrationRegularize.routes.js";
 import { taskLifecycleRoutes } from "./routes/taskLifecycle.routes.js";
 import { taskModelRoutes } from "./routes/taskModel.routes.js";
+import { ProjectWizardService } from "./services/projectWizardService.js";
 import { TaskReportingService } from "./services/taskReportingService.js";
 
 function taskServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -52,6 +58,7 @@ export function createTaskApp(
   logger: Logger,
   options?: {
     projectPlanService?: ProjectPlanRouteDeps;
+    projectWizardService?: ProjectWizardRouteDeps;
     depsTasksService?: DepsTasksRouteDeps;
     internalReportingService?: TaskReportingService;
   },
@@ -63,6 +70,15 @@ export function createTaskApp(
   const resolvedDepsTasksRoutes = options?.depsTasksService
     ? createDepsTasksRoutes(options.depsTasksService)
     : depsTasksRoutes;
+  const resolvedProjectWizardRoutes = createProjectWizardRoutes(
+    options?.projectWizardService ??
+      new ProjectWizardService(
+        createHttpProjectWizardIntegration({
+          serviceUrl: env.projectServiceUrl,
+          serviceToken: env.auditServiceToken,
+        }),
+      ),
+  );
   const internalReportingService =
     options?.internalReportingService ?? new TaskReportingService(prismaClient);
 
@@ -93,6 +109,7 @@ export function createTaskApp(
   app.use("/task", taskComercialRoutes);
   app.use("/task", taskFinanceiroRoutes);
   app.use("/task", taskCrudRoutes);
+  app.use("/task", resolvedProjectWizardRoutes);
   app.use("/task", resolvedProjectPlanRoutes);
   app.use("/task", resolvedDepsTasksRoutes);
   app.use(
