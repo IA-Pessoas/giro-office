@@ -8,6 +8,7 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
     name: "Implantacao ERP Cliente XPTO",
     client_id: "client-uuid",
     start_date: "2026-04-02T00:00:00.000Z",
+    end_date: "2026-05-10T00:00:00.000Z",
     objective: "Automatizar fluxo financeiro e fiscal.",
     sponsor_id: "user-uuid",
   };
@@ -215,6 +216,11 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
                     name: { type: "string" },
                     client_id: { type: "string", format: "uuid" },
                     start_date: { type: "string", format: "date-time" },
+                    end_date: {
+                      type: "string",
+                      format: "date-time",
+                      description: "Opcional. Deve ser igual ou posterior à data inicial.",
+                    },
                     objective: { type: "string" },
                     sponsor_id: { type: "string", format: "uuid" },
                   },
@@ -227,13 +233,15 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
           },
           responses: {
             "201": {
-              description: "Criado",
+              description:
+                "Criado; data.create.end_date contém a data final ou null quando omitida.",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/SuccessEnvelope" },
                 },
               },
             },
+            "400": { description: "Entrada inválida ou data final anterior à data inicial." },
           },
         },
         get: {
