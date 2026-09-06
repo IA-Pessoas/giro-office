@@ -178,6 +178,13 @@ export function TaskFormModal({
     },
   );
   const taskDetailQuery = useIntegracaoTaskDetail(open && taskId ? taskId : undefined);
+  const editResponsibleOptionsQuery = useFetch(
+    ["task-form-responsibles", editValues.department_id],
+    () => taskModelService.listOptions(editValues.department_id),
+    {
+      enabled: open && isEditing && !isRestrictedEdit && Boolean(editValues.department_id),
+    },
+  );
   const { user } = useAuth();
   const createMutation = useCreateIntegracaoTaskMutation();
   const updateMutation = useUpdateIntegracaoTaskMutation();
@@ -226,7 +233,9 @@ export function TaskFormModal({
       isUsersLoading: false,
     });
   const hasEditAuxiliaryOptionsWarning =
-    isEditing && !isRestrictedEdit && (departmentsQuery.isError || taskModelsQuery.isError);
+    isEditing &&
+    !isRestrictedEdit &&
+    (departmentsQuery.isError || taskModelsQuery.isError || editResponsibleOptionsQuery.isError);
   const hasRestrictedTaskAccessDenied =
     isRestrictedEdit &&
     Boolean(taskDetailQuery.data) &&
@@ -247,9 +256,7 @@ export function TaskFormModal({
   const editTaskModels = taskModels.filter(
     (model) => model.department_id === editValues.department_id,
   );
-  const selectedEditTaskModel = editTaskModels.find((model) => model.id === editValues.model_id);
-  const editResponsibleCandidates =
-    selectedEditTaskModel?.department?.users ?? editTaskModels[0]?.department?.users ?? [];
+  const editResponsibleCandidates = editResponsibleOptionsQuery.data?.users ?? [];
   const shouldRenderCurrentDepartmentOption =
     Boolean(editValues.department_id) &&
     !departments.some((department) => department.id === editValues.department_id);
@@ -666,7 +673,11 @@ export function TaskFormModal({
                   <ProjectSelect
                     value={editValues.responsible_id}
                     onChange={(event) => updateEditValue("responsible_id", event.target.value)}
-                    disabled={!editValues.model_id || taskModelsQuery.isLoading || taskModelsQuery.isError}
+                    disabled={
+                      !editValues.department_id ||
+                      editResponsibleOptionsQuery.isLoading ||
+                      editResponsibleOptionsQuery.isError
+                    }
                   >
                     <option
                       value=""

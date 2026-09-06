@@ -53,7 +53,7 @@ const legacyTaskDetail = {
   client_id: clientId,
   name: task.name,
   status: task.status,
-  department_id: "department-one",
+  department_id: "department-legacy",
   observations: "Legado preservado",
   billing: task.billing,
   urgency: "Normal",
@@ -67,12 +67,20 @@ const legacyTaskDetail = {
   date_updated: "2026-09-01T12:00:00.000Z",
 };
 
+const assignedTaskDetail = {
+  ...legacyTaskDetail,
+  id: assignedTask.id,
+  name: assignedTask.name,
+  responsible_id: smokeUser.id,
+};
+
 async function installApiMocks(
   page,
   taskListRequests,
   clientDetailRequests,
   createTaskRequests,
   updateTaskRequests,
+  responsibleOptionsRequests,
 ) {
   await page.route("**/user/me", (route) =>
     route.fulfill({
@@ -168,6 +176,7 @@ async function installApiMocks(
       json: {
         data: [
           { id: "department-one", name: "Departamento com candidatos", status: "Ativo" },
+          { id: "department-legacy", name: "Departamento legado", status: "Ativo" },
           { id: "department-sole", name: "Departamento com candidato único", status: "Ativo" },
           { id: "department-multiple", name: "Departamento com múltiplos", status: "Ativo" },
           { id: "department-empty", name: "Departamento sem candidatos", status: "Ativo" },
@@ -243,6 +252,23 @@ async function installApiMocks(
       json: { success: true, data: [{ id: "project-one", name: "Projeto smoke" }] },
     }),
   );
+  await page.route("**/task/deps/options*", (route) => {
+    const requestUrl = new URL(route.request().url());
+    responsibleOptionsRequests.push(requestUrl);
+    const departmentId = requestUrl.searchParams.get("department_id");
+    const users =
+      departmentId === "department-legacy"
+        ? [
+            { id: "responsible-default", name: "Responsável padrão" },
+            { id: "responsible-alternative", name: "Responsável alternativo" },
+          ]
+        : [];
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: { success: true, data: { users, departments: [] } },
+    });
+  });
   await page.route(/\/task(?:\?.*)?$/, async (route) => {
     const request = route.request();
     if (request.method() === "POST") {
@@ -265,10 +291,14 @@ async function installApiMocks(
         },
       });
     }
+    const taskId = new URL(request.url()).searchParams.get("task_id");
     return route.fulfill({
       status: 200,
       contentType: "application/json",
-      json: { success: true, data: { detail: legacyTaskDetail } },
+      json: {
+        success: true,
+        data: { detail: taskId === assignedTask.id ? assignedTaskDetail : legacyTaskDetail },
+      },
     });
   });
 }
@@ -293,12 +323,14 @@ async function runBrowserProof() {
   const clientDetailRequests = [];
   const createTaskRequests = [];
   const updateTaskRequests = [];
+  const responsibleOptionsRequests = [];
   await installApiMocks(
     page,
     taskListRequests,
     clientDetailRequests,
     createTaskRequests,
     updateTaskRequests,
+    responsibleOptionsRequests,
   );
 
   try {
@@ -367,18 +399,28 @@ async function runBrowserProof() {
     await model.selectOption("model-empty");
     await expect(responsible).toHaveValue("");
     await expect(responsible.locator('option[value=""]')).toHaveText("Sem responsável");
-    await department.selectOption("department-one");
-    await model.selectOption("model-default");
     await dialog.getByRole("button", { name: "Criar tarefa" }).click();
     await expect(dialog).toHaveCount(0);
     await expect.poll(() => createTaskRequests.length).toBe(1);
+    assert.equal(createTaskRequests[0].responsible_id, null);
+
+    await page.getByRole("button", { name: "Nova tarefa" }).click();
+    const assignedCreateDialog = page.getByRole("dialog", { name: "Nova tarefa" });
+    await assignedCreateDialog.getByLabel("Projeto").selectOption("project-one");
+    await assignedCreateDialog.getByLabel("Observações").fill("Criação atribuída smoke");
+    await assignedCreateDialog.getByLabel("Departamento").selectOption("department-one");
+    await assignedCreateDialog.getByLabel("Modelo de tarefa").selectOption("model-default");
+    await assignedCreateDialog.getByRole("button", { name: "Criar tarefa" }).click();
+    await expect(assignedCreateDialog).toHaveCount(0);
+    await expect.poll(() => createTaskRequests.length).toBe(2);
+
     assert.deepEqual(
       {
-        client_id: createTaskRequests[0].client_id,
-        project_id: createTaskRequests[0].project_id,
-        model_id: createTaskRequests[0].model_id,
-        department_id: createTaskRequests[0].department_id,
-        responsible_id: createTaskRequests[0].responsible_id,
+        client_id: createTaskRequests[1].client_id,
+        project_id: createTaskRequests[1].project_id,
+        model_id: createTaskRequests[1].model_id,
+        department_id: createTaskRequests[1].department_id,
+        responsible_id: createTaskRequests[1].responsible_id,
       },
       {
         client_id: clientId,
@@ -395,8 +437,13 @@ async function runBrowserProof() {
     const editModel = editDialog.getByLabel("Modelo de tarefa");
     const editResponsible = editDialog.getByLabel("Responsável");
     await expect(editModel).toHaveValue("model-legacy");
+    await expect(editModel.locator('option[value="model-default"]')).toHaveCount(0);
     await expect(editResponsible.locator('option[value="responsible-alternative"]')).toHaveText(
       "Responsável alternativo",
+    );
+    assert.equal(
+      responsibleOptionsRequests.at(-1).searchParams.get("department_id"),
+      "department-legacy",
     );
     await editResponsible.selectOption("responsible-alternative");
     await editDialog.getByRole("button", { name: "Salvar alterações" }).click();
@@ -416,6 +463,27 @@ async function runBrowserProof() {
     assert.equal(assignedRequest.searchParams.get("client_id"), clientId);
     assert.equal(assignedRequest.searchParams.get("assignment"), "assigned");
 
+    smokeUser.modules.integracao = 1;
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByLabel("Atribuição").selectOption("assigned");
+    await page.getByRole("button", { name: `Editar tarefa ${assignedTask.name}` }).click();
+    const restrictedDialog = page.getByRole("dialog", { name: "Editar tarefa" });
+    await expect(restrictedDialog).toBeVisible();
+    await expect(restrictedDialog.getByLabel("Responsável")).toHaveCount(0);
+    await restrictedDialog.getByLabel("Observações").fill("Atualização restrita");
+    await restrictedDialog
+      .getByRole("button", { name: "Salvar status e observações" })
+      .click();
+    await expect(restrictedDialog).toHaveCount(0);
+    await expect.poll(() => updateTaskRequests.length).toBe(2);
+    assert.deepEqual(Object.keys(updateTaskRequests[1]).sort(), [
+      "observations",
+      "status",
+      "task_id",
+    ]);
+
+    smokeUser.modules.integracao = 3;
+    await page.reload({ waitUntil: "domcontentloaded" });
     await page.getByLabel("Atribuição").selectOption("all");
     await page.getByRole("button", { name: /Cliente Filtro/ }).click();
     await page.getByRole("option", { name: "Sem cliente selecionado" }).click();

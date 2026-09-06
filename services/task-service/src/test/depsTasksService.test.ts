@@ -83,6 +83,39 @@ describe("DepsTasksService", () => {
     });
   });
 
+  it("limita responsáveis departamentais a administradores e lideranças de RH", async () => {
+    const userFindMany = vi.fn().mockResolvedValue([{ id: "leader-1", name: "Lia" }]);
+    const service = new DepsTasksService({
+      user: { findMany: userFindMany },
+      department: { findMany: vi.fn().mockResolvedValue([]) },
+    } as never);
+
+    const result = await service.listTaskModelOptions("org-1", "dep-1");
+
+    expect(userFindMany).toHaveBeenCalledWith({
+      where: {
+        status: "active",
+        department: { id: "dep-1", organization_id: "org-1" },
+        AND: [
+          { OR: [{ organization_id: "org-1" }, { organization_id: null }] },
+          {
+            OR: [
+              { type: "admin" },
+              {
+                permissions: {
+                  some: { organization_id: "org-1", rh: { gte: 3 } },
+                },
+              },
+            ],
+          },
+        ],
+      },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+    expect(result.users).toEqual([{ id: "leader-1", name: "Lia" }]);
+  });
+
   it("envolve falha ao listar usuários em ServiceError 500", async () => {
     const service = new DepsTasksService({
       user: { findMany: vi.fn().mockRejectedValue(new Error("user db down")) },

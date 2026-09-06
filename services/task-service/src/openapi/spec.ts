@@ -857,6 +857,13 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["TaskDependent"],
           summary: "Listar opções ativas para modelos de tarefa",
           security: bearer,
+          parameters: [
+            {
+              name: "department_id",
+              in: "query",
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
           responses: { "200": { description: "Opções", ...successJson } },
         },
       },

@@ -36,6 +36,7 @@ import {
 import {
   buildCreateTaskModelPayload,
   buildDeleteTaskModelPayload,
+  buildTaskModelOptionsParams,
   buildTaskModelListParams,
   buildUpdateTaskModelPayload,
   normalizeTaskModelResponsibleSequence,
@@ -577,6 +578,13 @@ runTest("task model endpoints match task-service contract", () => {
   assert.equal(TASK_MODEL_ENDPOINTS.options, "/task/deps/options");
 });
 
+runTest("task model options scope eligible responsibles by department", () => {
+  assert.deepEqual(buildTaskModelOptionsParams("department-1"), {
+    department_id: "department-1",
+  });
+  assert.deepEqual(buildTaskModelOptionsParams(), {});
+});
+
 runTest("task model modal uses contextual user selectors", () => {
   const options = {
     users: [{ id: "user-1", name: "Ana" }],
@@ -592,12 +600,13 @@ runTest("task model modal uses contextual user selectors", () => {
   assert.doesNotMatch(source, /listAdminUsers/);
 });
 
-runTest("task form uses eligible responsibles supplied by department-scoped models", () => {
+runTest("task form obtains legacy edit responsibles independently from project models", () => {
   const source = readFileSync(new URL("./components/TaskFormModal.tsx", import.meta.url), "utf8");
 
   assert.match(source, /taskModelService\.list\(\{ type: "Projeto" \}\)/);
   assert.match(source, /model\.department_id === createValues\.department_id/);
   assert.match(source, /selectedCreateTaskModel\?\.department\?\.users/);
+  assert.match(source, /taskModelService\.listOptions\(editValues\.department_id\)/);
   assert.doesNotMatch(source, /useAssignableUsers/);
   assert.match(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
   assert.doesNotMatch(source, /listAdminUsers/);
