@@ -60,7 +60,7 @@ export const integracaoTaskCreateBodySchema = z
     prospecting_status: prospectingStatusZod,
     name: optionalTextZod,
     status: optionalStatusZod,
-    department_id: optionalTextZod,
+    department_id: zNonEmptyText("department_id"),
     observations: z.string().optional().default(""),
     billing: optionalBillingZod,
     urgency: zNonEmptyText("urgency"),

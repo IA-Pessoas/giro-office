@@ -8,6 +8,9 @@ const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
     project: {
       findFirst: vi.fn(),
     },
+    client: {
+      findFirst: vi.fn(),
+    },
     task: {
       findFirst: vi.fn(),
       create: vi.fn(),
@@ -125,9 +128,12 @@ describe("TaskCrudService", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });
-    prismaMock.user.findMany.mockImplementation(async (args) =>
-      ((args as { where?: { id?: { in?: string[] } } }).where?.id?.in ?? []).map((id) => ({ id })),
-    );
+    prismaMock.user.findMany.mockImplementation(async (args) => {
+      const ids = (args as { where?: { id?: { in?: string[] } } }).where?.id?.in;
+      return (ids ?? ["user-1", "user-model-1", "user-model-2", "user-model-3"]).map((id) => ({
+        id,
+      }));
+    });
   });
 
   it("createTask rejeita departamento de outra organização mesmo sem responsáveis", async () => {
@@ -194,7 +200,7 @@ describe("TaskCrudService", () => {
     expect(prismaMock.task.update).not.toHaveBeenCalled();
   });
 
-  it("createTask preserva null explícito sem herdar responsáveis do modelo", async () => {
+  it("createTask rejeita desatribuição voluntária quando há responsável elegível", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
@@ -207,6 +213,41 @@ describe("TaskCrudService", () => {
     });
     prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: "eligible-1" }]);
+
+    await expect(
+      new TaskCrudService().createTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        model_id: "model-1",
+        project_id: "project-1",
+        client_id: "client-1",
+        prospecting_status: "Fechado",
+        department_id: "dep-1",
+        urgency: "Alta",
+        observations: "",
+        integracaoLevel: 2,
+        responsible_id: null,
+      }),
+    ).rejects.toMatchObject({ statusCode: 422 });
+    expect(prismaMock.task.create).not.toHaveBeenCalled();
+  });
+
+  it("createTask prefere o responsável padrão do modelo quando ele é elegível", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      name: "Modelo",
+      department_id: "dep-1",
+      billing: "Realizar",
+      responsible_id: "leader-default",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "leader-default" }, { id: "admin-other" }]);
+    prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
+    prismaMock.taskDependent.findMany.mockResolvedValue([]);
+
     const result = await new TaskCrudService().createTask({
       user_id: "user-1",
       organization_id: "org-1",
@@ -214,28 +255,131 @@ describe("TaskCrudService", () => {
       project_id: "project-1",
       client_id: "client-1",
       prospecting_status: "Fechado",
+      department_id: "dep-1",
       urgency: "Alta",
       observations: "",
       integracaoLevel: 2,
-      responsible_id: null,
-      responsible2_id: null,
-      responsible3_id: null,
     });
-    expect(result.create).toMatchObject({
-      responsible_id: null,
-      responsible2_id: null,
-      responsible3_id: null,
-    });
-    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+
+    expect(prismaMock.taskModel.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "model-1",
+          organization_id: "org-1",
+          department_id: "dep-1",
+          type: "Projeto",
+          department: { status: "Ativo" },
+        }),
+      }),
+    );
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: "active",
+          department: { id: "dep-1", organization_id: "org-1" },
+        }),
+      }),
+    );
+    expect(result.create).toMatchObject({ responsible_id: "leader-default" });
   });
 
-  it("updateTask desatribui o principal sem revalidar ou alterar vínculos legados", async () => {
+  it("createTask atribui o único candidato elegível quando o padrão não é elegível", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      name: "Modelo",
+      department_id: "dep-1",
+      billing: "Realizar",
+      responsible_id: "legacy-default",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "sole-eligible" }]);
+    prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
+    prismaMock.taskDependent.findMany.mockResolvedValue([]);
+
+    const result = await new TaskCrudService().createTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      department_id: "dep-1",
+      urgency: "Alta",
+      observations: "",
+      integracaoLevel: 2,
+    });
+
+    expect(result.create).toMatchObject({ responsible_id: "sole-eligible" });
+  });
+
+  it("createTask exige escolha explícita entre múltiplos candidatos sem padrão elegível", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      name: "Modelo",
+      department_id: "dep-1",
+      billing: "Realizar",
+      responsible_id: "legacy-default",
+    });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "leader-1" }, { id: "admin-1" }]);
+
+    await expect(
+      new TaskCrudService().createTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        model_id: "model-1",
+        project_id: "project-1",
+        client_id: "client-1",
+        prospecting_status: "Fechado",
+        department_id: "dep-1",
+        urgency: "Alta",
+        observations: "",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 422 });
+    expect(prismaMock.task.create).not.toHaveBeenCalled();
+  });
+
+  it("createTask mantém Sem responsável quando não existe candidato elegível", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      name: "Modelo",
+      department_id: "dep-1",
+      billing: "Realizar",
+      responsible_id: "legacy-default",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.user.findMany.mockResolvedValue([]);
+    prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
+    prismaMock.taskDependent.findMany.mockResolvedValue([]);
+
+    const result = await new TaskCrudService().createTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      department_id: "dep-1",
+      urgency: "Alta",
+      observations: "",
+      integracaoLevel: 2,
+    });
+
+    expect(result.create).toMatchObject({ responsible_id: null });
+  });
+
+  it("updateTask permite editar outros campos de tarefa não atribuída sem migrar vínculos legados", async () => {
     prismaMock.department.findFirst.mockResolvedValue(null);
     prismaMock.task.findFirst.mockResolvedValue({
       id: "task-1",
       organization_id: "org-1",
       department_id: "dep-1",
-      responsible_id: "legacy-1",
+      responsible_id: null,
       responsible2_id: "legacy-outside",
       responsible3_id: null,
       status: "Em Andamento",
@@ -247,15 +391,80 @@ describe("TaskCrudService", () => {
       organization_id: "org-1",
       task_id: "task-1",
       integracaoLevel: 2,
-      responsible_id: null,
+      observations: "observação atualizada",
     });
     expect(result).toMatchObject({
       responsible_id: null,
       responsible2_id: "legacy-outside",
       responsible3_id: null,
+      observations: "observação atualizada",
     });
     expect(prismaMock.department.findFirst).not.toHaveBeenCalled();
     expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it("updateTask atribui posteriormente um candidato elegível a uma tarefa sem responsável", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      department_id: "dep-1",
+      responsible_id: null,
+      responsible2_id: null,
+      responsible3_id: null,
+      status: "Em Andamento",
+    });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "eligible-later" }]);
+    prismaMock.task.update.mockImplementation(async ({ data }) => data);
+
+    const result = await new TaskCrudService().updateTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      responsible_id: "eligible-later",
+      integracaoLevel: 2,
+    });
+
+    expect(result).toMatchObject({ responsible_id: "eligible-later" });
+  });
+
+  it("updateTask troca modelo e departamento, limpando vínculos incompatíveis", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      department_id: "dep-1",
+      responsible_id: "legacy-1",
+      responsible2_id: "legacy-2",
+      responsible3_id: null,
+      status: "Em Andamento",
+    });
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      id: "model-2",
+      department_id: "dep-2",
+      responsible_id: "admin-2",
+    });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "admin-2" }]);
+    prismaMock.task.update.mockImplementation(async ({ data }) => data);
+
+    const result = await new TaskCrudService().updateTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      model_id: "model-2",
+      department_id: "dep-2",
+      integracaoLevel: 2,
+    });
+
+    expect(result).toMatchObject({
+      model_id: "model-2",
+      department_id: "dep-2",
+      responsible_id: "admin-2",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
   });
 
   it("createTask lança 409 quando já existe tarefa em andamento", async () => {
@@ -518,7 +727,7 @@ describe("TaskCrudService", () => {
     );
   });
 
-  it("createTask retains model defaults when optional details are omitted", async () => {
+  it("createTask mantém os defaults elegíveis do modelo sem herdar responsáveis secundários", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
@@ -552,8 +761,8 @@ describe("TaskCrudService", () => {
           department_id: "department-model",
           billing: "Não Realizar",
           responsible_id: "user-model-1",
-          responsible2_id: "user-model-2",
-          responsible3_id: "user-model-3",
+          responsible2_id: null,
+          responsible3_id: null,
         }),
       }),
     );
@@ -605,6 +814,7 @@ describe("TaskCrudService", () => {
           status: "Em Andamento",
           billing: "Realizar",
           isOwn: false,
+          isUnassigned: false,
         },
       ],
       total: 41,
@@ -642,6 +852,69 @@ describe("TaskCrudService", () => {
         ],
       },
     });
+  });
+
+  it("listTasks compõe cliente e tarefas sem responsável com o escopo da organização", async () => {
+    const clientId = "11111111-1111-4111-8111-111111111111";
+    prismaMock.client.findFirst.mockResolvedValue({ id: clientId });
+    prismaMock.task.findMany.mockResolvedValue([
+      {
+        id: "task-1",
+        responsible_id: null,
+        responsible2_id: null,
+        responsible3_id: null,
+      },
+    ]);
+    prismaMock.task.count.mockResolvedValue(1);
+
+    const result = await new TaskCrudService().listTasks({
+      organization_id: "org-1",
+      user_id: "user-1",
+      status: "Todos",
+      ref: "",
+      ref_id: "",
+      search: "",
+      client_id: clientId,
+      assignment: "unassigned",
+      page: 1,
+      limit: 20,
+      integracaoLevel: 2,
+    });
+
+    expect(prismaMock.client.findFirst).toHaveBeenCalledWith({
+      where: { id: clientId, organization_id: "org-1" },
+      select: { id: true },
+    });
+    expect(prismaMock.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: "org-1",
+          client_id: clientId,
+          responsible_id: null,
+        },
+      }),
+    );
+    expect(result.data[0]).toMatchObject({ id: "task-1", isOwn: false, isUnassigned: true });
+  });
+
+  it("listTasks não consulta tarefas quando o cliente não pertence à organização", async () => {
+    prismaMock.client.findFirst.mockResolvedValue(null);
+
+    await expect(
+      new TaskCrudService().listTasks({
+        organization_id: "org-1",
+        user_id: "user-1",
+        status: "Todos",
+        ref: "",
+        ref_id: "",
+        search: "",
+        client_id: "11111111-1111-4111-8111-111111111111",
+        page: 1,
+        limit: 20,
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prismaMock.task.findMany).not.toHaveBeenCalled();
   });
 
   it("listTasks mantém a responsabilidade própria quando nível 0 pesquisa", async () => {

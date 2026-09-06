@@ -18,6 +18,7 @@ const taskBillingZod = z.enum(["Realizar", "Não Realizar"]);
 export const integracaoTaskUpdateBodySchema = z
   .object({
     task_id: zNonEmptyText("task_id"),
+    model_id: zNonEmptyText("model_id").optional(),
     name: z.string().optional(),
     status: integracaoTaskStatusZod.optional(),
     department_id: z.string().optional(),

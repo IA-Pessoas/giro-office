@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import {
   CheckSquare,
   Edit3,
@@ -76,9 +77,13 @@ function getBillingTone(value: string) {
 }
 
 export function TasksWorkspace() {
+  const router = useRouter();
   const { access: integracaoAccess } = useModuleAccess("integracao");
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [refFilter, setRefFilter] = useState("");
+  const [assignmentFilter, setAssignmentFilter] = useState<"all" | "assigned" | "unassigned">(
+    "all",
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -88,19 +93,23 @@ export function TasksWorkspace() {
   const [taskDeletionError, setTaskDeletionError] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
   const isSearchPending = searchTerm.trim() !== debouncedSearch;
+  const routeClientId =
+    typeof router.query.clientId === "string" ? router.query.clientId : undefined;
 
   const listParams = useMemo(
     () => ({
       status: statusFilter,
       ref: refFilter,
       search: debouncedSearch,
+      clientId: routeClientId,
+      assignment: assignmentFilter === "all" ? undefined : assignmentFilter,
       page,
       limit: TASKS_PAGE_SIZE,
     }),
-    [debouncedSearch, page, refFilter, statusFilter],
+    [assignmentFilter, debouncedSearch, page, refFilter, routeClientId, statusFilter],
   );
 
-  const tasksQuery = useIntegracaoTasksList(listParams);
+  const tasksQuery = useIntegracaoTasksList(listParams, { enabled: router.isReady });
   const deleteTaskMutation = useDeleteIntegracaoTaskMutation();
   const canDelete = integracaoAccess.isAdmin;
   const canCreate = integracaoAccess.canEdit;
@@ -111,7 +120,21 @@ export function TasksWorkspace() {
 
   useEffect(() => {
     setPage(1);
-  }, [refFilter, searchTerm, statusFilter]);
+  }, [assignmentFilter, refFilter, searchTerm, selectedClient?.id, statusFilter]);
+
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    const clientId = routeClientId ?? "";
+    setSelectedClient((current) => {
+      if (current?.id === clientId) {
+        return current;
+      }
+      return clientId ? { id: clientId, name: "Cliente selecionado" } : null;
+    });
+  }, [routeClientId, router.isReady]);
 
   const stats = useMemo(
     () => [
@@ -189,6 +212,16 @@ export function TasksWorkspace() {
     void tasksQuery.refetch();
   }
 
+  function handleClientSelect(client: ClientPickerOption | null) {
+    setSelectedClient(client);
+    setPage(1);
+    void router.replace(
+      { pathname: "/tasks", query: client ? { clientId: client.id } : {} },
+      undefined,
+      { shallow: true },
+    );
+  }
+
   const isInitialLoading = tasksQuery.isLoading && tasks.length === 0;
   const hasMore = Boolean(tasksQuery.data?.hasMore) && page < totalPages;
 
@@ -249,14 +282,12 @@ export function TasksWorkspace() {
         </div>
 
         <div className="flex flex-col gap-2 sm:items-end">
-          {canCreate ? (
-            <ClientPickerModal
-              selectedClient={selectedClient}
-              onSelectClient={setSelectedClient}
-              filters={{}}
-              allowClearSelection
-            />
-          ) : null}
+          <ClientPickerModal
+            selectedClient={selectedClient}
+            onSelectClient={handleClientSelect}
+            filters={{}}
+            allowClearSelection
+          />
           <div className="flex flex-col gap-2 sm:flex-row">
             {canManageTaskModels ? (
               <Link
@@ -311,7 +342,7 @@ export function TasksWorkspace() {
       </div>
 
       <section className={`${PROJECT_SUBPANEL_CLASSNAME} p-4`}>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px_260px]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_240px]">
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-white">
               <Search className="h-4 w-4 text-slate-400" />
@@ -324,6 +355,25 @@ export function TasksWorkspace() {
               className={PROJECT_INPUT_CLASSNAME}
               placeholder="Buscar por nome"
             />
+          </label>
+
+          <label className="space-y-2">
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-white">
+              <Filter className="h-4 w-4 text-slate-400" />
+              Atribuição
+            </span>
+            <select
+              value={assignmentFilter}
+              onChange={(event) =>
+                setAssignmentFilter(event.target.value as typeof assignmentFilter)
+              }
+              className={PROJECT_SELECT_CLASSNAME}
+              style={PROJECT_SELECT_ARROW_STYLE}
+            >
+              <option value="all">Todas</option>
+              <option value="assigned">Com responsável</option>
+              <option value="unassigned">Sem responsável</option>
+            </select>
           </label>
 
           <label className="space-y-2">
@@ -375,6 +425,7 @@ export function TasksWorkspace() {
                 <th className={TASK_TABLE_NAME_HEAD_CELL_CLASSNAME}>Tarefa</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-28`}>Status</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-28`}>Cobrança</th>
+                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-36`}>Responsável</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-24`}>Comercial</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-24`}>Financeiro</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-32`}>Contratação</th>
@@ -386,20 +437,20 @@ export function TasksWorkspace() {
             <tbody>
               {isInitialLoading ? (
                 <tr>
-                  <td className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={9}>
+                  <td className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={10}>
                     <LoaderCircle className="mr-2 inline h-4 w-4 animate-spin" />
                     Carregando tarefas...
                   </td>
                 </tr>
               ) : tasksQuery.isError ? (
                 <tr>
-                  <td className="px-5 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={9}>
+                  <td className="px-5 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={10}>
                     Não foi possível carregar as tarefas no momento.
                   </td>
                 </tr>
               ) : tasks.length === 0 ? (
                 <tr>
-                  <td className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={9}>
+                  <td className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={10}>
                     Nenhuma tarefa encontrada com os filtros atuais.
                   </td>
                 </tr>
@@ -432,6 +483,9 @@ export function TasksWorkspace() {
                       >
                         {task.billing}
                       </span>
+                    </td>
+                    <td className={TASK_TABLE_CELL_CLASSNAME}>
+                      {task.isUnassigned ? "Sem responsável" : "Com responsável"}
                     </td>
                     <td className={TASK_TABLE_CELL_CLASSNAME}>
                       <span

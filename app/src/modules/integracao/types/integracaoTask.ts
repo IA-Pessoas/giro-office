@@ -30,6 +30,7 @@ export type TaskBilling = "Realizar" | "Não Realizar";
 export interface IntegracaoTaskListItem {
   id: string;
   isOwn: boolean;
+  isUnassigned: boolean;
   name: string;
   status: string;
   billing: string;
@@ -76,6 +77,8 @@ export interface IntegracaoTaskListParams {
   ref?: string;
   ref_id?: string;
   search?: string;
+  clientId?: string;
+  assignment?: "assigned" | "unassigned";
   page?: number;
   limit?: number;
 }
@@ -87,7 +90,7 @@ export interface CreateIntegracaoTaskBody {
   prospecting_status: ProspectingStatus;
   name?: string;
   status?: IntegracaoTaskStatus;
-  department_id?: string;
+  department_id: string;
   observations?: string;
   billing?: TaskBilling;
   urgency: string;
@@ -99,6 +102,7 @@ export interface CreateIntegracaoTaskBody {
 
 export interface UpdateIntegracaoTaskBody {
   task_id: string;
+  model_id?: string;
   name?: string;
   status?: IntegracaoTaskStatus;
   department_id?: string;

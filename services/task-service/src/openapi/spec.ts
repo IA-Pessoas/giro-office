@@ -53,7 +53,14 @@ const createTaskRequestBody = createObjectRequestBody({
     responsible3_id: null,
     prevision_date: "2026-04-10",
   },
-  required: ["model_id", "project_id", "client_id", "prospecting_status", "urgency"],
+  required: [
+    "model_id",
+    "project_id",
+    "client_id",
+    "prospecting_status",
+    "urgency",
+    "department_id",
+  ],
   properties: {
     model_id: { type: "string" },
     project_id: { type: "string" },
@@ -75,6 +82,7 @@ const createTaskRequestBody = createObjectRequestBody({
 const updateTaskRequestBody = createObjectRequestBody({
   example: {
     task_id: "task-uuid",
+    model_id: "task-model-uuid",
     name: "Contato com cliente",
     status: "Em Andamento",
     department_id: "department-uuid",
@@ -89,6 +97,7 @@ const updateTaskRequestBody = createObjectRequestBody({
   required: ["task_id"],
   properties: {
     task_id: { type: "string" },
+    model_id: { type: "string" },
     name: { type: "string" },
     status: { type: "string" },
     department_id: { type: "string" },
@@ -540,6 +549,12 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             { name: "ref", in: "query", schema: { type: "string" } },
             { name: "ref_id", in: "query", schema: { type: "string" } },
             { name: "search", in: "query", schema: { type: "string" } },
+            { name: "client_id", in: "query", schema: { type: "string", format: "uuid" } },
+            {
+              name: "assignment",
+              in: "query",
+              schema: { type: "string", enum: ["assigned", "unassigned"] },
+            },
             { name: "page", in: "query", schema: { type: "integer" } },
             { name: "limit", in: "query", schema: { type: "integer" } },
           ],
@@ -561,10 +576,11 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                             type: "array",
                             items: {
                               type: "object",
-                              required: ["id", "isOwn"],
+                              required: ["id", "isOwn", "isUnassigned"],
                               properties: {
                                 id: { type: "string" },
                                 isOwn: { type: "boolean" },
+                                isUnassigned: { type: "boolean" },
                               },
                             },
                           },

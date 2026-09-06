@@ -24,6 +24,23 @@ describe("expansão do responsável de tarefa #981", () => {
     expect(JSON.stringify(spec.paths["/task/model"])).toContain(
       '"responsible_id":{"type":"string"}',
     );
+
+    const taskPath = spec.paths["/task"] as {
+      post: {
+        requestBody: { content: { "application/json": { schema: { required: string[] } } } };
+      };
+      put: {
+        requestBody: {
+          content: { "application/json": { schema: { properties: Record<string, unknown> } } };
+        };
+      };
+    };
+    expect(taskPath.post.requestBody.content["application/json"].schema.required).toContain(
+      "department_id",
+    );
+    expect(taskPath.put.requestBody.content["application/json"].schema.properties).toHaveProperty(
+      "model_id",
+    );
   });
   it("torna apenas Task anulável e preserva a política da relação legada", () => {
     const schema = readFileSync(

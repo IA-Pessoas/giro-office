@@ -4,9 +4,9 @@ import * as taskFormUi from "./components/taskFormModalUi.ts";
 
 runTest("task edit accepts an unassigned task while retaining required operational fields", () => {
   assert.equal(typeof taskFormUi.getTaskEditValidationMessage, "function");
-  const values = { name: "Tarefa", status: "Em Andamento", department_id: "dep-1", urgency: "Alta", responsible_id: "" };
+  const values = { name: "Tarefa", status: "Em Andamento", department_id: "dep-1", model_id: "model-1", urgency: "Alta", responsible_id: "" };
   assert.equal(taskFormUi.getTaskEditValidationMessage(values), null);
-  for (const field of ["name", "status", "department_id", "urgency"]) {
+  for (const field of ["name", "status", "department_id", "model_id", "urgency"]) {
     assert.ok(taskFormUi.getTaskEditValidationMessage({ ...values, [field]: "" }));
   }
 });
@@ -17,7 +17,7 @@ runTest("task edit sends actual null for an empty responsible select and preserv
 });
 
 runTest("task creation preserves explicit null responsibles and legacy omission", () => {
-  const base = { model_id: "model-1", project_id: "project-1", client_id: "client-1", prospecting_status: "Fechado", urgency: "Alta" };
+  const base = { model_id: "model-1", project_id: "project-1", client_id: "client-1", prospecting_status: "Fechado", department_id: "department-1", urgency: "Alta" };
   assert.deepEqual(buildCreateIntegracaoTaskPayload({ ...base, responsible_id: null, responsible2_id: null, responsible3_id: null }), { ...base, observations: "", responsible_id: null, responsible2_id: null, responsible3_id: null });
   assert.equal(Object.hasOwn(buildCreateIntegracaoTaskPayload(base), "responsible_id"), false);
 });
@@ -87,6 +87,7 @@ import {
   TASK_FORM_TEXTAREA_CLASSNAME,
   TASK_URGENCY_OPTIONS,
   getDefaultTaskUrgency,
+  getAutomaticTaskResponsibleId,
   getTaskCreateValidationMessage,
   getProjectSelectPlaceholder,
   getTaskUrgencyOptions,
@@ -103,7 +104,10 @@ import {
   getTaskModelEmptyStateMessage,
 } from "./components/taskModelConfigUi.ts";
 import { fetchTaskModelsWithOptionalDepartments } from "./hooks/useTaskModels.helpers.ts";
-import { projectMetricsQueryKey } from "./hooks/queryKeys.ts";
+import {
+  integracaoTasksListQueryKey,
+  projectMetricsQueryKey,
+} from "./hooks/queryKeys.ts";
 import { collectAdminUsersFromPages } from "../users/services/adminUsersService.helpers.ts";
 
 function runTest(name, fn) {
@@ -429,6 +433,25 @@ runTest("buildIntegracaoTaskListParams passes query fields literally", () => {
   );
 });
 
+runTest("task list contract maps client and assignment filters without cache collisions", () => {
+  const filters = {
+    clientId: "11111111-1111-4111-8111-111111111111",
+    assignment: "unassigned",
+  };
+
+  assert.deepEqual(buildIntegracaoTaskListParams(filters), {
+    status: "Todos",
+    ref: "",
+    ref_id: "",
+    search: "",
+    client_id: filters.clientId,
+    assignment: "unassigned",
+    page: 1,
+    limit: 20,
+  });
+  assert.notDeepEqual(integracaoTasksListQueryKey(filters), integracaoTasksListQueryKey({}));
+});
+
 runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
   assert.deepEqual(
     buildCreateIntegracaoTaskPayload({
@@ -436,6 +459,7 @@ runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
       project_id: "project-1",
       client_id: "client-1",
       prospecting_status: "Fechado",
+      department_id: "department-1",
       urgency: "Alta",
     }),
     {
@@ -443,6 +467,7 @@ runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
       project_id: "project-1",
       client_id: "client-1",
       prospecting_status: "Fechado",
+      department_id: "department-1",
       observations: "",
       urgency: "Alta",
     },
@@ -563,12 +588,13 @@ runTest("task model modal uses contextual user selectors", () => {
   assert.doesNotMatch(source, /listAdminUsers/);
 });
 
-runTest("task edit form loads contextual auxiliary selectors", () => {
+runTest("task form uses eligible responsibles supplied by department-scoped models", () => {
   const source = readFileSync(new URL("./components/TaskFormModal.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /useAssignableUsers/);
-  assert.match(source, /module: "integracao"/);
-  assert.match(source, /departmentId:/);
+  assert.match(source, /taskModelService\.list\(\{ type: "Projeto" \}\)/);
+  assert.match(source, /model\.department_id === createValues\.department_id/);
+  assert.match(source, /selectedCreateTaskModel\?\.department\?\.users/);
+  assert.doesNotMatch(source, /useAssignableUsers/);
   assert.match(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
   assert.doesNotMatch(source, /listAdminUsers/);
 });
@@ -802,7 +828,8 @@ runTest("integration write actions use the modular access level", () => {
   assert.match(tasksSource, /canEditIntegracaoTask\(integracaoAccess, task\)/);
   assert.match(taskFormSource, /const isRestrictedEdit =/);
   assert.match(taskFormSource, /enabled: open && !isRestrictedEdit/);
-  assert.match(taskFormSource, /module: "integracao"/);
+  assert.doesNotMatch(taskFormSource, /useAssignableUsers/);
+  assert.match(taskFormSource, /selectedCreateTaskModel\?\.department\?\.users/);
   assert.match(taskFormSource, /departmentId:/);
   assert.match(taskFormSource, /task_id: taskId,\s*status,\s*observations/);
   assert.match(taskFormSource, /hasRestrictedTaskAccessDenied/);
@@ -951,13 +978,51 @@ runTest("task create validation accepts blank observations before submit", () =>
     clientId: "client-1",
     projectId: "project-1",
     modelId: "model-1",
+    departmentId: "department-1",
     prospectingStatus: "Fechado",
     urgency: "Normal",
     observations: "Detalhes da tarefa",
+    eligibleResponsibleCount: 0,
+    responsibleId: "",
   };
 
   assert.equal(getTaskCreateValidationMessage(validValues), null);
   assert.equal(getTaskCreateValidationMessage({ ...validValues, observations: "   " }), null);
+});
+
+runTest("task responsible selection follows default, sole, explicit and unassigned branches", () => {
+  const candidates = [{ id: "leader-1" }, { id: "admin-1" }];
+
+  assert.equal(getAutomaticTaskResponsibleId("leader-1", candidates), "leader-1");
+  assert.equal(getAutomaticTaskResponsibleId("legacy", [{ id: "admin-1" }]), "admin-1");
+  assert.equal(getAutomaticTaskResponsibleId("legacy", candidates), "");
+  assert.equal(getAutomaticTaskResponsibleId("legacy", []), "");
+
+  const base = {
+    clientId: "client-1",
+    projectId: "project-1",
+    modelId: "model-1",
+    departmentId: "department-1",
+    prospectingStatus: "Fechado",
+    urgency: "Normal",
+    observations: "",
+  };
+  assert.match(
+    getTaskCreateValidationMessage({
+      ...base,
+      eligibleResponsibleCount: 2,
+      responsibleId: "",
+    }),
+    /responsável elegível/i,
+  );
+  assert.equal(
+    getTaskCreateValidationMessage({
+      ...base,
+      eligibleResponsibleCount: 2,
+      responsibleId: "leader-1",
+    }),
+    null,
+  );
 });
 
 runTest("task create form marks observations as optional", () => {
