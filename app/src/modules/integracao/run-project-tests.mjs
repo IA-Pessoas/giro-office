@@ -108,6 +108,7 @@ import { fetchTaskModelsWithOptionalDepartments } from "./hooks/useTaskModels.he
 import {
   integracaoTasksListQueryKey,
   projectMetricsQueryKey,
+  taskResponsibleOptionsQueryKey,
 } from "./hooks/queryKeys.ts";
 import { collectAdminUsersFromPages } from "../users/services/adminUsersService.helpers.ts";
 
@@ -583,6 +584,11 @@ runTest("task model options scope eligible responsibles by department", () => {
     department_id: "department-1",
   });
   assert.deepEqual(buildTaskModelOptionsParams(), {});
+  assert.deepEqual(taskResponsibleOptionsQueryKey("department-1"), [
+    "task-models",
+    "responsible-options",
+    "department-1",
+  ]);
 });
 
 runTest("task model modal uses contextual user selectors", () => {

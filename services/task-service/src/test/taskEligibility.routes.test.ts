@@ -272,6 +272,73 @@ describe("elegibilidade manual de tarefas via rotas", () => {
     });
   });
 
+  it("troca departamento e modelo, resolve o responsável e preserva os demais campos", async () => {
+    const taskBeforeSwap = {
+      ...legacyTask,
+      name: "Nome preservado",
+      observations: "Observação preservada",
+      billing: "Realizar",
+      urgency: "Normal",
+      prevision_date: new Date("2026-10-01T00:00:00.000Z"),
+    };
+    prismaMock.task.findFirst.mockResolvedValueOnce(taskBeforeSwap).mockResolvedValueOnce(null);
+    prismaMock.department.findFirst.mockResolvedValue({ id: "department-2" });
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      id: "model-2",
+      responsible_id: "responsible-default-2",
+    });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "responsible-default-2" }]);
+    prismaMock.task.update.mockImplementation(async ({ data }) => ({
+      id: taskBeforeSwap.id,
+      ...data,
+    }));
+
+    const response = await request(createApp()).put("/task").send({
+      task_id: taskBeforeSwap.id,
+      department_id: "department-2",
+      model_id: "model-2",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: expect.objectContaining({
+        id: taskBeforeSwap.id,
+        department_id: "department-2",
+        model_id: "model-2",
+        responsible_id: "responsible-default-2",
+        responsible2_id: null,
+        responsible3_id: null,
+        name: "Nome preservado",
+        observations: "Observação preservada",
+        billing: "Realizar",
+        urgency: "Normal",
+        prevision_date: "2026-10-01T00:00:00.000Z",
+      }),
+    });
+  });
+
+  it("rejeita troca para modelo incompatível com o departamento", async () => {
+    prismaMock.task.findFirst.mockResolvedValueOnce(legacyTask).mockResolvedValueOnce(null);
+    prismaMock.department.findFirst.mockResolvedValue({ id: "department-2" });
+    prismaMock.taskModel.findFirst.mockResolvedValue(null);
+
+    const response = await request(createApp()).put("/task").send({
+      task_id: legacyTask.id,
+      department_id: "department-2",
+      model_id: "model-incompatible",
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body).toEqual({
+      success: false,
+      error: "Modelo de tarefa não é elegível para o departamento informado.",
+      code: "UNPROCESSABLE_ENTITY",
+      requestId: expect.any(String),
+    });
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+  });
+
   it("nega atribuição posterior sem permissão de edição", async () => {
     authContext.level = 1;
     prismaMock.task.findFirst.mockResolvedValue(legacyTask);

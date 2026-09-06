@@ -551,6 +551,41 @@ describe("TaskCrudService", () => {
     expect(prismaMock.task.update).not.toHaveBeenCalled();
   });
 
+  it("updateTask converte colisão atômica ao trocar modelo em conflito de domínio", async () => {
+    prismaMock.task.findFirst
+      .mockResolvedValueOnce({
+        id: "task-1",
+        organization_id: "org-1",
+        model_id: "model-1",
+        project_id: "project-1",
+        department_id: "dep-1",
+        responsible_id: "leader-1",
+        responsible2_id: null,
+        responsible3_id: null,
+        status: "Em Andamento",
+      })
+      .mockResolvedValueOnce(null);
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      id: "model-2",
+      responsible_id: "leader-1",
+    });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "leader-1" }]);
+    prismaMock.task.update.mockRejectedValue({ code: "P2002" });
+
+    await expect(
+      new TaskCrudService().updateTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        model_id: "model-2",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Tarefa já foi cadastrada em andamento.",
+    });
+  });
+
   it("createTask lança 409 quando já existe tarefa em andamento", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue({ id: "task-1" });
@@ -569,6 +604,57 @@ describe("TaskCrudService", () => {
         integracaoLevel: 2,
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("createTask deixa somente uma criação vencer a corrida do mesmo modelo ativo", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      name: "Modelo 1",
+      billing: "Não Realizar",
+      department_id: "department-1",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.taskDependent.findMany.mockResolvedValue([]);
+    let activeTaskCreated = false;
+    prismaMock.task.create.mockImplementation(async ({ data }) => {
+      await Promise.resolve();
+      if (activeTaskCreated) {
+        throw { code: "P2002" };
+      }
+      activeTaskCreated = true;
+      return { id: "task-winner", ...data };
+    });
+    const service = new TaskCrudService();
+    const input = {
+      user_id: "user-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado" as const,
+      observations: "obs",
+      urgency: "Alta",
+      integracaoLevel: 2 as const,
+    };
+
+    const results = await Promise.allSettled([
+      service.createTask(input),
+      service.createTask(input),
+    ]);
+
+    expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find(({ status }) => status === "rejected");
+    expect(rejected).toMatchObject({
+      status: "rejected",
+      reason: {
+        statusCode: 409,
+        message: "Tarefa já foi cadastrada em andamento.",
+      },
+    });
+    expect(prismaMock.task.create).toHaveBeenCalledTimes(2);
   });
 
   it("createTask rejeita responsaveis ativos fora do departamento da tarefa", async () => {

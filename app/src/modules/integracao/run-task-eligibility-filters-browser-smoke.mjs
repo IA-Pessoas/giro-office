@@ -82,6 +82,7 @@ async function installApiMocks(
   updateTaskRequests,
   responsibleOptionsRequests,
 ) {
+  let currentLegacyTaskDetail = { ...legacyTaskDetail };
   await page.route("**/user/me", (route) =>
     route.fulfill({
       status: 200,
@@ -206,6 +207,20 @@ async function installApiMocks(
             },
           },
           {
+            id: "model-stale",
+            name: "Modelo incompatível no servidor",
+            department_id: "department-one",
+            responsible_id: "responsible-default",
+            department: {
+              id: "department-one",
+              name: "Departamento com candidatos",
+              users: [
+                { id: "responsible-default", name: "Responsável padrão" },
+                { id: "responsible-alternative", name: "Responsável alternativo" },
+              ],
+            },
+          },
+          {
             id: "model-sole",
             name: "Modelo com candidato único",
             department_id: "department-sole",
@@ -257,7 +272,7 @@ async function installApiMocks(
     responsibleOptionsRequests.push(requestUrl);
     const departmentId = requestUrl.searchParams.get("department_id");
     const users =
-      departmentId === "department-legacy"
+      departmentId === "department-legacy" || departmentId === "department-one"
         ? [
             { id: "responsible-default", name: "Responsável padrão" },
             { id: "responsible-alternative", name: "Responsável alternativo" },
@@ -282,12 +297,33 @@ async function installApiMocks(
     if (request.method() === "PUT") {
       const payload = request.postDataJSON();
       updateTaskRequests.push(payload);
+      if (payload.model_id === "model-stale") {
+        return route.fulfill({
+          status: 422,
+          contentType: "application/json",
+          json: {
+            success: false,
+            error: "Modelo de tarefa não é elegível para o departamento informado.",
+            code: "UNPROCESSABLE_ENTITY",
+          },
+        });
+      }
+      const currentDetail =
+        payload.task_id === assignedTask.id ? assignedTaskDetail : currentLegacyTaskDetail;
+      const updatedDetail = {
+        ...currentDetail,
+        ...payload,
+        ...(payload.model_id ? { responsible2_id: null, responsible3_id: null } : {}),
+      };
+      if (payload.task_id === currentLegacyTaskDetail.id) {
+        currentLegacyTaskDetail = updatedDetail;
+      }
       return route.fulfill({
         status: 200,
         contentType: "application/json",
         json: {
           success: true,
-          data: { ...legacyTaskDetail, responsible_id: payload.responsible_id ?? null },
+          data: updatedDetail,
         },
       });
     }
@@ -297,7 +333,9 @@ async function installApiMocks(
       contentType: "application/json",
       json: {
         success: true,
-        data: { detail: taskId === assignedTask.id ? assignedTaskDetail : legacyTaskDetail },
+        data: {
+          detail: taskId === assignedTask.id ? assignedTaskDetail : currentLegacyTaskDetail,
+        },
       },
     });
   });
@@ -456,6 +494,66 @@ async function runBrowserProof() {
       "A atribuição posterior não pode migrar implicitamente o modelo legado.",
     );
 
+    await page.getByRole("button", { name: `Editar tarefa ${task.name}` }).click();
+    const swapDialog = page.getByRole("dialog", { name: "Editar tarefa" });
+    await expect(swapDialog).toBeVisible();
+    await expect(swapDialog.getByLabel("Nome")).toHaveValue(task.name);
+    await expect(swapDialog.getByLabel("Observações")).toHaveValue("Legado preservado");
+    await swapDialog.getByLabel("Departamento").selectOption("department-one");
+    await swapDialog.getByLabel("Modelo de tarefa").selectOption("model-stale");
+    await expect(swapDialog.getByLabel("Responsável")).toHaveValue("responsible-default");
+    await swapDialog.getByRole("button", { name: "Salvar alterações" }).click();
+    await expect(swapDialog).toBeVisible();
+    await expect(
+      page.getByText("Modelo de tarefa não é elegível para o departamento informado.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect.poll(() => updateTaskRequests.length).toBe(2);
+
+    await swapDialog.getByLabel("Modelo de tarefa").selectOption("model-default");
+    await swapDialog.getByRole("button", { name: "Salvar alterações" }).click();
+    await expect(swapDialog).toHaveCount(0);
+    await expect.poll(() => updateTaskRequests.length).toBe(3);
+    assert.deepEqual(
+      {
+        model_id: updateTaskRequests[2].model_id,
+        department_id: updateTaskRequests[2].department_id,
+        responsible_id: updateTaskRequests[2].responsible_id,
+        name: updateTaskRequests[2].name,
+        status: updateTaskRequests[2].status,
+        observations: updateTaskRequests[2].observations,
+        billing: updateTaskRequests[2].billing,
+        urgency: updateTaskRequests[2].urgency,
+        prevision_date: updateTaskRequests[2].prevision_date,
+      },
+      {
+        model_id: "model-default",
+        department_id: "department-one",
+        responsible_id: "responsible-default",
+        name: task.name,
+        status: task.status,
+        observations: "Legado preservado",
+        billing: task.billing,
+        urgency: "Normal",
+        prevision_date: null,
+      },
+      "A troca válida deve resolver o responsável e preservar os demais campos editáveis.",
+    );
+
+    await page.getByRole("button", { name: `Editar tarefa ${task.name}` }).click();
+    const persistedSwapDialog = page.getByRole("dialog", { name: "Editar tarefa" });
+    await expect(persistedSwapDialog.getByLabel("Departamento")).toHaveValue("department-one");
+    await expect(persistedSwapDialog.getByLabel("Modelo de tarefa")).toHaveValue("model-default");
+    await expect(persistedSwapDialog.getByLabel("Responsável")).toHaveValue(
+      "responsible-default",
+    );
+    await expect(persistedSwapDialog.getByLabel("Observações")).toHaveValue(
+      "Legado preservado",
+    );
+    await persistedSwapDialog.getByRole("button", { name: "Cancelar" }).click();
+    await expect(persistedSwapDialog).toHaveCount(0);
+
     await page.getByLabel("Atribuição").selectOption("assigned");
     await expect(page.getByText(assignedTask.name, { exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Com responsável", exact: true })).toBeVisible();
@@ -475,8 +573,8 @@ async function runBrowserProof() {
       .getByRole("button", { name: "Salvar status e observações" })
       .click();
     await expect(restrictedDialog).toHaveCount(0);
-    await expect.poll(() => updateTaskRequests.length).toBe(2);
-    assert.deepEqual(Object.keys(updateTaskRequests[1]).sort(), [
+    await expect.poll(() => updateTaskRequests.length).toBe(4);
+    assert.deepEqual(Object.keys(updateTaskRequests[3]).sort(), [
       "observations",
       "status",
       "task_id",

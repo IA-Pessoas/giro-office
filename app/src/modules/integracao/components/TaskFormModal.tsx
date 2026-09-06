@@ -18,6 +18,7 @@ import {
   type TaskBilling,
 } from "../types";
 import { taskModelService } from "../services";
+import { taskResponsibleOptionsQueryKey } from "../hooks/queryKeys";
 import {
   useCreateIntegracaoTaskMutation,
   useIntegracaoTaskDetail,
@@ -179,7 +180,7 @@ export function TaskFormModal({
   );
   const taskDetailQuery = useIntegracaoTaskDetail(open && taskId ? taskId : undefined);
   const editResponsibleOptionsQuery = useFetch(
-    ["task-form-responsibles", editValues.department_id],
+    taskResponsibleOptionsQueryKey(editValues.department_id),
     () => taskModelService.listOptions(editValues.department_id),
     {
       enabled: open && isEditing && !isRestrictedEdit && Boolean(editValues.department_id),
