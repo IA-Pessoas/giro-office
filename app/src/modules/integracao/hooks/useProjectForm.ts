@@ -43,16 +43,12 @@ export function useProjectForm(project?: ProjectDetail | null) {
       return "Preencha a data de início.";
     }
 
-    if (values.end_date && values.end_date < values.start_date) {
-      return "A data final não pode ser anterior à data de início.";
-    }
-
     if (!values.objective.trim()) {
       return "Preencha o objetivo do projeto.";
     }
 
     return null;
-  }, [values.end_date, values.name, values.objective, values.start_date]);
+  }, [values.name, values.objective, values.start_date]);
 
   const buildCreatePayload = useCallback((clientId: string): CreateProjectData => {
     return {

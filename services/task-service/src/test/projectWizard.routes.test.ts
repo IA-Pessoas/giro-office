@@ -14,6 +14,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createTaskApp } from "../app.js";
 import type { TaskServiceEnv } from "../config/env.js";
 import { buildTaskServiceOpenApiSpec } from "../openapi/spec.js";
+import { projectWizardCreateBodySchema } from "../schemas/projectWizard.schemas.js";
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -216,6 +217,28 @@ describe("project wizard routes", () => {
     expect(
       JSON.parse(forwardedRequest?.headers[FORWARDED_AUTH_MODULES_HEADER] as string),
     ).toMatchObject({ integracao: 2 });
+  });
+
+  it.each(["start_date", "end_date"] as const)("converte %s ISO em Date", (field) => {
+    const parsed = projectWizardCreateBodySchema.parse(validBody);
+
+    expect(parsed[field]).toBeInstanceOf(Date);
+    expect(parsed[field]?.toISOString()).toBe(validBody[field]);
+  });
+
+  it.each(
+    ["start_date", "end_date"].flatMap((field) =>
+      [null, 0, true, false].map((value) => ({ field, value })),
+    ),
+  )("POST /task/project-wizard rejeita $field=$value", async ({ field, value }) => {
+    const response = await request(createApp())
+      .post("/task/project-wizard")
+      .set(gatewayHeaders())
+      .set("Idempotency-Key", "wizard-invalid-date")
+      .send({ ...validBody, start_date: "1969-01-01T00:00:00.000Z", [field]: value });
+
+    expect(response.status).toBe(400);
+    expect(forwardedRequest).toBeNull();
   });
 
   it("POST /task/project-wizard permite owner sem nível de Integração", async () => {

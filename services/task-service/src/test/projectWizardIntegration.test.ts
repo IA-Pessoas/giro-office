@@ -3,10 +3,16 @@ import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
+  error as logError,
 } from "@workspace/shared";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createHttpProjectWizardIntegration } from "../integrations/projectWizard.js";
+
+vi.mock("@workspace/shared", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@workspace/shared")>()),
+  error: vi.fn(),
+}));
 
 const params = {
   userId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
@@ -21,6 +27,8 @@ const params = {
 };
 
 describe("project wizard integration", () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it("encaminha criação, contexto autenticado e a mesma chave ao project-service", async () => {
     const fetchImpl = vi.fn(
       async () =>
@@ -72,5 +80,32 @@ describe("project wizard integration", () => {
     });
 
     await expect(integration.createProject(params)).rejects.toMatchObject({ statusCode: 502 });
+  });
+
+  it.each([
+    {
+      scenario: "falha de transporte",
+      fetchImpl: vi.fn().mockRejectedValue(new Error("token=segredo; body=sensível")),
+      message: "Falha ao chamar o project-service.",
+    },
+    {
+      scenario: "JSON inválido",
+      fetchImpl: async () => new Response("token=segredo; body=sensível"),
+      message: "Resposta inválida do project-service.",
+    },
+    {
+      scenario: "envelope inválido",
+      fetchImpl: async () => Response.json({ token: "segredo", body: "sensível" }),
+      message: "Resposta inválida do project-service.",
+    },
+  ])("registra $scenario sem expor dados sensíveis", async ({ fetchImpl, message }) => {
+    const integration = createHttpProjectWizardIntegration({
+      serviceUrl: "http://project-service:3033",
+      serviceToken: "task-service-token",
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    await expect(integration.createProject(params)).rejects.toMatchObject({ statusCode: 502 });
+    expect(logError).toHaveBeenCalledExactlyOnceWith(message);
   });
 });

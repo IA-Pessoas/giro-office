@@ -28,6 +28,12 @@ interface ProjectFormModalProps {
   onSuccess?: (project: ProjectDetail | { id: string; client_id?: string }) => void;
 }
 
+function getSaveErrorMessage(error: unknown): string {
+  const message = (error as { response?: { data?: { error?: unknown } } } | null)?.response?.data
+    ?.error;
+  return typeof message === "string" ? message : "Não foi possível salvar o projeto.";
+}
+
 export function ProjectFormModal({
   open,
   onOpenChange,
@@ -56,8 +62,12 @@ export function ProjectFormModal({
   }, [isEditing, open, reset]);
 
   const isSaving = createWizardMutation.isPending || updateMutation.isPending;
+  const dateRangeError =
+    !isEditing && values.end_date && values.end_date < values.start_date
+      ? "A data final não pode ser anterior à data de início."
+      : null;
 
-  async function handleDirectSubmit() {
+  async function handleUpdateSubmit() {
     if (isEditing && !detailQuery.data) {
       toast.error("Carregue o projeto antes de tentar editar.");
       return;
@@ -83,16 +93,7 @@ export function ProjectFormModal({
 
       onOpenChange(false);
     } catch (error) {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
-          "string"
-          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "Não foi possível salvar o projeto.";
-
-      toast.error(message);
+      toast.error(getSaveErrorMessage(error));
     }
   }
 
@@ -103,6 +104,8 @@ export function ProjectFormModal({
       toast.error(validationError);
       return;
     }
+
+    if (dateRangeError) return;
 
     setCreateStep(2);
   }
@@ -122,16 +125,7 @@ export function ProjectFormModal({
       onOpenChange(false);
       await router.push(`/tasks?clientId=${clientId}`);
     } catch (error) {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
-          "string"
-          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "Não foi possível salvar o projeto.";
-
-      toast.error(message);
+      toast.error(getSaveErrorMessage(error));
     }
   }
 
@@ -155,7 +149,7 @@ export function ProjectFormModal({
           {isEditing ? (
             <button
               type="button"
-              onClick={() => void handleDirectSubmit()}
+              onClick={() => void handleUpdateSubmit()}
               className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
               disabled={isSaving || !detailQuery.data}
             >
@@ -237,13 +231,13 @@ export function ProjectFormModal({
           onSubmit={(event) => {
             event.preventDefault();
             if (isEditing) {
-              void handleDirectSubmit();
+              void handleUpdateSubmit();
             } else {
               handleCreateStepOne();
             }
           }}
         >
-          {!isEditing && createStep === 1 ? (
+          {!isEditing ? (
             <div className="space-y-2">
               <span className="text-sm font-medium text-slate-700 dark:text-white">Cliente</span>
               <ClientSelectionField clientId={clientId} />
@@ -303,8 +297,19 @@ export function ProjectFormModal({
                     onChange={(event) => updateValue("end_date", event.target.value)}
                     onInput={(event) => updateValue("end_date", event.currentTarget.value)}
                     className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                    aria-invalid={Boolean(dateRangeError)}
+                    aria-describedby={dateRangeError ? "project-end-date-error" : undefined}
                   />
                 </div>
+                {dateRangeError ? (
+                  <p
+                    id="project-end-date-error"
+                    role="alert"
+                    className="text-sm text-rose-600 dark:text-rose-400"
+                  >
+                    {dateRangeError}
+                  </p>
+                ) : null}
               </label>
 
               <label className="space-y-2">
@@ -337,10 +342,6 @@ export function ProjectFormModal({
           {!isEditing && createStep === 3 ? (
             <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200">
               <h3 className="font-semibold text-slate-900 dark:text-white">Revisão</h3>
-              <div>
-                <span className="font-medium">Cliente:</span>
-                <ClientSelectionField clientId={clientId} />
-              </div>
               <p>
                 <span className="font-medium">Nome:</span> {values.name}
               </p>

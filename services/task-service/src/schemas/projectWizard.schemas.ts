@@ -1,12 +1,12 @@
-import { zNonEmptyText } from "@workspace/shared";
+import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
 export const projectWizardCreateBodySchema = z
   .object({
     client_id: z.string().uuid({ message: "client_id inválido." }),
     name: zNonEmptyText("name"),
-    start_date: z.coerce.date({ invalid_type_error: "start_date inválida." }),
-    end_date: z.coerce.date({ invalid_type_error: "end_date inválida." }).optional(),
+    start_date: zIsoDate("start_date"),
+    end_date: zIsoDate("end_date").optional(),
     objective: zNonEmptyText("objective"),
   })
   .strict()

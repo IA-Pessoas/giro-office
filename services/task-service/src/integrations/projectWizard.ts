@@ -6,6 +6,7 @@ import {
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
+  error as logError,
   ServiceError,
 } from "@workspace/shared";
 
@@ -94,6 +95,7 @@ class HttpProjectWizardIntegration implements ProjectWizardIntegration {
         }),
       });
     } catch (err: unknown) {
+      logError("Falha ao chamar o project-service.");
       throw new ServiceError(502, "Falha ao chamar o project-service.", err);
     }
 
@@ -109,6 +111,7 @@ class HttpProjectWizardIntegration implements ProjectWizardIntegration {
       debug("Projeto criado pelo command do wizard", { projectId: project.id });
       return project;
     } catch (err: unknown) {
+      logError("Resposta inválida do project-service.");
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(502, "Resposta inválida do project-service.", err);
     }

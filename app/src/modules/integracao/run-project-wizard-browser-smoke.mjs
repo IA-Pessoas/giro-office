@@ -144,7 +144,24 @@ async function runBrowserProof() {
   await context.addCookies([{ name: "cw.session", value: "opaque-test-session", url: baseUrl, httpOnly: true, sameSite: "Lax" }]);
   const page = await context.newPage();
   const wizardRequests = [];
+  const updateRequests = [];
   await installApiMocks(page, wizardRequests);
+  await page.route("**/project", async (route) => {
+    assert.equal(route.request().method(), "PUT");
+    updateRequests.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: { success: true, data: project },
+    });
+  });
+
+  async function expectLockedClient(wizard) {
+    await expect(wizard.getByText("Cliente Wizard", { exact: true })).toHaveCount(1);
+    await expect(wizard.getByText("Cliente Wizard", { exact: true })).toBeVisible();
+    await expect(wizard.getByRole("combobox")).toHaveCount(0);
+    await expect(wizard.getByRole("button", { name: /cliente/i })).toHaveCount(0);
+  }
 
   try {
     await page.goto("/projects", { waitUntil: "domcontentloaded" });
@@ -152,9 +169,24 @@ async function runBrowserProof() {
 
     await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Projetos", level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "Editar" }).first().click();
+    const legacyEditDialog = page.getByRole("dialog", { name: "Editar projeto" });
+    await expect(legacyEditDialog.getByLabel("Nome")).toHaveValue(project.name);
+    await legacyEditDialog.getByLabel("Data final prevista").fill("2026-08-31");
+    await legacyEditDialog.getByRole("button", { name: "Salvar alterações" }).click();
+    await expect.poll(() => updateRequests.length).toBe(1);
+    assert.deepEqual(updateRequests[0], {
+      project_id: project.id,
+      name: project.name,
+      start_date: project.start_date,
+      end_date: "2026-08-31",
+      objective: project.objective,
+    });
+    await expect(legacyEditDialog).not.toBeVisible();
+    assert.equal(wizardRequests.length, 0, "Edição deve continuar no PUT direto.");
     await page.getByRole("button", { name: "Novo projeto" }).click();
     const wizard = page.getByRole("dialog", { name: "Novo projeto" });
-    await expect(wizard.getByText("Cliente Wizard", { exact: true })).toBeVisible();
+    await expectLockedClient(wizard);
     await wizard.getByRole("button", { name: "Continuar" }).click();
     await expect(page.getByText("Preencha o nome do projeto.", { exact: true })).toBeVisible();
 
@@ -163,14 +195,20 @@ async function runBrowserProof() {
     await wizard.getByLabel("Data final prevista").fill("2026-09-09");
     await wizard.getByLabel("Objetivo").fill("Criar sem tarefas.");
     await wizard.getByRole("button", { name: "Continuar" }).click();
-    await expect(page.getByText("A data final não pode ser anterior à data de início.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "A data final não pode ser anterior à data de início." })).toBeVisible();
+    await expect(wizard.getByLabel("Data final prevista")).toHaveAttribute("aria-invalid", "true");
+    await expect(wizard.getByLabel("Data final prevista")).toHaveAccessibleDescription("A data final não pode ser anterior à data de início.");
+    await expect(wizard.getByText("Etapa 1 de 3", { exact: true })).toBeVisible();
 
     await wizard.getByLabel("Data final prevista").fill("2026-09-11");
+    await expect(wizard.getByRole("alert")).toHaveCount(0);
     await wizard.getByRole("button", { name: "Continuar" }).click();
     await expect(wizard.getByText("Nenhuma tarefa será criada nesta etapa.", { exact: true })).toBeVisible();
+    await expectLockedClient(wizard);
     await wizard.getByRole("button", { name: "Pular e revisar" }).click();
     assert.equal(wizardRequests.length, 0, "Pular a etapa 2 não pode criar tarefas nem minutos.");
     await expect(wizard.getByText("Revisão", { exact: true })).toBeVisible();
+    await expectLockedClient(wizard);
     await expect(wizard.getByText("Nome: Projeto pelo wizard", { exact: true })).toBeVisible();
     await wizard.getByRole("button", { name: "Voltar para etapa 1" }).click();
     await expect(wizard.getByLabel("Nome")).toHaveValue("Projeto pelo wizard");

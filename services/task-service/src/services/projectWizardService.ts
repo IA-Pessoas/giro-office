@@ -3,26 +3,15 @@ import {
   type IntegracaoPermissionLevel,
   requireIntegracaoRouteAccess,
 } from "@workspace/shared";
-
-import {
-  createHttpProjectWizardIntegration,
-  type ProjectWizardIntegration,
+import type {
+  CreateProjectFromWizardParams,
+  ProjectWizardIntegration,
 } from "../integrations/projectWizard.js";
+import { createHttpProjectWizardIntegration } from "../integrations/projectWizard.js";
 
-export interface CreateProjectWizardRequest {
-  userId: string;
-  organizationId: string;
-  permission?: number;
+export interface CreateProjectWizardRequest extends CreateProjectFromWizardParams {
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
-  userType?: "owner" | "admin" | "user";
-  modules?: Record<string, number>;
-  idempotencyKey: string;
-  client_id: string;
-  name: string;
-  start_date: Date;
-  end_date?: Date;
-  objective: string;
 }
 
 export class ProjectWizardService {
