@@ -1,7 +1,8 @@
 import "express-async-errors";
 
+import { createLogger } from "@workspace/shared/logger";
+import { MemoryLogStream } from "@workspace/shared/testUtils";
 import type { NextFunction, Request, Response } from "express";
-import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -43,23 +44,31 @@ vi.mock("../middlewares/isAuthenticated.js", () => ({
   },
 }));
 
-import { taskCrudRoutes } from "../routes/taskCrud.routes.js";
+import { createTaskApp } from "../app.js";
+import type { TaskServiceEnv } from "../config/env.js";
 
 function createApp() {
-  const app = express();
-  app.use(express.json());
-  app.use("/task", taskCrudRoutes);
-  app.use(
-    (
-      err: { statusCode?: number; message?: string },
-      _req: Request,
-      res: Response,
-      _next: NextFunction,
-    ) => {
-      res.status(err.statusCode ?? 500).json({ error: err.message ?? "Erro" });
-    },
-  );
-  return app;
+  const env = {
+    port: 3032,
+    databaseUrl: "postgresql://localhost/task_test",
+    jwtSecret: "test-secret",
+    nodeEnv: "test",
+    logLevel: "silent",
+    logPretty: false,
+    auditEnabled: false,
+    auditServiceUrl: "http://localhost:3020",
+    auditServiceToken: "audit-service-token",
+    projectServiceUrl: "http://localhost:3033",
+    enableApiDocs: false,
+  } satisfies TaskServiceEnv;
+  const logger = createLogger({
+    service: "task-service-test",
+    env: "test",
+    level: "silent",
+    destination: new MemoryLogStream(),
+  });
+
+  return createTaskApp(env, logger);
 }
 
 function taskBody(responsible_id?: string | null) {
@@ -113,6 +122,7 @@ describe("elegibilidade manual de tarefas via HTTP", () => {
       candidates: [{ id: "leader-1" }, { id: "admin-2" }],
       body: taskBody(),
       status: 422,
+      error: "Selecione um responsável elegível para a tarefa.",
     },
     { name: "nenhum candidato", candidates: [], body: taskBody(), status: 201, responsible: null },
     {
@@ -127,31 +137,40 @@ describe("elegibilidade manual de tarefas via HTTP", () => {
       candidates: [{ id: "leader-1" }],
       body: taskBody(null),
       status: 422,
+      error: "Sem responsável só é permitido quando não há candidato elegível.",
     },
     {
       name: "usuário inelegível",
       candidates: [{ id: "leader-1" }],
       body: taskBody("common-user"),
       status: 422,
+      error: "Responsável não é elegível para o departamento informado.",
     },
-  ])("resolve $name", async ({ candidates, body, status, responsible }) => {
+  ])("resolve $name", async ({ candidates, body, status, responsible, error }) => {
     prismaMock.user.findMany.mockResolvedValue(candidates);
 
     const response = await request(createApp()).post("/task").send(body);
 
     expect(response.status).toBe(status);
     if (status === 201) {
-      expect(prismaMock.task.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
+      expect(response.body).toEqual({
+        success: true,
+        data: {
+          create: expect.objectContaining({
+            id: "task-1",
             responsible_id: responsible,
             responsible2_id: null,
             responsible3_id: null,
           }),
-        }),
-      );
+        },
+      });
     } else {
-      expect(prismaMock.task.create).not.toHaveBeenCalled();
+      expect(response.body).toEqual({
+        success: false,
+        error,
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
+      });
     }
   });
 
@@ -161,7 +180,11 @@ describe("elegibilidade manual de tarefas via HTTP", () => {
     const response = await request(createApp()).post("/task").send(taskBody());
 
     expect(response.status).toBe(403);
-    expect(prismaMock.project.findFirst).not.toHaveBeenCalled();
-    expect(prismaMock.task.create).not.toHaveBeenCalled();
+    expect(response.body).toEqual({
+      success: false,
+      error: "Acesso negado para esta operação.",
+      code: "FORBIDDEN",
+      requestId: expect.any(String),
+    });
   });
 });

@@ -457,17 +457,19 @@ describe("TaskCrudService", () => {
   });
 
   it("updateTask troca modelo e departamento, limpando vínculos incompatíveis", async () => {
-    prismaMock.task.findFirst.mockResolvedValue({
-      id: "task-1",
-      organization_id: "org-1",
-      model_id: "model-1",
-      project_id: "project-1",
-      department_id: "dep-1",
-      responsible_id: "legacy-1",
-      responsible2_id: "legacy-2",
-      responsible3_id: null,
-      status: "Em Andamento",
-    });
+    prismaMock.task.findFirst
+      .mockResolvedValueOnce({
+        id: "task-1",
+        organization_id: "org-1",
+        model_id: "model-1",
+        project_id: "project-1",
+        department_id: "dep-1",
+        responsible_id: "legacy-1",
+        responsible2_id: "legacy-2",
+        responsible3_id: null,
+        status: "Em Andamento",
+      })
+      .mockResolvedValueOnce(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
       id: "model-2",
       department_id: "dep-2",
@@ -492,6 +494,61 @@ describe("TaskCrudService", () => {
       responsible2_id: null,
       responsible3_id: null,
     });
+    expect(prismaMock.task.findFirst).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: { not: "task-1" },
+        organization_id: "org-1",
+        project_id: "project-1",
+        model_id: "model-2",
+        status: { in: ["Em Andamento", "A Realizar", "Em Espera"] },
+      },
+    });
+  });
+
+  it("updateTask rejeita troca para modelo com outra tarefa ativa no projeto", async () => {
+    prismaMock.task.findFirst
+      .mockResolvedValueOnce({
+        id: "task-1",
+        organization_id: "org-1",
+        model_id: "model-1",
+        project_id: "project-1",
+        department_id: "dep-1",
+        responsible_id: "legacy-1",
+        responsible2_id: null,
+        responsible3_id: null,
+        status: "Em Andamento",
+      })
+      .mockResolvedValueOnce({ id: "task-2" });
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      id: "model-2",
+      department_id: "dep-1",
+      responsible_id: "admin-1",
+    });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "admin-1" }]);
+
+    await expect(
+      new TaskCrudService().updateTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        model_id: "model-2",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Tarefa já foi cadastrada em andamento.",
+    });
+
+    expect(prismaMock.task.findFirst).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: { not: "task-1" },
+        organization_id: "org-1",
+        project_id: "project-1",
+        model_id: "model-2",
+        status: { in: ["Em Andamento", "A Realizar", "Em Espera"] },
+      },
+    });
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
   });
 
   it("createTask lança 409 quando já existe tarefa em andamento", async () => {

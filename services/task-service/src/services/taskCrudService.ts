@@ -203,6 +203,30 @@ async function assertTaskDepartmentInOrganization(
   }
 }
 
+async function assertNoActiveTaskForModel(
+  prisma: Pick<Prisma.TransactionClient, "task">,
+  params: {
+    organizationId: string;
+    projectId: string;
+    modelId: string;
+    excludeTaskId?: string;
+  },
+): Promise<void> {
+  const duplicate = await prisma.task.findFirst({
+    where: {
+      ...(params.excludeTaskId ? { id: { not: params.excludeTaskId } } : {}),
+      organization_id: params.organizationId,
+      project_id: params.projectId,
+      model_id: params.modelId,
+      status: { in: ACTIVE_TASK_STATUSES },
+    },
+  });
+
+  if (duplicate) {
+    throw new ServiceError(409, "Tarefa já foi cadastrada em andamento.");
+  }
+}
+
 function resolveEligibleTaskResponsible(
   candidates: Array<{ id: string }>,
   modelDefaultId: string | null | undefined,
@@ -338,18 +362,11 @@ export class TaskCrudService {
         throw new ServiceError(400, "Projeto nao pertence ao cliente informado.");
       }
 
-      const dup = await prismaClient.task.findFirst({
-        where: {
-          organization_id: data.organization_id,
-          project_id: data.project_id,
-          model_id: data.model_id,
-          status: { in: ["Em Andamento", "A Realizar", "Em Espera"] },
-        },
+      await assertNoActiveTaskForModel(prismaClient, {
+        organizationId: data.organization_id,
+        projectId: data.project_id,
+        modelId: data.model_id,
       });
-
-      if (dup) {
-        throw new ServiceError(409, "Tarefa já foi cadastrada em andamento.");
-      }
 
       const isManualFlow = data.department_id !== undefined;
       const model = await prismaClient.taskModel.findFirst({
@@ -738,6 +755,15 @@ export class TaskCrudService {
       let responsible_id = exists.responsible_id;
       let responsible2_id = exists.responsible2_id;
       let responsible3_id = exists.responsible3_id;
+
+      if (modelChanged) {
+        await assertNoActiveTaskForModel(prismaClient, {
+          organizationId: data.organization_id,
+          projectId: exists.project_id,
+          modelId: model_id,
+          excludeTaskId: data.task_id,
+        });
+      }
 
       if (departmentChanged) {
         await assertTaskDepartmentInOrganization(prismaClient, data.organization_id, department_id);
