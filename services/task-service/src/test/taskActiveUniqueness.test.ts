@@ -17,7 +17,11 @@ describe("unicidade atômica de tarefas ativas", () => {
     expect(migration).toMatch(
       /ON "integracao\.tasks" \("organization_id", "project_id", "model_id"\)/,
     );
-    expect(migration).toMatch(/WHERE "status" IN \('Em Andamento', 'A Realizar', 'Em Espera'\)/);
+    expect(
+      migration.match(
+        /WHERE "status" IN \('Em Andamento', 'Em andamento', 'A Realizar', 'Em Espera'\)/g,
+      ),
+    ).toHaveLength(2);
     expect(migration).toMatch(/GROUP BY "organization_id", "project_id", "model_id"/);
     expect(migration).toMatch(/HAVING COUNT\(\*\) > 1/);
   });

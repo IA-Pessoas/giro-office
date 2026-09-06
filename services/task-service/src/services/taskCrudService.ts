@@ -20,6 +20,7 @@ import {
   assertResponsibleUsersInDepartment,
   listEligibleTaskResponsibles,
 } from "./responsibleUserContext.js";
+import { ACTIVE_TASK_CONFLICT_MESSAGE, throwIfActiveTaskConflict } from "./taskActiveConflict.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
 
 const TASK_DETAIL_SELECT = {
@@ -99,11 +100,6 @@ const DEPENDENTS_FOR_CREATE_SELECT = {
 } as const;
 
 const ACTIVE_TASK_STATUSES = ["Em Andamento", "A Realizar", "Em Espera"];
-const ACTIVE_TASK_CONFLICT_MESSAGE = "Tarefa já foi cadastrada em andamento.";
-
-function isPrismaUniqueConstraintError(err: unknown): boolean {
-  return typeof err === "object" && err !== null && "code" in err && err.code === "P2002";
-}
 
 export type TaskDetailRow = TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }>;
 export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }>;
@@ -539,9 +535,7 @@ export class TaskCrudService {
       return { create };
     } catch (err: unknown) {
       logError("Erro ao criar tarefa", { err });
-      if (isPrismaUniqueConstraintError(err)) {
-        throw new ServiceError(409, ACTIVE_TASK_CONFLICT_MESSAGE, err);
-      }
+      throwIfActiveTaskConflict(err);
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível criar a tarefa.", err);
     }
@@ -882,9 +876,7 @@ export class TaskCrudService {
       return updated;
     } catch (err: unknown) {
       logError("Erro ao atualizar tarefa", { err });
-      if (isPrismaUniqueConstraintError(err)) {
-        throw new ServiceError(409, ACTIVE_TASK_CONFLICT_MESSAGE, err);
-      }
+      throwIfActiveTaskConflict(err);
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível atualizar a tarefa.", err);
     }

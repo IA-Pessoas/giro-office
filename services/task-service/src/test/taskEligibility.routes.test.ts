@@ -22,6 +22,7 @@ const { prismaMock, authContext, auditMock, workflowMock } = vi.hoisted(() => ({
     taskModel: { findFirst: vi.fn() },
     taskDependent: { findMany: vi.fn() },
     user: { findFirst: vi.fn(), findMany: vi.fn() },
+    permissionSpecific: { findFirst: vi.fn() },
   },
   authContext: { level: 2 },
   auditMock: { createLog: vi.fn(), logUpdateIfChanged: vi.fn() },
@@ -337,6 +338,58 @@ describe("elegibilidade manual de tarefas via rotas", () => {
       requestId: expect.any(String),
     });
     expect(prismaMock.task.update).not.toHaveBeenCalled();
+  });
+
+  it("mapeia colisão atômica ao reabrir tarefa pela rota de conclusão", async () => {
+    authContext.level = 1;
+    prismaMock.task.findFirst.mockResolvedValue({
+      ...legacyTask,
+      status: "Não Contratado",
+      pending_approval: false,
+      end_date: null,
+      responsible_id: "user-1",
+    });
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
+    prismaMock.task.update.mockRejectedValue({ code: "P2002" });
+
+    const response = await request(createApp()).put("/task/conclusion").send({
+      task_id: legacyTask.id,
+      status: "Em Andamento",
+      responsible_id: "user-1",
+      observations: legacyTask.observations,
+    });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      success: false,
+      error: "Tarefa já foi cadastrada em andamento.",
+      code: "CONFLICT",
+      requestId: expect.any(String),
+    });
+    expect(prismaMock.task.update).toHaveBeenCalledTimes(1);
+    expect(auditMock.logUpdateIfChanged).not.toHaveBeenCalled();
+  });
+
+  it("mapeia colisão atômica ao reabrir tarefa pela rota comercial", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({ ...legacyTask, status: "Não Contratado" });
+    prismaMock.task.update.mockRejectedValue({ code: "P2002" });
+
+    const response = await request(createApp()).put("/task/comercial").send({
+      task_id: legacyTask.id,
+      hiring_status: "Contratado",
+      payment: "Pago",
+      billing_description: "Contrato reaberto",
+    });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      success: false,
+      error: "Tarefa já foi cadastrada em andamento.",
+      code: "CONFLICT",
+      requestId: expect.any(String),
+    });
+    expect(prismaMock.task.update).toHaveBeenCalledTimes(1);
+    expect(auditMock.logUpdateIfChanged).not.toHaveBeenCalled();
   });
 
   it("nega atribuição posterior sem permissão de edição", async () => {
