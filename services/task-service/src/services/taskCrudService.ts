@@ -119,7 +119,7 @@ export interface CreateTaskCrudRequest {
   observations: string;
   billing?: TaskBilling;
   urgency: string;
-  responsible_id?: string;
+  responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
   prevision_date?: Date | string | null;
@@ -138,7 +138,7 @@ export interface UpdateTaskCrudRequest {
   observations?: string;
   billing?: TaskBilling;
   urgency?: string;
-  responsible_id?: string;
+  responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
   prevision_date?: Date | string | null;
@@ -179,6 +179,20 @@ function taskAuthorization(data: {
     organizationId: data.organization_id,
     isOwner: data.isOwner === true,
   };
+}
+
+async function assertTaskDepartmentInOrganization(
+  prisma: Pick<Prisma.TransactionClient, "department">,
+  organizationId: string,
+  departmentId: string,
+): Promise<void> {
+  const department = await prisma.department.findFirst({
+    where: { id: departmentId, organization_id: organizationId },
+    select: { id: true },
+  });
+  if (!department) {
+    throw new ServiceError(422, "Departamento não pertence à organização informada.");
+  }
 }
 
 export class TaskCrudService {
@@ -317,9 +331,12 @@ export class TaskCrudService {
 
       const status = data.status ?? defaultStatus;
       const departmentId = data.department_id ?? model.department_id;
-      const responsibleId = data.responsible_id ?? model.responsible_id;
-      const responsible2Id = data.responsible2_id ?? model.responsible2_id;
-      const responsible3Id = data.responsible3_id ?? model.responsible3_id;
+      const responsibleId =
+        data.responsible_id !== undefined ? data.responsible_id : model.responsible_id;
+      const responsible2Id =
+        data.responsible2_id !== undefined ? data.responsible2_id : model.responsible2_id;
+      const responsible3Id =
+        data.responsible3_id !== undefined ? data.responsible3_id : model.responsible3_id;
       const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
       const previsionDate =
         data.prevision_date === undefined || data.prevision_date === null
@@ -329,6 +346,7 @@ export class TaskCrudService {
             : data.prevision_date;
 
       const { create, dependentCreates } = await this.#runTransaction(async (tx) => {
+        await assertTaskDepartmentInOrganization(tx, data.organization_id, departmentId);
         await assertResponsibleUsersInDepartment(tx, data.organization_id, departmentId, [
           responsibleId,
           responsible2Id,
@@ -628,10 +646,18 @@ export class TaskCrudService {
       const responsible3_id =
         data.responsible3_id !== undefined ? data.responsible3_id : exists.responsible3_id;
 
+      const departmentChanged = department_id !== exists.department_id;
+      if (departmentChanged) {
+        await assertTaskDepartmentInOrganization(prismaClient, data.organization_id, department_id);
+      }
       await assertResponsibleUsersInDepartment(prismaClient, data.organization_id, department_id, [
-        responsible_id,
-        responsible2_id,
-        responsible3_id,
+        departmentChanged || responsible_id !== exists.responsible_id ? responsible_id : undefined,
+        departmentChanged || responsible2_id !== exists.responsible2_id
+          ? responsible2_id
+          : undefined,
+        departmentChanged || responsible3_id !== exists.responsible3_id
+          ? responsible3_id
+          : undefined,
       ]);
 
       let prevision_date: Date | null;

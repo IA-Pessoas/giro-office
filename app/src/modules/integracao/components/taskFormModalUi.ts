@@ -19,6 +19,17 @@ export const TASK_FORM_AUXILIARY_WARNING_CLASSNAME =
 export const TASK_CREATE_REQUIRED_FIELDS_MESSAGE =
   "Preencha cliente, projeto, modelo, status de prospecção e urgência.";
 
+export function getTaskEditValidationMessage(values: {
+  name: string;
+  status: string;
+  department_id: string;
+  urgency: string;
+}): string | null {
+  return !values.name.trim() || !values.status || !values.department_id || !values.urgency.trim()
+    ? "Preencha nome, status, departamento e urgência."
+    : null;
+}
+
 export const TASK_URGENCY_OPTIONS = ["Baixa", "Normal", "Alta", "Urgente"] as const;
 
 export type TaskUrgencyOption = (typeof TASK_URGENCY_OPTIONS)[number];

@@ -922,7 +922,7 @@ model Task {
   observations        String?
   billing             String
   urgency             String
-  responsible_id      String
+  responsible_id      String?
   responsible2_id     String?
   responsible3_id     String?
   start_date          DateTime?
@@ -947,7 +947,7 @@ model Task {
   project             Project      @relation(fields: [project_id], references: [id])
   responsible2        User?        @relation("responsible2", fields: [responsible2_id], references: [id])
   responsible3        User?        @relation("responsible3", fields: [responsible3_id], references: [id])
-  responsible         User         @relation("responsible", fields: [responsible_id], references: [id])
+  responsible         User?        @relation("responsible", fields: [responsible_id], references: [id], onDelete: Restrict)
   license             License[]
   process             Process[]
 

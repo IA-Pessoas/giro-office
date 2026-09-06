@@ -1,5 +1,26 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import * as taskFormUi from "./components/taskFormModalUi.ts";
+
+runTest("task edit accepts an unassigned task while retaining required operational fields", () => {
+  assert.equal(typeof taskFormUi.getTaskEditValidationMessage, "function");
+  const values = { name: "Tarefa", status: "Em Andamento", department_id: "dep-1", urgency: "Alta", responsible_id: "" };
+  assert.equal(taskFormUi.getTaskEditValidationMessage(values), null);
+  for (const field of ["name", "status", "department_id", "urgency"]) {
+    assert.ok(taskFormUi.getTaskEditValidationMessage({ ...values, [field]: "" }));
+  }
+});
+
+runTest("task edit sends actual null for an empty responsible select and preserves omission", () => {
+  assert.deepEqual(buildUpdateIntegracaoTaskPayload({ task_id: "task-1", responsible_id: "" }), { task_id: "task-1", responsible_id: null });
+  assert.deepEqual(buildUpdateIntegracaoTaskPayload({ task_id: "task-1", observations: "obs" }), { task_id: "task-1", observations: "obs" });
+});
+
+runTest("task creation preserves explicit null responsibles and legacy omission", () => {
+  const base = { model_id: "model-1", project_id: "project-1", client_id: "client-1", prospecting_status: "Fechado", urgency: "Alta" };
+  assert.deepEqual(buildCreateIntegracaoTaskPayload({ ...base, responsible_id: null, responsible2_id: null, responsible3_id: null }), { ...base, observations: "", responsible_id: null, responsible2_id: null, responsible3_id: null });
+  assert.equal(Object.hasOwn(buildCreateIntegracaoTaskPayload(base), "responsible_id"), false);
+});
 
 import {
   buildCreateIntegracaoTaskPayload,

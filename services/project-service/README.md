@@ -28,6 +28,13 @@ Exemplos de paths publicos:
 - `/project/list`
 - `/project/progress`
 
+`POST /project` aceita `end_date` opcional, igual ou posterior a `start_date`.
+A resposta inclui `data.create.end_date` (ou `null` quando omitida); período invertido retorna 400.
+`ProjectCrudService.createInTransaction(data, tx)` reutiliza as validações e persistência com
+um `Prisma.TransactionClient` do chamador, sem abrir transação nem emitir auditoria.
+O chamador coordena commit/rollback e auditoria pós-commit; a criação normal já faz isso,
+com auditoria best-effort.
+
 As rotas internas `/internal/reporting/catalog` e `/internal/reporting/extract` não passam pelo
 gateway; exigem token interno e grant HMAC de curta duração emitido pelo reports-service.
 
