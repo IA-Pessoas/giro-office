@@ -36,7 +36,7 @@ const task = {
   billing_description: null,
 };
 
-async function installApiMocks(page, taskListRequests) {
+async function installApiMocks(page, taskListRequests, clientDetailRequests) {
   await page.route("**/user/me", (route) =>
     route.fulfill({
       status: 200,
@@ -69,23 +69,30 @@ async function installApiMocks(page, taskListRequests) {
       },
     });
   });
-  await page.route(`**/client/${clientId}`, (route) =>
-    route.fulfill({
+  await page.route("**/client/*", (route) => {
+    const requestUrl = new URL(route.request().url());
+    clientDetailRequests.push(requestUrl);
+    if (!requestUrl.pathname.endsWith(`/client/${clientId}`)) {
+      return route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        json: { error: "Cliente não encontrado" },
+      });
+    }
+    return route.fulfill({
       status: 200,
       contentType: "application/json",
       json: {
         success: true,
         data: {
-          detail: {
-            id: clientId,
-            name: "Cliente Filtro",
-            company_name: "Cliente Filtro",
-            cpf_cnpj: "00.000.000/0001-00",
-          },
+          id: clientId,
+          name: "Cliente Filtro",
+          company_name: "Cliente Filtro",
+          cpf_cnpj: "00.000.000/0001-00",
         },
       },
-    }),
-  );
+    });
+  });
   await page.route("**/client/list*", (route) =>
     route.fulfill({
       status: 200,
@@ -209,13 +216,23 @@ async function runBrowserProof() {
   ]);
   const page = await context.newPage();
   const taskListRequests = [];
-  await installApiMocks(page, taskListRequests);
+  const clientDetailRequests = [];
+  await installApiMocks(page, taskListRequests, clientDetailRequests);
 
   try {
     await page.goto(`/tasks?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Tarefas", level: 1 })).toBeVisible();
     await expect(page.getByText("Tarefa sem responsável", { exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Sem responsável", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Cliente Filtro.*00\.000\.000\/0001-00/ }),
+    ).toBeVisible();
+    await expect.poll(() => clientDetailRequests.length).toBeGreaterThan(0);
+    assert.equal(
+      clientDetailRequests.every((url) => url.pathname.endsWith(`/client/${clientId}`)),
+      true,
+      "A seleção profunda deve ser hidratada exclusivamente pelo ID da URL.",
+    );
     await expect.poll(() => taskListRequests.length).toBeGreaterThan(0);
     assert.equal(
       taskListRequests.every((url) => url.searchParams.get("client_id") === clientId),
@@ -262,7 +279,7 @@ async function runBrowserProof() {
     await dialog.getByRole("button", { name: "Fechar" }).click();
 
     await page.getByLabel("Atribuição").selectOption("all");
-    await page.getByRole("button", { name: "Cliente selecionado" }).click();
+    await page.getByRole("button", { name: /Cliente Filtro/ }).click();
     await page.getByRole("option", { name: "Sem cliente selecionado" }).click();
     await expect(page).toHaveURL(
       (url) => url.pathname === "/tasks" && !url.searchParams.has("clientId"),
@@ -286,6 +303,8 @@ async function runBrowserProof() {
       "clientId repetido deve chegar inválido ao backend, nunca virar uma listagem sem cliente.",
     );
     await expect(page.getByText("Tarefa sem responsável", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Selecionar cliente" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Nova tarefa" })).toBeDisabled();
 
     const requestsBeforeEmptyRoute = taskListRequests.length;
     await page.evaluate(

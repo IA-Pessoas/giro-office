@@ -15,7 +15,7 @@ import {
 import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
-import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
+import { ClientPickerModal, type ClientPickerOption, useClient } from "@modules/clients";
 import { ConfirmationDialog, PaginationControls } from "@shared/components";
 import { useDebouncedValue } from "@shared/hooks";
 
@@ -88,7 +88,6 @@ export function TasksWorkspace() {
   const [page, setPage] = useState(1);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
   const [pendingTaskDeletion, setPendingTaskDeletion] = useState<IntegracaoTaskListItem | null>(null);
   const [taskDeletionError, setTaskDeletionError] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
@@ -97,6 +96,16 @@ export function TasksWorkspace() {
     "clientId",
   );
   const routeClientId = routeClientIds.length > 0 ? routeClientIds.join(",") : undefined;
+  const clientQuery = useClient(routeClientId);
+  const client = clientQuery.data;
+  const selectedClient =
+    client && client.id === routeClientId
+      ? {
+          id: client.id,
+          name: client.company_name || client.name,
+          document: client.cpf_cnpj,
+        }
+      : null;
 
   const listParams = useMemo(
     () => ({
@@ -123,20 +132,6 @@ export function TasksWorkspace() {
   useEffect(() => {
     setPage(1);
   }, [assignmentFilter, refFilter, routeClientId, searchTerm, statusFilter]);
-
-  useEffect(() => {
-    if (!router.isReady) {
-      return;
-    }
-
-    const clientId = routeClientId ?? "";
-    setSelectedClient((current) => {
-      if (current?.id === clientId) {
-        return current;
-      }
-      return clientId ? { id: clientId, name: "Cliente selecionado" } : null;
-    });
-  }, [routeClientId, router.isReady]);
 
   const stats = useMemo(
     () => [
@@ -215,7 +210,6 @@ export function TasksWorkspace() {
   }
 
   function handleClientSelect(client: ClientPickerOption | null) {
-    setSelectedClient(client);
     setPage(1);
     void router.replace(
       { pathname: "/tasks", query: client ? { clientId: client.id } : {} },
