@@ -12,6 +12,7 @@ export {
 export { useProjectForm } from "./useProjectForm";
 export {
   useCreateProjectMutation,
+  useCreateProjectWizardMutation,
   useDeleteProjectMutation,
   useProjectDetail,
   useProjectMetrics,

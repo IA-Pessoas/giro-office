@@ -9,11 +9,13 @@ import { useFetch } from "@shared/hooks";
 
 import type {
   CreateProjectData,
+  CreateProjectWizardData,
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
+  ProjectWizardResult,
   UpdateProjectData,
 } from "../types";
 import { projectService } from "../services/projectService";
@@ -23,6 +25,17 @@ import {
   projectMetricsQueryKey,
   PROJECTS_QUERY_KEY,
 } from "./queryKeys";
+
+async function refreshCreatedProjectCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  project: ProjectListItem,
+  clientId: string,
+): Promise<void> {
+  queryClient.setQueryData(projectDetailQueryKey(project.id), project);
+  await queryClient.invalidateQueries({
+    queryKey: projectListQueryKey({ ref: "client", id: clientId }),
+  });
+}
 
 export function useProjectsList(
   params: ProjectListParams | null,
@@ -61,10 +74,22 @@ export function useCreateProjectMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => projectService.create(payload),
     onSuccess: async (project, variables) => {
-      queryClient.setQueryData(projectDetailQueryKey(project.id), project);
-      await queryClient.invalidateQueries({
-        queryKey: projectListQueryKey({ ref: "client", id: variables.client_id }),
-      });
+      await refreshCreatedProjectCache(queryClient, project, variables.client_id);
+    },
+  });
+}
+
+export function useCreateProjectWizardMutation(): UseMutationResult<
+  ProjectWizardResult,
+  Error,
+  CreateProjectWizardData
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => projectService.createWithWizard(payload),
+    onSuccess: async ({ project }, variables) => {
+      await refreshCreatedProjectCache(queryClient, project, variables.client_id);
     },
   });
 }

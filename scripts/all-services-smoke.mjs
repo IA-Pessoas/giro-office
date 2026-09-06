@@ -4602,6 +4602,19 @@ const handlers = {
     state.taskId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
   },
 
+  async taskProjectWizardCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      headers: { "Idempotency-Key": uniqueText("smoke-project-wizard") },
+      json: {
+        client_id: requireState("primaryClientId"),
+        name: uniqueText("Smoke Project Wizard"),
+        start_date: new Date().toISOString(),
+        objective: "Validate project creation without tasks.",
+      },
+    });
+  },
+
   async taskGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],

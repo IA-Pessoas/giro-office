@@ -2,11 +2,13 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   CreateProjectData,
+  CreateProjectWizardData,
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
+  ProjectWizardResult,
   UpdateProjectData,
 } from "../types";
 import {
@@ -20,6 +22,7 @@ import {
   unwrapProjectMetrics,
   unwrapProjectProgress,
   unwrapUpdatedProject,
+  unwrapProjectWizardResult,
 } from "./projectService.contract";
 
 export const projectService = {
@@ -54,6 +57,16 @@ export const projectService = {
     const response = await api.post(PROJECT_ENDPOINTS.crud, buildCreateProjectPayload(payload));
 
     return unwrapCreatedProject(response.data);
+  },
+
+  async createWithWizard(payload: CreateProjectWizardData): Promise<ProjectWizardResult> {
+    const api = setupAPIClient();
+    const { idempotencyKey, ...data } = payload;
+    const response = await api.post(PROJECT_ENDPOINTS.wizard, buildCreateProjectPayload(data), {
+      headers: { "Idempotency-Key": idempotencyKey },
+    });
+
+    return unwrapProjectWizardResult(response.data);
   },
 
   async update(payload: UpdateProjectData): Promise<ProjectDetail> {

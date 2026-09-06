@@ -330,6 +330,24 @@ const hireProjectPlanRequestBody = createObjectRequestBody({
   },
 });
 
+const createProjectWizardRequestBody = createObjectRequestBody({
+  example: {
+    client_id: "client-uuid",
+    name: "Novo projeto",
+    start_date: "2026-09-01T00:00:00.000Z",
+    end_date: "2026-09-30T00:00:00.000Z",
+    objective: "Objetivo do projeto",
+  },
+  required: ["client_id", "name", "start_date", "objective"],
+  properties: {
+    client_id: { type: "string", format: "uuid" },
+    name: { type: "string" },
+    start_date: { type: "string", format: "date-time" },
+    end_date: { type: "string", format: "date-time" },
+    objective: { type: "string" },
+  },
+});
+
 export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
 
@@ -349,6 +367,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       { name: "IntegracaoTasks", description: "CRUD tarefas de integracao" },
       { name: "TaskModel", description: "Modelos de tarefa" },
       { name: "ProjectPlan", description: "Planos de projeto" },
+      { name: "ProjectWizard", description: "Criação de projeto sem tarefas" },
       { name: "TaskDependent", description: "Dependencias entre modelos" },
       { name: "TaskIntegration", description: "Vinculos integracao Regularize" },
       { name: "Financeiro", description: "Cobranca financeira" },
@@ -842,6 +861,29 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           security: bearer,
           ...hireProjectPlanRequestBody,
           responses: { "200": { description: "Contratado", ...successJson } },
+        },
+      },
+      "/task/project-wizard": {
+        post: {
+          tags: ["ProjectWizard"],
+          summary: "Criar projeto sem tarefas pelo wizard",
+          security: bearer,
+          parameters: [
+            {
+              name: "Idempotency-Key",
+              in: "header",
+              required: true,
+              schema: { type: "string", minLength: 1, maxLength: 255 },
+            },
+          ],
+          ...createProjectWizardRequestBody,
+          responses: {
+            "201": { description: "Projeto criado sem tarefas", ...successJson },
+            "400": { description: "Entrada ou chave inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão de Integração" },
+            "502": { description: "Falha ao comunicar com o project-service" },
+          },
         },
       },
       "/task/deps/list": {

@@ -87,6 +87,19 @@ export interface CreateProjectData {
   end_date?: string | null;
 }
 
+export interface CreateProjectWizardData extends CreateProjectData {
+  idempotencyKey: string;
+}
+
+export interface ProjectWizardResult {
+  project: ProjectListItem;
+  counts: {
+    main: number;
+    dependencies: number;
+    unassigned: number;
+  };
+}
+
 export interface UpdateProjectData {
   project_id: string;
   name: string;

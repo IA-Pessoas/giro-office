@@ -329,6 +329,14 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     test: "task.create",
   }),
   routePolicy(
+    "POST",
+    "/task/project-wizard",
+    "project",
+    "create",
+    [writeRule(writeUser, PROJECT_FIELDS)],
+    { audit: "required", test: "task.projectWizard.create" },
+  ),
+  routePolicy(
     "PUT",
     "/task",
     "task",

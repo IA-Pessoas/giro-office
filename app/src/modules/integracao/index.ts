@@ -20,6 +20,7 @@ export {
   taskModelsListQueryKey,
   useCreateIntegracaoTaskMutation,
   useCreateProjectMutation,
+  useCreateProjectWizardMutation,
   useDeleteIntegracaoTaskMutation,
   useDeleteProjectMutation,
   useIntegracaoTaskDetail,
@@ -55,6 +56,7 @@ export {
 export type {
   CreateIntegracaoTaskBody,
   CreateProjectData,
+  CreateProjectWizardData,
   CreateTaskModelData,
   DeleteProjectData,
   IntegracaoTaskDetail,
@@ -70,6 +72,7 @@ export type {
   ProjectMetrics,
   ProjectTaskMetrics,
   ProjectProgressResponse,
+  ProjectWizardResult,
   ProjectTaskSummary,
   ProspectingStatus,
   RecalculateProjectProgressData,
