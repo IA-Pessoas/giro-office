@@ -46,6 +46,7 @@ import {
   getDefaultTaskUrgency,
   getProjectSelectPlaceholder,
   getTaskCreateValidationMessage,
+  getTaskEditValidationMessage,
   getTaskUrgencyOptions,
   shouldBlockTaskEditForm,
 } from "./taskFormModalUi";
@@ -263,12 +264,7 @@ export function TaskFormModal({
     projectCount: createProjectsCount,
   });
   const editUrgencyOptions = getTaskUrgencyOptions(editValues.urgency);
-  const hasInvalidFullEditValues =
-    !editValues.name.trim() ||
-    !editValues.status ||
-    !editValues.department_id ||
-    !editValues.responsible_id ||
-    !editValues.urgency.trim();
+  const hasInvalidFullEditValues = getTaskEditValidationMessage(editValues);
 
   function shouldRenderCurrentUserOption(userId: string) {
     return Boolean(userId) && !users.some((user) => user.id === userId);
@@ -373,7 +369,7 @@ export function TaskFormModal({
     }
 
     if (!isRestrictedEdit && hasInvalidFullEditValues) {
-      toast.warning("Preencha nome, status, departamento, responsável e urgência.");
+      toast.warning(hasInvalidFullEditValues);
       return;
     }
 
@@ -610,7 +606,7 @@ export function TaskFormModal({
                     style={PROJECT_SELECT_ARROW_STYLE}
                     disabled={usersQuery.isLoading || usersQuery.isError}
                   >
-                    <option value="">{getUserPlaceholder(false)}</option>
+                    <option value="">Sem responsável</option>
                     {shouldRenderCurrentUserOption(editValues.responsible_id) ? (
                       <option value={editValues.responsible_id}>Responsável atual</option>
                     ) : null}

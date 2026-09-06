@@ -9,6 +9,40 @@ describe("task crud routes", () => {
     resetTaskRouteMocks();
   });
 
+  it("POST /task preserva null explícito nos responsáveis", async () => {
+    const res = await request(createTestApp()).post("/task").send({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      urgency: "Alta",
+      responsible_id: null,
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    expect(res.status).toBe(201);
+    expect(taskCrudServiceMock.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        responsible_id: null,
+        responsible2_id: null,
+        responsible3_id: null,
+      }),
+    );
+  });
+
+  it("PUT /task aceita desatribuição por null e serializa null", async () => {
+    taskCrudServiceMock.updateTask.mockResolvedValue({ responsible_id: null });
+    const res = await request(createTestApp()).put("/task").send({
+      task_id: "task-1",
+      responsible_id: null,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data.responsible_id).toBeNull();
+    expect(taskCrudServiceMock.updateTask).toHaveBeenCalledWith(
+      expect.objectContaining({ responsible_id: null }),
+    );
+  });
+
   it("POST /task encaminha os detalhes operacionais opcionais da criação", async () => {
     const app = createTestApp();
 

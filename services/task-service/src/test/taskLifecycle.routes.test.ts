@@ -1,5 +1,16 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
+import { integracaoTaskConclusionBodySchema } from "../schemas/integracaoTaskConclusionBody.schema.js";
+
+it("conclusão aceita responsável principal nulo", () => {
+  expect(
+    integracaoTaskConclusionBodySchema.safeParse({
+      task_id: "task-1",
+      status: "Concluída",
+      responsible_id: null,
+    }).success,
+  ).toBe(true);
+});
 
 import { createTestApp, resetTaskRouteMocks, taskLifecycleServiceMock } from "./taskTestUtils.js";
 

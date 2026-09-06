@@ -119,7 +119,7 @@ export interface CreateTaskCrudRequest {
   observations: string;
   billing?: TaskBilling;
   urgency: string;
-  responsible_id?: string;
+  responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
   prevision_date?: Date | string | null;
@@ -138,7 +138,7 @@ export interface UpdateTaskCrudRequest {
   observations?: string;
   billing?: TaskBilling;
   urgency?: string;
-  responsible_id?: string;
+  responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
   prevision_date?: Date | string | null;
@@ -317,9 +317,12 @@ export class TaskCrudService {
 
       const status = data.status ?? defaultStatus;
       const departmentId = data.department_id ?? model.department_id;
-      const responsibleId = data.responsible_id ?? model.responsible_id;
-      const responsible2Id = data.responsible2_id ?? model.responsible2_id;
-      const responsible3Id = data.responsible3_id ?? model.responsible3_id;
+      const responsibleId =
+        data.responsible_id !== undefined ? data.responsible_id : model.responsible_id;
+      const responsible2Id =
+        data.responsible2_id !== undefined ? data.responsible2_id : model.responsible2_id;
+      const responsible3Id =
+        data.responsible3_id !== undefined ? data.responsible3_id : model.responsible3_id;
       const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
       const previsionDate =
         data.prevision_date === undefined || data.prevision_date === null
@@ -629,9 +632,15 @@ export class TaskCrudService {
         data.responsible3_id !== undefined ? data.responsible3_id : exists.responsible3_id;
 
       await assertResponsibleUsersInDepartment(prismaClient, data.organization_id, department_id, [
-        responsible_id,
-        responsible2_id,
-        responsible3_id,
+        department_id !== exists.department_id || responsible_id !== exists.responsible_id
+          ? responsible_id
+          : undefined,
+        department_id !== exists.department_id || responsible2_id !== exists.responsible2_id
+          ? responsible2_id
+          : undefined,
+        department_id !== exists.department_id || responsible3_id !== exists.responsible3_id
+          ? responsible3_id
+          : undefined,
       ]);
 
       let prevision_date: Date | null;
