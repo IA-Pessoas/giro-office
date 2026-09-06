@@ -452,6 +452,14 @@ runTest("task list contract maps client and assignment filters without cache col
   assert.notDeepEqual(integracaoTasksListQueryKey(filters), integracaoTasksListQueryKey({}));
 });
 
+runTest("task list contract preserves an empty client filter for explicit rejection", () => {
+  assert.equal(buildIntegracaoTaskListParams({ clientId: "" }).client_id, "");
+  assert.notDeepEqual(
+    integracaoTasksListQueryKey({ clientId: "" }),
+    integracaoTasksListQueryKey({}),
+  );
+});
+
 runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
   assert.deepEqual(
     buildCreateIntegracaoTaskPayload({

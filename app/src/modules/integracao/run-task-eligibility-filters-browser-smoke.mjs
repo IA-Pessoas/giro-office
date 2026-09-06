@@ -47,7 +47,8 @@ async function installApiMocks(page, taskListRequests) {
   await page.route("**/task/list*", (route) => {
     const requestUrl = new URL(route.request().url());
     taskListRequests.push(requestUrl);
-    if (requestUrl.searchParams.get("client_id")?.includes(",")) {
+    const requestClientId = requestUrl.searchParams.get("client_id");
+    if (requestClientId !== null && (!requestClientId || requestClientId.includes(","))) {
       return route.fulfill({
         status: 400,
         contentType: "application/json",
@@ -283,6 +284,20 @@ async function runBrowserProof() {
       taskListRequests.at(-1).searchParams.get("client_id"),
       `${clientId},${secondClientId}`,
       "clientId repetido deve chegar inválido ao backend, nunca virar uma listagem sem cliente.",
+    );
+    await expect(page.getByText("Tarefa sem responsável", { exact: true })).toHaveCount(0);
+
+    const requestsBeforeEmptyRoute = taskListRequests.length;
+    await page.evaluate(
+      (url) => window.next.router.replace(url, undefined, { shallow: true }),
+      "/tasks?clientId=",
+    );
+    await expect(page).toHaveURL((url) => url.searchParams.has("clientId"));
+    await expect.poll(() => taskListRequests.length).toBeGreaterThan(requestsBeforeEmptyRoute);
+    assert.equal(
+      taskListRequests.at(-1).searchParams.get("client_id"),
+      "",
+      "clientId vazio deve chegar inválido ao backend, nunca virar uma listagem sem cliente.",
     );
     await expect(page.getByText("Tarefa sem responsável", { exact: true })).toHaveCount(0);
   } finally {

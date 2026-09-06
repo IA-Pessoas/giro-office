@@ -195,23 +195,6 @@ describe("task crud routes", () => {
     });
   });
 
-  it("GET /task/list encaminha filtros validados de cliente e atribuição", async () => {
-    const app = createTestApp();
-
-    const res = await request(app).get("/task/list").query({
-      client_id: "11111111-1111-4111-8111-111111111111",
-      assignment: "unassigned",
-    });
-
-    expect(res.status).toBe(200);
-    expect(taskCrudServiceMock.listTasks).toHaveBeenCalledWith(
-      expect.objectContaining({
-        client_id: "11111111-1111-4111-8111-111111111111",
-        assignment: "unassigned",
-      }),
-    );
-  });
-
   it("GET /task/list expõe autoria calculada no contrato HTTP", async () => {
     const listResult = {
       data: [

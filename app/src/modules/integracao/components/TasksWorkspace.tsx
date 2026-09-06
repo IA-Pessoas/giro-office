@@ -93,10 +93,10 @@ export function TasksWorkspace() {
   const [taskDeletionError, setTaskDeletionError] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
   const isSearchPending = searchTerm.trim() !== debouncedSearch;
-  const routeClientId =
-    typeof router.query.clientId === "string"
-      ? router.query.clientId
-      : router.query.clientId?.join(",");
+  const routeClientIds = new URLSearchParams(router.asPath.split("?", 2)[1]?.split("#", 1)[0]).getAll(
+    "clientId",
+  );
+  const routeClientId = routeClientIds.length > 0 ? routeClientIds.join(",") : undefined;
 
   const listParams = useMemo(
     () => ({

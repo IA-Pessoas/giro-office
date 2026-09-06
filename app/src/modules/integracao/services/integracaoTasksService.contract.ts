@@ -18,7 +18,7 @@ export function buildIntegracaoTaskListParams(params: IntegracaoTaskListParams) 
     ref: params.ref ?? "",
     ref_id: params.ref_id ?? "",
     search: params.search ?? "",
-    ...(params.clientId ? { client_id: params.clientId } : {}),
+    ...(params.clientId !== undefined ? { client_id: params.clientId } : {}),
     ...(params.assignment ? { assignment: params.assignment } : {}),
     page: params.page ?? 1,
     limit: params.limit ?? 20,
