@@ -9,7 +9,7 @@ describe("task crud routes", () => {
     resetTaskRouteMocks();
   });
 
-  it("POST /task preserva null explícito nos responsáveis", async () => {
+  it("POST /task preserva null explícito no responsável principal", async () => {
     const res = await request(createTestApp()).post("/task").send({
       model_id: "model-1",
       project_id: "project-1",
@@ -18,17 +18,45 @@ describe("task crud routes", () => {
       department_id: "department-1",
       urgency: "Alta",
       responsible_id: null,
-      responsible2_id: null,
-      responsible3_id: null,
     });
     expect(res.status).toBe(201);
     expect(taskCrudServiceMock.createTask).toHaveBeenCalledWith(
       expect.objectContaining({
         responsible_id: null,
-        responsible2_id: null,
-        responsible3_id: null,
       }),
     );
+  });
+
+  it.each([
+    "responsible2_id",
+    "responsible3_id",
+  ])("POST /task rejeita mutação manual de %s", async (field) => {
+    const res = await request(createTestApp())
+      .post("/task")
+      .send({
+        model_id: "model-1",
+        project_id: "project-1",
+        client_id: "client-1",
+        prospecting_status: "Fechado",
+        department_id: "department-1",
+        urgency: "Alta",
+        [field]: "user-common",
+      });
+
+    expect(res.status).toBe(400);
+    expect(taskCrudServiceMock.createTask).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "responsible2_id",
+    "responsible3_id",
+  ])("PUT /task rejeita mutação manual de %s", async (field) => {
+    const res = await request(createTestApp())
+      .put("/task")
+      .send({ task_id: "task-1", [field]: "user-common" });
+
+    expect(res.status).toBe(400);
+    expect(taskCrudServiceMock.updateTask).not.toHaveBeenCalled();
   });
 
   it("PUT /task aceita desatribuição por null e serializa null", async () => {
@@ -59,8 +87,6 @@ describe("task crud routes", () => {
       billing: "Não Realizar",
       urgency: "Alta",
       responsible_id: "user-1",
-      responsible2_id: "user-2",
-      responsible3_id: "user-3",
       prevision_date: "2026-08-15",
     });
 
@@ -79,8 +105,6 @@ describe("task crud routes", () => {
       billing: "Não Realizar",
       urgency: "Alta",
       responsible_id: "user-1",
-      responsible2_id: "user-2",
-      responsible3_id: "user-3",
       prevision_date: "2026-08-15",
       integracaoLevel: 0,
       isOwner: false,
@@ -102,8 +126,6 @@ describe("task crud routes", () => {
       observations: "obs",
       urgency: "Alta",
       responsible_id: "",
-      responsible2_id: "",
-      responsible3_id: "",
       prevision_date: "",
     });
 
@@ -115,8 +137,6 @@ describe("task crud routes", () => {
         department_id: "department-1",
         billing: undefined,
         responsible_id: undefined,
-        responsible2_id: undefined,
-        responsible3_id: undefined,
         prevision_date: undefined,
       }),
     );

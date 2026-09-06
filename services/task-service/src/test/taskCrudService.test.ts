@@ -403,6 +403,33 @@ describe("TaskCrudService", () => {
     expect(prismaMock.user.findMany).not.toHaveBeenCalled();
   });
 
+  it("updateTask ignora mutação direta de responsáveis secundários e preserva legado", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      department_id: "dep-1",
+      responsible_id: "leader-1",
+      responsible2_id: "legacy-2",
+      responsible3_id: null,
+      status: "Em Andamento",
+    });
+    prismaMock.task.update.mockImplementation(async ({ data }) => data);
+
+    const result = await new TaskCrudService().updateTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      responsible2_id: "common-user",
+      responsible3_id: "common-user",
+      integracaoLevel: 2,
+      isOwner: true,
+    });
+
+    expect(result).toMatchObject({ responsible2_id: "legacy-2", responsible3_id: null });
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+  });
+
   it("updateTask atribui posteriormente um candidato elegível a uma tarefa sem responsável", async () => {
     prismaMock.task.findFirst.mockResolvedValue({
       id: "task-1",
@@ -600,7 +627,7 @@ describe("TaskCrudService", () => {
     expect(prismaMock.task.create).toHaveBeenCalledTimes(1);
   });
 
-  it("createTask persists supplied operational details instead of model defaults", async () => {
+  it("createTask persists supplied operational details without manual secondary assignments", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
@@ -647,8 +674,8 @@ describe("TaskCrudService", () => {
           billing: "Não Realizar",
           urgency: "Alta",
           responsible_id: "user-1",
-          responsible2_id: "user-2",
-          responsible3_id: "user-3",
+          responsible2_id: null,
+          responsible3_id: null,
           prevision_date: new Date("2026-08-15"),
           start_date: null,
           charge_comercial: false,
@@ -727,7 +754,7 @@ describe("TaskCrudService", () => {
     );
   });
 
-  it("createTask mantém os defaults elegíveis do modelo sem herdar responsáveis secundários", async () => {
+  it("createTask preserva defaults legados quando chamado pelo fluxo automático de plano", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
@@ -761,11 +788,14 @@ describe("TaskCrudService", () => {
           department_id: "department-model",
           billing: "Não Realizar",
           responsible_id: "user-model-1",
-          responsible2_id: null,
-          responsible3_id: null,
+          responsible2_id: "user-model-2",
+          responsible3_id: "user-model-3",
         }),
       }),
     );
+    expect(prismaMock.taskModel.findFirst).toHaveBeenCalledWith({
+      where: { id: "model-1", organization_id: "org-1" },
+    });
   });
 
   it("detailTask lança 404 quando tarefa não existe", async () => {

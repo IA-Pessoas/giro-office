@@ -143,8 +143,6 @@ const TASK_UPDATE_FIELDS = [
   "department_id",
   "billing",
   "responsible_id",
-  "responsible2_id",
-  "responsible3_id",
   "prevision_date",
 ] as const;
 const TASK_OWN_FIELDS = ["status", "observations"] as const;

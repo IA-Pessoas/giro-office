@@ -9,6 +9,7 @@ const configuredBaseUrl = process.env.TASKS_BROWSER_BASE_URL?.replace(/\/$/, "")
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const clientId = "11111111-1111-4111-8111-111111111111";
+const secondClientId = "22222222-2222-4222-8222-222222222222";
 
 const smokeUser = {
   id: "user-task-smoke",
@@ -43,8 +44,16 @@ async function installApiMocks(page, taskListRequests) {
       json: { success: true, data: smokeUser },
     }),
   );
-  await page.route("**/task/list?**", (route) => {
-    taskListRequests.push(new URL(route.request().url()));
+  await page.route("**/task/list*", (route) => {
+    const requestUrl = new URL(route.request().url());
+    taskListRequests.push(requestUrl);
+    if (requestUrl.searchParams.get("client_id")?.includes(",")) {
+      return route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        json: { error: "client_id inválido" },
+      });
+    }
     return route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -59,7 +68,24 @@ async function installApiMocks(page, taskListRequests) {
       },
     });
   });
-  await page.route("**/client/list?**", (route) =>
+  await page.route(`**/client/${clientId}`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: {
+        success: true,
+        data: {
+          detail: {
+            id: clientId,
+            name: "Cliente Filtro",
+            company_name: "Cliente Filtro",
+            cpf_cnpj: "00.000.000/0001-00",
+          },
+        },
+      },
+    }),
+  );
+  await page.route("**/client/list*", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -81,19 +107,21 @@ async function installApiMocks(page, taskListRequests) {
       },
     }),
   );
-  await page.route("**/department/list?**", (route) =>
+  await page.route("**/department/list*", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       json: {
         data: [
           { id: "department-one", name: "Departamento com candidatos", status: "Ativo" },
+          { id: "department-sole", name: "Departamento com candidato único", status: "Ativo" },
+          { id: "department-multiple", name: "Departamento com múltiplos", status: "Ativo" },
           { id: "department-empty", name: "Departamento sem candidatos", status: "Ativo" },
         ],
       },
     }),
   );
-  await page.route("**/task/model/list?**", (route) =>
+  await page.route("**/task/model/list*", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -115,6 +143,31 @@ async function installApiMocks(page, taskListRequests) {
             },
           },
           {
+            id: "model-sole",
+            name: "Modelo com candidato único",
+            department_id: "department-sole",
+            responsible_id: "legacy-ineligible",
+            department: {
+              id: "department-sole",
+              name: "Departamento com candidato único",
+              users: [{ id: "responsible-sole", name: "Responsável único" }],
+            },
+          },
+          {
+            id: "model-multiple",
+            name: "Modelo com múltiplos candidatos",
+            department_id: "department-multiple",
+            responsible_id: "legacy-ineligible",
+            department: {
+              id: "department-multiple",
+              name: "Departamento com múltiplos",
+              users: [
+                { id: "responsible-one", name: "Responsável um" },
+                { id: "responsible-two", name: "Responsável dois" },
+              ],
+            },
+          },
+          {
             id: "model-empty",
             name: "Modelo sem candidato",
             department_id: "department-empty",
@@ -129,7 +182,7 @@ async function installApiMocks(page, taskListRequests) {
       },
     }),
   );
-  await page.route("**/project/list?**", (route) =>
+  await page.route("**/project/list*", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -189,6 +242,17 @@ async function runBrowserProof() {
     await expect(responsible).toHaveValue("responsible-default");
     await expect(responsible.locator('option[value=""]')).toHaveAttribute("disabled", "");
 
+    await department.selectOption("department-sole");
+    await model.selectOption("model-sole");
+    await expect(responsible).toHaveValue("responsible-sole");
+    await expect(responsible).toBeDisabled();
+
+    await department.selectOption("department-multiple");
+    await model.selectOption("model-multiple");
+    await expect(responsible).toHaveValue("");
+    await expect(responsible).toBeEnabled();
+    await expect(responsible.locator('option[value=""]')).toHaveAttribute("disabled", "");
+
     await department.selectOption("department-empty");
     await expect(model).toHaveValue("");
     await model.selectOption("model-empty");
@@ -205,6 +269,22 @@ async function runBrowserProof() {
     await expect
       .poll(() => taskListRequests.some((url) => !url.searchParams.has("client_id")))
       .toBe(true);
+
+    const requestsBeforeInvalidRoute = taskListRequests.length;
+    await page.evaluate(
+      (url) => window.next.router.replace(url, undefined, { shallow: true }),
+      `/tasks?clientId=${clientId}&clientId=${secondClientId}`,
+    );
+    await expect(page).toHaveURL(
+      (url) => url.searchParams.getAll("clientId").length === 2,
+    );
+    await expect.poll(() => taskListRequests.length).toBeGreaterThan(requestsBeforeInvalidRoute);
+    assert.equal(
+      taskListRequests.at(-1).searchParams.get("client_id"),
+      `${clientId},${secondClientId}`,
+      "clientId repetido deve chegar inválido ao backend, nunca virar uma listagem sem cliente.",
+    );
+    await expect(page.getByText("Tarefa sem responsável", { exact: true })).toHaveCount(0);
   } finally {
     await context.close();
     await browser.close();

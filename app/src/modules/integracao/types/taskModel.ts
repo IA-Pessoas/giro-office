@@ -2,7 +2,7 @@ export interface TaskModelListItem {
   id: string;
   name: string;
   department_id: string;
-  responsible_id: string;
+  responsible_id: string | null;
   department?: {
     id: string;
     name: string;

@@ -16,9 +16,9 @@ runTest("task edit sends actual null for an empty responsible select and preserv
   assert.deepEqual(buildUpdateIntegracaoTaskPayload({ task_id: "task-1", observations: "obs" }), { task_id: "task-1", observations: "obs" });
 });
 
-runTest("task creation preserves explicit null responsibles and legacy omission", () => {
+runTest("task creation preserves explicit null responsible and omits secondary assignments", () => {
   const base = { model_id: "model-1", project_id: "project-1", client_id: "client-1", prospecting_status: "Fechado", department_id: "department-1", urgency: "Alta" };
-  assert.deepEqual(buildCreateIntegracaoTaskPayload({ ...base, responsible_id: null, responsible2_id: null, responsible3_id: null }), { ...base, observations: "", responsible_id: null, responsible2_id: null, responsible3_id: null });
+  assert.deepEqual(buildCreateIntegracaoTaskPayload({ ...base, responsible_id: null }), { ...base, observations: "", responsible_id: null });
   assert.equal(Object.hasOwn(buildCreateIntegracaoTaskPayload(base), "responsible_id"), false);
 });
 
@@ -488,8 +488,6 @@ runTest("buildCreateIntegracaoTaskPayload preserves optional operational details
       billing: "Não Realizar",
       urgency: "Alta",
       responsible_id: "user-1",
-      responsible2_id: "user-2",
-      responsible3_id: "user-3",
       prevision_date: "2026-08-15",
     }),
     {
@@ -504,8 +502,6 @@ runTest("buildCreateIntegracaoTaskPayload preserves optional operational details
       billing: "Não Realizar",
       urgency: "Alta",
       responsible_id: "user-1",
-      responsible2_id: "user-2",
-      responsible3_id: "user-3",
       prevision_date: "2026-08-15",
     },
   );

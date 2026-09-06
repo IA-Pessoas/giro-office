@@ -94,7 +94,9 @@ export function TasksWorkspace() {
   const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
   const isSearchPending = searchTerm.trim() !== debouncedSearch;
   const routeClientId =
-    typeof router.query.clientId === "string" ? router.query.clientId : undefined;
+    typeof router.query.clientId === "string"
+      ? router.query.clientId
+      : router.query.clientId?.join(",");
 
   const listParams = useMemo(
     () => ({
@@ -120,7 +122,7 @@ export function TasksWorkspace() {
 
   useEffect(() => {
     setPage(1);
-  }, [assignmentFilter, refFilter, searchTerm, selectedClient?.id, statusFilter]);
+  }, [assignmentFilter, refFilter, routeClientId, searchTerm, statusFilter]);
 
   useEffect(() => {
     if (!router.isReady) {

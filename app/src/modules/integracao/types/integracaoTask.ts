@@ -95,8 +95,6 @@ export interface CreateIntegracaoTaskBody {
   billing?: TaskBilling;
   urgency: string;
   responsible_id?: string | null;
-  responsible2_id?: string | null;
-  responsible3_id?: string | null;
   prevision_date?: string | null;
 }
 
@@ -110,7 +108,5 @@ export interface UpdateIntegracaoTaskBody {
   billing?: TaskBilling;
   urgency?: string;
   responsible_id?: string | null;
-  responsible2_id?: string | null;
-  responsible3_id?: string | null;
   prevision_date?: string | null;
 }

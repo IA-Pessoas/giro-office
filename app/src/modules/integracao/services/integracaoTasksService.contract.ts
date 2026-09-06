@@ -38,8 +38,6 @@ export function buildCreateIntegracaoTaskPayload(payload: CreateIntegracaoTaskBo
     ...(payload.billing ? { billing: payload.billing } : {}),
     urgency: payload.urgency,
     ...(payload.responsible_id !== undefined && payload.responsible_id !== "" ? { responsible_id: payload.responsible_id } : {}),
-    ...(payload.responsible2_id !== undefined && payload.responsible2_id !== "" ? { responsible2_id: payload.responsible2_id } : {}),
-    ...(payload.responsible3_id !== undefined && payload.responsible3_id !== "" ? { responsible3_id: payload.responsible3_id } : {}),
     ...(payload.prevision_date ? { prevision_date: payload.prevision_date } : {}),
   };
 }

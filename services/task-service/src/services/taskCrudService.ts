@@ -351,21 +351,29 @@ export class TaskCrudService {
         throw new ServiceError(409, "Tarefa já foi cadastrada em andamento.");
       }
 
+      const isManualFlow = data.department_id !== undefined;
       const model = await prismaClient.taskModel.findFirst({
         where: {
           id: data.model_id,
           organization_id: data.organization_id,
-          type: "Projeto",
-          ...(data.department_id ? { department_id: data.department_id } : {}),
-          department: { status: "Ativo" },
+          ...(data.department_id !== undefined
+            ? {
+                department_id: data.department_id,
+                type: "Projeto",
+                department: { status: "Ativo" },
+              }
+            : {}),
         },
       });
 
       if (!model) {
-        throw new ServiceError(
-          422,
-          "Modelo de tarefa não é elegível para o departamento informado.",
-        );
+        if (isManualFlow) {
+          throw new ServiceError(
+            422,
+            "Modelo de tarefa não é elegível para o departamento informado.",
+          );
+        }
+        throw new ServiceError(404, "Tarefa modelo não existe.");
       }
 
       const billing = data.billing ?? model.billing;
@@ -379,8 +387,18 @@ export class TaskCrudService {
 
       const status = data.status ?? defaultStatus;
       const departmentId = data.department_id ?? model.department_id;
-      const responsible2Id = data.responsible2_id ?? null;
-      const responsible3Id = data.responsible3_id ?? null;
+      let responsibleId =
+        data.responsible_id !== undefined ? data.responsible_id : model.responsible_id;
+      const responsible2Id = isManualFlow
+        ? null
+        : data.responsible2_id !== undefined
+          ? data.responsible2_id
+          : model.responsible2_id;
+      const responsible3Id = isManualFlow
+        ? null
+        : data.responsible3_id !== undefined
+          ? data.responsible3_id
+          : model.responsible3_id;
       const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
       const previsionDate =
         data.prevision_date === undefined || data.prevision_date === null
@@ -391,17 +409,20 @@ export class TaskCrudService {
 
       const { create, dependentCreates } = await this.#runTransaction(async (tx) => {
         await assertTaskDepartmentInOrganization(tx, data.organization_id, departmentId);
-        const eligibleResponsibles = await listEligibleTaskResponsibles(
-          tx,
-          data.organization_id,
-          departmentId,
-        );
-        const responsibleId = resolveEligibleTaskResponsible(
-          eligibleResponsibles,
-          model.responsible_id,
-          data.responsible_id,
-        );
+        if (isManualFlow) {
+          const eligibleResponsibles = await listEligibleTaskResponsibles(
+            tx,
+            data.organization_id,
+            departmentId,
+          );
+          responsibleId = resolveEligibleTaskResponsible(
+            eligibleResponsibles,
+            model.responsible_id,
+            data.responsible_id,
+          );
+        }
         await assertResponsibleUsersInDepartment(tx, data.organization_id, departmentId, [
+          isManualFlow ? undefined : responsibleId,
           responsible2Id,
           responsible3Id,
         ]);
@@ -715,10 +736,8 @@ export class TaskCrudService {
       const modelChanged = model_id !== exists.model_id;
       const assignmentChanged = data.responsible_id !== undefined;
       let responsible_id = exists.responsible_id;
-      let responsible2_id =
-        data.responsible2_id !== undefined ? data.responsible2_id : exists.responsible2_id;
-      let responsible3_id =
-        data.responsible3_id !== undefined ? data.responsible3_id : exists.responsible3_id;
+      let responsible2_id = exists.responsible2_id;
+      let responsible3_id = exists.responsible3_id;
 
       if (departmentChanged) {
         await assertTaskDepartmentInOrganization(prismaClient, data.organization_id, department_id);

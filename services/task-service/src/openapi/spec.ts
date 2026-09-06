@@ -49,8 +49,6 @@ const createTaskRequestBody = createObjectRequestBody({
     billing: "Realizar",
     urgency: "ALTA",
     responsible_id: "user-uuid",
-    responsible2_id: "backup-user-uuid",
-    responsible3_id: null,
     prevision_date: "2026-04-10",
   },
   required: [
@@ -73,8 +71,6 @@ const createTaskRequestBody = createObjectRequestBody({
     billing: { type: "string" },
     urgency: { type: "string" },
     responsible_id: { type: ["string", "null"] },
-    responsible2_id: { type: ["string", "null"] },
-    responsible3_id: { type: ["string", "null"] },
     prevision_date: { type: "string", format: "date" },
   },
 });
@@ -90,8 +86,6 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: "Realizar",
     urgency: "MEDIA",
     responsible_id: "user-uuid",
-    responsible2_id: "backup-user-uuid",
-    responsible3_id: null,
     prevision_date: "2026-04-10T09:00:00.000Z",
   },
   required: ["task_id"],
@@ -105,8 +99,6 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: { type: "string" },
     urgency: { type: "string" },
     responsible_id: { type: ["string", "null"] },
-    responsible2_id: { type: ["string", "null"] },
-    responsible3_id: { type: ["string", "null"] },
     prevision_date: { type: ["string", "null"], format: "date-time" },
   },
 });
