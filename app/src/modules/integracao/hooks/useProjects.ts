@@ -26,6 +26,17 @@ import {
   PROJECTS_QUERY_KEY,
 } from "./queryKeys";
 
+async function refreshCreatedProjectCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  project: ProjectListItem,
+  clientId: string,
+): Promise<void> {
+  queryClient.setQueryData(projectDetailQueryKey(project.id), project);
+  await queryClient.invalidateQueries({
+    queryKey: projectListQueryKey({ ref: "client", id: clientId }),
+  });
+}
+
 export function useProjectsList(
   params: ProjectListParams | null,
 ): UseQueryResult<ProjectListItem[], Error> {
@@ -63,10 +74,7 @@ export function useCreateProjectMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => projectService.create(payload),
     onSuccess: async (project, variables) => {
-      queryClient.setQueryData(projectDetailQueryKey(project.id), project);
-      await queryClient.invalidateQueries({
-        queryKey: projectListQueryKey({ ref: "client", id: variables.client_id }),
-      });
+      await refreshCreatedProjectCache(queryClient, project, variables.client_id);
     },
   });
 }
@@ -81,10 +89,7 @@ export function useCreateProjectWizardMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => projectService.createWithWizard(payload),
     onSuccess: async ({ project }, variables) => {
-      queryClient.setQueryData(projectDetailQueryKey(project.id), project);
-      await queryClient.invalidateQueries({
-        queryKey: projectListQueryKey({ ref: "client", id: variables.client_id }),
-      });
+      await refreshCreatedProjectCache(queryClient, project, variables.client_id);
     },
   });
 }
