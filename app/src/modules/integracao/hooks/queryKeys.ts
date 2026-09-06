@@ -28,6 +28,10 @@ export function taskModelsListQueryKey(params: TaskModelListParams = {}) {
   ] as const;
 }
 
+export function taskResponsibleOptionsQueryKey(departmentId: string) {
+  return [...TASK_MODELS_QUERY_KEY, "responsible-options", departmentId] as const;
+}
+
 export function integracaoTasksListQueryKey(params: IntegracaoTaskListParams) {
   return [
     ...INTEGRACAO_TASKS_QUERY_KEY,
@@ -35,6 +39,8 @@ export function integracaoTasksListQueryKey(params: IntegracaoTaskListParams) {
     params.status ?? "Todos",
     params.ref ?? "",
     params.search ?? "",
+    params.clientId ?? null,
+    params.assignment ?? "",
     params.page ?? 1,
     params.limit ?? 20,
   ] as const;

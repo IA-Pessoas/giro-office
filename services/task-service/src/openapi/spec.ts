@@ -1,6 +1,7 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { TaskServiceEnv } from "../config/env.js";
+import { TASK_ASSIGNMENT_FILTER_VALUES } from "../constants/integracaoTask.js";
 
 const successJson = {
   content: {
@@ -49,11 +50,16 @@ const createTaskRequestBody = createObjectRequestBody({
     billing: "Realizar",
     urgency: "ALTA",
     responsible_id: "user-uuid",
-    responsible2_id: "backup-user-uuid",
-    responsible3_id: null,
     prevision_date: "2026-04-10",
   },
-  required: ["model_id", "project_id", "client_id", "prospecting_status", "urgency"],
+  required: [
+    "model_id",
+    "project_id",
+    "client_id",
+    "prospecting_status",
+    "urgency",
+    "department_id",
+  ],
   properties: {
     model_id: { type: "string" },
     project_id: { type: "string" },
@@ -66,8 +72,6 @@ const createTaskRequestBody = createObjectRequestBody({
     billing: { type: "string" },
     urgency: { type: "string" },
     responsible_id: { type: ["string", "null"] },
-    responsible2_id: { type: ["string", "null"] },
-    responsible3_id: { type: ["string", "null"] },
     prevision_date: { type: "string", format: "date" },
   },
 });
@@ -75,6 +79,7 @@ const createTaskRequestBody = createObjectRequestBody({
 const updateTaskRequestBody = createObjectRequestBody({
   example: {
     task_id: "task-uuid",
+    model_id: "task-model-uuid",
     name: "Contato com cliente",
     status: "Em Andamento",
     department_id: "department-uuid",
@@ -82,13 +87,12 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: "Realizar",
     urgency: "MEDIA",
     responsible_id: "user-uuid",
-    responsible2_id: "backup-user-uuid",
-    responsible3_id: null,
     prevision_date: "2026-04-10T09:00:00.000Z",
   },
   required: ["task_id"],
   properties: {
     task_id: { type: "string" },
+    model_id: { type: "string" },
     name: { type: "string" },
     status: { type: "string" },
     department_id: { type: "string" },
@@ -96,8 +100,6 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: { type: "string" },
     urgency: { type: "string" },
     responsible_id: { type: ["string", "null"] },
-    responsible2_id: { type: ["string", "null"] },
-    responsible3_id: { type: ["string", "null"] },
     prevision_date: { type: ["string", "null"], format: "date-time" },
   },
 });
@@ -540,6 +542,12 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             { name: "ref", in: "query", schema: { type: "string" } },
             { name: "ref_id", in: "query", schema: { type: "string" } },
             { name: "search", in: "query", schema: { type: "string" } },
+            { name: "client_id", in: "query", schema: { type: "string", format: "uuid" } },
+            {
+              name: "assignment",
+              in: "query",
+              schema: { type: "string", enum: TASK_ASSIGNMENT_FILTER_VALUES },
+            },
             { name: "page", in: "query", schema: { type: "integer" } },
             { name: "limit", in: "query", schema: { type: "integer" } },
           ],
@@ -561,10 +569,11 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                             type: "array",
                             items: {
                               type: "object",
-                              required: ["id", "isOwn"],
+                              required: ["id", "isOwn", "isUnassigned"],
                               properties: {
                                 id: { type: "string" },
                                 isOwn: { type: "boolean" },
+                                isUnassigned: { type: "boolean" },
                               },
                             },
                           },
@@ -848,6 +857,13 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["TaskDependent"],
           summary: "Listar opções ativas para modelos de tarefa",
           security: bearer,
+          parameters: [
+            {
+              name: "department_id",
+              in: "query",
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
           responses: { "200": { description: "Opções", ...successJson } },
         },
       },

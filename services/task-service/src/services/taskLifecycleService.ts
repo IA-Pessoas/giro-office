@@ -10,6 +10,7 @@ import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import type { IntegracaoTaskConclusionBody } from "../schemas/integracaoTaskConclusionBody.schema.js";
 import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
+import { throwIfActiveTaskConflict } from "./taskActiveConflict.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
 
 const CONCLUSION_UPDATE_SELECT = {
@@ -183,6 +184,7 @@ export class TaskLifecycleService {
       return updated;
     } catch (err: unknown) {
       logError("Erro na conclusão da tarefa", { err });
+      throwIfActiveTaskConflict(err);
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível concluir a tarefa.", err);
     }

@@ -22,8 +22,7 @@ import {
   PROJECT_INPUT_CLASSNAME,
   PROJECT_PRIMARY_BUTTON_CLASSNAME,
   PROJECT_SECONDARY_BUTTON_CLASSNAME,
-  PROJECT_SELECT_ARROW_STYLE,
-  PROJECT_SELECT_CLASSNAME,
+  ProjectSelect,
   PROJECT_SUBPANEL_CLASSNAME,
 } from "./projectUi";
 import {
@@ -525,11 +524,9 @@ export function TaskModelModal({
               <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
                 Departamento
               </RequiredFieldLabel>
-              <select
+              <ProjectSelect
                 value={formData.department_id}
                 onChange={(event) => updateFormValue("department_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={optionsUnavailable}
                 aria-required="true"
               >
@@ -542,7 +539,7 @@ export function TaskModelModal({
                     {department.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
 
@@ -551,11 +548,9 @@ export function TaskModelModal({
               <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
                 Responsável
               </RequiredFieldLabel>
-              <select
+              <ProjectSelect
                 value={formData.responsible_id}
                 onChange={(event) => updateFormValue("responsible_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={optionsUnavailable}
                 aria-required="true"
               >
@@ -568,18 +563,16 @@ export function TaskModelModal({
                     {user.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Responsável 2
               </span>
-              <select
+              <ProjectSelect
                 value={formData.responsible2_id}
                 onChange={(event) => updateFormValue("responsible2_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={!formData.responsible_id || optionsUnavailable}
                 aria-describedby={
                   !formData.responsible_id ? "task-model-responsible2-help" : undefined
@@ -594,7 +587,7 @@ export function TaskModelModal({
                     {user.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
               {!formData.responsible_id ? (
                 <span
                   id="task-model-responsible2-help"
@@ -609,11 +602,9 @@ export function TaskModelModal({
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Responsável 3
               </span>
-              <select
+              <ProjectSelect
                 value={formData.responsible3_id}
                 onChange={(event) => updateFormValue("responsible3_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={!formData.responsible2_id || optionsUnavailable}
                 aria-describedby={
                   !formData.responsible2_id ? "task-model-responsible3-help" : undefined
@@ -628,7 +619,7 @@ export function TaskModelModal({
                     {user.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
               {!formData.responsible2_id ? (
                 <span
                   id="task-model-responsible3-help"
@@ -658,18 +649,16 @@ export function TaskModelModal({
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Cobrança</span>
-              <select
+              <ProjectSelect
                 value={formData.billing}
                 onChange={(event) => updateFormValue("billing", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
               >
                 {BILLING_OPTIONS.map((billing) => (
                   <option key={billing} value={billing}>
                     {billing}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
 
@@ -705,7 +694,7 @@ export function TaskModelModal({
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Modelo dependente
                   </span>
-                  <select
+                  <ProjectSelect
                     value={newDependent.dependent_id}
                     onChange={(event) =>
                       setNewDependent((currentValue) => ({
@@ -713,8 +702,6 @@ export function TaskModelModal({
                         dependent_id: event.target.value,
                       }))
                     }
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                     disabled={taskModelsUnavailable}
                   >
                     <option value="">{getDependentPlaceholder()}</option>
@@ -723,7 +710,7 @@ export function TaskModelModal({
                         {task.name}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
 
                 <label className={TASK_FORM_LABEL_CLASSNAME}>

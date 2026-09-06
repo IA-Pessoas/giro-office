@@ -2,7 +2,9 @@
 
 Microservico de tarefas. O gateway encaminha esse servico pelo prefixo publico **`/task`**.
 
-Tarefas aceitam `responsible_id: null` na criação, edição e conclusão. Na criação, omitir responsáveis mantém os defaults do modelo; `null` explícito remove a atribuição. Modelos continuam exigindo responsável. A expansão não altera atribuições ou vínculos legados.
+Criação de tarefa de projeto exige `department_id`. O responsável deve ser um usuário ativo do mesmo departamento e ser administrador ou liderança de RH (nível 3) na organização; quando há candidatos, um deles precisa ser selecionado. `responsible_id: null` só é aceito quando o departamento não possui candidato elegível. Na edição, atribuições e vínculos legados são preservados quando não enviados, e a remoção explícita do responsável também só é aceita sem candidatos elegíveis.
+
+`GET /task/list` aceita `client_id` como UUID e `assignment=assigned|unassigned`. Os filtros podem ser combinados com status, origem, busca e visibilidade do usuário. Cliente inexistente ou de outra organização retorna `404`, sem ampliar a consulta; valores inválidos retornam `400`.
 
 ## Porta local
 

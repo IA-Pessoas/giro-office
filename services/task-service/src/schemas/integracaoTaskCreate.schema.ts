@@ -60,13 +60,11 @@ export const integracaoTaskCreateBodySchema = z
     prospecting_status: prospectingStatusZod,
     name: optionalTextZod,
     status: optionalStatusZod,
-    department_id: optionalTextZod,
+    department_id: zNonEmptyText("department_id"),
     observations: z.string().optional().default(""),
     billing: optionalBillingZod,
     urgency: zNonEmptyText("urgency"),
     responsible_id: optionalResponsibleIdZod,
-    responsible2_id: optionalResponsibleIdZod,
-    responsible3_id: optionalResponsibleIdZod,
     prevision_date: optionalIsoDateZod,
   })
   .strict();

@@ -469,6 +469,67 @@ describe("client-service", () => {
     );
   });
 
+  it("PATCH /client/:id/commercial mapeia colisão ao reabrir tarefas legadas", async () => {
+    let persistedStatus = "Paralisado";
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 })
+      .mockRejectedValueOnce({ code: "P2002" });
+    const transactionClient = {
+      client: {
+        findFirst: vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID, status: "Paralisado" }),
+        update: vi.fn().mockImplementation(({ data }) => {
+          persistedStatus = data.status;
+          return Promise.resolve({
+            id: TEST_CLIENT_ID,
+            prospecting_status: "Fechado",
+          });
+        }),
+      },
+      task: { updateMany },
+    };
+    const transaction = vi.fn(async (callback: (tx: typeof transactionClient) => unknown) => {
+      const previousStatus = persistedStatus;
+      try {
+        return await callback(transactionClient);
+      } catch (error) {
+        persistedStatus = previousStatus;
+        throw error;
+      }
+    });
+    const prismaMock = {
+      ...transactionClient,
+      $transaction: transaction,
+    };
+    const prisma = prismaMock as unknown as PrismaClient;
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock, { prisma });
+    const token = jwt.sign(
+      {
+        user_id: "user-test-1",
+        organization_id: TEST_ORG_ID,
+        modules: { comercial: 2 },
+      },
+      TEST_JWT_SECRET,
+    );
+
+    const response = await request(app)
+      .patch(`/client/${TEST_CLIENT_ID}/commercial`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ prospecting_status: "Fechado" });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      success: false,
+      error: "Tarefa já foi cadastrada em andamento.",
+      code: "CONFLICT",
+      requestId: expect.any(String),
+    });
+    expect(updateMany).toHaveBeenCalledTimes(2);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(persistedStatus).toBe("Paralisado");
+  });
+
   it("PATCH /client/:id aceita o contexto encaminhado pelo gateway", async () => {
     const updated = baseClient({ name: "Nome atualizado pelo gateway" });
     const mock: IClientService = {

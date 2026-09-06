@@ -149,7 +149,33 @@ describe("TaskModelService", () => {
         id: true,
         name: true,
         department_id: true,
-        department: { select: { id: true, name: true } },
+        responsible_id: true,
+        department: {
+          select: {
+            id: true,
+            name: true,
+            users: {
+              where: {
+                status: "active",
+                AND: [
+                  { OR: [{ organization_id: "org-1" }, { organization_id: null }] },
+                  {
+                    OR: [
+                      { type: "admin" },
+                      {
+                        permissions: {
+                          some: { organization_id: "org-1", rh: { gte: 3 } },
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+              select: { id: true, name: true },
+              orderBy: { name: "asc" },
+            },
+          },
+        },
       },
       orderBy: { name: "asc" },
     });
@@ -189,6 +215,32 @@ describe("TaskModelService", () => {
       limit: 20,
       hasMore: false,
     });
+  });
+
+  it("listModel limita modelos de projeto a departamentos ativos", async () => {
+    prismaMock.taskModel.findMany.mockResolvedValue([]);
+    const service = new TaskModelService();
+
+    await service.listModel({
+      organizationId: "org-1",
+      type: "Projeto",
+      paginationRequested: false,
+      search: "",
+      page: 1,
+      limit: 20,
+      userId: "user-1",
+      integracaoLevel: 2,
+    });
+
+    expect(prismaMock.taskModel.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: "org-1",
+          type: "Projeto",
+          department: { status: "Ativo" },
+        },
+      }),
+    );
   });
 
   it("createModel lança 403 quando usuário não tem permissão", async () => {

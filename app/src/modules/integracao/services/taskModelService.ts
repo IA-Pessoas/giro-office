@@ -17,6 +17,7 @@ import {
   buildDeleteDependentPayload,
   buildDeleteTaskModelPayload,
   buildListDependentsParams,
+  buildTaskModelOptionsParams,
   buildTaskModelListParams,
   buildUpdateTaskModelPayload,
   TASK_MODEL_ENDPOINTS,
@@ -39,9 +40,11 @@ export const taskModelService = {
     return unwrapTaskModelList(response.data);
   },
 
-  async listOptions(): Promise<TaskModelOptions> {
+  async listOptions(departmentId?: string): Promise<TaskModelOptions> {
     const api = setupAPIClient();
-    const response = await api.get(TASK_MODEL_ENDPOINTS.options);
+    const response = await api.get(TASK_MODEL_ENDPOINTS.options, {
+      params: buildTaskModelOptionsParams(departmentId),
+    });
 
     return unwrapTaskModelOptions(response.data);
   },

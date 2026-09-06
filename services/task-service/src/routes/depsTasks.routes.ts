@@ -2,6 +2,7 @@ import {
   createSuccessResponse,
   error as logError,
   normalizeModulePermission,
+  parseWithZod,
   requireAuthenticatedRequestContext,
   requireIntegracaoRouteAccess,
 } from "@workspace/shared";
@@ -9,6 +10,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { taskModelOptionsQuerySchema } from "../schemas/taskModelList.schemas.js";
 import {
   DepsTasksService,
   type DepsTasksService as DepsTasksServiceType,
@@ -55,7 +57,8 @@ export function createDepsTasksRoutes(service: DepsTasksRouteDeps): ReturnType<t
           organizationId: organization_id,
           isOwner: req.user_type === "owner",
         });
-        const result = await service.listTaskModelOptions(organization_id);
+        const { department_id } = parseWithZod(taskModelOptionsQuerySchema, req.query);
+        const result = await service.listTaskModelOptions(organization_id, department_id);
         res.json(createSuccessResponse(result));
       } catch (err) {
         logError("Erro ao listar opções de modelo de tarefa", { err });

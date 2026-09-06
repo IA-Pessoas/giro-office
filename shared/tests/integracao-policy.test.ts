@@ -139,6 +139,25 @@ test("níveis 0 e 1 só alteram tarefa própria nos campos permitidos", () => {
   );
 });
 
+test("a política manual de tarefa rejeita responsáveis secundários", () => {
+  const policy = requirePolicy("PUT", "/task");
+
+  for (const field of ["responsible2_id", "responsible3_id"]) {
+    assert.equal(
+      evaluateIntegracaoAction(policy, {
+        userId: "user-1",
+        level: 2,
+        organizationId: "org-1",
+        resourceOrganizationId: "org-1",
+        isOwner: false,
+        requestedFields: [field],
+      }),
+      "forbidden",
+      field,
+    );
+  }
+});
+
 test("a propriedade da tarefa vale para os três responsáveis", () => {
   const readPolicy = requirePolicy("GET", "/task");
   const updatePolicy = requirePolicy("PUT", "/task");

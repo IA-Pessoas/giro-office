@@ -20,6 +20,7 @@
     "test:departments": "node --experimental-strip-types src/modules/departments/run-departments-tests.mjs",
     "test:contabil": "node --experimental-strip-types src/modules/contabil/run-contabil-tests.mjs",
     "test:projects": "node --experimental-strip-types src/modules/integracao/run-project-tests.mjs",
+    "test:tasks-browser": "node src/modules/integracao/run-task-eligibility-filters-browser-smoke.mjs",
     "test:socket": "node --experimental-strip-types src/context/run-socket-context-tests.mjs",
     "test:feature-flags": "node --experimental-strip-types src/shared/featureFlags/run-feature-flags-tests.mjs",
     "test:chat-context": "node --experimental-strip-types src/modules/chat/run-chat-context-tests.mjs",
