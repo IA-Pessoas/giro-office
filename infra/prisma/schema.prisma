@@ -144,6 +144,7 @@ model Organization {
   projectPlans                  ProjectPlan[]
   projectPlanTasks              ProjectPlanTasks[]
   projects                      Project[]
+  projectWizardConfirmations    ProjectWizardConfirmation[]
   tasks                         Task[]
   taskDependents                TaskDependent[]
   tasksIntegrationRegularize    TasksIntegrationRegularize[]
@@ -907,8 +908,27 @@ model Project {
   organization    Organization @relation(fields: [organization_id], references: [id])
   sponsor         User?        @relation("sponsor", fields: [sponsor_id], references: [id])
   tasks           Task[]
+  wizardConfirmations ProjectWizardConfirmation[]
 
   @@map("integracao.projects")
+}
+
+model ProjectWizardConfirmation {
+  id                String       @id @default(uuid())
+  project_id        String
+  organization_id   String
+  idempotency_key   String       @db.VarChar(255)
+  command_hash      String       @db.Char(64)
+  response_snapshot Json
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  project           Project      @relation(fields: [project_id], references: [id])
+
+  @@unique([organization_id, idempotency_key], map: "uq_project_wizard_confirmation_org_idempotency_key")
+  @@index([organization_id], map: "idx_project_wizard_confirmation_org")
+  @@index([project_id], map: "idx_project_wizard_confirmation_project")
+  @@map("integracao.project_wizard_confirmations")
 }
 
 model Task {
