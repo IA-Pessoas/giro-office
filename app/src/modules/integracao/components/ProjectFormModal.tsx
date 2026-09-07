@@ -184,31 +184,33 @@ export function ProjectFormModal({
     );
   }
 
-  async function handleTasksReview() {
+  function handleTasksReview() {
     if (previewRequestLockRef.current || isBusy || taskValidationError) return;
     previewRequestLockRef.current = true;
     const reviewedTasks = tasks.map((task) => ({ ...task, name: task.name.trim() }));
     const mainTasks = reviewedTasks.map(({ id: _id, ...task }) => task);
     setPreviewErrorMessage(null);
 
-    try {
-      const nextPreview = await previewMutation.mutateAsync(mainTasks);
-      setDependenciesChanged(
-        preview
-          ? dependencyModelIdsSignature(preview) !== dependencyModelIdsSignature(nextPreview)
-          : false,
-      );
-      setPreview(nextPreview);
-      setTasks(reviewedTasks);
-      setCreateStep(3);
-    } catch (error) {
-      console.error("Erro ao gerar prévia de dependências do wizard", error);
-      setPreviewErrorMessage(
-        getRequestErrorMessage(error, "Não foi possível gerar a prévia das dependências."),
-      );
-    } finally {
-      previewRequestLockRef.current = false;
-    }
+    previewMutation.mutate(mainTasks, {
+      onSuccess: (nextPreview) => {
+        setDependenciesChanged(
+          preview
+            ? dependencyModelIdsSignature(preview) !== dependencyModelIdsSignature(nextPreview)
+            : false,
+        );
+        setPreview(nextPreview);
+        setTasks(reviewedTasks);
+        setCreateStep(3);
+      },
+      onError: (error) => {
+        setPreviewErrorMessage(
+          getRequestErrorMessage(error, "Não foi possível gerar a prévia das dependências."),
+        );
+      },
+      onSettled: () => {
+        previewRequestLockRef.current = false;
+      },
+    });
   }
 
   async function handleUpdateSubmit() {
