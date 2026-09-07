@@ -7,6 +7,7 @@ import type {
 } from "../integrations/aiTaskExtraction.js";
 import {
   type ExtractProjectTasksRequest,
+  PREVISION_DATE_WARNING,
   ProjectWizardExtractionService,
 } from "../services/projectWizardExtractionService.js";
 
@@ -109,11 +110,12 @@ describe("ProjectWizardExtractionService", () => {
   });
 
   it.each([
-    "10/09/2026",
-    "próxima semana",
-    "2026-13-45",
-    "",
-  ])("descarta prazo inválido %j sem descartar a proposta", async (prevision) => {
+    ["data ambígua", "10/09/2026"],
+    ["data relativa", "próxima semana"],
+    ["data inexistente no calendário", "2026-13-45"],
+    ["dia fora do mês", "2026-02-30"],
+    ["data com fuso, que pode apontar outro dia civil", "2026-09-10T23:00:00-03:00"],
+  ])("deixa o prazo em branco e avisa quando a IA sugere %s", async (_label, prevision) => {
     const { provider } = createProvider(async () => [
       { name: "Tarefa proposta", prevision_date: prevision },
     ]);
@@ -121,7 +123,110 @@ describe("ProjectWizardExtractionService", () => {
 
     const result = await service.extractTasks(createRequest());
 
+    expect(result.tasks).toEqual([
+      { name: "Tarefa proposta", prevision_date_warning: PREVISION_DATE_WARNING },
+    ]);
+  });
+
+  it("não avisa sobre prazo quando a IA não sugeriu nenhum", async () => {
+    const { provider } = createProvider(async () => [
+      { name: "Tarefa proposta", prevision_date: "" },
+    ]);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest())).resolves.toEqual({
+      tasks: [{ name: "Tarefa proposta" }],
+    });
+  });
+
+  it("normaliza data civil inequívoca com horário para o dia sem horário", async () => {
+    const { provider } = createProvider(async () => [
+      { name: "Tarefa proposta", prevision_date: "2026-09-10T13:45:00.000Z" },
+    ]);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest())).resolves.toEqual({
+      tasks: [{ name: "Tarefa proposta", prevision_date: "2026-09-10" }],
+    });
+  });
+
+  it.each([
+    [
+      "espaços repetidos e quebras de linha",
+      "  apurar   impostos\n do cliente ",
+      "Apurar impostos do cliente",
+    ],
+    ["acentos decompostos", "revisa\u0303o de documentos", "Revisão de documentos"],
+  ])("normaliza o título proposto com %s", async (_label, proposed, expected) => {
+    const { provider } = createProvider(async () => [{ name: proposed }]);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    const result = await service.extractTasks(createRequest());
+
+    expect(result.tasks[0]?.name).toBe(expected);
+  });
+
+  it("deixa o departamento em branco quando a correspondência é conflitante", async () => {
+    const { provider } = createProvider(async () => [
+      { name: "Tarefa proposta", department: "Fiscal", model: "Apuração" },
+    ]);
+    const service = new ProjectWizardExtractionService(
+      provider,
+      createPrisma([
+        ...catalog,
+        {
+          id: "department-fiscal-legado",
+          name: "FISCAL",
+          tasksModel: [{ id: "model-apuracao-legado", name: "Apuração" }],
+        },
+      ]),
+    );
+
+    const result = await service.extractTasks(createRequest());
+
     expect(result.tasks).toEqual([{ name: "Tarefa proposta" }]);
+  });
+
+  it("deixa o Modelo em branco quando o departamento tem Modelos homônimos", async () => {
+    const { provider } = createProvider(async () => [
+      { name: "Tarefa proposta", department: "Fiscal", model: "Apuração" },
+    ]);
+    const service = new ProjectWizardExtractionService(
+      provider,
+      createPrisma([
+        {
+          id: "department-fiscal",
+          name: "Fiscal",
+          tasksModel: [
+            { id: "model-apuracao", name: "Apuração" },
+            { id: "model-apuracao-2", name: "APURAÇÃO" },
+          ],
+        },
+      ]),
+    );
+
+    await expect(service.extractTasks(createRequest())).resolves.toEqual({
+      tasks: [{ name: "Tarefa proposta", department_id: "department-fiscal" }],
+    });
+  });
+
+  it("restringe o catálogo a Modelos do tipo Projeto da organização autenticada", async () => {
+    const { provider } = createProvider(async () => [{ name: "Tarefa proposta" }]);
+    const prisma = createPrisma();
+    const service = new ProjectWizardExtractionService(provider, prisma);
+
+    await service.extractTasks(createRequest());
+
+    expect(prisma.department.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG_ID, status: "Ativo" },
+        select: expect.objectContaining({
+          tasksModel: expect.objectContaining({
+            where: { organization_id: ORG_ID, type: "Projeto" },
+          }),
+        }),
+      }),
+    );
   });
 
   it.each([

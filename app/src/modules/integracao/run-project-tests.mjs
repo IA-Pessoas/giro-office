@@ -67,6 +67,11 @@ import {
 } from "./services/projectService.contract.ts";
 import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
+  applyWizardTaskChange,
+  getWizardTaskDateWarning,
+  WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING,
+} from "./components/projectWizardUi.ts";
+import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
   canViewTaskModelConfig,
@@ -1324,4 +1329,92 @@ runTest("step 2 only sends the meeting minutes after an explicit click and warns
   assert.match(projectForm, /OpenAI/);
   assert.match(projectForm, /onClick=\{\(\) => void handleExtractTasks\(\)\}/);
   assert.doesNotMatch(projectForm, /onChange=\{[^}]*handleExtractTasks/);
+});
+
+runTest("extraction proposals carry the AI deadline warning for review", () => {
+  const [proposal] = unwrapProjectTaskProposals({
+    success: true,
+    data: {
+      tasks: [
+        {
+          name: "Apurar impostos",
+          department_id: "department-1",
+          prevision_date_warning: "Prazo não reconhecido.",
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(proposal, {
+    name: "Apurar impostos",
+    prevision_date: undefined,
+    department_id: "department-1",
+    model_id: "",
+    responsible_id: null,
+    prevision_date_warning: "Prazo não reconhecido.",
+  });
+});
+
+runTest("changing department drops the incompatible model and responsible", () => {
+  const models = [
+    { id: "model-1", department_id: "department-1", responsible_id: "user-1", department: { users: [{ id: "user-1" }, { id: "user-2" }] } },
+  ];
+  const task = { name: "Tarefa", prevision_date: "2026-09-10", department_id: "department-1", model_id: "model-1", responsible_id: "user-1" };
+
+  assert.deepEqual(applyWizardTaskChange(task, "department_id", "department-2", models), {
+    ...task,
+    department_id: "department-2",
+    model_id: "",
+    responsible_id: null,
+  });
+});
+
+runTest("changing model assigns the automatic responsible and drops the previous one", () => {
+  const models = [
+    { id: "model-1", department_id: "department-1", responsible_id: "user-1", department: { users: [{ id: "user-1" }, { id: "user-2" }] } },
+    { id: "model-2", department_id: "department-1", responsible_id: "user-9", department: { users: [{ id: "user-2" }] } },
+    { id: "model-3", department_id: "department-2", responsible_id: "user-3", department: { users: [{ id: "user-3" }] } },
+  ];
+  const task = { name: "Tarefa", department_id: "department-1", model_id: "model-1", responsible_id: "user-1" };
+
+  assert.equal(applyWizardTaskChange(task, "model_id", "model-2", models).responsible_id, "user-2");
+  assert.equal(applyWizardTaskChange(task, "model_id", "model-3", models).responsible_id, null);
+});
+
+runTest("editing the deadline clears the AI warning attached to it", () => {
+  const task = { name: "Tarefa", department_id: "", model_id: "", responsible_id: null, prevision_date_warning: "Prazo não reconhecido." };
+
+  assert.deepEqual(applyWizardTaskChange(task, "prevision_date", "2026-09-10", []), {
+    name: "Tarefa",
+    department_id: "",
+    model_id: "",
+    responsible_id: null,
+    prevision_date: "2026-09-10",
+    prevision_date_warning: undefined,
+  });
+  assert.equal(applyWizardTaskChange(task, "name", "Outra", []).prevision_date_warning, "Prazo não reconhecido.");
+});
+
+runTest("wizard task warns about an unusable AI deadline and about one outside the project period", () => {
+  const start = "2026-09-01";
+  const end = "2026-09-30";
+
+  assert.equal(getWizardTaskDateWarning({ prevision_date_warning: "Prazo não reconhecido." }, start, end), "Prazo não reconhecido.");
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-09-10" }, start, end), null);
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-08-31" }, start, end), WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING);
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-10-01" }, start, end), WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING);
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-10-01" }, start, ""), null);
+  assert.equal(getWizardTaskDateWarning({}, start, end), null);
+});
+
+runTest("AI proposals arrive with the automatic responsible of the proposed model", () => {
+  const models = [
+    { id: "model-1", department_id: "department-1", responsible_id: null, department: { users: [{ id: "user-1" }] } },
+    { id: "model-2", department_id: "department-1", responsible_id: null, department: { users: [{ id: "user-1" }, { id: "user-2" }] } },
+  ];
+  const proposal = { name: "Apurar impostos", department_id: "department-1", model_id: "model-1", responsible_id: null };
+
+  assert.equal(applyWizardTaskChange(proposal, "model_id", proposal.model_id, models).responsible_id, "user-1");
+  assert.equal(applyWizardTaskChange({ ...proposal, model_id: "model-2" }, "model_id", "model-2", models).responsible_id, null);
+  assert.equal(applyWizardTaskChange({ ...proposal, model_id: "" }, "model_id", "", models).responsible_id, null);
 });

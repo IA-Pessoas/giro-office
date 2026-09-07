@@ -197,7 +197,10 @@ async function installApiMocks(
               department_id: "department-one",
               model_id: "model-default",
             },
-            { name: "Reunir documentos do cliente" },
+            {
+              name: "Reunir documentos do cliente",
+              prevision_date_warning: "Prazo sugerido não reconhecido.",
+            },
           ],
         },
       },
@@ -546,7 +549,8 @@ async function runBrowserProof() {
     ]);
     await expect(review.getByRole("row").nth(1).getByRole("cell")).toHaveText([
       "Apuração revisada",
-      "21/09/2026",
+      // O prazo 21/09 está fora do período 10/09–20/09: o aviso acompanha a confirmação.
+      "21/09/2026Prazo fora do período do projeto.",
       "Fiscal",
       "Modelo com escolha",
       "Bia",
@@ -681,11 +685,14 @@ async function runBrowserProof() {
     await expect(proposedTask.getByLabel("Prazo", { exact: true })).toHaveValue("2026-09-15");
     await expect(proposedTask.getByLabel(/^Departamento/)).toHaveValue("department-one");
     await expect(proposedTask.getByLabel(/^Modelo/)).toHaveValue("model-default");
-    await expect(
-      wizard
-        .getByRole("group", { name: "Tarefa 2 (proposta pela IA)" })
-        .getByLabel(/^Departamento/),
-    ).toHaveValue("");
+    await expect(proposedTask.getByLabel(/^Responsável/)).toHaveValue("ana");
+    const secondProposedTask = wizard.getByRole("group", { name: "Tarefa 2 (proposta pela IA)" });
+    await expect(secondProposedTask.getByLabel(/^Departamento/)).toHaveValue("");
+    await expect(secondProposedTask.getByText("Prazo sugerido não reconhecido.")).toBeVisible();
+    await secondProposedTask.getByLabel("Prazo", { exact: true }).fill("2026-09-20");
+    await expect(secondProposedTask.getByText("Prazo sugerido não reconhecido.")).toHaveCount(0);
+    await proposedTask.getByLabel("Prazo", { exact: true }).fill("2026-09-05");
+    await expect(proposedTask.getByText("Prazo fora do período do projeto.")).toBeVisible();
     assert.equal(extractionRequests.length, 2);
     assert.deepEqual(extractionRequests[1], {
       content: "- Apurar impostos do trimestre\n- Reunir documentos do cliente",

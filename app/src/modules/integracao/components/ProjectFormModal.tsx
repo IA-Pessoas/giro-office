@@ -22,7 +22,12 @@ import {
   useUpdateProjectMutation,
 } from "../hooks/useProjects";
 import { PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE } from "../services/projectService.contract";
-import type { ProjectDetail, ProjectWizardPreview, ProjectWizardTask } from "../types";
+import type {
+  ProjectDetail,
+  ProjectWizardPreview,
+  ProjectWizardTask,
+  ProjectWizardTaskProposal,
+} from "../types";
 import { taskModelService } from "../services/taskModelService";
 import {
   formatProjectDate,
@@ -33,14 +38,14 @@ import {
   PROJECT_SUBPANEL_CLASSNAME,
   ProjectSelect,
 } from "./projectUi";
+import { applyWizardTaskChange, getWizardTaskDateWarning } from "./projectWizardUi";
 import {
-  getAutomaticTaskResponsibleId,
   TASK_FORM_AUXILIARY_WARNING_CLASSNAME,
   TASK_FORM_GRID_CLASSNAME,
   TASK_FORM_LABEL_CLASSNAME,
 } from "./taskFormModalUi";
 
-type WizardTask = ProjectWizardTask & { id: string; source: "ai" | "manual" };
+type WizardTask = ProjectWizardTaskProposal & { id: string; source: "ai" | "manual" };
 
 interface ProjectFormModalProps {
   open: boolean;
@@ -59,7 +64,12 @@ function getRequestErrorMessage(
   return typeof message === "string" ? message : fallback;
 }
 
-function toWizardTaskPayload({ id: _id, source: _source, ...task }: WizardTask): ProjectWizardTask {
+function toWizardTaskPayload({
+  id: _id,
+  source: _source,
+  prevision_date_warning: _warning,
+  ...task
+}: WizardTask): ProjectWizardTask {
   return task;
 }
 
@@ -176,28 +186,9 @@ export function ProjectFormModal({
   function updateTask(id: string, field: keyof ProjectWizardTask, value: string) {
     if (isBusy) return;
     setTasks((current) =>
-      current.map((task) => {
-        if (task.id !== id) return task;
-        if (field === "department_id") {
-          return { ...task, department_id: value, model_id: "", responsible_id: null };
-        }
-        if (field === "model_id") {
-          const model = taskModels.find(
-            (item) => item.id === value && item.department_id === task.department_id,
-          );
-          return {
-            ...task,
-            model_id: value,
-            responsible_id:
-              getAutomaticTaskResponsibleId(
-                model?.responsible_id,
-                model?.department?.users ?? [],
-              ) || null,
-          };
-        }
-        if (field === "prevision_date") return { ...task, prevision_date: value || undefined };
-        return { ...task, [field]: value };
-      }),
+      current.map((task) =>
+        task.id === id ? applyWizardTaskChange(task, field, value, taskModels) : task,
+      ),
     );
   }
 
@@ -215,11 +206,16 @@ export function ProjectFormModal({
 
       setTasks((current) => [
         ...current.filter((task) => task.source === "manual"),
-        ...proposals.map((proposal) => ({
-          ...proposal,
-          id: crypto.randomUUID(),
-          source: "ai" as const,
-        })),
+        // O Modelo proposto passa pela mesma cascata da edição manual, para já trazer o
+        // responsável automático quando o departamento tiver um único elegível.
+        ...proposals.map((proposal) =>
+          applyWizardTaskChange(
+            { ...proposal, id: crypto.randomUUID(), source: "ai" as const },
+            "model_id",
+            proposal.model_id,
+            taskModels,
+          ),
+        ),
       ]);
       toast.success(`Tarefas propostas pela IA: ${proposals.length}. Revise antes de continuar.`);
     } catch (error) {
@@ -626,10 +622,11 @@ export function ProjectFormModal({
                 );
                 const candidates =
                   models.find(({ id }) => id === task.model_id)?.department?.users ?? [];
-                const outsidePeriod =
-                  task.prevision_date &&
-                  (task.prevision_date < values.start_date ||
-                    (values.end_date && task.prevision_date > values.end_date));
+                const dateWarning = getWizardTaskDateWarning(
+                  task,
+                  values.start_date,
+                  values.end_date,
+                );
                 const warningId = `task-${task.id}-date-warning`;
                 return (
                   <fieldset
@@ -662,13 +659,13 @@ export function ProjectFormModal({
                             updateTask(task.id, "prevision_date", event.currentTarget.value)
                           }
                           className={PROJECT_INPUT_CLASSNAME}
-                          aria-describedby={outsidePeriod ? warningId : undefined}
+                          aria-describedby={dateWarning ? warningId : undefined}
                         />
                       </label>
                     </div>
-                    {outsidePeriod ? (
+                    {dateWarning ? (
                       <output className={`block ${TASK_FORM_AUXILIARY_WARNING_CLASSNAME}`}>
-                        <span id={warningId}>Prazo fora do período do projeto.</span>
+                        <span id={warningId}>{dateWarning}</span>
                       </output>
                     ) : null}
                     <div className={TASK_FORM_GRID_CLASSNAME}>
@@ -841,10 +838,23 @@ export function ProjectFormModal({
                           task.responsible_id,
                           model?.department?.users ?? [],
                         );
+                        // O aviso de período acompanha a confirmação, sem impedi-la.
+                        const dateWarning = getWizardTaskDateWarning(
+                          task,
+                          values.start_date,
+                          values.end_date,
+                        );
                         return [
                           <tr key={`main-${task.model_id}`}>
                             <td>{task.name}</td>
-                            <td>{formatProjectDate(task.prevision_date)}</td>
+                            <td>
+                              {formatProjectDate(task.prevision_date)}
+                              {dateWarning ? (
+                                <span className="block text-xs text-amber-700 dark:text-amber-300">
+                                  {dateWarning}
+                                </span>
+                              ) : null}
+                            </td>
                             <td>{department}</td>
                             <td>{model?.name ?? task.model_id}</td>
                             <td>{responsible}</td>

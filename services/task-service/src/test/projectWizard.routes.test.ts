@@ -599,6 +599,24 @@ describe("project wizard task extraction routes", () => {
     );
   });
 
+  it("entrega ao cliente o aviso de prazo da proposta", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({
+        tasks: [{ name: "Apurar impostos", prevision_date_warning: "Prazo não reconhecido." }],
+      }),
+    };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send(validExtractionBody);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.tasks).toEqual([
+      { name: "Apurar impostos", prevision_date_warning: "Prazo não reconhecido." },
+    ]);
+  });
+
   it("não envia identidade do cliente ao service de extração", async () => {
     const service: ProjectWizardExtractionRouteDeps = {
       extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),

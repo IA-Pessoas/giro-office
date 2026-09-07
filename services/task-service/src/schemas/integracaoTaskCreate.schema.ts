@@ -9,6 +9,7 @@ import {
   PROSPECTING_STATUS_VALUES,
   type ProspectingStatus,
 } from "../constants/prospectingStatus.js";
+import { isIsoCalendarDate } from "../utils/civilDate.js";
 
 const prospectingStatusZod = z.enum(
   PROSPECTING_STATUS_VALUES as unknown as [ProspectingStatus, ...ProspectingStatus[]],
@@ -22,19 +23,6 @@ const taskBillingZod = z.enum(["Realizar", "Não Realizar"]);
 
 function normalizeOptionalText(value: unknown): unknown {
   return typeof value === "string" && !value.trim() ? undefined : value;
-}
-
-function isIsoCalendarDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return (
-    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
-  );
 }
 
 const optionalTextZod = z.preprocess(normalizeOptionalText, z.string().optional());
