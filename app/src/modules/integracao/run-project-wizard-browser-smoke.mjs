@@ -176,9 +176,12 @@ async function installApiMocks(page, previewRequests, wizardRequests) {
     ) {
       failFirstModelChoicePreview = false;
       await route.fulfill({
-        status: 500,
+        status: 409,
         contentType: "application/json",
-        json: { error: "Prévia indisponível." },
+        json: {
+          error:
+            "Modelo model-choice repetido entre principal 1 (Apuração revisada) e dependência model-choice.",
+        },
       });
       return;
     }
@@ -195,7 +198,7 @@ async function installApiMocks(page, previewRequests, wizardRequests) {
                 department_id: "department-one",
                 status: "Em Espera",
                 observation: "Aguardar a tarefa principal",
-                responsible_id: "ana",
+                responsible_id: "responsible-not-loaded",
               },
             ]
           : task.model_id === "model-default"
@@ -211,6 +214,9 @@ async function installApiMocks(page, previewRequests, wizardRequests) {
               ]
             : [],
     }));
+    if (body.tasks.some((task) => task.model_id === "model-default")) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -474,7 +480,7 @@ async function runBrowserProof() {
       "Rascunhos não podem ser enviados antes da confirmação.",
     );
     await expect(wizard.getByRole("alert")).toHaveText(
-      "Não foi possível gerar a prévia das dependências.Tentar gerar prévia",
+      "Modelo model-choice repetido entre principal 1 (Apuração revisada) e dependência model-choice.Tentar gerar prévia",
     );
     await expect(wizard.getByRole("button", { name: "Criar projeto", exact: true })).toHaveCount(0);
     await wizard.getByRole("button", { name: "Tentar gerar prévia", exact: true }).click();
@@ -507,11 +513,11 @@ async function runBrowserProof() {
       "A Realizar",
     ]);
     await expect(review.getByRole("row").nth(2).getByRole("cell")).toHaveText([
-      "Dependência em espera Incluída pelo Modelo: Apuração revisada",
+      "Dependência em espera Incluída pelo Modelo: Modelo com escolha",
       "Não informado",
       "Fiscal",
       "Modelo padrão",
-      "Ana",
+      "Responsável não carregado (responsible-not-loaded)",
       "Em Espera",
     ]);
     await expect(review.getByRole("row")).toHaveCount(4);
@@ -538,6 +544,14 @@ async function runBrowserProof() {
     await firstTask.getByLabel(/^Modelo/).selectOption("model-default");
     await secondTask.getByRole("button", { name: "Remover tarefa", exact: true }).click();
     await reviewButton.click();
+    await expect(firstTask.getByLabel(/^Nome/)).toBeDisabled();
+    await expect(firstTask.getByLabel(/^Modelo/)).toBeDisabled();
+    await expect(firstTask.getByRole("button", { name: "Remover tarefa", exact: true })).toBeDisabled();
+    await expect(wizard.getByRole("button", { name: "Adicionar tarefa", exact: true })).toBeDisabled();
+    await expect.poll(() => previewRequests.length).toBe(5);
+    await wizard.locator("form").evaluate((form) => form.requestSubmit());
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(previewRequests.length, 5, "Uma prévia pendente não pode aceitar nova revisão.");
     await expect(review.getByRole("cell", { name: "Apuração final", exact: true })).toBeVisible();
     await expect(
       wizard.getByRole("alert", { name: "Dependências atualizadas", exact: true }),
