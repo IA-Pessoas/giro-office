@@ -2,6 +2,9 @@ import { inflateRawSync } from "node:zlib";
 
 import { ServiceError } from "@workspace/shared";
 
+export const DOCX_MIME_TYPE =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 const CORRUPTED_MESSAGE = "O arquivo DOCX está corrompido ou não pôde ser lido.";
 
 /** Container OLE/CFB usado pelo OOXML protegido por senha. */
@@ -83,15 +86,20 @@ function decodeXmlEntities(value: string): string {
 }
 
 function documentXmlToText(xml: string): string {
-  return xml
-    .split("</w:p>")
-    .map((paragraph) =>
-      [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g)]
-        .map((match) => decodeXmlEntities(match[1]))
-        .join(""),
-    )
-    .join("\n")
-    .trim();
+  return (
+    xml
+      // Tabulações e quebras de linha são nós próprios: viram texto para não colar palavras.
+      .replace(/<w:tab\b[^>]*\/>/g, "<w:t>\t</w:t>")
+      .replace(/<w:br\b[^>]*\/>/g, "<w:t>\n</w:t>")
+      .split("</w:p>")
+      .map((paragraph) =>
+        [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g)]
+          .map((match) => decodeXmlEntities(match[1]))
+          .join(""),
+      )
+      .join("\n")
+      .trim()
+  );
 }
 
 /**
@@ -101,6 +109,9 @@ function documentXmlToText(xml: string): string {
  * Macros (`word/vbaProject.bin`), campos ativos (`<w:instrText>`, incluindo
  * HYPERLINK), OLE objects e demais partes do pacote são ignorados: nada é
  * executado nem repassado adiante como comando.
+ *
+ * Limitações conhecidas: não lê pacotes ZIP64 nem partes fora de `word/document.xml`
+ * (cabeçalhos, rodapés e notas ficam de fora).
  */
 export function extractDocxText(file: Buffer): string {
   if (file.subarray(0, CFB_SIGNATURE.length).equals(CFB_SIGNATURE)) {
@@ -110,13 +121,11 @@ export function extractDocxText(file: Buffer): string {
     throw new ServiceError(400, CORRUPTED_MESSAGE);
   }
 
-  let documentXml: Buffer;
   try {
-    documentXml = readDocumentXml(file);
+    return documentXmlToText(readDocumentXml(file).toString("utf8"));
   } catch (err) {
-    // RangeError de offsets fora do buffer e falhas de inflate viram erro acionável.
+    // RangeError de offsets fora do buffer, falha de inflate ou entidade XML inválida
+    // viram erro acionável em vez de 500.
     throw err instanceof ServiceError ? err : new ServiceError(400, CORRUPTED_MESSAGE);
   }
-
-  return documentXmlToText(documentXml.toString("utf8"));
 }

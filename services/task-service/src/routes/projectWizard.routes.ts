@@ -22,7 +22,7 @@ import {
 import { projectWizardExtractTasksBodySchema } from "../schemas/projectWizardExtraction.schemas.js";
 import type { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import type { ProjectWizardService } from "../services/projectWizardService.js";
-import { extractDocxText } from "../utils/docx.js";
+import { DOCX_MIME_TYPE, extractDocxText } from "../utils/docx.js";
 
 export type ProjectWizardRouteDeps = Pick<ProjectWizardService, "create" | "preview">;
 export type ProjectWizardExtractionRouteDeps = Pick<ProjectWizardExtractionService, "extractTasks">;
@@ -35,7 +35,6 @@ export interface ProjectWizardRoutesDeps {
 
 const MEETING_MINUTES_UPLOAD_FIELD = "file";
 const MEETING_MINUTES_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const MEETING_MINUTES_FILE_TYPES: Record<string, readonly string[]> = {
   ".txt": ["text/plain"],
   ".md": ["text/markdown", "text/plain", "text/x-markdown"],

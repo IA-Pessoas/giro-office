@@ -2,6 +2,7 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { TaskServiceEnv } from "../config/env.js";
 import { TASK_ASSIGNMENT_FILTER_VALUES } from "../constants/integracaoTask.js";
+import { DOCX_MIME_TYPE } from "../utils/docx.js";
 
 const successJson = {
   content: {
@@ -433,10 +434,7 @@ const extractProjectWizardTasksRequestBody = {
             file: {
               type: "string",
               format: "binary",
-              description:
-                "Ata .txt, .md ou .docx de até 10 MB; aceita text/plain para .txt, text/markdown, text/plain ou " +
-                "text/x-markdown para .md e application/vnd.openxmlformats-officedocument.wordprocessingml.document " +
-                "para .docx; conteúdo transitório.",
+              description: `Ata .txt, .md ou .docx de até 10 MB; aceita text/plain para .txt, text/markdown, text/plain ou text/x-markdown para .md e ${DOCX_MIME_TYPE} para .docx; conteúdo transitório.`,
             },
             name: extractProjectWizardTasksProperties.name,
             objective: extractProjectWizardTasksProperties.objective,

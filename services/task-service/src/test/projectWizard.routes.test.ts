@@ -26,10 +26,9 @@ import type {
 import { projectWizardCreateBodySchema } from "../schemas/projectWizard.schemas.js";
 import { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "../services/projectWizardService.js";
+import { DOCX_MIME_TYPE } from "../utils/docx.js";
 
 vi.mock("../integrations/audit.js", () => ({ createLog: vi.fn() }));
-
-const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 function readDocxFixture(name: string): Buffer {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
@@ -648,6 +647,8 @@ describe("project wizard task extraction routes", () => {
 
     const { content } = vi.mocked(service.extractTasks).mock.calls[0][0] as { content: string };
     expect(content).toContain(validExtractionBody.content);
+    // Tabulação e quebra de linha do Word separam as palavras entregues ao provedor.
+    expect(content).toContain("Responsável:\tJoão\nPrazo: 30/09");
     // Macros e campos ativos ficam fora do texto entregue ao provedor.
     expect(content).not.toContain("HYPERLINK");
     expect(content).not.toContain("exemplo-malicioso");
@@ -672,6 +673,11 @@ describe("project wizard task extraction routes", () => {
       "O arquivo DOCX está corrompido ou não pôde ser lido.",
     ],
     ["sem texto", "meeting-minutes-empty.docx", "O arquivo da Ata não contém texto."],
+    [
+      "com entidade XML inválida",
+      "meeting-minutes-invalid-entity.docx",
+      "O arquivo DOCX está corrompido ou não pôde ser lido.",
+    ],
   ])("rejeita DOCX %s sem chamar o provedor", async (_label, fixture, error) => {
     const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
 
@@ -716,14 +722,21 @@ describe("project wizard task extraction routes", () => {
   });
 
   it.each([
-    ["MIME divergente", () => Buffer.from("Ata inválida"), "ata.txt", "text/markdown"],
+    [
+      "MIME divergente",
+      () => Buffer.from("Ata inválida"),
+      "ata.txt",
+      "text/markdown",
+      "Tipo de arquivo não permitido.",
+    ],
     [
       "DOCX corrompido",
       () => readDocxFixture("meeting-minutes-corrupted.docx"),
       "ata.docx",
       DOCX_MIME_TYPE,
+      "O arquivo DOCX está corrompido ou não pôde ser lido.",
     ],
-  ])("rejeita %s antes do rate limit e do provedor", async (_label, readFile, filename, contentType) => {
+  ])("rejeita %s antes do rate limit e do provedor", async (_label, readFile, filename, contentType, error) => {
     const service: ProjectWizardExtractionRouteDeps = {
       extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
     };
@@ -738,6 +751,7 @@ describe("project wizard task extraction routes", () => {
       .attach("file", readFile(), { filename, contentType });
 
     expect(invalid.status).toBe(400);
+    expect(invalid.body).toMatchObject({ success: false, error });
 
     for (const expected of [200, 200]) {
       const response = await request(app)
@@ -1076,6 +1090,36 @@ describe("project wizard task extraction routes", () => {
 
     expect(status).toBe(502);
     expect(written.join("\n")).not.toContain("SEGREDOXYZ");
+  });
+
+  it("percorre o fluxo HTTP completo da Ata DOCX com o adapter de IA falso", async () => {
+    const extractionService = new ProjectWizardExtractionService(
+      createAiTaskExtractionProvider({ mode: "fake" }),
+      {
+        department: {
+          findMany: vi.fn().mockResolvedValue([{ id: "dep-1", name: "Fiscal", tasksModel: [] }]),
+        },
+      } as never,
+    );
+
+    const response = await request(createExtractionApp(extractionService))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .attach("file", readDocxFixture("meeting-minutes.docx"), {
+        filename: "ata.docx",
+        contentType: DOCX_MIME_TYPE,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Apurar impostos do trimestre" }),
+        expect.objectContaining({ name: "Reunir documentos do cliente" }),
+      ]),
+    );
   });
 
   it("aceita owner sem nível de Integração", async () => {
