@@ -549,7 +549,8 @@ async function runBrowserProof() {
     ]);
     await expect(review.getByRole("row").nth(1).getByRole("cell")).toHaveText([
       "Apuração revisada",
-      "21/09/2026",
+      // O prazo 21/09 está fora do período 10/09–20/09: o aviso acompanha a confirmação.
+      "21/09/2026Prazo fora do período do projeto.",
       "Fiscal",
       "Modelo com escolha",
       "Bia",

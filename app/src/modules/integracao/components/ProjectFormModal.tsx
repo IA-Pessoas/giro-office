@@ -838,10 +838,23 @@ export function ProjectFormModal({
                           task.responsible_id,
                           model?.department?.users ?? [],
                         );
+                        // O aviso de período acompanha a confirmação, sem impedi-la.
+                        const dateWarning = getWizardTaskDateWarning(
+                          task,
+                          values.start_date,
+                          values.end_date,
+                        );
                         return [
                           <tr key={`main-${task.model_id}`}>
                             <td>{task.name}</td>
-                            <td>{formatProjectDate(task.prevision_date)}</td>
+                            <td>
+                              {formatProjectDate(task.prevision_date)}
+                              {dateWarning ? (
+                                <span className="block text-xs text-amber-700 dark:text-amber-300">
+                                  {dateWarning}
+                                </span>
+                              ) : null}
+                            </td>
                             <td>{department}</td>
                             <td>{model?.name ?? task.model_id}</td>
                             <td>{responsible}</td>
