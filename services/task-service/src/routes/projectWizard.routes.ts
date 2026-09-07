@@ -103,6 +103,7 @@ function validateProjectWizardExtractTasksBody(
     request.body = parseWithZod(projectWizardExtractTasksBodySchema, request.body);
     next();
   } catch (err) {
+    logError("Erro ao validar entrada da extração de tarefas", { err });
     next(err);
   }
 }
