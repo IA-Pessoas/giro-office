@@ -352,6 +352,7 @@ describe("project wizard routes", () => {
     1, 2,
   ])("POST /task/project-wizard aceita %i tarefa(s) com Modelos distintos", async (count) => {
     const service: ProjectWizardRouteDeps = {
+      preview: vi.fn(),
       create: vi.fn().mockResolvedValue({
         project: { id: "project-1" },
         counts: { main: count, dependencies: 0, unassigned: count - 1 },
