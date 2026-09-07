@@ -38,7 +38,7 @@ export function applyWizardTaskChange<T extends ProjectWizardTaskProposal>(
 
 /** Aviso do prazo: o da IA enquanto o campo está vazio, o do período assim que ele é preenchido. */
 export function getWizardTaskDateWarning(
-  task: { prevision_date?: string; prevision_date_warning?: string },
+  task: Pick<ProjectWizardTaskProposal, "prevision_date" | "prevision_date_warning">,
   startDate: string,
   endDate?: string | null,
 ): string | null {

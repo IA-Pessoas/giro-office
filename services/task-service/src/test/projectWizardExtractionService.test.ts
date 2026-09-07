@@ -114,6 +114,7 @@ describe("ProjectWizardExtractionService", () => {
     ["data relativa", "próxima semana"],
     ["data inexistente no calendário", "2026-13-45"],
     ["dia fora do mês", "2026-02-30"],
+    ["data com fuso, que pode apontar outro dia civil", "2026-09-10T23:00:00-03:00"],
   ])("deixa o prazo em branco e avisa quando a IA sugere %s", async (_label, prevision) => {
     const { provider } = createProvider(async () => [
       { name: "Tarefa proposta", prevision_date: prevision },
@@ -156,7 +157,6 @@ describe("ProjectWizardExtractionService", () => {
       "Apurar impostos do cliente",
     ],
     ["acentos decompostos", "revisa\u0303o de documentos", "Revisão de documentos"],
-    ["marcador de lista", "- enviar relatório", "Enviar relatório"],
   ])("normaliza o título proposto com %s", async (_label, proposed, expected) => {
     const { provider } = createProvider(async () => [{ name: proposed }]);
     const service = new ProjectWizardExtractionService(provider, createPrisma());

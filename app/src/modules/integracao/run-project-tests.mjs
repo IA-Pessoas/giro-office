@@ -1,15 +1,5 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-
-let projectFormSource = null;
-
-function readProjectFormSource() {
-  projectFormSource ??= readFileSync(
-    "src/modules/integracao/components/ProjectFormModal.tsx",
-    "utf8",
-  );
-  return projectFormSource;
-}
 import * as taskFormUi from "./components/taskFormModalUi.ts";
 
 runTest("task edit accepts an unassigned task while retaining required operational fields", () => {
@@ -1225,7 +1215,7 @@ runTest(
   },
 );
 runTest("project and task model forms disclose their required fields", () => {
-  const projectForm = readProjectFormSource();
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
   const taskModelForm = readFileSync("src/modules/integracao/components/TaskModelModal.tsx", "utf8");
 
   for (const source of [projectForm, taskModelForm]) {
@@ -1235,7 +1225,7 @@ runTest("project and task model forms disclose their required fields", () => {
 });
 
 runTest("project date fields handle native input events", () => {
-  const projectForm = readProjectFormSource();
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
 
   assert.equal(
     (projectForm.match(/onInput=\{\(event\) => updateValue\("start_date", event\.currentTarget\.value\)\}/g) ?? [])
@@ -1333,7 +1323,7 @@ runTest("extraction without usable proposals is treated as a failure", () => {
 });
 
 runTest("step 2 only sends the meeting minutes after an explicit click and warns about OpenAI", () => {
-  const projectForm = readProjectFormSource();
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
 
   assert.match(projectForm, /Extrair tarefas com IA/);
   assert.match(projectForm, /OpenAI/);
@@ -1417,9 +1407,14 @@ runTest("wizard task warns about an unusable AI deadline and about one outside t
   assert.equal(getWizardTaskDateWarning({}, start, end), null);
 });
 
-runTest("wizard task rows delegate edits and warnings to the tested helpers", () => {
-  const projectForm = readProjectFormSource();
+runTest("AI proposals arrive with the automatic responsible of the proposed model", () => {
+  const models = [
+    { id: "model-1", department_id: "department-1", responsible_id: null, department: { users: [{ id: "user-1" }] } },
+    { id: "model-2", department_id: "department-1", responsible_id: null, department: { users: [{ id: "user-1" }, { id: "user-2" }] } },
+  ];
+  const proposal = { name: "Apurar impostos", department_id: "department-1", model_id: "model-1", responsible_id: null };
 
-  assert.match(projectForm, /applyWizardTaskChange\(/);
-  assert.match(projectForm, /getWizardTaskDateWarning\(/);
+  assert.equal(applyWizardTaskChange(proposal, "model_id", proposal.model_id, models).responsible_id, "user-1");
+  assert.equal(applyWizardTaskChange({ ...proposal, model_id: "model-2" }, "model_id", "model-2", models).responsible_id, null);
+  assert.equal(applyWizardTaskChange({ ...proposal, model_id: "" }, "model_id", "", models).responsible_id, null);
 });

@@ -6,14 +6,13 @@ import {
   ServiceError,
 } from "@workspace/shared";
 
-import {
-  type AiTaskExtractionContext,
-  type AiTaskExtractionProvider,
-  type AiTaskProposal,
-  LIST_ITEM_PREFIX,
+import type {
+  AiTaskExtractionContext,
+  AiTaskExtractionProvider,
+  AiTaskProposal,
 } from "../integrations/aiTaskExtraction.js";
 import prismaClient from "../prisma/index.js";
-import { isIsoCalendarDate } from "../schemas/integracaoTaskCreate.schema.js";
+import { isIsoCalendarDate } from "../utils/civilDate.js";
 
 export const PROJECT_TASK_MODEL_TYPE = "Projeto";
 
@@ -45,8 +44,11 @@ interface CatalogDepartment {
   tasksModel: Array<{ id: string; name: string }>;
 }
 
-/** Aceita a data civil sozinha ou com horário anexado; o horário é sempre descartado. */
-const CIVIL_DATE = /^(\d{4}-\d{2}-\d{2})(?:[T ].*)?$/;
+/**
+ * Aceita a data civil sozinha ou com horário sem fuso: um deslocamento como -03:00 poderia
+ * apontar para outro dia civil, e dia ambíguo é dia em branco.
+ */
+const CIVIL_DATE = /^(\d{4}-\d{2}-\d{2})(?:[T ][\d:.]+Z?)?$/;
 
 export const PREVISION_DATE_WARNING =
   "A IA sugeriu um prazo que não é uma data civil inequívoca. Informe a data para revisão.";
@@ -61,7 +63,7 @@ function normalizeName(value: string): string {
 
 /** Título exibido ao usuário: acentos compostos, espaços colapsados e inicial maiúscula. */
 function normalizeTitle(value: string): string {
-  const title = value.normalize("NFC").replace(LIST_ITEM_PREFIX, "").replace(/\s+/g, " ").trim();
+  const title = value.normalize("NFC").replace(/\s+/g, " ").trim();
   return title ? `${title.charAt(0).toLocaleUpperCase("pt-BR")}${title.slice(1)}` : "";
 }
 

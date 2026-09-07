@@ -206,11 +206,16 @@ export function ProjectFormModal({
 
       setTasks((current) => [
         ...current.filter((task) => task.source === "manual"),
-        ...proposals.map((proposal) => ({
-          ...proposal,
-          id: crypto.randomUUID(),
-          source: "ai" as const,
-        })),
+        // O Modelo proposto passa pela mesma cascata da edição manual, para já trazer o
+        // responsável automático quando o departamento tiver um único elegível.
+        ...proposals.map((proposal) =>
+          applyWizardTaskChange(
+            { ...proposal, id: crypto.randomUUID(), source: "ai" as const },
+            "model_id",
+            proposal.model_id,
+            taskModels,
+          ),
+        ),
       ]);
       toast.success(`Tarefas propostas pela IA: ${proposals.length}. Revise antes de continuar.`);
     } catch (error) {
