@@ -32,12 +32,14 @@ export interface AiTaskExtractionProvider {
   extract(input: AiTaskExtractionInput): Promise<AiTaskProposal[]>;
 }
 
+export type AiTaskExtractionMode = "openai" | "fake";
+
 export interface AiTaskExtractionConfig {
+  mode: AiTaskExtractionMode;
   apiKey?: string;
   baseUrl?: string;
   model?: string;
   timeoutMs?: number;
-  nodeEnv?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -228,25 +230,17 @@ export function createFakeAiTaskExtractionProvider(): AiTaskExtractionProvider {
   };
 }
 
-function createUnavailableProvider(): AiTaskExtractionProvider {
-  return {
-    async extract(): Promise<AiTaskProposal[]> {
-      throw new ServiceError(503, "Extração de tarefas por IA não está configurada.");
-    },
-  };
-}
-
 export function createAiTaskExtractionProvider(
-  config: AiTaskExtractionConfig = {},
+  config: AiTaskExtractionConfig,
 ): AiTaskExtractionProvider {
-  if (config.apiKey) {
-    return new OpenAiTaskExtractionProvider({ ...config, apiKey: config.apiKey });
+  if (config.mode === "fake") {
+    warn("AI_EXTRACTION_MODE=fake: a extração de tarefas usa o adapter determinístico local.");
+    return createFakeAiTaskExtractionProvider();
   }
 
-  if (config.nodeEnv === "production") {
-    return createUnavailableProvider();
+  if (!config.apiKey) {
+    throw new Error("OPENAI_API_KEY é obrigatória quando AI_EXTRACTION_MODE=openai.");
   }
 
-  warn("OPENAI_API_KEY ausente: extração de tarefas usará o adapter determinístico local.");
-  return createFakeAiTaskExtractionProvider();
+  return new OpenAiTaskExtractionProvider({ ...config, apiKey: config.apiKey });
 }

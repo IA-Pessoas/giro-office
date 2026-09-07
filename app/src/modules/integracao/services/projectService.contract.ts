@@ -2,13 +2,13 @@ import type {
   CreateProjectData,
   DeleteProjectData,
   ExtractProjectTasksData,
-  ProjectTaskProposal,
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
   ProjectWizardResult,
+  ProjectWizardTask,
 } from "../types";
 import { unwrapServiceEnvelope } from "./envelope.contract.js";
 
@@ -86,7 +86,7 @@ export function buildExtractProjectTasksPayload(payload: ExtractProjectTasksData
   };
 }
 
-export function unwrapProjectTaskProposals(body: unknown): ProjectTaskProposal[] {
+export function unwrapProjectTaskProposals(body: unknown): ProjectWizardTask[] {
   const data = unwrapProjectEnvelope<{ tasks?: unknown }>(body);
   const tasks = isRecord(data) ? data.tasks : undefined;
 

@@ -11,7 +11,6 @@ import type {
   AiTaskExtractionProvider,
   AiTaskProposal,
 } from "../integrations/aiTaskExtraction.js";
-import { createAiTaskExtractionProvider } from "../integrations/aiTaskExtraction.js";
 import prismaClient from "../prisma/index.js";
 
 export const PROJECT_TASK_MODEL_TYPE = "Projeto";
@@ -61,7 +60,7 @@ function normalizePrevisionDate(value: string | undefined): string | undefined {
 
 export class ProjectWizardExtractionService {
   constructor(
-    private readonly provider: AiTaskExtractionProvider = createAiTaskExtractionProvider(),
+    private readonly provider: AiTaskExtractionProvider,
     private readonly prisma: ExtractionPrisma = prismaClient,
   ) {}
 
@@ -104,7 +103,6 @@ export class ProjectWizardExtractionService {
       })) as CatalogDepartment[];
     } catch (err: unknown) {
       logError("Erro ao listar departamentos e Modelos para a extração de tarefas.", { err });
-      if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível carregar departamentos e Modelos.", err);
     }
   }
@@ -119,8 +117,8 @@ export class ProjectWizardExtractionService {
         context: buildContext(data, catalog),
       });
     } catch (err: unknown) {
-      logError("Falha na extração de tarefas propostas pela IA.");
       if (err instanceof ServiceError) throw err;
+      logError("Falha na extração de tarefas propostas pela IA.");
       throw new ServiceError(502, "Não foi possível extrair tarefas da Ata.", err);
     }
   }
@@ -151,14 +149,14 @@ function toTaskProposal(
   const name = proposal.name?.trim();
   if (!name) return null;
 
-  const department = proposal.department
-    ? catalog.find((item) => normalizeName(item.name) === normalizeName(proposal.department ?? ""))
+  const departmentName = proposal.department ? normalizeName(proposal.department) : undefined;
+  const department = departmentName
+    ? catalog.find((item) => normalizeName(item.name) === departmentName)
     : undefined;
+  const modelName = proposal.model ? normalizeName(proposal.model) : undefined;
   const model =
-    department && proposal.model
-      ? department.tasksModel.find(
-          (item) => normalizeName(item.name) === normalizeName(proposal.model ?? ""),
-        )
+    department && modelName
+      ? department.tasksModel.find((item) => normalizeName(item.name) === modelName)
       : undefined;
   const previsionDate = normalizePrevisionDate(proposal.prevision_date);
 

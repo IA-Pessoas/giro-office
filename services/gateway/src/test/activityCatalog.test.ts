@@ -245,6 +245,13 @@ describe("activityCatalog", () => {
     });
   });
 
+  it("classifica a extração de tarefas por IA como atividade visível sem expor a Ata", () => {
+    expect(classifyActivity("POST", "/task/project-wizard/extract-tasks")).toEqual({
+      kind: "visible",
+      description: { action: "extraiu", item: "tarefas de uma Ata com IA" },
+    });
+  });
+
   it.each([
     ["GET", "/health"],
     ["GET", "/ready"],
@@ -259,7 +266,6 @@ describe("activityCatalog", () => {
     ["POST", "/platform/session/refresh"],
     ["GET", "/platform/me"],
     ["GET", "/platform/audit/requests"],
-    ["POST", "/task/project-wizard/extract-tasks"],
   ])("classifica %s %s como técnico", (method, path) => {
     expect(classifyActivity(method, path)).toEqual({ kind: "technical" });
     expect(describeActivity(method, path)).toBeNull();

@@ -34,6 +34,7 @@ function completion(content: string): unknown {
 
 function createProvider(fetchImpl: typeof fetch) {
   return createAiTaskExtractionProvider({
+    mode: "openai",
     apiKey: "sk-test",
     baseUrl: "https://provider.test/v1",
     model: "modelo-de-teste",
@@ -140,16 +141,12 @@ describe("adapter de extração de tarefas com OpenAI", () => {
     ).rejects.toMatchObject({ statusCode: 502 });
   });
 
-  it("responde 503 em produção quando a chave da OpenAI não está configurada", async () => {
-    const provider = createAiTaskExtractionProvider({ nodeEnv: "production" });
-
-    await expect(provider.extract({ content: ATA, context })).rejects.toMatchObject({
-      statusCode: 503,
-    });
+  it("recusa a construção do provedor quando o modo é openai sem chave", () => {
+    expect(() => createAiTaskExtractionProvider({ mode: "openai" })).toThrow(/OPENAI_API_KEY/);
   });
 
-  it("usa o adapter determinístico fora de produção quando não há chave", async () => {
-    const provider = createAiTaskExtractionProvider({ nodeEnv: "development" });
+  it("usa o adapter determinístico quando o modo é fake, mesmo com chave presente", async () => {
+    const provider = createAiTaskExtractionProvider({ mode: "fake", apiKey: "sk-test" });
 
     await expect(provider.extract({ content: "- Tarefa A\n- Tarefa B", context })).resolves.toEqual(
       [

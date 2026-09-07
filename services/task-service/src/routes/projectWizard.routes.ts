@@ -1,5 +1,4 @@
 import {
-  createRateLimitMiddleware,
   createSuccessResponse,
   error as logError,
   normalizeModulePermission,
@@ -21,29 +20,12 @@ import type { ProjectWizardService } from "../services/projectWizardService.js";
 export type ProjectWizardRouteDeps = Pick<ProjectWizardService, "create">;
 export type ProjectWizardExtractionRouteDeps = Pick<ProjectWizardExtractionService, "extractTasks">;
 
-export const AI_EXTRACTION_RATE_LIMIT_DEFAULTS = {
-  max: 10,
-  windowMs: 60_000,
-} as const;
-
-export interface ProjectWizardRoutesOptions {
-  rateLimitMax?: number;
-  rateLimitWindowMs?: number;
-}
-
 export function createProjectWizardRoutes(
   service: ProjectWizardRouteDeps,
   extractionService: ProjectWizardExtractionRouteDeps,
-  options: ProjectWizardRoutesOptions = {},
+  extractionRateLimit: RequestHandler,
 ): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
-  const extractionRateLimit: RequestHandler = createRateLimitMiddleware({
-    key: "task-service:project-wizard-extract-tasks",
-    max: options.rateLimitMax ?? AI_EXTRACTION_RATE_LIMIT_DEFAULTS.max,
-    windowMs: options.rateLimitWindowMs ?? AI_EXTRACTION_RATE_LIMIT_DEFAULTS.windowMs,
-    methods: ["POST"],
-    message: "Muitas extrações seguidas. Aguarde antes de tentar novamente.",
-  });
 
   router.post(
     "/project-wizard",

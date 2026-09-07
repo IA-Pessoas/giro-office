@@ -369,10 +369,10 @@ test("owner possui bypass global e exclusões preservam conflito de dependência
   );
 });
 
-test("a extração de tarefas por IA exige nível 2+ ou owner e não gera auditoria", () => {
+test("a extração de tarefas por IA exige nível 2+ ou owner", () => {
   const policy = requirePolicy("POST", "/task/project-wizard/extract-tasks");
 
-  assert.equal(policy.audit, "none");
+  assert.equal(policy.audit, "required");
   for (const level of [0, 1] as const) {
     assert.equal(
       evaluateIntegracaoAction(policy, {

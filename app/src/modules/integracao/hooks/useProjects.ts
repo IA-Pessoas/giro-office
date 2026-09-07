@@ -11,13 +11,13 @@ import type {
   CreateProjectData,
   CreateProjectWizardData,
   ExtractProjectTasksData,
-  ProjectTaskProposal,
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
   ProjectWizardResult,
+  ProjectWizardTask,
   UpdateProjectData,
 } from "../types";
 import { projectService } from "../services/projectService";
@@ -99,7 +99,7 @@ export function useCreateProjectWizardMutation(): UseMutationResult<
 }
 
 export function useExtractProjectTasksMutation(): UseMutationResult<
-  ProjectTaskProposal[],
+  ProjectWizardTask[],
   Error,
   ExtractProjectTasksData
 > {

@@ -1,5 +1,6 @@
 import {
   createExpressErrorHandler,
+  createRateLimitMiddleware,
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
@@ -85,26 +86,27 @@ export function createTaskApp(
     options?.projectWizardExtractionService ??
       new ProjectWizardExtractionService(
         createAiTaskExtractionProvider({
+          mode: env.aiExtractionMode,
           apiKey: env.openaiApiKey,
           baseUrl: env.openaiBaseUrl,
           model: env.openaiModel,
           timeoutMs: env.aiExtractionTimeoutMs,
-          nodeEnv: env.nodeEnv,
         }),
       ),
-    {
-      rateLimitMax: env.aiExtractionRateLimitMax,
-      rateLimitWindowMs: env.aiExtractionRateLimitWindowMs,
-    },
+    createRateLimitMiddleware({
+      key: "task-service:project-wizard-extract-tasks",
+      max: env.aiExtractionRateLimitMax,
+      windowMs: env.aiExtractionRateLimitWindowMs,
+      methods: ["POST"],
+      message: "Muitas extrações seguidas. Aguarde antes de tentar novamente.",
+    }),
   );
   const internalReportingService =
     options?.internalReportingService ?? new TaskReportingService(prismaClient);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "task-service")));
-  // A Ata colada pode passar do limite padrão do parser; o teto real continua sendo o gateway.
-  app.use("/task/project-wizard/extract-tasks", express.json({ limit: "1mb" }));
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" }));
   app.use(requestContext);
 
   app.get("/health", (_req, res) => {

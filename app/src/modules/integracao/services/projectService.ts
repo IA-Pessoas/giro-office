@@ -4,13 +4,13 @@ import type {
   CreateProjectData,
   CreateProjectWizardData,
   ExtractProjectTasksData,
-  ProjectTaskProposal,
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
   ProjectWizardResult,
+  ProjectWizardTask,
   UpdateProjectData,
 } from "../types";
 import {
@@ -74,7 +74,7 @@ export const projectService = {
     return unwrapProjectWizardResult(response.data);
   },
 
-  async extractTasks(payload: ExtractProjectTasksData): Promise<ProjectTaskProposal[]> {
+  async extractTasks(payload: ExtractProjectTasksData): Promise<ProjectWizardTask[]> {
     const api = setupAPIClient();
     const response = await api.post(
       PROJECT_ENDPOINTS.wizardExtractTasks,

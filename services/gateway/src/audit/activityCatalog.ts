@@ -46,7 +46,6 @@ const TECHNICAL_RULES = [
   /^\/user\/(?:session|start-config|me)(?:\/|$)/,
   /^\/platform\/(?:session|me|audit)(?:\/|$)/,
   /^\/project\/metrics$/,
-  /^\/task\/project-wizard\/extract-tasks$/,
   /^\/ti\/dashboard\/?$/,
   /^\/pessoal\/overview\/?$/,
 ] as const;
@@ -56,6 +55,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/task\/project-wizard$/,
     description: { action: "criou", item: "um projeto com tarefas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/project-wizard\/extract-tasks$/,
+    description: { action: "extraiu", item: "tarefas de uma Ata com IA" },
   },
   {
     methods: ["POST"],

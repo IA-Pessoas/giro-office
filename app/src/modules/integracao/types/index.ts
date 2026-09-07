@@ -108,10 +108,6 @@ export interface ExtractProjectTasksData {
   end_date?: string | null;
 }
 
-export interface ProjectTaskProposal extends ProjectWizardTask {
-  prevision_date?: string;
-}
-
 export interface ProjectWizardResult {
   project: ProjectListItem;
   counts: {

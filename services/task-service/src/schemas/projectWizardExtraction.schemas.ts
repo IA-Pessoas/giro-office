@@ -1,21 +1,18 @@
-import { zIsoDate, zNonEmptyText } from "@workspace/shared";
+import { zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
+
+import { projectWizardProjectFields, refineProjectWizardPeriod } from "./projectWizard.schemas.js";
+
+// ponytail: teto simples de uma passada; processar Atas maiores em partes é escopo do #993.
+export const MEETING_MINUTES_MAX_CHARS = 100_000;
 
 export const projectWizardExtractTasksBodySchema = z
   .object({
-    content: zNonEmptyText("content"),
-    name: zNonEmptyText("name"),
-    objective: zNonEmptyText("objective"),
-    start_date: zIsoDate("start_date"),
-    end_date: zIsoDate("end_date").optional(),
+    content: zNonEmptyText("content").max(
+      MEETING_MINUTES_MAX_CHARS,
+      `A Ata deve ter no máximo ${MEETING_MINUTES_MAX_CHARS} caracteres.`,
+    ),
+    ...projectWizardProjectFields,
   })
   .strict()
-  .superRefine((value, context) => {
-    if (value.end_date && value.end_date < value.start_date) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "A data final não pode ser anterior à data inicial.",
-        path: ["end_date"],
-      });
-    }
-  });
+  .superRefine(refineProjectWizardPeriod);

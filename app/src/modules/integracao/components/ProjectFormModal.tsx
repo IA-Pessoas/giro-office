@@ -59,14 +59,6 @@ function getSaveErrorMessage(error: unknown): string {
   return getResponseErrorMessage(error, "Não foi possível salvar o projeto.");
 }
 
-function getExtractionErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message === PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE) {
-    return error.message;
-  }
-
-  return getResponseErrorMessage(error, PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE);
-}
-
 export function ProjectFormModal({
   open,
   onOpenChange,
@@ -103,12 +95,10 @@ export function ProjectFormModal({
       setCreateStep(1);
       setTasks([]);
       setMeetingMinutes("");
-      extractTasksMutation.reset();
       idempotencyKeyRef.current = null;
     } else if (!isEditing && !idempotencyKeyRef.current) {
       idempotencyKeyRef.current = crypto.randomUUID();
     }
-    // biome-ignore lint/correctness/useExhaustiveDependencies: reset da mutation não deve reabrir o efeito
   }, [isEditing, open, reset]);
 
   const isSaving = createWizardMutation.isPending || updateMutation.isPending;
@@ -196,7 +186,7 @@ export function ProjectFormModal({
       ]);
       toast.success(`Tarefas propostas pela IA: ${proposals.length}. Revise antes de continuar.`);
     } catch (error) {
-      toast.error(getExtractionErrorMessage(error));
+      toast.error(getResponseErrorMessage(error, PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE));
     }
   }
 

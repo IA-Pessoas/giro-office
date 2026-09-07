@@ -19,13 +19,10 @@ function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
 }
 
-const optionalPositiveInteger = z
-  .string()
-  .optional()
-  .transform((value) => {
-    const parsed = Number.parseInt(value ?? "", 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-  });
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 const envSchema = z
   .object({
@@ -54,12 +51,22 @@ const envSchema = z
     auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
+    aiExtractionMode: z.enum(["openai", "fake"]).optional().default("fake"),
     openaiApiKey: z.string().trim().min(1).optional(),
     openaiBaseUrl: z.string().url().optional(),
     openaiModel: z.string().trim().min(1).optional(),
-    aiExtractionTimeoutMs: optionalPositiveInteger,
-    aiExtractionRateLimitMax: optionalPositiveInteger,
-    aiExtractionRateLimitWindowMs: optionalPositiveInteger,
+    aiExtractionTimeoutMs: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 30_000)),
+    aiExtractionRateLimitMax: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 10)),
+    aiExtractionRateLimitWindowMs: z
+      .string()
+      .optional()
+      .transform((value) => parsePositiveInteger(value, 60_000)),
     reportsInternalToken: z.string().optional().default("reports-service-token"),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     enableApiDocsEnv: z.string().optional(),
@@ -68,6 +75,23 @@ const envSchema = z
       .optional()
       .default("*")
       .transform((value) => parseAllowedOrigins(value)),
+  })
+  .superRefine((env, ctx) => {
+    if (env.aiExtractionMode === "fake" && env.nodeEnv === "production") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "AI_EXTRACTION_MODE=fake não é permitido em produção.",
+        path: ["aiExtractionMode"],
+      });
+    }
+
+    if (env.aiExtractionMode === "openai" && !env.openaiApiKey) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "OPENAI_API_KEY é obrigatória quando AI_EXTRACTION_MODE=openai.",
+        path: ["openaiApiKey"],
+      });
+    }
   })
   .transform((env) => {
     const { enableApiDocsEnv, ...rest } = env;
@@ -118,6 +142,7 @@ export function getTaskServiceEnv(): TaskServiceEnv {
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
+    aiExtractionMode: process.env.AI_EXTRACTION_MODE,
     openaiApiKey: process.env.OPENAI_API_KEY,
     openaiBaseUrl: process.env.OPENAI_BASE_URL,
     openaiModel: process.env.OPENAI_MODEL,
