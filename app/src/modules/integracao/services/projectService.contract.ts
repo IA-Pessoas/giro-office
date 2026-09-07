@@ -9,7 +9,7 @@ import type {
   ProjectProgressResponse,
   ProjectWizardPreview,
   ProjectWizardResult,
-  ProjectWizardTask,
+  ProjectWizardTaskProposal,
 } from "../types";
 import { unwrapServiceEnvelope } from "./envelope.contract.js";
 
@@ -88,7 +88,7 @@ export function buildExtractProjectTasksPayload(payload: ExtractProjectTasksData
   };
 }
 
-export function unwrapProjectTaskProposals(body: unknown): ProjectWizardTask[] {
+export function unwrapProjectTaskProposals(body: unknown): ProjectWizardTaskProposal[] {
   const data = unwrapProjectEnvelope<{ tasks?: unknown }>(body);
   const tasks = isRecord(data) ? data.tasks : undefined;
 
@@ -101,6 +101,9 @@ export function unwrapProjectTaskProposals(body: unknown): ProjectWizardTask[] {
       department_id: typeof task.department_id === "string" ? task.department_id : "",
       model_id: typeof task.model_id === "string" ? task.model_id : "",
       responsible_id: null,
+      ...(typeof task.prevision_date_warning === "string" && task.prevision_date_warning
+        ? { prevision_date_warning: task.prevision_date_warning }
+        : {}),
     }));
 
   if (proposals.length === 0) {

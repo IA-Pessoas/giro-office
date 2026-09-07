@@ -22,7 +22,12 @@ import {
   useUpdateProjectMutation,
 } from "../hooks/useProjects";
 import { PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE } from "../services/projectService.contract";
-import type { ProjectDetail, ProjectWizardPreview, ProjectWizardTask } from "../types";
+import type {
+  ProjectDetail,
+  ProjectWizardPreview,
+  ProjectWizardTask,
+  ProjectWizardTaskProposal,
+} from "../types";
 import { taskModelService } from "../services/taskModelService";
 import {
   formatProjectDate,
@@ -34,13 +39,14 @@ import {
   ProjectSelect,
 } from "./projectUi";
 import {
-  getAutomaticTaskResponsibleId,
+  applyWizardTaskChange,
+  getWizardTaskDateWarning,
   TASK_FORM_AUXILIARY_WARNING_CLASSNAME,
   TASK_FORM_GRID_CLASSNAME,
   TASK_FORM_LABEL_CLASSNAME,
 } from "./taskFormModalUi";
 
-type WizardTask = ProjectWizardTask & { id: string; source: "ai" | "manual" };
+type WizardTask = ProjectWizardTaskProposal & { id: string; source: "ai" | "manual" };
 
 interface ProjectFormModalProps {
   open: boolean;
@@ -59,7 +65,12 @@ function getRequestErrorMessage(
   return typeof message === "string" ? message : fallback;
 }
 
-function toWizardTaskPayload({ id: _id, source: _source, ...task }: WizardTask): ProjectWizardTask {
+function toWizardTaskPayload({
+  id: _id,
+  source: _source,
+  prevision_date_warning: _warning,
+  ...task
+}: WizardTask): ProjectWizardTask {
   return task;
 }
 
@@ -176,28 +187,9 @@ export function ProjectFormModal({
   function updateTask(id: string, field: keyof ProjectWizardTask, value: string) {
     if (isBusy) return;
     setTasks((current) =>
-      current.map((task) => {
-        if (task.id !== id) return task;
-        if (field === "department_id") {
-          return { ...task, department_id: value, model_id: "", responsible_id: null };
-        }
-        if (field === "model_id") {
-          const model = taskModels.find(
-            (item) => item.id === value && item.department_id === task.department_id,
-          );
-          return {
-            ...task,
-            model_id: value,
-            responsible_id:
-              getAutomaticTaskResponsibleId(
-                model?.responsible_id,
-                model?.department?.users ?? [],
-              ) || null,
-          };
-        }
-        if (field === "prevision_date") return { ...task, prevision_date: value || undefined };
-        return { ...task, [field]: value };
-      }),
+      current.map((task) =>
+        task.id === id ? applyWizardTaskChange(task, field, value, taskModels) : task,
+      ),
     );
   }
 
@@ -626,10 +618,10 @@ export function ProjectFormModal({
                 );
                 const candidates =
                   models.find(({ id }) => id === task.model_id)?.department?.users ?? [];
-                const outsidePeriod =
-                  task.prevision_date &&
-                  (task.prevision_date < values.start_date ||
-                    (values.end_date && task.prevision_date > values.end_date));
+                const dateWarning = getWizardTaskDateWarning(task, {
+                  start_date: values.start_date,
+                  end_date: values.end_date || undefined,
+                });
                 const warningId = `task-${task.id}-date-warning`;
                 return (
                   <fieldset
@@ -662,13 +654,13 @@ export function ProjectFormModal({
                             updateTask(task.id, "prevision_date", event.currentTarget.value)
                           }
                           className={PROJECT_INPUT_CLASSNAME}
-                          aria-describedby={outsidePeriod ? warningId : undefined}
+                          aria-describedby={dateWarning ? warningId : undefined}
                         />
                       </label>
                     </div>
-                    {outsidePeriod ? (
+                    {dateWarning ? (
                       <output className={`block ${TASK_FORM_AUXILIARY_WARNING_CLASSNAME}`}>
-                        <span id={warningId}>Prazo fora do período do projeto.</span>
+                        <span id={warningId}>{dateWarning}</span>
                       </output>
                     ) : null}
                     <div className={TASK_FORM_GRID_CLASSNAME}>

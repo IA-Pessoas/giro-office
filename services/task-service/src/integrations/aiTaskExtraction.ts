@@ -205,7 +205,7 @@ class OpenAiTaskExtractionProvider implements AiTaskExtractionProvider {
   }
 }
 
-const LIST_ITEM_PREFIX = /^\s*(?:[-*•]|\d+[.)])\s*/;
+export const LIST_ITEM_PREFIX = /^\s*(?:[-*•]|\d+[.)])\s*/;
 
 /**
  * Adapter determinístico usado em testes e no smoke: cada linha da Ata vira uma proposta,

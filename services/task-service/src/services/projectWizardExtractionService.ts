@@ -6,10 +6,11 @@ import {
   ServiceError,
 } from "@workspace/shared";
 
-import type {
-  AiTaskExtractionContext,
-  AiTaskExtractionProvider,
-  AiTaskProposal,
+import {
+  type AiTaskExtractionContext,
+  type AiTaskExtractionProvider,
+  type AiTaskProposal,
+  LIST_ITEM_PREFIX,
 } from "../integrations/aiTaskExtraction.js";
 import prismaClient from "../prisma/index.js";
 
@@ -32,6 +33,7 @@ export interface ProjectTaskProposal {
   prevision_date?: string;
   department_id?: string;
   model_id?: string;
+  prevision_date_warning?: string;
 }
 
 export type ExtractionPrisma = Pick<typeof prismaClient, "department">;
@@ -42,20 +44,41 @@ interface CatalogDepartment {
   tasksModel: Array<{ id: string; name: string }>;
 }
 
-const CIVIL_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Aceita a data civil sozinha ou com horário anexado; o horário é sempre descartado. */
+const CIVIL_DATE = /^(\d{4}-\d{2}-\d{2})(?:[T ].*)?$/;
+
+export const PREVISION_DATE_WARNING =
+  "A IA sugeriu um prazo que não é uma data civil inequívoca. Informe a data para revisão.";
 
 function toCivilDate(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
 function normalizeName(value: string): string {
-  return value.trim().toLocaleLowerCase("pt-BR");
+  return value.normalize("NFC").trim().toLocaleLowerCase("pt-BR");
+}
+
+/** Título exibido ao usuário: acentos compostos, espaços colapsados e inicial maiúscula. */
+function normalizeTitle(value: string): string {
+  const title = value.normalize("NFC").replace(LIST_ITEM_PREFIX, "").replace(/\s+/g, " ").trim();
+  return title ? `${title.charAt(0).toLocaleUpperCase("pt-BR")}${title.slice(1)}` : "";
 }
 
 function normalizePrevisionDate(value: string | undefined): string | undefined {
-  if (!value || !CIVIL_DATE.test(value)) return undefined;
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(parsed.getTime()) || toCivilDate(parsed) !== value ? undefined : value;
+  const day = value ? CIVIL_DATE.exec(value.trim())?.[1] : undefined;
+  if (!day) return undefined;
+  const parsed = new Date(`${day}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) || toCivilDate(parsed) !== day ? undefined : day;
+}
+
+/** Nomes homônimos após a normalização são correspondência conflitante: ninguém vence. */
+function indexByName<T extends { name: string }>(items: T[]): Map<string, T | null> {
+  const index = new Map<string, T | null>();
+  for (const item of items) {
+    const key = normalizeName(item.name);
+    index.set(key, index.has(key) ? null : item);
+  }
+  return index;
 }
 
 export class ProjectWizardExtractionService {
@@ -75,8 +98,9 @@ export class ProjectWizardExtractionService {
 
     const catalog = await this.listCatalog(data.organizationId);
     const proposals = await this.callProvider(data, catalog);
+    const departmentsByName = indexByName(catalog);
     const tasks = proposals
-      .map((proposal) => toTaskProposal(proposal, catalog))
+      .map((proposal) => toTaskProposal(proposal, departmentsByName))
       .filter((task): task is ProjectTaskProposal => task !== null);
 
     if (tasks.length === 0) {
@@ -144,26 +168,26 @@ function buildContext(
 
 function toTaskProposal(
   proposal: AiTaskProposal,
-  catalog: CatalogDepartment[],
+  departmentsByName: Map<string, CatalogDepartment | null>,
 ): ProjectTaskProposal | null {
-  const name = proposal.name?.trim();
+  const name = normalizeTitle(proposal.name ?? "");
   if (!name) return null;
 
-  const departmentName = proposal.department ? normalizeName(proposal.department) : undefined;
-  const department = departmentName
-    ? catalog.find((item) => normalizeName(item.name) === departmentName)
-    : undefined;
-  const modelName = proposal.model ? normalizeName(proposal.model) : undefined;
+  const department = proposal.department
+    ? (departmentsByName.get(normalizeName(proposal.department)) ?? null)
+    : null;
   const model =
-    department && modelName
-      ? department.tasksModel.find((item) => normalizeName(item.name) === modelName)
-      : undefined;
+    department && proposal.model
+      ? (indexByName(department.tasksModel).get(normalizeName(proposal.model)) ?? null)
+      : null;
   const previsionDate = normalizePrevisionDate(proposal.prevision_date);
+  const suggestedDate = proposal.prevision_date?.trim();
 
   return {
     name,
     ...(previsionDate ? { prevision_date: previsionDate } : {}),
     ...(department ? { department_id: department.id } : {}),
     ...(model ? { model_id: model.id } : {}),
+    ...(!previsionDate && suggestedDate ? { prevision_date_warning: PREVISION_DATE_WARNING } : {}),
   };
 }
