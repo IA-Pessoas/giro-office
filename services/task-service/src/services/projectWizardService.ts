@@ -47,13 +47,16 @@ export interface ProjectWizardPreviewRequest {
 export interface ProjectWizardModel {
   id: string;
   name: string;
+  organization_id?: string;
   department_id: string;
+  department_organization_id?: string;
   responsible_id: string | null;
   observations: string | null;
   type: string | null;
   department_status: string;
   dependencies: Array<{
     dependent_id: string;
+    organization_id?: string;
     wait: boolean;
     observation: string;
     dependent: Omit<ProjectWizardModel, "dependencies">;
@@ -87,26 +90,28 @@ function createProjectWizardCompositionRepository(): ProjectWizardCompositionRep
         select: {
           id: true,
           name: true,
+          organization_id: true,
           department_id: true,
           responsible_id: true,
           observations: true,
           type: true,
-          department: { select: { status: true } },
+          department: { select: { status: true, organization_id: true } },
           dependencies: {
-            where: { organization_id: organizationId },
             select: {
               dependent_id: true,
+              organization_id: true,
               wait: true,
               observation: true,
               dependent: {
                 select: {
                   id: true,
                   name: true,
+                  organization_id: true,
                   department_id: true,
                   responsible_id: true,
                   observations: true,
                   type: true,
-                  department: { select: { status: true } },
+                  department: { select: { status: true, organization_id: true } },
                 },
               },
             },
@@ -118,9 +123,14 @@ function createProjectWizardCompositionRepository(): ProjectWizardCompositionRep
       return models.map(({ department, dependencies, ...model }) => ({
         ...model,
         department_status: department.status,
+        department_organization_id: department.organization_id,
         dependencies: dependencies.map(({ dependent, ...dependency }) => ({
           ...dependency,
-          dependent: { ...dependent, department_status: dependent.department.status },
+          dependent: {
+            ...dependent,
+            department_status: dependent.department.status,
+            department_organization_id: dependent.department.organization_id,
+          },
         })),
       }));
     },
@@ -131,9 +141,13 @@ function createProjectWizardCompositionRepository(): ProjectWizardCompositionRep
 
 function assertEligibleModel(
   model: Omit<ProjectWizardModel, "dependencies">,
+  organizationId: string,
   departmentId?: string,
 ): void {
   if (
+    (model.organization_id !== undefined && model.organization_id !== organizationId) ||
+    (model.department_organization_id !== undefined &&
+      model.department_organization_id !== organizationId) ||
     model.type !== "Projeto" ||
     model.department_status !== "Ativo" ||
     (departmentId !== undefined && model.department_id !== departmentId)
@@ -188,7 +202,7 @@ export class ProjectWizardService {
     const seen = new Map<string, string>();
     const tasks: ProjectWizardPreviewTask[] = [];
 
-    for (const task of data.tasks) {
+    for (const [index, task] of data.tasks.entries()) {
       const model = modelsById.get(task.model_id);
       if (!model) {
         throw new ServiceError(
@@ -198,7 +212,7 @@ export class ProjectWizardService {
       }
 
       try {
-        assertEligibleModel(model, task.department_id);
+        assertEligibleModel(model, data.organizationId, task.department_id);
       } catch {
         throw new ServiceError(
           422,
@@ -206,14 +220,15 @@ export class ProjectWizardService {
         );
       }
 
+      const principal = `principal ${index + 1} (${task.name})`;
       const previous = seen.get(model.id);
       if (previous) {
         throw new ServiceError(
           409,
-          `Modelo ${model.id} repetido entre ${previous} e principal ${model.id}.`,
+          `Modelo ${model.id} repetido entre ${previous} e ${principal}.`,
         );
       }
-      seen.set(model.id, `principal ${model.id}`);
+      seen.set(model.id, principal);
 
       const responsible_id = resolveEligibleTaskResponsible(
         await this.compositionRepository.listEligibleTaskResponsibles(
@@ -227,13 +242,19 @@ export class ProjectWizardService {
 
       for (const dependency of model.dependencies) {
         try {
-          assertEligibleModel(dependency.dependent);
+          if (
+            dependency.organization_id !== undefined &&
+            dependency.organization_id !== data.organizationId
+          ) {
+            throw new Error("DEPENDENCY_OUT_OF_SCOPE");
+          }
+          assertEligibleModel(dependency.dependent, data.organizationId);
         } catch {
           throw new ServiceError(422, "Modelo dependente não é elegível.");
         }
 
         const duplicate = seen.get(dependency.dependent_id);
-        const item = `dependência ${dependency.dependent_id} da principal ${model.id}`;
+        const item = `dependência ${dependency.dependent_id} da ${principal}`;
         if (duplicate) {
           throw new ServiceError(
             409,
@@ -287,7 +308,18 @@ export class ProjectWizardService {
       requestedFields: ["name", "client_id", "start_date", "end_date", "objective"],
     });
 
-    const preview = await this.preview(data);
+    let preview: Awaited<ReturnType<ProjectWizardService["preview"]>>;
+    try {
+      preview = await this.preview(data);
+    } catch (err: unknown) {
+      if (err instanceof ServiceError && err.statusCode === 422) {
+        throw new ServiceError(
+          409,
+          "A configuração das dependências foi alterada. Gere uma nova prévia.",
+        );
+      }
+      throw err;
+    }
     if (preview.revision !== data.revision) {
       throw new ServiceError(
         409,

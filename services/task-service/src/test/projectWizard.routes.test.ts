@@ -154,7 +154,11 @@ describe("project wizard routes", () => {
       buildTaskServiceOpenApiSpec(env).paths["/task/project-wizard/preview"].post,
     ).toMatchObject({
       tags: ["ProjectWizard"],
-      responses: { "200": expect.any(Object), "409": expect.any(Object) },
+      responses: {
+        "200": expect.any(Object),
+        "409": expect.any(Object),
+        "422": expect.any(Object),
+      },
     });
   });
 

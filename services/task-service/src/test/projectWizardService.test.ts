@@ -393,7 +393,7 @@ describe("ProjectWizardService", () => {
     ).rejects.toMatchObject({ statusCode: 422 });
   });
 
-  it("identifica Modelo repetido entre dependências e suas principais", async () => {
+  it("identifica dependências repetidas pelos dois pais", async () => {
     const dependent = {
       id: "model-shared",
       name: "Compartilhada",
@@ -441,7 +441,11 @@ describe("ProjectWizardService", () => {
           { name: "Segunda", department_id: "department-2", model_id: "model-2" },
         ],
       }),
-    ).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining("model-shared") });
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message:
+        "Modelo model-shared repetido entre dependência model-shared da principal 1 (Primeira) e dependência model-shared da principal 2 (Segunda).",
+    });
   });
 
   it("bloqueia nível 1 antes de criar Projeto ou Tarefas", async () => {
@@ -458,5 +462,210 @@ describe("ProjectWizardService", () => {
 
     expect(integration.createProject).not.toHaveBeenCalled();
     expect(taskCreator.createTask).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      dependencyOrganizationId: "other-org",
+      dependentOrganizationId: request.organizationId,
+      departmentOrganizationId: request.organizationId,
+    },
+    {
+      dependencyOrganizationId: request.organizationId,
+      dependentOrganizationId: "other-org",
+      departmentOrganizationId: request.organizationId,
+    },
+    {
+      dependencyOrganizationId: request.organizationId,
+      dependentOrganizationId: request.organizationId,
+      departmentOrganizationId: "other-org",
+    },
+  ])("rejeita relação, dependência ou departamento de outra organização", async (tenant) => {
+    const repository = {
+      findTaskModels: vi.fn(async () => [
+        {
+          id: "model-main",
+          name: "Principal",
+          organization_id: request.organizationId,
+          department_id: "department-1",
+          department_organization_id: request.organizationId,
+          responsible_id: "user-1",
+          observations: "",
+          type: "Projeto",
+          department_status: "Ativo",
+          dependencies: [
+            {
+              dependent_id: "model-dependent",
+              organization_id: tenant.dependencyOrganizationId,
+              wait: true,
+              observation: "Aguardar",
+              dependent: {
+                id: "model-dependent",
+                name: "Dependente",
+                organization_id: tenant.dependentOrganizationId,
+                department_id: "department-2",
+                department_organization_id: tenant.departmentOrganizationId,
+                responsible_id: "user-2",
+                observations: "",
+                type: "Projeto",
+                department_status: "Ativo",
+              },
+            },
+          ],
+        },
+      ]),
+      listEligibleTaskResponsibles: vi.fn(async () => [{ id: "user-1" }]),
+    };
+    const service = new ProjectWizardService(
+      { createProject: vi.fn() },
+      { createTask: vi.fn() },
+      repository,
+    );
+
+    await expect(
+      service.preview({
+        ...request,
+        tasks: [{ name: "Principal", department_id: "department-1", model_id: "model-main" }],
+      }),
+    ).rejects.toMatchObject({ statusCode: 422 });
+  });
+
+  it.each([
+    "type",
+    "department",
+    "dependency",
+    "responsible",
+  ] as const)("converte alteração de %s após a prévia em conflito antes do Projeto", async (mutation) => {
+    const model = {
+      id: "model-main",
+      name: "Principal",
+      department_id: "department-1",
+      responsible_id: "user-1",
+      observations: "",
+      type: "Projeto",
+      department_status: "Ativo",
+      dependencies: [],
+    };
+    let current = model;
+    let responsibles = [{ id: "user-1" }];
+    const integration: ProjectWizardIntegration = { createProject: vi.fn() };
+    const repository = {
+      findTaskModels: vi.fn(async () => [current]),
+      listEligibleTaskResponsibles: vi.fn(async () => responsibles),
+    };
+    const service = new ProjectWizardService(integration, { createTask: vi.fn() }, repository);
+    const tasks = [{ name: "Principal", department_id: "department-1", model_id: "model-main" }];
+    const preview = await service.preview({ ...request, tasks });
+
+    if (mutation === "type") current = { ...current, type: "Outro" };
+    if (mutation === "department") current = { ...current, department_status: "Inativo" };
+    if (mutation === "dependency") {
+      current = {
+        ...current,
+        dependencies: [
+          {
+            dependent_id: "model-dependent",
+            wait: true,
+            observation: "Aguardar",
+            dependent: {
+              id: "model-dependent",
+              name: "Dependente",
+              department_id: "department-2",
+              responsible_id: "user-2",
+              observations: "",
+              type: "Projeto",
+              department_status: "Ativo",
+            },
+          },
+        ],
+      };
+    }
+    if (mutation === "responsible") responsibles = [{ id: "user-2" }, { id: "user-3" }];
+
+    await expect(
+      service.create({ ...request, tasks, revision: preview.revision }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(integration.createProject).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      tasks: [
+        { name: "Primeira", department_id: "department-1", model_id: "model-main" },
+        { name: "Segunda", department_id: "department-1", model_id: "model-main" },
+      ],
+      models: [
+        {
+          id: "model-main",
+          name: "Principal",
+          department_id: "department-1",
+          responsible_id: "user-1",
+          observations: "",
+          type: "Projeto",
+          department_status: "Ativo",
+          dependencies: [],
+        },
+      ],
+      message: "Modelo model-main repetido entre principal 1 (Primeira) e principal 2 (Segunda).",
+    },
+    {
+      tasks: [
+        { name: "Principal", department_id: "department-1", model_id: "model-main" },
+        { name: "Também dependente", department_id: "department-2", model_id: "model-dependent" },
+      ],
+      models: [
+        {
+          id: "model-main",
+          name: "Principal",
+          department_id: "department-1",
+          responsible_id: "user-1",
+          observations: "",
+          type: "Projeto",
+          department_status: "Ativo",
+          dependencies: [
+            {
+              dependent_id: "model-dependent",
+              wait: true,
+              observation: "Aguardar",
+              dependent: {
+                id: "model-dependent",
+                name: "Dependente",
+                department_id: "department-2",
+                responsible_id: "user-2",
+                observations: "",
+                type: "Projeto",
+                department_status: "Ativo",
+              },
+            },
+          ],
+        },
+        {
+          id: "model-dependent",
+          name: "Dependente",
+          department_id: "department-2",
+          responsible_id: "user-2",
+          observations: "",
+          type: "Projeto",
+          department_status: "Ativo",
+          dependencies: [],
+        },
+      ],
+      message:
+        "Modelo model-dependent repetido entre dependência model-dependent da principal 1 (Principal) e principal 2 (Também dependente).",
+    },
+  ])("identifica itens em conflito na composição", async ({ tasks, models, message }) => {
+    const service = new ProjectWizardService(
+      { createProject: vi.fn() },
+      { createTask: vi.fn() },
+      {
+        findTaskModels: vi.fn(async () => models),
+        listEligibleTaskResponsibles: vi.fn(async () => [{ id: "user-1" }]),
+      },
+    );
+
+    await expect(service.preview({ ...request, tasks })).rejects.toMatchObject({
+      statusCode: 409,
+      message,
+    });
   });
 });

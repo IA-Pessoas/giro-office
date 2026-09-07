@@ -932,7 +932,10 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           ],
           ...createProjectWizardRequestBody,
           responses: {
-            "201": { description: "Projeto e tarefas principais criados", ...successJson },
+            "201": {
+              description: "Projeto, tarefas principais e dependências criados",
+              ...successJson,
+            },
             "400": { description: "Entrada ou chave inválida" },
             "401": { description: "Não autenticado" },
             "403": { description: "Sem permissão de Integração" },
@@ -953,6 +956,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             "401": { description: "Não autenticado" },
             "403": { description: "Sem permissão de Integração" },
             "409": { description: "Modelo repetido na composição" },
+            "422": { description: "Modelo, departamento ou responsável inelegível" },
           },
         },
       },
