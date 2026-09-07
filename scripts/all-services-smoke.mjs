@@ -1775,7 +1775,7 @@ const handlers = {
       form: {
         file: {
           fieldName: "file",
-          path: path.join(rootDir, "scripts", "fixtures", "smoke-meeting-minutes.txt"),
+          path: env.fixturePath,
           filename: "smoke-certificate.pfx",
           contentType: "application/octet-stream",
         },
@@ -4635,7 +4635,7 @@ const handlers = {
         },
         file: {
           fieldName: "file",
-          path: env.fixturePath,
+          path: path.join(rootDir, "scripts", "fixtures", "smoke-meeting-minutes.txt"),
           filename: "smoke-meeting-minutes.txt",
           contentType: "text/plain",
         },
