@@ -2,10 +2,15 @@ import { createHash } from "node:crypto";
 import {
   INTEGRACAO_PERMISSION_LEVEL,
   type IntegracaoPermissionLevel,
+  error as logError,
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
-import { INTEGRACAO_TASK_STATUS_TODO } from "../constants/integracaoTask.js";
+import {
+  INTEGRACAO_TASK_STATUS_TODO,
+  INTEGRACAO_TASK_STATUS_WAITING,
+  type IntegracaoTaskStatus,
+} from "../constants/integracaoTask.js";
 import { PROSPECTING_STATUS_CLOSED } from "../constants/prospectingStatus.js";
 import type {
   CreatedProject,
@@ -20,6 +25,9 @@ import {
   resolveEligibleTaskResponsible,
   TaskCrudService,
 } from "./taskCrudService.js";
+
+const PROJECT_WIZARD_MODEL_TYPE = "Projeto";
+const PROJECT_WIZARD_DEPARTMENT_STATUS_ACTIVE = "Ativo";
 
 export interface ProjectWizardTask {
   name: string;
@@ -75,7 +83,7 @@ export interface ProjectWizardPreviewTask {
   name: string;
   model_id: string;
   department_id: string;
-  status: "A Realizar" | "Em Espera";
+  status: IntegracaoTaskStatus;
   observation: string;
   responsible_id: string | null;
   prevision_date?: string;
@@ -139,21 +147,19 @@ function createProjectWizardCompositionRepository(): ProjectWizardCompositionRep
   };
 }
 
-function assertEligibleModel(
+function isEligibleModel(
   model: Omit<ProjectWizardModel, "dependencies">,
   organizationId: string,
   departmentId?: string,
-): void {
-  if (
+): boolean {
+  return !(
     (model.organization_id !== undefined && model.organization_id !== organizationId) ||
     (model.department_organization_id !== undefined &&
       model.department_organization_id !== organizationId) ||
-    model.type !== "Projeto" ||
-    model.department_status !== "Ativo" ||
+    model.type !== PROJECT_WIZARD_MODEL_TYPE ||
+    model.department_status !== PROJECT_WIZARD_DEPARTMENT_STATUS_ACTIVE ||
     (departmentId !== undefined && model.department_id !== departmentId)
-  ) {
-    throw new Error("MODEL_NOT_ELIGIBLE");
-  }
+  );
 }
 
 function revisionFor(tasks: ProjectWizardPreviewTask[]): string {
@@ -211,9 +217,7 @@ export class ProjectWizardService {
         );
       }
 
-      try {
-        assertEligibleModel(model, data.organizationId, task.department_id);
-      } catch {
+      if (!isEligibleModel(model, data.organizationId, task.department_id)) {
         throw new ServiceError(
           422,
           "Modelo de tarefa não é elegível para o departamento informado.",
@@ -241,15 +245,11 @@ export class ProjectWizardService {
       const dependencies: ProjectWizardPreviewTask["dependencies"] = [];
 
       for (const dependency of model.dependencies) {
-        try {
-          if (
-            dependency.organization_id !== undefined &&
-            dependency.organization_id !== data.organizationId
-          ) {
-            throw new Error("DEPENDENCY_OUT_OF_SCOPE");
-          }
-          assertEligibleModel(dependency.dependent, data.organizationId);
-        } catch {
+        if (
+          (dependency.organization_id !== undefined &&
+            dependency.organization_id !== data.organizationId) ||
+          !isEligibleModel(dependency.dependent, data.organizationId)
+        ) {
           throw new ServiceError(422, "Modelo dependente não é elegível.");
         }
 
@@ -267,7 +267,7 @@ export class ProjectWizardService {
           name: dependency.dependent.name,
           model_id: dependency.dependent_id,
           department_id: dependency.dependent.department_id,
-          status: dependency.wait ? "Em Espera" : INTEGRACAO_TASK_STATUS_TODO,
+          status: dependency.wait ? INTEGRACAO_TASK_STATUS_WAITING : INTEGRACAO_TASK_STATUS_TODO,
           observation: dependency.observation,
           responsible_id: resolveEligibleTaskResponsible(
             await this.compositionRepository.listEligibleTaskResponsibles(
@@ -312,6 +312,7 @@ export class ProjectWizardService {
     try {
       preview = await this.preview(data);
     } catch (err: unknown) {
+      logError("Erro ao recalcular prévia do wizard antes da criação", { err });
       if (err instanceof ServiceError && err.statusCode === 422) {
         throw new ServiceError(
           409,
@@ -329,8 +330,10 @@ export class ProjectWizardService {
 
     const project = await this.projectIntegration.createProject(data);
     const createdTasks = [];
+    const tasksToCreate: Array<Omit<ProjectWizardPreviewTask, "dependencies">> =
+      preview.tasks.flatMap(({ dependencies, ...task }) => [task, ...dependencies]);
 
-    for (const task of preview.tasks) {
+    for (const task of tasksToCreate) {
       const result = await this.taskService.createTask({
         user_id: data.userId,
         organization_id: data.organizationId,
@@ -339,38 +342,17 @@ export class ProjectWizardService {
         client_id: data.client_id,
         prospecting_status: PROSPECTING_STATUS_CLOSED,
         name: task.name,
-        status: INTEGRACAO_TASK_STATUS_TODO,
+        status: task.status,
         department_id: task.department_id,
         observations: task.observation,
         urgency: "",
         responsible_id: task.responsible_id,
-        prevision_date: task.prevision_date,
+        ...(task.prevision_date === undefined ? {} : { prevision_date: task.prevision_date }),
         integracaoLevel: data.integracaoLevel,
         isOwner: data.isOwner === true,
         createDependencies: false,
       });
       createdTasks.push(result.create);
-
-      for (const dependency of task.dependencies) {
-        const dependent = await this.taskService.createTask({
-          user_id: data.userId,
-          organization_id: data.organizationId,
-          model_id: dependency.model_id,
-          project_id: project.id,
-          client_id: data.client_id,
-          prospecting_status: PROSPECTING_STATUS_CLOSED,
-          name: dependency.name,
-          status: dependency.status,
-          department_id: dependency.department_id,
-          observations: dependency.observation,
-          urgency: "",
-          responsible_id: dependency.responsible_id,
-          integracaoLevel: data.integracaoLevel,
-          isOwner: data.isOwner === true,
-          createDependencies: false,
-        });
-        createdTasks.push(dependent.create);
-      }
     }
 
     return {

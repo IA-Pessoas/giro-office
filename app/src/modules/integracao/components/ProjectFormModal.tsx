@@ -52,7 +52,7 @@ function getSaveErrorMessage(error: unknown, fallback = "Não foi possível salv
   return typeof message === "string" ? message : fallback;
 }
 
-function dependencyModels(preview: ProjectWizardPreview): string {
+function dependencyModelIdsSignature(preview: ProjectWizardPreview): string {
   return preview.tasks
     .flatMap((task) => task.dependencies.map((dependency) => dependency.model_id))
     .sort()
@@ -193,7 +193,11 @@ export function ProjectFormModal({
 
     try {
       const nextPreview = await previewMutation.mutateAsync(mainTasks);
-      setDependenciesChanged(preview ? dependencyModels(preview) !== dependencyModels(nextPreview) : false);
+      setDependenciesChanged(
+        preview
+          ? dependencyModelIdsSignature(preview) !== dependencyModelIdsSignature(nextPreview)
+          : false,
+      );
       setPreview(nextPreview);
       setTasks(reviewedTasks);
       setCreateStep(3);
