@@ -1,7 +1,10 @@
 import {
+  type CreateProjectCrudRequest,
+  createProjectInTransaction,
   INTEGRACAO_PERMISSION_LEVEL,
-  type IntegracaoPermissionLevel,
   error as logError,
+  type ProjectCreateRow,
+  type ProjectCrudAuthContext,
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
@@ -22,22 +25,7 @@ type ProjectCrudAuditFns = {
   logUpdateIfChanged: (params: LogUpdateParams) => Promise<void>;
 };
 
-export interface ProjectCrudAuthContext {
-  userId: string;
-  organizationId: string;
-  permission?: number;
-  integracaoLevel?: IntegracaoPermissionLevel;
-  isOwner?: boolean;
-}
-
-export interface CreateProjectCrudRequest extends ProjectCrudAuthContext {
-  name: string;
-  client_id: string;
-  start_date: Date;
-  end_date?: Date;
-  objective: string;
-  sponsor_id?: string;
-}
+export type { CreateProjectCrudRequest, ProjectCrudAuthContext } from "@workspace/shared";
 
 export interface UpdateProjectCrudRequest extends ProjectCrudAuthContext {
   project_id: string;
@@ -51,17 +39,6 @@ export interface UpdateProjectCrudRequest extends ProjectCrudAuthContext {
 export interface DeleteProjectCrudRequest extends ProjectCrudAuthContext {
   project_id: string;
 }
-
-const CREATE_SELECT = {
-  id: true,
-  name: true,
-  client_id: true,
-  status: true,
-  start_date: true,
-  end_date: true,
-  objective: true,
-  sponsor_id: true,
-} as const;
 
 const UPDATE_SELECT = {
   id: true,
@@ -119,56 +96,8 @@ export class ProjectCrudService {
   async createInTransaction(
     data: CreateProjectCrudRequest,
     tx: Prisma.TransactionClient,
-  ): Promise<{ create: Prisma.ProjectGetPayload<{ select: typeof CREATE_SELECT }> }> {
-    requireIntegracaoRouteAccess("POST", "/project", {
-      userId: data.userId,
-      level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
-      organizationId: data.organizationId,
-      resourceOrganizationId: data.organizationId,
-      isOwner: data.isOwner === true,
-      requestedFields: ["name", "client_id", "start_date", "end_date", "objective", "sponsor_id"],
-    });
-
-    if (data.end_date && data.end_date < data.start_date) {
-      throw new ServiceError(400, "A data final não pode ser anterior à data inicial.");
-    }
-
-    const client = await tx.client.findFirst({
-      where: { id: data.client_id, organization_id: data.organizationId },
-    });
-
-    if (!client) {
-      throw new ServiceError(404, "Cliente não encontrado.");
-    }
-
-    const duplicate = await tx.project.findFirst({
-      where: {
-        name: data.name,
-        client_id: data.client_id,
-        organization_id: data.organizationId,
-      },
-    });
-
-    if (duplicate !== null) {
-      throw new ServiceError(409, "Um objetivo com esse nome nesse cliente já foi cadastrada");
-    }
-
-    const create = await tx.project.create({
-      data: {
-        name: data.name,
-        client_id: data.client_id,
-        organization_id: data.organizationId,
-        status: "Em andamento",
-        start_date: data.start_date,
-        end_date: data.end_date ?? null,
-        objective: data.objective,
-        sponsor_id: data.sponsor_id ?? null,
-        porcentage: 0,
-      },
-      select: CREATE_SELECT,
-    });
-
-    return { create };
+  ): Promise<{ create: ProjectCreateRow }> {
+    return createProjectInTransaction(data, tx);
   }
 
   async detail(

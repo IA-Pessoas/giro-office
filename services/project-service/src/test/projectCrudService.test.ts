@@ -1,5 +1,6 @@
 import "./envBootstrap.js";
 
+import * as shared from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Prisma } from "../generated/prisma/client.js";
@@ -37,6 +38,34 @@ function createMockPrisma(): ProjectCrudPrisma {
 }
 
 describe("ProjectCrudService", () => {
+  it("helper compartilhado cria o projeto usando somente o tx fornecido", async () => {
+    const tx = createMockPrisma();
+    tx.client.findFirst = vi.fn(async () => ({ id: CLIENT_ID }));
+    tx.project.create = vi.fn(async ({ data }) => ({ id: PROJECT_ID, ...data }));
+
+    const result = await shared.createProjectInTransaction(baseCreateInput, tx);
+
+    expect(result.create).toMatchObject({
+      id: PROJECT_ID,
+      name: "Projeto Alpha",
+      client_id: CLIENT_ID,
+      organization_id: ORG_ID,
+      status: "Em andamento",
+      start_date: new Date("2025-01-15"),
+      end_date: null,
+      objective: "Objetivo",
+      sponsor_id: null,
+      porcentage: 0,
+    });
+    expect(tx.client.findFirst).toHaveBeenCalledWith({
+      where: { id: CLIENT_ID, organization_id: ORG_ID },
+    });
+    expect(tx.project.findFirst).toHaveBeenCalledWith({
+      where: { name: "Projeto Alpha", client_id: CLIENT_ID, organization_id: ORG_ID },
+    });
+    expect(tx.$transaction).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       label: "nível 1",
