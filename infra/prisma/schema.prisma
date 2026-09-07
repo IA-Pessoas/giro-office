@@ -915,7 +915,7 @@ model Project {
 
 model ProjectWizardConfirmation {
   id                String       @id @default(uuid())
-  project_id        String
+  project_id        String?
   organization_id   String
   idempotency_key   String       @db.VarChar(255)
   command_hash      String       @db.Char(64)
@@ -923,7 +923,7 @@ model ProjectWizardConfirmation {
   created_at        DateTime     @default(now())
   updated_at        DateTime     @updatedAt
   organization      Organization @relation(fields: [organization_id], references: [id])
-  project           Project      @relation(fields: [project_id], references: [id])
+  project           Project?     @relation(fields: [project_id], references: [id], onDelete: SetNull)
 
   @@unique([organization_id, idempotency_key], map: "uq_project_wizard_confirmation_org_idempotency_key")
   @@index([organization_id], map: "idx_project_wizard_confirmation_org")

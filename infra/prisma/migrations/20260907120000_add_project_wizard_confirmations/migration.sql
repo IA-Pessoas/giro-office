@@ -1,6 +1,6 @@
 CREATE TABLE "integracao.project_wizard_confirmations" (
   "id" TEXT NOT NULL,
-  "project_id" TEXT NOT NULL,
+  "project_id" TEXT,
   "organization_id" TEXT NOT NULL,
   "idempotency_key" VARCHAR(255) NOT NULL,
   "command_hash" CHAR(64) NOT NULL,
@@ -28,4 +28,4 @@ ALTER TABLE "integracao.project_wizard_confirmations"
 ALTER TABLE "integracao.project_wizard_confirmations"
   ADD CONSTRAINT "integracao.project_wizard_confirmations_project_id_fkey"
   FOREIGN KEY ("project_id") REFERENCES "integracao.projects"("id")
-  ON DELETE RESTRICT ON UPDATE CASCADE;
+  ON DELETE SET NULL ON UPDATE CASCADE;

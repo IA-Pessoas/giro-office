@@ -365,6 +365,43 @@ describe.skipIf(process.env.PROJECT_WIZARD_POSTGRES_TEST !== "1")(
       expect(await db.projectWizardConfirmation.count()).toBe(2);
     });
 
+    it("permite excluir Projeto sem Tarefas e mantém o replay da confirmação original", async () => {
+      const payload = {
+        ...body,
+        tasks: [],
+        revision: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      };
+      const confirm = () =>
+        request(app)
+          .post("/task/project-wizard")
+          .set(headers)
+          .set("Idempotency-Key", "deleted-project")
+          .send(payload);
+      const original = await confirm();
+      expect(original.status).toBe(201);
+      const confirmation = await db.projectWizardConfirmation.findFirstOrThrow();
+
+      // Mesma exclusão física executada pelo ProjectCrudService após autorização.
+      await db.project.delete({ where: { id: original.body.data.project.id } });
+      expect(await db.project.count()).toBe(0);
+      expect(await db.projectWizardConfirmation.findFirstOrThrow()).toMatchObject({
+        id: confirmation.id,
+        project_id: null,
+        idempotency_key: "deleted-project",
+        command_hash: confirmation.command_hash,
+        response_snapshot: original.body.data,
+      });
+
+      const replay = await confirm();
+      expect(replay.status).toBe(201);
+      expect(replay.body).toEqual(original.body);
+      expect(await db.project.count()).toBe(0);
+      expect(await db.task.count()).toBe(0);
+      expect(await db.projectWizardConfirmation.count()).toBe(1);
+      const { createLog } = await import("../integrations/audit.js");
+      expect(createLog).toHaveBeenCalledTimes(1);
+    });
+
     it("mesma chave com comando diferente retorna 409 e preserva a criação original", async () => {
       const payload = await command();
       const confirm = (value: unknown) =>
