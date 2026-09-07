@@ -4,9 +4,12 @@ import {
   normalizeModulePermission,
   parseWithZod,
   requireAuthenticatedRequestContext,
+  ServiceError,
 } from "@workspace/shared";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { Router } from "express";
+import multer from "multer";
+import type { z } from "zod";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
@@ -25,6 +28,81 @@ export interface ProjectWizardRoutesDeps {
   service: ProjectWizardRouteDeps;
   extractionService: ProjectWizardExtractionRouteDeps;
   extractionRateLimit: RequestHandler;
+}
+
+const MEETING_MINUTES_UPLOAD_FIELD = "file";
+const MEETING_MINUTES_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MEETING_MINUTES_FILE_TYPES: Record<string, readonly string[]> = {
+  ".txt": ["text/plain"],
+  ".md": ["text/markdown", "text/plain", "text/x-markdown"],
+};
+type ProjectWizardExtractTasksBody = z.infer<typeof projectWizardExtractTasksBodySchema>;
+
+const meetingMinutesUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MEETING_MINUTES_MAX_FILE_SIZE_BYTES, files: 1, fields: 4 },
+  fileFilter(_request, file, callback) {
+    const extension = file.originalname.match(/\.[^.]+$/)?.[0]?.toLowerCase();
+    const allowedMimeTypes = extension ? MEETING_MINUTES_FILE_TYPES[extension] : undefined;
+    if (!allowedMimeTypes?.includes(file.mimetype)) {
+      callback(new ServiceError(400, "Tipo de arquivo não permitido."));
+      return;
+    }
+
+    callback(null, true);
+  },
+});
+
+function uploadMeetingMinutes(request: Request, response: Response, next: NextFunction): void {
+  if (!request.is("multipart/form-data")) {
+    next();
+    return;
+  }
+
+  meetingMinutesUpload.single(MEETING_MINUTES_UPLOAD_FIELD)(request, response, (err: unknown) => {
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      next(new ServiceError(400, "Arquivo excede o limite de 10 MB."));
+      return;
+    }
+    if (err) {
+      next(err instanceof multer.MulterError ? new ServiceError(400, "Upload inválido.") : err);
+      return;
+    }
+    if (!request.file || request.file.size === 0) {
+      next(new ServiceError(400, "O arquivo da Ata é obrigatório e não pode estar vazio."));
+      return;
+    }
+
+    try {
+      const content = new TextDecoder("utf-8", { fatal: true }).decode(request.file.buffer);
+      if (content.includes("\0")) {
+        throw new ServiceError(400, "O arquivo da Ata não pode conter NUL.");
+      }
+      request.body = { ...request.body, content };
+      next();
+    } catch (decodeError) {
+      logError("Falha ao decodificar arquivo da Ata", { err: decodeError });
+      next(
+        decodeError instanceof ServiceError
+          ? decodeError
+          : new ServiceError(400, "O arquivo da Ata deve conter texto UTF-8 válido."),
+      );
+    }
+  });
+}
+
+function validateProjectWizardExtractTasksBody(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  try {
+    request.body = parseWithZod(projectWizardExtractTasksBodySchema, request.body);
+    next();
+  } catch (err) {
+    logError("Erro ao validar entrada da extração de tarefas", { err });
+    next(err);
+  }
 }
 
 export function createProjectWizardRoutes({
@@ -89,10 +167,12 @@ export function createProjectWizardRoutes({
   router.post(
     "/project-wizard/extract-tasks",
     isAuthenticated,
+    uploadMeetingMinutes,
+    validateProjectWizardExtractTasksBody,
     extractionRateLimit,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const body = parseWithZod(projectWizardExtractTasksBodySchema, req.body);
+        const body = req.body as ProjectWizardExtractTasksBody;
         const auth = requireAuthenticatedRequestContext(req);
 
         const result = await extractionService.extractTasks({

@@ -101,18 +101,22 @@ export interface ProjectWizardTask {
   responsible_id: string | null;
 }
 
-/** Proposta da IA: o aviso é estado de revisão e nunca faz parte do payload enviado. */
-export interface ProjectWizardTaskProposal extends ProjectWizardTask {
-  prevision_date_warning?: string;
-}
-
-export interface ExtractProjectTasksData {
+interface ExtractProjectTasksContext {
   content: string;
   name: string;
   objective: string;
   start_date: string;
   end_date?: string | null;
 }
+
+/** Proposta da IA: o aviso é estado de revisão e nunca faz parte do payload enviado. */
+export interface ProjectWizardTaskProposal extends ProjectWizardTask {
+  prevision_date_warning?: string;
+}
+
+export type ExtractProjectTasksData =
+  | ExtractProjectTasksContext
+  | (Omit<ExtractProjectTasksContext, "content"> & { file: File });
 
 export interface ProjectWizardResult {
   project: ProjectListItem;

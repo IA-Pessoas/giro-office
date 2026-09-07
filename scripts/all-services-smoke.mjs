@@ -4627,11 +4627,18 @@ const handlers = {
   async taskProjectWizardExtractTasks(op) {
     await httpRequest(op, {
       expectedStatus: [200],
-      json: {
-        content: "- Apurar impostos do trimestre\n- Reunir documentos do cliente",
-        name: uniqueText("Smoke Extract Wizard"),
-        objective: "Validate meeting minutes extraction.",
-        start_date: new Date().toISOString(),
+      form: {
+        fields: {
+          name: uniqueText("Smoke Extract Wizard"),
+          objective: "Validate meeting minutes extraction.",
+          start_date: new Date().toISOString(),
+        },
+        file: {
+          fieldName: "file",
+          path: path.join(rootDir, "scripts", "fixtures", "smoke-meeting-minutes.txt"),
+          filename: "smoke-meeting-minutes.txt",
+          contentType: "text/plain",
+        },
       },
     });
   },
