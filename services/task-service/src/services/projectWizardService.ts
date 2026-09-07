@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  createProjectInTransaction,
   INTEGRACAO_PERMISSION_LEVEL,
   type IntegracaoPermissionLevel,
   error as logError,
@@ -12,12 +13,12 @@ import {
   type IntegracaoTaskStatus,
 } from "../constants/integracaoTask.js";
 import { PROSPECTING_STATUS_CLOSED } from "../constants/prospectingStatus.js";
+import type { Prisma } from "../generated/prisma/client.js";
+import * as audit from "../integrations/audit.js";
 import type {
   CreatedProject,
   CreateProjectFromWizardParams,
-  ProjectWizardIntegration,
 } from "../integrations/projectWizard.js";
-import { createHttpProjectWizardIntegration } from "../integrations/projectWizard.js";
 import prismaClient from "../prisma/index.js";
 import { listEligibleTaskResponsibles } from "./responsibleUserContext.js";
 import {
@@ -42,6 +43,34 @@ export interface CreateProjectWizardRequest extends CreateProjectFromWizardParam
   isOwner?: boolean;
   tasks: ProjectWizardTask[];
   revision: string;
+}
+
+interface ProjectWizardConfirmationResponse {
+  project: CreatedProject;
+  counts: { main: number; dependencies: number; unassigned: number };
+}
+
+function commandHash(data: CreateProjectWizardRequest): string {
+  // Projeção explícita: credenciais, permissões e headers não fazem parte do comando.
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        client_id: data.client_id,
+        name: data.name,
+        start_date: data.start_date.toISOString(),
+        end_date: data.end_date?.toISOString(),
+        objective: data.objective,
+        revision: data.revision,
+        tasks: data.tasks.map((task) => ({
+          name: task.name,
+          department_id: task.department_id,
+          model_id: task.model_id,
+          prevision_date: task.prevision_date,
+          responsible_id: task.responsible_id,
+        })),
+      }),
+    )
+    .digest("hex");
 }
 
 export interface ProjectWizardPreviewRequest {
@@ -90,10 +119,12 @@ export interface ProjectWizardPreviewTask {
   dependencies: Array<Omit<ProjectWizardPreviewTask, "dependencies" | "prevision_date">>;
 }
 
-function createProjectWizardCompositionRepository(): ProjectWizardCompositionRepository {
+function createProjectWizardCompositionRepository(
+  client: Prisma.TransactionClient,
+): ProjectWizardCompositionRepository {
   return {
     async findTaskModels(organizationId, modelIds) {
-      const models = await prismaClient.taskModel.findMany({
+      const models = await client.taskModel.findMany({
         where: { organization_id: organizationId, id: { in: modelIds } },
         select: {
           id: true,
@@ -143,7 +174,7 @@ function createProjectWizardCompositionRepository(): ProjectWizardCompositionRep
       }));
     },
     listEligibleTaskResponsibles: (organizationId, departmentId) =>
-      listEligibleTaskResponsibles(prismaClient, organizationId, departmentId),
+      listEligibleTaskResponsibles(client, organizationId, departmentId),
   };
 }
 
@@ -176,16 +207,29 @@ function revisionFor(tasks: ProjectWizardPreviewTask[]): string {
 
 export class ProjectWizardService {
   constructor(
-    private readonly projectIntegration: ProjectWizardIntegration = createHttpProjectWizardIntegration(),
+    private readonly db = prismaClient,
     private readonly taskService: {
-      createTask(data: CreateTaskCrudRequest): Promise<{
-        create: { responsible_id: string | null };
+      createTaskInTransaction(
+        data: CreateTaskCrudRequest,
+        tx: Prisma.TransactionClient,
+      ): Promise<{
+        create: { id: string; responsible_id: string | null };
       }>;
     } = new TaskCrudService(),
-    private readonly compositionRepository: ProjectWizardCompositionRepository = createProjectWizardCompositionRepository(),
+    private readonly compositionRepository = createProjectWizardCompositionRepository,
   ) {}
 
   async preview(data: ProjectWizardPreviewRequest): Promise<{
+    tasks: ProjectWizardPreviewTask[];
+    revision: string;
+  }> {
+    return this.#compose(data, this.compositionRepository(this.db));
+  }
+
+  async #compose(
+    data: ProjectWizardPreviewRequest,
+    repository: ProjectWizardCompositionRepository,
+  ): Promise<{
     tasks: ProjectWizardPreviewTask[];
     revision: string;
   }> {
@@ -200,7 +244,7 @@ export class ProjectWizardService {
     const models =
       data.tasks.length === 0
         ? []
-        : await this.compositionRepository.findTaskModels(
+        : await repository.findTaskModels(
             data.organizationId,
             data.tasks.map(({ model_id }) => model_id),
           );
@@ -235,10 +279,7 @@ export class ProjectWizardService {
       seen.set(model.id, principal);
 
       const responsible_id = resolveEligibleTaskResponsible(
-        await this.compositionRepository.listEligibleTaskResponsibles(
-          data.organizationId,
-          model.department_id,
-        ),
+        await repository.listEligibleTaskResponsibles(data.organizationId, model.department_id),
         model.responsible_id,
         task.responsible_id,
       );
@@ -270,7 +311,7 @@ export class ProjectWizardService {
           status: dependency.wait ? INTEGRACAO_TASK_STATUS_WAITING : INTEGRACAO_TASK_STATUS_TODO,
           observation: dependency.observation,
           responsible_id: resolveEligibleTaskResponsible(
-            await this.compositionRepository.listEligibleTaskResponsibles(
+            await repository.listEligibleTaskResponsibles(
               data.organizationId,
               dependency.dependent.department_id,
             ),
@@ -295,10 +336,7 @@ export class ProjectWizardService {
     return { tasks, revision: revisionFor(tasks) };
   }
 
-  async create(data: CreateProjectWizardRequest): Promise<{
-    project: CreatedProject;
-    counts: { main: number; dependencies: number; unassigned: number };
-  }> {
+  async create(data: CreateProjectWizardRequest): Promise<ProjectWizardConfirmationResponse> {
     requireIntegracaoRouteAccess("POST", "/task/project-wizard", {
       userId: data.userId,
       level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
@@ -308,60 +346,125 @@ export class ProjectWizardService {
       requestedFields: ["name", "client_id", "start_date", "end_date", "objective"],
     });
 
-    let preview: Awaited<ReturnType<ProjectWizardService["preview"]>>;
-    try {
-      preview = await this.preview(data);
-    } catch (err: unknown) {
-      logError("Erro ao recalcular prévia do wizard antes da criação", { err });
-      if (err instanceof ServiceError && err.statusCode === 422) {
+    const hash = commandHash(data);
+    const result = await this.db.$transaction(async (tx) => {
+      const lockKey = JSON.stringify([data.organizationId, data.idempotencyKey]);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+      const previous = await tx.projectWizardConfirmation.findUnique({
+        where: {
+          organization_id_idempotency_key: {
+            organization_id: data.organizationId,
+            idempotency_key: data.idempotencyKey,
+          },
+        },
+      });
+      if (previous) {
+        if (previous.command_hash !== hash) {
+          throw new ServiceError(409, "Idempotency-Key já utilizada com outro comando.");
+        }
+        return {
+          response: previous.response_snapshot as unknown as ProjectWizardConfirmationResponse,
+        };
+      }
+      let preview: Awaited<ReturnType<ProjectWizardService["preview"]>>;
+      try {
+        preview = await this.#compose(data, this.compositionRepository(tx));
+      } catch (err: unknown) {
+        logError("Erro ao recalcular prévia do wizard antes da criação", { err });
+        if (err instanceof ServiceError && err.statusCode === 422) {
+          throw new ServiceError(
+            409,
+            "A configuração das dependências foi alterada. Gere uma nova prévia.",
+          );
+        }
+        throw err;
+      }
+      if (preview.revision !== data.revision) {
         throw new ServiceError(
           409,
           "A configuração das dependências foi alterada. Gere uma nova prévia.",
         );
       }
-      throw err;
-    }
-    if (preview.revision !== data.revision) {
-      throw new ServiceError(
-        409,
-        "A configuração das dependências foi alterada. Gere uma nova prévia.",
+
+      const { create: project } = await createProjectInTransaction(data, tx);
+      const createdTasks = [];
+      let mainCount = 0;
+      for (const { dependencies, ...principal } of preview.tasks) {
+        const tasks: Array<Omit<ProjectWizardPreviewTask, "dependencies">> = [
+          principal,
+          ...dependencies,
+        ];
+        for (const task of tasks) {
+          const result = await this.taskService.createTaskInTransaction(
+            {
+              user_id: data.userId,
+              organization_id: data.organizationId,
+              model_id: task.model_id,
+              project_id: project.id,
+              client_id: data.client_id,
+              prospecting_status: PROSPECTING_STATUS_CLOSED,
+              name: task.name,
+              status: task.status,
+              department_id: task.department_id,
+              observations: task.observation,
+              urgency: "",
+              responsible_id: task.responsible_id,
+              ...(task.prevision_date === undefined ? {} : { prevision_date: task.prevision_date }),
+              integracaoLevel: data.integracaoLevel,
+              isOwner: data.isOwner === true,
+              createDependencies: false,
+            },
+            tx,
+          );
+          createdTasks.push(result.create);
+        }
+        mainCount += 1;
+      }
+
+      const response: ProjectWizardConfirmationResponse = JSON.parse(
+        JSON.stringify({
+          project,
+          counts: {
+            main: mainCount,
+            dependencies: createdTasks.length - mainCount,
+            unassigned: createdTasks.filter(({ responsible_id }) => responsible_id === null).length,
+          },
+        }),
       );
-    }
-
-    const project = await this.projectIntegration.createProject(data);
-    const createdTasks = [];
-    const tasksToCreate: Array<Omit<ProjectWizardPreviewTask, "dependencies">> =
-      preview.tasks.flatMap(({ dependencies, ...task }) => [task, ...dependencies]);
-
-    for (const task of tasksToCreate) {
-      const result = await this.taskService.createTask({
-        user_id: data.userId,
-        organization_id: data.organizationId,
-        model_id: task.model_id,
-        project_id: project.id,
-        client_id: data.client_id,
-        prospecting_status: PROSPECTING_STATUS_CLOSED,
-        name: task.name,
-        status: task.status,
-        department_id: task.department_id,
-        observations: task.observation,
-        urgency: "",
-        responsible_id: task.responsible_id,
-        ...(task.prevision_date === undefined ? {} : { prevision_date: task.prevision_date }),
-        integracaoLevel: data.integracaoLevel,
-        isOwner: data.isOwner === true,
-        createDependencies: false,
+      await tx.projectWizardConfirmation.create({
+        data: {
+          organization_id: data.organizationId,
+          idempotency_key: data.idempotencyKey,
+          project_id: project.id,
+          command_hash: hash,
+          response_snapshot: response as unknown as Prisma.InputJsonValue,
+        },
       });
-      createdTasks.push(result.create);
-    }
+      return { response, taskIds: createdTasks.map(({ id }) => id) };
+    });
 
-    return {
-      project,
-      counts: {
-        main: preview.tasks.length,
-        dependencies: createdTasks.length - preview.tasks.length,
-        unassigned: createdTasks.filter(({ responsible_id }) => responsible_id === null).length,
-      },
-    };
+    if (result.taskIds) {
+      try {
+        await audit.createLog({
+          userId: data.userId,
+          organizationId: data.organizationId,
+          action: "Cadastro",
+          referring: "integracao.projects",
+          referringId: result.response.project.id,
+          changes: {
+            source: "project-wizard",
+            projectId: result.response.project.id,
+            taskIds: result.taskIds,
+            counts: result.response.counts,
+          },
+        });
+      } catch {
+        logError("Falha ao auditar confirmação do wizard após commit", {
+          projectId: result.response.project.id,
+          organizationId: data.organizationId,
+        });
+      }
+    }
+    return result.response;
   }
 }

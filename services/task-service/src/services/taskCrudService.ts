@@ -352,161 +352,168 @@ export class TaskCrudService {
     return { create };
   }
 
+  /** O chamador controla commit/rollback e os efeitos após o commit. */
+  async createTaskInTransaction(
+    data: CreateTaskCrudRequest,
+    tx: Prisma.TransactionClient,
+  ): Promise<{ create: TaskCreateRow; dependentCreates: Array<{ create: TaskCreateRow }> }> {
+    requireIntegracaoRouteAccess("POST", "/task", taskAuthorization(data));
+
+    const project = await tx.project.findFirst({
+      where: { id: data.project_id, organization_id: data.organization_id },
+      select: { client_id: true },
+    });
+
+    if (!project) {
+      throw new ServiceError(404, "Projeto nao encontrado.");
+    }
+
+    if (project.client_id !== data.client_id) {
+      throw new ServiceError(400, "Projeto nao pertence ao cliente informado.");
+    }
+
+    await assertNoActiveTaskForModel(tx, {
+      organizationId: data.organization_id,
+      projectId: data.project_id,
+      modelId: data.model_id,
+    });
+
+    const isManualFlow = data.department_id !== undefined;
+    const model = await tx.taskModel.findFirst({
+      where: {
+        id: data.model_id,
+        organization_id: data.organization_id,
+        ...(data.department_id !== undefined
+          ? {
+              department_id: data.department_id,
+              type: "Projeto",
+              department: { status: "Ativo" },
+            }
+          : {}),
+      },
+    });
+
+    if (!model) {
+      if (isManualFlow) {
+        throw new ServiceError(
+          422,
+          "Modelo de tarefa não é elegível para o departamento informado.",
+        );
+      }
+      throw new ServiceError(404, "Tarefa modelo não existe.");
+    }
+
+    const billing = data.billing ?? model.billing;
+    let defaultStatus = "A Realizar";
+    if (data.prospecting_status === "Fechado") {
+      defaultStatus = "Em Andamento";
+    }
+    if (billing === "Realizar") {
+      defaultStatus = "A Realizar";
+    }
+
+    const status = data.status ?? defaultStatus;
+    const departmentId = data.department_id ?? model.department_id;
+    let responsibleId =
+      data.responsible_id !== undefined ? data.responsible_id : model.responsible_id;
+    const responsible2Id = isManualFlow
+      ? null
+      : data.responsible2_id !== undefined
+        ? data.responsible2_id
+        : model.responsible2_id;
+    const responsible3Id = isManualFlow
+      ? null
+      : data.responsible3_id !== undefined
+        ? data.responsible3_id
+        : model.responsible3_id;
+    const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
+    const previsionDate =
+      data.prevision_date === undefined || data.prevision_date === null
+        ? null
+        : typeof data.prevision_date === "string"
+          ? new Date(`${data.prevision_date}T00:00:00.000Z`)
+          : data.prevision_date;
+
+    await assertTaskDepartmentInOrganization(tx, data.organization_id, departmentId);
+    if (isManualFlow) {
+      const eligibleResponsibles = await listEligibleTaskResponsibles(
+        tx,
+        data.organization_id,
+        departmentId,
+      );
+      responsibleId = resolveEligibleTaskResponsible(
+        eligibleResponsibles,
+        model.responsible_id,
+        data.responsible_id,
+      );
+    }
+    await assertResponsibleUsersInDepartment(tx, data.organization_id, departmentId, [
+      isManualFlow ? undefined : responsibleId,
+      responsible2Id,
+      responsible3Id,
+    ]);
+
+    const create = await tx.task.create({
+      data: {
+        organization_id: data.organization_id,
+        model_id: data.model_id,
+        project_id: data.project_id,
+        client_id: data.client_id,
+        name: data.name ?? model.name,
+        status,
+        department_id: departmentId,
+        observations: data.observations,
+        billing,
+        urgency: data.urgency,
+        responsible_id: responsibleId,
+        responsible2_id: responsible2Id,
+        responsible3_id: responsible3Id,
+        start_date: status === "Em Andamento" ? new Date() : null,
+        prevision_date: previsionDate,
+        pending_approval: false,
+        charge_comercial,
+        charge_financeiro: false,
+      },
+      select: TASK_CREATE_SELECT,
+    });
+
+    const dependents =
+      data.createDependencies === false
+        ? []
+        : await tx.taskDependent.findMany({
+            where: {
+              task_id: data.model_id,
+              organization_id: data.organization_id,
+            },
+            select: DEPENDENTS_FOR_CREATE_SELECT,
+          });
+
+    const dependentCreates = await Promise.all(
+      dependents.map((dep: (typeof dependents)[number]) => {
+        let statusDependent = data.prospecting_status === "Fechado" ? "Em Andamento" : "A Realizar";
+        statusDependent = dep.wait === false ? statusDependent : "Em Espera";
+
+        return this.#createDependentTaskInstance({
+          prisma: tx,
+          user_id: data.user_id,
+          organization_id: data.organization_id,
+          model_id: dep.dependent_id,
+          status: statusDependent,
+          project_id: data.project_id,
+          client_id: data.client_id,
+          observations: dep.observation,
+        });
+      }),
+    );
+
+    return { create, dependentCreates };
+  }
+
   async createTask(data: CreateTaskCrudRequest): Promise<{ create: TaskCreateRow }> {
     try {
-      requireIntegracaoRouteAccess("POST", "/task", taskAuthorization(data));
-
-      const project = await prismaClient.project.findFirst({
-        where: { id: data.project_id, organization_id: data.organization_id },
-        select: { client_id: true },
-      });
-
-      if (!project) {
-        throw new ServiceError(404, "Projeto nao encontrado.");
-      }
-
-      if (project.client_id !== data.client_id) {
-        throw new ServiceError(400, "Projeto nao pertence ao cliente informado.");
-      }
-
-      await assertNoActiveTaskForModel(prismaClient, {
-        organizationId: data.organization_id,
-        projectId: data.project_id,
-        modelId: data.model_id,
-      });
-
-      const isManualFlow = data.department_id !== undefined;
-      const model = await prismaClient.taskModel.findFirst({
-        where: {
-          id: data.model_id,
-          organization_id: data.organization_id,
-          ...(data.department_id !== undefined
-            ? {
-                department_id: data.department_id,
-                type: "Projeto",
-                department: { status: "Ativo" },
-              }
-            : {}),
-        },
-      });
-
-      if (!model) {
-        if (isManualFlow) {
-          throw new ServiceError(
-            422,
-            "Modelo de tarefa não é elegível para o departamento informado.",
-          );
-        }
-        throw new ServiceError(404, "Tarefa modelo não existe.");
-      }
-
-      const billing = data.billing ?? model.billing;
-      let defaultStatus = "A Realizar";
-      if (data.prospecting_status === "Fechado") {
-        defaultStatus = "Em Andamento";
-      }
-      if (billing === "Realizar") {
-        defaultStatus = "A Realizar";
-      }
-
-      const status = data.status ?? defaultStatus;
-      const departmentId = data.department_id ?? model.department_id;
-      let responsibleId =
-        data.responsible_id !== undefined ? data.responsible_id : model.responsible_id;
-      const responsible2Id = isManualFlow
-        ? null
-        : data.responsible2_id !== undefined
-          ? data.responsible2_id
-          : model.responsible2_id;
-      const responsible3Id = isManualFlow
-        ? null
-        : data.responsible3_id !== undefined
-          ? data.responsible3_id
-          : model.responsible3_id;
-      const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
-      const previsionDate =
-        data.prevision_date === undefined || data.prevision_date === null
-          ? null
-          : typeof data.prevision_date === "string"
-            ? new Date(`${data.prevision_date}T00:00:00.000Z`)
-            : data.prevision_date;
-
-      const { create, dependentCreates } = await this.#runTransaction(async (tx) => {
-        await assertTaskDepartmentInOrganization(tx, data.organization_id, departmentId);
-        if (isManualFlow) {
-          const eligibleResponsibles = await listEligibleTaskResponsibles(
-            tx,
-            data.organization_id,
-            departmentId,
-          );
-          responsibleId = resolveEligibleTaskResponsible(
-            eligibleResponsibles,
-            model.responsible_id,
-            data.responsible_id,
-          );
-        }
-        await assertResponsibleUsersInDepartment(tx, data.organization_id, departmentId, [
-          isManualFlow ? undefined : responsibleId,
-          responsible2Id,
-          responsible3Id,
-        ]);
-
-        const create = await tx.task.create({
-          data: {
-            organization_id: data.organization_id,
-            model_id: data.model_id,
-            project_id: data.project_id,
-            client_id: data.client_id,
-            name: data.name ?? model.name,
-            status,
-            department_id: departmentId,
-            observations: data.observations,
-            billing,
-            urgency: data.urgency,
-            responsible_id: responsibleId,
-            responsible2_id: responsible2Id,
-            responsible3_id: responsible3Id,
-            start_date: status === "Em Andamento" ? new Date() : null,
-            prevision_date: previsionDate,
-            pending_approval: false,
-            charge_comercial,
-            charge_financeiro: false,
-          },
-          select: TASK_CREATE_SELECT,
-        });
-
-        const dependents =
-          data.createDependencies === false
-            ? []
-            : await tx.taskDependent.findMany({
-                where: {
-                  task_id: data.model_id,
-                  organization_id: data.organization_id,
-                },
-                select: DEPENDENTS_FOR_CREATE_SELECT,
-              });
-
-        const dependentCreates = await Promise.all(
-          dependents.map((dep: (typeof dependents)[number]) => {
-            let statusDependent =
-              data.prospecting_status === "Fechado" ? "Em Andamento" : "A Realizar";
-            statusDependent = dep.wait === false ? statusDependent : "Em Espera";
-
-            return this.#createDependentTaskInstance({
-              prisma: tx,
-              user_id: data.user_id,
-              organization_id: data.organization_id,
-              model_id: dep.dependent_id,
-              status: statusDependent,
-              project_id: data.project_id,
-              client_id: data.client_id,
-              observations: dep.observation,
-            });
-          }),
-        );
-
-        return { create, dependentCreates };
-      });
+      const { create, dependentCreates } = await this.#runTransaction((tx) =>
+        this.createTaskInTransaction(data, tx),
+      );
 
       await audit.createLog({
         userId: data.user_id,

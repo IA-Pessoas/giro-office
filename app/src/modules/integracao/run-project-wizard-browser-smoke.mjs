@@ -71,7 +71,13 @@ const project = {
   end_date: null,
 };
 
-async function installApiMocks(page, previewRequests, wizardRequests, extractionRequests = []) {
+async function installApiMocks(
+  page,
+  previewRequests,
+  wizardRequests,
+  extractionRequests = [],
+  secondExtractionGate,
+) {
   const existingTask = {
     id: "task-existing",
     name: "Tarefa anterior",
@@ -177,6 +183,7 @@ async function installApiMocks(page, previewRequests, wizardRequests, extraction
       });
       return;
     }
+    await secondExtractionGate;
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -326,7 +333,17 @@ async function runBrowserProof() {
   const wizardRequests = [];
   const updateRequests = [];
   const extractionRequests = [];
-  await installApiMocks(page, previewRequests, wizardRequests, extractionRequests);
+  let releaseSecondExtraction;
+  const secondExtractionGate = new Promise((resolve) => {
+    releaseSecondExtraction = resolve;
+  });
+  await installApiMocks(
+    page,
+    previewRequests,
+    wizardRequests,
+    extractionRequests,
+    secondExtractionGate,
+  );
   await page.route("**/project", async (route) => {
     assert.equal(route.request().method(), "PUT");
     updateRequests.push(route.request().postDataJSON());
@@ -657,6 +674,8 @@ async function runBrowserProof() {
     await expect(wizard.getByRole("group", { name: /^Tarefa 1/ })).toHaveCount(0);
 
     await extractButton.click();
+    await expect(wizard.getByRole("contentinfo").getByRole("button").last()).toBeDisabled();
+    releaseSecondExtraction();
     const proposedTask = wizard.getByRole("group", { name: "Tarefa 1 (proposta pela IA)" });
     await expect(proposedTask.getByLabel(/^Nome/)).toHaveValue("Apurar impostos do trimestre");
     await expect(proposedTask.getByLabel("Prazo", { exact: true })).toHaveValue("2026-09-15");

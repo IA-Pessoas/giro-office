@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
   prismaMock: {
+    $transaction: vi.fn(),
     department: {
       findFirst: vi.fn(),
     },
@@ -52,9 +53,142 @@ vi.mock("../services/taskWorkflowService.js", () => ({
   }),
 }));
 
+import type { Prisma } from "../generated/prisma/client.js";
 import { TaskCrudService } from "../services/taskCrudService.js";
 
 describe("TaskCrudService", () => {
+  it("createTaskInTransaction persiste tarefa e dependentes somente no tx sem efeitos pós-commit", async () => {
+    const tx = {
+      $transaction: vi.fn(),
+      project: { findFirst: vi.fn().mockResolvedValue({ client_id: "client-1" }) },
+      department: { findFirst: vi.fn().mockResolvedValue({ id: "dep-1" }) },
+      task: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn(async ({ data }) => ({ id: `task-${data.model_id}`, ...data })),
+      },
+      taskModel: {
+        findFirst: vi.fn().mockResolvedValue({
+          name: "Modelo",
+          department_id: "dep-1",
+          billing: "Não Realizar",
+          responsible_id: "user-1",
+          responsible2_id: null,
+          responsible3_id: null,
+        }),
+      },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: "user-1" }]) },
+      taskDependent: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ dependent_id: "model-2", wait: true, observation: "Dependente" }]),
+      },
+    };
+
+    const result = await new TaskCrudService().createTaskInTransaction(
+      {
+        user_id: "user-1",
+        organization_id: "org-1",
+        model_id: "model-1",
+        project_id: "project-1",
+        client_id: "client-1",
+        prospecting_status: "Fechado",
+        observations: "Principal",
+        urgency: "Alta",
+        integracaoLevel: 2,
+      },
+      tx as unknown as Prisma.TransactionClient,
+    );
+
+    expect(result).toMatchObject({
+      create: { id: "task-model-1", status: "Em Andamento", observations: "Principal" },
+      dependentCreates: [
+        { create: { id: "task-model-2", status: "Em Espera", observations: "Dependente" } },
+      ],
+    });
+    expect(tx.project.findFirst).toHaveBeenCalledWith({
+      where: { id: "project-1", organization_id: "org-1" },
+      select: { client_id: true },
+    });
+    expect(tx.task.findFirst).toHaveBeenCalledTimes(2);
+    expect(tx.taskModel.findFirst).toHaveBeenCalledTimes(2);
+    expect(tx.user.findMany).toHaveBeenCalledTimes(2);
+    expect(tx.department.findFirst).toHaveBeenCalledOnce();
+    expect(tx.taskDependent.findMany).toHaveBeenCalledOnce();
+    expect(tx.$transaction).not.toHaveBeenCalled();
+    for (const delegate of Object.values(prismaMock)) {
+      if (typeof delegate === "function") {
+        expect(delegate).not.toHaveBeenCalled();
+        continue;
+      }
+      for (const operation of Object.values(delegate)) {
+        expect(operation).not.toHaveBeenCalled();
+      }
+    }
+    expect(auditMock.createLog).not.toHaveBeenCalled();
+    expect(workflowMock.afterTaskCreated).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    false,
+    true,
+  ])("createTask aguarda commit e preserva efeitos pós-commit (falha: %s)", async (failCommit) => {
+    const tx = {
+      ...prismaMock,
+      project: { findFirst: vi.fn().mockResolvedValue({ client_id: "client-1" }) },
+    };
+    prismaMock.task.findFirst.mockResolvedValue(null);
+    prismaMock.taskModel.findFirst.mockResolvedValue({
+      name: "Modelo",
+      department_id: "dep-1",
+      billing: "Não Realizar",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: data.model_id, ...data }));
+    prismaMock.taskDependent.findMany.mockResolvedValue([
+      { dependent_id: "dependent-1", wait: true, observation: "Dependente" },
+    ]);
+    prismaMock.$transaction.mockImplementation(async (callback) => {
+      const result = await callback(tx);
+      expect(auditMock.createLog).not.toHaveBeenCalled();
+      expect(workflowMock.afterTaskCreated).not.toHaveBeenCalled();
+      if (failCommit) throw new Error("commit failed");
+      return result;
+    });
+
+    const result = new TaskCrudService().createTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      observations: "",
+      urgency: "Alta",
+      integracaoLevel: 2,
+    });
+
+    if (failCommit) {
+      await expect(result).rejects.toMatchObject({ statusCode: 500 });
+      expect(auditMock.createLog).not.toHaveBeenCalled();
+      expect(workflowMock.afterTaskCreated).not.toHaveBeenCalled();
+    } else {
+      await expect(result).resolves.toEqual({ create: expect.objectContaining({ id: "model-1" }) });
+      expect(auditMock.createLog.mock.calls.map(([event]) => event.referringId)).toEqual([
+        "model-1",
+        "dependent-1",
+      ]);
+      expect(workflowMock.afterTaskCreated).toHaveBeenCalledWith({
+        projectId: "project-1",
+        userId: "user-1",
+        organizationId: "org-1",
+      });
+    }
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
+    expect(prismaMock.project.findFirst).not.toHaveBeenCalled();
+  });
+
   it.each([
     { integracaoLevel: 1 as const },
     { integracaoLevel: 2 as const },
@@ -127,6 +261,7 @@ describe("TaskCrudService", () => {
   });
   beforeEach(() => {
     vi.resetAllMocks();
+    prismaMock.$transaction.mockImplementation(async (callback) => callback(prismaMock));
     prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1" });
     prismaMock.user.findMany.mockImplementation(async (args) => {
       const ids = (args as { where?: { id?: { in?: string[] } } }).where?.id?.in;

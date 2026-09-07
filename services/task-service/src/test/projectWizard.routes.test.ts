@@ -1,4 +1,3 @@
-import { createServer, type Server } from "node:http";
 import { Writable } from "node:stream";
 import {
   FORWARDED_AUTH_MODULES_HEADER,
@@ -11,10 +10,11 @@ import {
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTaskApp } from "../app.js";
 import type { TaskServiceEnv } from "../config/env.js";
+import type { PrismaClient } from "../generated/prisma/client.js";
 import { createAiTaskExtractionProvider } from "../integrations/aiTaskExtraction.js";
 import { buildTaskServiceOpenApiSpec } from "../openapi/spec.js";
 import type {
@@ -24,6 +24,8 @@ import type {
 import { projectWizardCreateBodySchema } from "../schemas/projectWizard.schemas.js";
 import { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "../services/projectWizardService.js";
+
+vi.mock("../integrations/audit.js", () => ({ createLog: vi.fn() }));
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -59,63 +61,35 @@ function gatewayHeaders(): Record<string, string> {
 }
 
 describe("project wizard routes", () => {
-  let upstream: Server;
-  let projectServiceUrl = "";
-  let forwardedRequest: {
-    body: unknown;
-    headers: Record<string, string | string[] | undefined>;
-  } | null;
-
-  beforeAll(async () => {
-    upstream = createServer(async (req, res) => {
-      const chunks: Buffer[] = [];
-      for await (const chunk of req) {
-        chunks.push(Buffer.from(chunk));
-      }
-      forwardedRequest = {
-        body: JSON.parse(Buffer.concat(chunks).toString()),
-        headers: req.headers,
-      };
-      res.writeHead(201, { "content-type": "application/json" });
-      res.end(
-        JSON.stringify({
-          success: true,
-          data: {
-            create: {
-              id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
-              name: "Novo projeto",
-              client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
-            },
-          },
-        }),
-      );
-    });
-    await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
-    const address = upstream.address();
-    if (!address || typeof address === "string") throw new Error("Porta do upstream indisponível.");
-    projectServiceUrl = `http://127.0.0.1:${address.port}`;
-  });
-
-  afterAll(async () => {
-    await new Promise<void>((resolve, reject) =>
-      upstream.close((err) => (err ? reject(err) : resolve())),
-    );
-  });
-
-  beforeEach(() => {
-    forwardedRequest = null;
-  });
+  const db = {
+    client: { findFirst: vi.fn(async () => ({ id: "cccccccc-cccc-cccc-cccc-cccccccccccc" })) },
+    project: {
+      findFirst: vi.fn(async () => null),
+      create: vi.fn(async () => ({
+        id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+        name: "Novo projeto",
+        client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      })),
+    },
+    projectWizardConfirmation: { findUnique: vi.fn(async () => null), create: vi.fn() },
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(async (callback) => callback(db)),
+  };
+  beforeEach(() => vi.clearAllMocks());
 
   function createApp(projectWizardService?: ProjectWizardRouteDeps) {
     return createTaskApp(
-      { ...env, projectServiceUrl },
+      env,
       createLogger({
         service: "task-service-test",
         env: "test",
         level: "silent",
         destination: new MemoryLogStream(),
       }),
-      projectWizardService ? { projectWizardService } : undefined,
+      {
+        projectWizardService:
+          projectWizardService ?? new ProjectWizardService(db as unknown as PrismaClient),
+      },
     );
   }
 
@@ -192,56 +166,52 @@ describe("project wizard routes", () => {
   });
 
   it("POST /task/project-wizard/preview expõe dependências reais com espera e sem responsável", async () => {
-    const service = new ProjectWizardService(
-      { createProject: vi.fn() },
-      { createTask: vi.fn() },
-      {
-        findTaskModels: vi.fn(async () => [
-          {
-            id: "model-main",
-            name: "Principal",
-            department_id: "department-1",
-            responsible_id: "responsible-main",
-            observations: "Observação principal",
-            type: "Projeto",
-            department_status: "Ativo",
-            dependencies: [
-              {
-                dependent_id: "model-wait",
-                wait: true,
-                observation: "Aguardar principal",
-                dependent: {
-                  id: "model-wait",
-                  name: "Dependência em espera",
-                  department_id: "department-2",
-                  responsible_id: "responsible-wait",
-                  observations: "",
-                  type: "Projeto",
-                  department_status: "Ativo",
-                },
+    const service = new ProjectWizardService(undefined, undefined, () => ({
+      findTaskModels: vi.fn(async () => [
+        {
+          id: "model-main",
+          name: "Principal",
+          department_id: "department-1",
+          responsible_id: "responsible-main",
+          observations: "Observação principal",
+          type: "Projeto",
+          department_status: "Ativo",
+          dependencies: [
+            {
+              dependent_id: "model-wait",
+              wait: true,
+              observation: "Aguardar principal",
+              dependent: {
+                id: "model-wait",
+                name: "Dependência em espera",
+                department_id: "department-2",
+                responsible_id: "responsible-wait",
+                observations: "",
+                type: "Projeto",
+                department_status: "Ativo",
               },
-              {
-                dependent_id: "model-ready",
-                wait: false,
-                observation: "Pode iniciar",
-                dependent: {
-                  id: "model-ready",
-                  name: "Dependência pronta",
-                  department_id: "department-3",
-                  responsible_id: "responsible-ready",
-                  observations: "",
-                  type: "Projeto",
-                  department_status: "Ativo",
-                },
+            },
+            {
+              dependent_id: "model-ready",
+              wait: false,
+              observation: "Pode iniciar",
+              dependent: {
+                id: "model-ready",
+                name: "Dependência pronta",
+                department_id: "department-3",
+                responsible_id: "responsible-ready",
+                observations: "",
+                type: "Projeto",
+                department_status: "Ativo",
               },
-            ],
-          },
-        ]),
-        listEligibleTaskResponsibles: vi.fn(async (_organizationId, departmentId) =>
-          departmentId === "department-3" ? [] : [{ id: `responsible-${departmentId}` }],
-        ),
-      },
-    );
+            },
+          ],
+        },
+      ]),
+      listEligibleTaskResponsibles: vi.fn(async (_organizationId, departmentId) =>
+        departmentId === "department-3" ? [] : [{ id: `responsible-${departmentId}` }],
+      ),
+    }));
 
     const response = await request(createApp(service))
       .post("/task/project-wizard/preview")
@@ -294,32 +264,28 @@ describe("project wizard routes", () => {
       type: "Projeto",
       department_status: "Ativo",
     };
-    const service = new ProjectWizardService(
-      { createProject: vi.fn() },
-      { createTask: vi.fn() },
-      {
-        findTaskModels: vi.fn(async () =>
-          ["model-one", "model-two"].map((id, index) => ({
-            id,
-            name: `Principal ${index + 1}`,
-            department_id: `department-${index + 1}`,
-            responsible_id: `responsible-${index + 1}`,
-            observations: "",
-            type: "Projeto",
-            department_status: "Ativo",
-            dependencies: [
-              {
-                dependent_id: "model-shared",
-                wait: true,
-                observation: "Aguardar",
-                dependent: sharedDependency,
-              },
-            ],
-          })),
-        ),
-        listEligibleTaskResponsibles: vi.fn(async () => [{ id: "responsible-1" }]),
-      },
-    );
+    const service = new ProjectWizardService(undefined, undefined, () => ({
+      findTaskModels: vi.fn(async () =>
+        ["model-one", "model-two"].map((id, index) => ({
+          id,
+          name: `Principal ${index + 1}`,
+          department_id: `department-${index + 1}`,
+          responsible_id: `responsible-${index + 1}`,
+          observations: "",
+          type: "Projeto",
+          department_status: "Ativo",
+          dependencies: [
+            {
+              dependent_id: "model-shared",
+              wait: true,
+              observation: "Aguardar",
+              dependent: sharedDependency,
+            },
+          ],
+        })),
+      ),
+      listEligibleTaskResponsibles: vi.fn(async () => [{ id: "responsible-1" }]),
+    }));
 
     const response = await request(createApp(service))
       .post("/task/project-wizard/preview")
@@ -413,7 +379,6 @@ describe("project wizard routes", () => {
       error: "Modelo model-1 repetido.",
     });
     expect(service.create).toHaveBeenCalled();
-    expect(forwardedRequest).toBeNull();
   });
 
   it.each([
@@ -455,7 +420,6 @@ describe("project wizard routes", () => {
       .send(validBody);
 
     expect(response.status).toBe(403);
-    expect(forwardedRequest).toBeNull();
   });
 
   it("POST /task/project-wizard exige Idempotency-Key", async () => {
@@ -465,7 +429,6 @@ describe("project wizard routes", () => {
       .send(validBody);
 
     expect(response.status).toBe(400);
-    expect(forwardedRequest).toBeNull();
   });
 
   it.each([
@@ -480,7 +443,6 @@ describe("project wizard routes", () => {
       .send(validBody);
 
     expect(response.status).toBe(400);
-    expect(forwardedRequest).toBeNull();
   });
 
   it("POST /task/project-wizard rejeita corpo inválido", async () => {
@@ -491,7 +453,6 @@ describe("project wizard routes", () => {
       .send({ ...validBody, end_date: "2026-08-31T00:00:00.000Z" });
 
     expect(response.status).toBe(400);
-    expect(forwardedRequest).toBeNull();
   });
 
   it("POST /task/project-wizard cria projeto quando tasks é omitido", async () => {
@@ -513,24 +474,6 @@ describe("project wizard routes", () => {
         counts: { main: 0, dependencies: 0, unassigned: 0 },
       },
     });
-    expect(forwardedRequest).toMatchObject({
-      body: {
-        client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
-        name: "Novo projeto",
-        start_date: "2026-09-01T00:00:00.000Z",
-        end_date: "2026-09-30T00:00:00.000Z",
-        objective: "Objetivo do projeto",
-      },
-      headers: {
-        "idempotency-key": "wizard-open-1",
-        [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
-        [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORG_ID,
-        [FORWARDED_AUTH_MODULES_HEADER]: expect.any(String),
-      },
-    });
-    expect(
-      JSON.parse(forwardedRequest?.headers[FORWARDED_AUTH_MODULES_HEADER] as string),
-    ).toMatchObject({ integracao: 2 });
   });
 
   it.each(["start_date", "end_date"] as const)("converte %s ISO em Date", (field) => {
@@ -552,7 +495,6 @@ describe("project wizard routes", () => {
       .send({ ...validBody, start_date: "1969-01-01T00:00:00.000Z", [field]: value });
 
     expect(response.status).toBe(400);
-    expect(forwardedRequest).toBeNull();
   });
 
   it("POST /task/project-wizard permite owner sem nível de Integração", async () => {

@@ -134,7 +134,10 @@ export function ProjectFormModal({
   }, [isEditing, open, reset]);
 
   const isBusy =
-    createWizardMutation.isPending || previewMutation.isPending || updateMutation.isPending;
+    createWizardMutation.isPending ||
+    previewMutation.isPending ||
+    updateMutation.isPending ||
+    extractTasksMutation.isPending;
   const dateRangeError =
     !isEditing && values.end_date && values.end_date < values.start_date
       ? "A data final não pode ser anterior à data de início."
