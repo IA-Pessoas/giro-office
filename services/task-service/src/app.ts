@@ -11,7 +11,6 @@ import express, { type Express, type Request } from "express";
 import "express-async-errors";
 
 import type { TaskServiceEnv } from "./config/env.js";
-import { createHttpProjectWizardIntegration } from "./integrations/projectWizard.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
 import prismaClient from "./prisma/index.js";
@@ -71,13 +70,7 @@ export function createTaskApp(
     ? createDepsTasksRoutes(options.depsTasksService)
     : depsTasksRoutes;
   const resolvedProjectWizardRoutes = createProjectWizardRoutes(
-    options?.projectWizardService ??
-      new ProjectWizardService(
-        createHttpProjectWizardIntegration({
-          serviceUrl: env.projectServiceUrl,
-          serviceToken: env.auditServiceToken,
-        }),
-      ),
+    options?.projectWizardService ?? new ProjectWizardService(),
   );
   const internalReportingService =
     options?.internalReportingService ?? new TaskReportingService(prismaClient);

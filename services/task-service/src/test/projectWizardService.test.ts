@@ -1,7 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProjectWizardIntegration } from "../integrations/projectWizard.js";
+import type { PrismaClient } from "../generated/prisma/client.js";
 import { ProjectWizardService } from "../services/projectWizardService.js";
+
+vi.mock("../integrations/audit.js", () => ({ createLog: vi.fn() }));
+
+function createDatabase(create = vi.fn()) {
+  const db = {
+    client: { findFirst: vi.fn(async () => ({ id: request.client_id })) },
+    project: { findFirst: vi.fn(async () => null), create },
+    projectWizardConfirmation: { findUnique: vi.fn(async () => null), create: vi.fn() },
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(async (callback) => callback(db)),
+  };
+  return db as unknown as PrismaClient;
+}
 
 const request = {
   userId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
@@ -17,8 +30,53 @@ const request = {
 };
 
 describe("ProjectWizardService", () => {
+  it("recompõe usando o banco da transação e recusa a revisão obsoleta sem gravar", async () => {
+    const db = createDatabase();
+    const tx = {
+      ...db,
+      taskModel: { findMany: vi.fn(async () => []) },
+      user: { findMany: vi.fn(async () => []) },
+    };
+    vi.mocked(db.$transaction).mockImplementation(async (callback) => callback(tx));
+    // A conexão fora do tx não tem os delegates da composição. Usá-la falharia fora do domínio.
+    await expect(
+      new ProjectWizardService(db).create({
+        ...request,
+        tasks: [{ name: "Principal", model_id: "modelo-removido", department_id: "department" }],
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "A configuração das dependências foi alterada. Gere uma nova prévia.",
+    });
+    expect(db.project.create).not.toHaveBeenCalled();
+    expect(db.projectWizardConfirmation.create).not.toHaveBeenCalled();
+  });
+
+  it("hash ignora ordem de propriedades e autenticação, mas distingue o comando", async () => {
+    const db = createDatabase(vi.fn(async () => ({ id: "project-1" })));
+    const service = new ProjectWizardService(db);
+    const result = await service.create(request);
+    const saved = vi.mocked(db.projectWizardConfirmation.create).mock.calls[0][0].data;
+    vi.mocked(db.projectWizardConfirmation.findUnique).mockResolvedValue(saved);
+    const replay = await service.create({
+      ...Object.fromEntries(Object.entries(request).reverse()),
+      ...request,
+      userId: "different-author",
+      permission: 0,
+      integracaoLevel: 0,
+      userType: "owner",
+      isOwner: true,
+      modules: { integracao: 0, rh: 3 },
+    });
+    expect(replay).toEqual(result);
+    await expect(service.create({ ...request, objective: "Novo objetivo" })).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    expect(db.project.create).toHaveBeenCalledTimes(1);
+  });
+
   it("prévia expande somente dependências diretas com status e responsável resolvidos", async () => {
-    const integration: ProjectWizardIntegration = { createProject: vi.fn() };
+    const db = createDatabase();
     const compositionRepository = {
       findTaskModels: vi.fn(async () => [
         {
@@ -66,9 +124,9 @@ describe("ProjectWizardService", () => {
       ),
     };
     const service = new ProjectWizardService(
-      integration,
-      { createTask: vi.fn() },
-      compositionRepository,
+      db,
+      { createTaskInTransaction: vi.fn() },
+      () => compositionRepository,
     );
 
     await expect(
@@ -110,36 +168,40 @@ describe("ProjectWizardService", () => {
   });
 
   it("cria projeto e retorna contadores zerados", async () => {
-    const integration: ProjectWizardIntegration = {
-      createProject: vi.fn(async () => ({ id: "project-1", name: "Novo projeto" })),
-    };
+    const db = createDatabase(vi.fn(async () => ({ id: "project-1", name: "Novo projeto" })));
 
-    const result = await new ProjectWizardService(integration).create(request);
+    const result = await new ProjectWizardService(db).create(request);
 
-    expect(integration.createProject).toHaveBeenCalledWith(request);
+    expect(db.project.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: "Novo projeto",
+          organization_id: request.organizationId,
+        }),
+      }),
+    );
     expect(result).toEqual({
       project: { id: "project-1", name: "Novo projeto" },
       counts: { main: 0, dependencies: 0, unassigned: 0 },
     });
   });
 
-  it("bloqueia nível 1 antes de chamar o project-service", async () => {
-    const integration: ProjectWizardIntegration = { createProject: vi.fn() };
+  it("bloqueia nível 1 antes de abrir a transação", async () => {
+    const db = createDatabase();
 
     await expect(
-      new ProjectWizardService(integration).create({ ...request, integracaoLevel: 1 }),
+      new ProjectWizardService(db).create({ ...request, integracaoLevel: 1 }),
     ).rejects.toMatchObject({ statusCode: 403 });
 
-    expect(integration.createProject).not.toHaveBeenCalled();
+    expect(db.project.create).not.toHaveBeenCalled();
+    expect(db.$transaction).not.toHaveBeenCalled();
   });
 
   it("permite owner sem nível de Integração", async () => {
-    const integration: ProjectWizardIntegration = {
-      createProject: vi.fn(async () => ({ id: "project-1" })),
-    };
+    const db = createDatabase(vi.fn(async () => ({ id: "project-1" })));
 
     await expect(
-      new ProjectWizardService(integration).create({
+      new ProjectWizardService(db).create({
         ...request,
         integracaoLevel: 0,
         isOwner: true,
@@ -149,11 +211,11 @@ describe("ProjectWizardService", () => {
   });
 
   it("cria Tarefas principais manuais e conta o resultado persistido", async () => {
-    const integration: ProjectWizardIntegration = {
-      createProject: vi.fn(async () => ({ id: "project-1", client_id: request.client_id })),
-    };
+    const db = createDatabase(
+      vi.fn(async () => ({ id: "project-1", client_id: request.client_id })),
+    );
     const taskCreator = {
-      createTask: vi
+      createTaskInTransaction: vi
         .fn()
         .mockResolvedValueOnce({ create: { id: "task-1", responsible_id: "user-1" } })
         .mockResolvedValueOnce({ create: { id: "task-2", responsible_id: null } }),
@@ -190,7 +252,7 @@ describe("ProjectWizardService", () => {
         departmentId === "department-2" ? [] : [{ id: "user-1" }],
       ),
     };
-    const service = new ProjectWizardService(integration, taskCreator, compositionRepository);
+    const service = new ProjectWizardService(db, taskCreator, () => compositionRepository);
     const preview = await service.preview({ ...request, tasks });
 
     const result = await service.create({
@@ -199,25 +261,29 @@ describe("ProjectWizardService", () => {
       revision: preview.revision,
     });
 
-    expect(taskCreator.createTask).toHaveBeenNthCalledWith(1, {
-      user_id: request.userId,
-      organization_id: request.organizationId,
-      model_id: "model-1",
-      project_id: "project-1",
-      client_id: request.client_id,
-      prospecting_status: "Fechado",
-      name: "Revisar documentos",
-      status: "A Realizar",
-      department_id: "department-1",
-      observations: "",
-      urgency: "",
-      responsible_id: "user-1",
-      prevision_date: "2026-09-15",
-      integracaoLevel: request.integracaoLevel,
-      isOwner: false,
-      createDependencies: false,
-    });
-    expect(taskCreator.createTask).toHaveBeenNthCalledWith(
+    expect(taskCreator.createTaskInTransaction).toHaveBeenNthCalledWith(
+      1,
+      {
+        user_id: request.userId,
+        organization_id: request.organizationId,
+        model_id: "model-1",
+        project_id: "project-1",
+        client_id: request.client_id,
+        prospecting_status: "Fechado",
+        name: "Revisar documentos",
+        status: "A Realizar",
+        department_id: "department-1",
+        observations: "",
+        urgency: "",
+        responsible_id: "user-1",
+        prevision_date: "2026-09-15",
+        integracaoLevel: request.integracaoLevel,
+        isOwner: false,
+        createDependencies: false,
+      },
+      expect.anything(),
+    );
+    expect(taskCreator.createTaskInTransaction).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         project_id: "project-1",
@@ -226,6 +292,7 @@ describe("ProjectWizardService", () => {
         responsible_id: null,
         createDependencies: false,
       }),
+      expect.anything(),
     );
     expect(result).toEqual({
       project: { id: "project-1", client_id: request.client_id },
@@ -234,7 +301,7 @@ describe("ProjectWizardService", () => {
   });
 
   it("rejeita uma revisão alterada antes de criar o Projeto", async () => {
-    const integration: ProjectWizardIntegration = { createProject: vi.fn() };
+    const db = createDatabase();
     const model = {
       id: "model-1",
       name: "Principal",
@@ -252,7 +319,11 @@ describe("ProjectWizardService", () => {
         .mockResolvedValueOnce([{ ...model, observations: "alterada" }]),
       listEligibleTaskResponsibles: vi.fn(async () => [{ id: "user-1" }]),
     };
-    const service = new ProjectWizardService(integration, { createTask: vi.fn() }, repository);
+    const service = new ProjectWizardService(
+      db,
+      { createTaskInTransaction: vi.fn() },
+      () => repository,
+    );
     const tasks = [{ name: "Principal", department_id: "department-1", model_id: "model-1" }];
     const preview = await service.preview({ ...request, tasks });
 
@@ -261,13 +332,11 @@ describe("ProjectWizardService", () => {
     ).rejects.toMatchObject({
       statusCode: 409,
     });
-    expect(integration.createProject).not.toHaveBeenCalled();
+    expect(db.project.create).not.toHaveBeenCalled();
   });
 
   it("persiste exatamente a principal e dependências diretas canônicas", async () => {
-    const integration: ProjectWizardIntegration = {
-      createProject: vi.fn(async () => ({ id: "project-1" })),
-    };
+    const db = createDatabase(vi.fn(async () => ({ id: "project-1" })));
     const repository = {
       findTaskModels: vi.fn(async () => [
         {
@@ -315,13 +384,13 @@ describe("ProjectWizardService", () => {
       ),
     };
     const taskCreator = {
-      createTask: vi
+      createTaskInTransaction: vi
         .fn()
         .mockResolvedValueOnce({ create: { id: "task-main", responsible_id: "user-1" } })
         .mockResolvedValueOnce({ create: { id: "task-wait", responsible_id: "user-2" } })
         .mockResolvedValueOnce({ create: { id: "task-ready", responsible_id: null } }),
     };
-    const service = new ProjectWizardService(integration, taskCreator, repository);
+    const service = new ProjectWizardService(db, taskCreator, () => repository);
     const tasks = [
       { name: "Principal personalizada", department_id: "department-1", model_id: "model-main" },
     ];
@@ -332,7 +401,7 @@ describe("ProjectWizardService", () => {
     ).resolves.toMatchObject({
       counts: { main: 1, dependencies: 2, unassigned: 1 },
     });
-    expect(taskCreator.createTask).toHaveBeenNthCalledWith(
+    expect(taskCreator.createTaskInTransaction).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
         model_id: "model-main",
@@ -340,8 +409,9 @@ describe("ProjectWizardService", () => {
         observations: "Observação principal",
         createDependencies: false,
       }),
+      expect.anything(),
     );
-    expect(taskCreator.createTask).toHaveBeenNthCalledWith(
+    expect(taskCreator.createTaskInTransaction).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         model_id: "model-wait",
@@ -349,8 +419,9 @@ describe("ProjectWizardService", () => {
         observations: "Aguardar",
         createDependencies: false,
       }),
+      expect.anything(),
     );
-    expect(taskCreator.createTask).toHaveBeenNthCalledWith(
+    expect(taskCreator.createTaskInTransaction).toHaveBeenNthCalledWith(
       3,
       expect.objectContaining({
         model_id: "model-ready",
@@ -358,6 +429,7 @@ describe("ProjectWizardService", () => {
         observations: "Iniciar",
         createDependencies: false,
       }),
+      expect.anything(),
     );
   });
 
@@ -380,9 +452,9 @@ describe("ProjectWizardService", () => {
       listEligibleTaskResponsibles: vi.fn(),
     };
     const service = new ProjectWizardService(
-      { createProject: vi.fn() },
-      { createTask: vi.fn() },
-      repository,
+      undefined,
+      { createTaskInTransaction: vi.fn() },
+      () => repository,
     );
 
     await expect(
@@ -428,9 +500,9 @@ describe("ProjectWizardService", () => {
       ]),
     };
     const service = new ProjectWizardService(
-      { createProject: vi.fn() },
-      { createTask: vi.fn() },
-      repository,
+      undefined,
+      { createTaskInTransaction: vi.fn() },
+      () => repository,
     );
 
     await expect(
@@ -449,19 +521,19 @@ describe("ProjectWizardService", () => {
   });
 
   it("bloqueia nível 1 antes de criar Projeto ou Tarefas", async () => {
-    const integration: ProjectWizardIntegration = { createProject: vi.fn() };
-    const taskCreator = { createTask: vi.fn() };
+    const db = createDatabase();
+    const taskCreator = { createTaskInTransaction: vi.fn() };
 
     await expect(
-      new ProjectWizardService(integration, taskCreator).create({
+      new ProjectWizardService(db, taskCreator).create({
         ...request,
         tasks: [{ name: "Tarefa", department_id: "department-1", model_id: "model-1" }],
         integracaoLevel: 1,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
 
-    expect(integration.createProject).not.toHaveBeenCalled();
-    expect(taskCreator.createTask).not.toHaveBeenCalled();
+    expect(db.project.create).not.toHaveBeenCalled();
+    expect(taskCreator.createTaskInTransaction).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -517,9 +589,9 @@ describe("ProjectWizardService", () => {
       listEligibleTaskResponsibles: vi.fn(async () => [{ id: "user-1" }]),
     };
     const service = new ProjectWizardService(
-      { createProject: vi.fn() },
-      { createTask: vi.fn() },
-      repository,
+      undefined,
+      { createTaskInTransaction: vi.fn() },
+      () => repository,
     );
 
     await expect(
@@ -548,12 +620,16 @@ describe("ProjectWizardService", () => {
     };
     let current = model;
     let responsibles = [{ id: "user-1" }];
-    const integration: ProjectWizardIntegration = { createProject: vi.fn() };
+    const db = createDatabase();
     const repository = {
       findTaskModels: vi.fn(async () => [current]),
       listEligibleTaskResponsibles: vi.fn(async () => responsibles),
     };
-    const service = new ProjectWizardService(integration, { createTask: vi.fn() }, repository);
+    const service = new ProjectWizardService(
+      db,
+      { createTaskInTransaction: vi.fn() },
+      () => repository,
+    );
     const tasks = [{ name: "Principal", department_id: "department-1", model_id: "model-main" }];
     const preview = await service.preview({ ...request, tasks });
 
@@ -585,7 +661,7 @@ describe("ProjectWizardService", () => {
     await expect(
       service.create({ ...request, tasks, revision: preview.revision }),
     ).rejects.toMatchObject({ statusCode: 409 });
-    expect(integration.createProject).not.toHaveBeenCalled();
+    expect(db.project.create).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -655,12 +731,12 @@ describe("ProjectWizardService", () => {
     },
   ])("identifica itens em conflito na composição", async ({ tasks, models, message }) => {
     const service = new ProjectWizardService(
-      { createProject: vi.fn() },
-      { createTask: vi.fn() },
-      {
+      undefined,
+      { createTaskInTransaction: vi.fn() },
+      () => ({
         findTaskModels: vi.fn(async () => models),
         listEligibleTaskResponsibles: vi.fn(async () => [{ id: "user-1" }]),
-      },
+      }),
     );
 
     await expect(service.preview({ ...request, tasks })).rejects.toMatchObject({

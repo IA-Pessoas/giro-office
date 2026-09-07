@@ -920,27 +920,34 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       "/task/project-wizard": {
         post: {
           tags: ["ProjectWizard"],
-          summary: "Criar projeto com tarefas manuais pelo wizard",
+          summary: "Confirmar projeto e tarefas atomicamente pelo wizard",
+          description:
+            "Idempotência por organização e chave: o mesmo comando, inclusive concorrente, retorna o snapshot original sem novas criações. Auditoria após commit, somente na criação nova, com IDs e contagens; falha de auditoria não altera a resposta.",
           security: bearer,
           parameters: [
             {
               name: "Idempotency-Key",
               in: "header",
               required: true,
+              description: "Na mesma organização, reutilize a chave apenas para o mesmo comando.",
               schema: { type: "string", minLength: 1, maxLength: 255 },
             },
           ],
           ...createProjectWizardRequestBody,
           responses: {
             "201": {
-              description: "Projeto, tarefas principais e dependências criados",
+              description:
+                "Projeto, tarefas principais e dependências criados, ou snapshot original no replay",
               ...successJson,
             },
             "400": { description: "Entrada ou chave inválida" },
             "401": { description: "Não autenticado" },
             "403": { description: "Sem permissão de Integração" },
-            "409": { description: "Prévia desatualizada ou Modelo repetido" },
-            "502": { description: "Falha ao comunicar com o project-service" },
+            "404": { description: "Cliente não encontrado na organização" },
+            "409": {
+              description: "Chave usada com outro comando, prévia desatualizada ou Modelo repetido",
+            },
+            "500": { description: "Falha na confirmação; nenhuma criação parcial é persistida" },
           },
         },
       },
