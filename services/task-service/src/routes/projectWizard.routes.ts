@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import {
   createSuccessResponse,
   error as logError,
@@ -33,23 +35,20 @@ export interface ProjectWizardRoutesDeps {
 
 const MEETING_MINUTES_UPLOAD_FIELD = "file";
 const MEETING_MINUTES_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-const DOCX_EXTENSION = ".docx";
+const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const MEETING_MINUTES_FILE_TYPES: Record<string, readonly string[]> = {
   ".txt": ["text/plain"],
   ".md": ["text/markdown", "text/plain", "text/x-markdown"],
-  [DOCX_EXTENSION]: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  ".docx": [DOCX_MIME_TYPE],
 };
 type ProjectWizardExtractTasksBody = z.infer<typeof projectWizardExtractTasksBodySchema>;
-
-function meetingMinutesExtension(originalname: string): string {
-  return originalname.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
-}
 
 const meetingMinutesUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MEETING_MINUTES_MAX_FILE_SIZE_BYTES, files: 1, fields: 4 },
   fileFilter(_request, file, callback) {
-    const allowedMimeTypes = MEETING_MINUTES_FILE_TYPES[meetingMinutesExtension(file.originalname)];
+    const allowedMimeTypes =
+      MEETING_MINUTES_FILE_TYPES[path.extname(file.originalname).toLowerCase()];
     if (!allowedMimeTypes?.includes(file.mimetype)) {
       callback(new ServiceError(400, "Tipo de arquivo não permitido."));
       return;
@@ -82,11 +81,14 @@ function uploadMeetingMinutes(request: Request, response: Response, next: NextFu
     const file = request.file;
     try {
       const content =
-        meetingMinutesExtension(file.originalname) === DOCX_EXTENSION
+        file.mimetype === DOCX_MIME_TYPE
           ? extractDocxText(file.buffer)
           : new TextDecoder("utf-8", { fatal: true }).decode(file.buffer);
       if (content.includes("\0")) {
         throw new ServiceError(400, "O arquivo da Ata não pode conter NUL.");
+      }
+      if (!content.trim()) {
+        throw new ServiceError(400, "O arquivo da Ata não contém texto.");
       }
       request.body = { ...request.body, content };
       next();

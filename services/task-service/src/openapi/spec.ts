@@ -436,8 +436,7 @@ const extractProjectWizardTasksRequestBody = {
               description:
                 "Ata .txt, .md ou .docx de até 10 MB; aceita text/plain para .txt, text/markdown, text/plain ou " +
                 "text/x-markdown para .md e application/vnd.openxmlformats-officedocument.wordprocessingml.document " +
-                "para .docx (somente o texto do documento é lido; macros e campos ativos são ignorados); " +
-                "conteúdo transitório.",
+                "para .docx; conteúdo transitório.",
             },
             name: extractProjectWizardTasksProperties.name,
             objective: extractProjectWizardTasksProperties.objective,

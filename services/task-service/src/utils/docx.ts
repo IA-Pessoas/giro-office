@@ -2,42 +2,19 @@ import { inflateRawSync } from "node:zlib";
 
 import { ServiceError } from "@workspace/shared";
 
-/**
- * Extrai apenas o texto corrido de um DOCX (OOXML).
- *
- * Lê exclusivamente `word/document.xml` e, dentro dele, somente os nós `<w:t>`.
- * Macros (`word/vbaProject.bin`), campos ativos (`<w:instrText>`, incluindo
- * HYPERLINK), OLE objects e demais partes do pacote são ignorados: nada é
- * executado nem repassado adiante como comando.
- */
 const CORRUPTED_MESSAGE = "O arquivo DOCX está corrompido ou não pôde ser lido.";
-const ENCRYPTED_MESSAGE = "O arquivo DOCX está protegido por senha e não pode ser lido.";
-const EMPTY_MESSAGE = "O arquivo DOCX não contém texto.";
 
 /** Container OLE/CFB usado pelo OOXML protegido por senha. */
 const CFB_SIGNATURE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
 const ZIP_LOCAL_FILE_SIGNATURE = Buffer.from("PK\x03\x04", "latin1");
-const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;
+const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
 const ZIP_CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
-const ZIP_END_OF_CENTRAL_DIRECTORY_SIZE = 22;
-const ZIP_MAX_COMMENT_SIZE = 0xffff;
 const DOCUMENT_ENTRY_NAME = "word/document.xml";
 /** Limite de descompressão: barra zip bombs bem antes de estourar a memória. */
-const MAX_DOCUMENT_XML_BYTES = 32 * 1024 * 1024;
+const MAX_DOCUMENT_XML_BYTES = 10 * 1024 * 1024;
 
 const STORED = 0;
 const DEFLATED = 8;
-
-function findEndOfCentralDirectory(zip: Buffer): number {
-  const last = zip.length - ZIP_END_OF_CENTRAL_DIRECTORY_SIZE;
-  const first = Math.max(0, last - ZIP_MAX_COMMENT_SIZE);
-
-  for (let offset = last; offset >= first; offset -= 1) {
-    if (zip.readUInt32LE(offset) === ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE) return offset;
-  }
-
-  return -1;
-}
 
 function readEntryData(zip: Buffer, localOffset: number, method: number, size: number): Buffer {
   const nameLength = zip.readUInt16LE(localOffset + 26);
@@ -56,7 +33,7 @@ function readEntryData(zip: Buffer, localOffset: number, method: number, size: n
 
 /** Localiza `word/document.xml` pelo diretório central do ZIP. */
 function readDocumentXml(zip: Buffer): Buffer {
-  const endOffset = findEndOfCentralDirectory(zip);
+  const endOffset = zip.lastIndexOf(ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE);
   if (endOffset < 0) throw new ServiceError(400, CORRUPTED_MESSAGE);
 
   const entries = zip.readUInt16LE(endOffset + 10);
@@ -86,24 +63,30 @@ function readDocumentXml(zip: Buffer): Buffer {
   throw new ServiceError(400, CORRUPTED_MESSAGE);
 }
 
+const XML_NAMED_ENTITIES: Record<string, string> = {
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  amp: "&",
+};
+
 function decodeXmlEntities(value: string): string {
-  return value
-    .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) =>
-      String.fromCodePoint(Number.parseInt(hex, 16)),
-    )
-    .replace(/&#(\d+);/g, (_match, code: string) => String.fromCodePoint(Number(code)))
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, "&");
+  return value.replace(
+    /&(?:#x([\da-f]+)|#(\d+)|(\w+));/gi,
+    (match, hex: string | undefined, decimal: string | undefined, name: string | undefined) => {
+      if (hex) return String.fromCodePoint(Number.parseInt(hex, 16));
+      if (decimal) return String.fromCodePoint(Number(decimal));
+      return XML_NAMED_ENTITIES[name?.toLowerCase() ?? ""] ?? match;
+    },
+  );
 }
 
 function documentXmlToText(xml: string): string {
   return xml
     .split("</w:p>")
     .map((paragraph) =>
-      [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)]
+      [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g)]
         .map((match) => decodeXmlEntities(match[1]))
         .join(""),
     )
@@ -111,9 +94,17 @@ function documentXmlToText(xml: string): string {
     .trim();
 }
 
+/**
+ * Extrai apenas o texto corrido de um DOCX (OOXML).
+ *
+ * Lê exclusivamente `word/document.xml` e, dentro dele, somente os nós `<w:t>`.
+ * Macros (`word/vbaProject.bin`), campos ativos (`<w:instrText>`, incluindo
+ * HYPERLINK), OLE objects e demais partes do pacote são ignorados: nada é
+ * executado nem repassado adiante como comando.
+ */
 export function extractDocxText(file: Buffer): string {
   if (file.subarray(0, CFB_SIGNATURE.length).equals(CFB_SIGNATURE)) {
-    throw new ServiceError(400, ENCRYPTED_MESSAGE);
+    throw new ServiceError(400, "O arquivo DOCX está protegido por senha e não pode ser lido.");
   }
   if (!file.subarray(0, ZIP_LOCAL_FILE_SIGNATURE.length).equals(ZIP_LOCAL_FILE_SIGNATURE)) {
     throw new ServiceError(400, CORRUPTED_MESSAGE);
@@ -127,8 +118,5 @@ export function extractDocxText(file: Buffer): string {
     throw err instanceof ServiceError ? err : new ServiceError(400, CORRUPTED_MESSAGE);
   }
 
-  const text = documentXmlToText(documentXml.toString("utf8"));
-  if (!text) throw new ServiceError(400, EMPTY_MESSAGE);
-
-  return text;
+  return documentXmlToText(documentXml.toString("utf8"));
 }
