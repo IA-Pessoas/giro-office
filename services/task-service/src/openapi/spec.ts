@@ -356,6 +356,7 @@ const createProjectWizardRequestBody = createObjectRequestBody({
     objective: { type: "string" },
     tasks: {
       type: "array",
+      description: "Cada model_id deve ser único no lote de tarefas.",
       items: {
         type: "object",
         required: ["name", "department_id", "model_id"],

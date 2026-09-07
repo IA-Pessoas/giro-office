@@ -167,29 +167,58 @@ describe("project wizard routes", () => {
     expect(service.create).toHaveBeenCalledWith(expect.objectContaining({ tasks: [] }));
   });
 
-  it("POST /task/project-wizard aceita prazo opcional e responsável anulável", async () => {
+  it.each([
+    1, 2,
+  ])("POST /task/project-wizard aceita %i tarefa(s) com Modelos distintos", async (count) => {
     const service: ProjectWizardRouteDeps = {
       create: vi.fn().mockResolvedValue({
         project: { id: "project-1" },
-        counts: { main: 2, dependencies: 0, unassigned: 1 },
+        counts: { main: count, dependencies: 0, unassigned: count - 1 },
       }),
     };
 
+    const tasks = [
+      validTask,
+      { ...validTask, model_id: "model-2", prevision_date: undefined, responsible_id: null },
+    ].slice(0, count);
     const tasksResponse = await request(createApp(service))
       .post("/task/project-wizard")
       .set(gatewayHeaders())
       .set("Idempotency-Key", "wizard-tasks")
       .send({
         ...validBody,
-        tasks: [validTask, { ...validTask, prevision_date: undefined, responsible_id: null }],
+        tasks,
       });
 
     expect(tasksResponse.status).toBe(201);
     expect(service.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        tasks: [validTask, { ...validTask, prevision_date: undefined, responsible_id: null }],
+        tasks,
       }),
     );
+  });
+
+  it.each([
+    "model-1",
+    " model-1 ",
+  ])("POST /task/project-wizard rejeita Modelo repetido %j antes do service", async (modelId) => {
+    const service: ProjectWizardRouteDeps = { create: vi.fn() };
+    const response = await request(createApp(service))
+      .post("/task/project-wizard")
+      .set(gatewayHeaders())
+      .set("Idempotency-Key", "wizard-duplicate-model")
+      .send({
+        ...validBody,
+        tasks: [validTask, { ...validTask, name: "Outra tarefa", model_id: modelId }],
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Cada Modelo pode ser usado em apenas uma tarefa do projeto.",
+    });
+    expect(service.create).not.toHaveBeenCalled();
+    expect(forwardedRequest).toBeNull();
   });
 
   it.each([

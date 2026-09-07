@@ -37,7 +37,8 @@ Exemplos de paths publicos:
 - `/task/deps/list`
 - `POST /task/project-wizard` cria um projeto com uma lista, inclusive vazia, de tarefas manuais e
   exige `Idempotency-Key`. Cada tarefa exige nome, departamento e modelo; prazo e responsável são
-  opcionais, e o responsável também aceita `null`.
+  opcionais, e o responsável também aceita `null`. Cada Modelo pode aparecer em apenas uma tarefa
+  do lote; repetições são rejeitadas com `400` antes de criar o projeto.
 
 `/internal/reporting` é contrato direto interno, não roteado pelo gateway.
 

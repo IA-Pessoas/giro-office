@@ -387,8 +387,21 @@ async function runBrowserProof() {
     await wizard.getByRole("button", { name: "Adicionar tarefa", exact: true }).click();
     const secondTask = wizard.getByRole("group", { name: "Tarefa 2", exact: true });
     await secondTask.getByLabel(/^Nome/).fill("Sem atribuição");
+    await secondTask.getByLabel(/^Departamento/).selectOption("department-one");
+    await secondTask.getByLabel(/^Modelo/).selectOption("model-choice");
+    await secondTask.getByLabel(/^Responsável/).selectOption("ana");
+    await expect(reviewButton).toBeDisabled();
+    await expect(wizard.getByRole("alert")).toHaveText(
+      'O Modelo "Modelo com escolha" já foi usado. Selecione um Modelo diferente para cada tarefa.',
+    );
+    await wizard.locator("form").evaluate((form) => form.requestSubmit());
+    await expect(wizard.getByText("Etapa 2 de 3", { exact: true })).toBeVisible();
+    await expect(wizard.getByRole("button", { name: "Criar projeto", exact: true })).toHaveCount(0);
+    assert.equal(wizardRequests.length, 2, "Modelo repetido não pode chegar à confirmação.");
     await secondTask.getByLabel(/^Departamento/).selectOption("department-empty");
     await secondTask.getByLabel(/^Modelo/).selectOption("model-empty");
+    await expect(wizard.getByRole("alert")).toHaveCount(0);
+    await expect(reviewButton).toBeEnabled();
     await expect(secondTask.getByLabel(/^Responsável/)).toHaveValue("");
     await expect(secondTask.getByLabel(/^Responsável/)).toBeDisabled();
     await expect(

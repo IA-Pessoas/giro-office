@@ -102,6 +102,7 @@ export function ProjectFormModal({
     if (taskOptionsError)
       return "Não foi possível carregar departamentos e Modelos. Tente novamente.";
     if (taskOptionsLoading) return "Carregando departamentos e Modelos...";
+    const usedModelIds = new Set<string>();
     for (const task of tasks) {
       const model = taskModels.find(
         (item) => item.id === task.model_id && item.department_id === task.department_id,
@@ -109,6 +110,10 @@ export function ProjectFormModal({
       if (!task.name.trim() || !model || !departments.some(({ id }) => id === task.department_id)) {
         return "Preencha nome, departamento e Modelo de todas as tarefas.";
       }
+      if (usedModelIds.has(task.model_id)) {
+        return `O Modelo "${model.name}" já foi usado. Selecione um Modelo diferente para cada tarefa.`;
+      }
+      usedModelIds.add(task.model_id);
       const candidates = model.department?.users ?? [];
       if (candidates.length > 0 && !candidates.some(({ id }) => id === task.responsible_id)) {
         return "Selecione um responsável elegível para cada tarefa.";

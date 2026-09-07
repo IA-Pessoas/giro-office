@@ -20,7 +20,12 @@ export const projectWizardCreateBodySchema = z
     start_date: zIsoDate("start_date"),
     end_date: zIsoDate("end_date").optional(),
     objective: zNonEmptyText("objective"),
-    tasks: z.array(projectWizardTaskSchema).default([]),
+    tasks: z
+      .array(projectWizardTaskSchema)
+      .refine((tasks) => new Set(tasks.map((task) => task.model_id)).size === tasks.length, {
+        message: "Cada Modelo pode ser usado em apenas uma tarefa do projeto.",
+      })
+      .default([]),
   })
   .strict()
   .superRefine((value, context) => {
