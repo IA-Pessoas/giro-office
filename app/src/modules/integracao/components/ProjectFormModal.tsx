@@ -46,7 +46,7 @@ interface ProjectFormModalProps {
   onSuccess?: (project: ProjectDetail | { id: string; client_id?: string }) => void;
 }
 
-function getSaveErrorMessage(error: unknown, fallback = "Não foi possível salvar o projeto."): string {
+function getRequestErrorMessage(error: unknown, fallback = "Não foi possível salvar o projeto."): string {
   const message = (error as { response?: { data?: { error?: unknown } } } | null)?.response?.data
     ?.error;
   return typeof message === "string" ? message : fallback;
@@ -119,7 +119,7 @@ export function ProjectFormModal({
     }
   }, [isEditing, open, reset]);
 
-  const isSaving =
+  const isBusy =
     createWizardMutation.isPending || previewMutation.isPending || updateMutation.isPending;
   const dateRangeError =
     !isEditing && values.end_date && values.end_date < values.start_date
@@ -157,7 +157,7 @@ export function ProjectFormModal({
   }
 
   function updateTask(id: string, field: keyof ProjectWizardTask, value: string) {
-    if (isSaving) return;
+    if (isBusy) return;
     setTasks((current) =>
       current.map((task) => {
         if (task.id !== id) return task;
@@ -185,7 +185,7 @@ export function ProjectFormModal({
   }
 
   async function handleTasksReview() {
-    if (previewRequestLockRef.current || isSaving || taskValidationError) return;
+    if (previewRequestLockRef.current || isBusy || taskValidationError) return;
     previewRequestLockRef.current = true;
     const reviewedTasks = tasks.map((task) => ({ ...task, name: task.name.trim() }));
     const mainTasks = reviewedTasks.map(({ id: _id, ...task }) => task);
@@ -202,8 +202,9 @@ export function ProjectFormModal({
       setTasks(reviewedTasks);
       setCreateStep(3);
     } catch (error) {
+      console.error("Erro ao gerar prévia de dependências do wizard", error);
       setPreviewErrorMessage(
-        getSaveErrorMessage(error, "Não foi possível gerar a prévia das dependências."),
+        getRequestErrorMessage(error, "Não foi possível gerar a prévia das dependências."),
       );
     } finally {
       previewRequestLockRef.current = false;
@@ -236,7 +237,7 @@ export function ProjectFormModal({
 
       onOpenChange(false);
     } catch (error) {
-      toast.error(getSaveErrorMessage(error));
+      toast.error(getRequestErrorMessage(error));
     }
   }
 
@@ -258,7 +259,7 @@ export function ProjectFormModal({
       !clientId ||
       !idempotencyKeyRef.current ||
       !preview ||
-      isSaving ||
+      isBusy ||
       taskValidationError ||
       dateRangeError
     ) {
@@ -279,7 +280,7 @@ export function ProjectFormModal({
       onOpenChange(false);
       await router.push(`/tasks?clientId=${clientId}`);
     } catch (error) {
-      toast.error(getSaveErrorMessage(error));
+      toast.error(getRequestErrorMessage(error));
     }
   }
 
@@ -290,14 +291,14 @@ export function ProjectFormModal({
       title={isEditing ? "Editar projeto" : "Novo projeto"}
       description={isEditing ? "Formulário de projeto" : `Etapa ${createStep} de 3`}
       contentClassName="w-[min(92vw,760px)] [&>footer]:flex-wrap"
-      preventClose={isSaving}
+      preventClose={isBusy}
       footer={
         <>
           <button
             type="button"
             onClick={() => onOpenChange(false)}
             className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-            disabled={isSaving}
+            disabled={isBusy}
           >
             Cancelar
           </button>
@@ -306,9 +307,9 @@ export function ProjectFormModal({
               type="button"
               onClick={() => void handleUpdateSubmit()}
               className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-              disabled={isSaving || !detailQuery.data}
+              disabled={isBusy || !detailQuery.data}
             >
-              {isSaving ? (
+              {isBusy ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               ) : (
                 <Save className="h-4 w-4" />
@@ -320,7 +321,7 @@ export function ProjectFormModal({
               type="button"
               onClick={handleCreateStepOne}
               className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-              disabled={isSaving || !clientId}
+              disabled={isBusy || !clientId}
             >
               Continuar
             </button>
@@ -330,7 +331,7 @@ export function ProjectFormModal({
                 type="button"
                 onClick={() => setCreateStep(1)}
                 className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                disabled={isSaving}
+                disabled={isBusy}
               >
                 Voltar
               </button>
@@ -338,9 +339,9 @@ export function ProjectFormModal({
                 type="button"
                 onClick={() => void handleTasksReview()}
                 className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-                disabled={isSaving || Boolean(taskValidationError)}
+                disabled={isBusy || Boolean(taskValidationError)}
               >
-                {isSaving ? (
+                {isBusy ? (
                   <>
                     <LoaderCircle className="h-4 w-4 animate-spin" />
                     Gerando prévia...
@@ -358,7 +359,7 @@ export function ProjectFormModal({
                 type="button"
                 onClick={() => setCreateStep(1)}
                 className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                disabled={isSaving}
+                disabled={isBusy}
               >
                 Voltar para etapa 1
               </button>
@@ -366,7 +367,7 @@ export function ProjectFormModal({
                 type="button"
                 onClick={() => setCreateStep(2)}
                 className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                disabled={isSaving}
+                disabled={isBusy}
               >
                 Voltar para tarefas
               </button>
@@ -374,9 +375,9 @@ export function ProjectFormModal({
                 type="button"
                 onClick={() => void handleWizardSubmit()}
                 className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-                disabled={isSaving || !clientId || !preview || Boolean(taskValidationError)}
+                disabled={isBusy || !clientId || !preview || Boolean(taskValidationError)}
               >
-                {isSaving ? (
+                {isBusy ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
                 ) : (
                   <Save className="h-4 w-4" />
@@ -548,7 +549,7 @@ export function ProjectFormModal({
                 return (
                   <fieldset
                     key={task.id}
-                    disabled={isSaving}
+                    disabled={isBusy}
                     className={`${PROJECT_SUBPANEL_CLASSNAME} space-y-3 p-3`}
                   >
                     <legend className="px-1 text-sm font-semibold">Tarefa {index + 1}</legend>
@@ -690,7 +691,7 @@ export function ProjectFormModal({
               <button
                 type="button"
                 className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                disabled={isSaving || taskOptionsLoading || taskOptionsError}
+                disabled={isBusy || taskOptionsLoading || taskOptionsError}
                 onClick={() =>
                   setTasks((current) => [
                     ...current,
