@@ -41,6 +41,7 @@ describe.skipIf(process.env.PROJECT_WIZARD_POSTGRES_TEST !== "1")(
       try {
         if (db) await db.$disconnect();
       } finally {
+        vi.unstubAllEnvs();
         if (containerId) {
           execFileSync("docker", ["stop", containerId], { stdio: "pipe" });
           containerId = undefined;
@@ -87,9 +88,12 @@ describe.skipIf(process.env.PROJECT_WIZARD_POSTGRES_TEST !== "1")(
             await setTimeout(100);
           }
         }
-        process.env.DATABASE_URL = `postgresql://postgres:wizard-test-only@127.0.0.1:${port}/wizard_test`;
-        process.env.AUDIT_ENABLED = "false";
-        process.env.AUDIT_SERVICE_TOKEN = "audit-service-token";
+        vi.stubEnv(
+          "DATABASE_URL",
+          `postgresql://postgres:wizard-test-only@127.0.0.1:${port}/wizard_test`,
+        );
+        vi.stubEnv("AUDIT_ENABLED", "false");
+        vi.stubEnv("AUDIT_SERVICE_TOKEN", "audit-service-token");
         const { default: prisma } = await import("../prisma/index.js");
         db = prisma;
         const schemaSql = execFileSync(
@@ -210,7 +214,7 @@ describe.skipIf(process.env.PROJECT_WIZARD_POSTGRES_TEST !== "1")(
             },
           ],
         });
-        process.env.PROJECT_SERVICE_URL = "http://127.0.0.1:1";
+        vi.stubEnv("PROJECT_SERVICE_URL", "http://127.0.0.1:1");
         const { createTaskApp } = await import("../app.js");
         const { getTaskServiceEnv } = await import("../config/env.js");
         const { createLogger } = await import("@workspace/shared/logger");
