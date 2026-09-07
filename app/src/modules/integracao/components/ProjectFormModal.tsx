@@ -586,13 +586,13 @@ export function ProjectFormModal({
                 ) : null}
                 <label className="space-y-2" htmlFor="project-meeting-minutes-file">
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
-                    Selecione um arquivo .txt ou .md
+                    Selecione um arquivo .txt, .md ou .docx
                   </span>
                   <input
                     ref={meetingMinutesFileRef}
                     id="project-meeting-minutes-file"
                     type="file"
-                    accept=".txt,.md,text/plain,text/markdown,text/x-markdown"
+                    accept=".txt,.md,.docx,text/plain,text/markdown,text/x-markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     onChange={(event) => setMeetingMinutesFile(event.target.files?.[0] ?? null)}
                     className={PROJECT_INPUT_CLASSNAME}
                     aria-describedby="project-meeting-minutes-notice"

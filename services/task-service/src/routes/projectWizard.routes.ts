@@ -20,6 +20,7 @@ import {
 import { projectWizardExtractTasksBodySchema } from "../schemas/projectWizardExtraction.schemas.js";
 import type { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import type { ProjectWizardService } from "../services/projectWizardService.js";
+import { extractDocxText } from "../utils/docx.js";
 
 export type ProjectWizardRouteDeps = Pick<ProjectWizardService, "create" | "preview">;
 export type ProjectWizardExtractionRouteDeps = Pick<ProjectWizardExtractionService, "extractTasks">;
@@ -32,18 +33,23 @@ export interface ProjectWizardRoutesDeps {
 
 const MEETING_MINUTES_UPLOAD_FIELD = "file";
 const MEETING_MINUTES_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const DOCX_EXTENSION = ".docx";
 const MEETING_MINUTES_FILE_TYPES: Record<string, readonly string[]> = {
   ".txt": ["text/plain"],
   ".md": ["text/markdown", "text/plain", "text/x-markdown"],
+  [DOCX_EXTENSION]: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
 };
 type ProjectWizardExtractTasksBody = z.infer<typeof projectWizardExtractTasksBodySchema>;
+
+function meetingMinutesExtension(originalname: string): string {
+  return originalname.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+}
 
 const meetingMinutesUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MEETING_MINUTES_MAX_FILE_SIZE_BYTES, files: 1, fields: 4 },
   fileFilter(_request, file, callback) {
-    const extension = file.originalname.match(/\.[^.]+$/)?.[0]?.toLowerCase();
-    const allowedMimeTypes = extension ? MEETING_MINUTES_FILE_TYPES[extension] : undefined;
+    const allowedMimeTypes = MEETING_MINUTES_FILE_TYPES[meetingMinutesExtension(file.originalname)];
     if (!allowedMimeTypes?.includes(file.mimetype)) {
       callback(new ServiceError(400, "Tipo de arquivo não permitido."));
       return;
@@ -73,8 +79,12 @@ function uploadMeetingMinutes(request: Request, response: Response, next: NextFu
       return;
     }
 
+    const file = request.file;
     try {
-      const content = new TextDecoder("utf-8", { fatal: true }).decode(request.file.buffer);
+      const content =
+        meetingMinutesExtension(file.originalname) === DOCX_EXTENSION
+          ? extractDocxText(file.buffer)
+          : new TextDecoder("utf-8", { fatal: true }).decode(file.buffer);
       if (content.includes("\0")) {
         throw new ServiceError(400, "O arquivo da Ata não pode conter NUL.");
       }

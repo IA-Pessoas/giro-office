@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { Writable } from "node:stream";
 import {
   FORWARDED_AUTH_MODULES_HEADER,
@@ -27,6 +28,12 @@ import { ProjectWizardExtractionService } from "../services/projectWizardExtract
 import { ProjectWizardService } from "../services/projectWizardService.js";
 
 vi.mock("../integrations/audit.js", () => ({ createLog: vi.fn() }));
+
+const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+function readDocxFixture(name: string): Buffer {
+  return readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
+}
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -566,6 +573,9 @@ describe("project wizard task extraction routes", () => {
       "objective",
       "start_date",
     ]);
+    expect(
+      operation.requestBody.content["multipart/form-data"].schema.properties.file.description,
+    ).toContain(".docx");
   });
 
   it.each([
@@ -613,6 +623,149 @@ describe("project wizard task extraction routes", () => {
       error: "Tipo de arquivo não permitido.",
     });
     expect(service.extractTasks).not.toHaveBeenCalled();
+  });
+
+  it("aceita Ata DOCX e propõe as mesmas Tarefas das demais fontes", async () => {
+    const proposals = { tasks: [{ name: "Apurar impostos" }, { name: "Reunir documentos" }] };
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue(proposals),
+    };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .field("end_date", validExtractionBody.end_date)
+      .attach("file", readDocxFixture("meeting-minutes.docx"), {
+        filename: "ata.docx",
+        contentType: DOCX_MIME_TYPE,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, data: proposals });
+
+    const { content } = vi.mocked(service.extractTasks).mock.calls[0][0] as { content: string };
+    expect(content).toContain(validExtractionBody.content);
+    // Macros e campos ativos ficam fora do texto entregue ao provedor.
+    expect(content).not.toContain("HYPERLINK");
+    expect(content).not.toContain("exemplo-malicioso");
+    expect(content).not.toContain("MACRO-NAO-EXECUTADA");
+    expect(content).not.toContain("<w:");
+  });
+
+  it("rejeita MIME incompatível para DOCX", async () => {
+    const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .attach("file", readDocxFixture("meeting-minutes.docx"), {
+        filename: "ata.docx",
+        contentType: "text/plain",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Tipo de arquivo não permitido.",
+    });
+    expect(service.extractTasks).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "corrompido",
+      "meeting-minutes-corrupted.docx",
+      "O arquivo DOCX está corrompido ou não pôde ser lido.",
+    ],
+    [
+      "criptografado",
+      "meeting-minutes-encrypted.docx",
+      "O arquivo DOCX está protegido por senha e não pode ser lido.",
+    ],
+    [
+      "com assinatura divergente",
+      "meeting-minutes-not-ooxml.docx",
+      "O arquivo DOCX está corrompido ou não pôde ser lido.",
+    ],
+    ["sem texto", "meeting-minutes-empty.docx", "O arquivo DOCX não contém texto."],
+  ])("rejeita DOCX %s sem chamar o provedor", async (_label, fixture, error) => {
+    const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .attach("file", readDocxFixture(fixture), {
+        filename: "ata.docx",
+        contentType: DOCX_MIME_TYPE,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({ success: false, error });
+    expect(service.extractTasks).not.toHaveBeenCalled();
+  });
+
+  it("não consome tentativa de extração quando o DOCX é rejeitado", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
+    };
+    const app = createExtractionApp(service, { aiExtractionRateLimitMax: 2 });
+
+    const invalid = await request(app)
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .attach("file", readDocxFixture("meeting-minutes-corrupted.docx"), {
+        filename: "ata.docx",
+        contentType: DOCX_MIME_TYPE,
+      });
+
+    expect(invalid.status).toBe(400);
+
+    for (const expected of [200, 200]) {
+      const response = await request(app)
+        .post("/task/project-wizard/extract-tasks")
+        .set(gatewayHeaders())
+        .send(validExtractionBody);
+
+      expect(response.status).toBe(expected);
+    }
+
+    expect(service.extractTasks).toHaveBeenCalledTimes(2);
+  });
+
+  it("não registra nem audita o texto da Ata DOCX aceita", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
+    };
+    const written: string[] = [];
+    const auditLog = vi.mocked(createLog);
+    const auditCallsBefore = auditLog.mock.calls.length;
+
+    const response = await request(createExtractionApp(service, {}, written))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .attach("file", readDocxFixture("meeting-minutes.docx"), {
+        filename: "ata.docx",
+        contentType: DOCX_MIME_TYPE,
+      });
+
+    expect(response.status).toBe(200);
+    expect(auditLog).toHaveBeenCalledTimes(auditCallsBefore);
+    expect(written.join("\n")).not.toContain("Apurar impostos do trimestre");
   });
 
   it("rejeita multipart inválido antes do rate limit e do provedor", async () => {
