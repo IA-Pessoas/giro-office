@@ -13,4 +13,6 @@ export const PROSPECTING_STATUS_VALUES = [
   "Inativo",
 ] as const;
 
+export const PROSPECTING_STATUS_CLOSED = PROSPECTING_STATUS_VALUES[5];
+
 export type ProspectingStatus = (typeof PROSPECTING_STATUS_VALUES)[number];

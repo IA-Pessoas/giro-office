@@ -16,6 +16,8 @@ export const INTEGRACAO_TASK_STATUS_VALUES = [
   "APEC",
 ] as const;
 
+export const INTEGRACAO_TASK_STATUS_TODO = INTEGRACAO_TASK_STATUS_VALUES[4];
+
 export type IntegracaoTaskStatus = (typeof INTEGRACAO_TASK_STATUS_VALUES)[number];
 
 export const TASK_ASSIGNMENT_FILTER_VALUES = ["assigned", "unassigned"] as const;

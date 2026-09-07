@@ -18,7 +18,11 @@ import {
   type TaskBilling,
 } from "../types";
 import { taskModelService } from "../services";
-import { taskResponsibleOptionsQueryKey } from "../hooks/queryKeys";
+import {
+  TASK_FORM_DEPARTMENTS_QUERY_KEY,
+  TASK_FORM_TASK_MODELS_QUERY_KEY,
+  taskResponsibleOptionsQueryKey,
+} from "../hooks/queryKeys";
 import {
   useCreateIntegracaoTaskMutation,
   useIntegracaoTaskDetail,
@@ -165,14 +169,14 @@ export function TaskFormModal({
     !isEditing && createValues.client_id ? { ref: "client", id: createValues.client_id } : null,
   );
   const taskModelsQuery = useFetch(
-    ["task-form-task-models"],
+    TASK_FORM_TASK_MODELS_QUERY_KEY,
     () => taskModelService.list({ type: "Projeto" }),
     {
       enabled: open && !isRestrictedEdit,
     },
   );
   const departmentsQuery = useFetch<DepItem[]>(
-    ["task-form-departments"],
+    TASK_FORM_DEPARTMENTS_QUERY_KEY,
     () => departmentService.list({ status: "Ativo" }),
     {
       enabled: open && !isRestrictedEdit,

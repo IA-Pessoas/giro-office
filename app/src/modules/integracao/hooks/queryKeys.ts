@@ -3,6 +3,8 @@ import type { IntegracaoTaskListParams, ProjectListParams, TaskModelListParams }
 export const PROJECTS_QUERY_KEY = ["projects"] as const;
 export const TASK_MODELS_QUERY_KEY = ["task-models"] as const;
 export const INTEGRACAO_TASKS_QUERY_KEY = ["integracao-tasks"] as const;
+export const TASK_FORM_DEPARTMENTS_QUERY_KEY = ["task-form-departments"] as const;
+export const TASK_FORM_TASK_MODELS_QUERY_KEY = ["task-form-task-models"] as const;
 
 export function projectListQueryKey(params: ProjectListParams) {
   return [...PROJECTS_QUERY_KEY, "list", params.ref, params.id] as const;

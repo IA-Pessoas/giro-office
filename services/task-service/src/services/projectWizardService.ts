@@ -3,6 +3,8 @@ import {
   type IntegracaoPermissionLevel,
   requireIntegracaoRouteAccess,
 } from "@workspace/shared";
+import { INTEGRACAO_TASK_STATUS_TODO } from "../constants/integracaoTask.js";
+import { PROSPECTING_STATUS_CLOSED } from "../constants/prospectingStatus.js";
 import type {
   CreatedProject,
   CreateProjectFromWizardParams,
@@ -58,9 +60,9 @@ export class ProjectWizardService {
         model_id: task.model_id,
         project_id: project.id,
         client_id: data.client_id,
-        prospecting_status: "Fechado",
+        prospecting_status: PROSPECTING_STATUS_CLOSED,
         name: task.name,
-        status: "A Realizar",
+        status: INTEGRACAO_TASK_STATUS_TODO,
         department_id: task.department_id,
         observations: "",
         urgency: "",

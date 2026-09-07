@@ -9,6 +9,10 @@ import { Dialog } from "@shared/components/ui/Dialog";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { useFetch } from "@shared/hooks";
 
+import {
+  TASK_FORM_DEPARTMENTS_QUERY_KEY,
+  TASK_FORM_TASK_MODELS_QUERY_KEY,
+} from "../hooks/queryKeys";
 import { useProjectForm } from "../hooks/useProjectForm";
 import {
   useCreateProjectWizardMutation,
@@ -62,12 +66,12 @@ export function ProjectFormModal({
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
   const [tasks, setTasks] = useState<Array<ProjectWizardTask & { id: string }>>([]);
   const departmentsQuery = useFetch(
-    ["task-form-departments"],
+    TASK_FORM_DEPARTMENTS_QUERY_KEY,
     () => departmentService.list({ status: "Ativo" }),
     { enabled: open && !isEditing },
   );
   const taskModelsQuery = useFetch(
-    ["task-form-task-models"],
+    TASK_FORM_TASK_MODELS_QUERY_KEY,
     () => taskModelService.list({ type: "Projeto" }),
     { enabled: open && !isEditing },
   );
