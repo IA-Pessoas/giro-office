@@ -10,6 +10,8 @@ import { useFetch } from "@shared/hooks";
 import type {
   CreateProjectData,
   CreateProjectWizardData,
+  ExtractProjectTasksData,
+  ProjectTaskProposal,
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
@@ -93,6 +95,16 @@ export function useCreateProjectWizardMutation(): UseMutationResult<
       await refreshCreatedProjectCache(queryClient, project, variables.client_id);
       await queryClient.invalidateQueries({ queryKey: INTEGRACAO_TASKS_QUERY_KEY });
     },
+  });
+}
+
+export function useExtractProjectTasksMutation(): UseMutationResult<
+  ProjectTaskProposal[],
+  Error,
+  ExtractProjectTasksData
+> {
+  return useMutation({
+    mutationFn: (payload) => projectService.extractTasks(payload),
   });
 }
 

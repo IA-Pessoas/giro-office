@@ -4616,6 +4616,18 @@ const handlers = {
     });
   },
 
+  async taskProjectWizardExtractTasks(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        content: "- Apurar impostos do trimestre\n- Reunir documentos do cliente",
+        name: uniqueText("Smoke Extract Wizard"),
+        objective: "Validate meeting minutes extraction.",
+        start_date: new Date().toISOString(),
+      },
+    });
+  },
+
   async taskGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],

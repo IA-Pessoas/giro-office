@@ -46,6 +46,7 @@ const TECHNICAL_RULES = [
   /^\/user\/(?:session|start-config|me)(?:\/|$)/,
   /^\/platform\/(?:session|me|audit)(?:\/|$)/,
   /^\/project\/metrics$/,
+  /^\/task\/project-wizard\/extract-tasks$/,
   /^\/ti\/dashboard\/?$/,
   /^\/pessoal\/overview\/?$/,
 ] as const;

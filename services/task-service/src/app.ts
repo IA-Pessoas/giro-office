@@ -11,6 +11,7 @@ import express, { type Express, type Request } from "express";
 import "express-async-errors";
 
 import type { TaskServiceEnv } from "./config/env.js";
+import { createAiTaskExtractionProvider } from "./integrations/aiTaskExtraction.js";
 import { createHttpProjectWizardIntegration } from "./integrations/projectWizard.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
@@ -28,6 +29,7 @@ import {
 } from "./routes/projectPlan.routes.js";
 import {
   createProjectWizardRoutes,
+  type ProjectWizardExtractionRouteDeps,
   type ProjectWizardRouteDeps,
 } from "./routes/projectWizard.routes.js";
 import { taskComercialRoutes } from "./routes/taskComercial.routes.js";
@@ -37,6 +39,7 @@ import { taskFinanceiroRoutes } from "./routes/taskFinanceiro.routes.js";
 import { taskIntegrationRegularizeRoutes } from "./routes/taskIntegrationRegularize.routes.js";
 import { taskLifecycleRoutes } from "./routes/taskLifecycle.routes.js";
 import { taskModelRoutes } from "./routes/taskModel.routes.js";
+import { ProjectWizardExtractionService } from "./services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "./services/projectWizardService.js";
 import { TaskReportingService } from "./services/taskReportingService.js";
 
@@ -59,6 +62,7 @@ export function createTaskApp(
   options?: {
     projectPlanService?: ProjectPlanRouteDeps;
     projectWizardService?: ProjectWizardRouteDeps;
+    projectWizardExtractionService?: ProjectWizardExtractionRouteDeps;
     depsTasksService?: DepsTasksRouteDeps;
     internalReportingService?: TaskReportingService;
   },
@@ -78,12 +82,28 @@ export function createTaskApp(
           serviceToken: env.auditServiceToken,
         }),
       ),
+    options?.projectWizardExtractionService ??
+      new ProjectWizardExtractionService(
+        createAiTaskExtractionProvider({
+          apiKey: env.openaiApiKey,
+          baseUrl: env.openaiBaseUrl,
+          model: env.openaiModel,
+          timeoutMs: env.aiExtractionTimeoutMs,
+          nodeEnv: env.nodeEnv,
+        }),
+      ),
+    {
+      rateLimitMax: env.aiExtractionRateLimitMax,
+      rateLimitWindowMs: env.aiExtractionRateLimitWindowMs,
+    },
   );
   const internalReportingService =
     options?.internalReportingService ?? new TaskReportingService(prismaClient);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "task-service")));
+  // A Ata colada pode passar do limite padrão do parser; o teto real continua sendo o gateway.
+  app.use("/task/project-wizard/extract-tasks", express.json({ limit: "1mb" }));
   app.use(express.json());
   app.use(requestContext);
 

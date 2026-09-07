@@ -100,6 +100,18 @@ export interface ProjectWizardTask {
   responsible_id: string | null;
 }
 
+export interface ExtractProjectTasksData {
+  content: string;
+  name: string;
+  objective: string;
+  start_date: string;
+  end_date?: string | null;
+}
+
+export interface ProjectTaskProposal extends ProjectWizardTask {
+  prevision_date?: string;
+}
+
 export interface ProjectWizardResult {
   project: ProjectListItem;
   counts: {

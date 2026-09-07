@@ -5,6 +5,7 @@ import {
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
+  ServiceError,
 } from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
@@ -14,7 +15,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { createTaskApp } from "../app.js";
 import type { TaskServiceEnv } from "../config/env.js";
 import { buildTaskServiceOpenApiSpec } from "../openapi/spec.js";
-import type { ProjectWizardRouteDeps } from "../routes/projectWizard.routes.js";
+import type {
+  ProjectWizardExtractionRouteDeps,
+  ProjectWizardRouteDeps,
+} from "../routes/projectWizard.routes.js";
 import { projectWizardCreateBodySchema } from "../schemas/projectWizard.schemas.js";
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
@@ -372,5 +376,219 @@ describe("project wizard routes", () => {
       .send(validBody);
 
     expect(response.status).toBe(201);
+  });
+});
+
+describe("project wizard task extraction routes", () => {
+  const validExtractionBody = {
+    content: "- Apurar impostos do trimestre\n- Reunir documentos do cliente",
+    name: "Novo projeto",
+    objective: "Objetivo do projeto",
+    start_date: "2026-09-01T00:00:00.000Z",
+    end_date: "2026-09-30T00:00:00.000Z",
+  };
+
+  function createExtractionApp(
+    projectWizardExtractionService?: ProjectWizardExtractionRouteDeps,
+    overrides: Partial<TaskServiceEnv> = {},
+  ) {
+    return createTaskApp(
+      { ...env, ...overrides },
+      createLogger({
+        service: "task-service-test",
+        env: "test",
+        level: "error",
+        destination: new MemoryLogStream(),
+      }),
+      projectWizardExtractionService ? { projectWizardExtractionService } : undefined,
+    );
+  }
+
+  it("documenta o contrato público da extração no OpenAPI", () => {
+    const operation =
+      buildTaskServiceOpenApiSpec(env).paths["/task/project-wizard/extract-tasks"].post;
+
+    expect(operation.requestBody.content["application/json"].schema.required).toEqual([
+      "content",
+      "name",
+      "objective",
+      "start_date",
+    ]);
+    expect(operation.responses["422"]).toBeDefined();
+    expect(operation.responses["429"]).toBeDefined();
+  });
+
+  it("devolve as Tarefas propostas para a Ata colada", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({
+        tasks: [
+          { name: "Apurar impostos", prevision_date: "2026-09-10", department_id: "department-1" },
+          { name: "Reunir documentos" },
+        ],
+      }),
+    };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send(validExtractionBody);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: {
+        tasks: [
+          { name: "Apurar impostos", prevision_date: "2026-09-10", department_id: "department-1" },
+          { name: "Reunir documentos" },
+        ],
+      },
+    });
+    expect(service.extractTasks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        integracaoLevel: 2,
+        isOwner: false,
+        content: validExtractionBody.content,
+        name: "Novo projeto",
+        objective: "Objetivo do projeto",
+      }),
+    );
+  });
+
+  it("não envia identidade do cliente ao service de extração", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
+    };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send({ ...validExtractionBody, client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc" });
+
+    expect(response.status).toBe(400);
+    expect(service.extractTasks).not.toHaveBeenCalled();
+  });
+
+  it("sem autenticação retorna 401 sem chamar o provedor", async () => {
+    const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .send(validExtractionBody);
+
+    expect(response.status).toBe(401);
+    expect(service.extractTasks).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia Integração nível 1", async () => {
+    const response = await request(createExtractionApp())
+      .post("/task/project-wizard/extract-tasks")
+      .set({
+        ...gatewayHeaders(),
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 1 }),
+      })
+      .send(validExtractionBody);
+
+    expect(response.status).toBe(403);
+  });
+
+  it.each([
+    ["content", { content: "   " }],
+    ["name", { name: "" }],
+    ["objective", { objective: "" }],
+    ["start_date", { start_date: "ontem" }],
+    ["end_date", { end_date: "2026-08-31T00:00:00.000Z" }],
+  ])("rejeita %s inválido antes do provedor", async (_field, override) => {
+    const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send({ ...validExtractionBody, ...override });
+
+    expect(response.status).toBe(400);
+    expect(service.extractTasks).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [422, "Nenhuma tarefa foi identificada na Ata."],
+    [502, "Não foi possível extrair tarefas da Ata."],
+    [503, "Extração de tarefas por IA não está configurada."],
+  ])("serializa a falha de extração como %i", async (statusCode, message) => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockRejectedValue(new ServiceError(statusCode, message)),
+    };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send(validExtractionBody);
+
+    expect(response.status).toBe(statusCode);
+    expect(response.body).toMatchObject({ success: false, error: message });
+  });
+
+  it("limita a taxa de extrações por usuário", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
+    };
+    const app = createExtractionApp(service, { aiExtractionRateLimitMax: 2 });
+
+    for (const expected of [200, 200, 429]) {
+      const response = await request(app)
+        .post("/task/project-wizard/extract-tasks")
+        .set(gatewayHeaders())
+        .send(validExtractionBody);
+
+      expect(response.status).toBe(expected);
+    }
+
+    expect(service.extractTasks).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["falha", { extractTasks: () => Promise.reject(new ServiceError(502, "Falha do provedor.")) }],
+    ["sucesso", { extractTasks: () => Promise.resolve({ tasks: [{ name: "Apurar impostos" }] }) }],
+  ])("não registra a Ata nem a resposta da IA nos logs em caso de %s", async (_label, service) => {
+    const written: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        written.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+        return true;
+      });
+
+    try {
+      await request(createExtractionApp(service))
+        .post("/task/project-wizard/extract-tasks")
+        .set(gatewayHeaders())
+        .send(validExtractionBody);
+    } finally {
+      writeSpy.mockRestore();
+    }
+
+    const logs = written.join("\n");
+
+    expect(logs).not.toContain("Apurar impostos do trimestre");
+    expect(logs).not.toContain("Reunir documentos do cliente");
+  });
+
+  it("aceita owner sem nível de Integração", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
+    };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set({
+        ...gatewayHeaders(),
+        [FORWARDED_AUTH_TYPE_HEADER]: "owner",
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 0 }),
+      })
+      .send(validExtractionBody);
+
+    expect(response.status).toBe(200);
+    expect(service.extractTasks).toHaveBeenCalledWith(expect.objectContaining({ isOwner: true }));
   });
 });

@@ -372,6 +372,28 @@ const createProjectWizardRequestBody = createObjectRequestBody({
   },
 });
 
+const extractProjectWizardTasksRequestBody = createObjectRequestBody({
+  example: {
+    content: "Ata da reunião colada pelo usuário.",
+    name: "Novo projeto",
+    objective: "Objetivo do projeto",
+    start_date: "2026-09-01T00:00:00.000Z",
+    end_date: "2026-09-30T00:00:00.000Z",
+  },
+  required: ["content", "name", "objective", "start_date"],
+  properties: {
+    content: {
+      type: "string",
+      description:
+        "Ata de reunião em texto. Conteúdo transitório: não é persistido, auditado nem registrado em log.",
+    },
+    name: { type: "string" },
+    objective: { type: "string" },
+    start_date: { type: "string", format: "date-time" },
+    end_date: { type: "string", format: "date-time" },
+  },
+});
+
 export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
 
@@ -907,6 +929,26 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             "401": { description: "Não autenticado" },
             "403": { description: "Sem permissão de Integração" },
             "502": { description: "Falha ao comunicar com o project-service" },
+          },
+        },
+      },
+      "/task/project-wizard/extract-tasks": {
+        post: {
+          tags: ["ProjectWizard"],
+          summary: "Extrair Tarefas propostas de uma Ata com a OpenAI",
+          description:
+            "Exige nível 2+ em Integração ou owner. A Ata e a resposta bruta do provedor são transitórias.",
+          security: bearer,
+          ...extractProjectWizardTasksRequestBody,
+          responses: {
+            "200": { description: "Tarefas propostas para revisão", ...successJson },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão de Integração" },
+            "422": { description: "Nenhuma tarefa identificada na Ata" },
+            "429": { description: "Muitas extrações seguidas" },
+            "502": { description: "Falha do provedor de IA" },
+            "503": { description: "Extração por IA não configurada" },
           },
         },
       },

@@ -259,6 +259,7 @@ describe("activityCatalog", () => {
     ["POST", "/platform/session/refresh"],
     ["GET", "/platform/me"],
     ["GET", "/platform/audit/requests"],
+    ["POST", "/task/project-wizard/extract-tasks"],
   ])("classifica %s %s como técnico", (method, path) => {
     expect(classifyActivity(method, path)).toEqual({ kind: "technical" });
     expect(describeActivity(method, path)).toBeNull();

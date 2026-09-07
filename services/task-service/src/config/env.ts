@@ -19,6 +19,14 @@ function parseBoolean(value: string | undefined): boolean {
   return value === "true" || value === "1";
 }
 
+const optionalPositiveInteger = z
+  .string()
+  .optional()
+  .transform((value) => {
+    const parsed = Number.parseInt(value ?? "", 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  });
+
 const envSchema = z
   .object({
     port: z
@@ -46,6 +54,12 @@ const envSchema = z
     auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
+    openaiApiKey: z.string().trim().min(1).optional(),
+    openaiBaseUrl: z.string().url().optional(),
+    openaiModel: z.string().trim().min(1).optional(),
+    aiExtractionTimeoutMs: optionalPositiveInteger,
+    aiExtractionRateLimitMax: optionalPositiveInteger,
+    aiExtractionRateLimitWindowMs: optionalPositiveInteger,
     reportsInternalToken: z.string().optional().default("reports-service-token"),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     enableApiDocsEnv: z.string().optional(),
@@ -104,6 +118,12 @@ export function getTaskServiceEnv(): TaskServiceEnv {
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
+    openaiApiKey: process.env.OPENAI_API_KEY,
+    openaiBaseUrl: process.env.OPENAI_BASE_URL,
+    openaiModel: process.env.OPENAI_MODEL,
+    aiExtractionTimeoutMs: process.env.AI_EXTRACTION_TIMEOUT_MS,
+    aiExtractionRateLimitMax: process.env.AI_EXTRACTION_RATE_LIMIT_MAX,
+    aiExtractionRateLimitWindowMs: process.env.AI_EXTRACTION_RATE_LIMIT_WINDOW_MS,
     reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,
     reportsGrantSecret: process.env.REPORTS_GRANT_SECRET,
     logLevel: process.env.LOG_LEVEL,

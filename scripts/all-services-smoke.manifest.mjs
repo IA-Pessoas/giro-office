@@ -117,6 +117,7 @@ const ROUTE_NEGATIVE_CASE_OVERRIDES = new Map([
   ["task-service|PUT|/task/comercial", "unauthorized401"],
   ["task-service|PUT|/task/conclusion", "unauthorized401"],
   ["task-service|POST|/task/project-wizard", "lowPermission403"],
+  ["task-service|POST|/task/project-wizard/extract-tasks", "lowPermission403"],
 ]);
 
 const GENERATED_BAD_CASES_BEFORE = new Set([
@@ -2291,6 +2292,14 @@ const baseManifest = [
     method: "POST",
     path: "/task/project-wizard",
     action: "taskProjectWizardCreate",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "POST",
+    path: "/task/project-wizard/extract-tasks",
+    action: "taskProjectWizardExtractTasks",
     target: "gateway",
     auth: "admin-bearer",
   }),

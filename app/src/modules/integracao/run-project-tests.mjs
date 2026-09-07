@@ -53,6 +53,7 @@ import {
   buildProjectListParams,
   getProjectDeleteErrorMessage,
   PROJECT_DELETE_ADMIN_MESSAGE,
+  buildExtractProjectTasksPayload,
   PROJECT_ENDPOINTS,
   unwrapCreatedProject,
   unwrapProjectDetail,
@@ -61,6 +62,7 @@ import {
   unwrapProjectMetrics,
   unwrapProjectProgress,
   unwrapUpdatedProject,
+  unwrapProjectTaskProposals,
 } from "./services/projectService.contract.ts";
 import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
@@ -1210,4 +1212,96 @@ runTest("project date fields handle native input events", () => {
       .length,
     1,
   );
+});
+
+runTest("project wizard exposes the authenticated AI extraction endpoint", () => {
+  assert.equal(PROJECT_ENDPOINTS.wizard, "/task/project-wizard");
+  assert.equal(PROJECT_ENDPOINTS.wizardExtractTasks, "/task/project-wizard/extract-tasks");
+});
+
+runTest("extraction payload carries only the project context allowed by the spec", () => {
+  const payload = buildExtractProjectTasksPayload({
+    content: "  Ata colada  ",
+    name: "Implantação fiscal",
+    objective: "Estruturar a operação",
+    start_date: "2026-09-01",
+    end_date: "2026-09-30",
+  });
+
+  assert.deepEqual(payload, {
+    content: "Ata colada",
+    name: "Implantação fiscal",
+    objective: "Estruturar a operação",
+    start_date: "2026-09-01",
+    end_date: "2026-09-30",
+  });
+  assert.equal(Object.hasOwn(payload, "client_id"), false);
+  assert.equal(
+    Object.hasOwn(
+      buildExtractProjectTasksPayload({
+        content: "Ata",
+        name: "Projeto",
+        objective: "Objetivo",
+        start_date: "2026-09-01",
+        end_date: "",
+      }),
+      "end_date",
+    ),
+    false,
+  );
+});
+
+runTest("extraction response becomes reviewable proposals with optional fields", () => {
+  assert.deepEqual(
+    unwrapProjectTaskProposals({
+      success: true,
+      data: {
+        tasks: [
+          {
+            name: "Apurar impostos",
+            prevision_date: "2026-09-10",
+            department_id: "department-1",
+            model_id: "model-1",
+          },
+          { name: "Reunir documentos" },
+        ],
+      },
+    }),
+    [
+      {
+        name: "Apurar impostos",
+        prevision_date: "2026-09-10",
+        department_id: "department-1",
+        model_id: "model-1",
+        responsible_id: null,
+      },
+      {
+        name: "Reunir documentos",
+        prevision_date: undefined,
+        department_id: "",
+        model_id: "",
+        responsible_id: null,
+      },
+    ],
+  );
+});
+
+runTest("extraction without usable proposals is treated as a failure", () => {
+  for (const body of [
+    { success: true, data: { tasks: [] } },
+    { success: true, data: { tasks: [{ name: "   " }] } },
+    { success: true, data: {} },
+    { success: true, data: { tasks: "nao-e-lista" } },
+  ]) {
+    assert.throws(() => unwrapProjectTaskProposals(body), /Ata/);
+  }
+});
+
+runTest("step 2 only sends the meeting minutes after an explicit click and warns about OpenAI", () => {
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+
+  assert.match(projectForm, /Extrair tarefas com IA/);
+  assert.match(projectForm, /OpenAI/);
+  assert.match(projectForm, /onClick=\{\(\) => void handleExtractTasks\(\)\}/);
+  assert.doesNotMatch(projectForm, /onChange=\{[^}]*handleExtractTasks/);
 });
