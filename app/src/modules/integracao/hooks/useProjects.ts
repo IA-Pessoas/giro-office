@@ -19,6 +19,7 @@ import type {
   ProjectWizardPreview,
   ProjectWizardResult,
   ProjectWizardTask,
+  ProjectWizardTaskProposal,
   UpdateProjectData,
 } from "../types";
 import { projectService } from "../services/projectService";
@@ -100,7 +101,7 @@ export function useCreateProjectWizardMutation(): UseMutationResult<
 }
 
 export function useExtractProjectTasksMutation(): UseMutationResult<
-  ProjectWizardTask[],
+  ProjectWizardTaskProposal[],
   Error,
   ExtractProjectTasksData
 > {

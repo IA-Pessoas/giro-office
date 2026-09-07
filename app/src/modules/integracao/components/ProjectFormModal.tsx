@@ -38,9 +38,8 @@ import {
   PROJECT_SUBPANEL_CLASSNAME,
   ProjectSelect,
 } from "./projectUi";
+import { applyWizardTaskChange, getWizardTaskDateWarning } from "./projectWizardUi";
 import {
-  applyWizardTaskChange,
-  getWizardTaskDateWarning,
   TASK_FORM_AUXILIARY_WARNING_CLASSNAME,
   TASK_FORM_GRID_CLASSNAME,
   TASK_FORM_LABEL_CLASSNAME,
@@ -618,10 +617,11 @@ export function ProjectFormModal({
                 );
                 const candidates =
                   models.find(({ id }) => id === task.model_id)?.department?.users ?? [];
-                const dateWarning = getWizardTaskDateWarning(task, {
-                  start_date: values.start_date,
-                  end_date: values.end_date || undefined,
-                });
+                const dateWarning = getWizardTaskDateWarning(
+                  task,
+                  values.start_date,
+                  values.end_date,
+                );
                 const warningId = `task-${task.id}-date-warning`;
                 return (
                   <fieldset

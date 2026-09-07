@@ -1,5 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+
+let projectFormSource = null;
+
+function readProjectFormSource() {
+  projectFormSource ??= readFileSync(
+    "src/modules/integracao/components/ProjectFormModal.tsx",
+    "utf8",
+  );
+  return projectFormSource;
+}
 import * as taskFormUi from "./components/taskFormModalUi.ts";
 
 runTest("task edit accepts an unassigned task while retaining required operational fields", () => {
@@ -67,6 +77,11 @@ import {
 } from "./services/projectService.contract.ts";
 import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
+  applyWizardTaskChange,
+  getWizardTaskDateWarning,
+  WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING,
+} from "./components/projectWizardUi.ts";
+import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
   canViewTaskModelConfig,
@@ -92,9 +107,6 @@ import {
   TASK_URGENCY_OPTIONS,
   getDefaultTaskUrgency,
   getAutomaticTaskResponsibleId,
-  applyWizardTaskChange,
-  getWizardTaskDateWarning,
-  WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING,
   getTaskCreateValidationMessage,
   getProjectSelectPlaceholder,
   getTaskUrgencyOptions,
@@ -1213,7 +1225,7 @@ runTest(
   },
 );
 runTest("project and task model forms disclose their required fields", () => {
-  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+  const projectForm = readProjectFormSource();
   const taskModelForm = readFileSync("src/modules/integracao/components/TaskModelModal.tsx", "utf8");
 
   for (const source of [projectForm, taskModelForm]) {
@@ -1223,7 +1235,7 @@ runTest("project and task model forms disclose their required fields", () => {
 });
 
 runTest("project date fields handle native input events", () => {
-  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+  const projectForm = readProjectFormSource();
 
   assert.equal(
     (projectForm.match(/onInput=\{\(event\) => updateValue\("start_date", event\.currentTarget\.value\)\}/g) ?? [])
@@ -1321,7 +1333,7 @@ runTest("extraction without usable proposals is treated as a failure", () => {
 });
 
 runTest("step 2 only sends the meeting minutes after an explicit click and warns about OpenAI", () => {
-  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+  const projectForm = readProjectFormSource();
 
   assert.match(projectForm, /Extrair tarefas com IA/);
   assert.match(projectForm, /OpenAI/);
@@ -1394,18 +1406,19 @@ runTest("editing the deadline clears the AI warning attached to it", () => {
 });
 
 runTest("wizard task warns about an unusable AI deadline and about one outside the project period", () => {
-  const period = { start_date: "2026-09-01", end_date: "2026-09-30" };
+  const start = "2026-09-01";
+  const end = "2026-09-30";
 
-  assert.equal(getWizardTaskDateWarning({ prevision_date_warning: "Prazo não reconhecido." }, period), "Prazo não reconhecido.");
-  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-09-10" }, period), null);
-  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-08-31" }, period), WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING);
-  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-10-01" }, period), WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING);
-  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-10-01" }, { start_date: "2026-09-01" }), null);
-  assert.equal(getWizardTaskDateWarning({}, period), null);
+  assert.equal(getWizardTaskDateWarning({ prevision_date_warning: "Prazo não reconhecido." }, start, end), "Prazo não reconhecido.");
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-09-10" }, start, end), null);
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-08-31" }, start, end), WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING);
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-10-01" }, start, end), WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING);
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-10-01" }, start, ""), null);
+  assert.equal(getWizardTaskDateWarning({}, start, end), null);
 });
 
 runTest("wizard task rows delegate edits and warnings to the tested helpers", () => {
-  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+  const projectForm = readProjectFormSource();
 
   assert.match(projectForm, /applyWizardTaskChange\(/);
   assert.match(projectForm, /getWizardTaskDateWarning\(/);

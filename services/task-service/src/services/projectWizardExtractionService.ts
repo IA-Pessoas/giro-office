@@ -13,6 +13,7 @@ import {
   LIST_ITEM_PREFIX,
 } from "../integrations/aiTaskExtraction.js";
 import prismaClient from "../prisma/index.js";
+import { isIsoCalendarDate } from "../schemas/integracaoTaskCreate.schema.js";
 
 export const PROJECT_TASK_MODEL_TYPE = "Projeto";
 
@@ -66,19 +67,18 @@ function normalizeTitle(value: string): string {
 
 function normalizePrevisionDate(value: string | undefined): string | undefined {
   const day = value ? CIVIL_DATE.exec(value.trim())?.[1] : undefined;
-  if (!day) return undefined;
-  const parsed = new Date(`${day}T00:00:00.000Z`);
-  return Number.isNaN(parsed.getTime()) || toCivilDate(parsed) !== day ? undefined : day;
+  return day && isIsoCalendarDate(day) ? day : undefined;
 }
 
 /** Nomes homônimos após a normalização são correspondência conflitante: ninguém vence. */
-function indexByName<T extends { name: string }>(items: T[]): Map<string, T | null> {
-  const index = new Map<string, T | null>();
-  for (const item of items) {
-    const key = normalizeName(item.name);
-    index.set(key, index.has(key) ? null : item);
-  }
-  return index;
+function findUniqueByName<T extends { name: string }>(
+  items: T[],
+  name: string | undefined,
+): T | undefined {
+  if (!name) return undefined;
+  const key = normalizeName(name);
+  const matches = items.filter((item) => normalizeName(item.name) === key);
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 export class ProjectWizardExtractionService {
@@ -98,9 +98,8 @@ export class ProjectWizardExtractionService {
 
     const catalog = await this.listCatalog(data.organizationId);
     const proposals = await this.callProvider(data, catalog);
-    const departmentsByName = indexByName(catalog);
     const tasks = proposals
-      .map((proposal) => toTaskProposal(proposal, departmentsByName))
+      .map((proposal) => toTaskProposal(proposal, catalog))
       .filter((task): task is ProjectTaskProposal => task !== null);
 
     if (tasks.length === 0) {
@@ -168,18 +167,13 @@ function buildContext(
 
 function toTaskProposal(
   proposal: AiTaskProposal,
-  departmentsByName: Map<string, CatalogDepartment | null>,
+  catalog: CatalogDepartment[],
 ): ProjectTaskProposal | null {
   const name = normalizeTitle(proposal.name ?? "");
   if (!name) return null;
 
-  const department = proposal.department
-    ? (departmentsByName.get(normalizeName(proposal.department)) ?? null)
-    : null;
-  const model =
-    department && proposal.model
-      ? (indexByName(department.tasksModel).get(normalizeName(proposal.model)) ?? null)
-      : null;
+  const department = findUniqueByName(catalog, proposal.department);
+  const model = department && findUniqueByName(department.tasksModel, proposal.model);
   const previsionDate = normalizePrevisionDate(proposal.prevision_date);
   const suggestedDate = proposal.prevision_date?.trim();
 
