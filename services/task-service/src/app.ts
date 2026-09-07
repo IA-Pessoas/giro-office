@@ -75,15 +75,17 @@ export function createTaskApp(
   const resolvedDepsTasksRoutes = options?.depsTasksService
     ? createDepsTasksRoutes(options.depsTasksService)
     : depsTasksRoutes;
-  const resolvedProjectWizardRoutes = createProjectWizardRoutes(
-    options?.projectWizardService ??
+  const resolvedProjectWizardRoutes = createProjectWizardRoutes({
+    service:
+      options?.projectWizardService ??
       new ProjectWizardService(
         createHttpProjectWizardIntegration({
           serviceUrl: env.projectServiceUrl,
           serviceToken: env.auditServiceToken,
         }),
       ),
-    options?.projectWizardExtractionService ??
+    extractionService:
+      options?.projectWizardExtractionService ??
       new ProjectWizardExtractionService(
         createAiTaskExtractionProvider({
           mode: env.aiExtractionMode,
@@ -93,14 +95,14 @@ export function createTaskApp(
           timeoutMs: env.aiExtractionTimeoutMs,
         }),
       ),
-    createRateLimitMiddleware({
+    extractionRateLimit: createRateLimitMiddleware({
       key: "task-service:project-wizard-extract-tasks",
       max: env.aiExtractionRateLimitMax,
       windowMs: env.aiExtractionRateLimitWindowMs,
       methods: ["POST"],
       message: "Muitas extrações seguidas. Aguarde antes de tentar novamente.",
     }),
-  );
+  });
   const internalReportingService =
     options?.internalReportingService ?? new TaskReportingService(prismaClient);
 

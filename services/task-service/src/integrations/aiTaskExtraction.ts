@@ -32,7 +32,8 @@ export interface AiTaskExtractionProvider {
   extract(input: AiTaskExtractionInput): Promise<AiTaskProposal[]>;
 }
 
-export type AiTaskExtractionMode = "openai" | "fake";
+export const AI_TASK_EXTRACTION_MODES = ["openai", "fake"] as const;
+export type AiTaskExtractionMode = (typeof AI_TASK_EXTRACTION_MODES)[number];
 
 export interface AiTaskExtractionConfig {
   mode: AiTaskExtractionMode;
@@ -117,8 +118,10 @@ function parseProposals(content: string): AiTaskProposal[] {
 
   try {
     parsed = JSON.parse(content);
-  } catch (err: unknown) {
-    throw new ServiceError(502, "Resposta da IA em formato incompatível.", err);
+  } catch {
+    // O erro do JSON.parse embute um trecho da resposta do modelo: descartamos a causa
+    // para que a resposta bruta nunca alcance log ou auditoria.
+    throw new ServiceError(502, "Resposta da IA em formato incompatível.");
   }
 
   const result = providerPayloadSchema.safeParse(parsed);
@@ -196,7 +199,8 @@ class OpenAiTaskExtractionProvider implements AiTaskExtractionProvider {
     } catch (err: unknown) {
       logError("Resposta inválida do provedor de extração de tarefas.");
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(502, "Resposta da IA em formato incompatível.", err);
+      // Sem causa: o erro de parse do corpo carrega um trecho da resposta bruta.
+      throw new ServiceError(502, "Resposta da IA em formato incompatível.");
     }
   }
 }

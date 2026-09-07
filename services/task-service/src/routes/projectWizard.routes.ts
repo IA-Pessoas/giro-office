@@ -20,11 +20,17 @@ import type { ProjectWizardService } from "../services/projectWizardService.js";
 export type ProjectWizardRouteDeps = Pick<ProjectWizardService, "create">;
 export type ProjectWizardExtractionRouteDeps = Pick<ProjectWizardExtractionService, "extractTasks">;
 
-export function createProjectWizardRoutes(
-  service: ProjectWizardRouteDeps,
-  extractionService: ProjectWizardExtractionRouteDeps,
-  extractionRateLimit: RequestHandler,
-): ReturnType<typeof Router> {
+export interface ProjectWizardRoutesDeps {
+  service: ProjectWizardRouteDeps;
+  extractionService: ProjectWizardExtractionRouteDeps;
+  extractionRateLimit: RequestHandler;
+}
+
+export function createProjectWizardRoutes({
+  service,
+  extractionService,
+  extractionRateLimit,
+}: ProjectWizardRoutesDeps): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
   router.post(

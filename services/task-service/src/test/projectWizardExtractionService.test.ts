@@ -149,13 +149,16 @@ describe("ProjectWizardExtractionService", () => {
     await expect(service.extractTasks(createRequest())).rejects.toMatchObject({ statusCode: 502 });
   });
 
-  it("preserva o status HTTP de um ServiceError do provedor", async () => {
+  it("preserva a falha original do provedor sem reembrulhar", async () => {
     const { provider } = createProvider(async () => {
-      throw new ServiceError(503, "Extração por IA não configurada.");
+      throw new ServiceError(502, "Resposta da IA em formato incompatível.");
     });
     const service = new ProjectWizardExtractionService(provider, createPrisma());
 
-    await expect(service.extractTasks(createRequest())).rejects.toMatchObject({ statusCode: 503 });
+    await expect(service.extractTasks(createRequest())).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Resposta da IA em formato incompatível.",
+    });
   });
 
   it("envia ao provedor apenas o contexto permitido pela especificação", async () => {

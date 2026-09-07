@@ -1,4 +1,5 @@
 import { createServer, type Server } from "node:http";
+import { Writable } from "node:stream";
 import {
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -14,12 +15,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 import { createTaskApp } from "../app.js";
 import type { TaskServiceEnv } from "../config/env.js";
+import { createAiTaskExtractionProvider } from "../integrations/aiTaskExtraction.js";
 import { buildTaskServiceOpenApiSpec } from "../openapi/spec.js";
 import type {
   ProjectWizardExtractionRouteDeps,
   ProjectWizardRouteDeps,
 } from "../routes/projectWizard.routes.js";
 import { projectWizardCreateBodySchema } from "../schemas/projectWizard.schemas.js";
+import { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -392,9 +395,19 @@ describe("project wizard task extraction routes", () => {
     end_date: "2026-09-30T00:00:00.000Z",
   };
 
+  function createCapturingLogStream(sink: string[]) {
+    return new Writable({
+      write(chunk: string | Uint8Array, _encoding, callback) {
+        sink.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+        callback();
+      },
+    });
+  }
+
   function createExtractionApp(
     projectWizardExtractionService?: ProjectWizardExtractionRouteDeps,
     overrides: Partial<TaskServiceEnv> = {},
+    logSink?: string[],
   ) {
     return createTaskApp(
       { ...env, ...overrides },
@@ -402,7 +415,7 @@ describe("project wizard task extraction routes", () => {
         service: "task-service-test",
         env: "test",
         level: "error",
-        destination: new MemoryLogStream(),
+        destination: logSink ? createCapturingLogStream(logSink) : new MemoryLogStream(),
       }),
       projectWizardExtractionService ? { projectWizardExtractionService } : undefined,
     );
@@ -518,7 +531,6 @@ describe("project wizard task extraction routes", () => {
   it.each([
     [422, "Nenhuma tarefa foi identificada na Ata."],
     [502, "Não foi possível extrair tarefas da Ata."],
-    [503, "Extração de tarefas por IA não está configurada."],
   ])("serializa a falha de extração como %i", async (statusCode, message) => {
     const service: ProjectWizardExtractionRouteDeps = {
       extractTasks: vi.fn().mockRejectedValue(new ServiceError(statusCode, message)),
@@ -564,7 +576,7 @@ describe("project wizard task extraction routes", () => {
       });
 
     try {
-      await request(createExtractionApp(service))
+      await request(createExtractionApp(service, {}, written))
         .post("/task/project-wizard/extract-tasks")
         .set(gatewayHeaders())
         .send(validExtractionBody);
@@ -576,6 +588,59 @@ describe("project wizard task extraction routes", () => {
 
     expect(logs).not.toContain("Apurar impostos do trimestre");
     expect(logs).not.toContain("Reunir documentos do cliente");
+  });
+
+  it.each([
+    [
+      "resposta do provedor fora do JSON",
+      new Response('{"choices":[{"message":{"content":"SEGREDOXYZ da Ata"}}]}', {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ],
+    [
+      "corpo do provedor sem JSON",
+      new Response("SEGREDOXYZ da Ata", {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ],
+  ])("não registra a resposta bruta da IA nos logs quando %s", async (_label, providerResponse) => {
+    const extractionService = new ProjectWizardExtractionService(
+      createAiTaskExtractionProvider({
+        mode: "openai",
+        apiKey: "sk-test",
+        baseUrl: "https://provider.test/v1",
+        fetchImpl: (async () => providerResponse) as unknown as typeof fetch,
+      }),
+      {
+        department: {
+          findMany: vi.fn().mockResolvedValue([{ id: "dep-1", name: "Fiscal", tasksModel: [] }]),
+        },
+      } as never,
+    );
+    const written: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        written.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+        return true;
+      });
+
+    let status = 0;
+    try {
+      status = (
+        await request(createExtractionApp(extractionService, {}, written))
+          .post("/task/project-wizard/extract-tasks")
+          .set(gatewayHeaders())
+          .send(validExtractionBody)
+      ).status;
+    } finally {
+      writeSpy.mockRestore();
+    }
+
+    expect(status).toBe(502);
+    expect(written.join("\n")).not.toContain("SEGREDOXYZ");
   });
 
   it("aceita owner sem nível de Integração", async () => {

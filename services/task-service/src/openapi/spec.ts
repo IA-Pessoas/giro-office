@@ -948,7 +948,6 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             "422": { description: "Nenhuma tarefa identificada na Ata" },
             "429": { description: "Muitas extrações seguidas" },
             "502": { description: "Falha do provedor de IA" },
-            "503": { description: "Extração por IA não configurada" },
           },
         },
       },

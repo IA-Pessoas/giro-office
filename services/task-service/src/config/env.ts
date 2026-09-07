@@ -9,6 +9,8 @@ import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
 
+import { AI_TASK_EXTRACTION_MODES } from "../integrations/aiTaskExtraction.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const serviceEnvPath = path.resolve(__dirname, "../../.env");
@@ -51,7 +53,7 @@ const envSchema = z
     auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
-    aiExtractionMode: z.enum(["openai", "fake"]).optional().default("fake"),
+    aiExtractionMode: z.enum(AI_TASK_EXTRACTION_MODES).optional().default("fake"),
     openaiApiKey: z.string().trim().min(1).optional(),
     openaiBaseUrl: z.string().url().optional(),
     openaiModel: z.string().trim().min(1).optional(),
