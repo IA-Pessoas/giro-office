@@ -12,6 +12,7 @@ import type {
   AiTaskProposal,
 } from "../integrations/aiTaskExtraction.js";
 import prismaClient from "../prisma/index.js";
+import { isIsoCalendarDate } from "../utils/civilDate.js";
 
 export const PROJECT_TASK_MODEL_TYPE = "Projeto";
 
@@ -32,6 +33,7 @@ export interface ProjectTaskProposal {
   prevision_date?: string;
   department_id?: string;
   model_id?: string;
+  prevision_date_warning?: string;
 }
 
 export type ExtractionPrisma = Pick<typeof prismaClient, "department">;
@@ -42,20 +44,43 @@ interface CatalogDepartment {
   tasksModel: Array<{ id: string; name: string }>;
 }
 
-const CIVIL_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/**
+ * Aceita a data civil sozinha ou com horário sem fuso: um deslocamento como -03:00 poderia
+ * apontar para outro dia civil, e dia ambíguo é dia em branco.
+ */
+const CIVIL_DATE = /^(\d{4}-\d{2}-\d{2})(?:[T ][\d:.]+Z?)?$/;
+
+export const PREVISION_DATE_WARNING =
+  "A IA sugeriu um prazo que não é uma data civil inequívoca. Informe a data para revisão.";
 
 function toCivilDate(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
 function normalizeName(value: string): string {
-  return value.trim().toLocaleLowerCase("pt-BR");
+  return value.normalize("NFC").trim().toLocaleLowerCase("pt-BR");
+}
+
+/** Título exibido ao usuário: acentos compostos, espaços colapsados e inicial maiúscula. */
+function normalizeTitle(value: string): string {
+  const title = value.normalize("NFC").replace(/\s+/g, " ").trim();
+  return title ? `${title.charAt(0).toLocaleUpperCase("pt-BR")}${title.slice(1)}` : "";
 }
 
 function normalizePrevisionDate(value: string | undefined): string | undefined {
-  if (!value || !CIVIL_DATE.test(value)) return undefined;
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(parsed.getTime()) || toCivilDate(parsed) !== value ? undefined : value;
+  const day = value ? CIVIL_DATE.exec(value.trim())?.[1] : undefined;
+  return day && isIsoCalendarDate(day) ? day : undefined;
+}
+
+/** Nomes homônimos após a normalização são correspondência conflitante: ninguém vence. */
+function findUniqueByName<T extends { name: string }>(
+  items: T[],
+  name: string | undefined,
+): T | undefined {
+  if (!name) return undefined;
+  const key = normalizeName(name);
+  const matches = items.filter((item) => normalizeName(item.name) === key);
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 export class ProjectWizardExtractionService {
@@ -146,24 +171,19 @@ function toTaskProposal(
   proposal: AiTaskProposal,
   catalog: CatalogDepartment[],
 ): ProjectTaskProposal | null {
-  const name = proposal.name?.trim();
+  const name = normalizeTitle(proposal.name ?? "");
   if (!name) return null;
 
-  const departmentName = proposal.department ? normalizeName(proposal.department) : undefined;
-  const department = departmentName
-    ? catalog.find((item) => normalizeName(item.name) === departmentName)
-    : undefined;
-  const modelName = proposal.model ? normalizeName(proposal.model) : undefined;
-  const model =
-    department && modelName
-      ? department.tasksModel.find((item) => normalizeName(item.name) === modelName)
-      : undefined;
+  const department = findUniqueByName(catalog, proposal.department);
+  const model = department && findUniqueByName(department.tasksModel, proposal.model);
   const previsionDate = normalizePrevisionDate(proposal.prevision_date);
+  const suggestedDate = proposal.prevision_date?.trim();
 
   return {
     name,
     ...(previsionDate ? { prevision_date: previsionDate } : {}),
     ...(department ? { department_id: department.id } : {}),
     ...(model ? { model_id: model.id } : {}),
+    ...(!previsionDate && suggestedDate ? { prevision_date_warning: PREVISION_DATE_WARNING } : {}),
   };
 }
