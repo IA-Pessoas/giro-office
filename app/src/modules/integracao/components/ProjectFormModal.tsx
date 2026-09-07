@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, FileText, LoaderCircle, Save } from "lucide-react";
+import { CalendarDays, FileText, LoaderCircle, Save, Sparkles } from "lucide-react";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
@@ -16,10 +16,12 @@ import {
 import { useProjectForm } from "../hooks/useProjectForm";
 import {
   useCreateProjectWizardMutation,
+  useExtractProjectTasksMutation,
   useProjectDetail,
   useProjectWizardPreviewMutation,
   useUpdateProjectMutation,
 } from "../hooks/useProjects";
+import { PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE } from "../services/projectService.contract";
 import type { ProjectDetail, ProjectWizardPreview, ProjectWizardTask } from "../types";
 import { taskModelService } from "../services/taskModelService";
 import {
@@ -38,6 +40,8 @@ import {
   TASK_FORM_LABEL_CLASSNAME,
 } from "./taskFormModalUi";
 
+type WizardTask = ProjectWizardTask & { id: string; source: "ai" | "manual" };
+
 interface ProjectFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -46,10 +50,17 @@ interface ProjectFormModalProps {
   onSuccess?: (project: ProjectDetail | { id: string; client_id?: string }) => void;
 }
 
-function getRequestErrorMessage(error: unknown, fallback = "Não foi possível salvar o projeto."): string {
+function getRequestErrorMessage(
+  error: unknown,
+  fallback = "Não foi possível salvar o projeto.",
+): string {
   const message = (error as { response?: { data?: { error?: unknown } } } | null)?.response?.data
     ?.error;
   return typeof message === "string" ? message : fallback;
+}
+
+function toWizardTaskPayload({ id: _id, source: _source, ...task }: WizardTask): ProjectWizardTask {
+  return task;
 }
 
 function dependencyModelIdsSignature(preview: ProjectWizardPreview): string {
@@ -84,7 +95,9 @@ export function ProjectFormModal({
   const previewMutation = useProjectWizardPreviewMutation();
   const updateMutation = useUpdateProjectMutation();
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
-  const [tasks, setTasks] = useState<Array<ProjectWizardTask & { id: string }>>([]);
+  const [tasks, setTasks] = useState<WizardTask[]>([]);
+  const [meetingMinutes, setMeetingMinutes] = useState("");
+  const extractTasksMutation = useExtractProjectTasksMutation();
   const [preview, setPreview] = useState<ProjectWizardPreview | null>(null);
   const [dependenciesChanged, setDependenciesChanged] = useState(false);
   const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null);
@@ -108,6 +121,7 @@ export function ProjectFormModal({
       reset(null);
       setCreateStep(1);
       setTasks([]);
+      setMeetingMinutes("");
       setPreview(null);
       setDependenciesChanged(false);
       setPreviewErrorMessage(null);
@@ -184,11 +198,37 @@ export function ProjectFormModal({
     );
   }
 
+  async function handleExtractTasks() {
+    if (!meetingMinutes.trim() || extractTasksMutation.isPending) return;
+
+    try {
+      const proposals = await extractTasksMutation.mutateAsync({
+        content: meetingMinutes,
+        name: values.name,
+        objective: values.objective,
+        start_date: values.start_date,
+        end_date: values.end_date,
+      });
+
+      setTasks((current) => [
+        ...current.filter((task) => task.source === "manual"),
+        ...proposals.map((proposal) => ({
+          ...proposal,
+          id: crypto.randomUUID(),
+          source: "ai" as const,
+        })),
+      ]);
+      toast.success(`Tarefas propostas pela IA: ${proposals.length}. Revise antes de continuar.`);
+    } catch (error) {
+      toast.error(getRequestErrorMessage(error, PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE));
+    }
+  }
+
   function handleTasksReview() {
     if (previewRequestLockRef.current || isBusy || taskValidationError) return;
     previewRequestLockRef.current = true;
     const reviewedTasks = tasks.map((task) => ({ ...task, name: task.name.trim() }));
-    const mainTasks = reviewedTasks.map(({ id: _id, ...task }) => task);
+    const mainTasks = reviewedTasks.map(toWizardTaskPayload);
     setPreviewErrorMessage(null);
 
     previewMutation.mutate(mainTasks, {
@@ -272,7 +312,7 @@ export function ProjectFormModal({
       const result = await createWizardMutation.mutateAsync({
         ...buildCreatePayload(clientId),
         idempotencyKey: idempotencyKeyRef.current,
-        tasks: tasks.map(({ id: _id, ...task }) => task),
+        tasks: tasks.map(toWizardTaskPayload),
         revision: preview.revision,
       });
       toast.success(
@@ -514,6 +554,46 @@ export function ProjectFormModal({
 
           {!isEditing && createStep === 2 ? (
             <div className="space-y-3">
+              <fieldset className={`${PROJECT_SUBPANEL_CLASSNAME} space-y-3 p-3`}>
+                <legend className="px-1 text-sm font-semibold">Ata de reunião</legend>
+                <label className="space-y-2" htmlFor="project-meeting-minutes">
+                  <span className="text-sm font-medium text-slate-700 dark:text-white">
+                    Cole a Ata para extrair tarefas
+                  </span>
+                  <textarea
+                    id="project-meeting-minutes"
+                    value={meetingMinutes}
+                    onChange={(event) => setMeetingMinutes(event.target.value)}
+                    className={`${PROJECT_INPUT_CLASSNAME} min-h-32 resize-y`}
+                    placeholder="Cole aqui o texto da Ata de reunião."
+                    aria-describedby="project-meeting-minutes-notice"
+                    disabled={extractTasksMutation.isPending}
+                  />
+                </label>
+                <p
+                  id="project-meeting-minutes-notice"
+                  className="text-sm text-slate-600 dark:text-slate-300"
+                >
+                  Ao clicar em “Extrair tarefas com IA”, o conteúdo da Ata será enviado para
+                  processamento pela OpenAI. Nada é enviado antes desse clique.
+                </p>
+                <button
+                  type="button"
+                  className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+                  onClick={() => void handleExtractTasks()}
+                  disabled={!meetingMinutes.trim() || extractTasksMutation.isPending || isBusy}
+                >
+                  {extractTasksMutation.isPending ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  Extrair tarefas com IA
+                </button>
+                {extractTasksMutation.isPending ? (
+                  <output className="block text-sm">Extraindo tarefas da Ata...</output>
+                ) : null}
+              </fieldset>
               {tasks.length === 0 ? (
                 <p className={`${PROJECT_SUBPANEL_CLASSNAME} px-4 py-3 text-sm`}>
                   Nenhuma tarefa será criada nesta etapa.
@@ -554,7 +634,9 @@ export function ProjectFormModal({
                     disabled={isBusy}
                     className={`${PROJECT_SUBPANEL_CLASSNAME} space-y-3 p-3`}
                   >
-                    <legend className="px-1 text-sm font-semibold">Tarefa {index + 1}</legend>
+                    <legend className="px-1 text-sm font-semibold">
+                      {`Tarefa ${index + 1}${task.source === "ai" ? " (proposta pela IA)" : ""}`}
+                    </legend>
                     <div className={TASK_FORM_GRID_CLASSNAME}>
                       <label className={TASK_FORM_LABEL_CLASSNAME}>
                         <RequiredFieldLabel required>Nome</RequiredFieldLabel>
@@ -703,6 +785,7 @@ export function ProjectFormModal({
                       department_id: "",
                       model_id: "",
                       responsible_id: null,
+                      source: "manual" as const,
                     },
                   ])
                 }

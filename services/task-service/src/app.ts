@@ -1,5 +1,6 @@
 import {
   createExpressErrorHandler,
+  createRateLimitMiddleware,
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
@@ -11,6 +12,7 @@ import express, { type Express, type Request } from "express";
 import "express-async-errors";
 
 import type { TaskServiceEnv } from "./config/env.js";
+import { createAiTaskExtractionProvider } from "./integrations/aiTaskExtraction.js";
 import { createHttpProjectWizardIntegration } from "./integrations/projectWizard.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
@@ -28,6 +30,7 @@ import {
 } from "./routes/projectPlan.routes.js";
 import {
   createProjectWizardRoutes,
+  type ProjectWizardExtractionRouteDeps,
   type ProjectWizardRouteDeps,
 } from "./routes/projectWizard.routes.js";
 import { taskComercialRoutes } from "./routes/taskComercial.routes.js";
@@ -37,6 +40,7 @@ import { taskFinanceiroRoutes } from "./routes/taskFinanceiro.routes.js";
 import { taskIntegrationRegularizeRoutes } from "./routes/taskIntegrationRegularize.routes.js";
 import { taskLifecycleRoutes } from "./routes/taskLifecycle.routes.js";
 import { taskModelRoutes } from "./routes/taskModel.routes.js";
+import { ProjectWizardExtractionService } from "./services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "./services/projectWizardService.js";
 import { TaskReportingService } from "./services/taskReportingService.js";
 
@@ -59,6 +63,7 @@ export function createTaskApp(
   options?: {
     projectPlanService?: ProjectPlanRouteDeps;
     projectWizardService?: ProjectWizardRouteDeps;
+    projectWizardExtractionService?: ProjectWizardExtractionRouteDeps;
     depsTasksService?: DepsTasksRouteDeps;
     internalReportingService?: TaskReportingService;
   },
@@ -70,21 +75,40 @@ export function createTaskApp(
   const resolvedDepsTasksRoutes = options?.depsTasksService
     ? createDepsTasksRoutes(options.depsTasksService)
     : depsTasksRoutes;
-  const resolvedProjectWizardRoutes = createProjectWizardRoutes(
-    options?.projectWizardService ??
+  const resolvedProjectWizardRoutes = createProjectWizardRoutes({
+    service:
+      options?.projectWizardService ??
       new ProjectWizardService(
         createHttpProjectWizardIntegration({
           serviceUrl: env.projectServiceUrl,
           serviceToken: env.auditServiceToken,
         }),
       ),
-  );
+    extractionService:
+      options?.projectWizardExtractionService ??
+      new ProjectWizardExtractionService(
+        createAiTaskExtractionProvider({
+          mode: env.aiExtractionMode,
+          apiKey: env.openaiApiKey,
+          baseUrl: env.openaiBaseUrl,
+          model: env.openaiModel,
+          timeoutMs: env.aiExtractionTimeoutMs,
+        }),
+      ),
+    extractionRateLimit: createRateLimitMiddleware({
+      key: "task-service:project-wizard-extract-tasks",
+      max: env.aiExtractionRateLimitMax,
+      windowMs: env.aiExtractionRateLimitWindowMs,
+      methods: ["POST"],
+      message: "Muitas extrações seguidas. Aguarde antes de tentar novamente.",
+    }),
+  });
   const internalReportingService =
     options?.internalReportingService ?? new TaskReportingService(prismaClient);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "task-service")));
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" }));
   app.use(requestContext);
 
   app.get("/health", (_req, res) => {

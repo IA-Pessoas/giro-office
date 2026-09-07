@@ -71,7 +71,7 @@ const project = {
   end_date: null,
 };
 
-async function installApiMocks(page, previewRequests, wizardRequests) {
+async function installApiMocks(page, previewRequests, wizardRequests, extractionRequests = []) {
   const existingTask = {
     id: "task-existing",
     name: "Tarefa anterior",
@@ -167,6 +167,36 @@ async function installApiMocks(page, previewRequests, wizardRequests) {
       json: { success: true, data: { detail: project } },
     }),
   );
+  await page.route("**/task/project-wizard/extract-tasks", async (route) => {
+    extractionRequests.push(route.request().postDataJSON());
+    if (extractionRequests.length === 1) {
+      await route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        json: { success: false, error: "Nenhuma tarefa foi identificada na Ata." },
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: {
+        success: true,
+        data: {
+          tasks: [
+            {
+              name: "Apurar impostos do trimestre",
+              prevision_date: "2026-09-15",
+              department_id: "department-one",
+              model_id: "model-default",
+            },
+            { name: "Reunir documentos do cliente" },
+          ],
+        },
+      },
+    });
+  });
+
   await page.route("**/task/project-wizard/preview", async (route) => {
     const body = route.request().postDataJSON();
     previewRequests.push(body);
@@ -295,7 +325,8 @@ async function runBrowserProof() {
   const previewRequests = [];
   const wizardRequests = [];
   const updateRequests = [];
-  await installApiMocks(page, previewRequests, wizardRequests);
+  const extractionRequests = [];
+  await installApiMocks(page, previewRequests, wizardRequests, extractionRequests);
   await page.route("**/project", async (route) => {
     assert.equal(route.request().method(), "PUT");
     updateRequests.push(route.request().postDataJSON());
@@ -604,6 +635,48 @@ async function runBrowserProof() {
     await expect(editDialog.getByRole("button", { name: "Continuar" })).toHaveCount(0);
     await editDialog.getByRole("button", { name: "Cancelar" }).click();
 
+    await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Novo projeto" }).click();
+    await wizard.getByLabel("Nome").fill("Projeto pela Ata");
+    await wizard.getByLabel("Data de início").fill("2026-09-10");
+    await wizard.getByLabel("Objetivo").fill("Extrair tarefas da Ata.");
+    await wizard.getByRole("button", { name: "Continuar" }).click();
+
+    const extractButton = wizard.getByRole("button", { name: "Extrair tarefas com IA" });
+    const minutesField = wizard.getByLabel("Cole a Ata para extrair tarefas");
+    await expect(extractButton).toBeDisabled();
+    await expect(minutesField).toHaveAccessibleDescription(/processamento pela OpenAI/);
+    await minutesField.fill("- Apurar impostos do trimestre\n- Reunir documentos do cliente");
+    assert.equal(extractionRequests.length, 0, "A Ata não pode ser enviada antes do clique.");
+    await expect(extractButton).toBeEnabled();
+
+    await extractButton.click();
+    await expect(
+      page.getByText("Nenhuma tarefa foi identificada na Ata.", { exact: true }),
+    ).toBeVisible();
+    await expect(wizard.getByRole("group", { name: /^Tarefa 1/ })).toHaveCount(0);
+
+    await extractButton.click();
+    const proposedTask = wizard.getByRole("group", { name: "Tarefa 1 (proposta pela IA)" });
+    await expect(proposedTask.getByLabel(/^Nome/)).toHaveValue("Apurar impostos do trimestre");
+    await expect(proposedTask.getByLabel("Prazo", { exact: true })).toHaveValue("2026-09-15");
+    await expect(proposedTask.getByLabel(/^Departamento/)).toHaveValue("department-one");
+    await expect(proposedTask.getByLabel(/^Modelo/)).toHaveValue("model-default");
+    await expect(
+      wizard
+        .getByRole("group", { name: "Tarefa 2 (proposta pela IA)" })
+        .getByLabel(/^Departamento/),
+    ).toHaveValue("");
+    assert.equal(extractionRequests.length, 2);
+    assert.deepEqual(extractionRequests[1], {
+      content: "- Apurar impostos do trimestre\n- Reunir documentos do cliente",
+      name: "Projeto pela Ata",
+      objective: "Extrair tarefas da Ata.",
+      start_date: "2026-09-10",
+    });
+    await wizard.getByRole("button", { name: "Cancelar" }).click();
+    assert.equal(wizardRequests.length, 3, "Cancelar não pode confirmar o wizard.");
+
     smokeUser.modules.integracao = 1;
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.getByRole("button", { name: "Novo projeto" })).toHaveCount(0);
@@ -656,3 +729,4 @@ async function withNextServer(run) {
 
 await withNextServer(runBrowserProof);
 console.log("PASS wizard revisa tarefas manuais, aceita lista vazia e preserva edição direta");
+console.log("PASS wizard extrai tarefas da Ata somente após o clique explícito");

@@ -20,6 +20,13 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `PROJECT_SERVICE_URL`
 - `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` para fonte interna de relatórios
 - `AUDIT_*` quando a auditoria estiver ativa
+- `AI_EXTRACTION_MODE` (`fake` por padrao, ou `openai`) escolhe o provedor da extracao de tarefas
+  do wizard de Projetos. `fake` usa um adapter deterministico local, sem rede nem creditos;
+  `openai` exige `OPENAI_API_KEY`. Em producao o servico so sobe com `openai` e chave presente.
+- `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` e `AI_EXTRACTION_TIMEOUT_MS` configuram o
+  provedor. Nunca versione a chave.
+- `AI_EXTRACTION_RATE_LIMIT_MAX` (default `10`) e `AI_EXTRACTION_RATE_LIMIT_WINDOW_MS`
+  (default `60000`) limitam extracoes por usuario e organizacao
 
 ## Gateway
 
@@ -40,6 +47,16 @@ Exemplos de paths publicos:
 - `POST /task/project-wizard` cria o projeto com a lista, inclusive vazia, de tarefas principais e
   exige `Idempotency-Key` e a `revision` da prévia. O serviço revalida a composição antes de criar;
   Modelo repetido ou prévia desatualizada retorna `409`.
+- `POST /task/project-wizard/extract-tasks` transforma uma Ata de reunião colada em Tarefas
+  propostas com a OpenAI. Exige nível `2+` em Integração ou `owner` e respeita o isolamento da
+  organização. O corpo aceita `content` (Ata), `name`, `objective`, `start_date` e `end_date`
+  opcional. A resposta traz `tasks` com `name` e, quando houver correspondência clara na
+  organização, `prevision_date`, `department_id` e `model_id`. Zero propostas retorna `422`;
+  formato incompatível, timeout ou falha do provedor retornam `502`; Ata acima de 100.000
+  caracteres é rejeitada com `400` antes do provedor. A Ata é tratada como dado não confiável, vai
+  ao provedor apenas como conteúdo do usuário e não é persistida, auditada nem registrada em log. O
+  payload enviado ao provedor contém somente nome, objetivo e datas do Projeto, nomes de
+  departamentos ativos e nomes de Modelos de tarefa do tipo `Projeto` da organização.
 
 `/internal/reporting` é contrato direto interno, não roteado pelo gateway.
 

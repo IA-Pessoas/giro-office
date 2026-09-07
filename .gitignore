@@ -25,6 +25,9 @@ tsconfig.tests*
 **/dist
 **/.next
 
+# Screenshots gerados pelos smokes de browser
+app/output/
+
 # OS files
 .DS_Store
 Thumbs.db

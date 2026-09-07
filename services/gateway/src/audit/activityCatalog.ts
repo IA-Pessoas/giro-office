@@ -58,6 +58,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/task\/project-wizard\/extract-tasks$/,
+    description: { action: "extraiu", item: "tarefas de uma Ata com IA" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/task\/project-wizard\/preview$/,
     description: { action: "gerou", item: "uma prévia de projeto com tarefas" },
   },
