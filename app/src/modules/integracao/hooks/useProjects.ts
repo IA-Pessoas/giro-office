@@ -20,6 +20,7 @@ import type {
 } from "../types";
 import { projectService } from "../services/projectService";
 import {
+  INTEGRACAO_TASKS_QUERY_KEY,
   projectDetailQueryKey,
   projectListQueryKey,
   projectMetricsQueryKey,
@@ -90,6 +91,7 @@ export function useCreateProjectWizardMutation(): UseMutationResult<
     mutationFn: (payload) => projectService.createWithWizard(payload),
     onSuccess: async ({ project }, variables) => {
       await refreshCreatedProjectCache(queryClient, project, variables.client_id);
+      await queryClient.invalidateQueries({ queryKey: INTEGRACAO_TASKS_QUERY_KEY });
     },
   });
 }

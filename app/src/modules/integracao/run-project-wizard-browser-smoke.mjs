@@ -72,6 +72,20 @@ const project = {
 };
 
 async function installApiMocks(page, wizardRequests) {
+  const existingTask = {
+    id: "task-existing",
+    name: "Tarefa anterior",
+    status: "A Realizar",
+    billing: "Não Realizar",
+    isOwn: false,
+    isUnassigned: true,
+    charge_comercial: false,
+    charge_financeiro: false,
+    hiring_status: null,
+    payment: null,
+    billing_description: null,
+  };
+  let taskList = [existingTask];
   await page.route("**/user/me", (route) =>
     route.fulfill({
       status: 200,
@@ -166,6 +180,13 @@ async function installApiMocks(page, wizardRequests) {
       });
       return;
     }
+    if (wizardRequests.length > 2) {
+      taskList = [
+        existingTask,
+        { ...existingTask, id: "task-created-one", name: "Apuração final", isUnassigned: false },
+        { ...existingTask, id: "task-created-two", name: "Sem atribuição" },
+      ];
+    }
     await route.fulfill({
       status: 201,
       contentType: "application/json",
@@ -187,7 +208,12 @@ async function installApiMocks(page, wizardRequests) {
       contentType: "application/json",
       json: {
         success: true,
-        data: { data: [], total: 0, hasMore: false, summary: { inProgress: 0, billable: 0 } },
+        data: {
+          data: taskList,
+          total: taskList.length,
+          hasMore: false,
+          summary: { inProgress: 0, billable: 0 },
+        },
       },
     }),
   );
@@ -313,8 +339,14 @@ async function runBrowserProof() {
       ),
     ).toHaveCount(1);
     await expect(page).toHaveURL(`/tasks?clientId=${clientId}`);
+    await expect(page.getByRole("cell", { name: "Tarefa anterior", exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Apuração final", exact: true })).toHaveCount(0);
+    const cachedTasksAt = Date.now();
+    const documentTimeOrigin = await page.evaluate(() => performance.timeOrigin);
 
-    await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
+    await page.goBack();
+    await expect(page).toHaveURL(`/projects?clientId=${clientId}`);
+    assert.equal(await page.evaluate(() => performance.timeOrigin), documentTimeOrigin);
     await page.getByRole("button", { name: "Novo projeto" }).click();
     await wizard.getByLabel("Nome").fill("Projeto com tarefas");
     await wizard.getByLabel("Data de início").fill("2026-09-10");
@@ -435,6 +467,14 @@ async function runBrowserProof() {
       ),
     ).toHaveCount(1);
     await expect(page).toHaveURL(`/tasks?clientId=${clientId}`);
+    assert.equal(await page.evaluate(() => performance.timeOrigin), documentTimeOrigin);
+    assert.ok(
+      Date.now() - cachedTasksAt < 60_000,
+      "O retorno deve ocorrer antes de expirar o cache de tarefas.",
+    );
+    await expect(page.getByRole("cell", { name: "Tarefa anterior", exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Apuração final", exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Sem atribuição", exact: true })).toBeVisible();
 
     await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "Editar" }).first().click();
