@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { Writable } from "node:stream";
 import {
   FORWARDED_AUTH_MODULES_HEADER,
@@ -25,8 +26,13 @@ import type {
 import { projectWizardCreateBodySchema } from "../schemas/projectWizard.schemas.js";
 import { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "../services/projectWizardService.js";
+import { DOCX_MIME_TYPE } from "../utils/docx.js";
 
 vi.mock("../integrations/audit.js", () => ({ createLog: vi.fn() }));
+
+function readDocxFixture(name: string): Buffer {
+  return readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
+}
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -566,6 +572,9 @@ describe("project wizard task extraction routes", () => {
       "objective",
       "start_date",
     ]);
+    expect(
+      operation.requestBody.content["multipart/form-data"].schema.properties.file.description,
+    ).toContain(".docx");
   });
 
   it.each([
@@ -594,7 +603,10 @@ describe("project wizard task extraction routes", () => {
     );
   });
 
-  it("rejeita MIME incompatível para Markdown", async () => {
+  it.each([
+    ["Markdown", "ata.md", "application/pdf"],
+    ["DOCX", "ata.docx", "text/plain"],
+  ])("rejeita MIME incompatível para %s", async (_label, filename, contentType) => {
     const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
     const response = await request(createExtractionApp(service))
       .post("/task/project-wizard/extract-tasks")
@@ -602,10 +614,7 @@ describe("project wizard task extraction routes", () => {
       .field("name", validExtractionBody.name)
       .field("objective", validExtractionBody.objective)
       .field("start_date", validExtractionBody.start_date)
-      .attach("file", Buffer.from("Ata inválida"), {
-        filename: "ata.md",
-        contentType: "application/pdf",
-      });
+      .attach("file", Buffer.from("Ata inválida"), { filename, contentType });
 
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
@@ -615,7 +624,119 @@ describe("project wizard task extraction routes", () => {
     expect(service.extractTasks).not.toHaveBeenCalled();
   });
 
-  it("rejeita multipart inválido antes do rate limit e do provedor", async () => {
+  it("aceita Ata DOCX e propõe as mesmas Tarefas das demais fontes", async () => {
+    const proposals = { tasks: [{ name: "Apurar impostos" }, { name: "Reunir documentos" }] };
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue(proposals),
+    };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .field("end_date", validExtractionBody.end_date)
+      .attach("file", readDocxFixture("meeting-minutes.docx"), {
+        filename: "ata.docx",
+        contentType: DOCX_MIME_TYPE,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, data: proposals });
+
+    const { content } = vi.mocked(service.extractTasks).mock.calls[0][0] as { content: string };
+    expect(content).toContain(validExtractionBody.content);
+    // Tabulação e quebra de linha do Word separam as palavras entregues ao provedor.
+    expect(content).toContain("Responsável:\tJoão\nPrazo: 30/09");
+    // Macros e campos ativos ficam fora do texto entregue ao provedor.
+    expect(content).not.toContain("HYPERLINK");
+    expect(content).not.toContain("exemplo-malicioso");
+    expect(content).not.toContain("MACRO-NAO-EXECUTADA");
+    expect(content).not.toContain("<w:");
+  });
+
+  it.each([
+    [
+      "corrompido",
+      "meeting-minutes-corrupted.docx",
+      "O arquivo DOCX está corrompido ou não pôde ser lido.",
+    ],
+    [
+      "criptografado",
+      "meeting-minutes-encrypted.docx",
+      "O arquivo DOCX está protegido por senha e não pode ser lido.",
+    ],
+    [
+      "com assinatura divergente",
+      "meeting-minutes-not-ooxml.docx",
+      "O arquivo DOCX está corrompido ou não pôde ser lido.",
+    ],
+    ["sem texto", "meeting-minutes-empty.docx", "O arquivo da Ata não contém texto."],
+    [
+      "com entidade XML inválida",
+      "meeting-minutes-invalid-entity.docx",
+      "O arquivo DOCX está corrompido ou não pôde ser lido.",
+    ],
+  ])("rejeita DOCX %s sem chamar o provedor", async (_label, fixture, error) => {
+    const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .attach("file", readDocxFixture(fixture), {
+        filename: "ata.docx",
+        contentType: DOCX_MIME_TYPE,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({ success: false, error });
+    expect(service.extractTasks).not.toHaveBeenCalled();
+  });
+
+  it("não registra nem audita o texto da Ata DOCX aceita", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
+    };
+    const written: string[] = [];
+    const auditLog = vi.mocked(createLog);
+    const auditCallsBefore = auditLog.mock.calls.length;
+
+    const response = await request(createExtractionApp(service, {}, written))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .attach("file", readDocxFixture("meeting-minutes.docx"), {
+        filename: "ata.docx",
+        contentType: DOCX_MIME_TYPE,
+      });
+
+    expect(response.status).toBe(200);
+    expect(auditLog).toHaveBeenCalledTimes(auditCallsBefore);
+    expect(written.join("\n")).not.toContain("Apurar impostos do trimestre");
+  });
+
+  it.each([
+    [
+      "MIME divergente",
+      () => Buffer.from("Ata inválida"),
+      "ata.txt",
+      "text/markdown",
+      "Tipo de arquivo não permitido.",
+    ],
+    [
+      "DOCX corrompido",
+      () => readDocxFixture("meeting-minutes-corrupted.docx"),
+      "ata.docx",
+      DOCX_MIME_TYPE,
+      "O arquivo DOCX está corrompido ou não pôde ser lido.",
+    ],
+  ])("rejeita %s antes do rate limit e do provedor", async (_label, readFile, filename, contentType, error) => {
     const service: ProjectWizardExtractionRouteDeps = {
       extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
     };
@@ -627,16 +748,10 @@ describe("project wizard task extraction routes", () => {
       .field("name", validExtractionBody.name)
       .field("objective", validExtractionBody.objective)
       .field("start_date", validExtractionBody.start_date)
-      .attach("file", Buffer.from("Ata inválida"), {
-        filename: "ata.txt",
-        contentType: "text/markdown",
-      });
+      .attach("file", readFile(), { filename, contentType });
 
     expect(invalid.status).toBe(400);
-    expect(invalid.body).toMatchObject({
-      success: false,
-      error: "Tipo de arquivo não permitido.",
-    });
+    expect(invalid.body).toMatchObject({ success: false, error });
 
     for (const expected of [200, 200]) {
       const response = await request(app)
@@ -693,6 +808,7 @@ describe("project wizard task extraction routes", () => {
     ["extensão não permitida", [Buffer.from("Ata inválida")], "Tipo de arquivo não permitido."],
     ["arquivo vazio", [Buffer.alloc(0)], "O arquivo da Ata é obrigatório e não pode estar vazio."],
     ["NUL", [Buffer.from("Ata\0inválida")], "O arquivo da Ata não pode conter NUL."],
+    ["somente espaços", [Buffer.from("   \n\t  ")], "O arquivo da Ata não contém texto."],
     [
       "UTF-8 inválido",
       [Buffer.from([0xc3, 0x28])],
@@ -974,6 +1090,36 @@ describe("project wizard task extraction routes", () => {
 
     expect(status).toBe(502);
     expect(written.join("\n")).not.toContain("SEGREDOXYZ");
+  });
+
+  it("percorre o fluxo HTTP completo da Ata DOCX com o adapter de IA falso", async () => {
+    const extractionService = new ProjectWizardExtractionService(
+      createAiTaskExtractionProvider({ mode: "fake" }),
+      {
+        department: {
+          findMany: vi.fn().mockResolvedValue([{ id: "dep-1", name: "Fiscal", tasksModel: [] }]),
+        },
+      } as never,
+    );
+
+    const response = await request(createExtractionApp(extractionService))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .attach("file", readDocxFixture("meeting-minutes.docx"), {
+        filename: "ata.docx",
+        contentType: DOCX_MIME_TYPE,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Apurar impostos do trimestre" }),
+        expect.objectContaining({ name: "Reunir documentos do cliente" }),
+      ]),
+    );
   });
 
   it("aceita owner sem nível de Integração", async () => {

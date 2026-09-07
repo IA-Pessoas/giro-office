@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import {
   createSuccessResponse,
   error as logError,
@@ -20,6 +22,7 @@ import {
 import { projectWizardExtractTasksBodySchema } from "../schemas/projectWizardExtraction.schemas.js";
 import type { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import type { ProjectWizardService } from "../services/projectWizardService.js";
+import { DOCX_MIME_TYPE, extractDocxText } from "../utils/docx.js";
 
 export type ProjectWizardRouteDeps = Pick<ProjectWizardService, "create" | "preview">;
 export type ProjectWizardExtractionRouteDeps = Pick<ProjectWizardExtractionService, "extractTasks">;
@@ -35,6 +38,7 @@ const MEETING_MINUTES_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const MEETING_MINUTES_FILE_TYPES: Record<string, readonly string[]> = {
   ".txt": ["text/plain"],
   ".md": ["text/markdown", "text/plain", "text/x-markdown"],
+  ".docx": [DOCX_MIME_TYPE],
 };
 type ProjectWizardExtractTasksBody = z.infer<typeof projectWizardExtractTasksBodySchema>;
 
@@ -42,8 +46,8 @@ const meetingMinutesUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MEETING_MINUTES_MAX_FILE_SIZE_BYTES, files: 1, fields: 4 },
   fileFilter(_request, file, callback) {
-    const extension = file.originalname.match(/\.[^.]+$/)?.[0]?.toLowerCase();
-    const allowedMimeTypes = extension ? MEETING_MINUTES_FILE_TYPES[extension] : undefined;
+    const allowedMimeTypes =
+      MEETING_MINUTES_FILE_TYPES[path.extname(file.originalname).toLowerCase()];
     if (!allowedMimeTypes?.includes(file.mimetype)) {
       callback(new ServiceError(400, "Tipo de arquivo não permitido."));
       return;
@@ -73,10 +77,17 @@ function uploadMeetingMinutes(request: Request, response: Response, next: NextFu
       return;
     }
 
+    const file = request.file;
     try {
-      const content = new TextDecoder("utf-8", { fatal: true }).decode(request.file.buffer);
+      const content =
+        file.mimetype === DOCX_MIME_TYPE
+          ? extractDocxText(file.buffer)
+          : new TextDecoder("utf-8", { fatal: true }).decode(file.buffer);
       if (content.includes("\0")) {
         throw new ServiceError(400, "O arquivo da Ata não pode conter NUL.");
+      }
+      if (!content.trim()) {
+        throw new ServiceError(400, "O arquivo da Ata não contém texto.");
       }
       request.body = { ...request.body, content };
       next();

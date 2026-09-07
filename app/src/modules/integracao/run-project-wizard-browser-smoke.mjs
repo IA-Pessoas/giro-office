@@ -709,7 +709,7 @@ async function runBrowserProof() {
     });
     assert.match(extractionRequests[1].contentType, /^application\/json/);
 
-    const minutesFile = wizard.getByLabel("Selecione um arquivo .txt ou .md");
+    const minutesFile = wizard.getByLabel("Selecione um arquivo .txt, .md ou .docx");
     await expect(minutesFile).toBeDisabled();
     await wizard.getByRole("button", { name: "Limpar texto" }).click();
     await expect(minutesField).toHaveValue("");
