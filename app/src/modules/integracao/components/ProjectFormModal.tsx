@@ -63,7 +63,7 @@ function getResponsibleName(
   responsibleId: string | null,
   candidates: Array<{ id: string; name: string }>,
 ): string {
-  if (!responsibleId) return "Sem responsável";
+  if (responsibleId === null) return "Sem responsável";
   return (
     candidates.find(({ id }) => id === responsibleId)?.name ??
     `Responsável não carregado (${responsibleId})`
@@ -99,6 +99,7 @@ export function ProjectFormModal({
     { enabled: open && !isEditing },
   );
   const idempotencyKeyRef = useRef<string | null>(null);
+  const previewRequestLockRef = useRef(false);
   const { values, updateValue, validate, reset, buildCreatePayload, buildUpdatePayload } =
     useProjectForm(detailQuery.data);
 
@@ -112,6 +113,7 @@ export function ProjectFormModal({
       setPreviewErrorMessage(null);
       previewMutation.reset();
       idempotencyKeyRef.current = null;
+      previewRequestLockRef.current = false;
     } else if (!isEditing && !idempotencyKeyRef.current) {
       idempotencyKeyRef.current = crypto.randomUUID();
     }
@@ -183,7 +185,8 @@ export function ProjectFormModal({
   }
 
   async function handleTasksReview() {
-    if (isSaving || taskValidationError) return;
+    if (previewRequestLockRef.current || isSaving || taskValidationError) return;
+    previewRequestLockRef.current = true;
     const reviewedTasks = tasks.map((task) => ({ ...task, name: task.name.trim() }));
     const mainTasks = reviewedTasks.map(({ id: _id, ...task }) => task);
     setPreviewErrorMessage(null);
@@ -198,6 +201,8 @@ export function ProjectFormModal({
       setPreviewErrorMessage(
         getSaveErrorMessage(error, "Não foi possível gerar a prévia das dependências."),
       );
+    } finally {
+      previewRequestLockRef.current = false;
     }
   }
 

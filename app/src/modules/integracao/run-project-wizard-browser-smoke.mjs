@@ -543,14 +543,15 @@ async function runBrowserProof() {
     await firstTask.getByLabel(/^Nome/).fill("Apuração final");
     await firstTask.getByLabel(/^Modelo/).selectOption("model-default");
     await secondTask.getByRole("button", { name: "Remover tarefa", exact: true }).click();
-    await reviewButton.click();
+    await wizard.locator("form").evaluate((form) => {
+      form.requestSubmit();
+      form.requestSubmit();
+    });
     await expect(firstTask.getByLabel(/^Nome/)).toBeDisabled();
     await expect(firstTask.getByLabel(/^Modelo/)).toBeDisabled();
     await expect(firstTask.getByRole("button", { name: "Remover tarefa", exact: true })).toBeDisabled();
     await expect(wizard.getByRole("button", { name: "Adicionar tarefa", exact: true })).toBeDisabled();
     await expect.poll(() => previewRequests.length).toBe(5);
-    await wizard.locator("form").evaluate((form) => form.requestSubmit());
-    await new Promise((resolve) => setTimeout(resolve, 100));
     assert.equal(previewRequests.length, 5, "Uma prévia pendente não pode aceitar nova revisão.");
     await expect(review.getByRole("cell", { name: "Apuração final", exact: true })).toBeVisible();
     await expect(
