@@ -63,6 +63,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/task\/project-wizard\/preview$/,
+    description: { action: "gerou", item: "uma prévia de projeto com tarefas" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/platform\/organizations\/[^/]+\/users$/,
     description: { action: "criou", item: "um usuário da organização" },
   },

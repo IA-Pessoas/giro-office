@@ -42,20 +42,21 @@ Exemplos de paths publicos:
 - `/task/project-plan`
 - `/task/project-plan/list`
 - `/task/deps/list`
-- `POST /task/project-wizard` cria um projeto com uma lista, inclusive vazia, de tarefas manuais e
-  exige `Idempotency-Key`. Cada tarefa exige nome, departamento e modelo; prazo e responsável são
-  opcionais, e o responsável também aceita `null`. Cada Modelo pode aparecer em apenas uma tarefa
-  do lote; repetições são rejeitadas com `400` antes de criar o projeto.
+- `POST /task/project-wizard/preview` compõe tarefas principais e dependências diretas canônicas e
+  retorna uma `revision` opaca. Exige Integração nível 2+ ou owner.
+- `POST /task/project-wizard` cria o projeto com a lista, inclusive vazia, de tarefas principais e
+  exige `Idempotency-Key` e a `revision` da prévia. O serviço revalida a composição antes de criar;
+  Modelo repetido ou prévia desatualizada retorna `409`.
 - `POST /task/project-wizard/extract-tasks` transforma uma Ata de reunião colada em Tarefas
   propostas com a OpenAI. Exige nível `2+` em Integração ou `owner` e respeita o isolamento da
   organização. O corpo aceita `content` (Ata), `name`, `objective`, `start_date` e `end_date`
   opcional. A resposta traz `tasks` com `name` e, quando houver correspondência clara na
   organização, `prevision_date`, `department_id` e `model_id`. Zero propostas retorna `422`;
   formato incompatível, timeout ou falha do provedor retornam `502`; Ata acima de 100.000
-  caracteres é rejeitada com `400` antes do provedor. A Ata é tratada como dado não confiável, vai ao provedor apenas como conteúdo
-  do usuário e não é persistida, auditada nem registrada em log. O payload enviado ao provedor
-  contém somente nome, objetivo e datas do Projeto, nomes de departamentos ativos e nomes de
-  Modelos de tarefa do tipo `Projeto` da organização.
+  caracteres é rejeitada com `400` antes do provedor. A Ata é tratada como dado não confiável, vai
+  ao provedor apenas como conteúdo do usuário e não é persistida, auditada nem registrada em log. O
+  payload enviado ao provedor contém somente nome, objetivo e datas do Projeto, nomes de
+  departamentos ativos e nomes de Modelos de tarefa do tipo `Projeto` da organização.
 
 `/internal/reporting` é contrato direto interno, não roteado pelo gateway.
 

@@ -216,6 +216,7 @@ const state = {
   taskDependentId: "",
   taskIntegrationId: "",
   taskId: "",
+  projectWizardRevision: "",
   planId: "",
   planTaskId: "",
   rhPointId: "",
@@ -4602,6 +4603,12 @@ const handlers = {
     state.taskId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
   },
 
+  async taskProjectWizardPreview(op) {
+    const response = await httpRequest(op, { expectedStatus: [200], json: { tasks: [] } });
+    if (isBadExpectation(op)) return;
+    state.projectWizardRevision = pickFirst(response.body, "data.revision") ?? "";
+  },
+
   async taskProjectWizardCreate(op) {
     await httpRequest(op, {
       expectedStatus: [201],
@@ -4612,6 +4619,7 @@ const handlers = {
         start_date: new Date().toISOString(),
         objective: "Validate project creation without tasks.",
         tasks: [],
+        revision: requireState("projectWizardRevision"),
       },
     });
   },

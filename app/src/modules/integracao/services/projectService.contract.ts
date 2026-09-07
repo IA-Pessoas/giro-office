@@ -7,6 +7,7 @@ import type {
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
+  ProjectWizardPreview,
   ProjectWizardResult,
   ProjectWizardTask,
 } from "../types";
@@ -19,6 +20,7 @@ export const PROJECT_ENDPOINTS = {
   metrics: "/project/metrics",
   wizard: "/task/project-wizard",
   wizardExtractTasks: "/task/project-wizard/extract-tasks",
+  wizardPreview: "/task/project-wizard/preview",
 } as const;
 
 export const PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE =
@@ -148,6 +150,9 @@ export function unwrapProjectWizardResult(body: unknown): ProjectWizardResult {
   return unwrapProjectEnvelope<ProjectWizardResult>(body);
 }
 
+export function unwrapProjectWizardPreview(body: unknown): ProjectWizardPreview {
+  return unwrapProjectEnvelope<ProjectWizardPreview>(body);
+}
 
 export function unwrapProjectMetrics(body: unknown): ProjectMetrics {
   return unwrapProjectEnvelope<ProjectMetrics>(body);

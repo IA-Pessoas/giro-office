@@ -9,6 +9,7 @@ import type {
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
+  ProjectWizardPreview,
   ProjectWizardResult,
   ProjectWizardTask,
   UpdateProjectData,
@@ -27,6 +28,7 @@ import {
   unwrapUpdatedProject,
   unwrapProjectTaskProposals,
   unwrapProjectWizardResult,
+  unwrapProjectWizardPreview,
 } from "./projectService.contract";
 
 export const projectService = {
@@ -64,10 +66,14 @@ export const projectService = {
 
   async createWithWizard(payload: CreateProjectWizardData): Promise<ProjectWizardResult> {
     const api = setupAPIClient();
-    const { idempotencyKey, tasks, ...data } = payload;
+    const { idempotencyKey, revision, tasks, ...data } = payload;
     const response = await api.post(
       PROJECT_ENDPOINTS.wizard,
-      { ...buildCreateProjectPayload(data), ...(tasks !== undefined ? { tasks } : {}) },
+      {
+        ...buildCreateProjectPayload(data),
+        ...(tasks !== undefined ? { tasks } : {}),
+        revision,
+      },
       { headers: { "Idempotency-Key": idempotencyKey } },
     );
 
@@ -82,6 +88,13 @@ export const projectService = {
     );
 
     return unwrapProjectTaskProposals(response.data);
+  },
+
+  async previewWizard(tasks: ProjectWizardTask[]): Promise<ProjectWizardPreview> {
+    const api = setupAPIClient();
+    const response = await api.post(PROJECT_ENDPOINTS.wizardPreview, { tasks });
+
+    return unwrapProjectWizardPreview(response.data);
   },
 
   async update(payload: UpdateProjectData): Promise<ProjectDetail> {

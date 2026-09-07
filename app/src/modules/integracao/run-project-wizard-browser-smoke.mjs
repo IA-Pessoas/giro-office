@@ -71,7 +71,7 @@ const project = {
   end_date: null,
 };
 
-async function installApiMocks(page, wizardRequests, extractionRequests = []) {
+async function installApiMocks(page, previewRequests, wizardRequests, extractionRequests = []) {
   const existingTask = {
     id: "task-existing",
     name: "Tarefa anterior",
@@ -86,6 +86,7 @@ async function installApiMocks(page, wizardRequests, extractionRequests = []) {
     billing_description: null,
   };
   let taskList = [existingTask];
+  let failFirstModelChoicePreview = true;
   await page.route("**/user/me", (route) =>
     route.fulfill({
       status: 200,
@@ -195,6 +196,63 @@ async function installApiMocks(page, wizardRequests, extractionRequests = []) {
       },
     });
   });
+
+  await page.route("**/task/project-wizard/preview", async (route) => {
+    const body = route.request().postDataJSON();
+    previewRequests.push(body);
+    if (
+      failFirstModelChoicePreview &&
+      body.tasks.some((task) => task.model_id === "model-choice")
+    ) {
+      failFirstModelChoicePreview = false;
+      await route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        json: {
+          error:
+            "Modelo model-choice repetido entre principal 1 (Apuração revisada) e dependência model-choice.",
+        },
+      });
+      return;
+    }
+    const tasks = body.tasks.map((task) => ({
+      ...task,
+      status: "A Realizar",
+      observation: "Observação do Modelo",
+      dependencies:
+        task.model_id === "model-choice"
+          ? [
+              {
+                name: "Dependência em espera",
+                model_id: "model-default",
+                department_id: "department-one",
+                status: "Em Espera",
+                observation: "Aguardar a tarefa principal",
+                responsible_id: "responsible-not-loaded",
+              },
+            ]
+          : task.model_id === "model-default"
+            ? [
+                {
+                  name: "Dependência sem responsável",
+                  model_id: "model-empty",
+                  department_id: "department-empty",
+                  status: "A Realizar",
+                  observation: "Iniciar junto da tarefa principal",
+                  responsible_id: null,
+                },
+              ]
+            : [],
+    }));
+    if (body.tasks.some((task) => task.model_id === "model-default")) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: { success: true, data: { tasks, revision: `revision-${previewRequests.length}` } },
+    });
+  });
   await page.route("**/task/project-wizard", async (route) => {
     const request = route.request();
     wizardRequests.push({
@@ -213,7 +271,7 @@ async function installApiMocks(page, wizardRequests, extractionRequests = []) {
       taskList = [
         existingTask,
         { ...existingTask, id: "task-created-one", name: "Apuração final", isUnassigned: false },
-        { ...existingTask, id: "task-created-two", name: "Sem atribuição" },
+        { ...existingTask, id: "task-created-two", name: "Dependência sem responsável" },
       ];
     }
     await route.fulfill({
@@ -225,7 +283,7 @@ async function installApiMocks(page, wizardRequests, extractionRequests = []) {
           project: { ...project, id: "project-created" },
           counts:
             wizardRequests.length > 2
-              ? { main: 2, dependencies: 0, unassigned: 1 }
+              ? { main: 1, dependencies: 1, unassigned: 1 }
               : { main: 0, dependencies: 0, unassigned: 0 },
         },
       },
@@ -264,10 +322,11 @@ async function runBrowserProof() {
     },
   ]);
   const page = await context.newPage();
+  const previewRequests = [];
   const wizardRequests = [];
   const updateRequests = [];
   const extractionRequests = [];
-  await installApiMocks(page, wizardRequests, extractionRequests);
+  await installApiMocks(page, previewRequests, wizardRequests, extractionRequests);
   await page.route("**/project", async (route) => {
     assert.equal(route.request().method(), "PUT");
     updateRequests.push(route.request().postDataJSON());
@@ -337,6 +396,8 @@ async function runBrowserProof() {
     await expectLockedClient(wizard);
     await wizard.getByRole("button", { name: "Pular e revisar" }).click();
     assert.equal(wizardRequests.length, 0, "Pular a etapa 2 não pode criar tarefas nem minutos.");
+    await expect.poll(() => previewRequests.length).toBe(1);
+    assert.deepEqual(previewRequests[0], { tasks: [] });
     await expect(wizard.getByText("Revisão", { exact: true })).toBeVisible();
     await expectLockedClient(wizard);
     await expect(wizard.getByText("Nome: Projeto pelo wizard", { exact: true })).toBeVisible();
@@ -361,6 +422,7 @@ async function runBrowserProof() {
       end_date: "2026-09-11",
       objective: "Criar sem tarefas.",
       tasks: [],
+      revision: "revision-2",
     });
     await expect(
       page.getByText(
@@ -448,6 +510,11 @@ async function runBrowserProof() {
       2,
       "Rascunhos não podem ser enviados antes da confirmação.",
     );
+    await expect(wizard.getByRole("alert")).toHaveText(
+      "Modelo model-choice repetido entre principal 1 (Apuração revisada) e dependência model-choice.Tentar gerar prévia",
+    );
+    await expect(wizard.getByRole("button", { name: "Criar projeto", exact: true })).toHaveCount(0);
+    await wizard.getByRole("button", { name: "Tentar gerar prévia", exact: true }).click();
     await expectLockedClient(wizard);
     await expect(wizard.getByRole("textbox")).toHaveCount(0);
     await expect(wizard.getByRole("combobox")).toHaveCount(0);
@@ -458,6 +525,7 @@ async function runBrowserProof() {
       "Departamento",
       "Modelo",
       "Responsável",
+      "Status",
     ]);
     await expect(review.getByRole("row").nth(1).getByRole("cell")).toHaveText([
       "Apuração revisada",
@@ -465,30 +533,30 @@ async function runBrowserProof() {
       "Fiscal",
       "Modelo com escolha",
       "Bia",
+      "A Realizar",
     ]);
-    await expect(review.getByRole("row").nth(2).getByRole("cell")).toHaveText([
+    await expect(review.getByRole("row").nth(3).getByRole("cell")).toHaveText([
       "Sem atribuição",
       "Não informado",
       "Sem equipe",
       "Modelo sem equipe",
       "Sem responsável",
+      "A Realizar",
     ]);
-    await expect(review.getByRole("row")).toHaveCount(3);
-    await wizard.getByRole("button", { name: "Voltar para tarefas", exact: true }).click();
-    await firstTask.getByLabel(/^Nome/).fill("Apuração final");
-    await reviewButton.click();
-    await expect(review.getByRole("cell", { name: "Apuração final", exact: true })).toBeVisible();
-    await wizard.getByRole("button", { name: "Criar projeto", exact: true }).click();
-    await expect.poll(() => wizardRequests.length).toBe(3);
-    assert.deepEqual(wizardRequests[2].body, {
-      client_id: clientId,
-      name: "Projeto com tarefas",
-      start_date: "2026-09-10",
-      end_date: "2026-09-20",
-      objective: "Revisar tarefas manuais.",
+    await expect(review.getByRole("row").nth(2).getByRole("cell")).toHaveText([
+      "Dependência em espera Incluída pelo Modelo: Modelo com escolha",
+      "Não informado",
+      "Fiscal",
+      "Modelo padrão",
+      "Responsável não carregado (responsible-not-loaded)",
+      "Em Espera",
+    ]);
+    await expect(review.getByRole("row")).toHaveCount(4);
+    await expect(review.getByRole("button", { name: /remover dependência/i })).toHaveCount(0);
+    assert.deepEqual(previewRequests[3], {
       tasks: [
         {
-          name: "Apuração final",
+          name: "Apuração revisada",
           department_id: "department-one",
           model_id: "model-choice",
           responsible_id: "bia",
@@ -502,10 +570,49 @@ async function runBrowserProof() {
         },
       ],
     });
+    await wizard.getByRole("button", { name: "Voltar para tarefas", exact: true }).click();
+    await firstTask.getByLabel(/^Nome/).fill("Apuração final");
+    await firstTask.getByLabel(/^Modelo/).selectOption("model-default");
+    await secondTask.getByRole("button", { name: "Remover tarefa", exact: true }).click();
+    await wizard.locator("form").evaluate((form) => {
+      form.requestSubmit();
+      form.requestSubmit();
+    });
+    await expect(firstTask.getByLabel(/^Nome/)).toBeDisabled();
+    await expect(firstTask.getByLabel(/^Modelo/)).toBeDisabled();
+    await expect(firstTask.getByRole("button", { name: "Remover tarefa", exact: true })).toBeDisabled();
+    await expect(wizard.getByRole("button", { name: "Adicionar tarefa", exact: true })).toBeDisabled();
+    await expect.poll(() => previewRequests.length).toBe(5);
+    assert.equal(previewRequests.length, 5, "Uma prévia pendente não pode aceitar nova revisão.");
+    await expect(review.getByRole("cell", { name: "Apuração final", exact: true })).toBeVisible();
+    await expect(
+      wizard.getByRole("alert", { name: "Dependências atualizadas", exact: true }),
+    ).toHaveText("As dependências incluídas pelos Modelos foram atualizadas.");
+    await expect(review.getByRole("cell", { name: /Dependência sem responsável/ })).toBeVisible();
+    await expect(review.getByRole("cell", { name: "Sem responsável", exact: true })).toBeVisible();
+    await wizard.getByRole("button", { name: "Criar projeto", exact: true }).click();
+    await expect.poll(() => wizardRequests.length).toBe(3);
+    assert.deepEqual(wizardRequests[2].body, {
+      client_id: clientId,
+      name: "Projeto com tarefas",
+      start_date: "2026-09-10",
+      end_date: "2026-09-20",
+      objective: "Revisar tarefas manuais.",
+      tasks: [
+        {
+          name: "Apuração final",
+          department_id: "department-one",
+          model_id: "model-default",
+          responsible_id: "ana",
+          prevision_date: "2026-09-21",
+        },
+      ],
+      revision: "revision-5",
+    });
     assert.notEqual(wizardRequests[2].key, wizardRequests[1].key);
     await expect(
       page.getByText(
-        "Projeto criado com sucesso. Tarefas principais: 2. Dependências: 0. Sem responsável: 1.",
+        "Projeto criado com sucesso. Tarefas principais: 1. Dependências: 1. Sem responsável: 1.",
         { exact: true },
       ),
     ).toHaveCount(1);
@@ -517,7 +624,9 @@ async function runBrowserProof() {
     );
     await expect(page.getByRole("cell", { name: "Tarefa anterior", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Apuração final", exact: true })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "Sem atribuição", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("cell", { name: "Dependência sem responsável", exact: true }),
+    ).toBeVisible();
 
     await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "Editar" }).first().click();

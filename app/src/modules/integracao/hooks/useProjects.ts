@@ -16,6 +16,7 @@ import type {
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
+  ProjectWizardPreview,
   ProjectWizardResult,
   ProjectWizardTask,
   UpdateProjectData,
@@ -105,6 +106,16 @@ export function useExtractProjectTasksMutation(): UseMutationResult<
 > {
   return useMutation({
     mutationFn: (payload) => projectService.extractTasks(payload),
+  });
+}
+
+export function useProjectWizardPreviewMutation(): UseMutationResult<
+  ProjectWizardPreview,
+  Error,
+  ProjectWizardTask[]
+> {
+  return useMutation({
+    mutationFn: (tasks) => projectService.previewWizard(tasks),
   });
 }
 

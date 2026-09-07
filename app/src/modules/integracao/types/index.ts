@@ -89,6 +89,7 @@ export interface CreateProjectData {
 
 export interface CreateProjectWizardData extends CreateProjectData {
   idempotencyKey: string;
+  revision: string;
   tasks?: ProjectWizardTask[];
 }
 
@@ -115,6 +116,26 @@ export interface ProjectWizardResult {
     dependencies: number;
     unassigned: number;
   };
+}
+
+export interface ProjectWizardPreview {
+  tasks: ProjectWizardPreviewTask[];
+  revision: string;
+}
+
+export interface ProjectWizardPreviewTask extends ProjectWizardTask {
+  status: "A Realizar" | "Em Espera";
+  observation: string;
+  dependencies: ProjectWizardPreviewDependency[];
+}
+
+export interface ProjectWizardPreviewDependency {
+  name: string;
+  model_id: string;
+  department_id: string;
+  status: "A Realizar" | "Em Espera";
+  observation: string;
+  responsible_id: string | null;
 }
 
 export interface UpdateProjectData {

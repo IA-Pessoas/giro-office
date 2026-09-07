@@ -252,6 +252,13 @@ describe("activityCatalog", () => {
     });
   });
 
+  it("classifica a prévia do wizard como atividade visível", () => {
+    expect(classifyActivity("POST", "/task/project-wizard/preview")).toEqual({
+      kind: "visible",
+      description: { action: "gerou", item: "uma prévia de projeto com tarefas" },
+    });
+  });
+
   it.each([
     ["GET", "/health"],
     ["GET", "/ready"],

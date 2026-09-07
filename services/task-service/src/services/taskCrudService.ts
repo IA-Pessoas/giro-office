@@ -234,7 +234,7 @@ async function assertNoActiveTaskForModel(
   }
 }
 
-function resolveEligibleTaskResponsible(
+export function resolveEligibleTaskResponsible(
   candidates: Array<{ id: string }>,
   modelDefaultId: string | null | undefined,
   requestedId: string | null | undefined,

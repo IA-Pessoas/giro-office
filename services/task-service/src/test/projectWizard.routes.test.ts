@@ -23,6 +23,7 @@ import type {
 } from "../routes/projectWizard.routes.js";
 import { projectWizardCreateBodySchema } from "../schemas/projectWizard.schemas.js";
 import { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
+import { ProjectWizardService } from "../services/projectWizardService.js";
 
 const ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -132,6 +133,7 @@ describe("project wizard routes", () => {
     start_date: "2026-09-01T00:00:00.000Z",
     end_date: "2026-09-30T00:00:00.000Z",
     objective: "Objetivo do projeto",
+    revision: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
   };
 
   it("documenta o contrato público do wizard no OpenAPI", () => {
@@ -145,6 +147,7 @@ describe("project wizard routes", () => {
       "name",
       "start_date",
       "objective",
+      "revision",
     ]);
     expect(operation.requestBody.content["application/json"].schema.properties.tasks).toMatchObject(
       {
@@ -158,10 +161,187 @@ describe("project wizard routes", () => {
         },
       },
     );
+    expect(
+      buildTaskServiceOpenApiSpec(env).paths["/task/project-wizard/preview"].post,
+    ).toMatchObject({
+      tags: ["ProjectWizard"],
+      responses: {
+        "200": expect.any(Object),
+        "409": expect.any(Object),
+        "422": expect.any(Object),
+      },
+    });
+  });
+
+  it("POST /task/project-wizard/preview delega a composição autenticada", async () => {
+    const service = {
+      preview: vi.fn().mockResolvedValue({ tasks: [], revision: "revision-1" }),
+      create: vi.fn(),
+    } as unknown as ProjectWizardRouteDeps;
+
+    const response = await request(createApp(service))
+      .post("/task/project-wizard/preview")
+      .set(gatewayHeaders())
+      .send({ tasks: [] });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: { tasks: [], revision: "revision-1" } });
+    expect(service.preview).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: USER_ID, organizationId: ORG_ID, tasks: [] }),
+    );
+  });
+
+  it("POST /task/project-wizard/preview expõe dependências reais com espera e sem responsável", async () => {
+    const service = new ProjectWizardService(
+      { createProject: vi.fn() },
+      { createTask: vi.fn() },
+      {
+        findTaskModels: vi.fn(async () => [
+          {
+            id: "model-main",
+            name: "Principal",
+            department_id: "department-1",
+            responsible_id: "responsible-main",
+            observations: "Observação principal",
+            type: "Projeto",
+            department_status: "Ativo",
+            dependencies: [
+              {
+                dependent_id: "model-wait",
+                wait: true,
+                observation: "Aguardar principal",
+                dependent: {
+                  id: "model-wait",
+                  name: "Dependência em espera",
+                  department_id: "department-2",
+                  responsible_id: "responsible-wait",
+                  observations: "",
+                  type: "Projeto",
+                  department_status: "Ativo",
+                },
+              },
+              {
+                dependent_id: "model-ready",
+                wait: false,
+                observation: "Pode iniciar",
+                dependent: {
+                  id: "model-ready",
+                  name: "Dependência pronta",
+                  department_id: "department-3",
+                  responsible_id: "responsible-ready",
+                  observations: "",
+                  type: "Projeto",
+                  department_status: "Ativo",
+                },
+              },
+            ],
+          },
+        ]),
+        listEligibleTaskResponsibles: vi.fn(async (_organizationId, departmentId) =>
+          departmentId === "department-3" ? [] : [{ id: `responsible-${departmentId}` }],
+        ),
+      },
+    );
+
+    const response = await request(createApp(service))
+      .post("/task/project-wizard/preview")
+      .set(gatewayHeaders())
+      .send({
+        tasks: [
+          {
+            name: "Tarefa principal",
+            department_id: "department-1",
+            model_id: "model-main",
+            responsible_id: "responsible-department-1",
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        revision: expect.any(String),
+        tasks: [
+          {
+            model_id: "model-main",
+            status: "A Realizar",
+            dependencies: [
+              {
+                model_id: "model-wait",
+                status: "Em Espera",
+                responsible_id: "responsible-department-2",
+              },
+              {
+                model_id: "model-ready",
+                status: "A Realizar",
+                responsible_id: null,
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  it("POST /task/project-wizard/preview identifica conflito da composição real", async () => {
+    const sharedDependency = {
+      id: "model-shared",
+      name: "Dependência compartilhada",
+      department_id: "department-3",
+      responsible_id: "responsible-shared",
+      observations: "",
+      type: "Projeto",
+      department_status: "Ativo",
+    };
+    const service = new ProjectWizardService(
+      { createProject: vi.fn() },
+      { createTask: vi.fn() },
+      {
+        findTaskModels: vi.fn(async () =>
+          ["model-one", "model-two"].map((id, index) => ({
+            id,
+            name: `Principal ${index + 1}`,
+            department_id: `department-${index + 1}`,
+            responsible_id: `responsible-${index + 1}`,
+            observations: "",
+            type: "Projeto",
+            department_status: "Ativo",
+            dependencies: [
+              {
+                dependent_id: "model-shared",
+                wait: true,
+                observation: "Aguardar",
+                dependent: sharedDependency,
+              },
+            ],
+          })),
+        ),
+        listEligibleTaskResponsibles: vi.fn(async () => [{ id: "responsible-1" }]),
+      },
+    );
+
+    const response = await request(createApp(service))
+      .post("/task/project-wizard/preview")
+      .set(gatewayHeaders())
+      .send({
+        tasks: [
+          { name: "Primeira", department_id: "department-1", model_id: "model-one" },
+          { name: "Segunda", department_id: "department-2", model_id: "model-two" },
+        ],
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({
+      success: false,
+      error:
+        "Modelo model-shared repetido entre dependência model-shared da principal 1 (Primeira) e dependência model-shared da principal 2 (Segunda).",
+    });
   });
 
   it("POST /task/project-wizard aceita lista vazia", async () => {
     const service: ProjectWizardRouteDeps = {
+      preview: vi.fn(),
       create: vi.fn().mockResolvedValue({
         project: { id: "project-1" },
         counts: { main: 0, dependencies: 0, unassigned: 0 },
@@ -182,6 +362,7 @@ describe("project wizard routes", () => {
     1, 2,
   ])("POST /task/project-wizard aceita %i tarefa(s) com Modelos distintos", async (count) => {
     const service: ProjectWizardRouteDeps = {
+      preview: vi.fn(),
       create: vi.fn().mockResolvedValue({
         project: { id: "project-1" },
         counts: { main: count, dependencies: 0, unassigned: count - 1 },
@@ -212,8 +393,11 @@ describe("project wizard routes", () => {
   it.each([
     "model-1",
     " model-1 ",
-  ])("POST /task/project-wizard rejeita Modelo repetido %j antes do service", async (modelId) => {
-    const service: ProjectWizardRouteDeps = { create: vi.fn() };
+  ])("POST /task/project-wizard propaga conflito de Modelo repetido %j", async (modelId) => {
+    const service: ProjectWizardRouteDeps = {
+      preview: vi.fn(),
+      create: vi.fn().mockRejectedValue(new ServiceError(409, "Modelo model-1 repetido.")),
+    };
     const response = await request(createApp(service))
       .post("/task/project-wizard")
       .set(gatewayHeaders())
@@ -223,12 +407,12 @@ describe("project wizard routes", () => {
         tasks: [validTask, { ...validTask, name: "Outra tarefa", model_id: modelId }],
       });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Cada Modelo pode ser usado em apenas uma tarefa do projeto.",
+      error: "Modelo model-1 repetido.",
     });
-    expect(service.create).not.toHaveBeenCalled();
+    expect(service.create).toHaveBeenCalled();
     expect(forwardedRequest).toBeNull();
   });
 
@@ -237,7 +421,7 @@ describe("project wizard routes", () => {
     "department_id",
     "model_id",
   ] as const)("POST /task/project-wizard rejeita Tarefa sem %s antes do service", async (field) => {
-    const service: ProjectWizardRouteDeps = { create: vi.fn() };
+    const service: ProjectWizardRouteDeps = { preview: vi.fn(), create: vi.fn() };
     const invalidTask = { ...validTask };
     delete invalidTask[field];
 

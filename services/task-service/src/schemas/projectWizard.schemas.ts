@@ -37,15 +37,15 @@ export const projectWizardCreateBodySchema = z
   .object({
     client_id: z.string().uuid({ message: "client_id inválido." }),
     ...projectWizardProjectFields,
-    tasks: z
-      .array(projectWizardTaskSchema)
-      .refine((tasks) => new Set(tasks.map((task) => task.model_id)).size === tasks.length, {
-        message: "Cada Modelo pode ser usado em apenas uma tarefa do projeto.",
-      })
-      .default([]),
+    tasks: z.array(projectWizardTaskSchema).default([]),
+    revision: zNonEmptyText("revision"),
   })
   .strict()
   .superRefine(refineProjectWizardPeriod);
+
+export const projectWizardPreviewBodySchema = z
+  .object({ tasks: z.array(projectWizardTaskSchema).default([]) })
+  .strict();
 
 export const idempotencyKeySchema = z
   .string({ required_error: "Idempotency-Key é obrigatória." })
