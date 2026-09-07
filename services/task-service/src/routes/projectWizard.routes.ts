@@ -84,7 +84,7 @@ function uploadMeetingMinutes(request: Request, response: Response, next: NextFu
       request.body = { ...request.body, content };
       next();
     } catch (decodeError) {
-      logError("Falha ao decodificar arquivo da Ata");
+      logError("Falha ao decodificar arquivo da Ata", { err: decodeError });
       next(
         decodeError instanceof ServiceError
           ? decodeError
