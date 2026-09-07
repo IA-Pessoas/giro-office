@@ -433,7 +433,8 @@ const extractProjectWizardTasksRequestBody = {
             file: {
               type: "string",
               format: "binary",
-              description: "Ata .txt ou .md de até 10 MB; conteúdo transitório.",
+              description:
+                "Ata .txt ou .md de até 10 MB; aceita text/plain para .txt e text/markdown, text/plain ou text/x-markdown para .md; conteúdo transitório.",
             },
             name: extractProjectWizardTasksProperties.name,
             objective: extractProjectWizardTasksProperties.objective,

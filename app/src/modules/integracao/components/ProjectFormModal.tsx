@@ -592,7 +592,7 @@ export function ProjectFormModal({
                     ref={meetingMinutesFileRef}
                     id="project-meeting-minutes-file"
                     type="file"
-                    accept=".txt,.md,text/plain,text/markdown"
+                    accept=".txt,.md,text/plain,text/markdown,text/x-markdown"
                     onChange={(event) => setMeetingMinutesFile(event.target.files?.[0] ?? null)}
                     className={PROJECT_INPUT_CLASSNAME}
                     aria-describedby="project-meeting-minutes-notice"

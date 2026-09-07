@@ -571,6 +571,8 @@ describe("project wizard task extraction routes", () => {
   it.each([
     ["TXT", "ata.txt", "text/plain"],
     ["Markdown", "ata.md", "text/markdown"],
+    ["Markdown enviado como texto simples", "ata.md", "text/plain"],
+    ["Markdown enviado pelo MIME legado", "ata.md", "text/x-markdown"],
   ])("aceita Ata %s enviada como multipart", async (_label, filename, contentType) => {
     const service: ProjectWizardExtractionRouteDeps = {
       extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
@@ -590,6 +592,27 @@ describe("project wizard task extraction routes", () => {
     expect(service.extractTasks).toHaveBeenCalledWith(
       expect.objectContaining({ content, name: validExtractionBody.name }),
     );
+  });
+
+  it("rejeita MIME incompatível para Markdown", async () => {
+    const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .attach("file", Buffer.from("Ata inválida"), {
+        filename: "ata.md",
+        contentType: "application/pdf",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Tipo de arquivo não permitido.",
+    });
+    expect(service.extractTasks).not.toHaveBeenCalled();
   });
 
   it("rejeita multipart inválido antes do rate limit e do provedor", async () => {

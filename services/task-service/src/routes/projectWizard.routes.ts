@@ -32,10 +32,10 @@ export interface ProjectWizardRoutesDeps {
 
 const MEETING_MINUTES_UPLOAD_FIELD = "file";
 const MEETING_MINUTES_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-const MEETING_MINUTES_FILE_TYPES = {
-  ".txt": "text/plain",
-  ".md": "text/markdown",
-} as const;
+const MEETING_MINUTES_FILE_TYPES: Record<string, readonly string[]> = {
+  ".txt": ["text/plain"],
+  ".md": ["text/markdown", "text/plain", "text/x-markdown"],
+};
 type ProjectWizardExtractTasksBody = z.infer<typeof projectWizardExtractTasksBodySchema>;
 
 const meetingMinutesUpload = multer({
@@ -43,11 +43,8 @@ const meetingMinutesUpload = multer({
   limits: { fileSize: MEETING_MINUTES_MAX_FILE_SIZE_BYTES, files: 1, fields: 4 },
   fileFilter(_request, file, callback) {
     const extension = file.originalname.match(/\.[^.]+$/)?.[0]?.toLowerCase();
-    if (
-      !extension ||
-      MEETING_MINUTES_FILE_TYPES[extension as keyof typeof MEETING_MINUTES_FILE_TYPES] !==
-        file.mimetype
-    ) {
+    const allowedMimeTypes = extension ? MEETING_MINUTES_FILE_TYPES[extension] : undefined;
+    if (!allowedMimeTypes?.includes(file.mimetype)) {
       callback(new ServiceError(400, "Tipo de arquivo não permitido."));
       return;
     }
