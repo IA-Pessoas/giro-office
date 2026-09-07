@@ -337,6 +337,7 @@ const createProjectWizardRequestBody = createObjectRequestBody({
     start_date: "2026-09-01T00:00:00.000Z",
     end_date: "2026-09-30T00:00:00.000Z",
     objective: "Objetivo do projeto",
+    revision: "revisao-opaca-da-previa",
     tasks: [
       {
         name: "Revisar documentação",
@@ -347,16 +348,45 @@ const createProjectWizardRequestBody = createObjectRequestBody({
       },
     ],
   },
-  required: ["client_id", "name", "start_date", "objective"],
+  required: ["client_id", "name", "start_date", "objective", "revision"],
   properties: {
     client_id: { type: "string", format: "uuid" },
     name: { type: "string" },
     start_date: { type: "string", format: "date-time" },
     end_date: { type: "string", format: "date-time" },
     objective: { type: "string" },
+    revision: { type: "string", description: "Revisão opaca retornada pela prévia do wizard." },
     tasks: {
       type: "array",
-      description: "Cada model_id deve ser único no lote de tarefas.",
+      description: "Modelos repetidos na composição canônica retornam conflito.",
+      items: {
+        type: "object",
+        required: ["name", "department_id", "model_id"],
+        properties: {
+          name: { type: "string" },
+          department_id: { type: "string" },
+          model_id: { type: "string" },
+          prevision_date: { type: "string", format: "date" },
+          responsible_id: { type: ["string", "null"] },
+        },
+      },
+    },
+  },
+});
+
+const projectWizardPreviewRequestBody = createObjectRequestBody({
+  example: {
+    tasks: [
+      {
+        name: "Revisar documentação",
+        department_id: "department-uuid",
+        model_id: "task-model-uuid",
+      },
+    ],
+  },
+  properties: {
+    tasks: {
+      type: "array",
       items: {
         type: "object",
         required: ["name", "department_id", "model_id"],
@@ -902,11 +932,31 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           ],
           ...createProjectWizardRequestBody,
           responses: {
-            "201": { description: "Projeto e tarefas principais criados", ...successJson },
+            "201": {
+              description: "Projeto, tarefas principais e dependências criados",
+              ...successJson,
+            },
             "400": { description: "Entrada ou chave inválida" },
             "401": { description: "Não autenticado" },
             "403": { description: "Sem permissão de Integração" },
+            "409": { description: "Prévia desatualizada ou Modelo repetido" },
             "502": { description: "Falha ao comunicar com o project-service" },
+          },
+        },
+      },
+      "/task/project-wizard/preview": {
+        post: {
+          tags: ["ProjectWizard"],
+          summary: "Gerar prévia canônica das tarefas e dependências do wizard",
+          security: bearer,
+          ...projectWizardPreviewRequestBody,
+          responses: {
+            "200": { description: "Prévia e revisão opaca", ...successJson },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão de Integração" },
+            "409": { description: "Modelo repetido na composição" },
+            "422": { description: "Modelo, departamento ou responsável inelegível" },
           },
         },
       },

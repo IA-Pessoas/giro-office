@@ -15,6 +15,8 @@ import type {
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
+  ProjectWizardPreview,
+  ProjectWizardTask,
   ProjectWizardResult,
   UpdateProjectData,
 } from "../types";
@@ -93,6 +95,16 @@ export function useCreateProjectWizardMutation(): UseMutationResult<
       await refreshCreatedProjectCache(queryClient, project, variables.client_id);
       await queryClient.invalidateQueries({ queryKey: INTEGRACAO_TASKS_QUERY_KEY });
     },
+  });
+}
+
+export function useProjectWizardPreviewMutation(): UseMutationResult<
+  ProjectWizardPreview,
+  Error,
+  ProjectWizardTask[]
+> {
+  return useMutation({
+    mutationFn: (tasks) => projectService.previewWizard(tasks),
   });
 }
 

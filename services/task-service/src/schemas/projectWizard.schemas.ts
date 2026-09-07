@@ -20,12 +20,8 @@ export const projectWizardCreateBodySchema = z
     start_date: zIsoDate("start_date"),
     end_date: zIsoDate("end_date").optional(),
     objective: zNonEmptyText("objective"),
-    tasks: z
-      .array(projectWizardTaskSchema)
-      .refine((tasks) => new Set(tasks.map((task) => task.model_id)).size === tasks.length, {
-        message: "Cada Modelo pode ser usado em apenas uma tarefa do projeto.",
-      })
-      .default([]),
+    tasks: z.array(projectWizardTaskSchema).default([]),
+    revision: zNonEmptyText("revision"),
   })
   .strict()
   .superRefine((value, context) => {
@@ -37,6 +33,10 @@ export const projectWizardCreateBodySchema = z
       });
     }
   });
+
+export const projectWizardPreviewBodySchema = z
+  .object({ tasks: z.array(projectWizardTaskSchema).default([]) })
+  .strict();
 
 export const idempotencyKeySchema = z
   .string({ required_error: "Idempotency-Key é obrigatória." })

@@ -17,9 +17,10 @@ import { useProjectForm } from "../hooks/useProjectForm";
 import {
   useCreateProjectWizardMutation,
   useProjectDetail,
+  useProjectWizardPreviewMutation,
   useUpdateProjectMutation,
 } from "../hooks/useProjects";
-import type { ProjectDetail, ProjectWizardTask } from "../types";
+import type { ProjectDetail, ProjectWizardPreview, ProjectWizardTask } from "../types";
 import { taskModelService } from "../services/taskModelService";
 import {
   formatProjectDate,
@@ -45,10 +46,28 @@ interface ProjectFormModalProps {
   onSuccess?: (project: ProjectDetail | { id: string; client_id?: string }) => void;
 }
 
-function getSaveErrorMessage(error: unknown): string {
+function getRequestErrorMessage(error: unknown, fallback = "Não foi possível salvar o projeto."): string {
   const message = (error as { response?: { data?: { error?: unknown } } } | null)?.response?.data
     ?.error;
-  return typeof message === "string" ? message : "Não foi possível salvar o projeto.";
+  return typeof message === "string" ? message : fallback;
+}
+
+function dependencyModelIdsSignature(preview: ProjectWizardPreview): string {
+  return preview.tasks
+    .flatMap((task) => task.dependencies.map((dependency) => dependency.model_id))
+    .sort()
+    .join("|");
+}
+
+function getResponsibleName(
+  responsibleId: string | null,
+  candidates: Array<{ id: string; name: string }>,
+): string {
+  if (responsibleId === null) return "Sem responsável";
+  return (
+    candidates.find(({ id }) => id === responsibleId)?.name ??
+    `Responsável não carregado (${responsibleId})`
+  );
 }
 
 export function ProjectFormModal({
@@ -62,9 +81,13 @@ export function ProjectFormModal({
   const isEditing = Boolean(projectId);
   const detailQuery = useProjectDetail(open && projectId ? projectId : undefined);
   const createWizardMutation = useCreateProjectWizardMutation();
+  const previewMutation = useProjectWizardPreviewMutation();
   const updateMutation = useUpdateProjectMutation();
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
   const [tasks, setTasks] = useState<Array<ProjectWizardTask & { id: string }>>([]);
+  const [preview, setPreview] = useState<ProjectWizardPreview | null>(null);
+  const [dependenciesChanged, setDependenciesChanged] = useState(false);
+  const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null);
   const departmentsQuery = useFetch(
     TASK_FORM_DEPARTMENTS_QUERY_KEY,
     () => departmentService.list({ status: "Ativo" }),
@@ -76,6 +99,7 @@ export function ProjectFormModal({
     { enabled: open && !isEditing },
   );
   const idempotencyKeyRef = useRef<string | null>(null);
+  const previewRequestLockRef = useRef(false);
   const { values, updateValue, validate, reset, buildCreatePayload, buildUpdatePayload } =
     useProjectForm(detailQuery.data);
 
@@ -84,13 +108,19 @@ export function ProjectFormModal({
       reset(null);
       setCreateStep(1);
       setTasks([]);
+      setPreview(null);
+      setDependenciesChanged(false);
+      setPreviewErrorMessage(null);
+      previewMutation.reset();
       idempotencyKeyRef.current = null;
+      previewRequestLockRef.current = false;
     } else if (!isEditing && !idempotencyKeyRef.current) {
       idempotencyKeyRef.current = crypto.randomUUID();
     }
   }, [isEditing, open, reset]);
 
-  const isSaving = createWizardMutation.isPending || updateMutation.isPending;
+  const isBusy =
+    createWizardMutation.isPending || previewMutation.isPending || updateMutation.isPending;
   const dateRangeError =
     !isEditing && values.end_date && values.end_date < values.start_date
       ? "A data final não pode ser anterior à data de início."
@@ -127,6 +157,7 @@ export function ProjectFormModal({
   }
 
   function updateTask(id: string, field: keyof ProjectWizardTask, value: string) {
+    if (isBusy) return;
     setTasks((current) =>
       current.map((task) => {
         if (task.id !== id) return task;
@@ -154,9 +185,32 @@ export function ProjectFormModal({
   }
 
   function handleTasksReview() {
-    if (taskValidationError) return;
-    setTasks((current) => current.map((task) => ({ ...task, name: task.name.trim() })));
-    setCreateStep(3);
+    if (previewRequestLockRef.current || isBusy || taskValidationError) return;
+    previewRequestLockRef.current = true;
+    const reviewedTasks = tasks.map((task) => ({ ...task, name: task.name.trim() }));
+    const mainTasks = reviewedTasks.map(({ id: _id, ...task }) => task);
+    setPreviewErrorMessage(null);
+
+    previewMutation.mutate(mainTasks, {
+      onSuccess: (nextPreview) => {
+        setDependenciesChanged(
+          preview
+            ? dependencyModelIdsSignature(preview) !== dependencyModelIdsSignature(nextPreview)
+            : false,
+        );
+        setPreview(nextPreview);
+        setTasks(reviewedTasks);
+        setCreateStep(3);
+      },
+      onError: (error) => {
+        setPreviewErrorMessage(
+          getRequestErrorMessage(error, "Não foi possível gerar a prévia das dependências."),
+        );
+      },
+      onSettled: () => {
+        previewRequestLockRef.current = false;
+      },
+    });
   }
 
   async function handleUpdateSubmit() {
@@ -185,7 +239,7 @@ export function ProjectFormModal({
 
       onOpenChange(false);
     } catch (error) {
-      toast.error(getSaveErrorMessage(error));
+      toast.error(getRequestErrorMessage(error));
     }
   }
 
@@ -206,7 +260,8 @@ export function ProjectFormModal({
     if (
       !clientId ||
       !idempotencyKeyRef.current ||
-      isSaving ||
+      !preview ||
+      isBusy ||
       taskValidationError ||
       dateRangeError
     ) {
@@ -218,6 +273,7 @@ export function ProjectFormModal({
         ...buildCreatePayload(clientId),
         idempotencyKey: idempotencyKeyRef.current,
         tasks: tasks.map(({ id: _id, ...task }) => task),
+        revision: preview.revision,
       });
       toast.success(
         `Projeto criado com sucesso. Tarefas principais: ${result.counts.main}. Dependências: ${result.counts.dependencies}. Sem responsável: ${result.counts.unassigned}.`,
@@ -226,7 +282,7 @@ export function ProjectFormModal({
       onOpenChange(false);
       await router.push(`/tasks?clientId=${clientId}`);
     } catch (error) {
-      toast.error(getSaveErrorMessage(error));
+      toast.error(getRequestErrorMessage(error));
     }
   }
 
@@ -237,14 +293,14 @@ export function ProjectFormModal({
       title={isEditing ? "Editar projeto" : "Novo projeto"}
       description={isEditing ? "Formulário de projeto" : `Etapa ${createStep} de 3`}
       contentClassName="w-[min(92vw,760px)] [&>footer]:flex-wrap"
-      preventClose={isSaving}
+      preventClose={isBusy}
       footer={
         <>
           <button
             type="button"
             onClick={() => onOpenChange(false)}
             className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-            disabled={isSaving}
+            disabled={isBusy}
           >
             Cancelar
           </button>
@@ -253,9 +309,9 @@ export function ProjectFormModal({
               type="button"
               onClick={() => void handleUpdateSubmit()}
               className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-              disabled={isSaving || !detailQuery.data}
+              disabled={isBusy || !detailQuery.data}
             >
-              {isSaving ? (
+              {isBusy ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               ) : (
                 <Save className="h-4 w-4" />
@@ -267,7 +323,7 @@ export function ProjectFormModal({
               type="button"
               onClick={handleCreateStepOne}
               className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-              disabled={isSaving || !clientId}
+              disabled={isBusy || !clientId}
             >
               Continuar
             </button>
@@ -277,17 +333,26 @@ export function ProjectFormModal({
                 type="button"
                 onClick={() => setCreateStep(1)}
                 className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                disabled={isSaving}
+                disabled={isBusy}
               >
                 Voltar
               </button>
               <button
                 type="button"
-                onClick={handleTasksReview}
+                onClick={() => void handleTasksReview()}
                 className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-                disabled={isSaving || Boolean(taskValidationError)}
+                disabled={isBusy || Boolean(taskValidationError)}
               >
-                {tasks.length ? "Revisar tarefas" : "Pular e revisar"}
+                {isBusy ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Gerando prévia...
+                  </>
+                ) : tasks.length ? (
+                  "Revisar tarefas"
+                ) : (
+                  "Pular e revisar"
+                )}
               </button>
             </>
           ) : (
@@ -296,7 +361,7 @@ export function ProjectFormModal({
                 type="button"
                 onClick={() => setCreateStep(1)}
                 className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                disabled={isSaving}
+                disabled={isBusy}
               >
                 Voltar para etapa 1
               </button>
@@ -304,7 +369,7 @@ export function ProjectFormModal({
                 type="button"
                 onClick={() => setCreateStep(2)}
                 className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                disabled={isSaving}
+                disabled={isBusy}
               >
                 Voltar para tarefas
               </button>
@@ -312,9 +377,9 @@ export function ProjectFormModal({
                 type="button"
                 onClick={() => void handleWizardSubmit()}
                 className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-                disabled={isSaving || !clientId || Boolean(taskValidationError)}
+                disabled={isBusy || !clientId || !preview || Boolean(taskValidationError)}
               >
-                {isSaving ? (
+                {isBusy ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
                 ) : (
                   <Save className="h-4 w-4" />
@@ -345,7 +410,7 @@ export function ProjectFormModal({
             } else if (createStep === 1) {
               handleCreateStepOne();
             } else if (createStep === 2) {
-              handleTasksReview();
+              void handleTasksReview();
             } else {
               void handleWizardSubmit();
             }
@@ -484,7 +549,11 @@ export function ProjectFormModal({
                     (values.end_date && task.prevision_date > values.end_date));
                 const warningId = `task-${task.id}-date-warning`;
                 return (
-                  <fieldset key={task.id} className={`${PROJECT_SUBPANEL_CLASSNAME} space-y-3 p-3`}>
+                  <fieldset
+                    key={task.id}
+                    disabled={isBusy}
+                    className={`${PROJECT_SUBPANEL_CLASSNAME} space-y-3 p-3`}
+                  >
                     <legend className="px-1 text-sm font-semibold">Tarefa {index + 1}</legend>
                     <div className={TASK_FORM_GRID_CLASSNAME}>
                       <label className={TASK_FORM_LABEL_CLASSNAME}>
@@ -609,10 +678,22 @@ export function ProjectFormModal({
                   {taskValidationError}
                 </p>
               ) : null}
+              {previewMutation.isError ? (
+                <div role="alert" className={TASK_FORM_AUXILIARY_WARNING_CLASSNAME}>
+                  {previewErrorMessage ?? "Não foi possível gerar a prévia das dependências."}
+                  <button
+                    type="button"
+                    className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+                    onClick={() => void handleTasksReview()}
+                  >
+                    Tentar gerar prévia
+                  </button>
+                </div>
+              ) : null}
               <button
                 type="button"
                 className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                disabled={taskOptionsLoading || taskOptionsError}
+                disabled={isBusy || taskOptionsLoading || taskOptionsError}
                 onClick={() =>
                   setTasks((current) => [
                     ...current,
@@ -648,7 +729,7 @@ export function ProjectFormModal({
               <p>
                 <span className="font-medium">Objetivo:</span> {values.objective}
               </p>
-              {tasks.length ? (
+              {preview?.tasks.length ? (
                 <div className="overflow-x-auto">
                   <table
                     aria-label="Tarefas revisadas"
@@ -661,23 +742,57 @@ export function ProjectFormModal({
                         <th scope="col">Departamento</th>
                         <th scope="col">Modelo</th>
                         <th scope="col">Responsável</th>
+                        <th scope="col">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {tasks.map((task) => {
+                      {preview.tasks.flatMap((task) => {
                         const model = taskModels.find(({ id }) => id === task.model_id);
-                        return (
-                          <tr key={task.id}>
+                        const department =
+                          departments.find(({ id }) => id === task.department_id)?.name ??
+                          task.department_id;
+                        const responsible = getResponsibleName(
+                          task.responsible_id,
+                          model?.department?.users ?? [],
+                        );
+                        return [
+                          <tr key={`main-${task.model_id}`}>
                             <td>{task.name}</td>
                             <td>{formatProjectDate(task.prevision_date)}</td>
-                            <td>{departments.find(({ id }) => id === task.department_id)?.name}</td>
-                            <td>{model?.name}</td>
-                            <td>
-                              {model?.department?.users.find(({ id }) => id === task.responsible_id)
-                                ?.name ?? "Sem responsável"}
-                            </td>
-                          </tr>
-                        );
+                            <td>{department}</td>
+                            <td>{model?.name ?? task.model_id}</td>
+                            <td>{responsible}</td>
+                            <td>{task.status}</td>
+                          </tr>,
+                          ...task.dependencies.map((dependency) => {
+                            const dependencyModel = taskModels.find(
+                              ({ id }) => id === dependency.model_id,
+                            );
+                            return (
+                              <tr key={`dependency-${task.model_id}-${dependency.model_id}`}>
+                                <td>
+                                  {dependency.name}{" "}
+                                  <span className="block text-xs text-slate-500 dark:text-slate-400">
+                                    Incluída pelo Modelo: {model?.name ?? task.model_id}
+                                  </span>
+                                </td>
+                                <td>Não informado</td>
+                                <td>
+                                  {departments.find(({ id }) => id === dependency.department_id)
+                                    ?.name ?? dependency.department_id}
+                                </td>
+                                <td>{dependencyModel?.name ?? dependency.model_id}</td>
+                                <td>
+                                  {getResponsibleName(
+                                    dependency.responsible_id,
+                                    dependencyModel?.department?.users ?? [],
+                                  )}
+                                </td>
+                                <td>{dependency.status}</td>
+                              </tr>
+                            );
+                          }),
+                        ];
                       })}
                     </tbody>
                   </table>
@@ -685,6 +800,11 @@ export function ProjectFormModal({
               ) : (
                 <p>Nenhuma tarefa será criada nesta etapa.</p>
               )}
+              {dependenciesChanged ? (
+                <p role="alert" aria-label="Dependências atualizadas">
+                  As dependências incluídas pelos Modelos foram atualizadas.
+                </p>
+              ) : null}
               {taskValidationError ? (
                 <p role="alert" className={TASK_FORM_AUXILIARY_WARNING_CLASSNAME}>
                   {taskValidationError}
