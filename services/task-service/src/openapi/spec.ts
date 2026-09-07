@@ -402,27 +402,49 @@ const projectWizardPreviewRequestBody = createObjectRequestBody({
   },
 });
 
-const extractProjectWizardTasksRequestBody = createObjectRequestBody({
-  example: {
-    content: "Ata da reunião colada pelo usuário.",
-    name: "Novo projeto",
-    objective: "Objetivo do projeto",
-    start_date: "2026-09-01T00:00:00.000Z",
-    end_date: "2026-09-30T00:00:00.000Z",
+const extractProjectWizardTasksProperties = {
+  content: {
+    type: "string",
+    description:
+      "Ata de reunião em texto. Conteúdo transitório: não é persistido, auditado nem registrado em log.",
   },
-  required: ["content", "name", "objective", "start_date"],
-  properties: {
+  name: { type: "string" },
+  objective: { type: "string" },
+  start_date: { type: "string", format: "date-time" },
+  end_date: { type: "string", format: "date-time" },
+};
+
+const extractProjectWizardTasksRequestBody = {
+  requestBody: {
+    required: true,
     content: {
-      type: "string",
-      description:
-        "Ata de reunião em texto. Conteúdo transitório: não é persistido, auditado nem registrado em log.",
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["content", "name", "objective", "start_date"],
+          properties: extractProjectWizardTasksProperties,
+        },
+      },
+      "multipart/form-data": {
+        schema: {
+          type: "object",
+          required: ["file", "name", "objective", "start_date"],
+          properties: {
+            file: {
+              type: "string",
+              format: "binary",
+              description: "Ata .txt ou .md de até 10 MB; conteúdo transitório.",
+            },
+            name: extractProjectWizardTasksProperties.name,
+            objective: extractProjectWizardTasksProperties.objective,
+            start_date: extractProjectWizardTasksProperties.start_date,
+            end_date: extractProjectWizardTasksProperties.end_date,
+          },
+        },
+      },
     },
-    name: { type: "string" },
-    objective: { type: "string" },
-    start_date: { type: "string", format: "date-time" },
-    end_date: { type: "string", format: "date-time" },
   },
-});
+};
 
 export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
