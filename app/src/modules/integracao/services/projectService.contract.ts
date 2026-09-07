@@ -6,6 +6,7 @@ import type {
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
+  ProjectWizardPreview,
   ProjectWizardResult,
 } from "../types";
 import { unwrapServiceEnvelope } from "./envelope.contract.js";
@@ -16,6 +17,7 @@ export const PROJECT_ENDPOINTS = {
   progress: "/project/progress",
   metrics: "/project/metrics",
   wizard: "/task/project-wizard",
+  wizardPreview: "/task/project-wizard/preview",
 } as const;
 
 export const PROJECT_DELETE_ADMIN_MESSAGE =
@@ -110,6 +112,9 @@ export function unwrapProjectWizardResult(body: unknown): ProjectWizardResult {
   return unwrapProjectEnvelope<ProjectWizardResult>(body);
 }
 
+export function unwrapProjectWizardPreview(body: unknown): ProjectWizardPreview {
+  return unwrapProjectEnvelope<ProjectWizardPreview>(body);
+}
 
 export function unwrapProjectMetrics(body: unknown): ProjectMetrics {
   return unwrapProjectEnvelope<ProjectMetrics>(body);

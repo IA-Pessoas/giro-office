@@ -60,6 +60,7 @@ import {
   unwrapProjectList,
   unwrapProjectMetrics,
   unwrapProjectProgress,
+  unwrapProjectWizardPreview,
   unwrapUpdatedProject,
 } from "./services/projectService.contract.ts";
 import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
@@ -283,6 +284,25 @@ runTest("project endpoints use only the v1 project contract", () => {
   assert.equal(PROJECT_ENDPOINTS.crud, "/project");
   assert.equal(PROJECT_ENDPOINTS.progress, "/project/progress");
   assert.equal(PROJECT_ENDPOINTS.metrics, "/project/metrics");
+  assert.equal(PROJECT_ENDPOINTS.wizardPreview, "/task/project-wizard/preview");
+});
+
+runTest("project wizard preview keeps the server revision and hierarchy", () => {
+  const preview = unwrapProjectWizardPreview({
+    success: true,
+    data: {
+      revision: "opaque-revision",
+      tasks: [
+        {
+          name: "Principal",
+          dependencies: [{ name: "Dependência", status: "Em Espera" }],
+        },
+      ],
+    },
+  });
+
+  assert.equal(preview.revision, "opaque-revision");
+  assert.equal(preview.tasks[0].dependencies[0].status, "Em Espera");
 });
 
 runTest("project metrics query key is stable and global", () => {
