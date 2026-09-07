@@ -4,21 +4,38 @@ import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
 import { ClientSelectionField } from "@modules/clients";
+import { departmentService } from "@modules/departments";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
+import { useFetch } from "@shared/hooks";
 
+import {
+  TASK_FORM_DEPARTMENTS_QUERY_KEY,
+  TASK_FORM_TASK_MODELS_QUERY_KEY,
+} from "../hooks/queryKeys";
 import { useProjectForm } from "../hooks/useProjectForm";
 import {
   useCreateProjectWizardMutation,
   useProjectDetail,
   useUpdateProjectMutation,
 } from "../hooks/useProjects";
-import type { ProjectDetail } from "../types";
+import type { ProjectDetail, ProjectWizardTask } from "../types";
+import { taskModelService } from "../services/taskModelService";
 import {
+  formatProjectDate,
+  PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME,
   PROJECT_INPUT_CLASSNAME,
   PROJECT_PRIMARY_BUTTON_CLASSNAME,
   PROJECT_SECONDARY_BUTTON_CLASSNAME,
+  PROJECT_SUBPANEL_CLASSNAME,
+  ProjectSelect,
 } from "./projectUi";
+import {
+  getAutomaticTaskResponsibleId,
+  TASK_FORM_AUXILIARY_WARNING_CLASSNAME,
+  TASK_FORM_GRID_CLASSNAME,
+  TASK_FORM_LABEL_CLASSNAME,
+} from "./taskFormModalUi";
 
 interface ProjectFormModalProps {
   open: boolean;
@@ -47,6 +64,17 @@ export function ProjectFormModal({
   const createWizardMutation = useCreateProjectWizardMutation();
   const updateMutation = useUpdateProjectMutation();
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
+  const [tasks, setTasks] = useState<Array<ProjectWizardTask & { id: string }>>([]);
+  const departmentsQuery = useFetch(
+    TASK_FORM_DEPARTMENTS_QUERY_KEY,
+    () => departmentService.list({ status: "Ativo" }),
+    { enabled: open && !isEditing },
+  );
+  const taskModelsQuery = useFetch(
+    TASK_FORM_TASK_MODELS_QUERY_KEY,
+    () => taskModelService.list({ type: "Projeto" }),
+    { enabled: open && !isEditing },
+  );
   const idempotencyKeyRef = useRef<string | null>(null);
   const { values, updateValue, validate, reset, buildCreatePayload, buildUpdatePayload } =
     useProjectForm(detailQuery.data);
@@ -55,6 +83,7 @@ export function ProjectFormModal({
     if (!open) {
       reset(null);
       setCreateStep(1);
+      setTasks([]);
       idempotencyKeyRef.current = null;
     } else if (!isEditing && !idempotencyKeyRef.current) {
       idempotencyKeyRef.current = crypto.randomUUID();
@@ -66,6 +95,69 @@ export function ProjectFormModal({
     !isEditing && values.end_date && values.end_date < values.start_date
       ? "A data final não pode ser anterior à data de início."
       : null;
+  const departments = departmentsQuery.data ?? [];
+  const taskModels = taskModelsQuery.data ?? [];
+  const taskOptionsLoading = departmentsQuery.isLoading || taskModelsQuery.isLoading;
+  const taskOptionsError = departmentsQuery.isError || taskModelsQuery.isError;
+  const taskValidationError = getTaskValidationError();
+
+  function getTaskValidationError(): string | null {
+    if (tasks.length === 0) return null;
+    if (taskOptionsError)
+      return "Não foi possível carregar departamentos e Modelos. Tente novamente.";
+    if (taskOptionsLoading) return "Carregando departamentos e Modelos...";
+    const usedModelIds = new Set<string>();
+    for (const task of tasks) {
+      const model = taskModels.find(
+        (item) => item.id === task.model_id && item.department_id === task.department_id,
+      );
+      if (!task.name.trim() || !model || !departments.some(({ id }) => id === task.department_id)) {
+        return "Preencha nome, departamento e Modelo de todas as tarefas.";
+      }
+      if (usedModelIds.has(task.model_id)) {
+        return `O Modelo "${model.name}" já foi usado. Selecione um Modelo diferente para cada tarefa.`;
+      }
+      usedModelIds.add(task.model_id);
+      const candidates = model.department?.users ?? [];
+      if (candidates.length > 0 && !candidates.some(({ id }) => id === task.responsible_id)) {
+        return "Selecione um responsável elegível para cada tarefa.";
+      }
+    }
+    return null;
+  }
+
+  function updateTask(id: string, field: keyof ProjectWizardTask, value: string) {
+    setTasks((current) =>
+      current.map((task) => {
+        if (task.id !== id) return task;
+        if (field === "department_id") {
+          return { ...task, department_id: value, model_id: "", responsible_id: null };
+        }
+        if (field === "model_id") {
+          const model = taskModels.find(
+            (item) => item.id === value && item.department_id === task.department_id,
+          );
+          return {
+            ...task,
+            model_id: value,
+            responsible_id:
+              getAutomaticTaskResponsibleId(
+                model?.responsible_id,
+                model?.department?.users ?? [],
+              ) || null,
+          };
+        }
+        if (field === "prevision_date") return { ...task, prevision_date: value || undefined };
+        return { ...task, [field]: value };
+      }),
+    );
+  }
+
+  function handleTasksReview() {
+    if (taskValidationError) return;
+    setTasks((current) => current.map((task) => ({ ...task, name: task.name.trim() })));
+    setCreateStep(3);
+  }
 
   async function handleUpdateSubmit() {
     if (isEditing && !detailQuery.data) {
@@ -111,7 +203,13 @@ export function ProjectFormModal({
   }
 
   async function handleWizardSubmit() {
-    if (!clientId || !idempotencyKeyRef.current) {
+    if (
+      !clientId ||
+      !idempotencyKeyRef.current ||
+      isSaving ||
+      taskValidationError ||
+      dateRangeError
+    ) {
       return;
     }
 
@@ -119,8 +217,11 @@ export function ProjectFormModal({
       const result = await createWizardMutation.mutateAsync({
         ...buildCreatePayload(clientId),
         idempotencyKey: idempotencyKeyRef.current,
+        tasks: tasks.map(({ id: _id, ...task }) => task),
       });
-      toast.success("Projeto criado com sucesso.");
+      toast.success(
+        `Projeto criado com sucesso. Tarefas principais: ${result.counts.main}. Dependências: ${result.counts.dependencies}. Sem responsável: ${result.counts.unassigned}.`,
+      );
       onSuccess?.(result.project);
       onOpenChange(false);
       await router.push(`/tasks?clientId=${clientId}`);
@@ -135,7 +236,8 @@ export function ProjectFormModal({
       onOpenChange={onOpenChange}
       title={isEditing ? "Editar projeto" : "Novo projeto"}
       description={isEditing ? "Formulário de projeto" : `Etapa ${createStep} de 3`}
-      contentClassName="w-[min(92vw,760px)]"
+      contentClassName="w-[min(92vw,760px)] [&>footer]:flex-wrap"
+      preventClose={isSaving}
       footer={
         <>
           <button
@@ -181,11 +283,11 @@ export function ProjectFormModal({
               </button>
               <button
                 type="button"
-                onClick={() => setCreateStep(3)}
+                onClick={handleTasksReview}
                 className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-                disabled={isSaving}
+                disabled={isSaving || Boolean(taskValidationError)}
               >
-                Pular e revisar
+                {tasks.length ? "Revisar tarefas" : "Pular e revisar"}
               </button>
             </>
           ) : (
@@ -200,9 +302,17 @@ export function ProjectFormModal({
               </button>
               <button
                 type="button"
+                onClick={() => setCreateStep(2)}
+                className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+                disabled={isSaving}
+              >
+                Voltar para tarefas
+              </button>
+              <button
+                type="button"
                 onClick={() => void handleWizardSubmit()}
                 className={PROJECT_PRIMARY_BUTTON_CLASSNAME}
-                disabled={isSaving || !clientId}
+                disabled={isSaving || !clientId || Boolean(taskValidationError)}
               >
                 {isSaving ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -232,8 +342,12 @@ export function ProjectFormModal({
             event.preventDefault();
             if (isEditing) {
               void handleUpdateSubmit();
-            } else {
+            } else if (createStep === 1) {
               handleCreateStepOne();
+            } else if (createStep === 2) {
+              handleTasksReview();
+            } else {
+              void handleWizardSubmit();
             }
           }}
         >
@@ -279,7 +393,7 @@ export function ProjectFormModal({
                       onChange={(event) => updateValue("start_date", event.target.value)}
                       onInput={(event) => updateValue("start_date", event.currentTarget.value)}
                       className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
-                      aria-required="true"
+                      required
                     />
                   </div>
                 </label>
@@ -334,9 +448,187 @@ export function ProjectFormModal({
           ) : null}
 
           {!isEditing && createStep === 2 ? (
-            <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
-              Nenhuma tarefa será criada nesta etapa.
-            </p>
+            <div className="space-y-3">
+              {tasks.length === 0 ? (
+                <p className={`${PROJECT_SUBPANEL_CLASSNAME} px-4 py-3 text-sm`}>
+                  Nenhuma tarefa será criada nesta etapa.
+                </p>
+              ) : null}
+              {taskOptionsLoading ? (
+                <output className="block">Carregando departamentos e Modelos...</output>
+              ) : null}
+              {taskOptionsError ? (
+                <div role="alert" className={TASK_FORM_AUXILIARY_WARNING_CLASSNAME}>
+                  Não foi possível carregar departamentos e Modelos.
+                  <button
+                    type="button"
+                    className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+                    onClick={() => {
+                      void departmentsQuery.refetch();
+                      void taskModelsQuery.refetch();
+                    }}
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : null}
+              {tasks.map((task, index) => {
+                const models = taskModels.filter(
+                  ({ department_id }) => department_id === task.department_id,
+                );
+                const candidates =
+                  models.find(({ id }) => id === task.model_id)?.department?.users ?? [];
+                const outsidePeriod =
+                  task.prevision_date &&
+                  (task.prevision_date < values.start_date ||
+                    (values.end_date && task.prevision_date > values.end_date));
+                const warningId = `task-${task.id}-date-warning`;
+                return (
+                  <fieldset key={task.id} className={`${PROJECT_SUBPANEL_CLASSNAME} space-y-3 p-3`}>
+                    <legend className="px-1 text-sm font-semibold">Tarefa {index + 1}</legend>
+                    <div className={TASK_FORM_GRID_CLASSNAME}>
+                      <label className={TASK_FORM_LABEL_CLASSNAME}>
+                        <RequiredFieldLabel required>Nome</RequiredFieldLabel>
+                        <input
+                          value={task.name}
+                          onChange={(event) => updateTask(task.id, "name", event.target.value)}
+                          className={PROJECT_INPUT_CLASSNAME}
+                          aria-required="true"
+                        />
+                      </label>
+                      <label className={TASK_FORM_LABEL_CLASSNAME}>
+                        <span>Prazo</span>
+                        <input
+                          type="date"
+                          value={task.prevision_date ?? ""}
+                          onChange={(event) =>
+                            updateTask(task.id, "prevision_date", event.target.value)
+                          }
+                          onInput={(event) =>
+                            updateTask(task.id, "prevision_date", event.currentTarget.value)
+                          }
+                          className={PROJECT_INPUT_CLASSNAME}
+                          aria-describedby={outsidePeriod ? warningId : undefined}
+                        />
+                      </label>
+                    </div>
+                    {outsidePeriod ? (
+                      <output className={`block ${TASK_FORM_AUXILIARY_WARNING_CLASSNAME}`}>
+                        <span id={warningId}>Prazo fora do período do projeto.</span>
+                      </output>
+                    ) : null}
+                    <div className={TASK_FORM_GRID_CLASSNAME}>
+                      <label
+                        htmlFor={`task-${task.id}-department`}
+                        className={TASK_FORM_LABEL_CLASSNAME}
+                      >
+                        <RequiredFieldLabel required>Departamento</RequiredFieldLabel>
+                        <ProjectSelect
+                          id={`task-${task.id}-department`}
+                          value={task.department_id}
+                          onChange={(event) =>
+                            updateTask(task.id, "department_id", event.target.value)
+                          }
+                          disabled={taskOptionsLoading || taskOptionsError}
+                          aria-required="true"
+                        >
+                          <option value="">Selecione um departamento</option>
+                          {departments.map((department) => (
+                            <option key={department.id} value={department.id}>
+                              {department.name}
+                            </option>
+                          ))}
+                        </ProjectSelect>
+                      </label>
+                      <label
+                        htmlFor={`task-${task.id}-model`}
+                        className={TASK_FORM_LABEL_CLASSNAME}
+                      >
+                        <RequiredFieldLabel required>Modelo</RequiredFieldLabel>
+                        <ProjectSelect
+                          id={`task-${task.id}-model`}
+                          value={task.model_id}
+                          onChange={(event) => updateTask(task.id, "model_id", event.target.value)}
+                          disabled={!task.department_id || taskOptionsLoading || taskOptionsError}
+                          aria-required="true"
+                        >
+                          <option value="">Selecione um Modelo</option>
+                          {models.map((model) => (
+                            <option key={model.id} value={model.id}>
+                              {model.name}
+                            </option>
+                          ))}
+                        </ProjectSelect>
+                      </label>
+                    </div>
+                    <label
+                      htmlFor={`task-${task.id}-responsible`}
+                      className={`block ${TASK_FORM_LABEL_CLASSNAME}`}
+                    >
+                      <RequiredFieldLabel required={candidates.length > 1}>
+                        Responsável
+                      </RequiredFieldLabel>
+                      <ProjectSelect
+                        id={`task-${task.id}-responsible`}
+                        value={task.responsible_id ?? ""}
+                        onChange={(event) =>
+                          updateTask(task.id, "responsible_id", event.target.value)
+                        }
+                        disabled={
+                          !task.model_id ||
+                          taskOptionsLoading ||
+                          taskOptionsError ||
+                          candidates.length <= 1
+                        }
+                        aria-required={candidates.length > 1}
+                      >
+                        <option value="" disabled={candidates.length > 0}>
+                          {candidates.length ? "Selecione um responsável" : "Sem responsável"}
+                        </option>
+                        {candidates.map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {candidate.name}
+                          </option>
+                        ))}
+                      </ProjectSelect>
+                    </label>
+                    <button
+                      type="button"
+                      className={PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME}
+                      onClick={() =>
+                        setTasks((current) => current.filter(({ id }) => id !== task.id))
+                      }
+                    >
+                      Remover tarefa
+                    </button>
+                  </fieldset>
+                );
+              })}
+              {taskValidationError ? (
+                <p role="alert" className={TASK_FORM_AUXILIARY_WARNING_CLASSNAME}>
+                  {taskValidationError}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+                disabled={taskOptionsLoading || taskOptionsError}
+                onClick={() =>
+                  setTasks((current) => [
+                    ...current,
+                    {
+                      id: crypto.randomUUID(),
+                      name: "",
+                      department_id: "",
+                      model_id: "",
+                      responsible_id: null,
+                    },
+                  ])
+                }
+              >
+                Adicionar tarefa
+              </button>
+            </div>
           ) : null}
 
           {!isEditing && createStep === 3 ? (
@@ -356,6 +648,48 @@ export function ProjectFormModal({
               <p>
                 <span className="font-medium">Objetivo:</span> {values.objective}
               </p>
+              {tasks.length ? (
+                <div className="overflow-x-auto">
+                  <table
+                    aria-label="Tarefas revisadas"
+                    className="w-full text-left text-sm [&_td]:p-2 [&_th]:p-2"
+                  >
+                    <thead>
+                      <tr>
+                        <th scope="col">Nome</th>
+                        <th scope="col">Prazo</th>
+                        <th scope="col">Departamento</th>
+                        <th scope="col">Modelo</th>
+                        <th scope="col">Responsável</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tasks.map((task) => {
+                        const model = taskModels.find(({ id }) => id === task.model_id);
+                        return (
+                          <tr key={task.id}>
+                            <td>{task.name}</td>
+                            <td>{formatProjectDate(task.prevision_date)}</td>
+                            <td>{departments.find(({ id }) => id === task.department_id)?.name}</td>
+                            <td>{model?.name}</td>
+                            <td>
+                              {model?.department?.users.find(({ id }) => id === task.responsible_id)
+                                ?.name ?? "Sem responsável"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p>Nenhuma tarefa será criada nesta etapa.</p>
+              )}
+              {taskValidationError ? (
+                <p role="alert" className={TASK_FORM_AUXILIARY_WARNING_CLASSNAME}>
+                  {taskValidationError}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </form>

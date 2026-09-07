@@ -238,6 +238,13 @@ describe("activityCatalog", () => {
     expect(describeActivity(method, path)).toEqual({ action, item });
   });
 
+  it("classifica POST /task/project-wizard como criação visível de Projeto com Tarefas", () => {
+    expect(classifyActivity("POST", "/task/project-wizard")).toEqual({
+      kind: "visible",
+      description: { action: "criou", item: "um projeto com tarefas" },
+    });
+  });
+
   it.each([
     ["GET", "/health"],
     ["GET", "/ready"],

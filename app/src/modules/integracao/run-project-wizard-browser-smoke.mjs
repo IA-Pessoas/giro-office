@@ -9,6 +9,45 @@ const configuredBaseUrl = process.env.PROJECT_WIZARD_BROWSER_BASE_URL?.replace(/
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const clientId = "11111111-1111-4111-8111-111111111111";
+const departments = [
+  { id: "department-one", name: "Fiscal" },
+  { id: "department-two", name: "Contábil" },
+  { id: "department-empty", name: "Sem equipe" },
+];
+const candidates = [
+  { id: "ana", name: "Ana" },
+  { id: "bia", name: "Bia" },
+];
+const taskModels = [
+  {
+    id: "model-default",
+    name: "Modelo padrão",
+    department_id: "department-one",
+    responsible_id: "ana",
+    department: { ...departments[0], users: candidates },
+  },
+  {
+    id: "model-choice",
+    name: "Modelo com escolha",
+    department_id: "department-one",
+    responsible_id: "ineligible",
+    department: { ...departments[0], users: candidates },
+  },
+  {
+    id: "model-single",
+    name: "Modelo único",
+    department_id: "department-two",
+    responsible_id: "ineligible",
+    department: { ...departments[1], users: [{ id: "caio", name: "Caio" }] },
+  },
+  {
+    id: "model-empty",
+    name: "Modelo sem equipe",
+    department_id: "department-empty",
+    responsible_id: "ineligible",
+    department: { ...departments[2], users: [] },
+  },
+];
 
 const smokeUser = {
   id: "user-project-wizard-smoke",
@@ -33,6 +72,20 @@ const project = {
 };
 
 async function installApiMocks(page, wizardRequests) {
+  const existingTask = {
+    id: "task-existing",
+    name: "Tarefa anterior",
+    status: "A Realizar",
+    billing: "Não Realizar",
+    isOwn: false,
+    isUnassigned: true,
+    charge_comercial: false,
+    charge_financeiro: false,
+    hiring_status: null,
+    payment: null,
+    billing_description: null,
+  };
+  let taskList = [existingTask];
   await page.route("**/user/me", (route) =>
     route.fulfill({
       status: 200,
@@ -44,8 +97,11 @@ async function installApiMocks(page, wizardRequests) {
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      json: { success: true, data: [] },
+      json: { success: true, data: departments },
     }),
+  );
+  await page.route("**/task/model/list*", (route) =>
+    route.fulfill({ status: 200, json: { success: true, data: taskModels } }),
   );
   await page.route("**/client/list*", (route) =>
     route.fulfill({
@@ -117,15 +173,32 @@ async function installApiMocks(page, wizardRequests) {
       key: request.headers()["idempotency-key"],
     });
     if (wizardRequests.length === 1) {
-      await route.fulfill({ status: 500, contentType: "application/json", json: { error: "Tente novamente." } });
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        json: { error: "Tente novamente." },
+      });
       return;
+    }
+    if (wizardRequests.length > 2) {
+      taskList = [
+        existingTask,
+        { ...existingTask, id: "task-created-one", name: "Apuração final", isUnassigned: false },
+        { ...existingTask, id: "task-created-two", name: "Sem atribuição" },
+      ];
     }
     await route.fulfill({
       status: 201,
       contentType: "application/json",
       json: {
         success: true,
-        data: { project: { ...project, id: "project-created" }, counts: { main: 0, dependencies: 0, unassigned: 0 } },
+        data: {
+          project: { ...project, id: "project-created" },
+          counts:
+            wizardRequests.length > 2
+              ? { main: 2, dependencies: 0, unassigned: 1 }
+              : { main: 0, dependencies: 0, unassigned: 0 },
+        },
       },
     });
   });
@@ -133,15 +206,34 @@ async function installApiMocks(page, wizardRequests) {
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      json: { success: true, data: { data: [], total: 0, hasMore: false, summary: { inProgress: 0, billable: 0 } } },
+      json: {
+        success: true,
+        data: {
+          data: taskList,
+          total: taskList.length,
+          hasMore: false,
+          summary: { inProgress: 0, billable: 0 },
+        },
+      },
     }),
   );
 }
 
 async function runBrowserProof() {
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ baseURL: baseUrl, viewport: { width: 1440, height: 900 } });
-  await context.addCookies([{ name: "cw.session", value: "opaque-test-session", url: baseUrl, httpOnly: true, sameSite: "Lax" }]);
+  const context = await browser.newContext({
+    baseURL: baseUrl,
+    viewport: { width: 1440, height: 900 },
+  });
+  await context.addCookies([
+    {
+      name: "cw.session",
+      value: "opaque-test-session",
+      url: baseUrl,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
   const page = await context.newPage();
   const wizardRequests = [];
   const updateRequests = [];
@@ -159,7 +251,7 @@ async function runBrowserProof() {
   async function expectLockedClient(wizard) {
     await expect(wizard.getByText("Cliente Wizard", { exact: true })).toHaveCount(1);
     await expect(wizard.getByText("Cliente Wizard", { exact: true })).toBeVisible();
-    await expect(wizard.getByRole("combobox")).toHaveCount(0);
+    await expect(wizard.getByRole("combobox", { name: "Cliente", exact: true })).toHaveCount(0);
     await expect(wizard.getByRole("button", { name: /cliente/i })).toHaveCount(0);
   }
 
@@ -195,15 +287,23 @@ async function runBrowserProof() {
     await wizard.getByLabel("Data final prevista").fill("2026-09-09");
     await wizard.getByLabel("Objetivo").fill("Criar sem tarefas.");
     await wizard.getByRole("button", { name: "Continuar" }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "A data final não pode ser anterior à data de início." })).toBeVisible();
+    await expect(
+      page
+        .getByRole("alert")
+        .filter({ hasText: "A data final não pode ser anterior à data de início." }),
+    ).toBeVisible();
     await expect(wizard.getByLabel("Data final prevista")).toHaveAttribute("aria-invalid", "true");
-    await expect(wizard.getByLabel("Data final prevista")).toHaveAccessibleDescription("A data final não pode ser anterior à data de início.");
+    await expect(wizard.getByLabel("Data final prevista")).toHaveAccessibleDescription(
+      "A data final não pode ser anterior à data de início.",
+    );
     await expect(wizard.getByText("Etapa 1 de 3", { exact: true })).toBeVisible();
 
     await wizard.getByLabel("Data final prevista").fill("2026-09-11");
     await expect(wizard.getByRole("alert")).toHaveCount(0);
     await wizard.getByRole("button", { name: "Continuar" }).click();
-    await expect(wizard.getByText("Nenhuma tarefa será criada nesta etapa.", { exact: true })).toBeVisible();
+    await expect(
+      wizard.getByText("Nenhuma tarefa será criada nesta etapa.", { exact: true }),
+    ).toBeVisible();
     await expectLockedClient(wizard);
     await wizard.getByRole("button", { name: "Pular e revisar" }).click();
     assert.equal(wizardRequests.length, 0, "Pular a etapa 2 não pode criar tarefas nem minutos.");
@@ -218,7 +318,11 @@ async function runBrowserProof() {
     await expect(page.getByText("Tente novamente.", { exact: true })).toBeVisible();
     await wizard.getByRole("button", { name: "Criar projeto" }).click();
     await expect.poll(() => wizardRequests.length).toBe(2);
-    assert.equal(wizardRequests[0].key, wizardRequests[1].key, "A retentativa deve reutilizar a chave da abertura.");
+    assert.equal(
+      wizardRequests[0].key,
+      wizardRequests[1].key,
+      "A retentativa deve reutilizar a chave da abertura.",
+    );
     assert.notEqual(wizardRequests[0].key, undefined);
     assert.deepEqual(wizardRequests[1].body, {
       client_id: clientId,
@@ -226,9 +330,164 @@ async function runBrowserProof() {
       start_date: "2026-09-10",
       end_date: "2026-09-11",
       objective: "Criar sem tarefas.",
+      tasks: [],
     });
-    await expect(page.getByText("Projeto criado com sucesso.", { exact: true })).toHaveCount(1);
+    await expect(
+      page.getByText(
+        "Projeto criado com sucesso. Tarefas principais: 0. Dependências: 0. Sem responsável: 0.",
+        { exact: true },
+      ),
+    ).toHaveCount(1);
     await expect(page).toHaveURL(`/tasks?clientId=${clientId}`);
+    await expect(page.getByRole("cell", { name: "Tarefa anterior", exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Apuração final", exact: true })).toHaveCount(0);
+    const cachedTasksAt = Date.now();
+    const documentTimeOrigin = await page.evaluate(() => performance.timeOrigin);
+
+    await page.goBack();
+    await expect(page).toHaveURL(`/projects?clientId=${clientId}`);
+    assert.equal(await page.evaluate(() => performance.timeOrigin), documentTimeOrigin);
+    await page.getByRole("button", { name: "Novo projeto" }).click();
+    await wizard.getByLabel("Nome").fill("Projeto com tarefas");
+    await wizard.getByLabel("Data de início").fill("2026-09-10");
+    await wizard.getByLabel("Data final prevista").fill("2026-09-20");
+    await wizard.getByLabel("Objetivo").fill("Revisar tarefas manuais.");
+    await wizard.getByRole("button", { name: "Continuar" }).click();
+    await wizard.getByRole("button", { name: "Adicionar tarefa", exact: true }).click();
+    const firstTask = wizard.getByRole("group", { name: "Tarefa 1", exact: true });
+    const reviewButton = wizard.getByRole("button", { name: "Revisar tarefas", exact: true });
+    await expect(reviewButton).toBeDisabled();
+    await firstTask.getByLabel(/^Nome/).fill("Rascunho inicial");
+    await expect(reviewButton).toBeDisabled();
+    await firstTask.getByLabel(/^Departamento/).selectOption("department-one");
+    await expect(reviewButton).toBeDisabled();
+    await firstTask.getByLabel(/^Modelo/).selectOption("model-default");
+    await expect(firstTask.getByLabel(/^Responsável/)).toHaveValue("ana");
+    await firstTask.getByLabel(/^Responsável/).selectOption("bia");
+    await firstTask.getByLabel(/^Departamento/).selectOption("department-two");
+    await expect(firstTask.getByLabel(/^Modelo/)).toHaveValue("");
+    await expect(firstTask.getByLabel(/^Responsável/)).toHaveValue("");
+    await expect(reviewButton).toBeDisabled();
+    await firstTask.getByLabel(/^Modelo/).selectOption("model-single");
+    await expect(firstTask.getByLabel(/^Responsável/)).toHaveValue("caio");
+    await expect(firstTask.getByLabel(/^Responsável/)).toBeDisabled();
+    await firstTask.getByLabel(/^Departamento/).selectOption("department-one");
+    await firstTask.getByLabel(/^Modelo/).selectOption("model-choice");
+    await expect(firstTask.getByLabel(/^Responsável/)).toHaveValue("");
+    await expect(reviewButton).toBeDisabled();
+    await firstTask.getByLabel(/^Responsável/).selectOption("bia");
+    await firstTask.getByLabel(/^Nome/).fill("Apuração revisada");
+    await firstTask.getByLabel("Prazo", { exact: true }).fill("2026-09-21");
+    await expect(firstTask.getByRole("status")).toHaveText("Prazo fora do período do projeto.");
+    await expect(firstTask.getByLabel("Prazo", { exact: true })).toHaveAccessibleDescription(
+      "Prazo fora do período do projeto.",
+    );
+    await expect(reviewButton).toBeEnabled();
+
+    await wizard.getByRole("button", { name: "Adicionar tarefa", exact: true }).click();
+    const secondTask = wizard.getByRole("group", { name: "Tarefa 2", exact: true });
+    await secondTask.getByLabel(/^Nome/).fill("Sem atribuição");
+    await secondTask.getByLabel(/^Departamento/).selectOption("department-one");
+    await secondTask.getByLabel(/^Modelo/).selectOption("model-choice");
+    await secondTask.getByLabel(/^Responsável/).selectOption("ana");
+    await expect(reviewButton).toBeDisabled();
+    await expect(wizard.getByRole("alert")).toHaveText(
+      'O Modelo "Modelo com escolha" já foi usado. Selecione um Modelo diferente para cada tarefa.',
+    );
+    await wizard.locator("form").evaluate((form) => form.requestSubmit());
+    await expect(wizard.getByText("Etapa 2 de 3", { exact: true })).toBeVisible();
+    await expect(wizard.getByRole("button", { name: "Criar projeto", exact: true })).toHaveCount(0);
+    assert.equal(wizardRequests.length, 2, "Modelo repetido não pode chegar à confirmação.");
+    await secondTask.getByLabel(/^Departamento/).selectOption("department-empty");
+    await secondTask.getByLabel(/^Modelo/).selectOption("model-empty");
+    await expect(wizard.getByRole("alert")).toHaveCount(0);
+    await expect(reviewButton).toBeEnabled();
+    await expect(secondTask.getByLabel(/^Responsável/)).toHaveValue("");
+    await expect(secondTask.getByLabel(/^Responsável/)).toBeDisabled();
+    await expect(
+      secondTask.getByRole("option", { name: "Sem responsável", exact: true }),
+    ).toHaveCount(1);
+    await wizard.getByRole("button", { name: "Adicionar tarefa", exact: true }).click();
+    const removedTask = wizard.getByRole("group", { name: "Tarefa 3", exact: true });
+    await removedTask.getByLabel(/^Nome/).fill("Tarefa removida");
+    await removedTask.getByRole("button", { name: "Remover tarefa", exact: true }).click();
+    await expect(removedTask).toHaveCount(0);
+    await reviewButton.click();
+    assert.equal(
+      wizardRequests.length,
+      2,
+      "Rascunhos não podem ser enviados antes da confirmação.",
+    );
+    await expectLockedClient(wizard);
+    await expect(wizard.getByRole("textbox")).toHaveCount(0);
+    await expect(wizard.getByRole("combobox")).toHaveCount(0);
+    const review = wizard.getByRole("table", { name: "Tarefas revisadas", exact: true });
+    await expect(review.getByRole("columnheader")).toHaveText([
+      "Nome",
+      "Prazo",
+      "Departamento",
+      "Modelo",
+      "Responsável",
+    ]);
+    await expect(review.getByRole("row").nth(1).getByRole("cell")).toHaveText([
+      "Apuração revisada",
+      "21/09/2026",
+      "Fiscal",
+      "Modelo com escolha",
+      "Bia",
+    ]);
+    await expect(review.getByRole("row").nth(2).getByRole("cell")).toHaveText([
+      "Sem atribuição",
+      "Não informado",
+      "Sem equipe",
+      "Modelo sem equipe",
+      "Sem responsável",
+    ]);
+    await expect(review.getByRole("row")).toHaveCount(3);
+    await wizard.getByRole("button", { name: "Voltar para tarefas", exact: true }).click();
+    await firstTask.getByLabel(/^Nome/).fill("Apuração final");
+    await reviewButton.click();
+    await expect(review.getByRole("cell", { name: "Apuração final", exact: true })).toBeVisible();
+    await wizard.getByRole("button", { name: "Criar projeto", exact: true }).click();
+    await expect.poll(() => wizardRequests.length).toBe(3);
+    assert.deepEqual(wizardRequests[2].body, {
+      client_id: clientId,
+      name: "Projeto com tarefas",
+      start_date: "2026-09-10",
+      end_date: "2026-09-20",
+      objective: "Revisar tarefas manuais.",
+      tasks: [
+        {
+          name: "Apuração final",
+          department_id: "department-one",
+          model_id: "model-choice",
+          responsible_id: "bia",
+          prevision_date: "2026-09-21",
+        },
+        {
+          name: "Sem atribuição",
+          department_id: "department-empty",
+          model_id: "model-empty",
+          responsible_id: null,
+        },
+      ],
+    });
+    assert.notEqual(wizardRequests[2].key, wizardRequests[1].key);
+    await expect(
+      page.getByText(
+        "Projeto criado com sucesso. Tarefas principais: 2. Dependências: 0. Sem responsável: 1.",
+        { exact: true },
+      ),
+    ).toHaveCount(1);
+    await expect(page).toHaveURL(`/tasks?clientId=${clientId}`);
+    assert.equal(await page.evaluate(() => performance.timeOrigin), documentTimeOrigin);
+    assert.ok(
+      Date.now() - cachedTasksAt < 60_000,
+      "O retorno deve ocorrer antes de expirar o cache de tarefas.",
+    );
+    await expect(page.getByRole("cell", { name: "Tarefa anterior", exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Apuração final", exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Sem atribuição", exact: true })).toBeVisible();
 
     await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "Editar" }).first().click();
@@ -249,13 +508,22 @@ async function runBrowserProof() {
 async function withNextServer(run) {
   if (configuredBaseUrl) return run();
   const command = process.platform === "win32" ? "cmd" : "corepack";
-  const args = process.platform === "win32"
-    ? ["/c", "pnpm", "exec", "next", "dev", "--webpack", "--port", PORT]
-    : ["pnpm", "exec", "next", "dev", "--webpack", "--port", PORT];
-  const server = spawn(command, args, { cwd: appRoot, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+  const args =
+    process.platform === "win32"
+      ? ["/c", "pnpm", "exec", "next", "dev", "--webpack", "--port", PORT]
+      : ["pnpm", "exec", "next", "dev", "--webpack", "--port", PORT];
+  const server = spawn(command, args, {
+    cwd: appRoot,
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   let output = "";
-  server.stdout.on("data", (chunk) => { output += chunk.toString(); });
-  server.stderr.on("data", (chunk) => { output += chunk.toString(); });
+  server.stdout.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  server.stderr.on("data", (chunk) => {
+    output += chunk.toString();
+  });
   try {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 45_000) {
@@ -279,4 +547,4 @@ async function withNextServer(run) {
 }
 
 await withNextServer(runBrowserProof);
-console.log("PASS wizard de projeto cria somente projeto e preserva edição direta");
+console.log("PASS wizard revisa tarefas manuais, aceita lista vazia e preserva edição direta");

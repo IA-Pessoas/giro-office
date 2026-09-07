@@ -89,6 +89,15 @@ export interface CreateProjectData {
 
 export interface CreateProjectWizardData extends CreateProjectData {
   idempotencyKey: string;
+  tasks?: ProjectWizardTask[];
+}
+
+export interface ProjectWizardTask {
+  name: string;
+  department_id: string;
+  model_id: string;
+  prevision_date?: string;
+  responsible_id: string | null;
 }
 
 export interface ProjectWizardResult {
@@ -115,7 +124,6 @@ export interface DeleteProjectData {
 export interface RecalculateProjectProgressData {
   project_id: string;
 }
-
 
 export interface ProjectTaskMetrics {
   total: number;

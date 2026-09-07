@@ -98,6 +98,12 @@ describe("project wizard integration", () => {
       fetchImpl: async () => Response.json({ token: "segredo", body: "sensível" }),
       message: "Resposta inválida do project-service.",
     },
+    {
+      scenario: "Projeto sem id",
+      fetchImpl: async () =>
+        Response.json({ success: true, data: { create: { name: "Projeto" } } }),
+      message: "Resposta inválida do project-service.",
+    },
   ])("registra $scenario sem expor dados sensíveis", async ({ fetchImpl, message }) => {
     const integration = createHttpProjectWizardIntegration({
       serviceUrl: "http://project-service:3033",
