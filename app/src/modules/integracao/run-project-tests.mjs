@@ -1437,12 +1437,13 @@ runTest("AI proposals arrive with the automatic responsible of the proposed mode
   assert.equal(applyWizardTaskChange({ ...proposal, model_id: "" }, "model_id", "", models).responsible_id, null);
 });
 
-runTest("step 2 accepts DOCX meeting minutes alongside TXT and Markdown", () => {
+runTest("step 2 accepts DOCX and PDF meeting minutes alongside TXT and Markdown", () => {
   const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
 
-  assert.match(projectForm, /Selecione um arquivo \.txt, \.md ou \.docx/);
+  assert.match(projectForm, /Selecione um arquivo \.txt, \.md, \.docx ou \.pdf/);
   assert.match(
     projectForm,
     /accept="[^"]*\.docx[^"]*application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/,
   );
+  assert.match(projectForm, /accept="[^"]*\.pdf[^"]*application\/pdf"/);
 });

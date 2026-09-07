@@ -23,6 +23,7 @@ import { projectWizardExtractTasksBodySchema } from "../schemas/projectWizardExt
 import type { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import type { ProjectWizardService } from "../services/projectWizardService.js";
 import { DOCX_MIME_TYPE, extractDocxText } from "../utils/docx.js";
+import { extractPdfText, PDF_MIME_TYPE } from "../utils/pdf.js";
 
 export type ProjectWizardRouteDeps = Pick<ProjectWizardService, "create" | "preview">;
 export type ProjectWizardExtractionRouteDeps = Pick<ProjectWizardExtractionService, "extractTasks">;
@@ -39,6 +40,12 @@ const MEETING_MINUTES_FILE_TYPES: Record<string, readonly string[]> = {
   ".txt": ["text/plain"],
   ".md": ["text/markdown", "text/plain", "text/x-markdown"],
   ".docx": [DOCX_MIME_TYPE],
+  ".pdf": [PDF_MIME_TYPE],
+};
+/** Formatos binários precisam de extração própria; o resto é texto puro em UTF-8. */
+const MEETING_MINUTES_EXTRACTORS: Record<string, (file: Buffer) => string> = {
+  [DOCX_MIME_TYPE]: extractDocxText,
+  [PDF_MIME_TYPE]: extractPdfText,
 };
 type ProjectWizardExtractTasksBody = z.infer<typeof projectWizardExtractTasksBodySchema>;
 
@@ -79,10 +86,10 @@ function uploadMeetingMinutes(request: Request, response: Response, next: NextFu
 
     const file = request.file;
     try {
-      const content =
-        file.mimetype === DOCX_MIME_TYPE
-          ? extractDocxText(file.buffer)
-          : new TextDecoder("utf-8", { fatal: true }).decode(file.buffer);
+      const extract = MEETING_MINUTES_EXTRACTORS[file.mimetype];
+      const content = extract
+        ? extract(file.buffer)
+        : new TextDecoder("utf-8", { fatal: true }).decode(file.buffer);
       if (content.includes("\0")) {
         throw new ServiceError(400, "O arquivo da Ata não pode conter NUL.");
       }
