@@ -227,6 +227,10 @@ describe("task crud routes", () => {
         auditServiceUrl: "http://localhost:3020",
         auditServiceToken: "audit-service-token",
         projectServiceUrl: "http://localhost:3033",
+        aiExtractionMode: "fake" as const,
+        aiExtractionTimeoutMs: 30_000,
+        aiExtractionRateLimitMax: 10,
+        aiExtractionRateLimitWindowMs: 60_000,
         enableApiDocs: false,
       }).paths["/task/list"],
     );

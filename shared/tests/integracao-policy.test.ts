@@ -28,6 +28,7 @@ const expectedRoutes = [
   "GET /task",
   "POST /task",
   "POST /task/project-wizard",
+  "POST /task/project-wizard/extract-tasks",
   "POST /task/project-wizard/preview",
   "PUT /task",
   "DELETE /task",
@@ -368,5 +369,45 @@ test("owner possui bypass global e exclusões preservam conflito de dependência
     INTEGRACAO_ROUTE_POLICIES.filter((policy) => policy.action === "delete").every(
       (policy) => policy.responses.dependency === 409,
     ),
+  );
+});
+
+test("a extração de tarefas por IA exige nível 2+ ou owner", () => {
+  const policy = requirePolicy("POST", "/task/project-wizard/extract-tasks");
+
+  assert.equal(policy.audit, "required");
+  for (const level of [0, 1] as const) {
+    assert.equal(
+      evaluateIntegracaoAction(policy, {
+        userId: "user-1",
+        level,
+        organizationId: "org-1",
+        resourceOrganizationId: "org-1",
+        isOwner: false,
+      }),
+      "forbidden",
+    );
+  }
+  for (const level of [2, 3] as const) {
+    assert.equal(
+      evaluateIntegracaoAction(policy, {
+        userId: "user-1",
+        level,
+        organizationId: "org-1",
+        resourceOrganizationId: "org-1",
+        isOwner: false,
+      }),
+      "allow",
+    );
+  }
+  assert.equal(
+    evaluateIntegracaoAction(policy, {
+      userId: "user-1",
+      level: 0,
+      organizationId: "org-1",
+      resourceOrganizationId: "org-2",
+      isOwner: true,
+    }),
+    "allow",
   );
 });

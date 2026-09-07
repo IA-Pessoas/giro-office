@@ -3,19 +3,21 @@ import { setupAPIClient } from "@shared/services/api";
 import type {
   CreateProjectData,
   CreateProjectWizardData,
+  ExtractProjectTasksData,
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
   ProjectWizardPreview,
-  ProjectWizardTask,
   ProjectWizardResult,
+  ProjectWizardTask,
   UpdateProjectData,
 } from "../types";
 import {
   buildCreateProjectPayload,
   buildDeleteProjectPayload,
+  buildExtractProjectTasksPayload,
   buildProjectListParams,
   PROJECT_ENDPOINTS,
   unwrapCreatedProject,
@@ -24,6 +26,7 @@ import {
   unwrapProjectMetrics,
   unwrapProjectProgress,
   unwrapUpdatedProject,
+  unwrapProjectTaskProposals,
   unwrapProjectWizardResult,
   unwrapProjectWizardPreview,
 } from "./projectService.contract";
@@ -75,6 +78,16 @@ export const projectService = {
     );
 
     return unwrapProjectWizardResult(response.data);
+  },
+
+  async extractTasks(payload: ExtractProjectTasksData): Promise<ProjectWizardTask[]> {
+    const api = setupAPIClient();
+    const response = await api.post(
+      PROJECT_ENDPOINTS.wizardExtractTasks,
+      buildExtractProjectTasksPayload(payload),
+    );
+
+    return unwrapProjectTaskProposals(response.data);
   },
 
   async previewWizard(tasks: ProjectWizardTask[]): Promise<ProjectWizardPreview> {
