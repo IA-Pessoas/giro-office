@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { extname } from "node:path";
 import { Writable } from "node:stream";
 import {
   FORWARDED_AUTH_MODULES_HEADER,
@@ -663,27 +664,60 @@ describe("project wizard task extraction routes", () => {
 
   it.each([
     [
-      "corrompido",
+      "DOCX corrompido",
       "meeting-minutes-corrupted.docx",
+      DOCX_MIME_TYPE,
       "O arquivo DOCX está corrompido ou não pôde ser lido.",
     ],
     [
-      "criptografado",
+      "DOCX criptografado",
       "meeting-minutes-encrypted.docx",
+      DOCX_MIME_TYPE,
       "O arquivo DOCX está protegido por senha e não pode ser lido.",
     ],
     [
-      "com assinatura divergente",
+      "DOCX com assinatura divergente",
       "meeting-minutes-not-ooxml.docx",
+      DOCX_MIME_TYPE,
       "O arquivo DOCX está corrompido ou não pôde ser lido.",
     ],
-    ["sem texto", "meeting-minutes-empty.docx", "O arquivo da Ata não contém texto."],
     [
-      "com entidade XML inválida",
+      "DOCX sem texto",
+      "meeting-minutes-empty.docx",
+      DOCX_MIME_TYPE,
+      "O arquivo da Ata não contém texto.",
+    ],
+    [
+      "DOCX com entidade XML inválida",
       "meeting-minutes-invalid-entity.docx",
+      DOCX_MIME_TYPE,
       "O arquivo DOCX está corrompido ou não pôde ser lido.",
     ],
-  ])("rejeita DOCX %s sem chamar o provedor", async (_label, fixture, error) => {
+    [
+      "PDF corrompido",
+      "meeting-minutes-corrupted.pdf",
+      PDF_MIME_TYPE,
+      "O arquivo PDF está corrompido ou não pôde ser lido.",
+    ],
+    [
+      "PDF criptografado",
+      "meeting-minutes-encrypted.pdf",
+      PDF_MIME_TYPE,
+      "O arquivo PDF está protegido por senha e não pode ser lido.",
+    ],
+    [
+      "PDF com assinatura divergente",
+      "meeting-minutes-not-pdf.pdf",
+      PDF_MIME_TYPE,
+      "O arquivo PDF está corrompido ou não pôde ser lido.",
+    ],
+    [
+      "PDF digitalizado, sem camada textual",
+      "meeting-minutes-scanned.pdf",
+      PDF_MIME_TYPE,
+      "O arquivo da Ata não contém texto.",
+    ],
+  ])("rejeita %s sem chamar o provedor", async (_label, fixture, contentType, error) => {
     const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
 
     const response = await request(createExtractionApp(service))
@@ -692,17 +726,17 @@ describe("project wizard task extraction routes", () => {
       .field("name", validExtractionBody.name)
       .field("objective", validExtractionBody.objective)
       .field("start_date", validExtractionBody.start_date)
-      .attach("file", readFixture(fixture), {
-        filename: "ata.docx",
-        contentType: DOCX_MIME_TYPE,
-      });
+      .attach("file", readFixture(fixture), { filename: `ata${extname(fixture)}`, contentType });
 
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({ success: false, error });
     expect(service.extractTasks).not.toHaveBeenCalled();
   });
 
-  it("não registra nem audita o texto da Ata DOCX aceita", async () => {
+  it.each([
+    ["DOCX", "meeting-minutes.docx", DOCX_MIME_TYPE],
+    ["PDF", "meeting-minutes.pdf", PDF_MIME_TYPE],
+  ])("não registra nem audita o texto da Ata %s aceita", async (_label, fixture, contentType) => {
     const service: ProjectWizardExtractionRouteDeps = {
       extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
     };
@@ -716,10 +750,7 @@ describe("project wizard task extraction routes", () => {
       .field("name", validExtractionBody.name)
       .field("objective", validExtractionBody.objective)
       .field("start_date", validExtractionBody.start_date)
-      .attach("file", readFixture("meeting-minutes.docx"), {
-        filename: "ata.docx",
-        contentType: DOCX_MIME_TYPE,
-      });
+      .attach("file", readFixture(fixture), { filename: `ata${extname(fixture)}`, contentType });
 
     expect(response.status).toBe(200);
     expect(auditLog).toHaveBeenCalledTimes(auditCallsBefore);
@@ -775,67 +806,6 @@ describe("project wizard task extraction routes", () => {
     expect(vi.mocked(service.extractTasks).mock.calls[0][0]).toMatchObject({
       content: "Reunião de acompanhamento",
     });
-  });
-
-  it.each([
-    [
-      "corrompido",
-      "meeting-minutes-corrupted.pdf",
-      "O arquivo PDF está corrompido ou não pôde ser lido.",
-    ],
-    [
-      "criptografado",
-      "meeting-minutes-encrypted.pdf",
-      "O arquivo PDF está protegido por senha e não pode ser lido.",
-    ],
-    [
-      "com assinatura divergente",
-      "meeting-minutes-not-pdf.pdf",
-      "O arquivo PDF está corrompido ou não pôde ser lido.",
-    ],
-    [
-      "digitalizado, sem camada textual",
-      "meeting-minutes-scanned.pdf",
-      "O arquivo da Ata não contém texto.",
-    ],
-  ])("rejeita PDF %s sem chamar o provedor", async (_label, fixture, error) => {
-    const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
-
-    const response = await request(createExtractionApp(service))
-      .post("/task/project-wizard/extract-tasks")
-      .set(gatewayHeaders())
-      .field("name", validExtractionBody.name)
-      .field("objective", validExtractionBody.objective)
-      .field("start_date", validExtractionBody.start_date)
-      .attach("file", readFixture(fixture), { filename: "ata.pdf", contentType: PDF_MIME_TYPE });
-
-    expect(response.status).toBe(400);
-    expect(response.body).toMatchObject({ success: false, error });
-    expect(service.extractTasks).not.toHaveBeenCalled();
-  });
-
-  it("não registra nem audita o texto da Ata PDF aceita", async () => {
-    const service: ProjectWizardExtractionRouteDeps = {
-      extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
-    };
-    const written: string[] = [];
-    const auditLog = vi.mocked(createLog);
-    const auditCallsBefore = auditLog.mock.calls.length;
-
-    const response = await request(createExtractionApp(service, {}, written))
-      .post("/task/project-wizard/extract-tasks")
-      .set(gatewayHeaders())
-      .field("name", validExtractionBody.name)
-      .field("objective", validExtractionBody.objective)
-      .field("start_date", validExtractionBody.start_date)
-      .attach("file", readFixture("meeting-minutes.pdf"), {
-        filename: "ata.pdf",
-        contentType: PDF_MIME_TYPE,
-      });
-
-    expect(response.status).toBe(200);
-    expect(auditLog).toHaveBeenCalledTimes(auditCallsBefore);
-    expect(written.join("\n")).not.toContain("Apurar impostos do trimestre");
   });
 
   it.each([
