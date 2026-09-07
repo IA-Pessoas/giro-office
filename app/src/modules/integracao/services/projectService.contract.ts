@@ -79,6 +79,16 @@ export function buildCreateProjectPayload(payload: CreateProjectData) {
 }
 
 export function buildExtractProjectTasksPayload(payload: ExtractProjectTasksData) {
+  if ("file" in payload) {
+    const formData = new FormData();
+    formData.append("file", payload.file);
+    formData.append("name", payload.name);
+    formData.append("objective", payload.objective);
+    formData.append("start_date", payload.start_date);
+    if (payload.end_date) formData.append("end_date", payload.end_date);
+    return formData;
+  }
+
   return {
     content: payload.content.trim(),
     name: payload.name,

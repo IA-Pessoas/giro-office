@@ -1271,6 +1271,24 @@ runTest("extraction payload carries only the project context allowed by the spec
   );
 });
 
+runTest("file extraction payload uses multipart with only the permitted project context", () => {
+  const file = new File(["Ata importada"], "ata.md", { type: "text/markdown" });
+  const payload = buildExtractProjectTasksPayload({
+    content: "Texto colado antigo",
+    file,
+    name: "Implantação fiscal",
+    objective: "Estruturar a operação",
+    start_date: "2026-09-01",
+    end_date: "2026-09-30",
+  });
+
+  assert.equal(payload instanceof FormData, true);
+  assert.deepEqual([...payload.keys()], ["file", "name", "objective", "start_date", "end_date"]);
+  assert.equal(payload.get("file"), file);
+  assert.equal(payload.get("content"), null);
+  assert.equal(payload.get("client_id"), null);
+});
+
 runTest("extraction response becomes reviewable proposals with optional fields", () => {
   assert.deepEqual(
     unwrapProjectTaskProposals({

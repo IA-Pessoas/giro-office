@@ -101,13 +101,17 @@ export interface ProjectWizardTask {
   responsible_id: string | null;
 }
 
-export interface ExtractProjectTasksData {
+interface ExtractProjectTasksContext {
   content: string;
   name: string;
   objective: string;
   start_date: string;
   end_date?: string | null;
 }
+
+export type ExtractProjectTasksData =
+  | ExtractProjectTasksContext
+  | (Omit<ExtractProjectTasksContext, "content"> & { file: File });
 
 export interface ProjectWizardResult {
   project: ProjectListItem;

@@ -97,6 +97,7 @@ export function ProjectFormModal({
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
   const [tasks, setTasks] = useState<WizardTask[]>([]);
   const [meetingMinutes, setMeetingMinutes] = useState("");
+  const [meetingMinutesFile, setMeetingMinutesFile] = useState<File | null>(null);
   const extractTasksMutation = useExtractProjectTasksMutation();
   const [preview, setPreview] = useState<ProjectWizardPreview | null>(null);
   const [dependenciesChanged, setDependenciesChanged] = useState(false);
@@ -112,6 +113,7 @@ export function ProjectFormModal({
     { enabled: open && !isEditing },
   );
   const idempotencyKeyRef = useRef<string | null>(null);
+  const meetingMinutesFileRef = useRef<HTMLInputElement>(null);
   const previewRequestLockRef = useRef(false);
   const { values, updateValue, validate, reset, buildCreatePayload, buildUpdatePayload } =
     useProjectForm(detailQuery.data);
@@ -122,6 +124,8 @@ export function ProjectFormModal({
       setCreateStep(1);
       setTasks([]);
       setMeetingMinutes("");
+      setMeetingMinutesFile(null);
+      if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
       setPreview(null);
       setDependenciesChanged(false);
       setPreviewErrorMessage(null);
@@ -147,6 +151,7 @@ export function ProjectFormModal({
   const taskOptionsLoading = departmentsQuery.isLoading || taskModelsQuery.isLoading;
   const taskOptionsError = departmentsQuery.isError || taskModelsQuery.isError;
   const taskValidationError = getTaskValidationError();
+  const hasMeetingMinutesText = Boolean(meetingMinutes.trim());
 
   function getTaskValidationError(): string | null {
     if (tasks.length === 0) return null;
@@ -202,15 +207,15 @@ export function ProjectFormModal({
   }
 
   async function handleExtractTasks() {
-    if (!meetingMinutes.trim() || extractTasksMutation.isPending) return;
+    if ((!hasMeetingMinutesText && !meetingMinutesFile) || extractTasksMutation.isPending) return;
 
     try {
       const proposals = await extractTasksMutation.mutateAsync({
-        content: meetingMinutes,
         name: values.name,
         objective: values.objective,
         start_date: values.start_date,
         end_date: values.end_date,
+        ...(meetingMinutesFile ? { file: meetingMinutesFile } : { content: meetingMinutes }),
       });
 
       setTasks((current) => [
@@ -570,9 +575,50 @@ export function ProjectFormModal({
                     className={`${PROJECT_INPUT_CLASSNAME} min-h-32 resize-y`}
                     placeholder="Cole aqui o texto da Ata de reunião."
                     aria-describedby="project-meeting-minutes-notice"
-                    disabled={extractTasksMutation.isPending}
+                    disabled={extractTasksMutation.isPending || Boolean(meetingMinutesFile)}
                   />
                 </label>
+                {hasMeetingMinutesText ? (
+                  <button
+                    type="button"
+                    className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+                    onClick={() => setMeetingMinutes("")}
+                    disabled={extractTasksMutation.isPending}
+                  >
+                    Limpar texto
+                  </button>
+                ) : null}
+                <label className="space-y-2" htmlFor="project-meeting-minutes-file">
+                  <span className="text-sm font-medium text-slate-700 dark:text-white">
+                    Selecione um arquivo .txt ou .md
+                  </span>
+                  <input
+                    ref={meetingMinutesFileRef}
+                    id="project-meeting-minutes-file"
+                    type="file"
+                    accept=".txt,.md,text/plain,text/markdown"
+                    onChange={(event) => setMeetingMinutesFile(event.target.files?.[0] ?? null)}
+                    className={PROJECT_INPUT_CLASSNAME}
+                    aria-describedby="project-meeting-minutes-notice"
+                    disabled={extractTasksMutation.isPending || hasMeetingMinutesText}
+                  />
+                </label>
+                {meetingMinutesFile ? (
+                  <div className="flex items-center gap-3 text-sm">
+                    <span>{meetingMinutesFile.name}</span>
+                    <button
+                      type="button"
+                      className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+                      onClick={() => {
+                        setMeetingMinutesFile(null);
+                        if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
+                      }}
+                      disabled={extractTasksMutation.isPending}
+                    >
+                      Remover arquivo
+                    </button>
+                  </div>
+                ) : null}
                 <p
                   id="project-meeting-minutes-notice"
                   className="text-sm text-slate-600 dark:text-slate-300"
@@ -584,7 +630,11 @@ export function ProjectFormModal({
                   type="button"
                   className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
                   onClick={() => void handleExtractTasks()}
-                  disabled={!meetingMinutes.trim() || extractTasksMutation.isPending || isBusy}
+                  disabled={
+                    (!hasMeetingMinutesText && !meetingMinutesFile) ||
+                    extractTasksMutation.isPending ||
+                    isBusy
+                  }
                 >
                   {extractTasksMutation.isPending ? (
                     <LoaderCircle className="h-4 w-4 animate-spin" />

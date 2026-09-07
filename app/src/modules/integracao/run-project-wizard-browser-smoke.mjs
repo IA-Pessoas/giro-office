@@ -174,7 +174,14 @@ async function installApiMocks(
     }),
   );
   await page.route("**/task/project-wizard/extract-tasks", async (route) => {
-    extractionRequests.push(route.request().postDataJSON());
+    const request = route.request();
+    const contentType = request.headers()["content-type"] ?? "";
+    extractionRequests.push({
+      contentType,
+      body: contentType.startsWith("multipart/form-data")
+        ? request.postDataBuffer().toString()
+        : request.postDataJSON(),
+    });
     if (extractionRequests.length === 1) {
       await route.fulfill({
         status: 422,
@@ -687,12 +694,46 @@ async function runBrowserProof() {
         .getByLabel(/^Departamento/),
     ).toHaveValue("");
     assert.equal(extractionRequests.length, 2);
-    assert.deepEqual(extractionRequests[1], {
+    assert.deepEqual(extractionRequests[1].body, {
       content: "- Apurar impostos do trimestre\n- Reunir documentos do cliente",
       name: "Projeto pela Ata",
       objective: "Extrair tarefas da Ata.",
       start_date: "2026-09-10",
     });
+    assert.match(extractionRequests[1].contentType, /^application\/json/);
+
+    const minutesFile = wizard.getByLabel("Selecione um arquivo .txt ou .md");
+    await expect(minutesFile).toBeDisabled();
+    await wizard.getByRole("button", { name: "Limpar texto" }).click();
+    await expect(minutesField).toHaveValue("");
+    await expect(minutesFile).toBeEnabled();
+    await minutesFile.setInputFiles({
+      name: "ata.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("- Validar importação da Ata"),
+    });
+    await expect(minutesField).toBeDisabled();
+    await expect(wizard.getByText("ata.md", { exact: true })).toBeVisible();
+    await wizard.getByRole("button", { name: "Remover arquivo" }).click();
+    await expect(minutesFile).toBeEnabled();
+    await minutesFile.setInputFiles({
+      name: "ata.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("- Validar importação da Ata"),
+    });
+    await extractButton.click();
+    await expect.poll(() => extractionRequests.length).toBe(3);
+    assert.match(extractionRequests[2].contentType, /^multipart\/form-data/);
+    assert.match(extractionRequests[2].body, /name="file"; filename="ata\.md"/);
+    assert.match(extractionRequests[2].body, /- Validar importação da Ata/);
+    for (const [field, value] of Object.entries({
+      name: "Projeto pela Ata",
+      objective: "Extrair tarefas da Ata.",
+      start_date: "2026-09-10",
+    })) {
+      assert.match(extractionRequests[2].body, new RegExp(`name="${field}"[\\s\\S]*${value}`));
+    }
+    assert.doesNotMatch(extractionRequests[2].body, /content|client_id/);
     await wizard.getByRole("button", { name: "Cancelar" }).click();
     assert.equal(wizardRequests.length, 3, "Cancelar não pode confirmar o wizard.");
 
