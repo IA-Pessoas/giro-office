@@ -27,6 +27,8 @@ const expectedRoutes = [
   "GET /task/list",
   "GET /task",
   "POST /task",
+  "POST /task/project-wizard",
+  "POST /task/project-wizard/preview",
   "PUT /task",
   "DELETE /task",
   "PUT /task/conclusion",
@@ -212,6 +214,8 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
     { method: "GET", path: "/task/list", allowedLevels: [0, 1, 2, 3] },
     { method: "GET", path: "/task", allowedLevels: [0, 1, 2, 3] },
     { method: "POST", path: "/task", allowedLevels: [2, 3] },
+    { method: "POST", path: "/task/project-wizard", allowedLevels: [2, 3] },
+    { method: "POST", path: "/task/project-wizard/preview", allowedLevels: [2, 3] },
     {
       method: "PUT",
       path: "/task",

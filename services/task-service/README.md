@@ -35,10 +35,11 @@ Exemplos de paths publicos:
 - `/task/project-plan`
 - `/task/project-plan/list`
 - `/task/deps/list`
-- `POST /task/project-wizard` cria um projeto com uma lista, inclusive vazia, de tarefas manuais e
-  exige `Idempotency-Key`. Cada tarefa exige nome, departamento e modelo; prazo e responsável são
-  opcionais, e o responsável também aceita `null`. Cada Modelo pode aparecer em apenas uma tarefa
-  do lote; repetições são rejeitadas com `400` antes de criar o projeto.
+- `POST /task/project-wizard/preview` compõe tarefas principais e dependências diretas canônicas e
+  retorna uma `revision` opaca. Exige Integração nível 2+ ou owner.
+- `POST /task/project-wizard` cria o projeto com a lista, inclusive vazia, de tarefas principais e
+  exige `Idempotency-Key` e a `revision` da prévia. O serviço revalida a composição antes de criar;
+  Modelo repetido ou prévia desatualizada retorna `409`.
 
 `/internal/reporting` é contrato direto interno, não roteado pelo gateway.
 

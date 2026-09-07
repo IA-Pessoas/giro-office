@@ -5,6 +5,7 @@ import {
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
+  ServiceError,
 } from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
@@ -121,6 +122,7 @@ describe("project wizard routes", () => {
     start_date: "2026-09-01T00:00:00.000Z",
     end_date: "2026-09-30T00:00:00.000Z",
     objective: "Objetivo do projeto",
+    revision: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
   };
 
   it("documenta o contrato público do wizard no OpenAPI", () => {
@@ -134,6 +136,7 @@ describe("project wizard routes", () => {
       "name",
       "start_date",
       "objective",
+      "revision",
     ]);
     expect(operation.requestBody.content["application/json"].schema.properties.tasks).toMatchObject(
       {
@@ -147,10 +150,35 @@ describe("project wizard routes", () => {
         },
       },
     );
+    expect(
+      buildTaskServiceOpenApiSpec(env).paths["/task/project-wizard/preview"].post,
+    ).toMatchObject({
+      tags: ["ProjectWizard"],
+      responses: { "200": expect.any(Object), "409": expect.any(Object) },
+    });
+  });
+
+  it("POST /task/project-wizard/preview delega a composição autenticada", async () => {
+    const service = {
+      preview: vi.fn().mockResolvedValue({ tasks: [], revision: "revision-1" }),
+      create: vi.fn(),
+    } as unknown as ProjectWizardRouteDeps;
+
+    const response = await request(createApp(service))
+      .post("/task/project-wizard/preview")
+      .set(gatewayHeaders())
+      .send({ tasks: [] });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: { tasks: [], revision: "revision-1" } });
+    expect(service.preview).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: USER_ID, organizationId: ORG_ID, tasks: [] }),
+    );
   });
 
   it("POST /task/project-wizard aceita lista vazia", async () => {
     const service: ProjectWizardRouteDeps = {
+      preview: vi.fn(),
       create: vi.fn().mockResolvedValue({
         project: { id: "project-1" },
         counts: { main: 0, dependencies: 0, unassigned: 0 },
@@ -201,8 +229,11 @@ describe("project wizard routes", () => {
   it.each([
     "model-1",
     " model-1 ",
-  ])("POST /task/project-wizard rejeita Modelo repetido %j antes do service", async (modelId) => {
-    const service: ProjectWizardRouteDeps = { create: vi.fn() };
+  ])("POST /task/project-wizard propaga conflito de Modelo repetido %j", async (modelId) => {
+    const service: ProjectWizardRouteDeps = {
+      preview: vi.fn(),
+      create: vi.fn().mockRejectedValue(new ServiceError(409, "Modelo model-1 repetido.")),
+    };
     const response = await request(createApp(service))
       .post("/task/project-wizard")
       .set(gatewayHeaders())
@@ -212,12 +243,12 @@ describe("project wizard routes", () => {
         tasks: [validTask, { ...validTask, name: "Outra tarefa", model_id: modelId }],
       });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Cada Modelo pode ser usado em apenas uma tarefa do projeto.",
+      error: "Modelo model-1 repetido.",
     });
-    expect(service.create).not.toHaveBeenCalled();
+    expect(service.create).toHaveBeenCalled();
     expect(forwardedRequest).toBeNull();
   });
 
@@ -226,7 +257,7 @@ describe("project wizard routes", () => {
     "department_id",
     "model_id",
   ] as const)("POST /task/project-wizard rejeita Tarefa sem %s antes do service", async (field) => {
-    const service: ProjectWizardRouteDeps = { create: vi.fn() };
+    const service: ProjectWizardRouteDeps = { preview: vi.fn(), create: vi.fn() };
     const invalidTask = { ...validTask };
     delete invalidTask[field];
 
