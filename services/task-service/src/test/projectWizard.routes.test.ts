@@ -610,6 +610,10 @@ describe("project wizard task extraction routes", () => {
       });
 
     expect(invalid.status).toBe(400);
+    expect(invalid.body).toMatchObject({
+      success: false,
+      error: "Tipo de arquivo não permitido.",
+    });
 
     for (const expected of [200, 200]) {
       const response = await request(app)
@@ -624,13 +628,59 @@ describe("project wizard task extraction routes", () => {
   });
 
   it.each([
-    ["mais de um arquivo", [Buffer.from("Ata 1"), Buffer.from("Ata 2")]],
-    ["extensão não permitida", [Buffer.from("Ata inválida")]],
-    ["arquivo vazio", [Buffer.alloc(0)]],
-    ["NUL", [Buffer.from("Ata\0inválida")]],
-    ["UTF-8 inválido", [Buffer.from([0xc3, 0x28])]],
-    ["arquivo acima de 10 MB", [Buffer.alloc(10 * 1024 * 1024 + 1, "a")]],
-  ])("rejeita %s sem chamar o provedor", async (label, files) => {
+    "JSON",
+    "multipart",
+  ])("rejeita metadado inválido em %s antes do rate limit", async (transport) => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
+    };
+    const app = createExtractionApp(service, { aiExtractionRateLimitMax: 2 });
+    const invalidRequest = request(app)
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders());
+
+    const invalid =
+      transport === "JSON"
+        ? await invalidRequest.send({ ...validExtractionBody, name: "" })
+        : await invalidRequest
+            .field("name", "")
+            .field("objective", validExtractionBody.objective)
+            .field("start_date", validExtractionBody.start_date)
+            .attach("file", Buffer.from("Ata válida"), {
+              filename: "ata.txt",
+              contentType: "text/plain",
+            });
+
+    expect(invalid.status).toBe(400);
+
+    for (const expected of [200, 200]) {
+      const response = await request(app)
+        .post("/task/project-wizard/extract-tasks")
+        .set(gatewayHeaders())
+        .send(validExtractionBody);
+
+      expect(response.status).toBe(expected);
+    }
+
+    expect(service.extractTasks).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["mais de um arquivo", [Buffer.from("Ata 1"), Buffer.from("Ata 2")], "Upload inválido."],
+    ["extensão não permitida", [Buffer.from("Ata inválida")], "Tipo de arquivo não permitido."],
+    ["arquivo vazio", [Buffer.alloc(0)], "O arquivo da Ata é obrigatório e não pode estar vazio."],
+    ["NUL", [Buffer.from("Ata\0inválida")], "O arquivo da Ata não pode conter NUL."],
+    [
+      "UTF-8 inválido",
+      [Buffer.from([0xc3, 0x28])],
+      "O arquivo da Ata deve conter texto UTF-8 válido.",
+    ],
+    [
+      "arquivo acima de 10 MB",
+      [Buffer.alloc(10 * 1024 * 1024 + 1, "a")],
+      "Arquivo excede o limite de 10 MB.",
+    ],
+  ])("rejeita %s sem chamar o provedor", async (label, files, error) => {
     const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
     let requestBuilder = request(createExtractionApp(service))
       .post("/task/project-wizard/extract-tasks")
@@ -649,6 +699,7 @@ describe("project wizard task extraction routes", () => {
     const response = await requestBuilder;
 
     expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({ success: false, error });
     expect(service.extractTasks).not.toHaveBeenCalled();
   });
 

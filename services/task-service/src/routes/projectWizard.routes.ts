@@ -9,6 +9,7 @@ import {
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { Router } from "express";
 import multer from "multer";
+import type { z } from "zod";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
@@ -35,6 +36,7 @@ const MEETING_MINUTES_FILE_TYPES = {
   ".txt": "text/plain",
   ".md": "text/markdown",
 } as const;
+type ProjectWizardExtractTasksBody = z.infer<typeof projectWizardExtractTasksBodySchema>;
 
 const meetingMinutesUpload = multer({
   storage: multer.memoryStorage(),
@@ -82,6 +84,7 @@ function uploadMeetingMinutes(request: Request, response: Response, next: NextFu
       request.body = { ...request.body, content };
       next();
     } catch (decodeError) {
+      logError("Falha ao decodificar arquivo da Ata");
       next(
         decodeError instanceof ServiceError
           ? decodeError
@@ -89,6 +92,19 @@ function uploadMeetingMinutes(request: Request, response: Response, next: NextFu
       );
     }
   });
+}
+
+function validateProjectWizardExtractTasksBody(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  try {
+    request.body = parseWithZod(projectWizardExtractTasksBodySchema, request.body);
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
 export function createProjectWizardRoutes({
@@ -154,10 +170,11 @@ export function createProjectWizardRoutes({
     "/project-wizard/extract-tasks",
     isAuthenticated,
     uploadMeetingMinutes,
+    validateProjectWizardExtractTasksBody,
     extractionRateLimit,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const body = parseWithZod(projectWizardExtractTasksBodySchema, req.body);
+        const body = req.body as ProjectWizardExtractTasksBody;
         const auth = requireAuthenticatedRequestContext(req);
 
         const result = await extractionService.extractTasks({
