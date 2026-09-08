@@ -6,7 +6,7 @@ Base verificada: `origin/develop@fda3bc54ea295913841a130c2f8f7db96ba85d56`
 
 ## Status
 
-Concluída. Os testes públicos do `task-service` e do gateway cobrem as três rotas do
+Concluída no escopo original do Task 1. Os testes públicos do `task-service` e do gateway cobrem as três rotas do
 Project Wizard, autorização, ordem entre validação e rate limit, payload allowlisted ao provedor,
 privacidade de logs/auditoria e contratos estáveis de erro.
 
@@ -15,8 +15,25 @@ mas não colocava o token confiável configurado ao encaminhar chamadas ao `task
 `task-service` exige esse token junto aos headers de identidade encaminhada, as três rotas não
 formavam um contrato autenticado completo através do proxy público.
 
-A correção de produção ficou em duas linhas: o proxy regular do `task-service` e o proxy especial de
-extração agora recebem `env.auditServiceToken`, reutilizando a credencial já exigida pelo serviço.
+A correção original de produção ficou em duas linhas: o proxy regular do `task-service` e o proxy
+especial de extração passaram a receber `env.auditServiceToken`, reutilizando a credencial já
+exigida pelo serviço. Após a revisão final, o proxy especial passou a reutilizar `targetUrl` e
+`internalServiceToken` da definição do `task-service` na registry; somente o timeout excepcional
+permanece local.
+
+## Cronologia posterior ao Task 1
+
+- O Task 2 adicionou a documentação operacional em `docs/vps-deploy.md` e executou
+  `pnpm smoke:coverage` antes e depois da edição, com `419/421` operações mapeadas.
+- O Task 3 executou depois o smoke público do app com
+  `pnpm run test:project-wizard-browser`, após preparar `@workspace/api`; os dois cenários passaram.
+- A correção dos findings da revisão final adicionou as asserções explícitas de status `401/403`,
+  alinhou `AUDIT_SERVICE_TOKEN` na documentação VPS e removeu a duplicação de configuração do proxy
+  especial. Depois dela, passaram: gateway `project-wizard` (`4/4`), registry (`26/26`),
+  `smoke:coverage` (`419/421`), typecheck do gateway, Biome escopado e `git diff --check`.
+
+As seções abaixo preservam a evidência histórica da execução original do Task 1; quando mencionam
+ausência de docs, smoke ou app, descrevem aquela etapa, não o head final da branch.
 
 ## RED
 
@@ -187,7 +204,7 @@ git diff --check
 
 Saída: vazia; exit code 0.
 
-## Arquivos alterados
+## Arquivos alterados no Task 1 original
 
 - `services/gateway/src/app.ts`: passa o token interno ao proxy especial de extração.
 - `services/gateway/src/config/serviceRegistry.ts`: passa o token interno ao proxy regular do
@@ -200,17 +217,21 @@ Saída: vazia; exit code 0.
   allowlisted entregue ao provedor.
 - `.superpowers/sdd/plan-issue-995/task-1-report.md`: este relatório.
 
-O arquivo preexistente e não rastreado `.superpowers/plan-issue-995.md` foi somente lido e permanece
-fora do commit.
+O Task 2 alterou depois `docs/vps-deploy.md`; o Task 3 apenas verificou o app. A correção da revisão
+final alterou novamente `services/gateway/src/app.ts`, `services/gateway/src/app.routes.test.ts`,
+`docs/vps-deploy.md` e este relatório. O arquivo preexistente e não rastreado
+`.superpowers/plan-issue-995.md` foi somente lido e permanece fora dos commits.
 
-## Self-review
+## Self-review do Task 1 original e revisão final
 
 ### Standards
 
-Nenhum finding.
+Na self-review original foi registrado nenhum finding. A revisão final encontrou um minor: o proxy
+especial ainda duplicava `targetUrl` e `internalServiceToken` fora da registry. O finding foi
+corrigido no head final.
 
-- A correção reutiliza `GatewayEnv.auditServiceToken` e `internalServiceToken`; não cria variável,
-  helper, abstração ou dependência nova.
+- A correção final reutiliza a definição já existente de `task-service`; não cria registry, mapa de
+  configuração, abstração ou dependência nova.
 - O proxy especial preserva exclusivamente o timeout especial já existente.
 - Os testes permanecem em Vitest, nos arquivos públicos já existentes, com imports ESM e sem rede
   externa ou infraestrutura nova.
@@ -227,12 +248,13 @@ Nenhum finding.
 - Payload ao provedor é fechado e sem IDs internos.
 - Ata, resposta bruta e sentinelas de cliente/responsável não entram em logs/auditoria.
 - Erros relevantes têm status, mensagem e `code` observados na interface HTTP.
-- Nenhum arquivo de docs, manifesto de smoke ou app foi alterado.
+- No Task 1 original, nenhum arquivo de docs, manifesto de smoke ou app foi alterado. O Task 2
+  alterou depois apenas a documentação VPS, e o Task 3 verificou o app sem alterar seu código.
 
 ### Mutation check
 
-Remover qualquer uma das duas linhas `internalServiceToken` faz o novo teste público falhar para o
-proxy correspondente. Remover autenticação/autorização, antecipar o rate limit, permitir campos
+Remover `internalServiceToken` da definição do `task-service` faz o novo teste público falhar nos
+proxies regular e especial. Remover autenticação/autorização, antecipar o rate limit, permitir campos
 privados, alterar os códigos de erro ou incluir body em observabilidade também quebra os casos
 adicionados/reforçados.
 
@@ -244,6 +266,7 @@ adicionados/reforçados.
 - As suítes imprimem logs de erros intencionais dos próprios cenários negativos, mas terminam com
   zero falhas.
 - O pnpm emite um warning preexistente sobre `resolutions` em `services/src/package.json`.
-- Por restrição desta Task 1, não foram executados testes do app nem `smoke:coverage`, e não houve
-  alteração em docs ou manifesto de smoke.
+- Por restrição da execução original do Task 1, naquela etapa não foram executados testes do app nem
+  `smoke:coverage`, e não houve alteração em docs ou manifesto de smoke. Como registrado acima,
+  `smoke:coverage`, o smoke do app e a validação final foram executados posteriormente.
 - Nenhum push, PR, merge ou deploy foi feito.

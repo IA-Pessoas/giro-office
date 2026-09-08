@@ -396,10 +396,12 @@ function mountDashboardRoutes(
   app.use("/dashboard", createDashboardRoutes(dashboardStatsService));
 }
 
-function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
+function buildServiceProxyMap(
+  services: ReturnType<typeof getGatewayServiceDefinitions>,
+): Map<string, GatewayProxy> {
   const proxyByServiceKey = new Map<string, GatewayProxy>();
 
-  for (const service of getGatewayServiceDefinitions(env)) {
+  for (const service of services) {
     proxyByServiceKey.set(
       service.key,
       buildHttpProxyMiddleware(service.targetUrl, {
@@ -416,17 +418,22 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
 }
 
 function mountServiceRoutes(app: express.Express, env: GatewayEnv): void {
-  const proxyByServiceKey = buildServiceProxyMap(env);
+  const services = getGatewayServiceDefinitions(env);
+  const taskService = services.find((service) => service.key === "task-service");
+  if (!taskService) {
+    throw new Error("task-service não configurado na registry do gateway.");
+  }
+  const proxyByServiceKey = buildServiceProxyMap(services);
 
   app.post(
     PROJECT_WIZARD_EXTRACTION_PATH,
-    buildHttpProxyMiddleware(env.taskServiceUrl, {
-      internalServiceToken: env.auditServiceToken,
+    buildHttpProxyMiddleware(taskService.targetUrl, {
+      internalServiceToken: taskService.internalServiceToken,
       upstreamTimeoutMs: PROJECT_WIZARD_EXTRACTION_UPSTREAM_TIMEOUT_MS,
     }),
   );
 
-  for (const service of getGatewayServiceDefinitions(env)) {
+  for (const service of services) {
     const proxy = proxyByServiceKey.get(service.key);
 
     for (const routePrefix of service.routePrefixes) {

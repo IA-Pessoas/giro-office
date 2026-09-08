@@ -2556,6 +2556,7 @@ it("protects the three public project-wizard routes before proxying", async () =
         headers: { "content-type": "application/json" },
         body: "{}",
       });
+      expect(unauthorized.status, path).toBe(401);
       expect(await unauthorized.json(), path).toMatchObject({
         success: false,
         error: "Não autenticado.",
@@ -2570,6 +2571,7 @@ it("protects the three public project-wizard routes before proxying", async () =
         },
         body: "{}",
       });
+      expect(forbidden.status, path).toBe(403);
       expect(await forbidden.json(), path).toMatchObject({
         success: false,
         error: "Acesso negado para esta rota.",
