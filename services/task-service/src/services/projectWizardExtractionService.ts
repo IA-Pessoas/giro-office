@@ -5,6 +5,7 @@ import {
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
+import { z } from "zod";
 
 import type {
   AiTaskExtractionContext,
@@ -15,6 +16,17 @@ import prismaClient from "../prisma/index.js";
 import { isIsoCalendarDate } from "../utils/civilDate.js";
 
 export const PROJECT_TASK_MODEL_TYPE = "Projeto";
+const PROVIDER_SOURCE_PART_MAX_CHARS = 100_000;
+const AI_TASK_PROPOSALS_SCHEMA = z.array(
+  z
+    .object({
+      name: z.string(),
+      prevision_date: z.string().optional(),
+      department: z.string().optional(),
+      model: z.string().optional(),
+    })
+    .strict(),
+);
 
 export interface ExtractProjectTasksRequest {
   userId: string;
@@ -136,17 +148,88 @@ export class ProjectWizardExtractionService {
     data: ExtractProjectTasksRequest,
     catalog: CatalogDepartment[],
   ): Promise<AiTaskProposal[]> {
+    const parts = partitionMeetingMinutes(data.content);
+
     try {
-      return await this.provider.extract({
-        content: data.content,
-        context: buildContext(data, catalog),
-      });
-    } catch (err: unknown) {
-      if (err instanceof ServiceError) throw err;
+      const context = buildContext(data, catalog);
+      const proposals: AiTaskProposal[][] = [];
+
+      for (const content of parts) {
+        const result = AI_TASK_PROPOSALS_SCHEMA.safeParse(
+          await this.provider.extract({ content, context }),
+        );
+        if (!result.success) {
+          throw new ServiceError(502, "Resposta da IA em formato incompatível.");
+        }
+        proposals.push(result.data);
+      }
+
+      return deduplicateProposalsBetweenParts(proposals);
+    } catch {
       logError("Falha na extração de tarefas propostas pela IA.");
-      throw new ServiceError(502, "Não foi possível extrair tarefas da Ata.", err);
+      throw new ServiceError(502, "Não foi possível extrair tarefas da Ata inteira.");
     }
   }
+}
+
+function partitionMeetingMinutes(content: string): string[] {
+  const parts: string[] = [];
+  let offset = 0;
+
+  while (content.length - offset > PROVIDER_SOURCE_PART_MAX_CHARS) {
+    const limit = offset + PROVIDER_SOURCE_PART_MAX_CHARS;
+    const newline = content.lastIndexOf("\n", limit - 1);
+    let end = newline >= offset ? newline + 1 : limit;
+    if (
+      end === limit &&
+      isHighSurrogate(content.charCodeAt(end - 1)) &&
+      isLowSurrogate(content.charCodeAt(end))
+    ) {
+      end -= 1;
+    }
+    parts.push(content.slice(offset, end));
+    offset = end;
+  }
+
+  parts.push(content.slice(offset));
+  return parts;
+}
+
+function isHighSurrogate(codeUnit: number): boolean {
+  return codeUnit >= 0xd800 && codeUnit <= 0xdbff;
+}
+
+function isLowSurrogate(codeUnit: number): boolean {
+  return codeUnit >= 0xdc00 && codeUnit <= 0xdfff;
+}
+
+function proposalDeduplicationKey(proposal: AiTaskProposal): string {
+  return JSON.stringify([
+    normalizeName(proposal.name),
+    proposal.prevision_date?.trim() ?? "",
+    proposal.department ? normalizeName(proposal.department) : "",
+    proposal.model ? normalizeName(proposal.model) : "",
+  ]);
+}
+
+/** Remove apenas repetições de partes anteriores; duplicatas da mesma parte permanecem intactas. */
+function deduplicateProposalsBetweenParts(parts: AiTaskProposal[][]): AiTaskProposal[] {
+  const priorPartKeys = new Set<string>();
+  const proposals: AiTaskProposal[] = [];
+
+  for (const part of parts) {
+    const keyedPart = part.map((proposal) => ({
+      proposal,
+      key: proposalDeduplicationKey(proposal),
+    }));
+
+    for (const { proposal, key } of keyedPart) {
+      if (!priorPartKeys.has(key)) proposals.push(proposal);
+    }
+    for (const { key } of keyedPart) priorPartKeys.add(key);
+  }
+
+  return proposals;
 }
 
 function buildContext(

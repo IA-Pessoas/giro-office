@@ -566,6 +566,14 @@ describe("project wizard task extraction routes", () => {
       "objective",
       "start_date",
     ]);
+    expect(
+      operation.requestBody.content["application/json"].schema.properties.content.maxLength,
+    ).toBeUndefined();
+    expect(
+      operation.requestBody.content["application/json"].schema.properties.content.description,
+    ).toContain("10 MiB em bytes UTF-8");
+    expect(operation.description).toContain("partes");
+    expect(operation.description).toContain("Ata inteira");
     expect(operation.responses["422"]).toBeDefined();
     expect(operation.responses["429"]).toBeDefined();
     expect(operation.requestBody.content["multipart/form-data"].schema.required).toEqual([
@@ -996,6 +1004,58 @@ describe("project wizard task extraction routes", () => {
         objective: "Objetivo do projeto",
       }),
     );
+  });
+
+  it("aceita Ata JSON no limite de 10 MB mesmo com escaping", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa extensa" }] }),
+    };
+    const content = '"'.repeat(10 * 1024 * 1024);
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send({ ...validExtractionBody, content });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: { tasks: [{ name: "Tarefa extensa" }] },
+    });
+    expect(service.extractTasks).toHaveBeenCalledWith(expect.objectContaining({ content }));
+  });
+
+  it("rejeita Ata JSON acima do limite de 10 MB da fonte", async () => {
+    const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send({ ...validExtractionBody, content: "A".repeat(10 * 1024 * 1024 + 1) });
+
+    expect(response.status).toBe(400);
+    expect(service.extractTasks).not.toHaveBeenCalled();
+  });
+
+  it("preserva o contrato de erro para Ata JSON maior que o antigo teto", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi
+        .fn()
+        .mockRejectedValue(
+          new ServiceError(502, "Não foi possível extrair tarefas da Ata inteira."),
+        ),
+    };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send({ ...validExtractionBody, content: "A".repeat(1_100_000) });
+
+    expect(response.status).toBe(502);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Não foi possível extrair tarefas da Ata inteira.",
+    });
   });
 
   it("entrega ao cliente o aviso de prazo da proposta", async () => {

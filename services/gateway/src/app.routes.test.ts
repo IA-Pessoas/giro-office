@@ -1967,6 +1967,86 @@ it("rejects JSON request bodies above the configured gateway limit before proxyi
   }
 });
 
+it("forwards project-wizard extraction content larger than 1 MiB to task-service", async () => {
+  const content = "a".repeat(1024 * 1024 + 1);
+  let receivedContentBytes = 0;
+  const taskService = createServer(async (request, response) => {
+    const body = await readJsonBody<{ content: string }>(request);
+    receivedContentBytes = Buffer.byteLength(body.content, "utf8");
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { received: true } }));
+  });
+  const taskServiceUrl = await startServer(taskService);
+  const gateway = createServer(createApp(createEnv({ taskServiceUrl }), createTestLogger()));
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+    modules: { integracao: 1 },
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/task/project-wizard/extract-tasks`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(receivedContentBytes).toBe(Buffer.byteLength(content, "utf8"));
+  } finally {
+    await stopServer(gateway);
+    await stopServer(taskService);
+  }
+});
+
+it("uses the extraction composition timeout only for its public gateway path", async () => {
+  const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+  const taskService = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: {} }));
+  });
+  const taskServiceUrl = await startServer(taskService);
+  const gateway = createServer(createApp(createEnv({ taskServiceUrl }), createTestLogger()));
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+    modules: { integracao: 1 },
+  });
+
+  try {
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    };
+    const extraction = await fetch(`${gatewayUrl}/task/project-wizard/extract-tasks`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ content: "Ata" }),
+    });
+    const regularTaskRoute = await fetch(`${gatewayUrl}/task/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(extraction.status).toBe(200);
+    expect(regularTaskRoute.status).toBe(200);
+    expect(timeoutSpy).toHaveBeenCalledWith(3_600_000);
+    expect(timeoutSpy).toHaveBeenCalledWith(30_000);
+  } finally {
+    timeoutSpy.mockRestore();
+    await stopServer(gateway);
+    await stopServer(taskService);
+  }
+});
+
 it("returns the shared success envelope for gateway health", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);

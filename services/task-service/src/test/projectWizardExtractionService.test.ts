@@ -250,11 +250,13 @@ describe("ProjectWizardExtractionService", () => {
     });
     const service = new ProjectWizardExtractionService(provider, createPrisma());
 
-    await expect(service.extractTasks(createRequest())).rejects.toBeInstanceOf(ServiceError);
-    await expect(service.extractTasks(createRequest())).rejects.toMatchObject({ statusCode: 502 });
+    await expect(service.extractTasks(createRequest())).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Não foi possível extrair tarefas da Ata inteira.",
+    });
   });
 
-  it("preserva a falha original do provedor sem reembrulhar", async () => {
+  it("uniformiza a falha estrutural do provedor para a Ata inteira", async () => {
     const { provider } = createProvider(async () => {
       throw new ServiceError(502, "Resposta da IA em formato incompatível.");
     });
@@ -262,7 +264,17 @@ describe("ProjectWizardExtractionService", () => {
 
     await expect(service.extractTasks(createRequest())).rejects.toMatchObject({
       statusCode: 502,
-      message: "Resposta da IA em formato incompatível.",
+      message: "Não foi possível extrair tarefas da Ata inteira.",
+    });
+  });
+
+  it("invalida uma Ata de uma parte quando a resposta é estruturalmente incompatível", async () => {
+    const { provider } = createProvider(async () => [{}]);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest())).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Não foi possível extrair tarefas da Ata inteira.",
     });
   });
 
@@ -293,6 +305,163 @@ describe("ProjectWizardExtractionService", () => {
     expect(serialized).not.toContain(USER_ID);
     expect(serialized).not.toContain("department-fiscal");
     expect(serialized).not.toContain("model-apuracao");
+  });
+
+  it("extrai todas as partes da Ata na ordem e com o mesmo contexto", async () => {
+    const firstLine = "A".repeat(99_999);
+    const content = `${firstLine}\nSegunda parte`;
+    const { provider, extract } = createProvider(async ({ content: part }) => [
+      { name: part === `${firstLine}\n` ? "Primeira tarefa" : "Segunda tarefa" },
+    ]);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest({ content }))).resolves.toEqual({
+      tasks: [{ name: "Primeira tarefa" }, { name: "Segunda tarefa" }],
+    });
+    expect(extract).toHaveBeenCalledTimes(2);
+    expect(extract.mock.calls[0]?.[0].context).toEqual(extract.mock.calls[1]?.[0].context);
+  });
+
+  it("aceita uma parte sem propostas quando outra parte contém tarefa válida", async () => {
+    const content = `${"A".repeat(100_000)}B`;
+    const { provider } = createProvider(
+      vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ name: "Tarefa válida" }]),
+    );
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest({ content }))).resolves.toEqual({
+      tasks: [{ name: "Tarefa válida" }],
+    });
+  });
+
+  it("remove duplicata entre partes sem colapsar propostas legítimas", async () => {
+    const repeated = {
+      name: "Revisar Ata",
+      prevision_date: "2026-09-10",
+      department: "Fiscal",
+      model: "Revisão",
+    };
+    const { provider } = createProvider(
+      vi
+        .fn()
+        .mockResolvedValueOnce([repeated, repeated])
+        .mockResolvedValueOnce([repeated, { ...repeated, prevision_date: "2026-09-11" }]),
+    );
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    const result = await service.extractTasks(
+      createRequest({ content: `${"A".repeat(100_000)}B` }),
+    );
+
+    expect(result.tasks).toEqual([
+      {
+        name: "Revisar Ata",
+        prevision_date: "2026-09-10",
+        department_id: "department-fiscal",
+        model_id: "model-revisao",
+      },
+      {
+        name: "Revisar Ata",
+        prevision_date: "2026-09-10",
+        department_id: "department-fiscal",
+        model_id: "model-revisao",
+      },
+      {
+        name: "Revisar Ata",
+        prevision_date: "2026-09-11",
+        department_id: "department-fiscal",
+        model_id: "model-revisao",
+      },
+    ]);
+  });
+
+  it("não divide um emoji no fallback de uma linha longa", async () => {
+    const content = `${"A".repeat(99_999)}😀B`;
+    const received: string[] = [];
+    const { provider } = createProvider(async ({ content: part }) => {
+      received.push(part);
+      return received.length === 1 ? [] : [{ name: "Tarefa" }];
+    });
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await service.extractTasks(createRequest({ content }));
+
+    expect(received).toEqual(["A".repeat(99_999), "😀B"]);
+    expect(received.join("")).toBe(content);
+  });
+
+  it("mantém uma única chamada quando a Ata não exige divisão", async () => {
+    const { provider, extract } = createProvider(async () => [{ name: "Tarefa" }]);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await service.extractTasks(createRequest());
+
+    expect(extract).toHaveBeenCalledOnce();
+  });
+
+  it("não trunca uma quantidade grande de propostas", async () => {
+    const proposals = Array.from({ length: 1_001 }, (_, index) => ({
+      name: `Tarefa ${index + 1}`,
+    }));
+    const { provider } = createProvider(async () => proposals);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    const result = await service.extractTasks(createRequest());
+
+    expect(result.tasks).toHaveLength(1_001);
+    expect(result.tasks.at(-1)?.name).toBe("Tarefa 1001");
+  });
+
+  it("invalida a Ata inteira quando uma parte intermediária falha", async () => {
+    const content = `${"A".repeat(100_000)}${"B".repeat(100_000)}C`;
+    const { provider, extract } = createProvider(
+      vi
+        .fn()
+        .mockResolvedValueOnce([{ name: "Tarefa parcial" }])
+        .mockRejectedValueOnce(new Error("boom")),
+    );
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest({ content }))).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Não foi possível extrair tarefas da Ata inteira.",
+    });
+    expect(extract).toHaveBeenCalledTimes(2);
+  });
+
+  it("trata timeout intermediário como falha da Ata inteira", async () => {
+    const content = `${"A".repeat(100_000)}${"B".repeat(100_000)}C`;
+    const { provider } = createProvider(
+      vi
+        .fn()
+        .mockResolvedValueOnce([{ name: "Tarefa parcial" }])
+        .mockRejectedValueOnce(Object.assign(new Error("timeout"), { name: "TimeoutError" })),
+    );
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest({ content }))).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Não foi possível extrair tarefas da Ata inteira.",
+    });
+  });
+
+  it("invalida a Ata inteira quando uma parte retorna estrutura incompatível", async () => {
+    const content = `${"A".repeat(100_000)}B`;
+    const { provider } = createProvider(
+      vi
+        .fn()
+        .mockResolvedValueOnce([{ name: "Tarefa parcial" }])
+        .mockResolvedValueOnce([{}]),
+    );
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest({ content }))).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Não foi possível extrair tarefas da Ata inteira.",
+    });
   });
 
   it.each([0, 1])("bloqueia Integração nível %i antes de chamar o provedor", async (level) => {

@@ -53,12 +53,13 @@ Exemplos de paths publicos:
   observações ou chave. Falha na auditoria não altera a resposta; replay não emite nova auditoria.
 - `POST /task/project-wizard/extract-tasks` transforma uma Ata de reunião colada ou enviada em TXT,
   Markdown, DOCX ou PDF em Tarefas propostas com a OpenAI. Exige nível `2+` em Integração ou `owner`
-  e respeita o isolamento da organização. O corpo JSON aceita `content` (Ata), `name`, `objective`,
-  `start_date` e `end_date` opcional; `multipart/form-data` aceita os mesmos campos e um único
-  `file` `.txt` (`text/plain`), `.md` (`text/markdown`, `text/plain` ou `text/x-markdown`),
-  `.docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`) ou `.pdf`
-  (`application/pdf`) de até
-  10 MB. Do DOCX é lido apenas o texto de `word/document.xml`: macros, campos ativos como HYPERLINK
+  e respeita o isolamento da organização. O conteúdo textual decodificado aceita até 10 MiB em bytes
+  UTF-8; no JSON, o parser reserva headroom técnico para envelope e escaping sem alterar esse limite
+  da fonte. A requisição aceita `content` (Ata), `name`, `objective`, `start_date` e `end_date` opcional;
+  `multipart/form-data` aceita os mesmos campos e um único `file` `.txt` (`text/plain`), `.md`
+  (`text/markdown`, `text/plain` ou `text/x-markdown`), `.docx`
+  (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`) ou `.pdf`
+  (`application/pdf`) de até 10 MB. Do DOCX é lido apenas o texto de `word/document.xml`: macros, campos ativos como HYPERLINK
   e demais conteúdos ativos não são executados nem repassados ao provedor; documento corrompido,
   protegido por senha, sem texto ou fora do padrão OOXML é rejeitado com `400` antes do provedor e
   sem consumir tentativa. Do PDF é lida apenas a camada textual já presente no arquivo: ações,
@@ -67,8 +68,9 @@ Exemplos de paths publicos:
   por senha ou com assinatura divergente de `%PDF-`. A resposta traz `tasks`
   com `name` e, quando houver correspondência clara na
   organização, `prevision_date`, `department_id` e `model_id`. Zero propostas retorna `422`;
-  formato incompatível, timeout ou falha do provedor retornam `502`; Ata acima de 100.000
-  caracteres é rejeitada com `400` antes do provedor. A Ata é tratada como dado não confiável, vai
+  formato incompatível, timeout ou falha do provedor retornam `502`. Atas extensas são processadas
+  integralmente em partes, na ordem; uma falha em qualquer parte invalida a Ata inteira e nenhuma
+  proposta parcial é devolvida. A Ata é tratada como dado não confiável, vai
   ao provedor apenas como conteúdo do usuário e não é persistida, auditada nem registrada em log. O
   payload enviado ao provedor contém somente nome, objetivo e datas do Projeto, nomes de
   departamentos ativos e nomes de Modelos de tarefa do tipo `Projeto` da organização.

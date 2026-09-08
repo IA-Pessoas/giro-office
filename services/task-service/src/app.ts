@@ -39,9 +39,13 @@ import { taskFinanceiroRoutes } from "./routes/taskFinanceiro.routes.js";
 import { taskIntegrationRegularizeRoutes } from "./routes/taskIntegrationRegularize.routes.js";
 import { taskLifecycleRoutes } from "./routes/taskLifecycle.routes.js";
 import { taskModelRoutes } from "./routes/taskModel.routes.js";
+import { MEETING_MINUTES_MAX_SOURCE_BYTES } from "./schemas/projectWizardExtraction.schemas.js";
 import { ProjectWizardExtractionService } from "./services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "./services/projectWizardService.js";
 import { TaskReportingService } from "./services/taskReportingService.js";
+
+const PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES =
+  MEETING_MINUTES_MAX_SOURCE_BYTES * 6 + 1024 * 1024;
 
 function taskServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -100,6 +104,10 @@ export function createTaskApp(
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "task-service")));
+  app.use(
+    "/task/project-wizard/extract-tasks",
+    express.json({ limit: PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES }),
+  );
   app.use(express.json({ limit: "1mb" }));
   app.use(requestContext);
 

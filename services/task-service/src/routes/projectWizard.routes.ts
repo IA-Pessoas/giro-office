@@ -19,7 +19,10 @@ import {
   projectWizardCreateBodySchema,
   projectWizardPreviewBodySchema,
 } from "../schemas/projectWizard.schemas.js";
-import { projectWizardExtractTasksBodySchema } from "../schemas/projectWizardExtraction.schemas.js";
+import {
+  MEETING_MINUTES_MAX_SOURCE_BYTES,
+  projectWizardExtractTasksBodySchema,
+} from "../schemas/projectWizardExtraction.schemas.js";
 import type { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import type { ProjectWizardService } from "../services/projectWizardService.js";
 import { DOCX_MIME_TYPE, extractDocxText } from "../utils/docx.js";
@@ -35,7 +38,6 @@ export interface ProjectWizardRoutesDeps {
 }
 
 const MEETING_MINUTES_UPLOAD_FIELD = "file";
-const MEETING_MINUTES_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 interface MeetingMinutesFormat {
   mimeTypes: readonly string[];
   extract?: (file: Buffer) => string;
@@ -64,7 +66,7 @@ type ProjectWizardExtractTasksBody = z.infer<typeof projectWizardExtractTasksBod
 
 const meetingMinutesUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MEETING_MINUTES_MAX_FILE_SIZE_BYTES, files: 1, fields: 4 },
+  limits: { fileSize: MEETING_MINUTES_MAX_SOURCE_BYTES, files: 1, fields: 4 },
   fileFilter(_request, file, callback) {
     if (!meetingMinutesFormat(file.originalname)?.mimeTypes.includes(file.mimetype)) {
       callback(new ServiceError(400, "Tipo de arquivo não permitido."));

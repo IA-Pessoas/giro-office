@@ -408,7 +408,7 @@ const extractProjectWizardTasksProperties = {
   content: {
     type: "string",
     description:
-      "Ata de reunião em texto. Conteúdo transitório: não é persistido, auditado nem registrado em log.",
+      "Ata de reunião em texto, com conteúdo de até 10 MiB em bytes UTF-8. Conteúdo transitório: não é persistido, auditado nem registrado em log.",
   },
   name: { type: "string" },
   objective: { type: "string" },
@@ -1006,7 +1006,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["ProjectWizard"],
           summary: "Extrair Tarefas propostas de uma Ata com a OpenAI",
           description:
-            "Exige nível 2+ em Integração ou owner. A Ata e a resposta bruta do provedor são transitórias.",
+            "Exige nível 2+ em Integração ou owner. Atas extensas são processadas integralmente em partes; uma falha em qualquer parte invalida a Ata inteira. A Ata e a resposta bruta do provedor são transitórias.",
           security: bearer,
           ...extractProjectWizardTasksRequestBody,
           responses: {
