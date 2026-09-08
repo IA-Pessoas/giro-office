@@ -1,3 +1,5 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
+
 const stringOperators = ["eq", "neq", "contains", "in"] as const;
 const dateOperators = ["eq", "neq", "gt", "gte", "lt", "lte", "between"] as const;
 
@@ -7,7 +9,15 @@ function field(
   value_type: "string" | "date",
   filter_operators: readonly string[],
 ) {
-  return { key, label, value_type, filter_operators, aggregations: [] };
+  return {
+    groupable: true,
+    sortable: true,
+    key,
+    label,
+    value_type,
+    filter_operators,
+    aggregations: reportingAggregations(value_type),
+  };
 }
 
 export const RH_REQUEST_REPORTING_SOURCES = ["rh.requests"] as const;

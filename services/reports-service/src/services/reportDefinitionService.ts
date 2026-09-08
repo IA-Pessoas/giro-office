@@ -54,6 +54,8 @@ export class ReportDefinitionService {
     }
 
     const findField = (sourceKey: string, fieldKey: string) => {
+      if (!sourceKeys.has(sourceKey))
+        throw new ServiceError(400, "O campo deve pertencer a uma área selecionada.");
       const source = sourceByKey.get(sourceKey);
       const field = source?.fields.find((candidate) => candidate.key === fieldKey);
       if (!field) throw new ServiceError(403, "O campo não está autorizado para este relatório.");
@@ -84,6 +86,11 @@ export class ReportDefinitionService {
     }
 
     for (const orderBy of definition.order_by) findField(orderBy.source, orderBy.field);
+    for (const groupBy of definition.group_by ?? []) {
+      if (!sourceKeys.has(groupBy.source))
+        throw new ServiceError(400, "Agrupamento deve usar uma área selecionada.");
+      findField(groupBy.source, groupBy.field);
+    }
 
     if (
       definition.declared_cost &&

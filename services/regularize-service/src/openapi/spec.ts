@@ -1,3 +1,5 @@
+import { reportingQueryOpenApiSchema } from "@workspace/shared";
+
 type OpenApiDocument = Record<string, unknown> & {
   openapi: string;
   info: { title: string; version: string; description?: string };
@@ -737,12 +739,14 @@ export function buildRegularizeServiceOpenApiSpec(
                       items: { type: "string" },
                     },
                     limit: { type: "integer", minimum: 1, maximum: 101 },
+                    query: reportingQueryOpenApiSchema,
                   },
                 },
               },
             },
           },
           responses: {
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
             "200": {
               description: "Linhas projetadas e limite de origem",
               ...successEnvelopeContent(),

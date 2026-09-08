@@ -91,3 +91,7 @@ PROJECT_WIZARD_POSTGRES_TEST=1 pnpm --filter @workspace/task-service exec vitest
 
 O harness gera o schema real, aplica a migration da confirmação e remove seu container/dados ao
 terminar. Usa porta aleatória em `127.0.0.1`, sem carregar `.env` ou aceitar URL de banco externo.
+
+## Critérios de relatórios
+
+`POST /internal/reporting/extract` aceita `query` opcional com filtros tipados, grupos AND/OR, ordenação, agrupamento e agregações. O corpo completo e todos os campos utilizados pertencem ao grant assinado. A origem aplica o escopo organizacional e processa o conjunto completo em snapshot consistente antes do limite de saída; excesso de 50.000 registros/20 MiB retorna 422, sem resultado parcial. Payloads sem `query` preservam o contrato legado. Consulte a [matriz e semântica dos critérios](../reports-service/docs/criteria-origins.md) e o OpenAPI do serviço.

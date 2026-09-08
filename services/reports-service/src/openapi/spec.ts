@@ -2,6 +2,136 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ReportsServiceEnv } from "../config/env.js";
 
+const fieldReference = {
+  source: { type: "string" },
+  field: { type: "string", pattern: "^[a-z][a-z0-9_]*$", maxLength: 64 },
+} as const;
+const reportDefinition = {
+  type: "object",
+  additionalProperties: false,
+  required: ["sources", "columns"],
+  description:
+    "Definição legada compatível. Critérios são independentes por área. Resumos retornam group_by e aliases (padrão field_function); não retornam colunas não agrupadas. count ignora nulos; demais resumos vazios retornam null. Valores dos parâmetros devem corresponder ao tipo declarado/campo e ao operador.",
+  properties: {
+    sources: {
+      type: "array",
+      minItems: 1,
+      maxItems: 2,
+      uniqueItems: true,
+      items: { type: "string" },
+    },
+    columns: {
+      type: "array",
+      minItems: 1,
+      maxItems: 25,
+      items: {
+        type: "object",
+        required: ["source", "field", "alias"],
+        additionalProperties: false,
+        properties: { ...fieldReference, alias: { type: "string" } },
+      },
+    },
+    joins: {
+      type: "array",
+      maxItems: 1,
+      items: {
+        type: "object",
+        required: ["relation", "type"],
+        additionalProperties: false,
+        properties: {
+          relation: { type: "string" },
+          type: { type: "string", enum: ["inner", "left"] },
+        },
+      },
+    },
+    filters: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["source", "field", "operator", "parameter"],
+        properties: {
+          ...fieldReference,
+          operator: {
+            type: "string",
+            enum: ["eq", "neq", "contains", "in", "gt", "gte", "lt", "lte", "between"],
+          },
+          parameter: { type: "string" },
+        },
+      },
+    },
+    filter_groups: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["operator", "filters"],
+        properties: {
+          operator: { type: "string", enum: ["and", "or"] },
+          filters: { type: "array", minItems: 1, items: { type: "string" } },
+        },
+      },
+    },
+    parameters: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "type"],
+        properties: {
+          name: { type: "string" },
+          type: { type: "string", enum: ["string", "number", "date", "boolean"] },
+        },
+      },
+    },
+    aggregations: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["source", "field", "function"],
+        additionalProperties: false,
+        properties: {
+          ...fieldReference,
+          function: { type: "string", enum: ["count", "sum", "avg", "min", "max"] },
+          alias: {
+            type: "string",
+            description: "Opcional; padrão field_function. Deve ser único no resultado.",
+          },
+        },
+      },
+    },
+    group_by: {
+      type: "array",
+      maxItems: 25,
+      items: {
+        type: "object",
+        required: ["source", "field"],
+        additionalProperties: false,
+        properties: fieldReference,
+      },
+    },
+    order_by: {
+      type: "array",
+      maxItems: 25,
+      items: {
+        type: "object",
+        required: ["source", "field", "direction"],
+        additionalProperties: false,
+        properties: { ...fieldReference, direction: { type: "string", enum: ["asc", "desc"] } },
+      },
+    },
+    declared_cost: {
+      type: "object",
+      additionalProperties: false,
+      required: ["rows", "bytes"],
+      properties: {
+        rows: { type: "integer", minimum: 0, maximum: 50000 },
+        bytes: { type: "integer", minimum: 0, maximum: 20971520 },
+      },
+    },
+  },
+} as const;
+
 const successResponse = {
   content: {
     "application/json": {
@@ -32,6 +162,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
         },
       },
       schemas: {
+        ReportDefinition: reportDefinition,
         ReportComposition: {
           type: "object",
           additionalProperties: false,
@@ -98,12 +229,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                     definition: {
                       oneOf: [
                         { $ref: "#/components/schemas/ReportComposition" },
-                        {
-                          type: "object",
-                          required: ["sources", "columns"],
-                          description:
-                            "Definição legada preservada, validada pelo contrato existente.",
-                        },
+                        { $ref: "#/components/schemas/ReportDefinition" },
                       ],
                     },
                   },
@@ -172,7 +298,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["definition"],
                   additionalProperties: false,
                   properties: {
-                    definition: { type: "object", additionalProperties: true },
+                    definition: { $ref: "#/components/schemas/ReportDefinition" },
                     parameterValues: { type: "object", additionalProperties: true },
                   },
                 },
@@ -180,6 +306,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
             },
           },
           responses: {
+            "422": { description: "Capacidade excedida; nenhum resultado parcial" },
             "200": {
               description: "Prévia limitada com linhas, apresentação e hasMore",
               ...successResponse,
@@ -203,7 +330,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   type: "object",
                   additionalProperties: false,
                   properties: {
-                    definition: { type: "object", additionalProperties: true },
+                    definition: { $ref: "#/components/schemas/ReportDefinition" },
                     modelVersionId: { type: "string", format: "uuid" },
                     parameterValues: { type: "object", additionalProperties: true },
                     format: { type: "string", enum: ["json", "csv"] },
@@ -433,7 +560,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["name", "definition"],
                   properties: {
                     name: { type: "string" },
-                    definition: { type: "object", additionalProperties: true },
+                    definition: { $ref: "#/components/schemas/ReportDefinition" },
                   },
                 },
               },
@@ -476,7 +603,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["definition"],
                   properties: {
                     name: { type: "string" },
-                    definition: { type: "object", additionalProperties: true },
+                    definition: { $ref: "#/components/schemas/ReportDefinition" },
                   },
                 },
               },
@@ -537,7 +664,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["name", "definition"],
                   properties: {
                     name: { type: "string", example: "Saldo mensal" },
-                    definition: { type: "object", additionalProperties: true },
+                    definition: { $ref: "#/components/schemas/ReportDefinition" },
                   },
                 },
               },
@@ -593,7 +720,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   type: "object",
                   properties: {
                     name: { type: "string" },
-                    definition: { type: "object", additionalProperties: true },
+                    definition: { $ref: "#/components/schemas/ReportDefinition" },
                   },
                 },
               },

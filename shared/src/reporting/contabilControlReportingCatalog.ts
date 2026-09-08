@@ -1,12 +1,16 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
+
 const booleanOperators = ["eq", "neq"] as const;
 
 function field(key: string, label: string, value_type: "string" | "boolean") {
   return {
+    groupable: true,
+    sortable: true,
     key,
     label,
     value_type,
     filter_operators: value_type === "boolean" ? booleanOperators : ["eq", "neq", "in"],
-    aggregations: [],
+    aggregations: reportingAggregations(value_type),
   };
 }
 

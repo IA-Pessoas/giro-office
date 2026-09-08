@@ -1,3 +1,4 @@
+import { reportingQuerySchema } from "@workspace/shared";
 import { z } from "zod";
 
 import { CERTIFICATE_PF_REPORTING_SOURCES } from "../reporting/certificatePfReportingCatalog.js";
@@ -7,6 +8,7 @@ const reportingFieldSchema = z.string().trim().min(1).max(64);
 
 export const internalReportingExtractBodySchema = z
   .object({
+    query: reportingQuerySchema.optional(),
     source: z.enum([...CERTIFICATE_PF_REPORTING_SOURCES, ...CERTIFICATE_PJ_REPORTING_SOURCES]),
     fields: z.array(reportingFieldSchema).min(1).max(25),
     limit: z.number().int().min(1).max(101),

@@ -93,3 +93,7 @@ pnpm --filter @workspace/ti-service test
 pnpm --filter @workspace/ti-service typecheck
 pnpm turbo run build --filter=@workspace/ti-service
 ```
+
+## Critérios de relatórios
+
+`POST /internal/reporting/extract` aceita `query` opcional com filtros tipados, grupos AND/OR, ordenação, agrupamento e agregações. O corpo completo e todos os campos utilizados pertencem ao grant assinado. A origem aplica o escopo organizacional e processa o conjunto completo em snapshot consistente antes do limite de saída; excesso de 50.000 registros/20 MiB retorna 422, sem resultado parcial. Payloads sem `query` preservam o contrato legado. Consulte a [matriz e semântica dos critérios](../reports-service/docs/criteria-origins.md) e o OpenAPI do serviço.

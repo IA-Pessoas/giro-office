@@ -78,7 +78,8 @@ export type ReportDefinition = {
   filters: { source: string; field: string; operator: string; parameter: string }[];
   filter_groups: { operator: ReportFilterLogic; filters: string[] }[];
   parameters: { name: string; type: ReportValueType }[];
-  aggregations: { source: string; field: string; function: string }[];
+  aggregations: { source: string; field: string; function: string; alias?: string }[];
+  group_by?: { source: string; field: string }[];
   order_by: { source: string; field: string; direction: "asc" | "desc" }[];
 };
 

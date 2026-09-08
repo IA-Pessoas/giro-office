@@ -2926,6 +2926,7 @@ const handlers = {
 
   async parcelamentoReportingExtract(op) {
     const body = { source: "parcelamento.installments", fields: ["status"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -2956,6 +2957,7 @@ const handlers = {
 
   async clientIntegrationReportingExtract(op) {
     const body = { source: "integracao.clients", fields: ["name"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -2986,6 +2988,7 @@ const handlers = {
 
   async projectReportingExtract(op) {
     const body = { source: "integracao.projects", fields: ["name"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3016,6 +3019,7 @@ const handlers = {
 
   async taskReportingExtract(op) {
     const body = { source: "integracao.tasks", fields: ["name"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3046,6 +3050,7 @@ const handlers = {
 
   async rhReportingExtract(op) {
     const body = { source: "rh.requests", fields: ["title"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3076,6 +3081,7 @@ const handlers = {
 
   async contabilReportingExtract(op) {
     const body = { source: "contabil.control", fields: ["competence"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3122,6 +3128,7 @@ const handlers = {
     ];
 
     for (const { body, headers, secretValue, missingSecretMessage } of requests) {
+      body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
       await httpRequest(op, {
         path: "/internal/reporting/extract",
         json: body,
@@ -3163,6 +3170,7 @@ const handlers = {
       { source: "fiscal.ipi", fields: ["ncm"], limit: 1 },
     ];
     for (const body of bodies) {
+      body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
       await httpRequest(op, {
         path: "/internal/reporting/extract",
         json: body,
@@ -3194,6 +3202,7 @@ const handlers = {
 
   async pessoalReportingExtract(op) {
     const body = { source: "pessoal.ldd", fields: ["type"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3224,6 +3233,7 @@ const handlers = {
 
   async regularizeReportingExtract(op) {
     const body = { source: "regularize.licenses", fields: ["protocol"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3258,6 +3268,7 @@ const handlers = {
       { source: "ti.stock", fields: ["name"], limit: 1 },
     ];
     for (const body of bodies) {
+      body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
       await httpRequest(op, {
         path: "/internal/reporting/extract",
         json: body,

@@ -17,6 +17,8 @@ export const reportAggregationSchema = z.enum(REPORT_AGGREGATIONS);
 
 export const reportCatalogFieldSchema = z
   .object({
+    groupable: z.boolean().optional(),
+    sortable: z.boolean().optional(),
     key: z.string().trim().min(1),
     label: z.string().trim().min(1),
     value_type: reportValueTypeSchema,

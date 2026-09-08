@@ -1,3 +1,4 @@
+import { reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { CertificateServiceEnv } from "../config/env.js";
@@ -413,12 +414,14 @@ function internalCertificateReportingExtractOperation() {
               source: { type: "string", enum: ["certificado.pf", "certificado.pj"] },
               fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
               limit: { type: "integer", minimum: 1, maximum: 101 },
+              query: reportingQueryOpenApiSchema,
             },
           },
         },
       },
     },
     responses: {
+      "422": errorResponse("Capacidade excedida; nenhum resultado parcial"),
       "200": successResponse("Dados internos de Certificados PF ou PJ", {
         type: "object",
         required: ["rows", "reachedLimit"],

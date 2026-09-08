@@ -1,23 +1,29 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
+
 const stringOperators = ["eq", "neq", "contains", "in"] as const;
 const dateOperators = ["eq", "gt", "gte", "lt", "lte", "between"] as const;
 
 function stringField(key: string, label: string) {
   return {
+    groupable: true,
+    sortable: true,
     key,
     label,
     value_type: "string" as const,
     filter_operators: stringOperators,
-    aggregations: [],
+    aggregations: reportingAggregations("string"),
   };
 }
 
 function dateField(key: string, label: string) {
   return {
+    groupable: true,
+    sortable: true,
     key,
     label,
     value_type: "date" as const,
     filter_operators: dateOperators,
-    aggregations: [],
+    aggregations: reportingAggregations("date"),
   };
 }
 

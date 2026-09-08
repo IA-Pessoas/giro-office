@@ -1,12 +1,16 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
+
 const stringOperators = ["eq", "neq", "contains", "in"] as const;
 
 function field(key: string, label: string) {
   return {
+    groupable: true,
+    sortable: true,
     key,
     label,
     value_type: "string" as const,
     filter_operators: stringOperators,
-    aggregations: [],
+    aggregations: reportingAggregations("string"),
   };
 }
 

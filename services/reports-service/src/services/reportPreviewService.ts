@@ -1,7 +1,7 @@
 import { ServiceError } from "@workspace/shared";
-
 import type { SourceCatalogService } from "../catalog/sourceCatalogService.js";
 import { normalizeReportPreviewAdapterOutput, type ReportCatalogScope } from "../catalog/types.js";
+import { reportAggregationAlias } from "../integrations/reportCriteria.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import type { ReportDefinitionService } from "./reportDefinitionService.js";
 
@@ -42,10 +42,16 @@ export class ReportPreviewService {
     return {
       rows: result.rows.slice(0, this.previewRowLimit),
       presentation: {
-        columns: validated.definition.columns.map((column) => ({
-          key: column.alias,
-          label: column.alias,
-        })),
+        columns:
+          definition.group_by?.length || definition.aggregations.length
+            ? [
+                ...(definition.group_by ?? []).map(({ field }) => field),
+                ...definition.aggregations.map(reportAggregationAlias),
+              ].map((key) => ({ key, label: key }))
+            : validated.definition.columns.map((column) => ({
+                key: column.alias,
+                label: column.alias,
+              })),
       },
       limit: this.previewRowLimit,
       hasMore: result.reachedLimit || result.rows.length > this.previewRowLimit,
