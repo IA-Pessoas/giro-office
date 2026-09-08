@@ -100,6 +100,7 @@ export function createTaskApp(
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "task-service")));
+  app.use("/task/project-wizard/extract-tasks", express.json({ limit: "10mb" }));
   app.use(express.json({ limit: "1mb" }));
   app.use(requestContext);
 

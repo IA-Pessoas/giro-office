@@ -295,6 +295,107 @@ describe("ProjectWizardExtractionService", () => {
     expect(serialized).not.toContain("model-apuracao");
   });
 
+  it("extrai todas as partes da Ata na ordem e com o mesmo contexto", async () => {
+    const firstLine = "A".repeat(99_999);
+    const content = `${firstLine}\nSegunda parte`;
+    const { provider, extract } = createProvider(async ({ content: part }) => [
+      { name: part === `${firstLine}\n` ? "Primeira tarefa" : "Segunda tarefa" },
+    ]);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest({ content }))).resolves.toEqual({
+      tasks: [{ name: "Primeira tarefa" }, { name: "Segunda tarefa" }],
+    });
+    expect(extract).toHaveBeenCalledTimes(2);
+    expect(extract.mock.calls[0]?.[0].context).toEqual(extract.mock.calls[1]?.[0].context);
+  });
+
+  it("aceita uma parte sem propostas quando outra parte contém tarefa válida", async () => {
+    const content = `${"A".repeat(100_000)}B`;
+    const { provider } = createProvider(
+      vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ name: "Tarefa válida" }]),
+    );
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest({ content }))).resolves.toEqual({
+      tasks: [{ name: "Tarefa válida" }],
+    });
+  });
+
+  it("mantém uma única chamada quando a Ata não exige divisão", async () => {
+    const { provider, extract } = createProvider(async () => [{ name: "Tarefa" }]);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await service.extractTasks(createRequest());
+
+    expect(extract).toHaveBeenCalledOnce();
+  });
+
+  it("não trunca uma quantidade grande de propostas", async () => {
+    const proposals = Array.from({ length: 1_001 }, (_, index) => ({
+      name: `Tarefa ${index + 1}`,
+    }));
+    const { provider } = createProvider(async () => proposals);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    const result = await service.extractTasks(createRequest());
+
+    expect(result.tasks).toHaveLength(1_001);
+    expect(result.tasks.at(-1)?.name).toBe("Tarefa 1001");
+  });
+
+  it("invalida a Ata inteira quando uma parte intermediária falha", async () => {
+    const content = `${"A".repeat(100_000)}${"B".repeat(100_000)}C`;
+    const { provider, extract } = createProvider(
+      vi
+        .fn()
+        .mockResolvedValueOnce([{ name: "Tarefa parcial" }])
+        .mockRejectedValueOnce(new Error("boom")),
+    );
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest({ content }))).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Não foi possível extrair tarefas da Ata inteira.",
+    });
+    expect(extract).toHaveBeenCalledTimes(2);
+  });
+
+  it("trata timeout intermediário como falha da Ata inteira", async () => {
+    const content = `${"A".repeat(100_000)}${"B".repeat(100_000)}C`;
+    const { provider } = createProvider(
+      vi
+        .fn()
+        .mockResolvedValueOnce([{ name: "Tarefa parcial" }])
+        .mockRejectedValueOnce(Object.assign(new Error("timeout"), { name: "TimeoutError" })),
+    );
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest({ content }))).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Não foi possível extrair tarefas da Ata inteira.",
+    });
+  });
+
+  it("invalida a Ata inteira quando uma parte retorna estrutura incompatível", async () => {
+    const content = `${"A".repeat(100_000)}B`;
+    const { provider } = createProvider(
+      vi
+        .fn()
+        .mockResolvedValueOnce([{ name: "Tarefa parcial" }])
+        .mockResolvedValueOnce([{}]),
+    );
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest({ content }))).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Não foi possível extrair tarefas da Ata inteira.",
+    });
+  });
+
   it.each([0, 1])("bloqueia Integração nível %i antes de chamar o provedor", async (level) => {
     const { provider, extract } = createProvider(async () => [{ name: "Tarefa" }]);
     const prisma = createPrisma();

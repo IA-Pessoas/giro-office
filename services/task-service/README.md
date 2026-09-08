@@ -53,9 +53,10 @@ Exemplos de paths publicos:
   observações ou chave. Falha na auditoria não altera a resposta; replay não emite nova auditoria.
 - `POST /task/project-wizard/extract-tasks` transforma uma Ata de reunião colada ou enviada em TXT,
   Markdown ou DOCX em Tarefas propostas com a OpenAI. Exige nível `2+` em Integração ou `owner` e
-  respeita o isolamento da organização. O corpo JSON aceita `content` (Ata), `name`, `objective`,
-  `start_date` e `end_date` opcional; `multipart/form-data` aceita os mesmos campos e um único
-  `file` `.txt` (`text/plain`), `.md` (`text/markdown`, `text/plain` ou `text/x-markdown`) ou
+  respeita o isolamento da organização. Requisições JSON de até 10 MB aceitam `content` (Ata),
+  `name`, `objective`, `start_date` e `end_date` opcional; `multipart/form-data` aceita os mesmos
+  campos e um único `file` `.txt` (`text/plain`), `.md` (`text/markdown`, `text/plain` ou
+  `text/x-markdown`) ou
   `.docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`) de até
   10 MB. Do DOCX é lido apenas o texto de `word/document.xml`: macros, campos ativos como HYPERLINK
   e demais conteúdos ativos não são executados nem repassados ao provedor; documento corrompido,
@@ -63,8 +64,9 @@ Exemplos de paths publicos:
   sem consumir tentativa. A resposta traz `tasks`
   com `name` e, quando houver correspondência clara na
   organização, `prevision_date`, `department_id` e `model_id`. Zero propostas retorna `422`;
-  formato incompatível, timeout ou falha do provedor retornam `502`; Ata acima de 100.000
-  caracteres é rejeitada com `400` antes do provedor. A Ata é tratada como dado não confiável, vai
+  formato incompatível, timeout ou falha do provedor retornam `502`. Atas extensas são processadas
+  integralmente em partes, na ordem; uma falha em qualquer parte invalida a Ata inteira e nenhuma
+  proposta parcial é devolvida. A Ata é tratada como dado não confiável, vai
   ao provedor apenas como conteúdo do usuário e não é persistida, auditada nem registrada em log. O
   payload enviado ao provedor contém somente nome, objetivo e datas do Projeto, nomes de
   departamentos ativos e nomes de Modelos de tarefa do tipo `Projeto` da organização.

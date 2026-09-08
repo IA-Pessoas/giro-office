@@ -1001,7 +1001,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["ProjectWizard"],
           summary: "Extrair Tarefas propostas de uma Ata com a OpenAI",
           description:
-            "Exige nível 2+ em Integração ou owner. A Ata e a resposta bruta do provedor são transitórias.",
+            "Exige nível 2+ em Integração ou owner. Atas extensas são processadas integralmente em partes; uma falha em qualquer parte invalida a Ata inteira. A Ata e a resposta bruta do provedor são transitórias.",
           security: bearer,
           ...extractProjectWizardTasksRequestBody,
           responses: {

@@ -5,6 +5,7 @@ import {
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
+import { z } from "zod";
 
 import type {
   AiTaskExtractionContext,
@@ -15,6 +16,17 @@ import prismaClient from "../prisma/index.js";
 import { isIsoCalendarDate } from "../utils/civilDate.js";
 
 export const PROJECT_TASK_MODEL_TYPE = "Projeto";
+const PROVIDER_SOURCE_PART_MAX_CHARS = 100_000;
+const AI_TASK_PROPOSALS_SCHEMA = z.array(
+  z
+    .object({
+      name: z.string(),
+      prevision_date: z.string().optional(),
+      department: z.string().optional(),
+      model: z.string().optional(),
+    })
+    .strict(),
+);
 
 export interface ExtractProjectTasksRequest {
   userId: string;
@@ -136,17 +148,48 @@ export class ProjectWizardExtractionService {
     data: ExtractProjectTasksRequest,
     catalog: CatalogDepartment[],
   ): Promise<AiTaskProposal[]> {
+    const parts = partitionMeetingMinutes(data.content);
+
     try {
-      return await this.provider.extract({
-        content: data.content,
-        context: buildContext(data, catalog),
-      });
+      const context = buildContext(data, catalog);
+      const proposals: AiTaskProposal[][] = [];
+
+      for (const content of parts) {
+        const result = AI_TASK_PROPOSALS_SCHEMA.safeParse(
+          await this.provider.extract({ content, context }),
+        );
+        if (!result.success) {
+          throw new ServiceError(502, "Resposta da IA em formato incompatível.");
+        }
+        proposals.push(result.data);
+      }
+
+      return proposals.flat();
     } catch (err: unknown) {
-      if (err instanceof ServiceError) throw err;
       logError("Falha na extração de tarefas propostas pela IA.");
+      if (parts.length === 1 && err instanceof ServiceError) throw err;
+      if (parts.length > 1) {
+        throw new ServiceError(502, "Não foi possível extrair tarefas da Ata inteira.");
+      }
       throw new ServiceError(502, "Não foi possível extrair tarefas da Ata.", err);
     }
   }
+}
+
+function partitionMeetingMinutes(content: string): string[] {
+  const parts: string[] = [];
+  let offset = 0;
+
+  while (content.length - offset > PROVIDER_SOURCE_PART_MAX_CHARS) {
+    const limit = offset + PROVIDER_SOURCE_PART_MAX_CHARS;
+    const newline = content.lastIndexOf("\n", limit - 1);
+    const end = newline >= offset ? newline + 1 : limit;
+    parts.push(content.slice(offset, end));
+    offset = end;
+  }
+
+  parts.push(content.slice(offset));
+  return parts;
 }
 
 function buildContext(
