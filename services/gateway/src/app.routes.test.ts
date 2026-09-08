@@ -1499,7 +1499,7 @@ it("returns shared forbidden response when permission update is attempted withou
   }
 });
 
-it("strips client-supplied internal auth headers before proxying", async () => {
+it("replaces client-supplied internal auth headers before proxying", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -1557,7 +1557,7 @@ it("strips client-supplied internal auth headers before proxying", async () => {
     });
 
     expect(response.status).toBe(200);
-    expect(seenHeaders.internalToken).toBeUndefined();
+    expect(seenHeaders.internalToken).toBe("audit-service-token");
     expect(seenHeaders.userId).toBe("user-1");
     expect(seenHeaders.organizationId).toBe("org-1");
     expect(seenHeaders.permission).toBe("2");
@@ -2366,6 +2366,218 @@ it("proxies task-service routes mapped in the gateway", async () => {
   } finally {
     await stopServer(gateway);
     await stopServer(taskService);
+  }
+});
+
+it("proxies the three project-wizard routes with trusted authenticated context", async () => {
+  const seen: Array<{
+    path: string;
+    body: Record<string, unknown>;
+    internalToken: string | undefined;
+    userId: string | undefined;
+    organizationId: string | undefined;
+    modules: string | undefined;
+    authorization: string | undefined;
+  }> = [];
+  const taskService = createServer(async (request, response) => {
+    seen.push({
+      path: request.url ?? "",
+      body: await readJsonBody<Record<string, unknown>>(request),
+      internalToken: request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined,
+      userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+      organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
+      modules: request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined,
+      authorization: request.headers.authorization,
+    });
+    response.statusCode = request.url === "/task/project-wizard" ? 201 : 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: {} }));
+  });
+  const taskServiceUrl = await startServer(taskService);
+  const gateway = createServer(createApp(createEnv({ taskServiceUrl }), createTestLogger()));
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "wizard-user",
+    organization_id: "wizard-org",
+    permission: 0,
+    type: "user",
+    modules: { integracao: 2 },
+  });
+  const cases = [
+    { path: "/task/project-wizard/preview", body: { tasks: [] }, status: 200 },
+    {
+      path: "/task/project-wizard",
+      body: { client_id: "client-private" },
+      status: 201,
+    },
+    {
+      path: "/task/project-wizard/extract-tasks",
+      body: { content: "Ata privada" },
+      status: 200,
+    },
+  ];
+
+  try {
+    for (const testCase of cases) {
+      const response = await fetch(`${gatewayUrl}${testCase.path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          ...(testCase.path === "/task/project-wizard"
+            ? { "Idempotency-Key": "wizard-contract" }
+            : {}),
+        },
+        body: JSON.stringify(testCase.body),
+      });
+
+      expect(response.status, testCase.path).toBe(testCase.status);
+    }
+
+    expect(seen.map(({ path, body }) => ({ path, body }))).toEqual(
+      cases.map(({ path, body }) => ({ path, body })),
+    );
+    for (const received of seen) {
+      expect(received).toMatchObject({
+        internalToken: "audit-service-token",
+        userId: "wizard-user",
+        organizationId: "wizard-org",
+        authorization: undefined,
+      });
+      expect(JSON.parse(received.modules ?? "{}")).toMatchObject({ integracao: 2 });
+    }
+  } finally {
+    await stopServer(gateway);
+    await stopServer(taskService);
+  }
+});
+
+it("protects the three public project-wizard routes before proxying", async () => {
+  let upstreamHits = 0;
+  const taskService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.end();
+  });
+  const taskServiceUrl = await startServer(taskService);
+  const gateway = createServer(createApp(createEnv({ taskServiceUrl }), createTestLogger()));
+  const gatewayUrl = await startServer(gateway);
+  const viewerToken = createToken({
+    user_id: "wizard-viewer",
+    organization_id: "wizard-org",
+    permission: 0,
+    type: "user",
+    modules: { integracao: 1 },
+  });
+  const paths = [
+    "/task/project-wizard/preview",
+    "/task/project-wizard",
+    "/task/project-wizard/extract-tasks",
+  ];
+
+  try {
+    for (const path of paths) {
+      const unauthorized = await fetch(`${gatewayUrl}${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      expect(unauthorized.status, path).toBe(401);
+      expect(await unauthorized.json(), path).toMatchObject({
+        success: false,
+        error: "Não autenticado.",
+        code: "UNAUTHORIZED",
+      });
+
+      const forbidden = await fetch(`${gatewayUrl}${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${viewerToken}`,
+          "content-type": "application/json",
+        },
+        body: "{}",
+      });
+      expect(forbidden.status, path).toBe(403);
+      expect(await forbidden.json(), path).toMatchObject({
+        success: false,
+        error: "Acesso negado para esta rota.",
+        code: "FORBIDDEN",
+      });
+    }
+
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(taskService);
+  }
+});
+
+it("keeps project-wizard request data out of gateway logs and audit", async () => {
+  const privateValues = [
+    "ATA-PRIVADA-995",
+    "CLIENTE-PRIVADO-995",
+    "responsavel.privado@example.invalid",
+  ];
+  const auditService = await startAuditIngestServer();
+  const taskService = createServer((_request, response) => {
+    response.statusCode = 502;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: false,
+        error: "Não foi possível extrair tarefas da Ata inteira.",
+        code: "BAD_GATEWAY",
+      }),
+    );
+  });
+  const taskServiceUrl = await startServer(taskService);
+  const { logger, stream } = createCapturedTestLogger();
+  const gateway = createServer(
+    createApp(
+      createEnv({ auditEnabled: true, auditServiceUrl: auditService.url, taskServiceUrl }),
+      logger,
+    ),
+  );
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "wizard-user",
+    organization_id: "wizard-org",
+    permission: 0,
+    type: "user",
+    modules: { integracao: 2 },
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/task/project-wizard/extract-tasks`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        content: privateValues[0],
+        client_name: privateValues[1],
+        responsible_email: privateValues[2],
+      }),
+    });
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      error: "Não foi possível extrair tarefas da Ata inteira.",
+      code: "BAD_GATEWAY",
+    });
+    await waitForRecords(auditService.records, 1);
+    await waitForLogs();
+
+    const observability = JSON.stringify({ audit: auditService.records, logs: stream.entries() });
+    for (const privateValue of privateValues) {
+      expect(observability).not.toContain(privateValue);
+    }
+  } finally {
+    await stopServer(gateway);
+    await stopServer(taskService);
+    await stopServer(auditService.server);
   }
 });
 

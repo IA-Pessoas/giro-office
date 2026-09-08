@@ -174,6 +174,39 @@ describe("project wizard routes", () => {
     );
   });
 
+  it("POST /task/project-wizard/preview exige autenticação com erro estável", async () => {
+    const service: ProjectWizardRouteDeps = { preview: vi.fn(), create: vi.fn() };
+
+    const response = await request(createApp(service))
+      .post("/task/project-wizard/preview")
+      .send({ tasks: [] });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Token de autenticação não informado.",
+      code: "UNAUTHORIZED",
+    });
+    expect(service.preview).not.toHaveBeenCalled();
+  });
+
+  it("POST /task/project-wizard/preview bloqueia Integração nível 1 com erro estável", async () => {
+    const response = await request(createApp())
+      .post("/task/project-wizard/preview")
+      .set({
+        ...gatewayHeaders(),
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 1 }),
+      })
+      .send({ tasks: [] });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Acesso negado para esta operação.",
+      code: "FORBIDDEN",
+    });
+  });
+
   it("POST /task/project-wizard/preview expõe dependências reais com espera e sem responsável", async () => {
     const service = new ProjectWizardService(undefined, undefined, () => ({
       findTaskModels: vi.fn(async () => [
@@ -311,6 +344,7 @@ describe("project wizard routes", () => {
       success: false,
       error:
         "Modelo model-shared repetido entre dependência model-shared da principal 1 (Primeira) e dependência model-shared da principal 2 (Segunda).",
+      code: "CONFLICT",
     });
   });
 
@@ -386,6 +420,7 @@ describe("project wizard routes", () => {
     expect(response.body).toMatchObject({
       success: false,
       error: "Modelo model-1 repetido.",
+      code: "CONFLICT",
     });
     expect(service.create).toHaveBeenCalled();
   });
@@ -416,6 +451,11 @@ describe("project wizard routes", () => {
       .send(validBody);
 
     expect(response.status).toBe(401);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Token de autenticação não informado.",
+      code: "UNAUTHORIZED",
+    });
   });
 
   it("POST /task/project-wizard bloqueia Integração nível 1", async () => {
@@ -429,6 +469,11 @@ describe("project wizard routes", () => {
       .send(validBody);
 
     expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Acesso negado para esta operação.",
+      code: "FORBIDDEN",
+    });
   });
 
   it("POST /task/project-wizard exige Idempotency-Key", async () => {
@@ -438,6 +483,11 @@ describe("project wizard routes", () => {
       .send(validBody);
 
     expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Idempotency-Key é obrigatória.",
+      code: "BAD_REQUEST",
+    });
   });
 
   it.each([
@@ -1076,18 +1126,39 @@ describe("project wizard task extraction routes", () => {
     ]);
   });
 
-  it("não envia identidade do cliente ao service de extração", async () => {
+  it.each([
+    ["identidade do cliente", "client_id", "CLIENTE-PRIVADO-995"],
+    ["e-mail do responsável", "responsible_email", "responsavel.privado@example.invalid"],
+    ["CPF do responsável", "responsible_cpf", "999.999.999-99"],
+  ])("rejeita %s antes do rate limit, provedor, logs e auditoria", async (_label, field, value) => {
     const service: ProjectWizardExtractionRouteDeps = {
       extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
     };
+    const written: string[] = [];
+    const auditLog = vi.mocked(createLog);
+    const auditCallsBefore = auditLog.mock.calls.length;
+    const app = createExtractionApp(service, { aiExtractionRateLimitMax: 1 }, written);
 
-    const response = await request(createExtractionApp(service))
+    const invalid = await request(app)
       .post("/task/project-wizard/extract-tasks")
       .set(gatewayHeaders())
-      .send({ ...validExtractionBody, client_id: "cccccccc-cccc-cccc-cccc-cccccccccccc" });
+      .send({ ...validExtractionBody, [field]: value });
+    const valid = await request(app)
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send(validExtractionBody);
+    const limited = await request(app)
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send(validExtractionBody);
 
-    expect(response.status).toBe(400);
-    expect(service.extractTasks).not.toHaveBeenCalled();
+    expect(invalid.status).toBe(400);
+    expect(invalid.body).toMatchObject({ success: false, code: "BAD_REQUEST" });
+    expect(valid.status).toBe(200);
+    expect(limited.status).toBe(429);
+    expect(service.extractTasks).toHaveBeenCalledOnce();
+    expect(auditLog).toHaveBeenCalledTimes(auditCallsBefore);
+    expect(written.join("\n")).not.toContain(value);
   });
 
   it("sem autenticação retorna 401 sem chamar o provedor", async () => {
@@ -1098,6 +1169,11 @@ describe("project wizard task extraction routes", () => {
       .send(validExtractionBody);
 
     expect(response.status).toBe(401);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Token de autenticação não informado.",
+      code: "UNAUTHORIZED",
+    });
     expect(service.extractTasks).not.toHaveBeenCalled();
   });
 
@@ -1111,6 +1187,11 @@ describe("project wizard task extraction routes", () => {
       .send(validExtractionBody);
 
     expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Acesso negado para esta operação.",
+      code: "FORBIDDEN",
+    });
   });
 
   it.each([
@@ -1132,9 +1213,9 @@ describe("project wizard task extraction routes", () => {
   });
 
   it.each([
-    [422, "Nenhuma tarefa foi identificada na Ata."],
-    [502, "Não foi possível extrair tarefas da Ata."],
-  ])("serializa a falha de extração como %i", async (statusCode, message) => {
+    [422, "Nenhuma tarefa foi identificada na Ata.", "UNPROCESSABLE_ENTITY"],
+    [502, "Não foi possível extrair tarefas da Ata.", "BAD_GATEWAY"],
+  ])("serializa a falha de extração como %i", async (statusCode, message, code) => {
     const service: ProjectWizardExtractionRouteDeps = {
       extractTasks: vi.fn().mockRejectedValue(new ServiceError(statusCode, message)),
     };
@@ -1145,7 +1226,7 @@ describe("project wizard task extraction routes", () => {
       .send(validExtractionBody);
 
     expect(response.status).toBe(statusCode);
-    expect(response.body).toMatchObject({ success: false, error: message });
+    expect(response.body).toMatchObject({ success: false, error: message, code });
   });
 
   it("limita a taxa de extrações por usuário", async () => {
@@ -1161,6 +1242,13 @@ describe("project wizard task extraction routes", () => {
         .send(validExtractionBody);
 
       expect(response.status).toBe(expected);
+      if (expected === 429) {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: "Muitas extrações seguidas. Aguarde antes de tentar novamente.",
+          code: "TOO_MANY_REQUESTS",
+        });
+      }
     }
 
     expect(service.extractTasks).toHaveBeenCalledTimes(2);
