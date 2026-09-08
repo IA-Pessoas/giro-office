@@ -785,13 +785,11 @@ async function runBrowserProof() {
       name: "Descartar propostas da IA?",
     });
     await expect(sourceChangeConfirmation).toBeVisible();
-    await expect(
-      sourceChangeConfirmation.getByText(
-        "Trocar a fonte da Ata descartará as propostas da IA atuais. Deseja continuar?",
-        { exact: true },
-      ),
-    ).toBeVisible();
+    await expect(sourceChangeConfirmation).toContainText(
+      "Trocar a fonte da Ata descartará as propostas da IA atuais. Deseja continuar?",
+    );
     await sourceChangeConfirmation.getByRole("button", { name: "Manter fonte" }).click();
+    await expect(sourceChangeConfirmation).not.toBeVisible();
     await expect(minutesField).toHaveValue(
       "- Apurar impostos do trimestre\n- Reunir documentos do cliente",
     );
@@ -824,15 +822,13 @@ async function runBrowserProof() {
       name: "Descartar rascunho?",
     });
     await expect(draftDiscardConfirmation).toBeVisible();
-    await expect(
-      draftDiscardConfirmation.getByText(
-        "Fechar agora vai descartar o rascunho deste projeto. Deseja continuar?",
-        { exact: true },
-      ),
-    ).toBeVisible();
+    await expect(draftDiscardConfirmation).toContainText(
+      "Fechar agora vai descartar o rascunho deste projeto. Deseja continuar?",
+    );
     await draftDiscardConfirmation
       .getByRole("button", { name: "Continuar editando" })
       .click();
+    await expect(draftDiscardConfirmation).not.toBeVisible();
     await expect(wizard).toBeVisible();
     await expect(minutesField).toHaveValue("Nova fonte em texto");
 
@@ -841,6 +837,7 @@ async function runBrowserProof() {
     await draftDiscardConfirmation
       .getByRole("button", { name: "Continuar editando" })
       .click();
+    await expect(draftDiscardConfirmation).not.toBeVisible();
     await expect(wizard).toBeVisible();
 
     await page.mouse.click(5, 5);
@@ -848,6 +845,7 @@ async function runBrowserProof() {
     await draftDiscardConfirmation
       .getByRole("button", { name: "Continuar editando" })
       .click();
+    await expect(draftDiscardConfirmation).not.toBeVisible();
     await expect(wizard).toBeVisible();
 
     await page.keyboard.press("Escape");

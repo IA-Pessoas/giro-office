@@ -13,7 +13,9 @@ Base: `4f1706a1`
 - `app/src/modules/integracao/run-project-wizard-browser-smoke.mjs`
   - observa os diálogos acessíveis por role, nome, descrição e botões;
   - cobre cancelamento e confirmação da troca de fonte;
-  - cobre descarte iniciado por Cancelar, botão Fechar, overlay e Escape.
+  - cobre descarte iniciado por Cancelar, botão Fechar, overlay e Escape;
+  - usa `toContainText` no diálogo acessível para não depender das duas renderizações intencionais da descrição;
+  - aguarda a confirmação anterior ficar oculta antes de acionar a próxima forma de fechamento.
 - `.superpowers/sdd/issue-994-plan/final-fix-report.md`
   - registra escopo, evidências e limitações desta correção.
 
@@ -23,12 +25,20 @@ Base: `4f1706a1`
 
 - `pnpm graphify:context:ui -- "Issue #994: ..."`
   - exit `2`: Graphify sem grafo local em `app/graphify-out/graph.json`; descoberta manual usada conforme fallback do repositório.
-- `pnpm --filter @workspace/app run test:project-wizard-browser`
+- `pnpm --filter @workspace/app run test:project-wizard-browser` durante o fix original
   - duas primeiras execuções não chegaram ao seam novo: falharam no `toHaveURL` preexistente da linha 462 usando o cache `.next` local;
   - após isolar o cache e usar `PROJECT_WIZARD_BROWSER_PORT=3127`, o RED esperado foi observado: `getByRole('dialog', { name: 'Descartar propostas da IA?' })` não encontrou o componente em `ProjectFormModal.tsx` ainda baseado em `window.confirm`;
-  - o GREEN não foi iniciado após a implementação, em respeito à instrução operacional posterior de não iniciar testes adicionais.
+  - o GREEN não foi iniciado naquele momento, em respeito à instrução operacional posterior de não iniciar testes adicionais.
+- validação pós-fix informada antes desta correção
+  - falhou na antiga linha 793: `getByText(...).toBeVisible()` encontrou as duas descrições intencionais do `ConfirmationDialog` — a `sr-only` do `Dialog` e o parágrafo visível — e entrou em strict mode.
+- `PROJECT_WIZARD_BROWSER_PORT=3127 pnpm --filter @workspace/app run test:project-wizard-browser`
+  - primeira execução não alcançou as asserções: `page.goto("/projects")` expirou após 30 segundos;
+  - após isolar o cache `.next`, avançou e revelou uma corrida do próprio smoke na antiga linha 844: a próxima ação começava durante a animação de saída da confirmação anterior;
+  - após aguardar cada confirmação ficar oculta, exit `0` com:
+    - `PASS wizard revisa tarefas manuais, aceita lista vazia e preserva edição direta`;
+    - `PASS wizard limita extração, preserva estado transitório e confirma descartes`.
 - `pnpm --filter @workspace/app run test:projects`
-  - não iniciado após a instrução operacional posterior de não iniciar testes adicionais.
+  - exit `0`; todas as verificações listadas passaram, incluindo uso do diálogo compartilhado, regras do wizard, pré-validação e formatos de Ata.
 - `pnpm --filter @workspace/app typecheck`
   - exit `0`: `tsc --noEmit` e `tsc -p tsconfig.usefetch-types.json --noEmit` passaram no estado final.
 - `git diff --check`
@@ -48,7 +58,7 @@ Remover a pré-validação do frontend afrouxaria uma validação de trust bound
 
 ## Concerns
 
-- O browser smoke final (GREEN) e `test:projects` permanecem pendentes por instrução explícita de não iniciar novos testes.
-- O hook `pre-commit` contém um teste (`node --test scripts/supply-chain-security.test.mjs`) e, pela mesma instrução, o commit foi criado com `--no-verify`.
-- Portanto, há prova estática e de tipos, além do RED correto, mas não há prova browser pós-implementação nesta execução.
+- O primeiro browser smoke pós-correção sofreu timeout de inicialização e exigiu isolar o cache `.next`; a repetição limpa passou.
+- `test:projects` emite o warning existente `MODULE_TYPELESS_PACKAGE_JSON`, sem falha.
 - Nenhuma API, dependência, ordem assíncrona ou regra de 10 MiB foi alterada.
+- `ProjectFormModal.tsx` não foi alterado na correção pós-fix.
