@@ -133,6 +133,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.taskServiceUrl,
       auditTarget: "task-service",
       routePrefixes: [...TASK_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
     },
     {
       key: "project-service",

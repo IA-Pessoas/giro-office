@@ -421,6 +421,7 @@ function mountServiceRoutes(app: express.Express, env: GatewayEnv): void {
   app.post(
     PROJECT_WIZARD_EXTRACTION_PATH,
     buildHttpProxyMiddleware(env.taskServiceUrl, {
+      internalServiceToken: env.auditServiceToken,
       upstreamTimeoutMs: PROJECT_WIZARD_EXTRACTION_UPSTREAM_TIMEOUT_MS,
     }),
   );

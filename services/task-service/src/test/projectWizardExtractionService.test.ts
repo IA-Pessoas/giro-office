@@ -2,7 +2,7 @@ import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
-  AiTaskExtractionContext,
+  AiTaskExtractionInput,
   AiTaskExtractionProvider,
 } from "../integrations/aiTaskExtraction.js";
 import {
@@ -279,9 +279,9 @@ describe("ProjectWizardExtractionService", () => {
   });
 
   it("envia ao provedor apenas o contexto permitido pela especificação", async () => {
-    let received: AiTaskExtractionContext | null = null;
-    const { provider } = createProvider(async ({ context }) => {
-      received = context;
+    let received: AiTaskExtractionInput | null = null;
+    const { provider } = createProvider(async (input) => {
+      received = input;
       return [{ name: "Tarefa proposta" }];
     });
     const service = new ProjectWizardExtractionService(provider, createPrisma());
@@ -289,16 +289,19 @@ describe("ProjectWizardExtractionService", () => {
     await service.extractTasks(createRequest());
 
     expect(received).toEqual({
-      project: {
-        name: "Implantação fiscal",
-        objective: "Estruturar a operação fiscal do cliente",
-        start_date: "2026-09-01",
-        end_date: "2026-09-30",
+      content: "Ata colada pelo usuário.",
+      context: {
+        project: {
+          name: "Implantação fiscal",
+          objective: "Estruturar a operação fiscal do cliente",
+          start_date: "2026-09-01",
+          end_date: "2026-09-30",
+        },
+        departments: [
+          { name: "Fiscal", taskModels: ["Apuração", "Revisão"] },
+          { name: "Contábil", taskModels: ["Balanço"] },
+        ],
       },
-      departments: [
-        { name: "Fiscal", taskModels: ["Apuração", "Revisão"] },
-        { name: "Contábil", taskModels: ["Balanço"] },
-      ],
     });
     const serialized = JSON.stringify(received);
     expect(serialized).not.toContain(ORG_ID);
