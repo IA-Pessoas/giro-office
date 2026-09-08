@@ -2,12 +2,12 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { PrismaPg } from "@prisma/adapter-pg";
-import argon2 from "argon2";
 import { PrismaClient } from "../generated/prisma/client.js";
 import {
   INTEGRACAO_QA_FIXTURES,
   INTEGRACAO_QA_PASSWORD,
 } from "../../scripts/qa/integracao-fixtures.mjs";
+import { hashQaPassword, upsertQaPermission } from "./qa-seed-support.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,51 +22,6 @@ if (!connectionString) {
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
-
-const permissionModuleNames = [
-  "certificado",
-  "comercial",
-  "contabil",
-  "financeiro",
-  "fiscal",
-  "integracao",
-  "marketing",
-  "parcelamento",
-  "pessoal",
-  "regularize",
-  "rh",
-  "ti",
-  "triagem",
-];
-
-function buildPermissionModules(level: number): Record<string, number> {
-  return Object.fromEntries(
-    permissionModuleNames.map((moduleName) => [moduleName, moduleName === "integracao" ? level : 0]),
-  );
-}
-
-async function seedPermission(
-  userId: string,
-  organizationId: string,
-  level: number,
-): Promise<void> {
-  const data = {
-    user_id: userId,
-    organization_id: organizationId,
-    ...buildPermissionModules(level),
-  };
-  const existing = await prisma.permission.findFirst({
-    where: { user_id: userId, organization_id: organizationId },
-    select: { id: true },
-  });
-
-  if (existing) {
-    await prisma.permission.update({ where: { id: existing.id }, data });
-    return;
-  }
-
-  await prisma.permission.create({ data });
-}
 
 async function seedFixture(fixture: (typeof INTEGRACAO_QA_FIXTURES)[number]): Promise<void> {
   const { organization, department } = fixture;
@@ -94,18 +49,12 @@ async function seedFixture(fixture: (typeof INTEGRACAO_QA_FIXTURES)[number]): Pr
       organization_id: organization.id,
       name: department.name,
       color: "#2563EB",
-      status: "active",
+      status: "Ativo",
       solution: false,
     },
   });
 
-  const password = await argon2.hash(INTEGRACAO_QA_PASSWORD, {
-    type: argon2.argon2id as 2,
-    version: 0x13,
-    memoryCost: 19 * 1024,
-    timeCost: 2,
-    parallelism: 1,
-  });
+  const password = await hashQaPassword(INTEGRACAO_QA_PASSWORD);
   for (const user of fixture.users) {
     const userType = user.type === "owner" ? "owner" : "user";
     const permissionLevel = user.type === "owner" ? 0 : user.level;
@@ -137,7 +86,11 @@ async function seedFixture(fixture: (typeof INTEGRACAO_QA_FIXTURES)[number]): Pr
         photo_url: null,
       },
     });
-    await seedPermission(user.id, organization.id, permissionLevel);
+    await upsertQaPermission(prisma, {
+      userId: user.id,
+      organizationId: organization.id,
+      integracaoLevel: permissionLevel,
+    });
   }
 
   await prisma.client.upsert({

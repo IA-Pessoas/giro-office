@@ -21,6 +21,7 @@
     "test:contabil": "node --experimental-strip-types src/modules/contabil/run-contabil-tests.mjs",
     "test:projects": "node --experimental-strip-types src/modules/integracao/run-project-tests.mjs",
     "test:project-wizard-browser": "node src/modules/integracao/run-project-wizard-browser-smoke.mjs",
+    "qa:wizard-evidence": "node scripts/wizard-evidence.mjs",
     "test:tasks-browser": "node src/modules/integracao/run-task-eligibility-filters-browser-smoke.mjs",
     "test:socket": "node --experimental-strip-types src/context/run-socket-context-tests.mjs",
     "test:feature-flags": "node --experimental-strip-types src/shared/featureFlags/run-feature-flags-tests.mjs",
