@@ -8,6 +8,7 @@
     "prisma:preflight:global-login": "node prisma/scripts/global-login-collision-preflight.mjs",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:seed:qa": "tsx prisma/seed-qa.ts",
+    "prisma:seed:qa:wizard": "tsx prisma/seed-qa-wizard.ts",
     "test": "node --test prisma/scripts/test/global-login-collision-preflight.test.mjs"
   },
   "dependencies": {

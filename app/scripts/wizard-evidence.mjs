@@ -5,12 +5,14 @@
  * `pnpm test` com a rede mockada, este runner exige serviços de pé, banco descartável e uma
  * OPENAI_API_KEY válida. Ele consome créditos reais, então fica fora da suíte e só roda sob demanda.
  *
+ * Modo padrão: os dois cenários usam a Ata sintética de `docs/qa/fixtures/`, e as capturas podem ser
+ * versionadas. Com WIZARD_QA_SENSITIVE_ATA o cenário de arquivo passa a usar uma Ata real: aí o
+ * runner entra em modo sensível, grava fora de `docs/` e não registra vídeo nem nomes extraídos,
+ * porque as Tarefas propostas carregam nomes e assuntos do cliente.
+ *
  * Uso:
- *   WIZARD_QA_BASE_URL=http://localhost:3000 \
- *   WIZARD_QA_LOGIN=qa.alfa.owner WIZARD_QA_PASSWORD=senha123 \
- *   WIZARD_QA_CLIENT_ID=<uuid do cliente de teste> \
- *   WIZARD_QA_OUTPUT_DIR=docs/qa/evidence/issue-996 \
  *   node app/scripts/wizard-evidence.mjs
+ *   WIZARD_QA_SENSITIVE_ATA=/fora/do/repo/ata.md node app/scripts/wizard-evidence.mjs
  */
 import assert from "node:assert/strict";
 import { mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
@@ -18,10 +20,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
+import { INTEGRACAO_QA_PASSWORD } from "../../scripts/qa/integracao-fixtures.mjs";
+
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const baseUrl = (process.env.WIZARD_QA_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 const login = process.env.WIZARD_QA_LOGIN || "qa.alfa.owner";
-const password = process.env.WIZARD_QA_PASSWORD || "senha123";
+const password = process.env.WIZARD_QA_PASSWORD || INTEGRACAO_QA_PASSWORD;
 const textClient = {
   id: process.env.WIZARD_QA_CLIENT_ID || "34000000-0000-4000-8000-000000000001",
   name: process.env.WIZARD_QA_CLIENT_NAME || "Cliente QA Alfa",
@@ -30,31 +34,36 @@ const fileClient = {
   id: process.env.WIZARD_QA_FILE_CLIENT_ID || "34000000-0000-4000-8000-000000000010",
   name: process.env.WIZARD_QA_FILE_CLIENT_NAME || "Cliente QA Wizard B",
 };
-const outputDir = path.resolve(
-  repoRoot,
-  process.env.WIZARD_QA_OUTPUT_DIR || "docs/qa/evidence/issue-996",
-);
-const sensitiveAtaPath = process.env.WIZARD_QA_SENSITIVE_ATA;
 const publicAtaPath = path.resolve(
   repoRoot,
   process.env.WIZARD_QA_PUBLIC_ATA || "docs/qa/fixtures/ata-qa-alfa.md",
 );
 
-let shotIndex = 0;
-
 /**
- * A Ata pode conter dado sensível do cliente, então toda captura mascara os campos que a exibem.
- * Sem isso a evidência viraria vazamento — é o mesmo contrato do smoke mockado.
+ * Uma Ata real vaza pelo que a IA devolve, não só pelo campo onde ela é colada: as Tarefas propostas
+ * repetem nomes e assuntos do cliente, e nenhuma máscara alcança isso. Por isso o modo sensível
+ * troca o destino das capturas, desliga o vídeo e cala o dump das propostas.
  */
-async function shot(page, name) {
-  shotIndex += 1;
-  const file = path.join(outputDir, `${String(shotIndex).padStart(2, "0")}-${name}.png`);
+const sensitiveAtaPath = process.env.WIZARD_QA_SENSITIVE_ATA;
+const isSensitiveRun = Boolean(sensitiveAtaPath);
+const outputDir = path.resolve(
+  repoRoot,
+  process.env.WIZARD_QA_OUTPUT_DIR ||
+    (isSensitiveRun ? "smoke-wizard-evidence-local" : "docs/qa/evidence/issue-996"),
+);
+
+let captureIndex = 0;
+
+/** Mascara os campos onde a Ata aparece literalmente; o modo sensível cuida do resto. */
+async function capture(page, name) {
+  captureIndex += 1;
+  const file = path.join(outputDir, `${String(captureIndex).padStart(2, "0")}-${name}.png`);
   await page.screenshot({
     path: file,
     fullPage: true,
     mask: [
       page.getByLabel("Cole a Ata para extrair tarefas"),
-      page.locator('[data-testid="wizard-minutes-text"]'),
+      page.getByLabel("Selecione um arquivo .txt, .md, .docx ou .pdf"),
     ],
     maskColor: "#94a3b8",
   });
@@ -70,10 +79,10 @@ async function signIn(page) {
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 30_000 });
 }
 
-async function openWizard(page, client, { name, startDate, endDate, objective }) {
+async function openWizard(page, { client, project }) {
   await page.goto(`${baseUrl}/projects?clientId=${client.id}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Projetos", level: 1 })).toBeVisible();
-  await shot(page, "projetos-filtrado-por-cliente");
+  await capture(page, "projetos-filtrado-por-cliente");
 
   await page.getByRole("button", { name: "Novo projeto" }).click();
   const wizard = page.getByRole("dialog", { name: "Novo projeto" });
@@ -82,17 +91,17 @@ async function openWizard(page, client, { name, startDate, endDate, objective })
   // O cliente vem travado do filtro: some o combobox e sobra o nome como texto.
   await expect(wizard.getByText(client.name, { exact: true })).toBeVisible();
   await expect(wizard.getByRole("combobox", { name: "Cliente", exact: true })).toHaveCount(0);
-  await shot(page, "wizard-etapa-1-cliente-travado");
+  await capture(page, "wizard-etapa-1-cliente-travado");
 
-  await wizard.getByLabel("Nome").fill(name);
-  await wizard.getByLabel("Data de início").fill(startDate);
-  if (endDate) await wizard.getByLabel("Data final prevista").fill(endDate);
-  await wizard.getByLabel("Objetivo").fill(objective);
+  await wizard.getByLabel("Nome").fill(project.name);
+  await wizard.getByLabel("Data de início").fill(project.startDate);
+  if (project.endDate) await wizard.getByLabel("Data final prevista").fill(project.endDate);
+  await wizard.getByLabel("Objetivo").fill(project.objective);
   await wizard.getByRole("button", { name: "Continuar" }).click();
   return wizard;
 }
 
-async function extractAndReview(page, wizard, { label, text, file }) {
+async function extractProposals(page, wizard, { label, text, file }) {
   const extractButton = wizard.getByRole("button", { name: "Extrair tarefas com IA" });
   await expect(wizard.getByText("Tentativas de extração: 0 de 3.", { exact: true })).toBeVisible();
 
@@ -103,7 +112,7 @@ async function extractAndReview(page, wizard, { label, text, file }) {
   } else {
     await wizard.getByLabel("Cole a Ata para extrair tarefas").fill(text);
   }
-  await shot(page, `${label}-etapa-2-ata-carregada`);
+  await capture(page, `${label}-etapa-2-ata-carregada`);
 
   const startedAt = Date.now();
   await extractButton.click();
@@ -118,7 +127,7 @@ async function extractAndReview(page, wizard, { label, text, file }) {
   const proposals = wizard.getByRole("group", { name: /\(proposta pela IA\)$/ });
   const proposalCount = await proposals.count();
   assert.ok(proposalCount > 0, "A IA precisa propor ao menos uma Tarefa.");
-  await shot(page, `${label}-etapa-2-propostas-da-ia`);
+  await capture(page, `${label}-etapa-2-propostas-da-ia`);
 
   const extracted = [];
   for (let index = 0; index < proposalCount; index += 1) {
@@ -132,10 +141,15 @@ async function extractAndReview(page, wizard, { label, text, file }) {
     });
   }
 
-  console.log(`  🤖 ${proposalCount} proposta(s):`);
-  for (const item of extracted) console.log(`     ${JSON.stringify(item)}`);
+  const mapped = extracted.filter(({ model }) => model).length;
+  console.log(`  🤖 ${proposalCount} proposta(s), ${mapped} já com Modelo:`);
+  if (isSensitiveRun) {
+    console.log("     (nomes omitidos: rodada com Ata real)");
+  } else {
+    for (const item of extracted) console.log(`     ${JSON.stringify(item)}`);
+  }
 
-  return { extracted, proposalCount };
+  return extracted;
 }
 
 /**
@@ -161,16 +175,20 @@ async function reviewProposals(page, wizard, label) {
     const group = groups.nth(index);
     const departmentField = group.getByLabel(/^Departamento/);
     const modelField = group.getByLabel(/^Modelo/);
-    const departmentIds = (await departmentField.locator("option").evaluateAll((options) =>
-      options.map((option) => option.value),
-    )).filter(Boolean);
+    const departmentIds = (
+      await departmentField
+        .locator("option")
+        .evaluateAll((options) => options.map((option) => option.value))
+    ).filter(Boolean);
 
     let chosen = null;
     for (const departmentId of departmentIds) {
       await departmentField.selectOption(departmentId);
-      const modelIds = (await modelField.locator("option").evaluateAll((options) =>
-        options.map((option) => option.value),
-      )).filter((value) => value && !usedModels.has(value));
+      const modelIds = (
+        await modelField
+          .locator("option")
+          .evaluateAll((options) => options.map((option) => option.value))
+      ).filter((value) => value && !usedModels.has(value));
       if (modelIds.length > 0) {
         await modelField.selectOption(modelIds[0]);
         usedModels.add(modelIds[0]);
@@ -186,14 +204,14 @@ async function reviewProposals(page, wizard, label) {
   await wizard.getByRole("button", { name: "Adicionar tarefa", exact: true }).click();
   const manual = wizard.getByRole("group", { name: `Tarefa ${total + 1}`, exact: true });
   await manual.getByLabel(/^Nome/).fill("Tarefa manual de QA (será removida)");
-  await shot(page, `${label}-etapa-2-revisao-manual`);
+  await capture(page, `${label}-etapa-2-revisao-manual`);
   await manual.getByRole("button", { name: "Remover tarefa", exact: true }).click();
 
-  console.log(`  ✍️  campos completados manualmente: ${JSON.stringify(completed)}`);
+  console.log(`  ✍️  ${completed.length} campo(s) completado(s) na revisão manual.`);
   return completed;
 }
 
-async function confirm(page, wizard, client, label, expectedTaskName, unassignedTaskName) {
+async function createProject(page, wizard, { client, source }, expected) {
   const reviewButton = wizard.getByRole("button", { name: "Revisar tarefas", exact: true });
   if (await reviewButton.isDisabled()) {
     const alerts = await wizard.getByRole("alert").allInnerTexts();
@@ -202,77 +220,87 @@ async function confirm(page, wizard, client, label, expectedTaskName, unassigned
   await reviewButton.click();
   const review = wizard.getByRole("table");
   await expect(review).toBeVisible({ timeout: 30_000 });
-  await expect(review.getByRole("cell", { name: "Sem responsável", exact: true }).first()).toBeVisible();
-  await shot(page, `${label}-etapa-3-revisao-final`);
+  await expect(
+    review.getByRole("cell", { name: "Sem responsável", exact: true }).first(),
+  ).toBeVisible();
+  await capture(page, `${source.label}-etapa-3-revisao-final`);
 
   await wizard.getByRole("button", { name: "Criar projeto", exact: true }).click();
   await page.waitForURL(`${baseUrl}/tasks?clientId=${client.id}`, { timeout: 30_000 });
-  const success = await page.getByText(/Projeto criado com sucesso\./).first().innerText();
+  const success = await page
+    .getByText(/Projeto criado com sucesso\./)
+    .first()
+    .innerText();
 
   // A listagem chega filtrada pelo cliente: espera a Tarefa criada antes de fotografar.
-  await expect(page.getByRole("cell", { name: expectedTaskName, exact: true })).toBeVisible({
+  await expect(page.getByRole("cell", { name: expected.anyTaskName, exact: true })).toBeVisible({
     timeout: 30_000,
   });
-  await shot(page, `${label}-etapa-4-sucesso-e-listagem-filtrada`);
+  await capture(page, `${source.label}-etapa-4-sucesso-e-listagem-filtrada`);
 
   // AC "Sem responsável" precisa ser visível E filtrável: o filtro de atribuição prova as duas.
   await page.getByLabel("Atribuição").selectOption("unassigned");
-  await expect(page.getByRole("cell", { name: unassignedTaskName, exact: true })).toBeVisible({
-    timeout: 30_000,
-  });
-  await shot(page, `${label}-etapa-4b-filtro-sem-responsavel`);
+  await expect(
+    page.getByRole("cell", { name: expected.unassignedTaskName, exact: true }),
+  ).toBeVisible({ timeout: 30_000 });
+  await capture(page, `${source.label}-etapa-4b-filtro-sem-responsavel`);
   await page.getByLabel("Atribuição").selectOption("all");
 
   // Limpar o cliente derruba o parâmetro e devolve a listagem permitida.
   await page.getByRole("button", { name: new RegExp(client.name, "i") }).first().click();
   await page.getByRole("option", { name: "Sem cliente selecionado" }).click();
   await page.waitForURL(`${baseUrl}/tasks`, { timeout: 30_000 });
-  await shot(page, `${label}-etapa-5-cliente-limpo`);
+  await capture(page, `${source.label}-etapa-5-cliente-limpo`);
 
   return success;
 }
 
 async function runScenario(page, scenario) {
   console.log(`\n▶️  ${scenario.title}`);
-  const wizard = await openWizard(page, scenario.client, scenario.project);
-  const { extracted, proposalCount } = await extractAndReview(page, wizard, scenario.source);
+  const wizard = await openWizard(page, scenario);
+  const extracted = await extractProposals(page, wizard, scenario.source);
   const completedByHand = await reviewProposals(page, wizard, scenario.source.label);
-  const success = await confirm(
-    page,
-    wizard,
-    scenario.client,
-    scenario.source.label,
-    extracted[0].name,
-    completedByHand.at(-1) ?? extracted[0].name,
-  );
+  const success = await createProject(page, wizard, scenario, {
+    anyTaskName: extracted[0].name,
+    unassignedTaskName: completedByHand.at(-1) ?? extracted[0].name,
+  });
 
   console.log(`  ✅ ${success}`);
   return {
     title: scenario.title,
     client: scenario.client.name,
     project: scenario.project.name,
-    proposalCount,
-    extracted,
-    completedByHand,
+    proposalCount: extracted.length,
+    mappedByAi: extracted.filter(({ model }) => model).length,
+    completedByHand: completedByHand.length,
     success,
+    ...(isSensitiveRun ? {} : { extracted }),
   };
 }
 
 async function main() {
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
+  console.log(
+    isSensitiveRun
+      ? `⚠️  Ata real em uso: evidência vai para ${path.relative(repoRoot, outputDir)} e não deve ser versionada.`
+      : `Evidência pública em ${path.relative(repoRoot, outputDir)}.`,
+  );
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
-    recordVideo: { dir: path.join(outputDir, "video"), size: { width: 1440, height: 900 } },
+    // Vídeo não tem máscara: só grava quando a Ata é a sintética.
+    ...(isSensitiveRun
+      ? {}
+      : { recordVideo: { dir: path.join(outputDir, "video"), size: { width: 1440, height: 900 } } }),
   });
   const page = await context.newPage();
   const results = [];
 
   try {
     await signIn(page);
-    await shot(page, "sessao-autenticada");
+    await capture(page, "sessao-autenticada");
 
     results.push(
       await runScenario(page, {
@@ -284,48 +312,48 @@ async function main() {
           endDate: "2026-10-31",
           objective: "Validar extração por texto colado com a IA real.",
         },
+        source: { label: "cenario-a-texto", text: await readFile(publicAtaPath, "utf8") },
+      }),
+    );
+
+    results.push(
+      await runScenario(page, {
+        title: isSensitiveRun
+          ? "Ata real do cliente (upload .md)"
+          : "Ata sintética de QA (upload .md)",
+        client: fileClient,
+        project: {
+          name: "QA #996 — Ata por arquivo",
+          startDate: "2026-09-10",
+          endDate: "2026-10-31",
+          objective: "Validar extração por upload de arquivo com a IA real.",
+        },
         source: {
-          label: "cenario-a-texto",
-          text: await readFile(publicAtaPath, "utf8"),
+          label: "cenario-b-arquivo",
+          file: {
+            name: "ata.md",
+            mimeType: "text/markdown",
+            buffer: await readFile(path.resolve(repoRoot, sensitiveAtaPath ?? publicAtaPath)),
+          },
         },
       }),
     );
 
-    if (sensitiveAtaPath) {
-      const buffer = await readFile(path.resolve(repoRoot, sensitiveAtaPath));
-      results.push(
-        await runScenario(page, {
-          title: "Ata real do cliente (upload .md)",
-          client: fileClient,
-          project: {
-            name: "QA #996 — Ata por arquivo",
-            startDate: "2026-09-10",
-            endDate: "2026-10-31",
-            objective: "Validar extração por upload de arquivo com a IA real.",
-          },
-          source: {
-            label: "cenario-b-arquivo",
-            file: { name: "ata.md", mimeType: "text/markdown", buffer },
-          },
-        }),
-      );
-    } else {
-      console.log("\n⚠️  WIZARD_QA_SENSITIVE_ATA não definida; cenário de arquivo ignorado.");
-    }
-
     console.log(`\n${JSON.stringify(results, null, 2)}`);
   } catch (error) {
-    await shot(page, "falha");
+    await capture(page, "falha");
     throw error;
   } finally {
     await context.close();
     await browser.close();
-    const [video] = await readdir(path.join(outputDir, "video"));
-    if (video) {
-      await rename(
-        path.join(outputDir, "video", video),
-        path.join(outputDir, "video", "wizard-projetos-e2e.webm"),
-      );
+    if (!isSensitiveRun) {
+      const [video] = await readdir(path.join(outputDir, "video"));
+      if (video) {
+        await rename(
+          path.join(outputDir, "video", video),
+          path.join(outputDir, "video", "wizard-projetos-e2e.webm"),
+        );
+      }
     }
   }
 }

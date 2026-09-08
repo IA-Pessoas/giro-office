@@ -6,37 +6,38 @@ Tarefas por IA. Duas camadas cobrem a issue:
 | Camada | Onde | Rede da IA | Roda no `pnpm test` |
 | --- | --- | --- | --- |
 | Smoke determinístico | `app/src/modules/integracao/run-project-wizard-browser-smoke.mjs` | mockada por `page.route` | sim (`test:project-wizard-browser`) |
-| Evidência end-to-end | `app/scripts/wizard-evidence.mjs` | OpenAI real | não (consome crédito) |
+| Evidência end-to-end | `app/scripts/wizard-evidence.mjs` | OpenAI real | não (`qa:wizard-evidence`, sob demanda) |
 
-O smoke é o gate de regressão. A evidência é a prova manual, sob demanda, de que os serviços reais
-entregam o mesmo comportamento.
+O smoke é o gate de regressão e é ele que satisfaz o critério "nenhuma credencial ou crédito real é
+usado". O runner de evidência foi pedido à parte, para provar manualmente que os serviços reais e a
+OpenAI entregam o mesmo comportamento; ele fica fora da suíte justamente por consumir crédito.
 
 ## Cobertura dos critérios de aceite
 
-| Critério | Onde é provado |
-| --- | --- |
-| Wizard abre pelo cliente selecionado e o cliente permanece bloqueado | smoke `expectLockedClient`; evidência `03`/`12` |
-| Cenário sem Ata cria Projeto sem Tarefas e cai na listagem filtrada | smoke (contagens `0/0/0` e `/tasks?clientId=`) |
-| Cenário com texto extrai, revisa, adiciona e remove itens | smoke; evidência `04`–`06` |
-| Ao menos um cenário de arquivo cobre upload e propostas | smoke (`setInputFiles`); evidência `13`–`15` (upload `.md`) |
-| Revisão final mostra Tarefas, dependências, estados, avisos e responsáveis | smoke; evidência `07`/`16` |
-| Sucesso mostra contagens exatas e navega para `/tasks?clientId=` com filtro restaurado | smoke; evidência `08`/`17` |
-| Limpar o cliente remove o parâmetro e restaura a listagem permitida | smoke `run-task-eligibility-filters-browser-smoke.mjs`; evidência `10`/`19` |
-| Tarefa "Sem responsável" visível e filtrável | evidência `09`/`18` (filtro Atribuição = Sem responsável) |
-| Rede da OpenAI substituída por contrato determinístico no gate | smoke mocka `**/task/project-wizard/extract-tasks` |
-| Falhas produzem artefato útil sem capturar a Ata | `captureFailureArtifact` no smoke, com `mask` nos campos da Ata |
+| Critério | Gate determinístico | Evidência manual |
+| --- | --- | --- |
+| Wizard abre pelo cliente selecionado e o cliente permanece bloqueado | `expectLockedClient` | `03`/`12` |
+| Cenário sem Ata cria Projeto sem Tarefas e cai na listagem filtrada | contagens `0/0/0` + `/tasks?clientId=` | — |
+| Cenário com texto extrai, revisa, adiciona e remove itens | sim | `04`–`06` |
+| Ao menos um cenário de arquivo cobre upload e propostas | `setInputFiles` (.txt/.md/.docx/.pdf) | `13`–`15` |
+| Revisão final mostra Tarefas, dependências, estados, avisos e responsáveis | sim | `07`/`16` |
+| Sucesso mostra contagens exatas e navega para `/tasks?clientId=` com filtro restaurado | sim | `08`/`17` |
+| Limpar o cliente remove o parâmetro e restaura a listagem permitida | `run-task-eligibility-filters-browser-smoke.mjs` | `10`/`19` |
+| Tarefa "Sem responsável" visível e filtrável | `run-task-eligibility-filters-browser-smoke.mjs` (`assignment=unassigned`) | `09`/`18` |
+| Rede da OpenAI substituída por contrato determinístico | mock de `**/task/project-wizard/extract-tasks` | não se aplica |
+| Falhas produzem artefato útil sem capturar a Ata | `captureFailureArtifact` | captura de `falha` |
 
 ## Artefato de falha
 
-O smoke grava um screenshot quando `PROJECT_WIZARD_BROWSER_ARTIFACT_DIR` aponta um diretório:
+Quando o smoke quebra, ele grava um screenshot em `app/smoke-artifacts/`
+(`PROJECT_WIZARD_BROWSER_ARTIFACT_DIR` muda o destino). Trace e vídeo do Playwright ficam de fora de
+propósito: o trace registra o texto passado a `fill()` e o vídeo mostra a digitação, ou seja, ambos
+guardariam a Ata. O screenshot mascara o textarea e o seletor de arquivo, que são os pontos onde a
+Ata aparece **literalmente**.
 
-```bash
-PROJECT_WIZARD_BROWSER_ARTIFACT_DIR=./smoke-artifacts pnpm --filter @workspace/app test:project-wizard-browser
-```
-
-Trace e vídeo do Playwright ficam de fora de propósito: o trace registra o texto passado a `fill()`
-e o vídeo mostra a digitação, ou seja, ambos guardariam a Ata. O screenshot mascara o textarea e o
-seletor de arquivo, e preserva o resto da tela — estado do wizard, contadores e mensagens de erro.
+A máscara não é blindagem geral: as Tarefas propostas pela IA derivam da Ata e podem repetir nomes e
+assuntos do cliente. No smoke isso é inofensivo porque a Ata é uma fixture sintética; num fluxo com
+Ata real, o screenshot também é dado sensível — ver a regra do modo sensível abaixo.
 
 ## Como rodar a evidência end-to-end
 
@@ -58,7 +59,7 @@ o runner cria Projetos e Tarefas de verdade.
    ```bash
    pnpm --filter @workspace/infra exec prisma migrate deploy
    pnpm --filter @workspace/infra prisma:seed:qa
-   pnpm --filter @workspace/infra exec tsx prisma/seed-qa-wizard.ts
+   pnpm --filter @workspace/infra prisma:seed:qa:wizard
    ```
 
 3. Configure a extração real em `services/task-service/.env`:
@@ -74,16 +75,24 @@ o runner cria Projetos e Tarefas de verdade.
 5. Rode o runner:
 
    ```bash
-   WIZARD_QA_SENSITIVE_ATA=/caminho/fora/do/repo/ata.md node app/scripts/wizard-evidence.mjs
+   pnpm --filter @workspace/app qa:wizard-evidence
    ```
 
-`WIZARD_QA_SENSITIVE_ATA` é opcional e aponta para uma Ata real **fora do repositório**. Sem ela o
-runner executa só o cenário sintético. As capturas mascaram os campos da Ata nos dois casos.
+### Modo sensível
+
+Por padrão os dois cenários usam a Ata sintética de `docs/qa/fixtures/ata-qa-alfa.md`, e as capturas
+podem ser versionadas — é o que está em `docs/qa/evidence/issue-996/`.
+
+`WIZARD_QA_SENSITIVE_ATA=/fora/do/repo/ata.md` troca o cenário de arquivo por uma Ata real. Nesse
+modo o runner grava em `smoke-wizard-evidence-local/` (fora de `docs/`, já coberto pelo
+`.gitignore`), não grava vídeo — vídeo não tem máscara — e omite do log os nomes das Tarefas
+extraídas. Nada dessa rodada deve ser versionado.
 
 ## Dados de teste
 
 `infra/prisma/seed-qa-wizard.ts` amplia as fixtures de `prisma:seed:qa` dentro da organização
-`QA Integração Alfa`, e trabalha apenas com clientes de teste:
+`QA Integração Alfa`, reaproveitando organização, cliente e senha de `scripts/qa/integracao-fixtures.mjs`.
+Trabalha apenas com clientes de teste:
 
 - Clientes: `Cliente QA Alfa` (cenário de texto) e `Cliente QA Wizard B` (cenário de arquivo). São
   dois porque um Modelo só admite uma Tarefa ativa por cliente — os cenários se atropelariam num só.
@@ -98,17 +107,21 @@ runner executa só o cenário sintético. As capturas mascaram os campos da Ata 
 
 ## Achados
 
-1. **Fixtures QA gravam `status: "active"` em departamentos e `type: "QA"` em Modelos**
-   (`infra/prisma/seed-qa.ts`), mas o catálogo do wizard filtra `status: "Ativo"` e
-   `type: "Projeto"` (`projectWizardExtractionService.listCatalog`). Com a fixture original o
-   catálogo chega vazio na IA, que devolve departamento e Modelo em branco em todas as propostas — o
-   wizard trava em "Preencha nome, departamento e Modelo de todas as tarefas". `seed-qa-wizard.ts`
-   usa os valores corretos; `seed-qa.ts` continua divergente.
-2. **A cadeia de migrations não é replayable do zero.** `20260713100000_platform_super_admin` e
+1. **Fixtures QA gravavam `status: "active"` em departamentos**, mas o produto grava `"Ativo"`
+   (`departmentService.create`) e todo filtro procura `"Ativo"` — inclusive o catálogo do wizard
+   (`projectWizardExtractionService.listCatalog`). Com a fixture original o catálogo chega vazio na
+   IA, que devolve departamento e Modelo em branco em todas as propostas, e o wizard trava em
+   "Preencha nome, departamento e Modelo de todas as tarefas". Corrigido em `seed-qa.ts`.
+   Os Modelos do fixture base seguem com `type: "QA"` de propósito: só `type: "Projeto"` entra no
+   catálogo do wizard, e os Modelos de Projeto vêm do `seed-qa-wizard.ts`.
+2. **`seed-qa.ts` grava clientes com `status: "active"`** enquanto o client-service usa `"Ativo"`
+   (`clientService` na restauração, `clientListQueryService` no filtro por departamento). Não afeta o
+   wizard e não foi alterado aqui por não ter sido validado ponta a ponta, mas é a mesma divergência
+   do achado 1 e provavelmente esconde outro filtro cego.
+3. **A cadeia de migrations não é replayable do zero.** `20260713100000_platform_super_admin` e
    `20260821200000_add_platform_auth_sessions` criam ambos o tipo `PlatformRole` e a tabela
    `platform_users`, então `prisma migrate deploy` num banco vazio falha com
    `type "PlatformRole" already exists`. Foi preciso aplicar a segunda migration à mão e marcá-la
    como aplicada.
-3. A IA não mapeia toda proposta a um Modelo. Nos dois cenários sobrou de uma a duas Tarefas sem
-   departamento/Modelo, completadas na revisão — comportamento esperado, mas é o que torna a etapa
-   de revisão obrigatória no fluxo real.
+4. A IA não mapeia toda proposta a um Modelo: sobram de uma a duas Tarefas sem departamento/Modelo,
+   completadas na revisão. Comportamento esperado, e é o que torna a etapa de revisão obrigatória.

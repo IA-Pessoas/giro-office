@@ -2,8 +2,12 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { PrismaPg } from "@prisma/adapter-pg";
-import argon2 from "argon2";
 import { PrismaClient } from "../generated/prisma/client.js";
+import {
+  INTEGRACAO_QA_FIXTURES,
+  INTEGRACAO_QA_PASSWORD,
+} from "../../scripts/qa/integracao-fixtures.mjs";
+import { hashQaPassword, upsertQaPermission } from "./qa-seed-support.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,19 +21,18 @@ if (!connectionString) {
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
-const ORGANIZATION_ID = "30000000-0000-4000-8000-000000000001";
+/** Reaproveita a organização e o cliente do fixture base, para os dois seeds não divergirem. */
+const [ALFA_FIXTURE] = INTEGRACAO_QA_FIXTURES;
+const ORGANIZATION_ID = ALFA_FIXTURE.organization.id;
 /** O cliente do fixture base atende o cenário de texto; o segundo isola o cenário de arquivo,
  * porque um Modelo só admite uma Tarefa ativa por cliente. */
-const CLIENT_IDS = [
-  "34000000-0000-4000-8000-000000000001",
-  "34000000-0000-4000-8000-000000000010",
-];
+const CLIENT_IDS = [ALFA_FIXTURE.client.id, "34000000-0000-4000-8000-000000000010"];
 const SECOND_CLIENT = {
   id: CLIENT_IDS[1],
   name: "Cliente QA Wizard B",
   cpfCnpj: "34000000000010",
 };
-const PASSWORD = "senha123";
+
 /** Prefixo dos Projetos criados pelo runner de evidência; só eles podem ser apagados. */
 const EVIDENCE_PROJECT_PREFIX = "QA #996";
 
@@ -136,48 +139,6 @@ const modelDependencies = [
   },
 ];
 
-const permissionModuleNames = [
-  "certificado",
-  "comercial",
-  "contabil",
-  "financeiro",
-  "fiscal",
-  "integracao",
-  "marketing",
-  "parcelamento",
-  "pessoal",
-  "regularize",
-  "rh",
-  "ti",
-  "triagem",
-];
-
-/** `rh >= 3` é o que torna o usuário elegível como responsável de Tarefa no departamento. */
-const RH_LEADERSHIP_LEVEL = 3;
-
-async function seedPermission(userId: string, level: number, eligible: boolean): Promise<void> {
-  const data = {
-    user_id: userId,
-    organization_id: ORGANIZATION_ID,
-    ...Object.fromEntries(
-      permissionModuleNames.map((moduleName) => [
-        moduleName,
-        moduleName === "integracao" ? level : 0,
-      ]),
-    ),
-    rh: eligible ? RH_LEADERSHIP_LEVEL : 0,
-  };
-  const existing = await prisma.permission.findFirst({
-    where: { user_id: userId, organization_id: ORGANIZATION_ID },
-    select: { id: true },
-  });
-  if (existing) {
-    await prisma.permission.update({ where: { id: existing.id }, data });
-    return;
-  }
-  await prisma.permission.create({ data });
-}
-
 /**
  * Um Modelo só admite uma Tarefa ativa por cliente, então rodar a evidência duas vezes seguidas
  * esbarraria na própria regra do produto. A limpeza devolve o cliente de teste ao estado inicial,
@@ -238,13 +199,7 @@ async function main(): Promise<void> {
     });
   }
 
-  const password = await argon2.hash(PASSWORD, {
-    type: argon2.argon2id as 2,
-    version: 0x13,
-    memoryCost: 19 * 1024,
-    timeCost: 2,
-    parallelism: 1,
-  });
+  const password = await hashQaPassword(INTEGRACAO_QA_PASSWORD);
 
   for (const user of users) {
     const data = {
@@ -263,7 +218,12 @@ async function main(): Promise<void> {
       update: data,
       create: { id: user.id, ...data, photo_url: null },
     });
-    await seedPermission(user.id, 3, user.eligible);
+    await upsertQaPermission(prisma, {
+      userId: user.id,
+      organizationId: ORGANIZATION_ID,
+      integracaoLevel: 3,
+      rhLeadership: user.eligible,
+    });
   }
 
   for (const model of taskModels) {
