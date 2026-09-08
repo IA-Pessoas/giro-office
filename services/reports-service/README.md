@@ -28,6 +28,16 @@ Consulte [`src/config/env.ts`](src/config/env.ts).
 
 Prefixo público: `/reports`.
 
+`POST /reports/definitions/validate` aceita `{ definition: { version: 2, areas: [{ source,
+fields }] } }` para revisar áreas independentes, além da definição legada. Revalida todas as
+áreas e campos contra o acesso atual; não consulta registros nem persiste modelos ou execuções.
+A ordem das áreas determina somente apresentação. Exige áreas/campos únicos e não vazios,
+até 32 áreas e 100 campos por área. Catálogo fornece `department_label` e `description` para
+apresentação, sem mapeamento de códigos no frontend.
+
+Este contrato de revisão prepara #1016; prévia, modelos e geração continuam recebendo o
+contrato legado até suas entregas específicas. Não há migração de banco nesta etapa.
+
 `GET /reports/catalog` expõe somente fontes e campos de adapters internos habilitados para a
 organização e permissões atuais. `POST /reports/preview` valida a mesma definição e devolve uma
 amostra limitada; não cria job, snapshot, arquivo ou registro persistido.

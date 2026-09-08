@@ -45,6 +45,8 @@ export type ReportsCatalogSource = {
   key: string;
   label: string;
   module: string;
+  department_label?: string;
+  description?: string;
   fields: ReportsCatalogField[];
   relations?: ReportsCatalogRelation[];
   parameters?: ReportsCatalogParameter[];
@@ -52,6 +54,11 @@ export type ReportsCatalogSource = {
 
 export type ReportsCatalog = {
   items: ReportsCatalogSource[];
+};
+
+export type ReportComposition = {
+  version: 2;
+  areas: { source: string; fields: string[] }[];
 };
 
 export type ReportsServiceError = {

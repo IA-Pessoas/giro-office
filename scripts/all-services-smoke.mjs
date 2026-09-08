@@ -1595,6 +1595,22 @@ const handlers = {
     });
   },
 
+  async reportsDefinitionValidate(op) {
+    await httpRequest(op, {
+      json: {
+        definition: {
+          version: 2,
+          areas: [
+            {
+              source: "parcelamento.installments",
+              fields: isBadExpectation(op) ? [] : ["agreement_number"],
+            },
+          ],
+        },
+      },
+    });
+  },
+
   async reportsPreviewInvalidDefinition(op) {
     await httpRequest(op, { json: { definition: { sources: [] } } });
   },

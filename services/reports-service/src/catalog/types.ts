@@ -31,6 +31,8 @@ export interface ReportCatalogSource {
   key: ReportSourceKey;
   label: string;
   module: string;
+  department_label?: string;
+  description?: string;
   minimum_permission: number;
   fields: readonly ReportCatalogField[];
 }

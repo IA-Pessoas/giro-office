@@ -5,6 +5,19 @@ import type {
   ReportSourceAdapter,
 } from "./types.js";
 
+const departmentLabels: Readonly<Record<string, string>> = {
+  financeiro: "Financeiro",
+  integracao: "Integração",
+  contabil: "Contábil",
+  certificado: "Certificados",
+  fiscal: "Fiscal",
+  parcelamento: "Parcelamento",
+  pessoal: "Departamento Pessoal",
+  regularize: "Regularize",
+  rh: "Recursos Humanos",
+  ti: "Tecnologia da Informação",
+};
+
 export interface AuthorizedReportCatalog {
   sources: readonly ReportCatalogSource[];
   relations: readonly ReportCatalogRelation[];
@@ -35,7 +48,17 @@ export class SourceCatalogService {
           : source.fields;
 
         return fields.length > 0 || relationSourceKeys.has(source.key)
-          ? [{ ...source, fields }]
+          ? [
+              {
+                ...source,
+                department_label:
+                  source.department_label ?? departmentLabels[source.module] ?? "Outras áreas",
+                description:
+                  source.description ??
+                  `Consulte ${source.label.toLocaleLowerCase("pt-BR")} e escolha as informações que deseja apresentar.`,
+                fields,
+              },
+            ]
           : [];
       });
     });

@@ -12,6 +12,9 @@ import type { ReportJobStatus } from "../types/report.types";
 export const panelClassName =
   "rounded-xl border border-gray-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900";
 
+export const reportCheckboxClassName =
+  "h-4 w-4 accent-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
+
 export function formatReportDate(value?: string | null): string {
   if (!value) return "—";
   const date = new Date(value);

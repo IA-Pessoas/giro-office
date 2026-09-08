@@ -42,6 +42,13 @@ const definition = {
 };
 
 describe("SourceCatalogService", () => {
+  it("publica apresentação amigável apenas para áreas autorizadas", () => {
+    const service = new SourceCatalogService([adapter]);
+    expect(service.getAuthorizedCatalog(scope).sources).toMatchObject([
+      { label: "Livro razão", department_label: "Financeiro", description: expect.any(String) },
+    ]);
+    expect(service.getAuthorizedCatalog({ ...scope, modules: {} }).sources).toEqual([]);
+  });
   it("omite fonte sem permissão e campo removido pelo grant", () => {
     const service = new SourceCatalogService([adapter]);
 
