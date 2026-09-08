@@ -80,7 +80,7 @@ export function SuperAdminPage() {
         </div>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(19rem,23rem)_minmax(0,1fr)] lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-[minmax(19rem,23rem)_minmax(0,1fr)] lg:items-stretch">
         <OrganizationDirectory
           createButtonRef={createButtonRef}
           isError={organizationsQuery.isError}

@@ -572,6 +572,17 @@ try {
       .locator("aside")
       .filter({ has: page.getByLabel("Pesquisar organização") });
     const directoryBox = await directory.boundingBox();
+    if (viewport.width >= 1024) {
+      const detailsPanelBox = await directory.locator("xpath=following-sibling::div[1]").boundingBox();
+      assert.ok(
+        directoryBox &&
+          detailsPanelBox &&
+          Math.abs(
+            directoryBox.y + directoryBox.height - (detailsPanelBox.y + detailsPanelBox.height),
+          ) <= 1,
+        `Diretório e painel desalinhados: ${JSON.stringify({ directoryBox, detailsPanelBox })}`,
+      );
+    }
     for (const name of ["Próxima", "Última página"]) {
       const buttonBox = await directory.getByRole("button", { name, exact: true }).boundingBox();
       assert.ok(
