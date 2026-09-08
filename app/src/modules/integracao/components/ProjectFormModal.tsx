@@ -131,6 +131,7 @@ export function ProjectFormModal({
   );
   const idempotencyKeyRef = useRef<string | null>(null);
   const meetingMinutesFileRef = useRef<HTMLInputElement>(null);
+  const extractionRequestLockRef = useRef(false);
   const previewRequestLockRef = useRef(false);
   const { values, updateValue, validate, reset, buildCreatePayload, buildUpdatePayload } =
     useProjectForm(detailQuery.data);
@@ -150,6 +151,7 @@ export function ProjectFormModal({
       previewMutation.reset();
       extractTasksMutation.reset();
       idempotencyKeyRef.current = null;
+      extractionRequestLockRef.current = false;
       previewRequestLockRef.current = false;
     } else if (!isEditing && !idempotencyKeyRef.current) {
       idempotencyKeyRef.current = crypto.randomUUID();
@@ -220,7 +222,9 @@ export function ProjectFormModal({
   }
 
   async function handleExtractTasks() {
-    if (extractTasksMutation.isPending || !canExtractTasks) return;
+    if (extractionRequestLockRef.current || extractTasksMutation.isPending || !canExtractTasks) {
+      return;
+    }
 
     const sourceValidationMessage = getWizardExtractionSourceValidationMessage({
       text: meetingMinutes,
@@ -231,6 +235,7 @@ export function ProjectFormModal({
       return;
     }
 
+    extractionRequestLockRef.current = true;
     setExtractionAttempts((current) => current + 1);
 
     try {
@@ -258,6 +263,8 @@ export function ProjectFormModal({
       toast.success(`Tarefas propostas pela IA: ${proposals.length}. Revise antes de continuar.`);
     } catch (error) {
       toast.error(getRequestErrorMessage(error, PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE));
+    } finally {
+      extractionRequestLockRef.current = false;
     }
   }
 

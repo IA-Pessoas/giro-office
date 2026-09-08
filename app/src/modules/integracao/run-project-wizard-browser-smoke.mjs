@@ -76,7 +76,7 @@ async function installApiMocks(
   previewRequests,
   wizardRequests,
   extractionRequests = [],
-  secondExtractionGate,
+  firstExtractionGate,
 ) {
   const existingTask = {
     id: "task-existing",
@@ -182,10 +182,11 @@ async function installApiMocks(
         ? request.postDataBuffer().toString()
         : request.postDataJSON(),
     });
-    if (extractionRequests.length === 2) {
-      await secondExtractionGate;
+    const extractionNumber = extractionRequests.length;
+    if (extractionNumber === 1) {
+      await firstExtractionGate;
     }
-    if (extractionRequests.length === 3) {
+    if (extractionNumber === 3) {
       await route.fulfill({
         status: 422,
         contentType: "application/json",
@@ -202,7 +203,7 @@ async function installApiMocks(
           tasks: [
             {
               name:
-                extractionRequests.length === 1
+                extractionNumber === 1
                   ? "Apurar impostos do trimestre"
                   : "Conferir impostos reextraídos",
               prevision_date: "2026-09-15",
@@ -344,16 +345,16 @@ async function runBrowserProof() {
   const wizardRequests = [];
   const updateRequests = [];
   const extractionRequests = [];
-  let releaseSecondExtraction;
-  const secondExtractionGate = new Promise((resolve) => {
-    releaseSecondExtraction = resolve;
+  let releaseFirstExtraction;
+  const firstExtractionGate = new Promise((resolve) => {
+    releaseFirstExtraction = resolve;
   });
   await installApiMocks(
     page,
     previewRequests,
     wizardRequests,
     extractionRequests,
-    secondExtractionGate,
+    firstExtractionGate,
   );
   await page.route("**/project", async (route) => {
     assert.equal(route.request().method(), "PUT");
@@ -700,10 +701,22 @@ async function runBrowserProof() {
     assert.equal(extractionRequests.length, 0, "A Ata não pode ser enviada antes do clique.");
     await expect(extractButton).toBeEnabled();
 
-    await extractButton.click();
+    await extractButton.evaluate((button) => {
+      button.click();
+      button.click();
+    });
+    await expect.poll(() => extractionRequests.length).toBe(1);
     await expect(
       wizard.getByText("Tentativas de extração: 1 de 3.", { exact: true }),
     ).toBeVisible();
+    const wizardOverlay = page.locator('[data-state="open"].fixed.inset-0');
+    await expect(wizardOverlay).toBeVisible();
+    await wizardOverlay.click({ position: { x: 5, y: 5 }, force: true });
+    await expect(wizard).toBeVisible();
+    await expect(
+      wizard.getByText("Tentativas de extração: 1 de 3.", { exact: true }),
+    ).toBeVisible();
+    releaseFirstExtraction();
     const firstProposedTask = wizard.getByRole("group", {
       name: "Tarefa 1 (proposta pela IA)",
     });
@@ -727,7 +740,6 @@ async function runBrowserProof() {
       wizard.getByText("Tentativas de extração: 2 de 3.", { exact: true }),
     ).toBeVisible();
     await expect(wizard.getByRole("contentinfo").getByRole("button").last()).toBeDisabled();
-    releaseSecondExtraction();
     const manualTask = wizard.getByRole("group", { name: "Tarefa 1", exact: true });
     const reextractedTask = wizard.getByRole("group", { name: "Tarefa 2 (proposta pela IA)" });
     await expect(manualTask.getByLabel(/^Nome/)).toHaveValue("Tarefa manual preservada");
