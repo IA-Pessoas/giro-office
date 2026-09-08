@@ -53,7 +53,9 @@ Exemplos de paths publicos:
   observações ou chave. Falha na auditoria não altera a resposta; replay não emite nova auditoria.
 - `POST /task/project-wizard/extract-tasks` transforma uma Ata de reunião colada ou enviada em TXT,
   Markdown ou DOCX em Tarefas propostas com a OpenAI. Exige nível `2+` em Integração ou `owner` e
-  respeita o isolamento da organização. Requisições JSON de até 10 MB aceitam `content` (Ata),
+  respeita o isolamento da organização. O conteúdo textual decodificado aceita até 10 MiB em
+  bytes UTF-8; no JSON, o parser reserva headroom técnico para envelope e escaping sem alterar
+  esse limite da fonte. A requisição aceita `content` (Ata),
   `name`, `objective`, `start_date` e `end_date` opcional; `multipart/form-data` aceita os mesmos
   campos e um único `file` `.txt` (`text/plain`), `.md` (`text/markdown`, `text/plain` ou
   `text/x-markdown`) ou

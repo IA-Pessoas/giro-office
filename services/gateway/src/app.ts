@@ -39,6 +39,13 @@ type GatewayOpenApiSpec = ReturnType<typeof buildGatewayOpenApiSpec>;
 type AuditRecorder = ReturnType<typeof createAuditRecorder>;
 type GatewayProxy = ReturnType<typeof buildHttpProxyMiddleware>;
 
+const PROJECT_WIZARD_EXTRACTION_PATH = "/task/project-wizard/extract-tasks";
+const PROJECT_WIZARD_SOURCE_MAX_BYTES = 10 * 1024 * 1024;
+const PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES =
+  PROJECT_WIZARD_SOURCE_MAX_BYTES * 6 + 1024 * 1024;
+// Até 105 partes sequenciais de 100 mil caracteres, com 30 s por chamada e margem operacional.
+const PROJECT_WIZARD_EXTRACTION_UPSTREAM_TIMEOUT_MS = 60 * 60 * 1000;
+
 export interface GatewayAppDeps {
   dashboardStatsService?: DashboardStatsProvider;
   featureFlags?: FeatureFlagService;
@@ -244,6 +251,10 @@ function mountCorsAndParsing(app: express.Express, env: GatewayEnv): void {
 
   app.use(cors(corsOptions));
   app.options("*", cors(corsOptions));
+  app.post(
+    PROJECT_WIZARD_EXTRACTION_PATH,
+    express.json({ limit: PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES }),
+  );
   app.use(express.json({ limit: env.jsonBodyLimit ?? "1mb" }));
   app.use(normalizeJsonBodyError);
 }
@@ -406,6 +417,13 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
 
 function mountServiceRoutes(app: express.Express, env: GatewayEnv): void {
   const proxyByServiceKey = buildServiceProxyMap(env);
+
+  app.post(
+    PROJECT_WIZARD_EXTRACTION_PATH,
+    buildHttpProxyMiddleware(env.taskServiceUrl, {
+      upstreamTimeoutMs: PROJECT_WIZARD_EXTRACTION_UPSTREAM_TIMEOUT_MS,
+    }),
+  );
 
   for (const service of getGatewayServiceDefinitions(env)) {
     const proxy = proxyByServiceKey.get(service.key);

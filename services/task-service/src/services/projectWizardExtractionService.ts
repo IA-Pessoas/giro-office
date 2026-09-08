@@ -164,7 +164,7 @@ export class ProjectWizardExtractionService {
         proposals.push(result.data);
       }
 
-      return proposals.flat();
+      return deduplicateProposalsBetweenParts(proposals);
     } catch {
       logError("Falha na extração de tarefas propostas pela IA.");
       throw new ServiceError(502, "Não foi possível extrair tarefas da Ata inteira.");
@@ -179,13 +179,57 @@ function partitionMeetingMinutes(content: string): string[] {
   while (content.length - offset > PROVIDER_SOURCE_PART_MAX_CHARS) {
     const limit = offset + PROVIDER_SOURCE_PART_MAX_CHARS;
     const newline = content.lastIndexOf("\n", limit - 1);
-    const end = newline >= offset ? newline + 1 : limit;
+    let end = newline >= offset ? newline + 1 : limit;
+    if (
+      end === limit &&
+      isHighSurrogate(content.charCodeAt(end - 1)) &&
+      isLowSurrogate(content.charCodeAt(end))
+    ) {
+      end -= 1;
+    }
     parts.push(content.slice(offset, end));
     offset = end;
   }
 
   parts.push(content.slice(offset));
   return parts;
+}
+
+function isHighSurrogate(codeUnit: number): boolean {
+  return codeUnit >= 0xd800 && codeUnit <= 0xdbff;
+}
+
+function isLowSurrogate(codeUnit: number): boolean {
+  return codeUnit >= 0xdc00 && codeUnit <= 0xdfff;
+}
+
+function proposalDeduplicationKey(proposal: AiTaskProposal): string {
+  return JSON.stringify([
+    normalizeName(proposal.name),
+    proposal.prevision_date?.trim() ?? "",
+    proposal.department ? normalizeName(proposal.department) : "",
+    proposal.model ? normalizeName(proposal.model) : "",
+  ]);
+}
+
+/** Remove apenas repetições de partes anteriores; duplicatas da mesma parte permanecem intactas. */
+function deduplicateProposalsBetweenParts(parts: AiTaskProposal[][]): AiTaskProposal[] {
+  const priorPartKeys = new Set<string>();
+  const proposals: AiTaskProposal[] = [];
+
+  for (const part of parts) {
+    const keyedPart = part.map((proposal) => ({
+      proposal,
+      key: proposalDeduplicationKey(proposal),
+    }));
+
+    for (const { proposal, key } of keyedPart) {
+      if (!priorPartKeys.has(key)) proposals.push(proposal);
+    }
+    for (const { key } of keyedPart) priorPartKeys.add(key);
+  }
+
+  return proposals;
 }
 
 function buildContext(

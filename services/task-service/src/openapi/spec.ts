@@ -407,7 +407,7 @@ const extractProjectWizardTasksProperties = {
   content: {
     type: "string",
     description:
-      "Ata de reunião em texto. Conteúdo transitório: não é persistido, auditado nem registrado em log.",
+      "Ata de reunião em texto, com conteúdo de até 10 MiB em bytes UTF-8. Conteúdo transitório: não é persistido, auditado nem registrado em log.",
   },
   name: { type: "string" },
   objective: { type: "string" },

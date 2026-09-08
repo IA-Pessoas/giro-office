@@ -567,6 +567,9 @@ describe("project wizard task extraction routes", () => {
     expect(
       operation.requestBody.content["application/json"].schema.properties.content.maxLength,
     ).toBeUndefined();
+    expect(
+      operation.requestBody.content["application/json"].schema.properties.content.description,
+    ).toContain("10 MiB em bytes UTF-8");
     expect(operation.description).toContain("partes");
     expect(operation.description).toContain("Ata inteira");
     expect(operation.responses["422"]).toBeDefined();

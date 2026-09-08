@@ -337,6 +337,62 @@ describe("ProjectWizardExtractionService", () => {
     });
   });
 
+  it("remove duplicata entre partes sem colapsar propostas legítimas", async () => {
+    const repeated = {
+      name: "Revisar Ata",
+      prevision_date: "2026-09-10",
+      department: "Fiscal",
+      model: "Revisão",
+    };
+    const { provider } = createProvider(
+      vi
+        .fn()
+        .mockResolvedValueOnce([repeated, repeated])
+        .mockResolvedValueOnce([repeated, { ...repeated, prevision_date: "2026-09-11" }]),
+    );
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    const result = await service.extractTasks(
+      createRequest({ content: `${"A".repeat(100_000)}B` }),
+    );
+
+    expect(result.tasks).toEqual([
+      {
+        name: "Revisar Ata",
+        prevision_date: "2026-09-10",
+        department_id: "department-fiscal",
+        model_id: "model-revisao",
+      },
+      {
+        name: "Revisar Ata",
+        prevision_date: "2026-09-10",
+        department_id: "department-fiscal",
+        model_id: "model-revisao",
+      },
+      {
+        name: "Revisar Ata",
+        prevision_date: "2026-09-11",
+        department_id: "department-fiscal",
+        model_id: "model-revisao",
+      },
+    ]);
+  });
+
+  it("não divide um emoji no fallback de uma linha longa", async () => {
+    const content = `${"A".repeat(99_999)}😀B`;
+    const received: string[] = [];
+    const { provider } = createProvider(async ({ content: part }) => {
+      received.push(part);
+      return received.length === 1 ? [] : [{ name: "Tarefa" }];
+    });
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await service.extractTasks(createRequest({ content }));
+
+    expect(received).toEqual(["A".repeat(99_999), "😀B"]);
+    expect(received.join("")).toBe(content);
+  });
+
   it("mantém uma única chamada quando a Ata não exige divisão", async () => {
     const { provider, extract } = createProvider(async () => [{ name: "Tarefa" }]);
     const service = new ProjectWizardExtractionService(provider, createPrisma());
