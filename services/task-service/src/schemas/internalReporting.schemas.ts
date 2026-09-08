@@ -1,10 +1,11 @@
-import { TASK_REPORTING_SOURCES } from "@workspace/shared";
+import { reportingQuerySchema, TASK_REPORTING_SOURCES } from "@workspace/shared";
 import { z } from "zod";
 
 const reportingFieldSchema = z.string().trim().min(1).max(64);
 
 export const internalReportingExtractBodySchema = z
   .object({
+    query: reportingQuerySchema.optional(),
     source: z.enum(TASK_REPORTING_SOURCES),
     fields: z.array(reportingFieldSchema).min(1).max(25),
     limit: z.number().int().min(1).max(101),

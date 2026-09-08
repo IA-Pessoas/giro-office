@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
-
-import { ServiceError } from "@workspace/shared";
+import {
+  executeReportingQuery,
+  type ReportingQuery,
+  ServiceError,
+  withReportingSnapshot,
+} from "@workspace/shared";
 import {
   getRhAttendanceReportingFields,
   type RhAttendanceReportingSource,
@@ -33,6 +37,8 @@ type ReportingDelegate = {
     where: { organization_id: string };
     select: Record<string, unknown>;
     take: number;
+    skip?: number;
+    orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -46,6 +52,8 @@ type HolidayReportingDelegate = {
     where: { organization_id: string };
     select: { name: true; date: true };
     take: number;
+    skip?: number;
+    orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -96,10 +104,16 @@ const reportingSelect: ReportingSelect = {
   updated_at: true,
 };
 
+const attendanceKinds = ["point", "timeSheets", "timeBankReleases", "timeClockRequest"] as const;
+type AttendanceKind = (typeof attendanceKinds)[number];
+
 const holidayReportingSelect = { name: true, date: true } as const;
 
 export class InternalReportingService {
-  constructor(private readonly prisma: AttendanceReportingPrisma) {}
+  constructor(
+    private readonly prisma: AttendanceReportingPrisma,
+    private readonly inSnapshot = false,
+  ) {}
 
   async consumeGrant(grant: string, expiresAt: number): Promise<void> {
     if (!this.prisma.reportGrantUse) {
@@ -125,11 +139,49 @@ export class InternalReportingService {
   }
 
   async extract(input: {
+    query?: ReportingQuery;
+    offset?: number;
     organizationId: string;
     source: RhReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+    if (input.query && !this.inSnapshot) {
+      return withReportingSnapshot(this.prisma, (transaction) =>
+        new InternalReportingService(transaction, true).extract(input),
+      );
+    }
+    if (input.query) {
+      if (input.source === "rh.attendance") {
+        let kind = 0;
+        let offset = 0;
+        return executeReportingQuery({ ...input, query: input.query }, async (fields, limit) => {
+          while (kind < attendanceKinds.length) {
+            const rows = await this.extractAttendanceRows(
+              input.organizationId,
+              limit,
+              offset,
+              attendanceKinds[kind],
+            );
+            const more = rows.length > limit;
+            if (more) offset += limit;
+            else {
+              kind++;
+              offset = 0;
+            }
+            if (rows.length)
+              return {
+                rows: projectRows(rows.slice(0, limit), fields),
+                reachedLimit: more || kind < attendanceKinds.length,
+              };
+          }
+          return { rows: [], reachedLimit: false };
+        });
+      }
+      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
+        this.extract({ ...input, query: undefined, fields, limit, offset }),
+      );
+    }
     const allowedFields =
       input.source === "rh.holidays"
         ? getRhHolidayReportingFields(input.source)
@@ -147,6 +199,9 @@ export class InternalReportingService {
       const rows = await this.prisma.holidays.findMany({
         where: { organization_id: input.organizationId },
         select: holidayReportingSelect,
+        ...(input.offset !== undefined
+          ? { skip: input.offset, orderBy: { id: "asc" as const } }
+          : {}),
         take: input.limit + 1,
       });
 
@@ -163,6 +218,9 @@ export class InternalReportingService {
       const rows = await this.prisma.rhRequest.findMany({
         where: { organization_id: input.organizationId },
         select: reportingSelect,
+        ...(input.offset !== undefined
+          ? { skip: input.offset, orderBy: { id: "asc" as const } }
+          : {}),
         take: input.limit + 1,
       });
 
@@ -183,6 +241,8 @@ export class InternalReportingService {
   private async extractAttendanceRows(
     organizationId: string,
     limit: number,
+    offset?: number,
+    kind?: AttendanceKind,
   ): Promise<readonly Record<string, unknown>[]> {
     if (
       !this.prisma.point ||
@@ -194,40 +254,52 @@ export class InternalReportingService {
     }
     const take = limit + 1;
     const [points, timeSheets, releases, requests] = await Promise.all([
-      this.prisma.point.findMany({
-        where: { organization_id: organizationId },
-        select: {
-          clock_in: true,
-          lunch_out: true,
-          lunch_in: true,
-          clock_out: true,
-          workload_hours: true,
-          time_bank_balance: true,
-        },
-        take,
-      }),
-      this.prisma.timeSheets.findMany({
-        where: { organization_id: organizationId },
-        select: { start_time: true, end_time: true, status: true, totals: true },
-        take,
-      }),
-      this.prisma.timeBankReleases.findMany({
-        where: { organization_id: organizationId },
-        select: { date: true, minutes: true, is_approved: true },
-        take,
-      }),
-      this.prisma.timeClockRequest.findMany({
-        where: { organization_id: organizationId },
-        select: {
-          date: true,
-          clock_in: true,
-          lunch_out: true,
-          lunch_in: true,
-          clock_out: true,
-          status: true,
-        },
-        take,
-      }),
+      kind !== undefined && kind !== "point"
+        ? Promise.resolve([])
+        : this.prisma.point.findMany({
+            where: { organization_id: organizationId },
+            select: {
+              clock_in: true,
+              lunch_out: true,
+              lunch_in: true,
+              clock_out: true,
+              workload_hours: true,
+              time_bank_balance: true,
+            },
+            ...(offset !== undefined ? { skip: offset, orderBy: { id: "asc" as const } } : {}),
+            take,
+          }),
+      kind !== undefined && kind !== "timeSheets"
+        ? Promise.resolve([])
+        : this.prisma.timeSheets.findMany({
+            where: { organization_id: organizationId },
+            select: { start_time: true, end_time: true, status: true, totals: true },
+            ...(offset !== undefined ? { skip: offset, orderBy: { id: "asc" as const } } : {}),
+            take,
+          }),
+      kind !== undefined && kind !== "timeBankReleases"
+        ? Promise.resolve([])
+        : this.prisma.timeBankReleases.findMany({
+            where: { organization_id: organizationId },
+            select: { date: true, minutes: true, is_approved: true },
+            ...(offset !== undefined ? { skip: offset, orderBy: { id: "asc" as const } } : {}),
+            take,
+          }),
+      kind !== undefined && kind !== "timeClockRequest"
+        ? Promise.resolve([])
+        : this.prisma.timeClockRequest.findMany({
+            where: { organization_id: organizationId },
+            select: {
+              date: true,
+              clock_in: true,
+              lunch_out: true,
+              lunch_in: true,
+              clock_out: true,
+              status: true,
+            },
+            ...(offset !== undefined ? { skip: offset, orderBy: { id: "asc" as const } } : {}),
+            take,
+          }),
     ]);
 
     return [

@@ -97,3 +97,7 @@ internas do catálogo.
 O adapter de situações de Departamento Pessoal usa as mesmas credenciais e publica somente status,
 título e datas de registro/conclusão; `client_id`, registrador e concluidor permanecem como chaves
 internas do catálogo.
+
+## Critérios executados na origem
+
+Filtros, parâmetros, grupos AND/OR, ordenação e resumos são encaminhados às origens reais. A definição legada aceita `group_by` e `aggregations[].alias` opcionais. A [matriz de 29 áreas e a semântica completa](docs/criteria-origins.md) documentam capacidades, limites, aliases e conjuntos vazios. Não há execução composta nem nova UI nesta predecessora #1023.

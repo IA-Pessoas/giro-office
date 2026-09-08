@@ -20,6 +20,8 @@ export const REPORT_AGGREGATIONS = ["count", "sum", "avg", "min", "max"] as cons
 export type ReportAggregation = (typeof REPORT_AGGREGATIONS)[number];
 
 export interface ReportCatalogField {
+  groupable?: boolean;
+  sortable?: boolean;
   key: string;
   label: string;
   value_type: ReportValueType;
@@ -54,6 +56,7 @@ export function deriveReportCatalogGrant(definition: {
   filters: readonly { source: string; field: string }[];
   aggregations: readonly { source: string; field: string }[];
   order_by: readonly { source: string; field: string }[];
+  group_by?: readonly { source: string; field: string }[];
   joins: readonly { relation: string }[];
 }): ReportCatalogGrant {
   const fieldsBySource = new Map<string, Set<string>>();
@@ -69,6 +72,7 @@ export function deriveReportCatalogGrant(definition: {
   for (const aggregation of definition.aggregations)
     addField(aggregation.source, aggregation.field);
   for (const orderBy of definition.order_by) addField(orderBy.source, orderBy.field);
+  for (const groupBy of definition.group_by ?? []) addField(groupBy.source, groupBy.field);
 
   return {
     sources: Object.fromEntries(

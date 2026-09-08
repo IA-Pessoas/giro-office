@@ -72,6 +72,7 @@ const parameterSchema = z
 
 const aggregationSchema = z
   .object({
+    alias: aliasSchema.optional(),
     source: reportSourceKeySchema,
     field: fieldNameSchema,
     function: reportAggregationSchema,
@@ -102,6 +103,10 @@ export const reportDefinitionSchema = z
     filter_groups: z.array(filterGroupSchema).default([]),
     parameters: z.array(parameterSchema).default([]),
     aggregations: z.array(aggregationSchema).default([]),
+    group_by: z
+      .array(z.object({ source: reportSourceKeySchema, field: fieldNameSchema }).strict())
+      .max(MAX_REPORT_COLUMNS)
+      .optional(),
     order_by: z.array(orderBySchema).max(MAX_REPORT_COLUMNS).default([]),
     declared_cost: declaredCostSchema.optional(),
   })

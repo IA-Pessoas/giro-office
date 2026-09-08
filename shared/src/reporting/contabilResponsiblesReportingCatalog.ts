@@ -1,3 +1,5 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
+
 const booleanOperators = ["eq", "neq"] as const;
 const keyOperators = ["eq", "in"] as const;
 
@@ -7,7 +9,15 @@ function field(
   value_type: "string" | "boolean",
   filter_operators: readonly string[],
 ) {
-  return { key, label, value_type, filter_operators, aggregations: [] };
+  return {
+    groupable: true,
+    sortable: true,
+    key,
+    label,
+    value_type,
+    filter_operators,
+    aggregations: reportingAggregations(value_type),
+  };
 }
 
 export const CONTABIL_RESPONSIBLES_REPORTING_SOURCES = ["contabil.responsibles"] as const;

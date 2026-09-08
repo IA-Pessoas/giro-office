@@ -10,6 +10,8 @@ type ReportingDelegate = {
     where: { organization_id: string };
     select: Record<string, unknown>;
     take: number;
+    skip?: number;
+    orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -50,6 +52,7 @@ export class TiRequestsReportingService {
   constructor(private readonly prisma: { tIRequest: ReportingDelegate }) {}
 
   async extract(input: {
+    offset?: number;
     organizationId: string;
     source: TiRequestsReportingSource;
     fields: readonly string[];
@@ -63,6 +66,9 @@ export class TiRequestsReportingService {
     const rows = await this.prisma.tIRequest.findMany({
       where: { organization_id: input.organizationId },
       select: Object.assign({}, ...input.fields.map((field) => fieldSelects[field])),
+      ...(input.offset !== undefined
+        ? { skip: input.offset, orderBy: { id: "asc" as const } }
+        : {}),
       take: input.limit + 1,
     });
 

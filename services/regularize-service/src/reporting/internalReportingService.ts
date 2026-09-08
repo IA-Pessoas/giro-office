@@ -1,4 +1,9 @@
-import { ServiceError } from "@workspace/shared";
+import {
+  executeReportingQuery,
+  type ReportingQuery,
+  ServiceError,
+  withReportingSnapshot,
+} from "@workspace/shared";
 
 import {
   getRegularizeLicenseReportingFields,
@@ -22,6 +27,8 @@ type ReportingDelegate = {
     where: { organization_id: string };
     select: Record<string, true>;
     take: number;
+    skip?: number;
+    orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -42,14 +49,27 @@ export class RegularizeLicenseReportingService {
       license: ReportingDelegate;
       process?: ReportingDelegate;
     },
+    private readonly inSnapshot = false,
   ) {}
 
   async extract(input: {
+    query?: ReportingQuery;
+    offset?: number;
     organizationId: string;
     source: RegularizePrimaryReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+    if (input.query && !this.inSnapshot) {
+      return withReportingSnapshot(this.prisma, (transaction) =>
+        new RegularizeLicenseReportingService(transaction, true).extract(input),
+      );
+    }
+    if (input.query) {
+      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
+        this.extract({ ...input, query: undefined, fields, limit, offset }),
+      );
+    }
     const allowedFields =
       input.source === "regularize.licenses"
         ? getRegularizeLicenseReportingFields(input.source)
@@ -67,6 +87,9 @@ export class RegularizeLicenseReportingService {
     const rows = await delegate.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
+      ...(input.offset !== undefined
+        ? { skip: input.offset, orderBy: { id: "asc" as const } }
+        : {}),
       take: input.limit + 1,
     });
 
@@ -78,14 +101,29 @@ export class RegularizeLicenseReportingService {
 }
 
 export class RegularizeMunicipalTaxesReportingService {
-  constructor(private readonly prisma: { municipalTaxes: ReportingDelegate }) {}
+  constructor(
+    private readonly prisma: { municipalTaxes: ReportingDelegate },
+    private readonly inSnapshot = false,
+  ) {}
 
   async extract(input: {
+    query?: ReportingQuery;
+    offset?: number;
     organizationId: string;
     source: RegularizeMunicipalTaxesReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+    if (input.query && !this.inSnapshot) {
+      return withReportingSnapshot(this.prisma, (transaction) =>
+        new RegularizeMunicipalTaxesReportingService(transaction, true).extract(input),
+      );
+    }
+    if (input.query) {
+      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
+        this.extract({ ...input, query: undefined, fields, limit, offset }),
+      );
+    }
     const allowedFields = getRegularizeMunicipalTaxesReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
@@ -94,6 +132,9 @@ export class RegularizeMunicipalTaxesReportingService {
     const rows = await this.prisma.municipalTaxes.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
+      ...(input.offset !== undefined
+        ? { skip: input.offset, orderBy: { id: "asc" as const } }
+        : {}),
       take: input.limit + 1,
     });
 

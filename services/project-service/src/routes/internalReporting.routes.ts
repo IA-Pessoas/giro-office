@@ -6,6 +6,7 @@ import {
   parseWithZod,
   projectReportingCatalog,
   REQUEST_ID_HEADER,
+  reportingQueryFields,
   ServiceError,
 } from "@workspace/shared";
 import { Router } from "express";
@@ -132,7 +133,7 @@ export function createInternalReportingRouter(options: {
       requestId: request.get(REQUEST_ID_HEADER) ?? "",
       operation: "extract",
       source: body.source,
-      fields: body.fields,
+      fields: reportingQueryFields(body.fields, body.query),
       body,
     });
     const result = await options.reportingService.extract({
@@ -140,6 +141,7 @@ export function createInternalReportingRouter(options: {
       source: body.source,
       fields: body.fields,
       limit: body.limit,
+      ...(body.query ? { query: body.query } : {}),
     });
     response.json(createSuccessResponse(result));
   });

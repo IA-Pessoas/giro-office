@@ -1,10 +1,10 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-
 import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
   parseWithZod,
   REQUEST_ID_HEADER,
+  reportingQueryFields,
   ServiceError,
 } from "@workspace/shared";
 import { Router } from "express";
@@ -144,7 +144,7 @@ export function createInternalReportingRouter(options: {
         requestId: request.get(REQUEST_ID_HEADER) ?? "",
         operation: "extract",
         source: body.source,
-        fields: body.fields,
+        fields: reportingQueryFields(body.fields, body.query),
         body,
         consumeGrant: (grant, expiresAt) => options.reportingService.consumeGrant(grant, expiresAt),
       });
@@ -153,6 +153,7 @@ export function createInternalReportingRouter(options: {
         source: body.source,
         fields: body.fields,
         limit: body.limit,
+        ...(body.query ? { query: body.query } : {}),
       });
       response.json(createSuccessResponse(result));
     } catch (error: unknown) {

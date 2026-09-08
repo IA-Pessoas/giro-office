@@ -73,6 +73,27 @@ function createApp(
 }
 
 describe("internal reporting routes", () => {
+  it("encaminha critérios assinados e recusa adulteração", async () => {
+    const body = {
+      source: "integracao.projects",
+      fields: ["name"],
+      limit: 1,
+      query: { filters: [{ field: "name", operator: "eq", parameter: "p", value: "Projeto 149" }] },
+    };
+    const signed = signedGrant({ body });
+    const { app, extract } = createApp();
+    const send = (payload: unknown) =>
+      request(app)
+        .post("/internal/reporting/extract")
+        .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
+        .set("x-request-id", requestId)
+        .set("x-reports-grant", signed.grant)
+        .set("x-reports-grant-signature", signed.signature)
+        .send(payload);
+    await send(body).expect(200);
+    expect(extract).toHaveBeenCalledWith(expect.objectContaining({ query: body.query }));
+    await send({ ...body, query: {} }).expect(403);
+  });
   it("protege e publica catálogo somente com grant canônico", async () => {
     const signed = signedGrant({ body: {} });
     const { app } = createApp();

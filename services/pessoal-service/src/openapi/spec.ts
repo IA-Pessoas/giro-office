@@ -1,3 +1,4 @@
+import { reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { PessoalServiceEnv } from "../config/env.js";
@@ -148,6 +149,7 @@ const internalReportingExtractRequestSchema = strictObjectSchema(
       items: reportingFieldSchema,
     },
     limit: { type: "integer", minimum: 1, maximum: 101 },
+    query: reportingQueryOpenApiSchema,
   },
   ["source", "fields", "limit"],
 );
@@ -872,6 +874,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           ],
           requestBody: jsonRequestBody(internalReportingExtractRequestSchema),
           responses: {
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
             "200": {
               description: "Linhas projetadas e indicação de limite atingido, sem campos sensíveis",
               ...successJsonWithData({
