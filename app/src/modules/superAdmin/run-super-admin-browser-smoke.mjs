@@ -886,6 +886,68 @@ try {
     );
     await page.getByRole("button", { name: "Auditoria", exact: true }).click();
     await page.getByText("Plano: Trial → Pro", { exact: true }).waitFor();
+    const auditContent = page.locator('[aria-labelledby="platform-audit-title"] [aria-busy]');
+    const auditDimensions = await auditContent.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    assert.ok(
+      auditDimensions.scrollWidth <= auditDimensions.clientWidth,
+      `Auditoria exige rolagem horizontal: ${JSON.stringify(auditDimensions)}`,
+    );
+    const subscriptionUpdate = page
+      .locator("tbody tr")
+      .filter({ hasText: "organization.subscription_plan.updated" })
+      .filter({ hasText: "Plano: Trial → Pro" });
+    assert.equal(
+      await subscriptionUpdate.count(),
+      1,
+      "Evento e alterações devem permanecer associados na mesma linha de auditoria",
+    );
+    if (viewport.width > 1000) {
+      assert.equal(
+        await auditContent.getByRole("columnheader", { name: "Evento", exact: true }).isVisible(),
+        true,
+        "Cabeçalhos devem permanecer visíveis no layout desktop",
+      );
+    }
+    const auditSearch = page.getByLabel("Pesquisar rota");
+    await auditSearch.focus();
+    assert.equal(await auditSearch.evaluate((element) => document.activeElement === element), true);
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await settleLayout();
+      await page.screenshot({
+        path: join(screenshotDirectory, `issue-970-audit-${viewport.width}-light.png`),
+      });
+      if (viewport.width > 1000) {
+        await page.screenshot({ path: join(screenshotDirectory, "issue-970-audit-desktop-focus.png") });
+      }
+      if (viewport.width <= 1000) {
+        await page.evaluate(() => {
+          document.documentElement.classList.remove("light");
+          document.documentElement.classList.add("dark");
+        });
+        await settleLayout();
+        await page.screenshot({ path: join(screenshotDirectory, "issue-970-audit-mobile-dark.png") });
+        await page.evaluate(() => {
+          document.documentElement.classList.remove("dark");
+          document.documentElement.classList.add("light");
+        });
+      }
+      if (viewport.width > 1000) {
+        await page.evaluate(() => {
+          document.documentElement.classList.remove("light");
+          document.documentElement.classList.add("dark");
+        });
+        await settleLayout();
+        await page.screenshot({ path: join(screenshotDirectory, "issue-970-audit-desktop-dark.png") });
+        await page.evaluate(() => {
+          document.documentElement.classList.remove("dark");
+          document.documentElement.classList.add("light");
+        });
+      }
+    }
     assert.equal(
       requests
         .filter((request) => request.path === "/platform/audit/requests")
@@ -1190,10 +1252,12 @@ try {
   console.error("URL", page?.url());
   console.error(
     "ACTIVE_ELEMENT",
-    await page?.evaluate(() => ({
-      tag: document.activeElement?.tagName,
-      id: document.activeElement?.id,
-    })),
+    await page
+      ?.evaluate(() => ({
+        tag: document.activeElement?.tagName,
+        id: document.activeElement?.id,
+      }))
+      .catch(() => null),
   );
   console.error(
     "PAGE",
@@ -1223,7 +1287,12 @@ try {
             windowsHide: true,
           });
         } catch (error) {
-          await new Promise(setImmediate);
+          try {
+            serverProcess.kill();
+          } catch {
+            // taskkill já foi solicitado; a verificação abaixo confirma o encerramento.
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1_500));
           if (error && typeof error === "object" && error.code === "EPERM") throw error;
           if (!hasProcessExited(serverProcess.pid)) throw error;
         }
