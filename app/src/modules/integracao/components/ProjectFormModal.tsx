@@ -38,7 +38,13 @@ import {
   PROJECT_SUBPANEL_CLASSNAME,
   ProjectSelect,
 } from "./projectUi";
-import { applyWizardTaskChange, getWizardTaskDateWarning } from "./projectWizardUi";
+import {
+  applyWizardTaskChange,
+  canAttemptWizardExtraction,
+  getWizardExtractionSourceValidationMessage,
+  getWizardTaskDateWarning,
+  WIZARD_EXTRACTION_MAX_ATTEMPTS,
+} from "./projectWizardUi";
 import {
   TASK_FORM_AUXILIARY_WARNING_CLASSNAME,
   TASK_FORM_GRID_CLASSNAME,
@@ -109,6 +115,7 @@ export function ProjectFormModal({
   const [meetingMinutes, setMeetingMinutes] = useState("");
   const [meetingMinutesFile, setMeetingMinutesFile] = useState<File | null>(null);
   const extractTasksMutation = useExtractProjectTasksMutation();
+  const [extractionAttempts, setExtractionAttempts] = useState(0);
   const [preview, setPreview] = useState<ProjectWizardPreview | null>(null);
   const [dependenciesChanged, setDependenciesChanged] = useState(false);
   const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null);
@@ -135,11 +142,13 @@ export function ProjectFormModal({
       setTasks([]);
       setMeetingMinutes("");
       setMeetingMinutesFile(null);
+      setExtractionAttempts(0);
       if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
       setPreview(null);
       setDependenciesChanged(false);
       setPreviewErrorMessage(null);
       previewMutation.reset();
+      extractTasksMutation.reset();
       idempotencyKeyRef.current = null;
       previewRequestLockRef.current = false;
     } else if (!isEditing && !idempotencyKeyRef.current) {
@@ -162,6 +171,19 @@ export function ProjectFormModal({
   const taskOptionsError = departmentsQuery.isError || taskModelsQuery.isError;
   const taskValidationError = getTaskValidationError();
   const hasMeetingMinutesText = Boolean(meetingMinutes.trim());
+  const canExtractTasks = canAttemptWizardExtraction(extractionAttempts);
+  const hasAiProposals = tasks.some(({ source }) => source === "ai");
+  const hasWizardDraft =
+    !isEditing &&
+    (createStep !== 1 ||
+      Boolean(values.name.trim()) ||
+      Boolean(values.objective.trim()) ||
+      Boolean(values.start_date) ||
+      Boolean(values.end_date) ||
+      tasks.length > 0 ||
+      hasMeetingMinutesText ||
+      Boolean(meetingMinutesFile) ||
+      extractionAttempts > 0);
 
   function getTaskValidationError(): string | null {
     if (tasks.length === 0) return null;
@@ -198,7 +220,18 @@ export function ProjectFormModal({
   }
 
   async function handleExtractTasks() {
-    if ((!hasMeetingMinutesText && !meetingMinutesFile) || extractTasksMutation.isPending) return;
+    if (extractTasksMutation.isPending || !canExtractTasks) return;
+
+    const sourceValidationMessage = getWizardExtractionSourceValidationMessage({
+      text: meetingMinutes,
+      file: meetingMinutesFile,
+    });
+    if (sourceValidationMessage) {
+      toast.error(sourceValidationMessage);
+      return;
+    }
+
+    setExtractionAttempts((current) => current + 1);
 
     try {
       const proposals = await extractTasksMutation.mutateAsync({
@@ -225,6 +258,31 @@ export function ProjectFormModal({
       toast.success(`Tarefas propostas pela IA: ${proposals.length}. Revise antes de continuar.`);
     } catch (error) {
       toast.error(getRequestErrorMessage(error, PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE));
+    }
+  }
+
+  function confirmSourceChange(): boolean {
+    if (!hasAiProposals) return true;
+    if (
+      !window.confirm(
+        "Trocar a fonte da Ata descartará as propostas da IA atuais. Deseja continuar?",
+      )
+    ) {
+      return false;
+    }
+
+    setTasks((current) => current.filter(({ source }) => source === "manual"));
+    return true;
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (
+      nextOpen ||
+      isEditing ||
+      !hasWizardDraft ||
+      window.confirm("Fechar agora vai descartar o rascunho deste projeto. Deseja continuar?")
+    ) {
+      onOpenChange(nextOpen);
     }
   }
 
@@ -333,7 +391,7 @@ export function ProjectFormModal({
   return (
     <Dialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={handleOpenChange}
       title={isEditing ? "Editar projeto" : "Novo projeto"}
       description={isEditing ? "Formulário de projeto" : `Etapa ${createStep} de 3`}
       contentClassName="w-[min(92vw,760px)] [&>footer]:flex-wrap"
@@ -342,7 +400,7 @@ export function ProjectFormModal({
         <>
           <button
             type="button"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
             className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
             disabled={isBusy}
           >
@@ -560,6 +618,10 @@ export function ProjectFormModal({
             <div className="space-y-3">
               <fieldset className={`${PROJECT_SUBPANEL_CLASSNAME} space-y-3 p-3`}>
                 <legend className="px-1 text-sm font-semibold">Ata de reunião</legend>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Tentativas de extração: {extractionAttempts} de{" "}
+                  {WIZARD_EXTRACTION_MAX_ATTEMPTS}.
+                </p>
                 <label className="space-y-2" htmlFor="project-meeting-minutes">
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Cole a Ata para extrair tarefas
@@ -578,7 +640,9 @@ export function ProjectFormModal({
                   <button
                     type="button"
                     className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                    onClick={() => setMeetingMinutes("")}
+                    onClick={() => {
+                      if (confirmSourceChange()) setMeetingMinutes("");
+                    }}
                     disabled={extractTasksMutation.isPending}
                   >
                     Limpar texto
@@ -606,6 +670,7 @@ export function ProjectFormModal({
                       type="button"
                       className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
                       onClick={() => {
+                        if (!confirmSourceChange()) return;
                         setMeetingMinutesFile(null);
                         if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
                       }}
@@ -628,7 +693,7 @@ export function ProjectFormModal({
                   onClick={() => void handleExtractTasks()}
                   disabled={
                     (!hasMeetingMinutesText && !meetingMinutesFile) ||
-                    extractTasksMutation.isPending ||
+                    !canExtractTasks ||
                     isBusy
                   }
                 >
@@ -639,6 +704,11 @@ export function ProjectFormModal({
                   )}
                   Extrair tarefas com IA
                 </button>
+                {!canExtractTasks ? (
+                  <p role="status" className="text-sm text-slate-600 dark:text-slate-300">
+                    Limite de 3 tentativas atingido. Continue adicionando tarefas manualmente.
+                  </p>
+                ) : null}
                 {extractTasksMutation.isPending ? (
                   <output className="block text-sm">Extraindo tarefas da Ata...</output>
                 ) : null}
