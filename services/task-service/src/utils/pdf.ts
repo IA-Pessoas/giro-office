@@ -7,9 +7,11 @@ export const PDF_MIME_TYPE = "application/pdf";
 const CORRUPTED_MESSAGE = "O arquivo PDF está corrompido ou não pôde ser lido.";
 const ENCRYPTED_MESSAGE = "O arquivo PDF está protegido por senha e não pode ser lido.";
 
-const PDF_SIGNATURE = Buffer.from("%PDF-", "latin1");
-/** Limite de descompressão: barra zip bombs bem antes de estourar a memória. */
-const MAX_STREAM_BYTES = 10 * 1024 * 1024;
+/** Limite de descompressão por stream e por documento: barra zip bombs sem estourar a memória. */
+const MAX_STREAM_BYTES = 8 * 1024 * 1024;
+const MAX_TOTAL_STREAM_BYTES = 16 * 1024 * 1024;
+/** Teto de códigos mapeados por documento: um `/ToUnicode` hostil declara ranges de 65 mil cada. */
+const MAX_CMAP_CODES = 65_536;
 
 interface PdfObject {
   dict: string;
@@ -23,43 +25,85 @@ interface FontCMap {
   codeBytes: 1 | 2;
 }
 
-function decodeFlate(raw: Buffer): string | null {
-  try {
-    return inflateSync(raw, { maxOutputLength: MAX_STREAM_BYTES }).toString("latin1");
-  } catch {
-    try {
-      return inflateRawSync(raw, { maxOutputLength: MAX_STREAM_BYTES }).toString("latin1");
-    } catch {
-      return null;
-    }
-  }
-}
+/**
+ * Streams de imagem, arquivo de fonte ou metadados nunca têm texto: descartá-los antes de
+ * descomprimir evita inflar megabytes que seriam jogados fora na linha seguinte.
+ */
+const NON_TEXT_STREAM = /\/Subtype\s*\/Image|\/Length1\b|\/Type\s*\/(Metadata|XRef)\b/;
 
 /**
- * Decodifica o conteúdo do stream.
+ * Busca `needle` a partir de posições sempre crescentes, sem revarrer o que já passou.
  *
- * Só FlateDecode é suportado: filtros de imagem (DCTDecode, JPXDecode, CCITTFaxDecode,
- * JBIG2Decode) retornam `null` de propósito, então um PDF digitalizado nunca vira OCR.
+ * `String.indexOf` chamado num laço de milhares de objetos é quadrático quando o terminador
+ * não existe — o caso exato de um PDF forjado com milhões de cabeçalhos `N 0 obj`.
  */
-function decodeStream(dict: string, raw: string): string | null {
-  const filter = /\/Filter\s*(\/[A-Za-z0-9]+|\[[^\]]*\])/.exec(dict)?.[1];
-  if (!filter) return raw;
-  if (!/FlateDecode/.test(filter)) return null;
-  return decodeFlate(Buffer.from(raw, "latin1"));
+function createForwardFinder(text: string, needle: string): (from: number) => number {
+  let found = 0;
+  let exhausted = false;
+
+  return (from: number): number => {
+    if (exhausted) return -1;
+    if (found < from) found = text.indexOf(needle, from);
+    if (found < 0) exhausted = true;
+    return found;
+  };
+}
+
+/** Percorre cada trecho entre `begin` e `end` em tempo linear, sem regex preguiçosa. */
+function forEachSection(
+  content: string,
+  begin: string,
+  end: string,
+  visit: (body: string) => void,
+): void {
+  let cursor = 0;
+  while (cursor < content.length) {
+    const start = content.indexOf(begin, cursor);
+    if (start < 0) return;
+    const stop = content.indexOf(end, start + begin.length);
+    if (stop < 0) return;
+    visit(content.slice(start + begin.length, stop));
+    cursor = stop + end.length;
+  }
 }
 
 /**
  * Varre os objetos indiretos pelo corpo do arquivo, sem depender da tabela xref
  * (que costuma ser a primeira parte a quebrar num PDF truncado).
+ *
+ * Só FlateDecode é descomprimido: filtros de imagem (DCTDecode, JPXDecode, CCITTFaxDecode,
+ * JBIG2Decode) são descartados de propósito, então um PDF digitalizado nunca vira OCR.
  */
-function parseObjects(text: string): { objects: Map<number, PdfObject>; unreadable: boolean } {
+function parseObjects(
+  file: Buffer,
+  text: string,
+): { objects: Map<number, PdfObject>; unreadable: boolean } {
   const objects = new Map<number, PdfObject>();
   const headers = [...text.matchAll(/(\d+)\s+\d+\s+obj\b/g)];
+  const findEndObj = createForwardFinder(text, "endobj");
+  const findEndStream = createForwardFinder(text, "endstream");
+  let remainingBytes = MAX_TOTAL_STREAM_BYTES;
   let unreadable = false;
+
+  function inflate(raw: Buffer): string | null {
+    const maxOutputLength = Math.min(MAX_STREAM_BYTES, remainingBytes);
+    if (maxOutputLength <= 0) return null;
+
+    for (const decompress of [inflateSync, inflateRawSync]) {
+      try {
+        const decoded = decompress(raw, { maxOutputLength });
+        remainingBytes -= decoded.length;
+        return decoded.toString("latin1");
+      } catch {
+        // Pode ser zlib ou raw deflate: só o segundo fracasso é falha de verdade.
+      }
+    }
+    return null;
+  }
 
   for (const [index, header] of headers.entries()) {
     const start = (header.index ?? 0) + header[0].length;
-    const endObj = text.indexOf("endobj", start);
+    const endObj = findEndObj(start);
     const nextHeader = headers[index + 1]?.index ?? text.length;
     const body = text.slice(start, Math.min(endObj < 0 ? text.length : endObj, nextHeader));
 
@@ -71,16 +115,24 @@ function parseObjects(text: string): { objects: Map<number, PdfObject>; unreadab
 
     // O corpo pode ter sido truncado por bytes do próprio stream: procura o fim no texto inteiro.
     const dataStart = start + (streamKeyword.index ?? 0) + streamKeyword[0].length;
-    const dataEnd = text.indexOf("endstream", dataStart);
+    const dataEnd = findEndStream(dataStart);
     if (dataEnd < 0) {
       unreadable = true;
       continue;
     }
 
-    const raw = text.slice(dataStart, dataEnd).replace(/\r?\n$/, "");
     const dict = body.slice(0, streamKeyword.index);
-    const stream = decodeStream(dict, raw);
-    if (!stream && /FlateDecode/.test(dict)) unreadable = true;
+    const filter = /\/Filter\s*(\/[A-Za-z0-9]+|\[[^\]]*\])/.exec(dict)?.[1];
+    const flate = filter !== undefined && /FlateDecode/.test(filter);
+    // `text` é latin1 do arquivo, então índice de caractere é offset de byte.
+    const raw = file.subarray(dataStart, dataEnd - (text[dataEnd - 1] === "\n" ? 1 : 0));
+
+    let stream: string | null = null;
+    if (!NON_TEXT_STREAM.test(dict)) {
+      if (flate) stream = inflate(raw);
+      else if (filter === undefined) stream = raw.toString("latin1");
+    }
+    if (stream === null && flate) unreadable = true;
     objects.set(Number(header[1]), { dict, stream });
   }
 
@@ -90,7 +142,7 @@ function parseObjects(text: string): { objects: Map<number, PdfObject>; unreadab
 /** Objetos de PDF 1.5+ ficam comprimidos dentro de `/Type /ObjStm`. */
 function expandObjectStreams(objects: Map<number, PdfObject>): void {
   for (const object of [...objects.values()]) {
-    if (!object.stream || !/\/Type\s*\/ObjStm/.test(object.dict)) continue;
+    if (object.stream === null || !/\/Type\s*\/ObjStm/.test(object.dict)) continue;
 
     const first = Number(/\/First\s+(\d+)/.exec(object.dict)?.[1]);
     const count = Number(/\/N\s+(\d+)/.exec(object.dict)?.[1]);
@@ -124,21 +176,21 @@ function parseCMap(content: string): FontCMap {
   const codes = new Map<number, string>();
   let codeBytes: 1 | 2 = 1;
 
-  const codespace = /begincodespacerange([\s\S]*?)endcodespacerange/.exec(content)?.[1];
-  const codespaceLow = codespace ? /<([\da-f]+)>/i.exec(codespace)?.[1] : undefined;
-  if (codespaceLow && codespaceLow.length > 2) codeBytes = 2;
+  forEachSection(content, "begincodespacerange", "endcodespacerange", (body) => {
+    if ((/<([\da-f]+)>/i.exec(body)?.[1].length ?? 0) > 2) codeBytes = 2;
+  });
 
-  for (const block of content.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)) {
-    for (const entry of block[1].matchAll(/<([\da-f]+)>\s*<([\da-f]*)>/gi)) {
+  forEachSection(content, "beginbfchar", "endbfchar", (body) => {
+    for (const entry of body.matchAll(/<([\da-f]+)>\s*<([\da-f]*)>/gi)) {
+      if (codes.size >= MAX_CMAP_CODES) return;
       if (entry[1].length > 2) codeBytes = 2;
       codes.set(Number.parseInt(entry[1], 16), hexToText(entry[2]));
     }
-  }
+  });
 
-  for (const block of content.matchAll(/beginbfrange([\s\S]*?)endbfrange/g)) {
-    for (const entry of block[1].matchAll(
-      /<([\da-f]+)>\s*<([\da-f]+)>\s*(<[\da-f]*>|\[[^\]]*\])/gi,
-    )) {
+  forEachSection(content, "beginbfrange", "endbfrange", (body) => {
+    for (const entry of body.matchAll(/<([\da-f]+)>\s*<([\da-f]+)>\s*(<[\da-f]*>|\[[^\]]*\])/gi)) {
+      if (codes.size >= MAX_CMAP_CODES) return;
       const low = Number.parseInt(entry[1], 16);
       const high = Number.parseInt(entry[2], 16);
       if (entry[1].length > 2) codeBytes = 2;
@@ -152,11 +204,12 @@ function parseCMap(content: string): FontCMap {
 
       const base = hexToText(entry[3].slice(1, -1));
       const lastUnit = base.charCodeAt(base.length - 1);
-      for (let code = low; code <= high && code - low < 0xffff; code += 1) {
+      const last = Math.min(high, low + MAX_CMAP_CODES - codes.size);
+      for (let code = low; code <= last; code += 1) {
         codes.set(code, base.slice(0, -1) + String.fromCharCode(lastUnit + (code - low)));
       }
     }
-  }
+  });
 
   return { codes, codeBytes };
 }
@@ -170,18 +223,41 @@ function parseCMap(content: string): FontCMap {
  */
 function collectFontCMaps(objects: Map<number, PdfObject>): Map<string, FontCMap> {
   const fontCMaps = new Map<string, FontCMap>();
+  // O mesmo /ToUnicode costuma ser referenciado por todas as páginas: parseia uma vez só.
+  const parsedCMaps = new Map<number, FontCMap | null>();
+
+  function cmapOf(fontDict: string): FontCMap | null {
+    const toUnicode = Number(/\/ToUnicode\s+(\d+)\s+\d+\s+R/.exec(fontDict)?.[1]);
+    if (!Number.isFinite(toUnicode)) return null;
+
+    const cached = parsedCMaps.get(toUnicode);
+    if (cached !== undefined) return cached;
+
+    const content = objects.get(toUnicode)?.stream ?? null;
+    const cmap = content === null ? null : parseCMap(content);
+    parsedCMaps.set(toUnicode, cmap);
+    return cmap;
+  }
 
   for (const object of objects.values()) {
-    for (const resources of object.dict.matchAll(/\/Font\s*(<<[\s\S]*?>>|\d+\s+\d+\s+R)/g)) {
-      const dict = resources[1].startsWith("<<")
-        ? resources[1]
-        : (objects.get(Number.parseInt(resources[1], 10))?.dict ?? "");
+    const resourcesAt = /\/Font\s*(?:<<|(\d+)\s+\d+\s+R)/g;
+    let resources = resourcesAt.exec(object.dict);
+
+    for (; resources !== null; resources = resourcesAt.exec(object.dict)) {
+      let dict: string;
+      if (resources[1] === undefined) {
+        // Dicionário de recursos inline: vai até o `>>` correspondente.
+        const end = object.dict.indexOf(">>", resources.index);
+        if (end < 0) break;
+        dict = object.dict.slice(resources.index, end);
+        resourcesAt.lastIndex = end;
+      } else {
+        dict = objects.get(Number(resources[1]))?.dict ?? "";
+      }
 
       for (const entry of dict.matchAll(/\/([^\s/<>[\]()]+)\s+(\d+)\s+\d+\s+R/g)) {
-        const font = objects.get(Number(entry[2]));
-        const toUnicode = font && /\/ToUnicode\s+(\d+)\s+\d+\s+R/.exec(font.dict)?.[1];
-        const cmap = toUnicode ? objects.get(Number(toUnicode))?.stream : null;
-        if (cmap) fontCMaps.set(entry[1], parseCMap(cmap));
+        const cmap = cmapOf(objects.get(Number(entry[2]))?.dict ?? "");
+        if (cmap) fontCMaps.set(entry[1], cmap);
       }
     }
   }
@@ -189,8 +265,9 @@ function collectFontCMaps(objects: Map<number, PdfObject>): Map<string, FontCMap
   return fontCMaps;
 }
 
+const STRING_ESCAPES: Record<string, string> = { n: "\n", r: "\r", t: "\t", b: "\b", f: "\f" };
+
 function readLiteralString(content: string, start: number): { bytes: number[]; next: number } {
-  const escapes: Record<string, string> = { n: "\n", r: "\r", t: "\t", b: "\b", f: "\f" };
   const bytes: number[] = [];
   let depth = 1;
   let index = start + 1;
@@ -210,7 +287,7 @@ function readLiteralString(content: string, start: number): { bytes: number[]; n
         index += next === "\r" && content[index + 2] === "\n" ? 3 : 2;
         continue;
       }
-      bytes.push((escapes[next] ?? next).charCodeAt(0));
+      bytes.push((STRING_ESCAPES[next] ?? next).charCodeAt(0));
       index += 2;
       continue;
     }
@@ -258,7 +335,7 @@ function matchAt(pattern: RegExp, content: string, index: number): RegExpExecArr
  */
 function extractContentText(content: string, fontCMaps: Map<string, FontCMap>): string {
   const parts: string[] = [];
-  let operands: Operand[] = [];
+  const operands: Operand[] = [];
   let array: Operand[] | null = null;
   let font: FontCMap | undefined;
   let lastVerticalOffset: number | null = null;
@@ -274,12 +351,13 @@ function extractContentText(content: string, fontCMaps: Map<string, FontCMap>): 
 
   while (index < content.length) {
     const char = content[index];
+    const code = content.charCodeAt(index);
 
     if (char === "%") {
       index = content.indexOf("\n", index) + 1 || content.length;
       continue;
     }
-    if (/[\s\0]/.test(char)) {
+    if (code <= 0x20) {
       index += 1;
       continue;
     }
@@ -323,7 +401,8 @@ function extractContentText(content: string, fontCMaps: Map<string, FontCMap>): 
       index += name.length + 1;
       continue;
     }
-    if (/[-+.\d]/.test(char)) {
+    // Dígito, "+", "-" ou ".": início de número.
+    if ((code >= 0x30 && code <= 0x39) || code === 0x2b || code === 0x2d || code === 0x2e) {
       const number = matchAt(NUMBER_AT, content, index)?.[0] ?? "";
       push({ number: Number.parseFloat(number) || 0 });
       index += number.length || 1;
@@ -374,19 +453,11 @@ function extractContentText(content: string, fontCMaps: Map<string, FontCMap>): 
         break;
     }
 
-    operands = [];
+    operands.length = 0;
     array = null;
   }
 
   return parts.join("");
-}
-
-/** Streams que carregam dados de fonte, imagem, metadados ou o próprio CMap não têm texto. */
-function isContentStream(object: PdfObject, decoded: string): boolean {
-  if (/\/Type\s*\/(ObjStm|XRef|Metadata)|\/Subtype\s*\/Image|\/Length1\b/.test(object.dict)) {
-    return false;
-  }
-  return !decoded.includes("begincmap") && /\b(Tj|TJ)\b/.test(decoded);
 }
 
 /**
@@ -398,18 +469,16 @@ function isContentStream(object: PdfObject, decoded: string): boolean {
  * anexos e demais objetos do arquivo são ignorados, então nada é executado.
  *
  * Limitações conhecidas: não decifra PDFs protegidos, não aplica predictors de
- * `/DecodeParms` e concatena as páginas na ordem dos objetos indiretos.
+ * `/DecodeParms`, concatena as páginas na ordem dos objetos indiretos e para de
+ * descomprimir ao atingir o teto de bytes do documento, devolvendo o texto obtido até ali.
  */
 export function extractPdfText(file: Buffer): string {
-  if (!file.subarray(0, PDF_SIGNATURE.length).equals(PDF_SIGNATURE)) {
-    throw new ServiceError(400, CORRUPTED_MESSAGE);
-  }
-
   const text = file.toString("latin1");
+  if (!text.startsWith("%PDF-")) throw new ServiceError(400, CORRUPTED_MESSAGE);
   // `/Encrypt` só é legal como referência indireta no trailer ou no dicionário do XRef stream.
   if (/\/Encrypt\s+\d+\s+\d+\s+R/.test(text)) throw new ServiceError(400, ENCRYPTED_MESSAGE);
 
-  const { objects, unreadable } = parseObjects(text);
+  const { objects, unreadable } = parseObjects(file, text);
   if (objects.size === 0) throw new ServiceError(400, CORRUPTED_MESSAGE);
 
   expandObjectStreams(objects);
@@ -417,8 +486,9 @@ export function extractPdfText(file: Buffer): string {
 
   const pages: string[] = [];
   for (const object of objects.values()) {
-    if (object.stream === null || !isContentStream(object, object.stream)) continue;
-    pages.push(extractContentText(object.stream, fontCMaps));
+    const stream = object.stream;
+    if (stream === null || stream.includes("begincmap") || !/\b(Tj|TJ)\b/.test(stream)) continue;
+    pages.push(extractContentText(stream, fontCMaps));
   }
 
   const extracted = pages
