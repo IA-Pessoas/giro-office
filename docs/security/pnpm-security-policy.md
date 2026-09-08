@@ -56,6 +56,39 @@ versão ou intervalo exato, proprietário, motivo, comando de evidência, data d
 revisão e data de expiração. Nunca use uma aprovação global equivalente a
 `dangerouslyAllowAllBuilds`.
 
+## Pins de confiança (trustPolicy)
+
+O lockfile do repositório era anterior à adoção de `trustPolicy: no-downgrade`,
+então qualquer instalação que re-resolvesse o grafo falhava — na prática, ninguém
+conseguia adicionar uma dependência. O `--frozen-lockfile` continuava passando
+porque não re-resolve nada, o que escondeu o problema.
+
+Cada pacote abaixo teve uma versão publicada **com** attestation de provenance e,
+depois, uma versão **sem** nenhuma evidência de confiança. O `no-downgrade`
+recusa essa regressão. Os pins abaixo fixam a última versão com provenance:
+
+| Pacote | Pin | Versão recusada | Origem |
+| --- | --- | --- | --- |
+| `pino` | `9.13.1` | `9.14.0` (2025-10-18, sem provenance) | dependência direta de `shared` |
+| `slow-redact` | `0.3.1` | `0.3.2` (2025-10-11, sem provenance) | subdependência do `pino` |
+| `reselect` | `5.3.0` | `5.1.1` (2024-06-01, sem provenance) | subdependência do `recharts` |
+| `react-redux` | `9.3.0` | `9.2.0` (2024-12-10, sem provenance) | subdependência do `recharts` |
+
+O `app` também passou de `@types/node@^20` para `^25.3.3`, alinhando com o resto
+do workspace: a linha 20 arrasta `undici-types@6.21.0`, publicado sem provenance,
+enquanto a 25 usa `undici-types@7.x`, que tem.
+
+Para aposentar um pin, confirme que a versão mais nova voltou a publicar com
+provenance e remova a entrada de `pnpm.overrides`:
+
+```text
+npm view <pacote>@<versão> dist.attestations
+```
+
+A revisão desses pins acompanha a revisão trimestral de dependências. Um pin não
+é permanente: ele existe só enquanto o pacote não restabelece a evidência de
+confiança.
+
 ## Escopo de repositórios
 
 O `giro-office` é o projeto pnpm tratado por esta configuração. `nexus` e
