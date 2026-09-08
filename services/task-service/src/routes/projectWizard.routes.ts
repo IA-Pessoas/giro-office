@@ -36,18 +36,20 @@ export interface ProjectWizardRoutesDeps {
 
 const MEETING_MINUTES_UPLOAD_FIELD = "file";
 const MEETING_MINUTES_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+interface MeetingMinutesFormat {
+  mimeTypes: readonly string[];
+  extract?: (file: Buffer) => string;
+}
+
 /** Formatos aceitos por extensão; os binários trazem o extrator próprio de texto. */
-const MEETING_MINUTES_FORMATS: Record<
-  string,
-  { mimeTypes: readonly string[]; extract?: (file: Buffer) => string }
-> = {
+const MEETING_MINUTES_FORMATS: Record<string, MeetingMinutesFormat> = {
   ".txt": { mimeTypes: ["text/plain"] },
   ".md": { mimeTypes: ["text/markdown", "text/plain", "text/x-markdown"] },
   ".docx": { mimeTypes: [DOCX_MIME_TYPE], extract: extractDocxText },
   ".pdf": { mimeTypes: [PDF_MIME_TYPE], extract: extractPdfText },
 };
 
-function meetingMinutesFormat(originalname: string) {
+function meetingMinutesFormat(originalname: string): MeetingMinutesFormat | undefined {
   return MEETING_MINUTES_FORMATS[path.extname(originalname).toLowerCase()];
 }
 

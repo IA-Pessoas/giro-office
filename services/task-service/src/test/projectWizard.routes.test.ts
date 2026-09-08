@@ -1186,7 +1186,10 @@ describe("project wizard task extraction routes", () => {
     expect(written.join("\n")).not.toContain("SEGREDOXYZ");
   });
 
-  it("percorre o fluxo HTTP completo da Ata DOCX com o adapter de IA falso", async () => {
+  it.each([
+    ["DOCX", "meeting-minutes.docx", DOCX_MIME_TYPE],
+    ["PDF", "meeting-minutes.pdf", PDF_MIME_TYPE],
+  ])("percorre o fluxo HTTP completo da Ata %s com o adapter de IA falso", async (_label, fixture, contentType) => {
     const extractionService = new ProjectWizardExtractionService(
       createAiTaskExtractionProvider({ mode: "fake" }),
       {
@@ -1202,12 +1205,10 @@ describe("project wizard task extraction routes", () => {
       .field("name", validExtractionBody.name)
       .field("objective", validExtractionBody.objective)
       .field("start_date", validExtractionBody.start_date)
-      .attach("file", readFixture("meeting-minutes.docx"), {
-        filename: "ata.docx",
-        contentType: DOCX_MIME_TYPE,
-      });
+      .attach("file", readFixture(fixture), { filename: `ata${extname(fixture)}`, contentType });
 
     expect(response.status).toBe(200);
+    // Toda fonte converge para as mesmas Tarefas propostas do texto colado.
     expect(response.body.data.tasks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "Apurar impostos do trimestre" }),

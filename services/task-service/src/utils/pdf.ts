@@ -77,13 +77,13 @@ function forEachSection(
 function parseObjects(
   file: Buffer,
   text: string,
-): { objects: Map<number, PdfObject>; unreadable: boolean } {
+): { objects: Map<number, PdfObject>; hasUnreadableStream: boolean } {
   const objects = new Map<number, PdfObject>();
   const headers = [...text.matchAll(/(\d+)\s+\d+\s+obj\b/g)];
   const findEndObj = createForwardFinder(text, "endobj");
   const findEndStream = createForwardFinder(text, "endstream");
   let remainingBytes = MAX_TOTAL_STREAM_BYTES;
-  let unreadable = false;
+  let hasUnreadableStream = false;
 
   function inflate(raw: Buffer): string | null {
     const maxOutputLength = Math.min(MAX_STREAM_BYTES, remainingBytes);
@@ -117,7 +117,7 @@ function parseObjects(
     const dataStart = start + (streamKeyword.index ?? 0) + streamKeyword[0].length;
     const dataEnd = findEndStream(dataStart);
     if (dataEnd < 0) {
-      unreadable = true;
+      hasUnreadableStream = true;
       continue;
     }
 
@@ -132,11 +132,11 @@ function parseObjects(
       if (flate) stream = inflate(raw);
       else if (filter === undefined) stream = raw.toString("latin1");
     }
-    if (stream === null && flate) unreadable = true;
+    if (stream === null && flate) hasUnreadableStream = true;
     objects.set(Number(header[1]), { dict, stream });
   }
 
-  return { objects, unreadable };
+  return { objects, hasUnreadableStream };
 }
 
 /** Objetos de PDF 1.5+ ficam comprimidos dentro de `/Type /ObjStm`. */
@@ -341,7 +341,8 @@ function extractContentText(content: string, fontCMaps: Map<string, FontCMap>): 
   let lastVerticalOffset: number | null = null;
   let index = 0;
 
-  const top = (offset: number): Operand | undefined => operands[operands.length - offset];
+  /** Operando a partir do topo da pilha, em base 1: `fromTop(1)` é o último empilhado. */
+  const fromTop = (offset: number): Operand | undefined => operands[operands.length - offset];
   const push = (operand: Operand) => (array ?? operands).push(operand);
   const show = (operand: Operand | undefined) => {
     if (operand && "text" in operand) parts.push(operand.text);
@@ -414,20 +415,20 @@ function extractContentText(content: string, fontCMaps: Map<string, FontCMap>): 
 
     switch (operator) {
       case "Tf": {
-        const name = top(2);
+        const name = fromTop(2);
         font = name && "name" in name ? fontCMaps.get(name.name) : undefined;
         break;
       }
       case "Tj":
-        show(top(1));
+        show(fromTop(1));
         break;
       case "'":
       case '"':
         parts.push("\n");
-        show(top(1));
+        show(fromTop(1));
         break;
       case "TJ": {
-        const last = top(1);
+        const last = fromTop(1);
         for (const item of last && "array" in last ? last.array : []) {
           if ("text" in item) parts.push(item.text);
           // Recuo grande entre glifos é espaço de palavra; kerning fica bem abaixo disso.
@@ -437,10 +438,10 @@ function extractContentText(content: string, fontCMaps: Map<string, FontCMap>): 
       }
       case "Td":
       case "TD":
-        parts.push(asNumber(top(1)) === 0 ? " " : "\n");
+        parts.push(asNumber(fromTop(1)) === 0 ? " " : "\n");
         break;
       case "Tm": {
-        const verticalOffset = asNumber(top(1));
+        const verticalOffset = asNumber(fromTop(1));
         parts.push(verticalOffset === lastVerticalOffset ? " " : "\n");
         lastVerticalOffset = verticalOffset;
         break;
@@ -469,16 +470,20 @@ function extractContentText(content: string, fontCMaps: Map<string, FontCMap>): 
  * anexos e demais objetos do arquivo são ignorados, então nada é executado.
  *
  * Limitações conhecidas: não decifra PDFs protegidos, não aplica predictors de
- * `/DecodeParms`, concatena as páginas na ordem dos objetos indiretos e para de
- * descomprimir ao atingir o teto de bytes do documento, devolvendo o texto obtido até ali.
+ * `/DecodeParms` e para de descomprimir ao atingir o teto de bytes do documento, devolvendo o
+ * texto obtido até ali. Todo stream com operador de texto entra, na ordem dos objetos indiretos:
+ * aparências de anotação e Form XObjects reaproveitados podem aparecer junto do corpo da página.
  */
 export function extractPdfText(file: Buffer): string {
   const text = file.toString("latin1");
   if (!text.startsWith("%PDF-")) throw new ServiceError(400, CORRUPTED_MESSAGE);
-  // `/Encrypt` só é legal como referência indireta no trailer ou no dicionário do XRef stream.
-  if (/\/Encrypt\s+\d+\s+\d+\s+R/.test(text)) throw new ServiceError(400, ENCRYPTED_MESSAGE);
+  // `/Encrypt` no trailer ou no dicionário do XRef stream, como referência indireta ou dicionário
+  // direto: o conteúdo está cifrado e não pode ser lido nem repassado adiante.
+  if (/\/Encrypt\s*(?:\d+\s+\d+\s+R|<<)/.test(text)) {
+    throw new ServiceError(400, ENCRYPTED_MESSAGE);
+  }
 
-  const { objects, unreadable } = parseObjects(file, text);
+  const { objects, hasUnreadableStream } = parseObjects(file, text);
   if (objects.size === 0) throw new ServiceError(400, CORRUPTED_MESSAGE);
 
   expandObjectStreams(objects);
@@ -498,6 +503,6 @@ export function extractPdfText(file: Buffer): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  if (!extracted && unreadable) throw new ServiceError(400, CORRUPTED_MESSAGE);
+  if (!extracted && hasUnreadableStream) throw new ServiceError(400, CORRUPTED_MESSAGE);
   return extracted;
 }
