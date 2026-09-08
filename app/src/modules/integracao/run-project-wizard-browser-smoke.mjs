@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium, expect } from "@playwright/test";
@@ -8,6 +10,7 @@ const PORT = process.env.PROJECT_WIZARD_BROWSER_PORT || "3117";
 const configuredBaseUrl = process.env.PROJECT_WIZARD_BROWSER_BASE_URL?.replace(/\/$/, "");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
+const failureArtifactDir = process.env.PROJECT_WIZARD_BROWSER_ARTIFACT_DIR;
 const clientId = "11111111-1111-4111-8111-111111111111";
 const departments = [
   { id: "department-one", name: "Fiscal" },
@@ -323,6 +326,32 @@ async function installApiMocks(
       },
     }),
   );
+}
+
+/**
+ * Captura de falha sem vazar a Ata: o trace do Playwright registraria o texto digitado e o vídeo
+ * mostraria a digitação, então a evidência é um screenshot com os campos da Ata mascarados.
+ * Só grava quando PROJECT_WIZARD_BROWSER_ARTIFACT_DIR aponta um diretório.
+ */
+async function captureFailureArtifact(page) {
+  if (!failureArtifactDir) return;
+
+  try {
+    await mkdir(failureArtifactDir, { recursive: true });
+    const file = path.join(failureArtifactDir, `project-wizard-failure-${Date.now()}.png`);
+    await page.screenshot({
+      path: file,
+      fullPage: true,
+      mask: [
+        page.getByLabel("Cole a Ata para extrair tarefas"),
+        page.getByLabel("Selecione um arquivo .txt, .md, .docx ou .pdf"),
+      ],
+      maskColor: "#94a3b8",
+    });
+    console.error(`Evidência da falha: ${file}`);
+  } catch (artifactError) {
+    console.error("Não foi possível capturar a evidência da falha.", artifactError);
+  }
 }
 
 async function runBrowserProof() {
@@ -910,6 +939,9 @@ async function runBrowserProof() {
     await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.getByRole("button", { name: "Novo projeto" })).toHaveCount(0);
+  } catch (error) {
+    await captureFailureArtifact(page);
+    throw error;
   } finally {
     await context.close();
     await browser.close();
