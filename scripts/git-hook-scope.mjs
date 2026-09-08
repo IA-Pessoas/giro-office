@@ -28,6 +28,9 @@ const GLOBAL_ROOT_FILES = new Set([
   "turbo.json",
 ]);
 
+// Caminhos fora do grafo de pacotes: o turbo não consegue derivar quem eles afetam.
+// `infra/` fica aqui de propósito — é um pacote do workspace, mas ninguém o declara como
+// dependência, então uma mudança de schema Prisma não selecionaria nenhum dependente.
 const GLOBAL_PREFIXES = [
   ".codex/",
   ".cursor/",
@@ -35,9 +38,7 @@ const GLOBAL_PREFIXES = [
   ".husky/",
   "docker/",
   "infra/",
-  "packages/",
   "scripts/",
-  "shared/",
   "supabase/",
 ];
 
@@ -48,12 +49,7 @@ const GLOBAL_COMMANDS = [
   ["pnpm", ["test"]],
 ];
 
-const SCOPE_COMMANDS = {
-  ui: [["pnpm", ["exec", "turbo", "run", "typecheck", "test", "--filter=@workspace/app"]]],
-  services: [
-    ["pnpm", ["exec", "turbo", "run", "check", "typecheck", "test", "--filter=./services/*"]],
-  ],
-};
+const AFFECTED_TASKS = ["check", "typecheck", "test"];
 
 function normalizeGitPath(filePath) {
   return filePath
@@ -91,79 +87,32 @@ export function classifyChangedFiles(changedFiles) {
     };
   }
 
-  let hasUi = false;
-  let hasServices = false;
-  let hasGlobal = false;
-  let hasNonDocs = false;
+  const codePaths = filePaths.filter((filePath) => !isDocsOnlyPath(filePath));
 
-  for (const filePath of filePaths) {
-    if (isDocsOnlyPath(filePath)) {
-      continue;
-    }
-
-    hasNonDocs = true;
-
-    if (filePath.startsWith("app/")) {
-      hasUi = true;
-      continue;
-    }
-
-    if (filePath.startsWith("services/")) {
-      hasServices = true;
-      continue;
-    }
-
-    if (isGlobalImpactPath(filePath)) {
-      hasGlobal = true;
-      continue;
-    }
-
-    hasGlobal = true;
+  if (codePaths.length === 0) {
+    return { mode: "skip", reason: "docs-only" };
   }
 
-  if (!hasNonDocs) {
-    return {
-      mode: "skip",
-      scopes: [],
-      reason: "docs-only",
-    };
+  if (codePaths.some(isGlobalImpactPath)) {
+    return { mode: "global", reason: "global-impact" };
   }
 
-  if (hasGlobal) {
-    return {
-      mode: "global",
-      scopes: ["global"],
-      reason: "global-impact",
-    };
-  }
-
-  const scopes = [];
-
-  if (hasUi) {
-    scopes.push("ui");
-  }
-
-  if (hasServices) {
-    scopes.push("services");
-  }
-
-  return {
-    mode: "scoped",
-    scopes,
-    reason: scopes.join("+"),
-  };
+  // Todo o resto vive dentro de um pacote do workspace: o turbo seleciona o que mudou
+  // e, pelo grafo, quem depende do que mudou.
+  return { mode: "affected", reason: "workspace-packages" };
 }
 
-export function buildHookPlan(classification) {
+export function buildHookPlan(classification, bases = []) {
   if (classification.mode === "skip") {
     return [];
   }
 
-  if (classification.mode === "global") {
+  if (classification.mode === "global" || bases.length === 0) {
     return cloneCommands(GLOBAL_COMMANDS);
   }
 
-  return classification.scopes.flatMap((scope) => cloneCommands(SCOPE_COMMANDS[scope] ?? []));
+  const filters = bases.map((base) => `--filter=...[${base}]`);
+  return [["pnpm", ["exec", "turbo", "run", ...AFFECTED_TASKS, ...filters]]];
 }
 
 export function parsePrePushInput(input) {
@@ -207,6 +156,7 @@ function resolveManualChangedFiles(git) {
       if (files !== null) {
         return {
           files,
+          bases: [mergeBase],
           forceGlobal: false,
           reason: "manual-upstream",
         };
@@ -222,6 +172,7 @@ function resolveManualChangedFiles(git) {
     if (files !== null) {
       return {
         files,
+        bases: [originDevelopBase],
         forceGlobal: false,
         reason: "manual-origin-develop",
       };
@@ -230,6 +181,7 @@ function resolveManualChangedFiles(git) {
 
   return {
     files: [],
+    bases: [],
     forceGlobal: true,
     reason: "manual-base-unavailable",
   };
@@ -243,6 +195,7 @@ export function resolvePrePushChangedFiles(input, git = createGitRunner()) {
   }
 
   const files = new Set();
+  const bases = new Set();
 
   for (const record of records) {
     if (ZERO_OID.test(record.localOid)) {
@@ -255,6 +208,7 @@ export function resolvePrePushChangedFiles(input, git = createGitRunner()) {
       if (!mergeBase) {
         return {
           files: [],
+          bases: [],
           forceGlobal: true,
           reason: "new-branch-without-origin-develop",
         };
@@ -265,10 +219,13 @@ export function resolvePrePushChangedFiles(input, git = createGitRunner()) {
       if (changedFiles === null) {
         return {
           files: [],
+          bases: [],
           forceGlobal: true,
           reason: "new-branch-diff-unavailable",
         };
       }
+
+      bases.add(mergeBase);
 
       for (const filePath of changedFiles) {
         files.add(filePath);
@@ -282,10 +239,13 @@ export function resolvePrePushChangedFiles(input, git = createGitRunner()) {
     if (changedFiles === null) {
       return {
         files: [],
+        bases: [],
         forceGlobal: true,
         reason: "pre-push-diff-unavailable",
       };
     }
+
+    bases.add(record.remoteOid);
 
     for (const filePath of changedFiles) {
       files.add(filePath);
@@ -294,6 +254,7 @@ export function resolvePrePushChangedFiles(input, git = createGitRunner()) {
 
   return {
     files: [...files],
+    bases: [...bases],
     forceGlobal: false,
     reason: "pre-push-refs",
   };
@@ -427,13 +388,9 @@ function main() {
 
   const resolution = resolvePrePushChangedFiles(readHookInput());
   const classification = resolution.forceGlobal
-    ? {
-        mode: "global",
-        scopes: ["global"],
-        reason: resolution.reason,
-      }
+    ? { mode: "global", reason: resolution.reason }
     : classifyChangedFiles(resolution.files);
-  const commands = buildHookPlan(classification);
+  const commands = buildHookPlan(classification, resolution.bases ?? []);
 
   console.log(
     `git-hook-scope: ${classification.mode} (${classification.reason}); files=${resolution.files.length}`,

@@ -10,35 +10,30 @@ import {
 } from "./git-hook-scope.mjs";
 
 describe("classifyChangedFiles", () => {
-  it("classifies app files as ui", () => {
-    assert.deepEqual(classifyChangedFiles(["app/src/x.tsx"]), {
-      mode: "scoped",
-      scopes: ["ui"],
-      reason: "ui",
-    });
-  });
-
-  it("classifies service files as services", () => {
-    assert.deepEqual(classifyChangedFiles(["services/user-service/src/x.ts"]), {
-      mode: "scoped",
-      scopes: ["services"],
-      reason: "services",
-    });
-  });
-
-  it("classifies mixed app and services files as both scopes", () => {
-    assert.deepEqual(classifyChangedFiles(["app/src/x.tsx", "services/user-service/src/x.ts"]), {
-      mode: "scoped",
-      scopes: ["ui", "services"],
-      reason: "ui+services",
-    });
-  });
-
-  it("classifies shared files and root configs as global", () => {
-    const globalPaths = [
+  it("treats package changes as affected, deixando o grafo do turbo decidir", () => {
+    const packagePaths = [
+      "app/src/x.tsx",
+      "services/user-service/src/x.ts",
+      // shared e packages/api têm dependentes declarados: o turbo seleciona quem depende.
       "shared/src/x.ts",
       "packages/api/src/x.ts",
-      "infra/package.json",
+    ];
+
+    for (const filePath of packagePaths) {
+      assert.deepEqual(classifyChangedFiles([filePath]), {
+        mode: "affected",
+        reason: "workspace-packages",
+      });
+    }
+  });
+
+  it("keeps paths outside the package graph global", () => {
+    const globalPaths = [
+      // infra é pacote do workspace, mas ninguém o declara como dependência.
+      "infra/prisma/schema.prisma",
+      "scripts/build.mjs",
+      ".github/workflows/ci.yml",
+      "docker/Dockerfile",
       "package.json",
       "pnpm-lock.yaml",
       "turbo.json",
@@ -48,41 +43,74 @@ describe("classifyChangedFiles", () => {
     for (const filePath of globalPaths) {
       assert.deepEqual(classifyChangedFiles([filePath]), {
         mode: "global",
-        scopes: ["global"],
         reason: "global-impact",
       });
     }
   });
 
+  it("prefers global when a change mixes package and infrastructure paths", () => {
+    assert.deepEqual(classifyChangedFiles(["app/src/x.tsx", "pnpm-lock.yaml"]), {
+      mode: "global",
+      reason: "global-impact",
+    });
+  });
+
   it("skips docs-only changes", () => {
     assert.deepEqual(classifyChangedFiles(["docs/hooks.md", "README.md"]), {
       mode: "skip",
-      scopes: [],
       reason: "docs-only",
     });
   });
 });
 
 describe("buildHookPlan", () => {
-  it("builds the ui command for ui-only changes", () => {
-    assert.deepEqual(buildHookPlan(classifyChangedFiles(["app/src/x.tsx"])), [
-      ["pnpm", ["exec", "turbo", "run", "typecheck", "test", "--filter=@workspace/app"]],
+  it("filters by the affected graph from the pushed base", () => {
+    assert.deepEqual(buildHookPlan(classifyChangedFiles(["app/src/x.tsx"]), ["abc123"]), [
+      ["pnpm", ["exec", "turbo", "run", "check", "typecheck", "test", "--filter=...[abc123]"]],
     ]);
   });
 
-  it("builds the services command for services-only changes", () => {
-    assert.deepEqual(buildHookPlan(classifyChangedFiles(["services/user-service/src/x.ts"])), [
-      ["pnpm", ["exec", "turbo", "run", "check", "typecheck", "test", "--filter=./services/*"]],
-    ]);
+  it("carries one filter per pushed ref", () => {
+    assert.deepEqual(
+      buildHookPlan(classifyChangedFiles(["services/user-service/src/x.ts"]), ["abc123", "def456"]),
+      [
+        [
+          "pnpm",
+          [
+            "exec",
+            "turbo",
+            "run",
+            "check",
+            "typecheck",
+            "test",
+            "--filter=...[abc123]",
+            "--filter=...[def456]",
+          ],
+        ],
+      ],
+    );
   });
 
-  it("builds the current global command sequence for global changes", () => {
-    assert.deepEqual(buildHookPlan(classifyChangedFiles(["shared/src/x.ts"])), [
+  it("falls back to the global sequence when there is no base to diff against", () => {
+    assert.deepEqual(buildHookPlan(classifyChangedFiles(["app/src/x.tsx"]), []), [
       ["pnpm", ["audit:ci"]],
       ["pnpm", ["check"]],
       ["pnpm", ["typecheck"]],
       ["pnpm", ["test"]],
     ]);
+  });
+
+  it("builds the current global command sequence for global changes", () => {
+    assert.deepEqual(buildHookPlan(classifyChangedFiles(["infra/prisma/schema.prisma"]), ["abc"]), [
+      ["pnpm", ["audit:ci"]],
+      ["pnpm", ["check"]],
+      ["pnpm", ["typecheck"]],
+      ["pnpm", ["test"]],
+    ]);
+  });
+
+  it("skips every command for docs-only changes", () => {
+    assert.deepEqual(buildHookPlan(classifyChangedFiles(["docs/x.md"]), ["abc"]), []);
   });
 });
 
@@ -129,9 +157,49 @@ describe("resolvePrePushChangedFiles", () => {
 
     assert.deepEqual(result, {
       files: [],
+      bases: [],
       forceGlobal: true,
       reason: "new-branch-without-origin-develop",
     });
+  });
+
+  it("uses the remote oid as base for a branch that already exists", () => {
+    const git = {
+      run(args) {
+        if (args[0] === "diff") return "services/user-service/src/x.ts\n";
+        throw new Error(`Unexpected git call: ${args.join(" ")}`);
+      },
+    };
+
+    assert.deepEqual(resolvePrePushChangedFiles("refs/heads/f abc123 refs/heads/f def456\n", git), {
+      files: ["services/user-service/src/x.ts"],
+      bases: ["def456"],
+      forceGlobal: false,
+      reason: "pre-push-refs",
+    });
+  });
+
+  it("uses the merge-base with origin/develop as base for a new branch", () => {
+    const git = {
+      run(args) {
+        if (args[0] === "merge-base") return "base789";
+        if (args[0] === "diff") return "app/src/x.tsx\n";
+        throw new Error(`Unexpected git call: ${args.join(" ")}`);
+      },
+    };
+
+    assert.deepEqual(
+      resolvePrePushChangedFiles(
+        "refs/heads/f abc123 refs/heads/f 0000000000000000000000000000000000000000\n",
+        git,
+      ),
+      {
+        files: ["app/src/x.tsx"],
+        bases: ["base789"],
+        forceGlobal: false,
+        reason: "pre-push-refs",
+      },
+    );
   });
 });
 
