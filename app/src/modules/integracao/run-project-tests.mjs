@@ -69,6 +69,10 @@ import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
   applyWizardTaskChange,
   getWizardTaskDateWarning,
+  getWizardExtractionSourceValidationMessage,
+  canAttemptWizardExtraction,
+  WIZARD_EXTRACTION_MAX_ATTEMPTS,
+  WIZARD_EXTRACTION_MAX_SOURCE_BYTES,
   WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING,
 } from "./components/projectWizardUi.ts";
 import {
@@ -1242,6 +1246,58 @@ runTest("project date fields handle native input events", () => {
 runTest("project wizard exposes the authenticated AI extraction endpoint", () => {
   assert.equal(PROJECT_ENDPOINTS.wizard, "/task/project-wizard");
   assert.equal(PROJECT_ENDPOINTS.wizardExtractTasks, "/task/project-wizard/extract-tasks");
+});
+
+runTest("wizard extraction allows only three provider attempts per opening", () => {
+  assert.equal(WIZARD_EXTRACTION_MAX_ATTEMPTS, 3);
+  assert.equal(canAttemptWizardExtraction(0), true);
+  assert.equal(canAttemptWizardExtraction(2), true);
+  assert.equal(canAttemptWizardExtraction(3), false);
+  assert.equal(canAttemptWizardExtraction(4), false);
+});
+
+runTest("wizard extraction validates text and file sources before sending", () => {
+  assert.equal(getWizardExtractionSourceValidationMessage({ text: "  Ata da reunião  " }), null);
+  assert.equal(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata da reunião"], "ata.md", { type: "text/markdown" }),
+    }),
+    null,
+  );
+  assert.ok(getWizardExtractionSourceValidationMessage({ text: "   " }));
+  assert.ok(getWizardExtractionSourceValidationMessage({}));
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      text: "a".repeat(WIZARD_EXTRACTION_MAX_SOURCE_BYTES + 1),
+    }),
+  );
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      file: new File([], "ata.md", { type: "text/markdown" }),
+    }),
+  );
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata"], "ata.exe", { type: "application/octet-stream" }),
+    }),
+  );
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata"], ".md", { type: "text/markdown" }),
+    }),
+  );
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata"], "ata.pdf", { type: "text/plain" }),
+    }),
+  );
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["a".repeat(WIZARD_EXTRACTION_MAX_SOURCE_BYTES + 1)], "ata.md", {
+        type: "text/markdown",
+      }),
+    }),
+  );
 });
 
 runTest("extraction payload carries only the project context allowed by the spec", () => {
