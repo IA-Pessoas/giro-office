@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 
 import { ClientSelectionField } from "@modules/clients";
 import { departmentService } from "@modules/departments";
-import { Dialog } from "@shared/components/ui/Dialog";
+import { ConfirmationDialog, Dialog } from "@shared/components";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { useFetch } from "@shared/hooks";
 
@@ -38,7 +38,13 @@ import {
   PROJECT_SUBPANEL_CLASSNAME,
   ProjectSelect,
 } from "./projectUi";
-import { applyWizardTaskChange, getWizardTaskDateWarning } from "./projectWizardUi";
+import {
+  applyWizardTaskChange,
+  canAttemptWizardExtraction,
+  getWizardExtractionSourceValidationMessage,
+  getWizardTaskDateWarning,
+  WIZARD_EXTRACTION_MAX_ATTEMPTS,
+} from "./projectWizardUi";
 import {
   TASK_FORM_AUXILIARY_WARNING_CLASSNAME,
   TASK_FORM_GRID_CLASSNAME,
@@ -46,6 +52,11 @@ import {
 } from "./taskFormModalUi";
 
 type WizardTask = ProjectWizardTaskProposal & { id: string; source: "ai" | "manual" };
+type PendingWizardConfirmation =
+  | "clear-meeting-minutes"
+  | "remove-meeting-minutes-file"
+  | "discard-wizard"
+  | null;
 
 interface ProjectFormModalProps {
   open: boolean;
@@ -108,7 +119,10 @@ export function ProjectFormModal({
   const [tasks, setTasks] = useState<WizardTask[]>([]);
   const [meetingMinutes, setMeetingMinutes] = useState("");
   const [meetingMinutesFile, setMeetingMinutesFile] = useState<File | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] =
+    useState<PendingWizardConfirmation>(null);
   const extractTasksMutation = useExtractProjectTasksMutation();
+  const [extractionAttempts, setExtractionAttempts] = useState(0);
   const [preview, setPreview] = useState<ProjectWizardPreview | null>(null);
   const [dependenciesChanged, setDependenciesChanged] = useState(false);
   const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null);
@@ -124,6 +138,7 @@ export function ProjectFormModal({
   );
   const idempotencyKeyRef = useRef<string | null>(null);
   const meetingMinutesFileRef = useRef<HTMLInputElement>(null);
+  const extractionRequestLockRef = useRef(false);
   const previewRequestLockRef = useRef(false);
   const { values, updateValue, validate, reset, buildCreatePayload, buildUpdatePayload } =
     useProjectForm(detailQuery.data);
@@ -135,12 +150,16 @@ export function ProjectFormModal({
       setTasks([]);
       setMeetingMinutes("");
       setMeetingMinutesFile(null);
+      setPendingConfirmation(null);
+      setExtractionAttempts(0);
       if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
       setPreview(null);
       setDependenciesChanged(false);
       setPreviewErrorMessage(null);
       previewMutation.reset();
+      extractTasksMutation.reset();
       idempotencyKeyRef.current = null;
+      extractionRequestLockRef.current = false;
       previewRequestLockRef.current = false;
     } else if (!isEditing && !idempotencyKeyRef.current) {
       idempotencyKeyRef.current = crypto.randomUUID();
@@ -162,6 +181,19 @@ export function ProjectFormModal({
   const taskOptionsError = departmentsQuery.isError || taskModelsQuery.isError;
   const taskValidationError = getTaskValidationError();
   const hasMeetingMinutesText = Boolean(meetingMinutes.trim());
+  const canExtractTasks = canAttemptWizardExtraction(extractionAttempts);
+  const hasAiProposals = tasks.some(({ source }) => source === "ai");
+  const hasWizardDraft =
+    !isEditing &&
+    (createStep !== 1 ||
+      Boolean(values.name.trim()) ||
+      Boolean(values.objective.trim()) ||
+      Boolean(values.start_date) ||
+      Boolean(values.end_date) ||
+      tasks.length > 0 ||
+      hasMeetingMinutesText ||
+      Boolean(meetingMinutesFile) ||
+      extractionAttempts > 0);
 
   function getTaskValidationError(): string | null {
     if (tasks.length === 0) return null;
@@ -198,7 +230,21 @@ export function ProjectFormModal({
   }
 
   async function handleExtractTasks() {
-    if ((!hasMeetingMinutesText && !meetingMinutesFile) || extractTasksMutation.isPending) return;
+    if (extractionRequestLockRef.current || extractTasksMutation.isPending || !canExtractTasks) {
+      return;
+    }
+
+    const sourceValidationMessage = getWizardExtractionSourceValidationMessage({
+      text: meetingMinutes,
+      file: meetingMinutesFile,
+    });
+    if (sourceValidationMessage) {
+      toast.error(sourceValidationMessage);
+      return;
+    }
+
+    extractionRequestLockRef.current = true;
+    setExtractionAttempts((current) => current + 1);
 
     try {
       const proposals = await extractTasksMutation.mutateAsync({
@@ -225,6 +271,53 @@ export function ProjectFormModal({
       toast.success(`Tarefas propostas pela IA: ${proposals.length}. Revise antes de continuar.`);
     } catch (error) {
       toast.error(getRequestErrorMessage(error, PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE));
+    } finally {
+      extractionRequestLockRef.current = false;
+    }
+  }
+
+  function changeMeetingMinutesSource(
+    action: Exclude<PendingWizardConfirmation, "discard-wizard" | null>,
+  ) {
+    setTasks((current) => current.filter(({ source }) => source === "manual"));
+
+    if (action === "clear-meeting-minutes") {
+      setMeetingMinutes("");
+      return;
+    }
+
+    setMeetingMinutesFile(null);
+    if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
+  }
+
+  function handleMeetingMinutesSourceChange(
+    action: Exclude<PendingWizardConfirmation, "discard-wizard" | null>,
+  ) {
+    if (hasAiProposals) {
+      setPendingConfirmation(action);
+      return;
+    }
+
+    changeMeetingMinutesSource(action);
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (nextOpen || isEditing || !hasWizardDraft) {
+      onOpenChange(nextOpen);
+      return;
+    }
+
+    setPendingConfirmation("discard-wizard");
+  }
+
+  function handleConfirmPendingAction() {
+    if (pendingConfirmation === "discard-wizard") {
+      onOpenChange(false);
+      return;
+    }
+
+    if (pendingConfirmation) {
+      changeMeetingMinutesSource(pendingConfirmation);
     }
   }
 
@@ -330,10 +423,14 @@ export function ProjectFormModal({
     }
   }
 
+  const isSourceChangeConfirmation =
+    pendingConfirmation === "clear-meeting-minutes" ||
+    pendingConfirmation === "remove-meeting-minutes-file";
+
   return (
     <Dialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={handleOpenChange}
       title={isEditing ? "Editar projeto" : "Novo projeto"}
       description={isEditing ? "Formulário de projeto" : `Etapa ${createStep} de 3`}
       contentClassName="w-[min(92vw,760px)] [&>footer]:flex-wrap"
@@ -342,7 +439,7 @@ export function ProjectFormModal({
         <>
           <button
             type="button"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
             className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
             disabled={isBusy}
           >
@@ -435,6 +532,27 @@ export function ProjectFormModal({
         </>
       }
     >
+      <ConfirmationDialog
+        open={pendingConfirmation !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setPendingConfirmation(null);
+        }}
+        title={
+          isSourceChangeConfirmation ? "Descartar propostas da IA?" : "Descartar rascunho?"
+        }
+        description={
+          isSourceChangeConfirmation
+            ? "Trocar a fonte da Ata descartará as propostas da IA atuais. Deseja continuar?"
+            : "Fechar agora vai descartar o rascunho deste projeto. Deseja continuar?"
+        }
+        onConfirm={handleConfirmPendingAction}
+        isConfirming={isBusy}
+        errorMessage={null}
+        confirmLabel={isSourceChangeConfirmation ? "Trocar fonte" : "Descartar rascunho"}
+        cancelLabel={isSourceChangeConfirmation ? "Manter fonte" : "Continuar editando"}
+        variant="destructive"
+      />
+
       {isEditing && detailQuery.isLoading ? (
         <div className="flex min-h-52 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
           <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
@@ -560,6 +678,10 @@ export function ProjectFormModal({
             <div className="space-y-3">
               <fieldset className={`${PROJECT_SUBPANEL_CLASSNAME} space-y-3 p-3`}>
                 <legend className="px-1 text-sm font-semibold">Ata de reunião</legend>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Tentativas de extração: {extractionAttempts} de{" "}
+                  {WIZARD_EXTRACTION_MAX_ATTEMPTS}.
+                </p>
                 <label className="space-y-2" htmlFor="project-meeting-minutes">
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Cole a Ata para extrair tarefas
@@ -578,7 +700,7 @@ export function ProjectFormModal({
                   <button
                     type="button"
                     className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                    onClick={() => setMeetingMinutes("")}
+                    onClick={() => handleMeetingMinutesSourceChange("clear-meeting-minutes")}
                     disabled={extractTasksMutation.isPending}
                   >
                     Limpar texto
@@ -605,10 +727,9 @@ export function ProjectFormModal({
                     <button
                       type="button"
                       className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                      onClick={() => {
-                        setMeetingMinutesFile(null);
-                        if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
-                      }}
+                      onClick={() =>
+                        handleMeetingMinutesSourceChange("remove-meeting-minutes-file")
+                      }
                       disabled={extractTasksMutation.isPending}
                     >
                       Remover arquivo
@@ -628,7 +749,7 @@ export function ProjectFormModal({
                   onClick={() => void handleExtractTasks()}
                   disabled={
                     (!hasMeetingMinutesText && !meetingMinutesFile) ||
-                    extractTasksMutation.isPending ||
+                    !canExtractTasks ||
                     isBusy
                   }
                 >
@@ -639,6 +760,11 @@ export function ProjectFormModal({
                   )}
                   Extrair tarefas com IA
                 </button>
+                {!canExtractTasks ? (
+                  <p role="status" className="text-sm text-slate-600 dark:text-slate-300">
+                    Limite de 3 tentativas atingido. Continue adicionando tarefas manualmente.
+                  </p>
+                ) : null}
                 {extractTasksMutation.isPending ? (
                   <output className="block text-sm">Extraindo tarefas da Ata...</output>
                 ) : null}
