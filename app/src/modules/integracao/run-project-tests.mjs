@@ -1264,6 +1264,32 @@ runTest("wizard extraction validates text and file sources before sending", () =
     }),
     null,
   );
+  assert.equal(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata da reunião"], "ata.txt", { type: "text/plain" }),
+    }),
+    null,
+  );
+  assert.equal(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata da reunião"], "ata.md", { type: "text/plain" }),
+    }),
+    null,
+  );
+  assert.equal(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata da reunião"], "ata.docx", {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+    }),
+    null,
+  );
+  assert.equal(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata da reunião"], "ata.pdf", { type: "application/pdf" }),
+    }),
+    null,
+  );
   assert.ok(getWizardExtractionSourceValidationMessage({ text: "   " }));
   assert.ok(getWizardExtractionSourceValidationMessage({}));
   assert.ok(
