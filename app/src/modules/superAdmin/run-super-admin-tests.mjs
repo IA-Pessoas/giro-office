@@ -333,6 +333,16 @@ await runTest("mantém pesquisa e paginação acessíveis e responsivas", () => 
   assert.match(superAdminPageSource, /lg:grid-cols/);
 });
 
+await runTest("alinha a paginação do diretório ao painel de configuração", () => {
+  assert.match(superAdminPageSource, /lg:items-stretch/);
+  assert.match(
+    organizationDirectorySource,
+    /<aside className="flex min-h-0 flex-col overflow-hidden/,
+  );
+  assert.doesNotMatch(organizationDirectorySource, /min-h-\[34rem\]/);
+  assert.match(organizationDirectorySource, /min-h-0 flex-1 overflow-y-auto/);
+});
+
 await runTest("oferece gestão explícita sem suporte ou CTA inerte", () => {
   assert.doesNotMatch(allSuperAdminSources, /Novo usuário|Modo suporte|Suporte assistido/);
   assert.doesNotMatch(allSuperAdminSources, /onClick=\{\(\) => \{\}\}/);
