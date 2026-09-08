@@ -2,6 +2,7 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   ReportDefinition,
+  ReportComposition,
   ReportDownloadResult,
   ReportHistoryPage,
   ReportHistoryScope,
@@ -23,6 +24,10 @@ import {
 } from "./reportsService.contract";
 
 export const reportsService = {
+  async validateDefinition(definition: ReportComposition): Promise<void> {
+    const response = await setupAPIClient().post("/reports/definitions/validate", { definition });
+    unwrapReportsEnvelope(response.data);
+  },
   async getCatalog(): Promise<ReportsCatalog> {
     const api = setupAPIClient();
     return fetchReportsCatalog((path) => api.get(path));

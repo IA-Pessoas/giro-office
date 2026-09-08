@@ -6,6 +6,7 @@ import type {
   SourceCatalogService,
 } from "../catalog/sourceCatalogService.js";
 import type { ReportCatalogScope } from "../catalog/types.js";
+import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
 import {
   MAX_DECLARED_REPORT_BYTES,
   MAX_DECLARED_REPORT_ROWS,
@@ -21,6 +22,25 @@ export class ReportDefinitionService {
   readonly #relationshipValidator = new RelationshipValidator();
 
   constructor(private readonly sourceCatalog: SourceCatalogService) {}
+
+  validateComposition(definition: ReportComposition, scope: ReportCatalogScope): ReportComposition {
+    for (const area of definition.areas) {
+      this.validate(
+        {
+          sources: [area.source],
+          columns: area.fields.map((field) => ({ source: area.source, field, alias: field })),
+          joins: [],
+          filters: [],
+          filter_groups: [],
+          parameters: [],
+          aggregations: [],
+          order_by: [],
+        },
+        scope,
+      );
+    }
+    return definition;
+  }
 
   validate(definition: ReportDefinition, scope: ReportCatalogScope): ValidatedReportDefinition {
     const catalog = this.sourceCatalog.getAuthorizedCatalog(scope);

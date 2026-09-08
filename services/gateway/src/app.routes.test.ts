@@ -249,6 +249,65 @@ it("proxies reports requests with the authenticated context and no gateway modul
   }
 });
 
+it("protects report definition review with bound CSRF and forwarded identity", async () => {
+  const proof = "A".repeat(43);
+  const session = createToken({
+    user_id: "reports-user",
+    organization_id: "reports-org",
+    permission: 0,
+    type: "user",
+    csrf_hash: hashCsrfToken(proof),
+  });
+  let hits = 0;
+  const upstream = createServer((request, response) => {
+    hits += 1;
+    expect(request.url).toBe("/reports/definitions/validate");
+    expect(request.headers[FORWARDED_AUTH_USER_ID_HEADER]).toBe("reports-user");
+    expect(request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER]).toBe("reports-org");
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: {} }));
+  });
+  const reportsServiceUrl = await startServer(upstream);
+  const gateway = createServer(
+    createApp(
+      createEnv({
+        reportsServiceUrl,
+        allowedOrigins: ["https://useoffice.com.br"],
+        bearerAuthCompatibility: false,
+      }),
+      createTestLogger(),
+    ),
+  );
+  const url = await startServer(gateway);
+  try {
+    const headers = {
+      Cookie: `cw.session=${session}; cw.csrf=${proof}`,
+      Origin: "https://useoffice.com.br",
+      "content-type": "application/json",
+    };
+    const body = JSON.stringify({
+      definition: { version: 2, areas: [{ source: "integracao.projects", fields: ["name"] }] },
+    });
+    const denied = await fetch(`${url}/reports/definitions/validate`, {
+      method: "POST",
+      headers,
+      body,
+    });
+    expect(denied.status).toBe(403);
+    expect(hits).toBe(0);
+    const accepted = await fetch(`${url}/reports/definitions/validate`, {
+      method: "POST",
+      headers: { ...headers, [CSRF_HEADER_NAME]: proof },
+      body,
+    });
+    expect(accepted.status).toBe(200);
+    expect(hits).toBe(1);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 function createToken(
   claims: {
     user_id: string;

@@ -12,9 +12,7 @@ const {
   unwrapReportJobListEnvelope,
   unwrapReportsCatalogEnvelope,
   unwrapReportsEnvelope,
-} = await import(
-  "./services/reportsService.contract.ts"
-);
+} = await import("./services/reportsService.contract.ts");
 const {
   reportsCatalogQueryKey,
   reportsHistoryQueryKey,
@@ -31,9 +29,18 @@ const {
   sanitizeReportPreviewResult,
 } = await import("./utils/reportBuilder.ts");
 const appPackage = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url)));
-const reportsPageSource = await readFile(new URL("./components/ReportsCatalogPage.tsx", import.meta.url), "utf8");
-const snapshotTableSource = await readFile(new URL("./components/ReportSnapshotTable.tsx", import.meta.url), "utf8");
-const downloadActionsSource = await readFile(new URL("./components/ReportDownloadActions.tsx", import.meta.url), "utf8");
+const reportsPageSource = await readFile(
+  new URL("./components/ReportsCatalogPage.tsx", import.meta.url),
+  "utf8",
+);
+const snapshotTableSource = await readFile(
+  new URL("./components/ReportSnapshotTable.tsx", import.meta.url),
+  "utf8",
+);
+const downloadActionsSource = await readFile(
+  new URL("./components/ReportDownloadActions.tsx", import.meta.url),
+  "utf8",
+);
 
 function runTest(name, callback) {
   try {
@@ -47,6 +54,26 @@ function runTest(name, callback) {
 
 runTest("unwraps the shared success envelope", () => {
   assert.deepEqual(unwrapReportsEnvelope({ success: true, data: { items: [] } }), { items: [] });
+});
+
+runTest("preserves friendly department and area descriptions from the authorized catalog", () => {
+  const catalog = unwrapReportsCatalogEnvelope({
+    success: true,
+    data: {
+      items: [
+        {
+          key: "internal.projects",
+          label: "Projetos",
+          module: "internal",
+          department_label: "Equipe de projetos",
+          description: "Prazos e responsáveis dos projetos.",
+          fields: [],
+        },
+      ],
+    },
+  });
+  assert.equal(catalog.items[0].department_label, "Equipe de projetos");
+  assert.equal(catalog.items[0].description, "Prazos e responsáveis dos projetos.");
 });
 
 runTest("rejects malformed catalog data", () => {
@@ -84,39 +111,42 @@ runTest("does not expose upstream error details", () => {
 });
 
 runTest("normalizes preview errors without exposing upstream details", () => {
-  assert.deepEqual(normalizeReportsPreviewError({ response: { status: 422, data: { error: "secret" } } }), {
-    message: "Não foi possível gerar a prévia agora.",
-    status: 422,
-  });
+  assert.deepEqual(
+    normalizeReportsPreviewError({ response: { status: 422, data: { error: "secret" } } }),
+    {
+      message: "Não foi possível gerar a prévia agora.",
+      status: 422,
+    },
+  );
 });
 
 await (async () => {
   let requestedPath;
   const catalog = await fetchReportsCatalog(async (path) => {
-      requestedPath = path;
-      return {
+    requestedPath = path;
+    return {
+      data: {
+        success: true,
         data: {
-          success: true,
-          data: {
-            items: [
-              {
-                key: "rh.requests",
-                label: "Solicitações",
-                module: "rh",
-                fields: [
-                  {
-                    key: "status",
-                    label: "Status",
-                    value_type: "string",
-                    filter_operators: ["eq"],
-                    aggregations: [],
-                  },
-                ],
-              },
-            ],
-          },
+          items: [
+            {
+              key: "rh.requests",
+              label: "Solicitações",
+              module: "rh",
+              fields: [
+                {
+                  key: "status",
+                  label: "Status",
+                  value_type: "string",
+                  filter_operators: ["eq"],
+                  aggregations: [],
+                },
+              ],
+            },
+          ],
         },
-      };
+      },
+    };
   });
 
   runTest("loads catalog from the public reports endpoint", () => {
@@ -151,16 +181,24 @@ await (async () => {
 await (async () => {
   let requestedPath;
   let requestedPayload;
-  const result = await fetchReportsPreview(async (path, payload) => {
-    requestedPath = path;
-    requestedPayload = payload;
-    return {
-      data: {
-        success: true,
-        data: { rows: [], presentation: { columns: [] }, limit: 100, hasMore: false },
+  const result = await fetchReportsPreview(
+    async (path, payload) => {
+      requestedPath = path;
+      requestedPayload = payload;
+      return {
+        data: {
+          success: true,
+          data: { rows: [], presentation: { columns: [] }, limit: 100, hasMore: false },
+        },
+      };
+    },
+    {
+      definition: {
+        sources: ["requests"],
+        columns: [{ source: "requests", field: "status", alias: "status" }],
       },
-    };
-  }, { definition: { sources: ["requests"], columns: [{ source: "requests", field: "status", alias: "status" }] } });
+    },
+  );
 
   runTest("loads a valid empty preview from the preview endpoint", () => {
     assert.equal(requestedPath, "/reports/preview");
@@ -183,7 +221,7 @@ const descriptor = {
   label: "Solicitações",
   module: "rh",
   fields: [
-  {
+    {
       key: "status",
       label: "Status",
       type: "string",
@@ -271,7 +309,9 @@ runTest("builds a governed preview payload from catalog capabilities", () => {
         { source: "requests", field: "amount", alias: "amount" },
       ],
       joins: [{ relation: "department", type: "inner" }],
-      filters: [{ source: "requests", field: "status", operator: "eq", parameter: "filter_value_1" }],
+      filters: [
+        { source: "requests", field: "status", operator: "eq", parameter: "filter_value_1" },
+      ],
       filter_groups: [{ operator: "and", filters: ["filter_value_1"] }],
       parameters: [
         { name: "period", type: "string" },
@@ -286,14 +326,25 @@ runTest("builds a governed preview payload from catalog capabilities", () => {
 
 runTest("keeps empty preview results valid and exposes the backend limit", () => {
   const payload = buildReportPreviewPayload(
-    { ...builderState, fieldKeys: [], filters: [], groupBy: [], aggregations: [], orderBy: [], limit: 0 },
+    {
+      ...builderState,
+      fieldKeys: [],
+      filters: [],
+      groupBy: [],
+      aggregations: [],
+      orderBy: [],
+      limit: 0,
+    },
     descriptor,
   );
   assert.equal(payload, undefined);
 });
 
 runTest("normalizes builder state without leaking unknown catalog keys", () => {
-  assert.deepEqual(normalizeReportBuilderState(builderState, descriptor).fieldKeys, ["status", "amount"]);
+  assert.deepEqual(normalizeReportBuilderState(builderState, descriptor).fieldKeys, [
+    "status",
+    "amount",
+  ]);
 });
 
 runTest("uses one stable preview query key", () => {
@@ -306,10 +357,9 @@ runTest("exposes the governed history, snapshot, and download contracts", () => 
   assert.equal(REPORTS_ENDPOINTS.jobs, "/reports/jobs/list");
   assert.equal(REPORTS_ENDPOINTS.snapshot("job-1"), "/reports/jobs/job-1/snapshot");
   assert.equal(REPORTS_ENDPOINTS.download("snapshot-1"), "/reports/snapshots/snapshot-1/export");
-  assert.deepEqual(
-    buildReportJobListParams({ scope: "personal", status: "", cursor: undefined }),
-    { scope: "personal" },
-  );
+  assert.deepEqual(buildReportJobListParams({ scope: "personal", status: "", cursor: undefined }), {
+    scope: "personal",
+  });
   assert.deepEqual(reportsModelsQueryKey("personal"), ["reports", "models", "personal"]);
   assert.deepEqual(reportsHistoryQueryKey({ scope: "library", status: "completed" }), [
     "reports",

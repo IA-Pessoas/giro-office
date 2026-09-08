@@ -153,6 +153,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/reports\/definitions\/validate$/,
+    description: { action: "revisou", item: "a configuração de um relatório" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/reports\/preview$/,
     description: { action: "gerou", item: "uma prévia de relatório" },
   },

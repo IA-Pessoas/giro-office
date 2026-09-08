@@ -32,6 +32,35 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
         },
       },
       schemas: {
+        ReportComposition: {
+          type: "object",
+          additionalProperties: false,
+          required: ["version", "areas"],
+          properties: {
+            version: { type: "integer", enum: [2] },
+            areas: {
+              type: "array",
+              minItems: 1,
+              maxItems: 32,
+              description: "Áreas únicas e independentes; ordem exclusivamente visual.",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["source", "fields"],
+                properties: {
+                  source: { type: "string" },
+                  fields: {
+                    type: "array",
+                    minItems: 1,
+                    maxItems: 100,
+                    uniqueItems: true,
+                    items: { type: "string", minLength: 1, maxLength: 64 },
+                  },
+                },
+              },
+            },
+          },
+        },
         SuccessEnvelope: {
           type: "object",
           required: ["success", "data"],
@@ -52,6 +81,47 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
       },
     },
     paths: {
+      "/reports/definitions/validate": {
+        post: {
+          tags: ["Reports"],
+          summary: "Revisar áreas e campos autorizados sem executar ou persistir",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["definition"],
+                  properties: {
+                    definition: {
+                      oneOf: [
+                        { $ref: "#/components/schemas/ReportComposition" },
+                        {
+                          type: "object",
+                          required: ["sources", "columns"],
+                          description:
+                            "Definição legada preservada, validada pelo contrato existente.",
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Definição validada, preservando versão e ordem",
+              ...successResponse,
+            },
+            "400": { description: "Escolhas inválidas, repetidas, vazias ou acima dos limites" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Área ou campo não autorizado" },
+          },
+        },
+      },
       "/health": {
         get: {
           tags: ["Health"],
@@ -72,7 +142,11 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           summary: "Listar catalogo de relatorios",
           security: [{ bearerAuth: [] }],
           responses: {
-            "200": { description: "Catalogo de relatorios", ...successResponse },
+            "200": {
+              description:
+                "Áreas autorizadas com key, label, module, department_label, description e fields autorizados. Agrupar por department_label; identificadores internos não são rótulos de interface.",
+              ...successResponse,
+            },
             "401": {
               description: "Contexto autenticado ausente",
               content: {
