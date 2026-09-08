@@ -909,11 +909,11 @@ describe("project wizard task extraction routes", () => {
     );
   });
 
-  it("aceita Ata JSON maior que o antigo teto e preserva o contrato de sucesso", async () => {
+  it("aceita Ata JSON no limite de 10 MB mesmo com escaping", async () => {
     const service: ProjectWizardExtractionRouteDeps = {
       extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa extensa" }] }),
     };
-    const content = "A".repeat(1_100_000);
+    const content = '"'.repeat(10 * 1024 * 1024);
 
     const response = await request(createExtractionApp(service))
       .post("/task/project-wizard/extract-tasks")
@@ -926,6 +926,18 @@ describe("project wizard task extraction routes", () => {
       data: { tasks: [{ name: "Tarefa extensa" }] },
     });
     expect(service.extractTasks).toHaveBeenCalledWith(expect.objectContaining({ content }));
+  });
+
+  it("rejeita Ata JSON acima do limite de 10 MB da fonte", async () => {
+    const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .send({ ...validExtractionBody, content: "A".repeat(10 * 1024 * 1024 + 1) });
+
+    expect(response.status).toBe(400);
+    expect(service.extractTasks).not.toHaveBeenCalled();
   });
 
   it("preserva o contrato de erro para Ata JSON maior que o antigo teto", async () => {

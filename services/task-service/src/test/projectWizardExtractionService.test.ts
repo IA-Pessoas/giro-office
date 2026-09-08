@@ -250,11 +250,13 @@ describe("ProjectWizardExtractionService", () => {
     });
     const service = new ProjectWizardExtractionService(provider, createPrisma());
 
-    await expect(service.extractTasks(createRequest())).rejects.toBeInstanceOf(ServiceError);
-    await expect(service.extractTasks(createRequest())).rejects.toMatchObject({ statusCode: 502 });
+    await expect(service.extractTasks(createRequest())).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Não foi possível extrair tarefas da Ata inteira.",
+    });
   });
 
-  it("preserva a falha original do provedor sem reembrulhar", async () => {
+  it("uniformiza a falha estrutural do provedor para a Ata inteira", async () => {
     const { provider } = createProvider(async () => {
       throw new ServiceError(502, "Resposta da IA em formato incompatível.");
     });
@@ -262,7 +264,17 @@ describe("ProjectWizardExtractionService", () => {
 
     await expect(service.extractTasks(createRequest())).rejects.toMatchObject({
       statusCode: 502,
-      message: "Resposta da IA em formato incompatível.",
+      message: "Não foi possível extrair tarefas da Ata inteira.",
+    });
+  });
+
+  it("invalida uma Ata de uma parte quando a resposta é estruturalmente incompatível", async () => {
+    const { provider } = createProvider(async () => [{}]);
+    const service = new ProjectWizardExtractionService(provider, createPrisma());
+
+    await expect(service.extractTasks(createRequest())).rejects.toMatchObject({
+      statusCode: 502,
+      message: "Não foi possível extrair tarefas da Ata inteira.",
     });
   });
 

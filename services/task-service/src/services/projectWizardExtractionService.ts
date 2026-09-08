@@ -165,13 +165,9 @@ export class ProjectWizardExtractionService {
       }
 
       return proposals.flat();
-    } catch (err: unknown) {
+    } catch {
       logError("Falha na extração de tarefas propostas pela IA.");
-      if (parts.length === 1 && err instanceof ServiceError) throw err;
-      if (parts.length > 1) {
-        throw new ServiceError(502, "Não foi possível extrair tarefas da Ata inteira.");
-      }
-      throw new ServiceError(502, "Não foi possível extrair tarefas da Ata.", err);
+      throw new ServiceError(502, "Não foi possível extrair tarefas da Ata inteira.");
     }
   }
 }
