@@ -780,29 +780,26 @@ async function runBrowserProof() {
       wizard.getByText("Tentativas de extração: 3 de 3.", { exact: true }),
     ).toBeVisible();
 
-    const sourceChangeDismissed = new Promise((resolve) => {
-      page.once("dialog", async (dialog) => {
-        assert.equal(dialog.type(), "confirm");
-        assert.match(dialog.message(), /descartará as propostas da IA/i);
-        await dialog.dismiss();
-        resolve();
-      });
-    });
     await wizard.getByRole("button", { name: "Limpar texto" }).click();
-    await sourceChangeDismissed;
+    const sourceChangeConfirmation = page.getByRole("dialog", {
+      name: "Descartar propostas da IA?",
+    });
+    await expect(sourceChangeConfirmation).toBeVisible();
+    await expect(
+      sourceChangeConfirmation.getByText(
+        "Trocar a fonte da Ata descartará as propostas da IA atuais. Deseja continuar?",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await sourceChangeConfirmation.getByRole("button", { name: "Manter fonte" }).click();
     await expect(minutesField).toHaveValue(
       "- Apurar impostos do trimestre\n- Reunir documentos do cliente",
     );
     await expect(reextractedTask).toBeVisible();
 
-    const sourceChangeAccepted = new Promise((resolve) => {
-      page.once("dialog", async (dialog) => {
-        await dialog.accept();
-        resolve();
-      });
-    });
     await wizard.getByRole("button", { name: "Limpar texto" }).click();
-    await sourceChangeAccepted;
+    await expect(sourceChangeConfirmation).toBeVisible();
+    await sourceChangeConfirmation.getByRole("button", { name: "Trocar fonte" }).click();
     await expect(minutesField).toHaveValue("");
     await expect(minutesFile).toBeEnabled();
     await expect(manualTask.getByLabel(/^Nome/)).toHaveValue("Tarefa manual preservada");
@@ -822,27 +819,40 @@ async function runBrowserProof() {
     await expect(minutesFile).toBeEnabled();
     await minutesField.fill("Nova fonte em texto");
 
-    const cancelDismissed = new Promise((resolve) => {
-      page.once("dialog", async (dialog) => {
-        assert.equal(dialog.type(), "confirm");
-        assert.match(dialog.message(), /descartar o rascunho/i);
-        await dialog.dismiss();
-        resolve();
-      });
-    });
     await wizard.getByRole("button", { name: "Cancelar" }).click();
-    await cancelDismissed;
+    const draftDiscardConfirmation = page.getByRole("dialog", {
+      name: "Descartar rascunho?",
+    });
+    await expect(draftDiscardConfirmation).toBeVisible();
+    await expect(
+      draftDiscardConfirmation.getByText(
+        "Fechar agora vai descartar o rascunho deste projeto. Deseja continuar?",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await draftDiscardConfirmation
+      .getByRole("button", { name: "Continuar editando" })
+      .click();
     await expect(wizard).toBeVisible();
     await expect(minutesField).toHaveValue("Nova fonte em texto");
 
-    const closeAccepted = new Promise((resolve) => {
-      page.once("dialog", async (dialog) => {
-        await dialog.accept();
-        resolve();
-      });
-    });
+    await wizard.getByRole("button", { name: "Fechar" }).click();
+    await expect(draftDiscardConfirmation).toBeVisible();
+    await draftDiscardConfirmation
+      .getByRole("button", { name: "Continuar editando" })
+      .click();
+    await expect(wizard).toBeVisible();
+
+    await page.mouse.click(5, 5);
+    await expect(draftDiscardConfirmation).toBeVisible();
+    await draftDiscardConfirmation
+      .getByRole("button", { name: "Continuar editando" })
+      .click();
+    await expect(wizard).toBeVisible();
+
     await page.keyboard.press("Escape");
-    await closeAccepted;
+    await expect(draftDiscardConfirmation).toBeVisible();
+    await draftDiscardConfirmation.getByRole("button", { name: "Descartar rascunho" }).click();
     await expect(wizard).not.toBeVisible();
     assert.equal(wizardRequests.length, 3, "Cancelar ou fechar não pode confirmar o wizard.");
 

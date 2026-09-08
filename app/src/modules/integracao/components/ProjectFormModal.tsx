@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 
 import { ClientSelectionField } from "@modules/clients";
 import { departmentService } from "@modules/departments";
-import { Dialog } from "@shared/components/ui/Dialog";
+import { ConfirmationDialog, Dialog } from "@shared/components";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { useFetch } from "@shared/hooks";
 
@@ -52,6 +52,11 @@ import {
 } from "./taskFormModalUi";
 
 type WizardTask = ProjectWizardTaskProposal & { id: string; source: "ai" | "manual" };
+type PendingWizardConfirmation =
+  | "clear-meeting-minutes"
+  | "remove-meeting-minutes-file"
+  | "discard-wizard"
+  | null;
 
 interface ProjectFormModalProps {
   open: boolean;
@@ -114,6 +119,8 @@ export function ProjectFormModal({
   const [tasks, setTasks] = useState<WizardTask[]>([]);
   const [meetingMinutes, setMeetingMinutes] = useState("");
   const [meetingMinutesFile, setMeetingMinutesFile] = useState<File | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] =
+    useState<PendingWizardConfirmation>(null);
   const extractTasksMutation = useExtractProjectTasksMutation();
   const [extractionAttempts, setExtractionAttempts] = useState(0);
   const [preview, setPreview] = useState<ProjectWizardPreview | null>(null);
@@ -143,6 +150,7 @@ export function ProjectFormModal({
       setTasks([]);
       setMeetingMinutes("");
       setMeetingMinutesFile(null);
+      setPendingConfirmation(null);
       setExtractionAttempts(0);
       if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
       setPreview(null);
@@ -268,28 +276,48 @@ export function ProjectFormModal({
     }
   }
 
-  function confirmSourceChange(): boolean {
-    if (!hasAiProposals) return true;
-    if (
-      !window.confirm(
-        "Trocar a fonte da Ata descartará as propostas da IA atuais. Deseja continuar?",
-      )
-    ) {
-      return false;
+  function changeMeetingMinutesSource(
+    action: Exclude<PendingWizardConfirmation, "discard-wizard" | null>,
+  ) {
+    setTasks((current) => current.filter(({ source }) => source === "manual"));
+
+    if (action === "clear-meeting-minutes") {
+      setMeetingMinutes("");
+      return;
     }
 
-    setTasks((current) => current.filter(({ source }) => source === "manual"));
-    return true;
+    setMeetingMinutesFile(null);
+    if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
+  }
+
+  function handleMeetingMinutesSourceChange(
+    action: Exclude<PendingWizardConfirmation, "discard-wizard" | null>,
+  ) {
+    if (hasAiProposals) {
+      setPendingConfirmation(action);
+      return;
+    }
+
+    changeMeetingMinutesSource(action);
   }
 
   function handleOpenChange(nextOpen: boolean) {
-    if (
-      nextOpen ||
-      isEditing ||
-      !hasWizardDraft ||
-      window.confirm("Fechar agora vai descartar o rascunho deste projeto. Deseja continuar?")
-    ) {
+    if (nextOpen || isEditing || !hasWizardDraft) {
       onOpenChange(nextOpen);
+      return;
+    }
+
+    setPendingConfirmation("discard-wizard");
+  }
+
+  function handleConfirmPendingAction() {
+    if (pendingConfirmation === "discard-wizard") {
+      onOpenChange(false);
+      return;
+    }
+
+    if (pendingConfirmation) {
+      changeMeetingMinutesSource(pendingConfirmation);
     }
   }
 
@@ -394,6 +422,10 @@ export function ProjectFormModal({
       toast.error(getRequestErrorMessage(error));
     }
   }
+
+  const isSourceChangeConfirmation =
+    pendingConfirmation === "clear-meeting-minutes" ||
+    pendingConfirmation === "remove-meeting-minutes-file";
 
   return (
     <Dialog
@@ -500,6 +532,27 @@ export function ProjectFormModal({
         </>
       }
     >
+      <ConfirmationDialog
+        open={pendingConfirmation !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setPendingConfirmation(null);
+        }}
+        title={
+          isSourceChangeConfirmation ? "Descartar propostas da IA?" : "Descartar rascunho?"
+        }
+        description={
+          isSourceChangeConfirmation
+            ? "Trocar a fonte da Ata descartará as propostas da IA atuais. Deseja continuar?"
+            : "Fechar agora vai descartar o rascunho deste projeto. Deseja continuar?"
+        }
+        onConfirm={handleConfirmPendingAction}
+        isConfirming={isBusy}
+        errorMessage={null}
+        confirmLabel={isSourceChangeConfirmation ? "Trocar fonte" : "Descartar rascunho"}
+        cancelLabel={isSourceChangeConfirmation ? "Manter fonte" : "Continuar editando"}
+        variant="destructive"
+      />
+
       {isEditing && detailQuery.isLoading ? (
         <div className="flex min-h-52 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
           <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
@@ -647,9 +700,7 @@ export function ProjectFormModal({
                   <button
                     type="button"
                     className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                    onClick={() => {
-                      if (confirmSourceChange()) setMeetingMinutes("");
-                    }}
+                    onClick={() => handleMeetingMinutesSourceChange("clear-meeting-minutes")}
                     disabled={extractTasksMutation.isPending}
                   >
                     Limpar texto
@@ -676,11 +727,9 @@ export function ProjectFormModal({
                     <button
                       type="button"
                       className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
-                      onClick={() => {
-                        if (!confirmSourceChange()) return;
-                        setMeetingMinutesFile(null);
-                        if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
-                      }}
+                      onClick={() =>
+                        handleMeetingMinutesSourceChange("remove-meeting-minutes-file")
+                      }
                       disabled={extractTasksMutation.isPending}
                     >
                       Remover arquivo
