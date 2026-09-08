@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { extname } from "node:path";
 import { Writable } from "node:stream";
 import {
   FORWARDED_AUTH_MODULES_HEADER,
@@ -27,10 +28,11 @@ import { projectWizardCreateBodySchema } from "../schemas/projectWizard.schemas.
 import { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "../services/projectWizardService.js";
 import { DOCX_MIME_TYPE } from "../utils/docx.js";
+import { PDF_MIME_TYPE } from "../utils/pdf.js";
 
 vi.mock("../integrations/audit.js", () => ({ createLog: vi.fn() }));
 
-function readDocxFixture(name: string): Buffer {
+function readFixture(name: string): Buffer {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
 }
 
@@ -575,6 +577,9 @@ describe("project wizard task extraction routes", () => {
     expect(
       operation.requestBody.content["multipart/form-data"].schema.properties.file.description,
     ).toContain(".docx");
+    expect(
+      operation.requestBody.content["multipart/form-data"].schema.properties.file.description,
+    ).toContain(".pdf");
   });
 
   it.each([
@@ -606,6 +611,7 @@ describe("project wizard task extraction routes", () => {
   it.each([
     ["Markdown", "ata.md", "application/pdf"],
     ["DOCX", "ata.docx", "text/plain"],
+    ["PDF", "ata.pdf", "text/plain"],
   ])("rejeita MIME incompatível para %s", async (_label, filename, contentType) => {
     const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
     const response = await request(createExtractionApp(service))
@@ -637,7 +643,7 @@ describe("project wizard task extraction routes", () => {
       .field("objective", validExtractionBody.objective)
       .field("start_date", validExtractionBody.start_date)
       .field("end_date", validExtractionBody.end_date)
-      .attach("file", readDocxFixture("meeting-minutes.docx"), {
+      .attach("file", readFixture("meeting-minutes.docx"), {
         filename: "ata.docx",
         contentType: DOCX_MIME_TYPE,
       });
@@ -658,27 +664,60 @@ describe("project wizard task extraction routes", () => {
 
   it.each([
     [
-      "corrompido",
+      "DOCX corrompido",
       "meeting-minutes-corrupted.docx",
+      DOCX_MIME_TYPE,
       "O arquivo DOCX está corrompido ou não pôde ser lido.",
     ],
     [
-      "criptografado",
+      "DOCX criptografado",
       "meeting-minutes-encrypted.docx",
+      DOCX_MIME_TYPE,
       "O arquivo DOCX está protegido por senha e não pode ser lido.",
     ],
     [
-      "com assinatura divergente",
+      "DOCX com assinatura divergente",
       "meeting-minutes-not-ooxml.docx",
+      DOCX_MIME_TYPE,
       "O arquivo DOCX está corrompido ou não pôde ser lido.",
     ],
-    ["sem texto", "meeting-minutes-empty.docx", "O arquivo da Ata não contém texto."],
     [
-      "com entidade XML inválida",
+      "DOCX sem texto",
+      "meeting-minutes-empty.docx",
+      DOCX_MIME_TYPE,
+      "O arquivo da Ata não contém texto.",
+    ],
+    [
+      "DOCX com entidade XML inválida",
       "meeting-minutes-invalid-entity.docx",
+      DOCX_MIME_TYPE,
       "O arquivo DOCX está corrompido ou não pôde ser lido.",
     ],
-  ])("rejeita DOCX %s sem chamar o provedor", async (_label, fixture, error) => {
+    [
+      "PDF corrompido",
+      "meeting-minutes-corrupted.pdf",
+      PDF_MIME_TYPE,
+      "O arquivo PDF está corrompido ou não pôde ser lido.",
+    ],
+    [
+      "PDF criptografado",
+      "meeting-minutes-encrypted.pdf",
+      PDF_MIME_TYPE,
+      "O arquivo PDF está protegido por senha e não pode ser lido.",
+    ],
+    [
+      "PDF com assinatura divergente",
+      "meeting-minutes-not-pdf.pdf",
+      PDF_MIME_TYPE,
+      "O arquivo PDF está corrompido ou não pôde ser lido.",
+    ],
+    [
+      "PDF digitalizado, sem camada textual",
+      "meeting-minutes-scanned.pdf",
+      PDF_MIME_TYPE,
+      "O arquivo da Ata não contém texto.",
+    ],
+  ])("rejeita %s sem chamar o provedor", async (_label, fixture, contentType, error) => {
     const service: ProjectWizardExtractionRouteDeps = { extractTasks: vi.fn() };
 
     const response = await request(createExtractionApp(service))
@@ -687,17 +726,17 @@ describe("project wizard task extraction routes", () => {
       .field("name", validExtractionBody.name)
       .field("objective", validExtractionBody.objective)
       .field("start_date", validExtractionBody.start_date)
-      .attach("file", readDocxFixture(fixture), {
-        filename: "ata.docx",
-        contentType: DOCX_MIME_TYPE,
-      });
+      .attach("file", readFixture(fixture), { filename: `ata${extname(fixture)}`, contentType });
 
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({ success: false, error });
     expect(service.extractTasks).not.toHaveBeenCalled();
   });
 
-  it("não registra nem audita o texto da Ata DOCX aceita", async () => {
+  it.each([
+    ["DOCX", "meeting-minutes.docx", DOCX_MIME_TYPE],
+    ["PDF", "meeting-minutes.pdf", PDF_MIME_TYPE],
+  ])("não registra nem audita o texto da Ata %s aceita", async (_label, fixture, contentType) => {
     const service: ProjectWizardExtractionRouteDeps = {
       extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
     };
@@ -711,14 +750,62 @@ describe("project wizard task extraction routes", () => {
       .field("name", validExtractionBody.name)
       .field("objective", validExtractionBody.objective)
       .field("start_date", validExtractionBody.start_date)
-      .attach("file", readDocxFixture("meeting-minutes.docx"), {
-        filename: "ata.docx",
-        contentType: DOCX_MIME_TYPE,
-      });
+      .attach("file", readFixture(fixture), { filename: `ata${extname(fixture)}`, contentType });
 
     expect(response.status).toBe(200);
     expect(auditLog).toHaveBeenCalledTimes(auditCallsBefore);
     expect(written.join("\n")).not.toContain("Apurar impostos do trimestre");
+  });
+
+  it("aceita Ata PDF com camada textual e propõe as mesmas Tarefas das demais fontes", async () => {
+    const proposals = { tasks: [{ name: "Apurar impostos" }, { name: "Reunir documentos" }] };
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue(proposals),
+    };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .field("end_date", validExtractionBody.end_date)
+      .attach("file", readFixture("meeting-minutes.pdf"), {
+        filename: "ata.pdf",
+        contentType: PDF_MIME_TYPE,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, data: proposals });
+
+    const { content } = vi.mocked(service.extractTasks).mock.calls[0][0] as { content: string };
+    expect(content).toContain(validExtractionBody.content);
+    // Ações, JavaScript e links do PDF ficam fora do texto entregue ao provedor.
+    expect(content).not.toContain("JavaScript");
+    expect(content).not.toContain("exemplo-malicioso");
+    expect(content).not.toContain("/Type");
+  });
+
+  it("lê PDF com fonte incorporada pelo mapa /ToUnicode", async () => {
+    const service: ProjectWizardExtractionRouteDeps = {
+      extractTasks: vi.fn().mockResolvedValue({ tasks: [{ name: "Tarefa" }] }),
+    };
+
+    const response = await request(createExtractionApp(service))
+      .post("/task/project-wizard/extract-tasks")
+      .set(gatewayHeaders())
+      .field("name", validExtractionBody.name)
+      .field("objective", validExtractionBody.objective)
+      .field("start_date", validExtractionBody.start_date)
+      .attach("file", readFixture("meeting-minutes-embedded-font.pdf"), {
+        filename: "ata.pdf",
+        contentType: PDF_MIME_TYPE,
+      });
+
+    expect(response.status).toBe(200);
+    expect(vi.mocked(service.extractTasks).mock.calls[0][0]).toMatchObject({
+      content: "Reunião de acompanhamento",
+    });
   });
 
   it.each([
@@ -731,10 +818,17 @@ describe("project wizard task extraction routes", () => {
     ],
     [
       "DOCX corrompido",
-      () => readDocxFixture("meeting-minutes-corrupted.docx"),
+      () => readFixture("meeting-minutes-corrupted.docx"),
       "ata.docx",
       DOCX_MIME_TYPE,
       "O arquivo DOCX está corrompido ou não pôde ser lido.",
+    ],
+    [
+      "PDF corrompido",
+      () => readFixture("meeting-minutes-corrupted.pdf"),
+      "ata.pdf",
+      PDF_MIME_TYPE,
+      "O arquivo PDF está corrompido ou não pôde ser lido.",
     ],
   ])("rejeita %s antes do rate limit e do provedor", async (_label, readFile, filename, contentType, error) => {
     const service: ProjectWizardExtractionRouteDeps = {
@@ -1092,7 +1186,10 @@ describe("project wizard task extraction routes", () => {
     expect(written.join("\n")).not.toContain("SEGREDOXYZ");
   });
 
-  it("percorre o fluxo HTTP completo da Ata DOCX com o adapter de IA falso", async () => {
+  it.each([
+    ["DOCX", "meeting-minutes.docx", DOCX_MIME_TYPE],
+    ["PDF", "meeting-minutes.pdf", PDF_MIME_TYPE],
+  ])("percorre o fluxo HTTP completo da Ata %s com o adapter de IA falso", async (_label, fixture, contentType) => {
     const extractionService = new ProjectWizardExtractionService(
       createAiTaskExtractionProvider({ mode: "fake" }),
       {
@@ -1108,12 +1205,10 @@ describe("project wizard task extraction routes", () => {
       .field("name", validExtractionBody.name)
       .field("objective", validExtractionBody.objective)
       .field("start_date", validExtractionBody.start_date)
-      .attach("file", readDocxFixture("meeting-minutes.docx"), {
-        filename: "ata.docx",
-        contentType: DOCX_MIME_TYPE,
-      });
+      .attach("file", readFixture(fixture), { filename: `ata${extname(fixture)}`, contentType });
 
     expect(response.status).toBe(200);
+    // Toda fonte converge para as mesmas Tarefas propostas do texto colado.
     expect(response.body.data.tasks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "Apurar impostos do trimestre" }),

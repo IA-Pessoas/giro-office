@@ -23,6 +23,7 @@ import { projectWizardExtractTasksBodySchema } from "../schemas/projectWizardExt
 import type { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import type { ProjectWizardService } from "../services/projectWizardService.js";
 import { DOCX_MIME_TYPE, extractDocxText } from "../utils/docx.js";
+import { extractPdfText, PDF_MIME_TYPE } from "../utils/pdf.js";
 
 export type ProjectWizardRouteDeps = Pick<ProjectWizardService, "create" | "preview">;
 export type ProjectWizardExtractionRouteDeps = Pick<ProjectWizardExtractionService, "extractTasks">;
@@ -35,20 +36,37 @@ export interface ProjectWizardRoutesDeps {
 
 const MEETING_MINUTES_UPLOAD_FIELD = "file";
 const MEETING_MINUTES_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-const MEETING_MINUTES_FILE_TYPES: Record<string, readonly string[]> = {
-  ".txt": ["text/plain"],
-  ".md": ["text/markdown", "text/plain", "text/x-markdown"],
-  ".docx": [DOCX_MIME_TYPE],
+interface MeetingMinutesFormat {
+  mimeTypes: readonly string[];
+  extract?: (file: Buffer) => string;
+}
+
+/** Formatos aceitos por extensão; os binários trazem o extrator próprio de texto. */
+const MEETING_MINUTES_FORMATS: Record<string, MeetingMinutesFormat> = {
+  ".txt": { mimeTypes: ["text/plain"] },
+  ".md": { mimeTypes: ["text/markdown", "text/plain", "text/x-markdown"] },
+  ".docx": { mimeTypes: [DOCX_MIME_TYPE], extract: extractDocxText },
+  ".pdf": { mimeTypes: [PDF_MIME_TYPE], extract: extractPdfText },
 };
+
+function meetingMinutesFormat(originalname: string): MeetingMinutesFormat | undefined {
+  return MEETING_MINUTES_FORMATS[path.extname(originalname).toLowerCase()];
+}
+
+function decodeUtf8(file: Buffer): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(file);
+  } catch {
+    throw new ServiceError(400, "O arquivo da Ata deve conter texto UTF-8 válido.");
+  }
+}
 type ProjectWizardExtractTasksBody = z.infer<typeof projectWizardExtractTasksBodySchema>;
 
 const meetingMinutesUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MEETING_MINUTES_MAX_FILE_SIZE_BYTES, files: 1, fields: 4 },
   fileFilter(_request, file, callback) {
-    const allowedMimeTypes =
-      MEETING_MINUTES_FILE_TYPES[path.extname(file.originalname).toLowerCase()];
-    if (!allowedMimeTypes?.includes(file.mimetype)) {
+    if (!meetingMinutesFormat(file.originalname)?.mimeTypes.includes(file.mimetype)) {
       callback(new ServiceError(400, "Tipo de arquivo não permitido."));
       return;
     }
@@ -79,10 +97,8 @@ function uploadMeetingMinutes(request: Request, response: Response, next: NextFu
 
     const file = request.file;
     try {
-      const content =
-        file.mimetype === DOCX_MIME_TYPE
-          ? extractDocxText(file.buffer)
-          : new TextDecoder("utf-8", { fatal: true }).decode(file.buffer);
+      const extract = meetingMinutesFormat(file.originalname)?.extract ?? decodeUtf8;
+      const content = extract(file.buffer);
       if (content.includes("\0")) {
         throw new ServiceError(400, "O arquivo da Ata não pode conter NUL.");
       }
@@ -96,7 +112,7 @@ function uploadMeetingMinutes(request: Request, response: Response, next: NextFu
       next(
         decodeError instanceof ServiceError
           ? decodeError
-          : new ServiceError(400, "O arquivo da Ata deve conter texto UTF-8 válido."),
+          : new ServiceError(400, "O arquivo da Ata não pôde ser lido."),
       );
     }
   });
