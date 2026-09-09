@@ -462,10 +462,15 @@ runTest("exposes the governed history, snapshot, and download contracts", () => 
 
 runTest("uses the materialized snapshot id for in-memory downloads", () => {
   assert.match(snapshotTableSource, /snapshotQuery\.data\?\.snapshot\.id/);
-  assert.match(snapshotTableSource, /ReportDownloadActions id=\{snapshotId \?\? ""\}/);
-  assert.match(snapshotTableSource, /disabled=\{!snapshotId\}/);
+  assert.match(snapshotTableSource, /snapshotId \? <ReportDownloadActions id=\{snapshotId\}/);
   assert.match(downloadActionsSource, /URL\.createObjectURL\(result\.blob\)/);
   assert.match(downloadActionsSource, /URL\.revokeObjectURL\(objectUrl\)/);
+});
+
+runTest("renders export actions only after a completed snapshot is available", () => {
+  assert.match(downloadActionsSource, /disabled=\{disabled \|\| downloadMutation\.isPending\}/);
+  assert.match(downloadActionsSource, /Baixar resultado em/);
+  assert.match(snapshotTableSource, /snapshotId \? <ReportDownloadActions/);
 });
 
 runTest("keeps repeated report sources distinct in the composed result", () => {

@@ -1,4 +1,5 @@
 import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "react-toastify";
 
 import { useDownloadReportMutation } from "../hooks/useReports";
@@ -12,8 +13,10 @@ const formats: Array<{ value: ReportExportFormat; label: string; icon: typeof Fi
 
 export function ReportDownloadActions({ id, disabled = false }: { id: string; disabled?: boolean }) {
   const downloadMutation = useDownloadReportMutation();
+  const [activeFormat, setActiveFormat] = useState<ReportExportFormat | null>(null);
 
   async function handleDownload(format: ReportExportFormat) {
+    setActiveFormat(format);
     try {
       const result = await downloadMutation.mutateAsync({ id, format });
       const objectUrl = URL.createObjectURL(result.blob);
@@ -25,6 +28,8 @@ export function ReportDownloadActions({ id, disabled = false }: { id: string; di
       toast.success(`${format.toUpperCase()} pronto para download.`);
     } catch {
       toast.error("Não foi possível preparar o download.");
+    } finally {
+      setActiveFormat(null);
     }
   }
 
@@ -34,11 +39,12 @@ export function ReportDownloadActions({ id, disabled = false }: { id: string; di
         <button
           key={value}
           type="button"
+          aria-label={`Baixar resultado em ${label}`}
           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
           disabled={disabled || downloadMutation.isPending}
           onClick={() => void handleDownload(value)}
         >
-          {downloadMutation.isPending ? (
+          {activeFormat === value ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
           ) : (
             <Icon className="h-3.5 w-3.5" aria-hidden="true" />

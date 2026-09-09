@@ -42,7 +42,7 @@ export function ReportSnapshotTable({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ReportDownloadActions id={snapshotId ?? ""} disabled={!snapshotId} />
+          {snapshotId ? <ReportDownloadActions id={snapshotId} /> : null}
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">
             Fechar
           </button>

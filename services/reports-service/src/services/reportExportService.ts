@@ -8,6 +8,7 @@ import { ReportLetterheadService } from "./reportLetterheadService.js";
 import { type ReportPdfRenderer, ReportPdfService } from "./reportPdfService.js";
 import type { ReportSnapshotService } from "./reportSnapshotService.js";
 import { ReportXlsxService } from "./reportXlsxService.js";
+import { createReportZip } from "./reportZipService.js";
 
 export type ReportExportFormat = "csv" | "xlsx" | "pdf";
 
@@ -16,6 +17,13 @@ export interface ReportExportResult {
   fileName: string;
   body: Buffer;
 }
+
+type ReportExportBlock = {
+  source: string;
+  label: string;
+  columns: readonly { key: string; label: string }[];
+  rows: readonly Record<string, unknown>[];
+};
 
 interface ReportExportRenderers {
   csv?: ReportTableRenderer;
@@ -65,9 +73,21 @@ export class ReportExportService {
         allowSharedLookup: Boolean(this.jobs && this.authorization),
       });
       const exportContext = await this.reauthorizeSnapshot(input, source);
-      const table = createTable(source.rows);
       const renderer = this.renderers[input.format];
       if (!renderer) throw new ServiceError(500, "Formato de exportação indisponível.");
+      const blocks: ReportExportBlock[] = source.blocks?.length
+        ? source.blocks
+        : [
+            {
+              source: "legacy",
+              label: "Relatório",
+              columns: [],
+              rows: source.rows,
+            },
+          ];
+      const tables = blocks.map((block) => createTable(block.rows, block.columns));
+      const stems = uniqueStems(blocks.map((block) => block.label));
+      const totalRows = tables.reduce((total, table) => total + table.rows.length, 0);
 
       const body =
         input.format === "pdf"
@@ -76,16 +96,28 @@ export class ReportExportService {
               generatedAt: source.snapshot.created_at,
               organizationId: input.organizationId,
               ...exportContext,
-              presentation_json: {
-                columns: table.columns.map((column) => ({
-                  key: column.key,
-                  label: column.label,
-                  format: column.valueType,
-                })),
-              },
-              rows: table.rows,
+              presentation_json: toPresentation(tables[0]),
+              rows: tables[0]?.rows ?? [],
+              ...(source.blocks?.length
+                ? {
+                    blocks: tables.map((table, index) => ({
+                      title: blocks[index]?.label ?? "Relatório",
+                      presentation_json: toPresentation(table),
+                      rows: table.rows,
+                    })),
+                  }
+                : {}),
             })
-          : await (renderer as ReportTableRenderer).render(table);
+          : tables.length > 1
+            ? createReportZip(
+                await Promise.all(
+                  tables.map(async (table, index) => ({
+                    fileName: `${stems[index]}.${input.format}`,
+                    body: await (renderer as ReportTableRenderer).render(table),
+                  })),
+                ),
+              )
+            : await (renderer as ReportTableRenderer).render(tables[0] ?? createTable([]));
       const finalExportContext = await this.reauthorizeSnapshot(input, source);
       await this.snapshots.assertExportable({
         snapshotId: input.snapshotId,
@@ -102,16 +134,23 @@ export class ReportExportService {
         occurred_at: new Date(),
         format: input.format,
         result: "success",
-        counts: { rows: source.rows.length, bytes: body.byteLength },
+        counts: { rows: totalRows, bytes: body.byteLength },
       });
       return {
         contentType:
-          input.format === "csv"
-            ? "text/csv; charset=utf-8"
-            : input.format === "xlsx"
-              ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              : "application/pdf",
-        fileName: `report-${source.job.id}.${input.format}`,
+          input.format !== "pdf" && tables.length > 1
+            ? "application/zip"
+            : input.format === "csv"
+              ? "text/csv; charset=utf-8"
+              : input.format === "xlsx"
+                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                : "application/pdf",
+        fileName:
+          input.format !== "pdf" && tables.length > 1
+            ? `report-${source.job.id}.zip`
+            : tables.length === 1 && source.blocks?.length
+              ? `${stems[0]}.${input.format}`
+              : `report-${source.job.id}.${input.format}`,
         body: Buffer.from(body),
       };
     } catch (error) {
@@ -177,16 +216,54 @@ function inferValueType(value: unknown): ReportTable["columns"][number]["valueTy
   return "string";
 }
 
-function createTable(rows: readonly Record<string, unknown>[]): ReportTable {
-  const keys = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+function createTable(
+  rows: readonly Record<string, unknown>[],
+  columns: readonly { key: string; label: string }[] = [],
+): ReportTable {
+  const keys =
+    columns.length > 0
+      ? columns.map((column) => column.key)
+      : Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
   return {
     columns: keys.map((key) => ({
       key,
-      label: key,
+      label: columns.find((column) => column.key === key)?.label ?? key,
       valueType: inferValueType(
         rows.find((row) => row[key] !== null && row[key] !== undefined)?.[key],
       ),
     })),
     rows,
   };
+}
+
+function toPresentation(table: ReportTable | undefined): {
+  columns: Array<{ key: string; label: string; format: string }>;
+} {
+  return {
+    columns: (table?.columns ?? []).map((column) => ({
+      key: column.key,
+      label: column.label,
+      format: column.valueType ?? "string",
+    })),
+  };
+}
+
+function uniqueStem(label: string, index: number): string {
+  const sanitized = label
+    .replace(/[<>:"/\\|?*]/gu, "_")
+    .replace(/\p{Cc}/gu, "_")
+    .trim()
+    .replace(/[. ]+$/u, "")
+    .slice(0, 120);
+  return sanitized || `area-${index + 1}`;
+}
+
+function uniqueStems(labels: readonly string[]): string[] {
+  const counts = new Map<string, number>();
+  return labels.map((label, index) => {
+    const base = uniqueStem(label, index);
+    const occurrence = counts.get(base) ?? 0;
+    counts.set(base, occurrence + 1);
+    return occurrence === 0 ? base : `${base}_${occurrence + 1}`;
+  });
 }

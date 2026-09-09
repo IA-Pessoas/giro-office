@@ -53,6 +53,13 @@ export interface ReportPdfRenderInput {
   scope: "personal" | "shared";
   presentation_json: unknown;
   rows: readonly Record<string, unknown>[];
+  blocks?: readonly ReportPdfBlock[];
+}
+
+export interface ReportPdfBlock {
+  title: string;
+  presentation_json: unknown;
+  rows: readonly Record<string, unknown>[];
 }
 
 /**
@@ -156,10 +163,16 @@ export class ReportPdfService implements ReportPdfRenderer {
   ) {}
 
   async render(input: ReportPdfRenderInput): Promise<Buffer> {
-    const presentation = presentationColumns(input.presentation_json);
-    if (presentation.columns.length === 0) {
-      throw new ServiceError(400, "A apresentação do relatório não possui colunas.");
-    }
+    const blocks = input.blocks?.length
+      ? input.blocks
+      : [{ title: "", presentation_json: input.presentation_json, rows: input.rows }];
+    const preparedBlocks = blocks.map((block) => {
+      const presentation = presentationColumns(block.presentation_json);
+      if (presentation.columns.length === 0) {
+        throw new ServiceError(400, "A apresentação do relatório não possui colunas.");
+      }
+      return { ...block, presentation };
+    });
 
     const letterhead = await this.letterheads.select({
       organizationId: input.organizationId,
@@ -180,9 +193,10 @@ export class ReportPdfService implements ReportPdfRenderer {
 
       try {
         this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
-        let y = this.drawTableHeader(document, presentation, presentation.title);
-        for (const row of input.rows) {
-          if (y + ROW_HEIGHT > A4_HEIGHT - FOOTER_BOTTOM) {
+        let y = CONTENT_TOP;
+        for (const block of preparedBlocks) {
+          const title = block.title || block.presentation.title;
+          if (y + ROW_HEIGHT * (title ? 2 : 1) > A4_HEIGHT - FOOTER_BOTTOM) {
             this.drawFooter(document, input.generatedAt);
             document.addPage({
               size: "A4",
@@ -190,10 +204,31 @@ export class ReportPdfService implements ReportPdfRenderer {
               info: { Author: input.author, CreationDate: input.generatedAt },
             });
             this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
-            y = this.drawTableHeader(document, presentation);
+            y = CONTENT_TOP;
           }
-          this.drawRow(document, presentation.columns, row, y);
-          y += ROW_HEIGHT;
+          y = this.drawTableHeader(document, block.presentation, title || undefined);
+          if (block.rows.length === 0) {
+            document
+              .fillColor("#4b5563")
+              .fontSize(8)
+              .text("Nenhum registro encontrado nesta área.", MARGIN, y);
+            y += ROW_HEIGHT;
+            continue;
+          }
+          for (const row of block.rows) {
+            if (y + ROW_HEIGHT > A4_HEIGHT - FOOTER_BOTTOM) {
+              this.drawFooter(document, input.generatedAt);
+              document.addPage({
+                size: "A4",
+                margin: 0,
+                info: { Author: input.author, CreationDate: input.generatedAt },
+              });
+              this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
+              y = this.drawTableHeader(document, block.presentation, title || undefined);
+            }
+            this.drawRow(document, block.presentation.columns, row, y);
+            y += ROW_HEIGHT;
+          }
         }
         this.drawFooter(document, input.generatedAt);
         document.end();
