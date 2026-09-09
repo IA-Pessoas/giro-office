@@ -347,7 +347,11 @@ await runTest("mantém a paginação da auditoria visível no painel com tabela 
   assert.match(superAdminPageSource, /lg:h-\[calc\(100vh-16rem\)\]/);
   assert.match(
     superAdminPageSource,
-    /className="flex min-h-0 flex-col overflow-hidden rounded-xl border/,
+    /flex min-h-0 flex-col rounded-xl border/,
+  );
+  assert.match(
+    superAdminPageSource,
+    /activePanel === "audit" \? "overflow-hidden" : "overflow-auto"/,
   );
   assert.match(
     auditPanelSource,
