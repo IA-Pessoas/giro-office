@@ -2,6 +2,7 @@ import { ServiceError } from "@workspace/shared";
 import type { SourceCatalogService } from "../catalog/sourceCatalogService.js";
 import { normalizeReportPreviewAdapterOutput, type ReportCatalogScope } from "../catalog/types.js";
 import { reportAggregationAlias } from "../integrations/reportCriteria.js";
+import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import type { ReportDefinitionService } from "./reportDefinitionService.js";
 
@@ -11,6 +12,61 @@ export class ReportPreviewService {
     private readonly definitionService: ReportDefinitionService,
     private readonly previewRowLimit: number,
   ) {}
+
+  async previewComposition(
+    definition: ReportComposition,
+    scope: ReportCatalogScope,
+    requestId = "reports-preview",
+  ): Promise<{
+    blocks: Array<
+      { source: string; label: string } & Awaited<ReturnType<ReportPreviewService["preview"]>>
+    >;
+  }> {
+    const prepared = definition.areas.map((area) =>
+      this.definitionService.prepareArea(area, scope),
+    );
+    const catalog = this.sourceCatalog.getAuthorizedCatalog(scope);
+    const blocks = [];
+    for (const [index, area] of definition.areas.entries()) {
+      const source = catalog.sources.find((item) => item.key === area.source);
+      if (!source) throw new ServiceError(403, "Confira as áreas disponíveis para seu acesso.");
+      const result = await this.preview(
+        prepared[index].definition,
+        scope,
+        requestId,
+        prepared[index].parameterValues,
+      );
+      const summaries: Record<string, string> = {
+        count: "Contagem",
+        sum: "Soma",
+        avg: "Média",
+        min: "Mínimo",
+        max: "Máximo",
+      };
+      const columns = result.presentation.columns.map((column) => {
+        const aggregation = prepared[index].definition.aggregations.find(
+          (item) => reportAggregationAlias(item) === column.key,
+        );
+        const field = source.fields.find((item) => item.key === (aggregation?.field ?? column.key));
+        return {
+          key: column.key,
+          label: aggregation
+            ? `${summaries[aggregation.function]} de ${field?.label}`
+            : (field?.label ?? "Campo"),
+        };
+      });
+      blocks.push({
+        ...result,
+        source: area.source,
+        label: source.label,
+        presentation: { columns },
+        rows: result.rows.map((row) =>
+          Object.fromEntries(columns.map(({ key }) => [key, row[key]])),
+        ),
+      });
+    }
+    return { blocks };
+  }
 
   async preview(
     definition: ReportDefinition,

@@ -41,6 +41,83 @@ const definition = {
   aggregations: [{ source: "finance.ledger", field: "balance", function: "sum" }],
 };
 
+describe("ReportDefinitionService composed criteria", () => {
+  const service = new ReportDefinitionService(
+    new SourceCatalogService([
+      {
+        ...adapter,
+        sources: [
+          {
+            ...adapter.sources[0],
+            fields: adapter.sources[0].fields.map((field) => ({
+              ...field,
+              groupable: true,
+              sortable: true,
+            })),
+            parameters: [
+              {
+                key: "criterion_1",
+                label: "Opção",
+                type: "select",
+                required: true,
+                options: [{ value: "active", label: "Ativo" }],
+              },
+            ],
+          },
+        ],
+      },
+    ]),
+  );
+  const area = {
+    source: "finance.ledger",
+    fields: ["balance"],
+    parameterValues: { criterion_1: "active" },
+  };
+  it("keeps published parameter values separate from generated filter parameters", () => {
+    const result = service.prepareArea(
+      { ...area, filters: [{ field: "balance", operator: "eq", value: 10 }] },
+      scope,
+    );
+    expect(result.parameterValues).toEqual({ criterion_1: "active", criterion_2: 10 });
+    expect(result.definition.filters[0].parameter).toBe("criterion_2");
+  });
+  it("rejects unpublished parameters, unsupported options, duplicate grouping and incompatible ordering", () => {
+    expect(() =>
+      service.validateComposition(
+        { version: 2, areas: [{ ...area, parameterValues: { other: "secret" } }] },
+        scope,
+      ),
+    ).toThrow("parâmetros disponíveis");
+    expect(() =>
+      service.validateComposition(
+        { version: 2, areas: [{ ...area, parameterValues: { criterion_1: "unknown" } }] },
+        scope,
+      ),
+    ).toThrow("opções do parâmetro");
+    expect(() =>
+      service.validateComposition(
+        { version: 2, areas: [{ ...area, groupBy: ["balance", "balance"] }] },
+        scope,
+      ),
+    ).toThrow("apenas uma vez");
+    expect(() =>
+      service.validateComposition(
+        {
+          version: 2,
+          areas: [
+            {
+              ...area,
+              aggregations: [{ field: "balance", function: "sum" }],
+              orderBy: [{ field: "balance", direction: "asc" }],
+            },
+          ],
+        },
+        scope,
+      ),
+    ).toThrow("campos agrupados");
+  });
+});
+
 describe("SourceCatalogService", () => {
   it("publica apresentação amigável apenas para áreas autorizadas", () => {
     const service = new SourceCatalogService([adapter]);

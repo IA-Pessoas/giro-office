@@ -180,6 +180,79 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                 required: ["source", "fields"],
                 properties: {
                   source: { type: "string" },
+                  filterLogic: { type: "string", enum: ["and", "or"], default: "and" },
+                  filters: {
+                    type: "array",
+                    maxItems: 100,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["field", "operator", "value"],
+                      properties: {
+                        field: { type: "string", minLength: 1, maxLength: 64 },
+                        operator: reportDefinition.properties.filters.items.properties.operator,
+                        value: {
+                          description:
+                            "Valor tipado; in usa lista e between usa dois extremos. Máximo 100 valores, textos até 2048 caracteres.",
+                          oneOf: [
+                            { type: "string", maxLength: 2048 },
+                            { type: "number" },
+                            { type: "boolean" },
+                            {
+                              type: "array",
+                              maxItems: 100,
+                              items: {
+                                nullable: true,
+                                oneOf: [
+                                  { type: "string", maxLength: 2048 },
+                                  { type: "number" },
+                                  { type: "boolean" },
+                                ],
+                              },
+                            },
+                          ],
+                          nullable: true,
+                        },
+                      },
+                    },
+                  },
+                  parameterValues: {
+                    type: "object",
+                    additionalProperties: true,
+                    description:
+                      "Parâmetros publicados e obrigatórios da própria área, com tipos e opções do catálogo.",
+                  },
+                  groupBy: {
+                    type: "array",
+                    maxItems: 25,
+                    items: { type: "string", minLength: 1, maxLength: 64 },
+                  },
+                  aggregations: {
+                    type: "array",
+                    maxItems: 25,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["field", "function"],
+                      properties: {
+                        field: { type: "string", minLength: 1, maxLength: 64 },
+                        function: { type: "string", enum: ["count", "sum", "avg", "min", "max"] },
+                      },
+                    },
+                  },
+                  orderBy: {
+                    type: "array",
+                    maxItems: 25,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["field", "direction"],
+                      properties: {
+                        field: { type: "string", minLength: 1, maxLength: 64 },
+                        direction: { type: "string", enum: ["asc", "desc"] },
+                      },
+                    },
+                  },
                   fields: {
                     type: "array",
                     minItems: 1,
@@ -287,7 +360,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
       "/reports/preview": {
         post: {
           tags: ["Reports"],
-          summary: "Gerar prévia limitada de relatório",
+          summary: "Visualizar prévia opcional e temporária, sem execução ou histórico",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -298,7 +371,12 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["definition"],
                   additionalProperties: false,
                   properties: {
-                    definition: { $ref: "#/components/schemas/ReportDefinition" },
+                    definition: {
+                      oneOf: [
+                        { $ref: "#/components/schemas/ReportDefinition" },
+                        { $ref: "#/components/schemas/ReportComposition" },
+                      ],
+                    },
                     parameterValues: { type: "object", additionalProperties: true },
                   },
                 },
@@ -308,7 +386,8 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           responses: {
             "422": { description: "Capacidade excedida; nenhum resultado parcial" },
             "200": {
-              description: "Prévia limitada com linhas, apresentação e hasMore",
+              description:
+                "Legado: rows, presentation.columns, limit e hasMore. Composição: blocks em ordem visual, cada um com source, label amigável, rows independentes, presentation.columns com key/label amigável, limit e hasMore. Bloco vazio é válido. Nenhum resultado parcial em falha.",
               ...successResponse,
             },
             "400": { description: "Definição inválida" },
