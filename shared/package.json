@@ -109,7 +109,7 @@
     "@launchdarkly/node-server-sdk": "^9.13.1",
     "@supabase/supabase-js": "^2.99.1",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.2.0",
+    "multer": "^2.3.0",
     "pino": "^9.9.0",
     "pino-pretty": "^13.1.2",
     "swagger-ui-express": "^5.0.1",

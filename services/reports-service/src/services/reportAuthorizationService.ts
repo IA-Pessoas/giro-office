@@ -9,6 +9,7 @@ import {
   getReportingCatalogScope,
   type ReportingAccessContextClient,
 } from "../routes/reportingContext.js";
+import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import type {
   ReportDefinitionService,
@@ -48,6 +49,18 @@ export class ReportAuthorizationService {
   ): Promise<ValidatedReportDefinition> {
     const scope = await getReportingCatalogScope(this.accessContextClient, input);
     return this.definitionService.validate(input.definition, scope);
+  }
+
+  async validateComposition(input: {
+    userId: string;
+    organizationId: string;
+    requestId: string;
+    definition: ReportComposition;
+  }): Promise<{ definition: ReportComposition }> {
+    const scope = await getReportingCatalogScope(this.accessContextClient, input);
+    return {
+      definition: this.definitionService.validateComposition(input.definition, scope),
+    };
   }
 
   async getSharedDepartment(

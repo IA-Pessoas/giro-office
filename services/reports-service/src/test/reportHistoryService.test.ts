@@ -71,6 +71,7 @@ describe("ReportJobService histórico", () => {
         requested_at: true,
         started_at: true,
         finished_at: true,
+        error_message: true,
       },
     });
   });

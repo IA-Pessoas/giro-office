@@ -2287,15 +2287,33 @@ model ReportSnapshot {
   @@map("reports.snapshots")
 }
 
+model ReportSnapshotBlock {
+  id              String   @id @default(uuid())
+  organization_id String
+  snapshot_id     String
+  position        Int
+  source          String
+  label           String
+  columns_json    Json
+  row_count       Int      @default(0)
+  created_at      DateTime @default(now())
+
+  @@unique([snapshot_id, position])
+  @@index([snapshot_id, position])
+  @@map("reports.snapshot_blocks")
+}
+
 model ReportSnapshotRow {
   id              String   @id @default(uuid())
   organization_id String
   snapshot_id     String
+  block_id        String?
   row_number      Int
   data_json       Json
   created_at      DateTime @default(now())
 
   @@index([snapshot_id, row_number])
+  @@index([snapshot_id, block_id, row_number])
   @@map("reports.snapshot_rows")
 }
 

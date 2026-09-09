@@ -7,6 +7,7 @@ import type {
   ReportDownloadResult,
   ReportHistoryPage,
   ReportHistoryScope,
+  ReportJob,
   ReportModel,
   ReportPreviewPayload,
   ReportPreviewResult,
@@ -20,6 +21,7 @@ import {
   fetchReportsPreview,
   REPORTS_ENDPOINTS,
   unwrapReportDownload,
+  unwrapReportJobEnvelope,
   unwrapReportJobListEnvelope,
   unwrapReportsEnvelope,
   unwrapReportCompositionPreview,
@@ -33,6 +35,14 @@ export const reportsService = {
   async validateDefinition(definition: ReportComposition): Promise<void> {
     const response = await setupAPIClient().post("/reports/definitions/validate", { definition });
     unwrapReportsEnvelope(response.data);
+  },
+  async createJob(definition: ReportComposition): Promise<ReportJob> {
+    const response = await setupAPIClient().post(REPORTS_ENDPOINTS.createJob, { definition });
+    return unwrapReportJobEnvelope(response.data);
+  },
+  async getJob(id: string): Promise<ReportJob> {
+    const response = await setupAPIClient().get(REPORTS_ENDPOINTS.job(id));
+    return unwrapReportJobEnvelope(response.data);
   },
   async getCatalog(): Promise<ReportsCatalog> {
     const api = setupAPIClient();

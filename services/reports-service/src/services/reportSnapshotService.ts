@@ -1,6 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { ReportsPrismaClient } from "../prisma/index.js";
+import type { ReportResultColumn } from "./reportExecutionService.js";
 
 export class ReportSnapshotService {
   constructor(private readonly prisma: ReportsPrismaClient) {}
@@ -17,6 +18,14 @@ export class ReportSnapshotService {
     snapshot: { id: string; created_at: Date };
     rows: Array<{ row_number: number; values: Record<string, unknown> }>;
     nextCursor: number | null;
+    blocks?: Array<{
+      source: string;
+      label: string;
+      columns: ReportResultColumn[];
+      rowCount: number;
+      rows: Array<{ row_number: number; values: Record<string, unknown> }>;
+      nextCursor: number | null;
+    }>;
   }> {
     const job = await this.prisma.reportJob.findFirst({
       where: {
@@ -60,6 +69,52 @@ export class ReportSnapshotService {
       },
     });
     if (!snapshot) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+
+    const blocks = this.prisma.reportSnapshotBlock
+      ? await this.prisma.reportSnapshotBlock.findMany({
+          where: { snapshot_id: snapshot.id, organization_id: input.organizationId },
+          orderBy: { position: "asc" },
+        })
+      : [];
+    if (blocks.length > 0) {
+      const blockPages = await Promise.all(
+        blocks.map(async (block) => {
+          const records = await this.prisma.reportSnapshotRow.findMany({
+            where: {
+              snapshot_id: snapshot.id,
+              block_id: block.id,
+              ...(input.cursor === undefined ? {} : { row_number: { gt: input.cursor } }),
+            },
+            orderBy: { row_number: "asc" },
+            take: input.limit + 1,
+          });
+          const visible = records.slice(0, input.limit);
+          return {
+            source: block.source,
+            label: block.label,
+            columns: block.columns_json as ReportResultColumn[],
+            rowCount: block.row_count,
+            rows: visible.map((row) => ({
+              row_number: row.row_number,
+              values: row.data_json as Record<string, unknown>,
+            })),
+            nextCursor:
+              records.length > input.limit
+                ? (visible[visible.length - 1]?.row_number ?? null)
+                : null,
+          };
+        }),
+      );
+      const nextCursors = blockPages
+        .map((block) => block.nextCursor)
+        .filter((cursor): cursor is number => cursor !== null);
+      return {
+        snapshot: { id: snapshot.id, created_at: snapshot.created_at },
+        rows: [],
+        nextCursor: nextCursors.length > 0 ? Math.min(...nextCursors) : null,
+        blocks: blockPages,
+      };
+    }
 
     const records = await this.prisma.reportSnapshotRow.findMany({
       where: {
