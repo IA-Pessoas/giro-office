@@ -29,6 +29,8 @@ const {
   sanitizeReportPreviewResult,
 } = await import("./utils/reportBuilder.ts");
 const appPackage = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url)));
+const { buildReportComposition } = await import("./utils/reportCriteria.ts");
+const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
 const reportsPageSource = await readFile(
   new URL("./components/ReportsCatalogPage.tsx", import.meta.url),
   "utf8",
@@ -51,6 +53,66 @@ function runTest(name, callback) {
     throw error;
   }
 }
+
+runTest("composes typed criteria and parameters independently without requiring preview", () => {
+  const source = {
+    key: "test.items",
+    label: "Itens",
+    module: "test",
+    parameters: [{ key: "enabled", label: "Ativo", type: "boolean", required: true }],
+    fields: [
+      { key: "amount", label: "Valor", type: "number", operators: ["between"], selectable: true },
+    ],
+  };
+  assert.throws(
+    () => buildReportComposition([{ source: source.key, fields: ["amount"] }], [source]),
+    /Preencha Ativo/,
+  );
+  const definition = buildReportComposition(
+    [
+      {
+        source: source.key,
+        fields: ["amount"],
+        parameterValues: { enabled: "false" },
+        filters: [{ field: "amount", operator: "between", value: "10;20" }],
+      },
+    ],
+    [source],
+  );
+  assert.equal(definition.areas[0].parameterValues.enabled, false);
+  assert.deepEqual(definition.areas[0].filters[0].value, [10, 20]);
+  assert.throws(
+    () =>
+      buildReportComposition(
+        [
+          {
+            ...definition.areas[0],
+            filters: [{ field: "amount", operator: "between", value: "10;bad" }],
+          },
+        ],
+        [source],
+      ),
+    /número válido/,
+  );
+});
+
+runTest("preserves independent empty blocks and rejects malformed composed preview", () => {
+  const block = {
+    source: "test.items",
+    label: "Itens",
+    rows: [],
+    presentation: { columns: [{ key: "name", label: "Nome" }] },
+    limit: 100,
+    hasMore: false,
+  };
+  const result = unwrapReportCompositionPreview({
+    success: true,
+    data: { blocks: [block, { ...block, source: "test.other", label: "Outros" }] },
+  });
+  assert.equal(result.blocks.length, 2);
+  assert.deepEqual(result.blocks[0].rows, []);
+  assert.throws(() => unwrapReportCompositionPreview({ blocks: [{ ...block, rows: "invalid" }] }));
+});
 
 runTest("unwraps the shared success envelope", () => {
   assert.deepEqual(unwrapReportsEnvelope({ success: true, data: { items: [] } }), { items: [] });

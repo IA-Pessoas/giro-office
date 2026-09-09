@@ -1,5 +1,5 @@
 import { z } from "zod";
-
+import { reportCompositionSchema } from "./reportComposition.schemas.js";
 import { reportDefinitionSchema } from "./reportDefinition.schemas.js";
 
 export const MAX_PREVIEW_ROWS = 100;
@@ -15,7 +15,7 @@ export const reportPreviewQuerySchema = z
 
 export const reportPreviewRequestSchema = z
   .object({
-    definition: reportDefinitionSchema,
+    definition: z.union([reportCompositionSchema, reportDefinitionSchema]),
     parameterValues: z.record(z.unknown()).optional(),
   })
   .strict();

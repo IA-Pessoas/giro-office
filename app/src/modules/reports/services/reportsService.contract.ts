@@ -1,6 +1,7 @@
 import type {
   ReportPreviewPayload,
   ReportPreviewResult,
+  ReportCompositionPreview,
   ReportDownloadResult,
   ReportHistoryPage,
   ReportsCatalog,
@@ -207,6 +208,29 @@ export function unwrapReportsPreviewEnvelope(body: unknown): ReportPreviewResult
     rows: result.rows,
     limit: result.limit,
     hasMore: result.hasMore,
+  };
+}
+
+export function unwrapReportCompositionPreview(body: unknown): ReportCompositionPreview {
+  const result = unwrapReportsEnvelope<unknown>(body);
+  if (
+    !isRecord(result) ||
+    !Array.isArray(result.blocks) ||
+    !result.blocks.every(
+      (block) =>
+        isRecord(block) &&
+        typeof block.source === "string" &&
+        typeof block.label === "string" &&
+        isPreviewResult(block),
+    )
+  )
+    throw reportsError();
+  return {
+    blocks: result.blocks.map((block) => ({
+      ...unwrapReportsPreviewEnvelope(block),
+      source: block.source,
+      label: block.label,
+    })),
   };
 }
 

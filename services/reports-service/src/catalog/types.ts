@@ -30,6 +30,13 @@ export interface ReportCatalogField {
 }
 
 export interface ReportCatalogSource {
+  parameters?: readonly {
+    key: string;
+    label: string;
+    type: "text" | "number" | "date" | "boolean" | "select";
+    required?: boolean;
+    options?: readonly { value: string; label: string }[];
+  }[];
   key: ReportSourceKey;
   label: string;
   module: string;

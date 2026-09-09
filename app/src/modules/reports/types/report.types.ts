@@ -58,7 +58,21 @@ export type ReportsCatalog = {
 
 export type ReportComposition = {
   version: 2;
-  areas: { source: string; fields: string[] }[];
+  areas: ReportArea[];
+};
+
+export type ReportArea = {
+  source: string;
+  fields: string[];
+  filters?: { field: string; operator: string; value: unknown }[];
+  filterLogic?: "and" | "or";
+  parameterValues?: Record<string, unknown>;
+  groupBy?: string[];
+  aggregations?: { field: string; function: string }[];
+  orderBy?: { field: string; direction: "asc" | "desc" }[];
+};
+export type ReportCompositionPreview = {
+  blocks: (ReportPreviewResult & { source: string; label: string })[];
 };
 
 export type ReportsServiceError = {

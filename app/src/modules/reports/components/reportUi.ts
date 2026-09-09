@@ -1,11 +1,4 @@
-import {
-  CheckCircle2,
-  Clock3,
-  CircleX,
-  FileWarning,
-  Loader2,
-  Trash2,
-} from "lucide-react";
+import { CheckCircle2, Clock3, CircleX, FileWarning, Loader2, Trash2 } from "lucide-react";
 
 import type { ReportJobStatus } from "../types/report.types";
 
@@ -45,3 +38,5 @@ export function getErrorStatus(error: unknown): number | undefined {
   const response = (error as { response?: { status?: unknown } }).response;
   return typeof response?.status === "number" ? response.status : undefined;
 }
+export const reportInputClassName =
+  "mt-1 block min-h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100";

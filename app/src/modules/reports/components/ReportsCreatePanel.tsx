@@ -8,16 +8,24 @@ import { reportsCatalogQueryKey } from "../hooks/queryKeys";
 import { reportsService } from "../services/reportsService";
 import { getSelectableReportFields } from "../utils/reportBuilder";
 import { ReportFieldsStep } from "./ReportFieldsStep";
+import { ReportCriteriaStep } from "./ReportCriteriaStep";
+import { buildReportComposition, operatorLabels, summaryLabels } from "../utils/reportCriteria";
+import type { ReportArea } from "../types/report.types";
 import { ReportSourceStep } from "./ReportSourceStep";
 import { getErrorStatus } from "./reportUi";
 
-const steps = ["Escolher áreas", "Escolher campos", "Revisar relatório"];
+const steps = ["Escolher áreas", "Escolher campos", "Definir critérios", "Revisar relatório"];
 
 export function ReportsCreatePanel() {
   const catalog = useReportsCatalog();
   const builder = useReportBuilder();
   const queryClient = useQueryClient();
   const review = useMutation({ mutationFn: reportsService.validateDefinition });
+  const preview = useMutation({ mutationFn: reportsService.previewComposition });
+  const [previewConfiguration, setPreviewConfiguration] = useState("");
+  const busy = review.isPending || preview.isPending;
+  const configuration = JSON.stringify(builder.areas);
+  const stale = Boolean(preview.data && previewConfiguration !== configuration);
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const contentRef = useRef<HTMLDivElement>(null);
@@ -38,21 +46,55 @@ export function ReportsCreatePanel() {
   const unavailable = selected.some(
     (area) =>
       !area.catalog ||
-      area.fields.some(
-        (key) => !getSelectableReportFields(area.catalog!).some((field) => field.key === key),
-      ),
+      [
+        ...area.fields,
+        ...(area.filters ?? []).map((item) => item.field),
+        ...(area.groupBy ?? []),
+        ...(area.aggregations ?? []).map((item) => item.field),
+        ...(area.orderBy ?? []).map((item) => item.field),
+      ].some((key) => !getSelectableReportFields(area.catalog!).some((field) => field.key === key)),
   );
   const empty = selected.filter((area) => area.fields.length === 0);
 
   function changeArea(source: string) {
-    if (review.isPending) return;
+    if (busy) return;
     builder.toggleArea(source);
     setError("");
     review.reset();
-    if (step === 2) setStep(1);
+    if (step >= 2) setStep(1);
+  }
+  function updateArea(area: ReportArea) {
+    builder.setAreas((current) =>
+      current.map((item) => (item.source === area.source ? area : item)),
+    );
+    setError("");
+    review.reset();
+  }
+  async function showPreview() {
+    if (busy) return;
+    setError("");
+    try {
+      await preview.mutateAsync(buildReportComposition(builder.areas, sources));
+      setPreviewConfiguration(configuration);
+    } catch (cause) {
+      const status = getErrorStatus(cause);
+      setError(
+        status === 403
+          ? "Seu acesso mudou. Confira as áreas e os campos disponíveis e tente novamente."
+          : status === 422
+            ? "Esta consulta excede a capacidade disponível. Reduza as áreas ou ajuste os critérios e tente novamente."
+            : status === 400
+              ? "Confira os critérios, parâmetros e opções de cada área e tente novamente."
+              : "Não foi possível visualizar a prévia. Tente novamente.",
+      );
+      if (status === 403) {
+        preview.reset();
+        await queryClient.invalidateQueries({ queryKey: reportsCatalogQueryKey() });
+      }
+    }
   }
   async function goTo(target: number) {
-    if (review.isPending) return;
+    if (busy) return;
     setError("");
     if (target === 0) {
       setStep(0);
@@ -78,20 +120,33 @@ export function ReportsCreatePanel() {
       );
       return;
     }
-    try {
-      await review.mutateAsync({ version: 2, areas: builder.areas });
+    if (target === 2) {
       setStep(2);
+      return;
+    }
+    let definition;
+    try {
+      definition = buildReportComposition(builder.areas, sources);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Confira os critérios da área.");
+      return;
+    }
+    try {
+      await review.mutateAsync(definition);
+      setStep(3);
     } catch (cause) {
       const status = getErrorStatus(cause);
       setError(
         status === 403
           ? "Seu acesso mudou. Confira as áreas e os campos disponíveis e tente novamente."
           : status === 400
-            ? "Não foi possível revisar essas escolhas. Confira os campos ou reduza a quantidade de áreas e tente novamente."
+            ? "Não foi possível revisar essas escolhas. Confira campos, critérios, parâmetros e opções; reduza as áreas se necessário."
             : "Não foi possível revisar o relatório. Tente novamente.",
       );
-      if (status === 403)
+      if (status === 403) {
+        preview.reset();
         await queryClient.invalidateQueries({ queryKey: reportsCatalogQueryKey() });
+      }
     }
   }
 
@@ -122,12 +177,12 @@ export function ReportsCreatePanel() {
 
   return (
     <div className="space-y-6">
-      <ol aria-label="Etapas do relatório" className="grid gap-2 sm:grid-cols-3">
+      <ol aria-label="Etapas do relatório" className="grid gap-2 sm:grid-cols-4">
         {steps.map((label, index) => (
           <li key={label}>
             <button
               type="button"
-              disabled={review.isPending}
+              disabled={busy}
               aria-current={step === index ? "step" : undefined}
               onClick={() => void goTo(index)}
               className={`w-full rounded-lg px-3 py-2 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 ${step === index ? "bg-blue-100 font-semibold text-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "text-gray-600 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
@@ -147,6 +202,14 @@ export function ReportsCreatePanel() {
           {error}
         </p>
       ) : null}
+      {stale ? (
+        <p
+          role="status"
+          className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          A amostra está desatualizada. Revise suas escolhas e visualize a prévia novamente.
+        </p>
+      ) : null}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div ref={contentRef} tabIndex={-1} className="min-w-0 space-y-5 outline-none">
           {step === 0 ? (
@@ -154,7 +217,7 @@ export function ReportsCreatePanel() {
               sources={sources}
               sourceKeys={builder.areas.map((area) => area.source)}
               onSourceChange={changeArea}
-              disabled={review.isPending}
+              disabled={busy}
             />
           ) : null}
           {step === 1 ? (
@@ -173,7 +236,7 @@ export function ReportsCreatePanel() {
                     key={area.source}
                     source={area.catalog}
                     fieldKeys={area.fields}
-                    disabled={review.isPending}
+                    disabled={busy}
                     onFieldKeysChange={(fields) => {
                       builder.setAreas((current) =>
                         current.map((item) =>
@@ -197,6 +260,24 @@ export function ReportsCreatePanel() {
             </>
           ) : null}
           {step === 2 ? (
+            <>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Definir critérios
+              </h2>
+              {selected.map(({ catalog: areaCatalog, ...area }) =>
+                areaCatalog ? (
+                  <ReportCriteriaStep
+                    key={area.source}
+                    area={area}
+                    source={areaCatalog}
+                    onChange={updateArea}
+                    disabled={busy}
+                  />
+                ) : null,
+              )}
+            </>
+          ) : null}
+          {step === 3 ? (
             <>
               <div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -225,11 +306,135 @@ export function ReportsCreatePanel() {
                       </li>
                     ))}
                   </ul>
+                  <p className="text-sm text-gray-600 dark:text-slate-300">
+                    {area.filters?.length
+                      ? area.filterLogic === "or"
+                        ? "Pelo menos um critério"
+                        : "Todos os critérios"
+                      : "Sem critérios: todos os registros autorizados"}
+                  </p>
+                  <ul className="space-y-1 text-sm text-gray-800 dark:text-slate-200">
+                    {area.filters?.map((filter, index) => (
+                      <li key={index}>
+                        {area.catalog?.fields.find((field) => field.key === filter.field)?.label}{" "}
+                        {operatorLabels[filter.operator]}{" "}
+                        {Array.isArray(filter.value)
+                          ? filter.value.join("; ")
+                          : filter.value === "true" || filter.value === true
+                            ? "Sim"
+                            : filter.value === "false" || filter.value === false
+                              ? "Não"
+                              : String(filter.value)}
+                      </li>
+                    ))}
+                    {area.catalog?.parameters?.map((parameter) => (
+                      <li key={parameter.key}>
+                        {parameter.label}:{" "}
+                        {parameter.options?.find(
+                          (option) => option.value === area.parameterValues?.[parameter.key],
+                        )?.label ??
+                          (parameter.type === "boolean" &&
+                          area.parameterValues?.[parameter.key] !== undefined
+                            ? String(area.parameterValues[parameter.key]) === "true"
+                              ? "Sim"
+                              : "Não"
+                            : String(area.parameterValues?.[parameter.key] ?? "Não informado"))}
+                      </li>
+                    ))}
+                    {area.groupBy?.map((key) => (
+                      <li key={`group-${key}`}>
+                        Agrupar por {area.catalog?.fields.find((field) => field.key === key)?.label}
+                      </li>
+                    ))}
+                    {area.aggregations?.map((item) => (
+                      <li key={`summary-${item.field}`}>
+                        {summaryLabels[item.function]} de{" "}
+                        {area.catalog?.fields.find((field) => field.key === item.field)?.label}
+                      </li>
+                    ))}
+                    {area.orderBy?.map((item) => (
+                      <li key={`sort-${item.field}`}>
+                        Ordenar por{" "}
+                        {area.catalog?.fields.find((field) => field.key === item.field)?.label}:{" "}
+                        {item.direction === "asc" ? "crescente" : "decrescente"}
+                      </li>
+                    ))}
+                  </ul>
                 </section>
               ))}
               <p role="status" className="text-sm text-gray-600 dark:text-slate-300">
-                Áreas e campos revisados. Você pode voltar para ajustar suas escolhas.
+                Configuração revisada. A prévia é opcional e temporária; não é necessária para a
+                geração posterior.
               </p>
+              {preview.data && !stale && !unavailable ? (
+                <div aria-label="Prévia do relatório" className="space-y-6">
+                  <p role="status" className="text-sm text-gray-600 dark:text-slate-300">
+                    Prévia pronta. Cada área aparece em um bloco independente.
+                  </p>
+                  {preview.data.blocks.map((block) => (
+                    <section
+                      key={block.source}
+                      aria-label={`Prévia de ${block.label}`}
+                      className="min-w-0 space-y-2 border-t border-gray-200 pt-4 dark:border-slate-700"
+                    >
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{block.label}</h3>
+                      <p className="text-sm text-gray-600 dark:text-slate-300">
+                        {block.rows.length} {block.rows.length === 1 ? "registro" : "registros"} na
+                        amostra
+                        {block.hasMore ? ". Há mais registros disponíveis." : "."}
+                      </p>
+                      {block.rows.length ? (
+                        <div
+                          className="overflow-x-auto rounded border border-gray-200 dark:border-slate-700"
+                          tabIndex={0}
+                          role="region"
+                          aria-label={`Dados de ${block.label}`}
+                        >
+                          <table className="w-full text-left text-sm text-gray-800 dark:text-slate-200">
+                            <thead>
+                              <tr>
+                                {block.columns.map((column) => (
+                                  <th
+                                    key={column.key}
+                                    scope="col"
+                                    className="bg-gray-50 px-3 py-2 dark:bg-slate-800"
+                                  >
+                                    {column.label}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {block.rows.map((row, index) => (
+                                <tr key={index}>
+                                  {block.columns.map((column) => (
+                                    <td
+                                      key={column.key}
+                                      className="border-t border-gray-200 px-3 py-2 dark:border-slate-700"
+                                    >
+                                      {typeof row[column.key] === "boolean"
+                                        ? row[column.key]
+                                          ? "Sim"
+                                          : "Não"
+                                        : row[column.key] == null
+                                          ? "—"
+                                          : String(row[column.key])}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-600 dark:text-slate-300">
+                          Nenhum registro encontrado nesta área. Ajuste os critérios se necessário.
+                        </p>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -254,7 +459,7 @@ export function ReportsCreatePanel() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    disabled={review.isPending}
+                    disabled={busy}
                     aria-label={`Remover ${area.catalog?.label || "área indisponível"}`}
                     onClick={() => changeArea(area.source)}
                   >
@@ -266,17 +471,17 @@ export function ReportsCreatePanel() {
           </ol>
         </aside>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4 dark:border-slate-700">
+      <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-white py-4 dark:border-slate-700 dark:bg-slate-900">
         <Button
           type="button"
           variant="outline"
-          disabled={step === 0 || review.isPending}
+          disabled={step === 0 || busy}
           onClick={() => void goTo(step - 1)}
         >
           Anterior
         </Button>
-        {step < 2 ? (
-          <Button type="button" disabled={review.isPending} onClick={() => void goTo(step + 1)}>
+        {step < 3 ? (
+          <Button type="button" disabled={busy} onClick={() => void goTo(step + 1)}>
             {review.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -287,8 +492,8 @@ export function ReportsCreatePanel() {
             )}
           </Button>
         ) : (
-          <Button type="button" variant="outline" onClick={() => void goTo(0)}>
-            Ajustar áreas
+          <Button type="button" disabled={busy || unavailable} onClick={() => void showPreview()}>
+            {preview.isPending ? "Carregando prévia..." : "Visualizar prévia"}
           </Button>
         )}
       </div>
