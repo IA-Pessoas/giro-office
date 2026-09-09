@@ -108,7 +108,9 @@ export function SuperAdminPage() {
         />
 
         <div
-          className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          className={`flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
+            activePanel === "audit" ? "overflow-hidden" : "overflow-auto"
+          }`}
         >
           <div className="border-b border-slate-200 p-2 dark:border-slate-800">
             <div className="flex flex-wrap gap-1">
