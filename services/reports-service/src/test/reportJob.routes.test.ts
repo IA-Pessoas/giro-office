@@ -39,6 +39,59 @@ function accessContext(overrides: Record<string, unknown> = {}) {
 }
 
 describe("reportJob routes", () => {
+  it("valida e enfileira uma composição sem exigir formato", async () => {
+    const validateComposition = vi.fn().mockResolvedValue({
+      definition: {
+        version: 2,
+        areas: [{ source: "regularize.licenses", fields: ["protocol"] }],
+      },
+    });
+    const createFromDefinition = vi.fn().mockResolvedValue({ id: jobId, status: "queued" });
+    const app = express();
+    app.use(express.json());
+    app.use(
+      "/reports",
+      createReportJobRouter({
+        jobService: { createFromDefinition } as never,
+        snapshotService: {} as never,
+        authorizationService: { validateComposition } as never,
+        lifecycleService: {} as never,
+        accessContextClient: { getAccessContext: vi.fn() },
+      }),
+    );
+
+    await request(app)
+      .post("/reports/jobs")
+      .set(FORWARDED_AUTH_USER_ID_HEADER, userId)
+      .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, organizationId)
+      .send({
+        definition: {
+          version: 2,
+          areas: [{ source: "regularize.licenses", fields: ["protocol"] }],
+        },
+      })
+      .expect(201);
+
+    expect(validateComposition).toHaveBeenCalledWith({
+      userId,
+      organizationId,
+      requestId: "reports-job-create",
+      definition: {
+        version: 2,
+        areas: [{ source: "regularize.licenses", fields: ["protocol"] }],
+      },
+    });
+    expect(createFromDefinition).toHaveBeenCalledWith({
+      userId,
+      organizationId,
+      definition: {
+        version: 2,
+        areas: [{ source: "regularize.licenses", fields: ["protocol"] }],
+      },
+      payload: { format: "json", parameterValues: {} },
+    });
+  });
+
   it("lista histórico pessoal e aceita filtros no contrato jobs/list", async () => {
     const listHistory = vi.fn().mockResolvedValue({ items: [], nextCursor: null });
     const app = express();

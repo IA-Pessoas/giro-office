@@ -38,6 +38,10 @@ function createPersistence(status = "processing") {
       findMany: vi.fn(async () => [{ id: "snapshot-1" }]),
       deleteMany: vi.fn(),
     },
+    reportSnapshotBlock: {
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     reportSnapshotRow: {
       createMany: vi.fn(),
       deleteMany: vi.fn(),
@@ -214,6 +218,62 @@ describe("ReportLifecycleService", () => {
           counts: { rows: 1, bytes: 16, matched: 3 },
         }),
       }),
+    });
+  });
+
+  it("persiste blocos compostos no mesmo snapshot e mantém área vazia", async () => {
+    const { prisma, transaction } = createPersistence();
+    const audit = new ReportAuditService(prisma as never, vi.fn());
+    const service = new ReportLifecycleService(prisma as never, audit, () => now);
+
+    await service.complete({
+      job_id: "job-1",
+      organization_id: "org-1",
+      actor_id: "user-1",
+      lease_token: "lease-b",
+      blocks: [
+        {
+          source: "regularize.licenses",
+          label: "Licenças do Regularize",
+          columns: [{ key: "protocol", label: "Protocolo" }],
+          rows: [{ protocol: "P-1" }],
+        },
+        {
+          source: "regularize.processes",
+          label: "Processos do Regularize",
+          columns: [{ key: "number", label: "Número" }],
+          rows: [],
+        },
+      ],
+    });
+
+    expect(transaction.reportSnapshotBlock.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          organization_id: "org-1",
+          snapshot_id: "snapshot-1",
+          position: 0,
+          source: "regularize.licenses",
+          label: "Licenças do Regularize",
+          row_count: 1,
+        }),
+        expect.objectContaining({
+          position: 1,
+          source: "regularize.processes",
+          row_count: 0,
+        }),
+      ],
+    });
+    expect(transaction.reportSnapshotRow.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          organization_id: "org-1",
+          snapshot_id: "snapshot-1",
+          row_number: 1,
+          block_id: expect.any(String),
+          data_json: { protocol: "P-1" },
+        }),
+      ],
     });
   });
 
