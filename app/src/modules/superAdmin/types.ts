@@ -107,6 +107,8 @@ export interface PlatformAuditRecord {
   referring?: string | null;
   referringId?: string | null;
   actorPlatformUserId?: string;
+  actorPlatformUserName?: string;
+  organizationName?: string;
   changes?: {
     status?: { from: PlatformOrganizationStatus | null; to: PlatformOrganizationStatus | null };
     subscription_plan?: {

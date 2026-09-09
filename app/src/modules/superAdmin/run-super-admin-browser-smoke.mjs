@@ -115,6 +115,8 @@ function recordAuditEvent(organizationId, action, referringId, changes) {
     referring: "user",
     referringId,
     actorPlatformUserId: identity.id,
+    actorPlatformUserName: identity.name,
+    organizationName: organizations.find((item) => item.id === organizationId)?.name,
     changes,
   });
 }
@@ -184,6 +186,8 @@ const upstream = createServer(async (request, response) => {
       referring: "organization",
       referringId: auditOrganization.id,
       actorPlatformUserId: identity.id,
+      actorPlatformUserName: identity.name,
+      organizationName: auditOrganization.name,
       changes: { subscription_plan: { from: "trial", to: "pro" } },
     };
     const allItems = [
@@ -938,6 +942,10 @@ try {
     await auditDetails.getByText("Ação selecionada", { exact: true }).waitFor();
     await auditDetails.getByText("organization.subscription_plan.updated", { exact: true }).waitFor();
     await auditDetails.getByText("request-safe-1", { exact: true }).waitFor();
+    await auditDetails.getByText(/Operador de teste · b4bc983b-1c5c-43d8-80f0-dab220f0c500/).waitFor();
+    await auditDetails
+      .getByText(/Organização Aurora · fc70c08e-1907-4268-b303-f88c6f5c5c01/)
+      .waitFor();
     await auditDetails.getByText("42 ms", { exact: true }).waitFor();
     assert.equal(await auditSearch.inputValue(), "/platform/organizations");
     if (screenshotDirectory) {

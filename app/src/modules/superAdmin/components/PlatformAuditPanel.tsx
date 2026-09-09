@@ -156,7 +156,7 @@ export function PlatformAuditPanel({
                   Evento
                 </th>
                 <th className="px-4 py-3 font-semibold" scope="col">
-                  Ator
+                  Autor
                 </th>
                 <th className="px-4 py-3 font-semibold" scope="col">
                   Mudanças
@@ -207,9 +207,12 @@ export function PlatformAuditPanel({
                         aria-hidden="true"
                         className="mb-1 text-xs font-medium text-slate-500 sm:hidden"
                       >
-                        Ator
+                        Autor
                       </p>
-                      <p className="break-all text-xs">{item.actorPlatformUserId ?? "Sistema"}</p>
+                      <p className="break-words text-xs">{item.actorPlatformUserName ?? "Sistema"}</p>
+                      <p className="mt-0.5 break-all text-[11px] text-slate-500 dark:text-slate-400">
+                        {item.actorPlatformUserId ?? "—"}
+                      </p>
                     </td>
                     <td className="min-w-0 sm:w-[27%] sm:px-4 sm:py-3 sm:text-xs">
                       <p
@@ -321,9 +324,21 @@ export function PlatformAuditPanel({
                 </dd>
               </div>
               <div>
-                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Ator</dt>
-                <dd className="mt-1 break-all text-sm text-slate-900 dark:text-slate-100">
-                  {selectedAudit.actorPlatformUserId ?? "Sistema"}
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Autor</dt>
+                <dd className="mt-1 break-words text-sm text-slate-900 dark:text-slate-100">
+                  {selectedAudit.actorPlatformUserName ?? "Sistema"}
+                  {selectedAudit.actorPlatformUserId
+                    ? ` · ${selectedAudit.actorPlatformUserId}`
+                    : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Organização
+                </dt>
+                <dd className="mt-1 break-words text-sm text-slate-900 dark:text-slate-100">
+                  {selectedAudit.organizationName ?? "—"}
+                  {selectedAudit.organizationId ? ` · ${selectedAudit.organizationId}` : ""}
                 </dd>
               </div>
               <div>
