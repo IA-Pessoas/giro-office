@@ -85,6 +85,8 @@ async function run() {
   const previews = [];
   let previewFailure = 0;
   let generatedJob;
+  const models = [];
+  let modelVersionId = "reports-fixture-model-version";
   let jobPolls = 0;
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => {
@@ -105,10 +107,34 @@ async function run() {
     if (path === "/reports/jobs" && route.request().method() === "POST") {
       const payload = route.request().postDataJSON();
       assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
-      assert.ok(payload.definition?.version === 2);
+      assert.ok(
+        payload.modelVersionId === modelVersionId || payload.definition?.version === 2,
+        "Generation must use a validated definition or a saved model version",
+      );
       generatedJob = { id: "reports-fixture-job", status: "queued", error_message: null };
       jobPolls = 0;
       return route.fulfill({ status: 201, json: { success: true, data: generatedJob } });
+    }
+    if (path === "/reports/models" && route.request().method() === "POST") {
+      const payload = route.request().postDataJSON();
+      assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
+      assert.equal(payload.definition.version, 2);
+      assert.ok(payload.name);
+      assert.ok(payload.description);
+      const model = {
+        id: "reports-fixture-model",
+        organization_id: user.organization_id,
+        name: payload.name,
+        description: payload.description,
+        version: 1,
+        version_id: modelVersionId,
+        definition: payload.definition,
+      };
+      models.splice(0, models.length, model);
+      return route.fulfill({ status: 201, json: { success: true, data: model } });
+    }
+    if (path === "/reports/models/reports-fixture-model" && route.request().method() === "GET") {
+      return route.fulfill({ json: { success: true, data: models[0] } });
     }
     if (path === "/reports/jobs/reports-fixture-job" && route.request().method() === "GET") {
       if (generatedJob?.status === "queued") {
@@ -207,8 +233,12 @@ async function run() {
     const data =
       path === "/user/me"
         ? user
-        : path === "/reports/catalog"
-          ? { items: catalogMode === "empty" ? [] : catalogMode === "invalid" ? null : items }
+          : path === "/reports/catalog"
+            ? { items: catalogMode === "empty" ? [] : catalogMode === "invalid" ? null : items }
+            : path === "/reports/models/list"
+              ? { items: models }
+              : path === "/reports/models/shared/list"
+                ? { items: [] }
           : [];
     await route.fulfill({ status: 200, json: { success: true, data } });
   });
@@ -389,6 +419,20 @@ async function run() {
     ).toContainText("Nenhum registro encontrado");
     await checkLanguage();
     await screenshot("05-resultado-desktop");
+    await panel.getByRole("button", { name: "Salvar para usar novamente", exact: true }).click();
+    const saveDialog = page.getByRole("dialog");
+    await saveDialog.getByLabel("Nome", { exact: true }).fill("Projetos acompanhados");
+    await saveDialog.getByLabel(/Descrição/).fill("Modelo para acompanhar projetos com clientes.");
+    await saveDialog.getByRole("button", { name: "Salvar modelo", exact: true }).click();
+    await expect(page.getByText("Modelo salvo para usar novamente.")).toBeVisible();
+    await page.getByRole("tab", { name: "Modelos", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Projetos acompanhados", exact: true })).toBeVisible();
+    await expect(page.getByText("Modelo para acompanhar projetos com clientes.", { exact: true })).toBeVisible();
+    await screenshot("07-modelos-salvos-desktop");
+    await page.getByRole("button", { name: "Abrir modelo", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Revisar relatório", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Gerar relatório", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Relatório pronto", exact: true })).toBeVisible({ timeout: 10000 });
     await panel.getByRole("button", { name: "Gerar relatório", exact: true }).click();
     await expect(panel.getByRole("button", { name: "Cancelar geração", exact: true })).toBeVisible();
     await panel.getByRole("button", { name: "Cancelar geração", exact: true }).click();

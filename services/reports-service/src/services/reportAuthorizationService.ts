@@ -1,6 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 import {
   deriveReportCatalogGrant,
+  deriveReportCatalogGrantFromComposition,
   type ReportCatalogGrant,
   type ReportCatalogScope,
 } from "../catalog/types.js";
@@ -10,7 +11,7 @@ import {
   type ReportingAccessContextClient,
 } from "../routes/reportingContext.js";
 import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
-import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
+import type { ReportModelDefinition } from "../schemas/reportModel.schemas.js";
 import type {
   ReportDefinitionService,
   ValidatedReportDefinition,
@@ -20,12 +21,13 @@ export interface ValidateReportDefinitionInput {
   userId: string;
   organizationId: string;
   requestId: string;
-  definition: ReportDefinition;
+  definition: ReportModelDefinition;
 }
 
-export interface AuthorizedSharedReportDefinition extends ValidatedReportDefinition {
+export interface AuthorizedSharedReportDefinition {
   department_id: string;
   grant: ReportCatalogGrant;
+  definition: ReportModelDefinition;
 }
 
 export interface SharedDepartment {
@@ -47,6 +49,9 @@ export class ReportAuthorizationService {
   async validateDefinition(
     input: ValidateReportDefinitionInput,
   ): Promise<ValidatedReportDefinition> {
+    if ("version" in input.definition) {
+      throw new ServiceError(400, "A composição deve ser validada como relatório composto.");
+    }
     const scope = await getReportingCatalogScope(this.accessContextClient, input);
     return this.definitionService.validate(input.definition, scope);
   }
@@ -95,14 +100,25 @@ export class ReportAuthorizationService {
       );
     }
 
-    const validated = this.definitionService.validate(input.definition, {
-      organization_id: context.organization_id,
-      modules: context.modules,
-    });
+    const validated =
+      "version" in input.definition
+        ? {
+            definition: this.definitionService.validateComposition(input.definition, {
+              organization_id: context.organization_id,
+              modules: context.modules,
+            }),
+          }
+        : this.definitionService.validate(input.definition, {
+            organization_id: context.organization_id,
+            modules: context.modules,
+          });
     return {
       ...validated,
       department_id: department.id,
-      grant: deriveReportCatalogGrant(validated.definition),
+      grant:
+        "version" in validated.definition
+          ? deriveReportCatalogGrantFromComposition(validated.definition)
+          : deriveReportCatalogGrant(validated.definition),
     };
   }
 
@@ -110,14 +126,25 @@ export class ReportAuthorizationService {
     input: ValidateReportDefinitionInput,
   ): Promise<AuthorizedSharedReportDefinition> {
     const execution = await this.getSharedExecutionContext(input);
-    const definition = this.definitionService.validate(input.definition, {
-      ...execution.scope,
-      grant: deriveReportCatalogGrant(input.definition),
-    });
+    const definition =
+      "version" in input.definition
+        ? {
+            definition: this.definitionService.validateComposition(
+              input.definition,
+              execution.scope,
+            ),
+          }
+        : this.definitionService.validate(input.definition, {
+            ...execution.scope,
+            grant: deriveReportCatalogGrant(input.definition),
+          });
     return {
       ...definition,
       department_id: execution.department.id,
-      grant: deriveReportCatalogGrant(definition.definition),
+      grant:
+        "version" in definition.definition
+          ? deriveReportCatalogGrantFromComposition(definition.definition)
+          : deriveReportCatalogGrant(definition.definition),
     };
   }
 

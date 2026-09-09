@@ -14,6 +14,7 @@ import { createReportJobRouter } from "../routes/reportJob.routes.js";
 const organizationId = "00000000-0000-4000-8000-000000000002";
 const userId = "00000000-0000-4000-8000-000000000001";
 const jobId = "00000000-0000-4000-8000-000000000003";
+const modelVersionId = "00000000-0000-4000-8000-000000000004";
 
 function withErrors(app: express.Express): express.Express {
   app.use(
@@ -39,6 +40,55 @@ function accessContext(overrides: Record<string, unknown> = {}) {
 }
 
 describe("reportJob routes", () => {
+  it("revalida a composição salva antes de gerar pelo modelo", async () => {
+    const composition = {
+      version: 2 as const,
+      areas: [{ source: "regularize.licenses", fields: ["protocol"] }],
+    };
+    const validateComposition = vi.fn().mockResolvedValue({ definition: composition });
+    const getVersion = vi.fn().mockResolvedValue({
+      model: { created_by_user_id: userId, id: "model-1" },
+      version: { id: modelVersionId, definition_json: composition },
+    });
+    const create = vi.fn().mockResolvedValue({ id: jobId, status: "queued" });
+    const app = express();
+    app.use(express.json());
+    app.use(
+      "/reports",
+      createReportJobRouter({
+        jobService: {
+          getVersion,
+          getRetentionDays: vi.fn().mockResolvedValue(30),
+          create,
+        } as never,
+        snapshotService: {} as never,
+        authorizationService: { validateComposition } as never,
+        lifecycleService: {} as never,
+        accessContextClient: { getAccessContext: vi.fn() },
+      }),
+    );
+
+    await request(app)
+      .post("/reports/jobs")
+      .set(FORWARDED_AUTH_USER_ID_HEADER, userId)
+      .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, organizationId)
+      .send({ modelVersionId })
+      .expect(201);
+
+    expect(validateComposition).toHaveBeenCalledWith({
+      userId,
+      organizationId,
+      requestId: "reports-job-create",
+      definition: composition,
+    });
+    expect(create).toHaveBeenCalledWith({
+      userId,
+      organizationId,
+      modelVersionId,
+      payload: { format: "json", parameterValues: {}, retentionDays: 30 },
+    });
+  });
+
   it("valida e enfileira uma composição sem exigir formato", async () => {
     const validateComposition = vi.fn().mockResolvedValue({
       definition: {

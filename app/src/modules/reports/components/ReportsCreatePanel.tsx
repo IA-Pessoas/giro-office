@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+import { toast } from "react-toastify";
+import { Dialog } from "@shared/components";
 import { Button } from "@shared/ui/newLayout/button";
 import { useReportBuilder } from "../hooks/useReportBuilder";
 import { useReportsCatalog } from "../hooks/useReportsCatalog";
@@ -16,20 +18,56 @@ import { getErrorStatus } from "./reportUi";
 import {
   useCancelReportJobMutation,
   useCreateReportJobMutation,
+  useCreateReportModelMutation,
   useReportJob,
   useReportSnapshot,
 } from "../hooks/useReports";
 import { ReportResultBlocks } from "./ReportResultBlocks";
+import type { ReportModel } from "../types/report.types";
 
 const steps = ["Escolher áreas", "Escolher campos", "Definir critérios", "Revisar relatório"];
 
-export function ReportsCreatePanel() {
+function legacyDefinitionToAreas(model: ReportModel) {
+  const definition = model.definition;
+  if ("areas" in definition) return definition.areas;
+  return definition.sources.map((source) => ({
+    source,
+    fields: definition.columns
+      .filter((column) => column.source === source)
+      .map((column) => column.field),
+    filters: definition.filters
+      .filter((filter) => filter.source === source)
+      .map((filter) => ({
+        field: filter.field,
+        operator: filter.operator,
+        value: filter.parameter,
+      })),
+    groupBy: definition.group_by
+      ?.filter((item) => item.source === source)
+      .map((item) => item.field),
+    aggregations: definition.aggregations
+      .filter((item) => item.source === source)
+      .map((item) => ({ field: item.field, function: item.function })),
+    orderBy: definition.order_by
+      .filter((item) => item.source === source)
+      .map((item) => ({ field: item.field, direction: item.direction })),
+  }));
+}
+
+export function ReportsCreatePanel({
+  model,
+  onModelLoaded,
+}: {
+  model?: ReportModel | null;
+  onModelLoaded?: () => void;
+}) {
   const catalog = useReportsCatalog();
   const builder = useReportBuilder();
   const queryClient = useQueryClient();
   const review = useMutation({ mutationFn: reportsService.validateDefinition });
   const preview = useMutation({ mutationFn: reportsService.previewComposition });
   const createJob = useCreateReportJobMutation();
+  const createModel = useCreateReportModelMutation();
   const cancelJob = useCancelReportJobMutation();
   const [generatedJobId, setGeneratedJobId] = useState<string | null>(null);
   const job = useReportJob(generatedJobId);
@@ -49,6 +87,9 @@ export function ReportsCreatePanel() {
   const stale = Boolean(preview.data && previewConfiguration !== configuration);
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
+  const [loadedModel, setLoadedModel] = useState<ReportModel | null>(null);
+  const [loadedModelVersionId, setLoadedModelVersionId] = useState<string | null>(null);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
 
@@ -58,6 +99,20 @@ export function ReportsCreatePanel() {
   useEffect(() => {
     if (error) errorRef.current?.focus();
   }, [error]);
+  useEffect(() => {
+    if (!model) return;
+    builder.setAreas(legacyDefinitionToAreas(model));
+    setLoadedModel(model);
+    setLoadedModelVersionId(model.version_id ?? null);
+    setGeneratedJobId(null);
+    createJob.reset();
+    preview.reset();
+    review.reset();
+    setPreviewConfiguration("");
+    setError("");
+    setStep(3);
+    onModelLoaded?.();
+  }, [model]);
 
   const sources = catalog.data?.items ?? [];
   const selected = builder.areas.map((area) => ({
@@ -82,9 +137,15 @@ export function ReportsCreatePanel() {
     createJob.reset();
   }
 
+  function clearLoadedModel() {
+    setLoadedModel(null);
+    setLoadedModelVersionId(null);
+  }
+
   function changeArea(source: string) {
     if (busy) return;
     builder.toggleArea(source);
+    clearLoadedModel();
     clearGeneratedResult();
     setError("");
     review.reset();
@@ -94,6 +155,7 @@ export function ReportsCreatePanel() {
     builder.setAreas((current) =>
       current.map((item) => (item.source === area.source ? area : item)),
     );
+    clearLoadedModel();
     clearGeneratedResult();
     setError("");
     review.reset();
@@ -103,7 +165,9 @@ export function ReportsCreatePanel() {
     setError("");
     try {
       const definition = buildReportComposition(builder.areas, sources);
-      const created = await createJob.mutateAsync(definition);
+      const created = await createJob.mutateAsync(
+        loadedModelVersionId ? { modelVersionId: loadedModelVersionId } : definition,
+      );
       setGeneratedJobId(created.id);
     } catch (cause) {
       const status = getErrorStatus(cause);
@@ -115,6 +179,38 @@ export function ReportsCreatePanel() {
             : "Não foi possível iniciar a geração. Tente novamente.",
       );
       if (status === 403) await queryClient.invalidateQueries({ queryKey: reportsCatalogQueryKey() });
+    }
+  }
+  async function saveModel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") ?? "").trim();
+    const description = String(form.get("description") ?? "").trim();
+    if (!name) {
+      setError("Informe um nome para salvar o modelo.");
+      return;
+    }
+    try {
+      await createModel.mutateAsync({
+        name,
+        ...(description ? { description } : {}),
+        definition:
+          loadedModel && loadedModelVersionId
+            ? loadedModel.definition
+            : buildReportComposition(builder.areas, sources),
+      });
+      setSaveDialogOpen(false);
+      toast.success("Modelo salvo para usar novamente.");
+    } catch (cause) {
+      const status = getErrorStatus(cause);
+      setError(
+        status === 403
+          ? "Seu acesso mudou. Não foi possível salvar este modelo."
+          : "Não foi possível salvar o modelo. Tente novamente.",
+      );
+      if (status === 403) {
+        await queryClient.invalidateQueries({ queryKey: reportsCatalogQueryKey() });
+      }
     }
   }
   async function cancelGeneratedReport() {
@@ -298,6 +394,7 @@ export function ReportsCreatePanel() {
                           item.source === area.source ? { ...item, fields } : item,
                         ),
                       );
+                      clearLoadedModel();
                       clearGeneratedResult();
                       setError("");
                       review.reset();
@@ -529,7 +626,14 @@ export function ReportsCreatePanel() {
                     ) : null}
                   </div>
                   {job.data.status === "completed" && snapshot.data?.blocks ? (
-                    <ReportResultBlocks blocks={snapshot.data.blocks} snapshot />
+                    <>
+                      <ReportResultBlocks blocks={snapshot.data.blocks} snapshot />
+                      <div className="flex justify-end border-t border-blue-200 pt-4 dark:border-blue-900">
+                        <Button type="button" variant="outline" onClick={() => setSaveDialogOpen(true)}>
+                          Salvar para usar novamente
+                        </Button>
+                      </div>
+                    </>
                   ) : null}
                   {job.data.status === "completed" && snapshot.isPending ? (
                     <p role="status" className="text-sm text-gray-700 dark:text-slate-300">
@@ -610,6 +714,42 @@ export function ReportsCreatePanel() {
           </div>
         )}
       </div>
+      <Dialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        title="Salvar modelo"
+        description="Dê um nome amigável ao modelo para reutilizá-lo depois."
+        footer={null}
+      >
+        <form className="space-y-4" onSubmit={(event) => void saveModel(event)}>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+            Nome
+            <input
+              name="name"
+              required
+              defaultValue={loadedModel?.name ?? "Meu relatório"}
+              className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-slate-900"
+            />
+          </label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+            Descrição <span className="font-normal text-gray-500">(opcional)</span>
+            <textarea
+              name="description"
+              maxLength={240}
+              defaultValue={loadedModel?.description ?? ""}
+              className="mt-1 min-h-24 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-slate-900"
+            />
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setSaveDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={createModel.isPending}>
+              {createModel.isPending ? "Salvando..." : "Salvar modelo"}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }
