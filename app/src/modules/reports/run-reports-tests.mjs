@@ -40,6 +40,10 @@ const snapshotTableSource = await readFile(
   new URL("./components/ReportSnapshotTable.tsx", import.meta.url),
   "utf8",
 );
+const resultBlocksSource = await readFile(
+  new URL("./components/ReportResultBlocks.tsx", import.meta.url),
+  "utf8",
+);
 const downloadActionsSource = await readFile(
   new URL("./components/ReportDownloadActions.tsx", import.meta.url),
   "utf8",
@@ -462,6 +466,14 @@ runTest("uses the materialized snapshot id for in-memory downloads", () => {
   assert.match(snapshotTableSource, /disabled=\{!snapshotId\}/);
   assert.match(downloadActionsSource, /URL\.createObjectURL\(result\.blob\)/);
   assert.match(downloadActionsSource, /URL\.revokeObjectURL\(objectUrl\)/);
+});
+
+runTest("keeps repeated report sources distinct in the composed result", () => {
+  assert.match(resultBlocksSource, /key=\{`\$\{block\.source\}-\$\{index\}`\}/);
+});
+
+runTest("keeps composed snapshots paginable in history", () => {
+  assert.match(snapshotTableSource, /snapshotQuery\.data\?\.blocks[\s\S]*PaginationControls/);
 });
 
 runTest("keeps reports tabs module-scoped", () => {

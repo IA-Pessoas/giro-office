@@ -15,11 +15,11 @@ export function ReportResultBlocks({
 }) {
   return (
     <div className="space-y-5" aria-label="Resultados do relatório">
-      {blocks.map((block) => {
+      {blocks.map((block, index) => {
         const count = snapshot && "rowCount" in block ? block.rowCount : block.rows.length;
         return (
           <section
-            key={block.source}
+            key={`${block.source}-${index}`}
             aria-label={"Resultado de " + block.label}
             className="min-w-0 space-y-2 border-t border-gray-200 pt-4 dark:border-slate-700"
           >

@@ -127,6 +127,64 @@ describe("ReportSnapshotService", () => {
     });
   });
 
+  it("expõe o próximo cursor composto quando algum bloco ainda possui linhas", async () => {
+    const prisma = {
+      reportJob: { findFirst: vi.fn().mockResolvedValue({ id: "job-1" }) },
+      reportSnapshot: {
+        findFirst: vi.fn().mockResolvedValue({ id: "snapshot-1", created_at: new Date() }),
+      },
+      reportSnapshotBlock: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "block-1",
+            source: "reports.first",
+            label: "Primeiro",
+            columns_json: [],
+            row_count: 2,
+            position: 0,
+          },
+          {
+            id: "block-2",
+            source: "reports.second",
+            label: "Segundo",
+            columns_json: [],
+            row_count: 3,
+            position: 1,
+          },
+        ]),
+      },
+      reportSnapshotRow: {
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([
+            { row_number: 1, data_json: { value: "a" } },
+            { row_number: 2, data_json: { value: "b" } },
+          ])
+          .mockResolvedValueOnce([
+            { row_number: 1, data_json: { value: "c" } },
+            { row_number: 2, data_json: { value: "d" } },
+            { row_number: 3, data_json: { value: "e" } },
+          ]),
+      },
+    };
+    const service = new ReportSnapshotService(prisma as never);
+
+    await expect(
+      service.get({
+        organizationId: "org-1",
+        userId: "user-1",
+        jobId: "job-1",
+        limit: 2,
+      }),
+    ).resolves.toMatchObject({
+      nextCursor: 2,
+      blocks: [
+        { rows: [{ row_number: 1 }, { row_number: 2 }], nextCursor: null },
+        { rows: [{ row_number: 1 }, { row_number: 2 }], nextCursor: 2 },
+      ],
+    });
+  });
+
   it("abre snapshot do acervo somente quando o modelo pertence ao departamento atual", async () => {
     const reportJob = {
       findFirst: vi.fn().mockResolvedValue({

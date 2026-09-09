@@ -25,6 +25,9 @@ export function ReportSnapshotTable({
   const snapshotQuery = useReportSnapshot(job.id, scope, cursor);
   const snapshotId = snapshotQuery.data?.snapshot.id;
   const rows = snapshotQuery.data?.rows ?? [];
+  const blocks = snapshotQuery.data?.blocks;
+  const visibleBlockRows = blocks?.reduce((total, block) => total + block.rows.length, 0) ?? 0;
+  const totalBlockRows = blocks?.reduce((total, block) => total + block.rowCount, 0) ?? 0;
   const headers = rows.length > 0 ? Object.keys(rows[0]?.values ?? {}) : [];
 
   return (
@@ -51,8 +54,31 @@ export function ReportSnapshotTable({
         </div>
       ) : snapshotQuery.isError ? (
         <p role="alert" className="py-5 text-sm text-red-600 dark:text-red-400">Não foi possível carregar o snapshot.</p>
-      ) : snapshotQuery.data?.blocks ? (
-        <ReportResultBlocks blocks={snapshotQuery.data.blocks} snapshot />
+      ) : blocks ? (
+        <>
+          <ReportResultBlocks blocks={blocks} snapshot />
+          <PaginationControls
+            page={page}
+            limit={100}
+            total={totalBlockRows}
+            count={visibleBlockRows}
+            hasMore={Boolean(snapshotQuery.data?.nextCursor)}
+            isFetching={snapshotQuery.isFetching}
+            onPrevious={() => {
+              const nextStack = [...cursorStack];
+              const previousCursor = nextStack.pop();
+              setCursorStack(nextStack);
+              setCursor(previousCursor);
+              setPage((current) => Math.max(1, current - 1));
+            }}
+            onNext={() => {
+              if (snapshotQuery.data?.nextCursor === null || snapshotQuery.data?.nextCursor === undefined) return;
+              setCursorStack((current) => [...current, cursor]);
+              setCursor(snapshotQuery.data.nextCursor);
+              setPage((current) => current + 1);
+            }}
+          />
+        </>
       ) : rows.length === 0 ? (
         <p className="py-5 text-sm text-gray-600 dark:text-slate-400" role="status">O snapshot não possui linhas.</p>
       ) : (

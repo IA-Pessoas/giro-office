@@ -105,10 +105,13 @@ export class ReportSnapshotService {
           };
         }),
       );
+      const nextCursors = blockPages
+        .map((block) => block.nextCursor)
+        .filter((cursor): cursor is number => cursor !== null);
       return {
         snapshot: { id: snapshot.id, created_at: snapshot.created_at },
         rows: [],
-        nextCursor: null,
+        nextCursor: nextCursors.length > 0 ? Math.min(...nextCursors) : null,
         blocks: blockPages,
       };
     }
