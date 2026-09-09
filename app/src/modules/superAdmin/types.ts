@@ -125,6 +125,10 @@ export interface PlatformAuditRecord {
       previousOwnerAction: "demote" | "deactivate";
       justification: string;
     };
+    modules?: {
+      before: Partial<Record<string, 0 | 1 | 2 | 3>>;
+      after: Partial<Record<string, 0 | 1 | 2 | 3>>;
+    };
   };
 }
 
