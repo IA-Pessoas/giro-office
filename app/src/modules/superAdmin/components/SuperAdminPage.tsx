@@ -80,7 +80,9 @@ export function SuperAdminPage() {
         </div>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(19rem,23rem)_minmax(0,1fr)] lg:items-stretch">
+      <div
+        className="grid gap-4 lg:h-[calc(100vh-16rem)] lg:grid-cols-[minmax(19rem,23rem)_minmax(0,1fr)] lg:items-stretch"
+      >
         <OrganizationDirectory
           createButtonRef={createButtonRef}
           isError={organizationsQuery.isError}
@@ -105,7 +107,11 @@ export function SuperAdminPage() {
           total={total}
         />
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div
+          className={`flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
+            activePanel === "audit" ? "overflow-hidden" : "overflow-auto"
+          }`}
+        >
           <div className="border-b border-slate-200 p-2 dark:border-slate-800">
             <div className="flex flex-wrap gap-1">
               <button

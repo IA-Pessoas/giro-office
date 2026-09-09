@@ -48,8 +48,10 @@ export function PlatformAuditPanel({
   }, [organization?.id]);
 
   return (
-    <section aria-labelledby="platform-audit-title">
-      <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-end sm:justify-between dark:border-slate-800">
+    <section aria-labelledby="platform-audit-title" className="flex min-h-0 flex-1 flex-col">
+      <div
+        className="flex shrink-0 flex-col gap-4 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-end sm:justify-between dark:border-slate-800"
+      >
         <div>
           <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
             {isGlobalView ? "Todas as organizações" : organization?.name}
@@ -108,7 +110,7 @@ export function PlatformAuditPanel({
 
       <div
         aria-busy={auditQuery.isLoading || auditQuery.isFetching}
-        className="min-h-[24rem]"
+        className="min-h-0 flex-1 overflow-auto lg:min-h-[24rem]"
       >
         {auditQuery.isLoading ? (
           <div
