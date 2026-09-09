@@ -41,3 +41,7 @@ export function reportsSnapshotQueryKey(
 ) {
   return [...REPORTS_QUERY_KEY, "snapshot", id, scope, cursor ?? null] as const;
 }
+
+export function reportsJobQueryKey(id: string) {
+  return [...REPORTS_QUERY_KEY, "job", id] as const;
+}

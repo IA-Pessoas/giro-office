@@ -84,6 +84,8 @@ async function run() {
   let reviewGate;
   const previews = [];
   let previewFailure = 0;
+  let generatedJob;
+  let jobPolls = 0;
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -100,6 +102,57 @@ async function run() {
   );
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace(/^\/api/, "");
+    if (path === "/reports/jobs" && route.request().method() === "POST") {
+      const payload = route.request().postDataJSON();
+      assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
+      assert.ok(payload.definition?.version === 2);
+      generatedJob = { id: "reports-fixture-job", status: "queued", error_message: null };
+      jobPolls = 0;
+      return route.fulfill({ status: 201, json: { success: true, data: generatedJob } });
+    }
+    if (path === "/reports/jobs/reports-fixture-job" && route.request().method() === "GET") {
+      if (generatedJob?.status === "queued") {
+        jobPolls += 1;
+        generatedJob.status = "processing";
+      } else if (generatedJob?.status === "processing") {
+        generatedJob.status = "completed";
+      }
+      return route.fulfill({ json: { success: true, data: generatedJob } });
+    }
+    if (path === "/reports/jobs/reports-fixture-job/cancel" && route.request().method() === "POST") {
+      generatedJob = { ...generatedJob, status: "cancelled" };
+      return route.fulfill({ status: 204, body: "" });
+    }
+    if (path === "/reports/jobs/reports-fixture-job/snapshot" && route.request().method() === "GET") {
+      return route.fulfill({
+        json: {
+          success: true,
+          data: {
+            snapshot: { id: "reports-fixture-snapshot", created_at: "2026-09-09T12:00:00.000Z" },
+            rows: [],
+            nextCursor: null,
+            blocks: [
+              {
+                source: "integracao.projects",
+                label: "Projetos",
+                columns: [{ key: "name", label: "Nome" }],
+                rowCount: 1,
+                rows: [{ row_number: 1, values: { name: "Projeto gerado" } }],
+                nextCursor: null,
+              },
+              {
+                source: "integracao.clients",
+                label: "Clientes",
+                columns: [{ key: "email", label: "E-mail" }],
+                rowCount: 0,
+                rows: [],
+                nextCursor: null,
+              },
+            ],
+          },
+        },
+      });
+    }
     if (path === "/reports/preview") {
       assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
       const payload = route.request().postDataJSON();
@@ -320,9 +373,29 @@ async function run() {
     await expect(
       panel.getByRole("region", { name: "Prévia de Projetos", exact: true }),
     ).toBeVisible();
+    await panel.getByRole("button", { name: "Gerar relatório", exact: true }).click();
+    await expect(panel.getByText("Relatório aguardando na fila", { exact: true })).toBeVisible();
+    await expect(panel.getByRole("heading", { name: "Gerando relatório", exact: true })).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(panel.getByRole("heading", { name: "Relatório pronto", exact: true })).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(
+      panel.getByRole("region", { name: "Resultado de Projetos", exact: true }),
+    ).toContainText("Projeto gerado");
+    await expect(
+      panel.getByRole("region", { name: "Resultado de Clientes", exact: true }),
+    ).toContainText("Nenhum registro encontrado");
+    await checkLanguage();
+    await screenshot("05-resultado-desktop");
+    await panel.getByRole("button", { name: "Gerar relatório", exact: true }).click();
+    await expect(panel.getByRole("button", { name: "Cancelar geração", exact: true })).toBeVisible();
+    await panel.getByRole("button", { name: "Cancelar geração", exact: true }).click();
+    await expect(panel.getByRole("heading", { name: "Geração cancelada", exact: true })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     await checkLanguage();
-    await screenshot("05-previa-mobile");
+    await screenshot("06-resultado-mobile");
     assert.ok(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       "Layout não deve transbordar no mobile",

@@ -12,6 +12,8 @@ import type {
   ReportDownloadResult,
   ReportHistoryPage,
   ReportHistoryScope,
+  ReportJob,
+  ReportComposition,
   ReportModel,
   ReportDefinition,
   ReportSnapshotPage,
@@ -19,6 +21,7 @@ import type {
 } from "../types/report.types";
 import {
   reportsHistoryQueryKey,
+  reportsJobQueryKey,
   reportsModelsQueryKey,
   reportsSnapshotQueryKey,
   REPORTS_QUERY_KEY,
@@ -70,11 +73,37 @@ export function useReportSnapshot(
   );
 }
 
+export function useReportJob(id: string | null): UseQueryResult<ReportJob, Error> {
+  return useFetch(
+    reportsJobQueryKey(id ?? "missing"),
+    () => reportsService.getJob(id ?? ""),
+    {
+      enabled: Boolean(id),
+      refetchInterval: (query) => {
+        const status = query.state.data?.status;
+        return status === "queued" || status === "processing" ? 1500 : false;
+      },
+    },
+  );
+}
+
+export function useCreateReportJobMutation(): UseMutationResult<ReportJob, Error, ReportComposition> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (definition) => reportsService.createJob(definition),
+    onSuccess: async (job) => {
+      queryClient.setQueryData(reportsJobQueryKey(job.id), job);
+      await queryClient.invalidateQueries({ queryKey: [...REPORTS_QUERY_KEY, "history"] });
+    },
+  });
+}
+
 export function useCancelReportJobMutation(): UseMutationResult<void, Error, string> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id) => reportsService.cancelJob(id),
-    onSuccess: async () => {
+    onSuccess: async (_data, id) => {
+      await queryClient.invalidateQueries({ queryKey: reportsJobQueryKey(id) });
       await queryClient.invalidateQueries({ queryKey: [...REPORTS_QUERY_KEY, "history"] });
     },
   });

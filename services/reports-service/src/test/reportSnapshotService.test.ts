@@ -3,6 +3,79 @@ import { describe, expect, it, vi } from "vitest";
 import { ReportSnapshotService } from "../services/reportSnapshotService.js";
 
 describe("ReportSnapshotService", () => {
+  it("reabre um snapshot composto com blocos, campos, quantidade e valores", async () => {
+    const prisma = {
+      reportJob: { findFirst: vi.fn().mockResolvedValue({ id: "job-1" }) },
+      reportSnapshot: {
+        findFirst: vi.fn().mockResolvedValue({ id: "snapshot-1", created_at: new Date() }),
+      },
+      reportSnapshotBlock: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "block-1",
+            source: "regularize.licenses",
+            label: "Licenças do Regularize",
+            columns_json: [{ key: "protocol", label: "Protocolo" }],
+            row_count: 1,
+            position: 0,
+          },
+          {
+            id: "block-2",
+            source: "regularize.processes",
+            label: "Processos do Regularize",
+            columns_json: [{ key: "number", label: "Número" }],
+            row_count: 0,
+            position: 1,
+          },
+        ]),
+      },
+      reportSnapshotRow: {
+        findMany: vi
+          .fn()
+          .mockImplementation(({ where }: { where: { block_id?: string } }) =>
+            where.block_id === "block-1" ? [{ row_number: 1, data_json: { protocol: "P-1" } }] : [],
+          ),
+      },
+    };
+    const service = new ReportSnapshotService(prisma as never);
+
+    await expect(
+      service.get({
+        organizationId: "org-1",
+        userId: "user-1",
+        jobId: "job-1",
+        limit: 100,
+      }),
+    ).resolves.toEqual({
+      snapshot: { id: "snapshot-1", created_at: expect.any(Date) },
+      rows: [],
+      nextCursor: null,
+      blocks: [
+        {
+          source: "regularize.licenses",
+          label: "Licenças do Regularize",
+          columns: [{ key: "protocol", label: "Protocolo" }],
+          rowCount: 1,
+          rows: [{ row_number: 1, values: { protocol: "P-1" } }],
+          nextCursor: null,
+        },
+        {
+          source: "regularize.processes",
+          label: "Processos do Regularize",
+          columns: [{ key: "number", label: "Número" }],
+          rowCount: 0,
+          rows: [],
+          nextCursor: null,
+        },
+      ],
+    });
+    expect(prisma.reportSnapshotRow.findMany).toHaveBeenCalledWith({
+      where: { snapshot_id: "snapshot-1", block_id: "block-1" },
+      orderBy: { row_number: "asc" },
+      take: 101,
+    });
+  });
+
   it("retorna somente linhas de snapshot concluído, autorizado e paginado", async () => {
     const prisma = {
       reportJob: { findFirst: vi.fn().mockResolvedValue({ id: "job-1" }) },

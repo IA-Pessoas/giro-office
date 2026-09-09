@@ -8,6 +8,7 @@ import { useReportSnapshot } from "../hooks/useReports";
 import type { ReportHistoryItem, ReportHistoryScope } from "../types/report.types";
 import { formatReportDate, getReportStatusConfig, panelClassName } from "./reportUi";
 import { ReportDownloadActions } from "./ReportDownloadActions";
+import { ReportResultBlocks } from "./ReportResultBlocks";
 
 export function ReportSnapshotTable({
   job,
@@ -50,6 +51,8 @@ export function ReportSnapshotTable({
         </div>
       ) : snapshotQuery.isError ? (
         <p role="alert" className="py-5 text-sm text-red-600 dark:text-red-400">Não foi possível carregar o snapshot.</p>
+      ) : snapshotQuery.data?.blocks ? (
+        <ReportResultBlocks blocks={snapshotQuery.data.blocks} snapshot />
       ) : rows.length === 0 ? (
         <p className="py-5 text-sm text-gray-600 dark:text-slate-400" role="status">O snapshot não possui linhas.</p>
       ) : (

@@ -13,6 +13,13 @@ import { buildReportComposition, operatorLabels, summaryLabels } from "../utils/
 import type { ReportArea } from "../types/report.types";
 import { ReportSourceStep } from "./ReportSourceStep";
 import { getErrorStatus } from "./reportUi";
+import {
+  useCancelReportJobMutation,
+  useCreateReportJobMutation,
+  useReportJob,
+  useReportSnapshot,
+} from "../hooks/useReports";
+import { ReportResultBlocks } from "./ReportResultBlocks";
 
 const steps = ["Escolher áreas", "Escolher campos", "Definir critérios", "Revisar relatório"];
 
@@ -22,8 +29,22 @@ export function ReportsCreatePanel() {
   const queryClient = useQueryClient();
   const review = useMutation({ mutationFn: reportsService.validateDefinition });
   const preview = useMutation({ mutationFn: reportsService.previewComposition });
+  const createJob = useCreateReportJobMutation();
+  const cancelJob = useCancelReportJobMutation();
+  const [generatedJobId, setGeneratedJobId] = useState<string | null>(null);
+  const job = useReportJob(generatedJobId);
+  const snapshot = useReportSnapshot(
+    job.data?.status === "completed" ? generatedJobId : null,
+    "personal",
+  );
   const [previewConfiguration, setPreviewConfiguration] = useState("");
-  const busy = review.isPending || preview.isPending;
+  const busy =
+    review.isPending ||
+    preview.isPending ||
+    createJob.isPending ||
+    cancelJob.isPending ||
+    job.data?.status === "queued" ||
+    job.data?.status === "processing";
   const configuration = JSON.stringify(builder.areas);
   const stale = Boolean(preview.data && previewConfiguration !== configuration);
   const [step, setStep] = useState(0);
@@ -56,9 +77,15 @@ export function ReportsCreatePanel() {
   );
   const empty = selected.filter((area) => area.fields.length === 0);
 
+  function clearGeneratedResult() {
+    setGeneratedJobId(null);
+    createJob.reset();
+  }
+
   function changeArea(source: string) {
     if (busy) return;
     builder.toggleArea(source);
+    clearGeneratedResult();
     setError("");
     review.reset();
     if (step >= 2) setStep(1);
@@ -67,8 +94,36 @@ export function ReportsCreatePanel() {
     builder.setAreas((current) =>
       current.map((item) => (item.source === area.source ? area : item)),
     );
+    clearGeneratedResult();
     setError("");
     review.reset();
+  }
+  async function generateReport() {
+    if (busy || unavailable) return;
+    setError("");
+    try {
+      const definition = buildReportComposition(builder.areas, sources);
+      const created = await createJob.mutateAsync(definition);
+      setGeneratedJobId(created.id);
+    } catch (cause) {
+      const status = getErrorStatus(cause);
+      setError(
+        status === 403
+          ? "Seu acesso mudou. Confira as áreas e os campos disponíveis e tente novamente."
+          : status === 400
+            ? "Confira os critérios, parâmetros e opções de cada área e tente novamente."
+            : "Não foi possível iniciar a geração. Tente novamente.",
+      );
+      if (status === 403) await queryClient.invalidateQueries({ queryKey: reportsCatalogQueryKey() });
+    }
+  }
+  async function cancelGeneratedReport() {
+    if (!generatedJobId) return;
+    try {
+      await cancelJob.mutateAsync(generatedJobId);
+    } catch {
+      setError("Não foi possível cancelar a geração. Tente novamente.");
+    }
   }
   async function showPreview() {
     if (busy) return;
@@ -243,6 +298,7 @@ export function ReportsCreatePanel() {
                           item.source === area.source ? { ...item, fields } : item,
                         ),
                       );
+                      clearGeneratedResult();
                       setError("");
                       review.reset();
                     }}
@@ -435,6 +491,58 @@ export function ReportsCreatePanel() {
                   ))}
                 </div>
               ) : null}
+              {job.data ? (
+                <section
+                  aria-live="polite"
+                  aria-label="Estado da geração"
+                  className="space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">
+                        {job.data.status === "completed"
+                          ? "Relatório pronto"
+                          : job.data.status === "failed"
+                            ? "Não foi possível gerar o relatório"
+                            : job.data.status === "cancelled"
+                              ? "Geração cancelada"
+                              : job.data.status === "expired"
+                                ? "Resultado expirado"
+                                : job.data.status === "queued"
+                                  ? "Relatório aguardando na fila"
+                                  : "Gerando relatório"}
+                      </h3>
+                      <p className="mt-1 text-sm text-gray-700 dark:text-slate-300">
+                        {job.data.status === "queued"
+                          ? "A geração começará assim que houver capacidade disponível."
+                          : job.data.status === "processing"
+                            ? "Estamos consultando as áreas selecionadas."
+                            : job.data.status === "completed"
+                              ? "Cada área aparece em um bloco independente."
+                              : job.data.error_message ?? "Tente novamente com os mesmos critérios."}
+                      </p>
+                    </div>
+                    {job.data.status === "queued" || job.data.status === "processing" ? (
+                      <Button type="button" variant="outline" onClick={() => void cancelGeneratedReport()}>
+                        Cancelar geração
+                      </Button>
+                    ) : null}
+                  </div>
+                  {job.data.status === "completed" && snapshot.data?.blocks ? (
+                    <ReportResultBlocks blocks={snapshot.data.blocks} snapshot />
+                  ) : null}
+                  {job.data.status === "completed" && snapshot.isPending ? (
+                    <p role="status" className="text-sm text-gray-700 dark:text-slate-300">
+                      Carregando resultado...
+                    </p>
+                  ) : null}
+                  {job.data.status === "completed" && snapshot.isError ? (
+                    <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+                      Não foi possível carregar o resultado. Tente novamente.
+                    </p>
+                  ) : null}
+                </section>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -492,9 +600,14 @@ export function ReportsCreatePanel() {
             )}
           </Button>
         ) : (
-          <Button type="button" disabled={busy || unavailable} onClick={() => void showPreview()}>
-            {preview.isPending ? "Carregando prévia..." : "Visualizar prévia"}
-          </Button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" disabled={busy || unavailable} onClick={() => void showPreview()}>
+              {preview.isPending ? "Carregando prévia..." : "Visualizar prévia"}
+            </Button>
+            <Button type="button" disabled={busy || unavailable} onClick={() => void generateReport()}>
+              {createJob.isPending ? "Enfileirando..." : "Gerar relatório"}
+            </Button>
+          </div>
         )}
       </div>
     </div>

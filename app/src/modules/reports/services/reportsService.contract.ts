@@ -3,6 +3,7 @@ import type {
   ReportPreviewResult,
   ReportCompositionPreview,
   ReportDownloadResult,
+  ReportJob,
   ReportHistoryPage,
   ReportsCatalog,
   ReportsCatalogField,
@@ -250,6 +251,26 @@ export function unwrapReportJobListEnvelope(body: unknown): ReportHistoryPage {
     items: payload.items as ReportHistoryPage["items"],
     nextCursor: typeof payload.nextCursor === "number" ? payload.nextCursor : null,
   };
+}
+
+export function unwrapReportJobEnvelope(body: unknown): ReportJob {
+  const payload = unwrapReportsEnvelope<unknown>(body);
+  if (
+    !isRecord(payload) ||
+    typeof payload.id !== "string" ||
+    typeof payload.status !== "string"
+  ) {
+    throw reportsError();
+  }
+  const job: ReportJob = {
+    id: payload.id,
+    status: payload.status as ReportJob["status"],
+  };
+  const errorMessage = payload.error_message;
+  if (errorMessage === null || typeof errorMessage === "string") {
+    job.error_message = errorMessage as string | null;
+  }
+  return job;
 }
 
 export function parseReportFilename(header: string | undefined, fallback: string): string {

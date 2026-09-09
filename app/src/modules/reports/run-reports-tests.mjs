@@ -9,6 +9,7 @@ const {
   normalizeReportsError,
   normalizeReportsPreviewError,
   unwrapReportDownload,
+  unwrapReportJobEnvelope,
   unwrapReportJobListEnvelope,
   unwrapReportsCatalogEnvelope,
   unwrapReportsEnvelope,
@@ -116,6 +117,17 @@ runTest("preserves independent empty blocks and rejects malformed composed previ
 
 runTest("unwraps the shared success envelope", () => {
   assert.deepEqual(unwrapReportsEnvelope({ success: true, data: { items: [] } }), { items: [] });
+});
+
+runTest("normalizes a durable job without exposing technical failures", () => {
+  assert.deepEqual(
+    unwrapReportJobEnvelope({
+      success: true,
+      data: { id: "job-1", status: "failed", error_message: "Tente novamente." },
+    }),
+    { id: "job-1", status: "failed", error_message: "Tente novamente." },
+  );
+  assert.throws(() => unwrapReportJobEnvelope({ success: true, data: { id: "job-1" } }));
 });
 
 runTest("preserves friendly department and area descriptions from the authorized catalog", () => {
@@ -417,6 +429,7 @@ runTest("exposes the governed history, snapshot, and download contracts", () => 
   assert.equal(REPORTS_ENDPOINTS.models, "/reports/models/list");
   assert.equal(REPORTS_ENDPOINTS.sharedModels, "/reports/models/shared/list");
   assert.equal(REPORTS_ENDPOINTS.jobs, "/reports/jobs/list");
+  assert.equal(REPORTS_ENDPOINTS.createJob, "/reports/jobs");
   assert.equal(REPORTS_ENDPOINTS.snapshot("job-1"), "/reports/jobs/job-1/snapshot");
   assert.equal(REPORTS_ENDPOINTS.download("snapshot-1"), "/reports/snapshots/snapshot-1/export");
   assert.deepEqual(buildReportJobListParams({ scope: "personal", status: "", cursor: undefined }), {

@@ -409,7 +409,12 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   type: "object",
                   additionalProperties: false,
                   properties: {
-                    definition: { $ref: "#/components/schemas/ReportDefinition" },
+                    definition: {
+                      oneOf: [
+                        { $ref: "#/components/schemas/ReportComposition" },
+                        { $ref: "#/components/schemas/ReportDefinition" },
+                      ],
+                    },
                     modelVersionId: { type: "string", format: "uuid" },
                     parameterValues: { type: "object", additionalProperties: true },
                     format: { type: "string", enum: ["json", "csv"] },
