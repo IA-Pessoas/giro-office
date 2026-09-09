@@ -69,6 +69,7 @@ export function createTestEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     pessoalServiceUrl: "http://127.0.0.1:3042",
     parcelamentoServiceUrl: "http://127.0.0.1:3043",
     reportsServiceUrl: "http://127.0.0.1:3044",
+    commercialServiceUrl: "http://127.0.0.1:3045",
     databaseUrl: "postgres://test:test@127.0.0.1:5432/gateway_test",
     jwtSecret: "test-secret",
     logLevel: "silent",

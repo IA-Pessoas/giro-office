@@ -251,6 +251,44 @@ test("reports-service is wired into VPS build, runtime, wait, and secret materia
   );
 });
 
+test("commercial-service is wired into VPS build, runtime, wait, and secret materialization", async () => {
+  assert.match(
+    await dryRunBuildxPush("commercial-service"),
+    /WORKSPACE_PACKAGE=@workspace\/commercial-service/,
+  );
+  assert.equal(await runDeployScopeFunction("vps_validate_service_token", "commercial-service"), "");
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const commercialBlock = extractComposeServiceBlock(composeContents, "commercial-service");
+  const gatewayBlock = extractComposeServiceBlock(composeContents, "gateway");
+  assert.match(commercialBlock, /image: workspace-commercial-service:/);
+  assert.match(commercialBlock, /WORKSPACE_PACKAGE: "@workspace\/commercial-service"/);
+  assert.match(commercialBlock, /SERVICE_DIR: services\/commercial-service/);
+  assert.match(commercialBlock, /\.env\.vps\.commercial-service/);
+  assert.match(commercialBlock, /expose:[\s\S]*- "3045"/);
+  assert.match(commercialBlock, /fetch\('http:\/\/127\.0\.0\.1:3045\/health'\)/);
+  assert.match(gatewayBlock, /COMMERCIAL_SERVICE_URL: http:\/\/commercial-service:3045/);
+  assert.match(
+    gatewayBlock,
+    /depends_on:[\s\S]*commercial-service:[\s\S]*condition: service_healthy/,
+  );
+  assert.match(
+    await readFile(vpsSecretsManifest, "utf8"),
+    /^ENV_VPS_COMMERCIAL_SERVICE\|\.env\.vps\.commercial-service$/m,
+  );
+  const waitScript = await readFile(vpsWaitEndpointsScript, "utf8");
+  assert.match(
+    waitScript,
+    /commercial-service\)\s+printf "%s\\n" "http:\/\/commercial-service:3045\/health"/,
+  );
+  assert.match(waitScript, /ALL_BACKEND_SERVICES=\([\s\S]*commercial-service[\s\S]*\)/);
+  assert.match(
+    await readFile(composeVpsRuntimeOverrideFile, "utf8"),
+    /commercial-service:\s+healthcheck:\s+disable: true/,
+  );
+  assert.match(await readFile(productionDeployScript, "utf8"), /commercial-service/);
+  assert.match(await readFile(productionWaitScript, "utf8"), /http:\/\/commercial-service:3045\/health/);
+});
+
 test("reports project adapter has internal URL and shared reporting secret provisioning", async () => {
   const composeContents = await readFile(composeVpsFile, "utf8");
   const reportsBlock = extractComposeServiceBlock(composeContents, "reports-service");

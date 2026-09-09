@@ -648,6 +648,12 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 
 const RESOURCE_RULES: ResourceRule[] = [
   {
+    pattern: /^\/commercial\/proposal-configs(?:\/|$)/,
+    singular: "uma configuração de proposta comercial",
+    newSingular: "uma nova configuração de proposta comercial",
+    plural: "configurações de proposta comercial",
+  },
+  {
     pattern: /^\/reports\/models\/shared(?:\/|$)/,
     singular: "um modelo compartilhado de relatório",
     newSingular: "um novo modelo compartilhado de relatório",

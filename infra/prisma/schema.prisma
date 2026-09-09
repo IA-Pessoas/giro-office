@@ -99,6 +99,12 @@ generator reportsServiceClient {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator commercialServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/commercial-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }

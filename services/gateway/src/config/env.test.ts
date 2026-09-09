@@ -152,6 +152,13 @@ describe("gateway env security validation", () => {
     expect(getGatewayEnv().reportsServiceUrl).toBe("http://localhost:3044");
   });
 
+  it("uses commercial service default URL", () => {
+    setGatewayEnv({});
+    delete process.env.COMMERCIAL_SERVICE_URL;
+
+    expect(getGatewayEnv().commercialServiceUrl).toBe("http://localhost:3045");
+  });
+
   it("parses optional gateway public URL and JSON body limit overrides", () => {
     setGatewayEnv({
       GATEWAY_PUBLIC_URL: "https://api.example.com",

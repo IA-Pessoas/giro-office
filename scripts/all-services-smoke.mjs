@@ -259,6 +259,7 @@ const state = {
   certificatePfId: "",
   reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
   reportsJobId: "",
+  commercialProposalConfigId: "",
 };
 
 const cleanupTasks = [];
@@ -3493,6 +3494,34 @@ const handlers = {
         status: "Ativo",
         solution: false,
       },
+    });
+  },
+
+  async commercialProposalConfigList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async commercialProposalConfigGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/proposal-configs/${requireState("commercialProposalConfigId")}`,
+    });
+  },
+
+  async commercialProposalConfigCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: { name: uniqueText("Smoke Proposal Config"), minimum_wage: 1800 },
+    });
+    if (isBadExpectation(op)) return;
+    state.commercialProposalConfigId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async commercialProposalConfigUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/proposal-configs/${requireState("commercialProposalConfigId")}`,
+      json: { name: uniqueText("Smoke Proposal Config Updated"), minimum_wage: 2000 },
     });
   },
 
