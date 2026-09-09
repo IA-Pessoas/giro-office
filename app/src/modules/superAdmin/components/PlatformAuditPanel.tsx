@@ -52,6 +52,10 @@ export function PlatformAuditPanel({
     setSelectedAudit(null);
   }, [organization?.id]);
 
+  useEffect(() => {
+    setSelectedAudit(null);
+  }, [page, search, showGlobal]);
+
   return (
     <section aria-labelledby="platform-audit-title" className="flex min-h-0 flex-1 flex-col">
       <div
@@ -209,7 +213,10 @@ export function PlatformAuditPanel({
                       >
                         Autor
                       </p>
-                      <p className="break-words text-xs">{item.actorPlatformUserName ?? "Sistema"}</p>
+                      <p className="break-words text-xs">
+                        {item.actorPlatformUserName ??
+                          (item.actorPlatformUserId ? "Nome não disponível" : "Sistema")}
+                      </p>
                       <p className="mt-0.5 break-all text-[11px] text-slate-500 dark:text-slate-400">
                         {item.actorPlatformUserId ?? "—"}
                       </p>
@@ -326,7 +333,8 @@ export function PlatformAuditPanel({
               <div>
                 <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Autor</dt>
                 <dd className="mt-1 break-words text-sm text-slate-900 dark:text-slate-100">
-                  {selectedAudit.actorPlatformUserName ?? "Sistema"}
+                  {selectedAudit.actorPlatformUserName ??
+                    (selectedAudit.actorPlatformUserId ? "Nome não disponível" : "Sistema")}
                   {selectedAudit.actorPlatformUserId
                     ? ` · ${selectedAudit.actorPlatformUserId}`
                     : ""}

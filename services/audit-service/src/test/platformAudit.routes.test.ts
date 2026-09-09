@@ -371,11 +371,12 @@ describe("platform audit persistence", () => {
         },
       },
     ]);
+    const findPlatformUsers = vi
+      .fn()
+      .mockResolvedValue([{ id: "platform-user-1", name: "Operador de teste" }]);
     const repository = createAuditRequestRepository({
       auditRequest: { findMany, count: vi.fn().mockResolvedValue(1) },
-      user: {
-        findMany: vi.fn().mockResolvedValue([{ id: "platform-user-1", name: "Operador de teste" }]),
-      },
+      platformUser: { findMany: findPlatformUsers },
       $transaction: (operations: Array<Promise<unknown>>) => Promise.all(operations),
     } as never);
 
@@ -391,6 +392,10 @@ describe("platform audit persistence", () => {
           after: { rh: 3, fiscal: 1 },
         },
       },
+    });
+    expect(findPlatformUsers).toHaveBeenCalledWith({
+      where: { id: { in: ["platform-user-1"] } },
+      select: { id: true, name: true },
     });
     expect(JSON.stringify(result.items[0])).not.toContain("secret");
   });

@@ -395,12 +395,14 @@ async function getPlatformActorNames(
   const actorIds = [
     ...new Set(records.map((record) => getPlatformActor(record.metadata_json)).filter(Boolean)),
   ] as string[];
-  const userClient = (client as PrismaClient & { user?: PrismaClient["user"] }).user;
-  if (!actorIds.length || !userClient) {
+  const platformUserClient = (
+    client as PrismaClient & { platformUser?: PrismaClient["platformUser"] }
+  ).platformUser;
+  if (!actorIds.length || !platformUserClient) {
     return new Map();
   }
 
-  const users = await userClient.findMany({
+  const users = await platformUserClient.findMany({
     where: { id: { in: actorIds } },
     select: { id: true, name: true },
   });

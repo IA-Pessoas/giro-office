@@ -494,6 +494,8 @@ await runTest("auditoria é contextual por padrão e global somente por controle
   assert.match(auditPanelSource, /organizationName/);
   assert.match(auditPanelSource, /Autor/);
   assert.match(auditPanelSource, /Organização/);
+  assert.match(auditPanelSource, /Nome não disponível/);
+  assert.match(auditPanelSource, /\[page, search, showGlobal\]/);
   assert.match(auditPanelSource, /formatAuditChanges/);
   assert.doesNotMatch(auditHookSource, /placeholderData/);
   assert.doesNotMatch(
