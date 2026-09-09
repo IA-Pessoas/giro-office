@@ -9,6 +9,12 @@ const PROPOSAL_CONFIG_SELECT = {
   minimum_wage: true,
 } as const;
 
+const DUPLICATE_CONFIG_MESSAGE = "Já existe uma configuração com esse nome.";
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
 export interface CommercialProposalConfig {
   id: string;
   name: string;
@@ -50,7 +56,7 @@ export class CommercialProposalConfigService {
         where: { name: data.name, organization_id: data.organization_id },
         select: { id: true },
       });
-      if (duplicate) throw new ServiceError(409, "Já existe uma configuração com esse nome.");
+      if (duplicate) throw new ServiceError(409, DUPLICATE_CONFIG_MESSAGE);
 
       const created = await this.prisma.proposalConfig.create({
         data: {
@@ -72,6 +78,7 @@ export class CommercialProposalConfigService {
     } catch (err: unknown) {
       logError("Erro ao cadastrar configuração comercial", { err });
       if (err instanceof ServiceError) throw err;
+      if (isUniqueConstraintError(err)) throw new ServiceError(409, DUPLICATE_CONFIG_MESSAGE);
       throw new ServiceError(500, "Não foi possível cadastrar a configuração comercial.", err);
     }
   }
@@ -122,14 +129,22 @@ export class CommercialProposalConfigService {
           },
           select: { id: true },
         });
-        if (duplicate) throw new ServiceError(409, "Já existe uma configuração com esse nome.");
+        if (duplicate) throw new ServiceError(409, DUPLICATE_CONFIG_MESSAGE);
       }
 
-      const updated = await this.prisma.proposalConfig.update({
-        where: { id: data.config_id },
+      const updateResult = await this.prisma.proposalConfig.updateMany({
+        where: { id: data.config_id, organization_id: data.organization_id },
         data: { name: nextName, minimum_wage: data.minimum_wage ?? current.minimum_wage },
+      });
+      if (updateResult.count !== 1) {
+        throw new ServiceError(404, "Configuração comercial não encontrada.");
+      }
+
+      const updated = await this.prisma.proposalConfig.findFirst({
+        where: { id: data.config_id, organization_id: data.organization_id },
         select: PROPOSAL_CONFIG_SELECT,
       });
+      if (!updated) throw new ServiceError(404, "Configuração comercial não encontrada.");
       await this.audit.logUpdateIfChanged({
         userId: data.user_id,
         organizationId: data.organization_id,
@@ -143,6 +158,7 @@ export class CommercialProposalConfigService {
     } catch (err: unknown) {
       logError("Erro ao atualizar configuração comercial", { err });
       if (err instanceof ServiceError) throw err;
+      if (isUniqueConstraintError(err)) throw new ServiceError(409, DUPLICATE_CONFIG_MESSAGE);
       throw new ServiceError(500, "Não foi possível atualizar a configuração comercial.", err);
     }
   }

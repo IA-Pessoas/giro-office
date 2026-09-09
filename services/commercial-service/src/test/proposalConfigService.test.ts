@@ -20,6 +20,7 @@ function createMockPrisma(): CommercialProposalConfigPrismaDeps {
       findMany: vi.fn(async () => []),
       create: vi.fn(async () => ({})),
       update: vi.fn(async () => ({})),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
   } as unknown as CommercialProposalConfigPrismaDeps;
 }
@@ -95,6 +96,23 @@ describe("CommercialProposalConfigService", () => {
     expect(audit.createLog).not.toHaveBeenCalled();
   });
 
+  it("converte corrida de unicidade do banco em conflito", async () => {
+    const prisma = createMockPrisma();
+    prisma.proposalConfig.create = vi.fn(async () => {
+      throw { code: "P2002" };
+    });
+    const service = new CommercialProposalConfigService(prisma, createAuditMock());
+
+    await expect(
+      service.create({
+        user_id: USER_ID,
+        organization_id: ORGANIZATION_ID,
+        name: "Proposta padrão",
+        minimum_wage: 1800,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
   it("lista somente o catálogo da organização e ordena por nome", async () => {
     const findMany = vi.fn(async () => []);
     const prisma = createMockPrisma();
@@ -109,5 +127,28 @@ describe("CommercialProposalConfigService", () => {
         orderBy: { name: "asc" },
       }),
     );
+  });
+
+  it("atualiza somente dentro da organização autenticada", async () => {
+    const prisma = createMockPrisma();
+    prisma.proposalConfig.findFirst = vi
+      .fn()
+      .mockResolvedValueOnce({ id: CONFIG_ID, name: "Atual", minimum_wage: 1800 })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: CONFIG_ID, name: "Atualizada", minimum_wage: 1900 });
+    const service = new CommercialProposalConfigService(prisma, createAuditMock());
+
+    await service.update({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      config_id: CONFIG_ID,
+      name: "Atualizada",
+      minimum_wage: 1900,
+    });
+
+    expect(prisma.proposalConfig.updateMany).toHaveBeenCalledWith({
+      where: { id: CONFIG_ID, organization_id: ORGANIZATION_ID },
+      data: { name: "Atualizada", minimum_wage: 1900 },
+    });
   });
 });

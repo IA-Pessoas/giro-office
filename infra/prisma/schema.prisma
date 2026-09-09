@@ -987,6 +987,7 @@ model ProposalConfig {
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, name], map: "uq_proposal_config_org_name")
   @@map("proposal.config")
 }
 
