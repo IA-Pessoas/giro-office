@@ -154,6 +154,7 @@ const platformAuditSelect = {
   referring: true,
   referring_id: true,
   changes_json: true,
+  organization: { select: { name: true } },
 } satisfies Prisma.AuditRequestSelect;
 
 type PlatformAuditRow = Prisma.AuditRequestGetPayload<{ select: typeof platformAuditSelect }>;
@@ -387,8 +388,36 @@ function getPlatformChanges(
   return Object.keys(changes).length > 0 ? changes : undefined;
 }
 
-function toPlatformAuditRequest(record: PlatformAuditRow): PlatformAuditRequestRecord {
+async function getPlatformActorNames(
+  client: PrismaClient,
+  records: PlatformAuditRow[],
+): Promise<Map<string, string>> {
+  const actorIds = [
+    ...new Set(records.map((record) => getPlatformActor(record.metadata_json)).filter(Boolean)),
+  ] as string[];
+  const platformUserClient = (
+    client as PrismaClient & { platformUser?: PrismaClient["platformUser"] }
+  ).platformUser;
+  if (!actorIds.length || !platformUserClient) {
+    return new Map();
+  }
+
+  const users = await platformUserClient.findMany({
+    where: { id: { in: actorIds } },
+    select: { id: true, name: true },
+  });
+
+  return new Map(users.map((user) => [user.id, user.name]));
+}
+
+function toPlatformAuditRequest(
+  record: PlatformAuditRow,
+  actorNames: ReadonlyMap<string, string>,
+): PlatformAuditRequestRecord {
   const actorPlatformUserId = getPlatformActor(record.metadata_json);
+  const actorPlatformUserName = actorPlatformUserId
+    ? actorNames.get(actorPlatformUserId)
+    : undefined;
   const changes = getPlatformChanges(record);
 
   return {
@@ -406,6 +435,8 @@ function toPlatformAuditRequest(record: PlatformAuditRow): PlatformAuditRequestR
     ...(record.referring ? { referring: record.referring } : {}),
     ...(record.referring_id ? { referringId: record.referring_id } : {}),
     ...(actorPlatformUserId ? { actorPlatformUserId } : {}),
+    ...(actorPlatformUserName ? { actorPlatformUserName } : {}),
+    ...(record.organization?.name ? { organizationName: record.organization.name } : {}),
     ...(changes ? { changes } : {}),
   };
 }
@@ -537,9 +568,10 @@ export function createAuditRequestRepository(
         }),
         client.auditRequest.count({ where, take: totalLimit }),
       ]);
+      const actorNames = await getPlatformActorNames(client, items);
 
       return {
-        items: items.map(toPlatformAuditRequest),
+        items: items.map((item) => toPlatformAuditRequest(item, actorNames)),
         total: Math.min(total, totalLimit),
         page: filters.page,
         pageSize: filters.pageSize,

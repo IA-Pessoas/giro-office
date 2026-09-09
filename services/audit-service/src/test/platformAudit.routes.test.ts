@@ -319,6 +319,7 @@ describe("platform audit persistence", () => {
           referring: true,
           referring_id: true,
           changes_json: true,
+          organization: { select: { name: true } },
         },
       }),
     );
@@ -358,6 +359,7 @@ describe("platform audit persistence", () => {
         service_source: "user-service",
         created_at: new Date("2026-08-28T12:00:00.000Z"),
         metadata_json: { actorPlatformUserId: "platform-user-1", secret: "must-not-leak" },
+        organization: { name: "Organização Aurora" },
         action: "platform.user.permissions.updated",
         referring: "user",
         referring_id: "user-1",
@@ -369,8 +371,12 @@ describe("platform audit persistence", () => {
         },
       },
     ]);
+    const findPlatformUsers = vi
+      .fn()
+      .mockResolvedValue([{ id: "platform-user-1", name: "Operador de teste" }]);
     const repository = createAuditRequestRepository({
       auditRequest: { findMany, count: vi.fn().mockResolvedValue(1) },
+      platformUser: { findMany: findPlatformUsers },
       $transaction: (operations: Array<Promise<unknown>>) => Promise.all(operations),
     } as never);
 
@@ -378,12 +384,18 @@ describe("platform audit persistence", () => {
 
     expect(result.items[0]).toMatchObject({
       actorPlatformUserId: "platform-user-1",
+      actorPlatformUserName: "Operador de teste",
+      organizationName: "Organização Aurora",
       changes: {
         modules: {
           before: { rh: 1, fiscal: 0 },
           after: { rh: 3, fiscal: 1 },
         },
       },
+    });
+    expect(findPlatformUsers).toHaveBeenCalledWith({
+      where: { id: { in: ["platform-user-1"] } },
+      select: { id: true, name: true },
     });
     expect(JSON.stringify(result.items[0])).not.toContain("secret");
   });

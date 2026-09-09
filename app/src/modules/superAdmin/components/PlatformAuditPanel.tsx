@@ -1,12 +1,13 @@
 import { Activity, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { Dialog } from "@shared/components/ui/Dialog";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { Input } from "@shared/ui/newLayout/input";
 
 import { usePlatformAudit } from "../hooks/usePlatformAudit";
-import type { PlatformOrganization } from "../types";
+import type { PlatformAuditRecord, PlatformOrganization } from "../types";
 import { formatAuditChanges } from "../utils/platformManagement";
 
 const PAGE_SIZE = 25;
@@ -30,6 +31,8 @@ export function PlatformAuditPanel({
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [showGlobal, setShowGlobal] = useState(false);
+  const [selectedAudit, setSelectedAudit] = useState<PlatformAuditRecord | null>(null);
+  const auditActionRef = useRef<HTMLButtonElement>(null);
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const auditQuery = usePlatformAudit({
     page,
@@ -41,11 +44,17 @@ export function PlatformAuditPanel({
   const total = auditQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const isGlobalView = showGlobal || !organization;
+  const selectedAuditChanges = selectedAudit ? formatAuditChanges(selectedAudit.changes) : [];
 
   useEffect(() => {
     setShowGlobal(false);
     setPage(1);
+    setSelectedAudit(null);
   }, [organization?.id]);
+
+  useEffect(() => {
+    setSelectedAudit(null);
+  }, [page, search, showGlobal]);
 
   return (
     <section aria-labelledby="platform-audit-title" className="flex min-h-0 flex-1 flex-col">
@@ -151,7 +160,7 @@ export function PlatformAuditPanel({
                   Evento
                 </th>
                 <th className="px-4 py-3 font-semibold" scope="col">
-                  Ator
+                  Autor
                 </th>
                 <th className="px-4 py-3 font-semibold" scope="col">
                   Mudanças
@@ -185,15 +194,32 @@ export function PlatformAuditPanel({
                       <p className="mt-0.5 break-all text-xs text-slate-600 dark:text-slate-300">
                         {item.referringId ?? item.path}
                       </p>
+                      <button
+                        aria-label={`Ver detalhes da ação ${item.action ?? `${item.method} ${item.path}`}`}
+                        className="mt-3 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                        onClick={(event) => {
+                          auditActionRef.current = event.currentTarget;
+                          setSelectedAudit(item);
+                        }}
+                        type="button"
+                      >
+                        Ver detalhes da ação
+                      </button>
                     </td>
                     <td className="min-w-0 sm:w-[18%] sm:px-4 sm:py-3 sm:text-xs">
                       <p
                         aria-hidden="true"
                         className="mb-1 text-xs font-medium text-slate-500 sm:hidden"
                       >
-                        Ator
+                        Autor
                       </p>
-                      <p className="break-all text-xs">{item.actorPlatformUserId ?? "Sistema"}</p>
+                      <p className="break-words text-xs">
+                        {item.actorPlatformUserName ??
+                          (item.actorPlatformUserId ? "Nome não disponível" : "Sistema")}
+                      </p>
+                      <p className="mt-0.5 break-all text-[11px] text-slate-500 dark:text-slate-400">
+                        {item.actorPlatformUserId ?? "—"}
+                      </p>
                     </td>
                     <td className="min-w-0 sm:w-[27%] sm:px-4 sm:py-3 sm:text-xs">
                       <p
@@ -265,6 +291,118 @@ export function PlatformAuditPanel({
         total={total}
         totalPages={totalPages}
       />
+
+      <Dialog
+        contentClassName="!w-[min(96vw,720px)] !max-w-none"
+        description="Informações adicionais do registro de auditoria selecionado."
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          auditActionRef.current?.focus();
+        }}
+        onOpenChange={(open) => {
+          if (!open) setSelectedAudit(null);
+        }}
+        open={selectedAudit !== null}
+        title="Detalhes da ação"
+      >
+        {selectedAudit ? (
+          <div className="space-y-5">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/70 dark:bg-blue-950/30">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                Ação selecionada
+              </p>
+              <p className="mt-1 break-words font-semibold text-slate-950 dark:text-white">
+                {selectedAudit.action ?? `${selectedAudit.method} ${selectedAudit.path}`}
+              </p>
+            </div>
+
+            <dl className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Rota</dt>
+                <dd className="mt-1 break-all text-sm text-slate-900 dark:text-slate-100">
+                  {selectedAudit.method} {selectedAudit.path}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Resultado</dt>
+                <dd className="mt-1 text-sm text-slate-900 dark:text-slate-100">
+                  {OUTCOME_LABELS[selectedAudit.outcome]}
+                  {selectedAudit.statusCode ? ` · ${selectedAudit.statusCode}` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Autor</dt>
+                <dd className="mt-1 break-words text-sm text-slate-900 dark:text-slate-100">
+                  {selectedAudit.actorPlatformUserName ??
+                    (selectedAudit.actorPlatformUserId ? "Nome não disponível" : "Sistema")}
+                  {selectedAudit.actorPlatformUserId
+                    ? ` · ${selectedAudit.actorPlatformUserId}`
+                    : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Organização
+                </dt>
+                <dd className="mt-1 break-words text-sm text-slate-900 dark:text-slate-100">
+                  {selectedAudit.organizationName ?? "—"}
+                  {selectedAudit.organizationId ? ` · ${selectedAudit.organizationId}` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Serviço</dt>
+                <dd className="mt-1 break-words text-sm text-slate-900 dark:text-slate-100">
+                  {selectedAudit.serviceSource}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Duração</dt>
+                <dd className="mt-1 text-sm text-slate-900 dark:text-slate-100">
+                  {selectedAudit.durationMs === null || selectedAudit.durationMs === undefined
+                    ? "—"
+                    : `${selectedAudit.durationMs} ms`}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Horário</dt>
+                <dd className="mt-1 text-sm text-slate-900 dark:text-slate-100">
+                  {formatDate(selectedAudit.createdAt)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Referência</dt>
+                <dd className="mt-1 break-words text-sm text-slate-900 dark:text-slate-100">
+                  {selectedAudit.referring ?? "—"}
+                  {selectedAudit.referringId ? ` · ${selectedAudit.referringId}` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Request ID</dt>
+                <dd className="mt-1 break-all text-sm text-slate-900 dark:text-slate-100">
+                  {selectedAudit.requestId}
+                </dd>
+              </div>
+            </dl>
+
+            <div>
+              <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Alterações</h3>
+              {selectedAuditChanges.length ? (
+                <ul className="mt-2 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                  {selectedAuditChanges.map((change) => (
+                    <li className="break-words" key={change}>
+                      {change}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  Sem alteração de campo.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </Dialog>
     </section>
   );
 }
