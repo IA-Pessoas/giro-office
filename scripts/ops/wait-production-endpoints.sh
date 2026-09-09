@@ -35,6 +35,7 @@ checks=(
   "backend|http://certificate-service:3041/health"
   "backend|http://pessoal-service:3042/health"
   "backend|http://parcelamento-service:3043/health"
+  "backend|http://commercial-service:3045/health"
   "backend|http://reports-service:3044/health"
   "backend|http://audit-service:3020/ready"
   "backend|http://gateway:3010/ready"

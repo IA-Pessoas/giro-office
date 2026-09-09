@@ -28,6 +28,8 @@ const contabilModulePolicy = createModulePolicy("contabil", moduleAccessPermissi
 const contabilEditPolicy = createModulePolicy("contabil", moduleEditPermission);
 const certificateModulePolicy = createModulePolicy("certificado", moduleAccessPermission);
 const certificateEditPolicy = createModulePolicy("certificado", moduleEditPermission);
+const commercialModulePolicy = createModulePolicy("comercial", moduleAccessPermission);
+const commercialEditPolicy = createModulePolicy("comercial", moduleEditPermission);
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
@@ -148,6 +150,8 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoModulePolicy },
   { method: "ANY", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoEditPolicy },
   { method: "ANY", path: /^\/reports(?:\/|$)/, policy: authenticatedPolicy },
+  { method: "GET", path: /^\/commercial(?:\/|$)/, policy: commercialModulePolicy },
+  { method: "ANY", path: /^\/commercial(?:\/|$)/, policy: commercialEditPolicy },
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
   { method: "GET", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },

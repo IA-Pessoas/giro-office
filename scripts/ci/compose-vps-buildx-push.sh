@@ -59,7 +59,7 @@ service_build_command() {
         .
       )
       ;;
-    gateway | organization-service | user-service | task-service | project-service | client-service | department-service | fiscal-service | contabil-service | regularize-service | rh-service | ti-service | certificate-service | pessoal-service | parcelamento-service | reports-service | audit-service)
+    gateway | organization-service | user-service | task-service | project-service | client-service | department-service | fiscal-service | contabil-service | regularize-service | rh-service | ti-service | certificate-service | pessoal-service | parcelamento-service | commercial-service | reports-service | audit-service)
       BUILD_CMD=(
         docker buildx build
         --push

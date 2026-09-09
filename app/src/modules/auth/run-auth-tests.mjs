@@ -525,7 +525,7 @@ await (async () => {
   );
 
   await runTest("disabled modules are blocked even for global admins", () => {
-    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["comercial", "marketing", "triagem"]);
+    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["marketing", "triagem"]);
 
     for (const moduleKey of DISABLED_MODULE_KEYS) {
       assert.equal(isModuleDisabled(moduleKey), true);
@@ -589,26 +589,24 @@ await (async () => {
     },
   );
 
-  await runTest("disabled modules are not registered in navigation or quick actions", () => {
-    for (const blockedPath of ["/comercial", "/marketing", "/triagem"]) {
+  await runTest("retired modules are not registered in navigation or quick actions", () => {
+    for (const blockedPath of ["/marketing", "/triagem"]) {
       assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
       assert.equal(quickActionsSource.includes(`href: "${blockedPath}"`), false);
     }
+    assert.equal(appShellSource.includes('path: "/comercial"'), true);
   });
 
   await runTest(
     "disabled module pages return not found without importing module implementations",
     () => {
-      for (const source of [
-        commercialPageSource,
-        clientCommercialPageSource,
-        marketingPageSource,
-        triagemPageSource,
-      ]) {
+      for (const source of [marketingPageSource, triagemPageSource]) {
         assert.match(source, /notFound:\s*true/);
       }
 
-      assert.equal(commercialPageSource.includes("newLayout/Commercial"), false);
+      assert.equal(commercialPageSource.includes("CommercialCatalog"), true);
+      assert.equal(commercialPageSource.includes("notFound: true"), false);
+      assert.match(clientCommercialPageSource, /notFound:\s*true/);
       assert.equal(clientCommercialPageSource.includes("ClientCommercialForm"), false);
       assert.equal(clientCommercialPageSource.includes("useUpdateClientCommercialMutation"), false);
       assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);

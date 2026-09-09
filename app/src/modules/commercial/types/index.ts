@@ -89,3 +89,16 @@ export interface CommercialSuccessEnvelope<T> {
   success: boolean;
   data: T;
 }
+
+export interface CommercialProposalConfig {
+  id: string;
+  name: string;
+  minimum_wage: number;
+}
+
+export interface CreateCommercialProposalConfigPayload {
+  name: string;
+  minimum_wage: number;
+}
+
+export type UpdateCommercialProposalConfigPayload = Partial<CreateCommercialProposalConfigPayload>;

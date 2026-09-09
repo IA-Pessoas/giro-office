@@ -20,6 +20,23 @@ describe("reports-service gateway registry", () => {
   });
 });
 
+describe("commercial-service gateway registry", () => {
+  it("encaminha o catálogo comercial com sessão de usuário e permissão Comercial", () => {
+    const env = {
+      commercialServiceUrl: "http://commercial-service:3045",
+      auditServiceToken: "gateway-commercial-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, "/commercial/proposal-configs", "GET")).toMatchObject({
+      key: "commercial-service",
+      targetUrl: "http://commercial-service:3045",
+      internalServiceToken: "gateway-commercial-token",
+      permissionModule: "comercial",
+      routePrefixes: ["/commercial"],
+    });
+  });
+});
+
 describe("user-service gateway registry", () => {
   it("forwards the trusted gateway token with authenticated identity", () => {
     const env = {

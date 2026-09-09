@@ -80,7 +80,7 @@ test("orcamento de conexoes cabe no pooler em regime e durante rollout", () => {
     0,
   );
 
-  assert.equal(steadyStateSlots, 18, "budget versionado precisa refletir os processos do Compose");
+  assert.equal(steadyStateSlots, 19, "budget versionado precisa refletir os processos do Compose");
   assert.ok(
     steadyStateSlots <= poolerSessionSize,
     `budget de ${steadyStateSlots} excede pooler session mode de ${poolerSessionSize}`,
