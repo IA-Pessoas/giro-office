@@ -109,8 +109,8 @@ export function PlatformAuditPanel({
       </div>
 
       <div
-        className="min-h-0 flex-1 overflow-auto"
         aria-busy={auditQuery.isLoading || auditQuery.isFetching}
+        className="min-h-0 flex-1 overflow-auto lg:min-h-[24rem]"
       >
         {auditQuery.isLoading ? (
           <div
@@ -144,8 +144,8 @@ export function PlatformAuditPanel({
             </p>
           </div>
         ) : (
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950/60 dark:text-slate-300">
+          <table className="w-full table-fixed text-left text-sm">
+            <thead className="sr-only sm:not-sr-only sm:table-header-group sm:bg-slate-50 sm:text-xs sm:text-slate-600 sm:dark:bg-slate-950/60 sm:dark:text-slate-300">
               <tr>
                 <th className="px-4 py-3 font-semibold" scope="col">
                   Evento
@@ -164,23 +164,46 @@ export function PlatformAuditPanel({
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="block divide-y divide-slate-100 dark:divide-slate-800 sm:table-row-group">
               {items.map((item) => {
                 const changes = formatAuditChanges(item.changes);
                 return (
-                  <tr className="align-top text-slate-700 dark:text-slate-200" key={item.id}>
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-950 dark:text-white">
+                  <tr
+                    className="grid gap-3 px-4 py-4 align-top text-slate-700 dark:text-slate-200 sm:table-row sm:px-0 sm:py-0"
+                    key={item.id}
+                  >
+                    <td className="min-w-0 sm:w-[27%] sm:px-4 sm:py-3">
+                      <p
+                        aria-hidden="true"
+                        className="mb-1 text-xs font-medium text-slate-500 sm:hidden"
+                      >
+                        Evento
+                      </p>
+                      <p className="break-words font-semibold text-slate-950 dark:text-white">
                         {item.action ?? `${item.method} ${item.path}`}
                       </p>
-                      <p className="mt-0.5 max-w-xs truncate text-xs text-slate-600 dark:text-slate-300">
+                      <p className="mt-0.5 break-all text-xs text-slate-600 dark:text-slate-300">
                         {item.referringId ?? item.path}
                       </p>
                     </td>
-                    <td className="px-4 py-3 text-xs">{item.actorPlatformUserId ?? "Sistema"}</td>
-                    <td className="px-4 py-3 text-xs">
+                    <td className="min-w-0 sm:w-[18%] sm:px-4 sm:py-3 sm:text-xs">
+                      <p
+                        aria-hidden="true"
+                        className="mb-1 text-xs font-medium text-slate-500 sm:hidden"
+                      >
+                        Ator
+                      </p>
+                      <p className="break-all text-xs">{item.actorPlatformUserId ?? "Sistema"}</p>
+                    </td>
+                    <td className="min-w-0 sm:w-[27%] sm:px-4 sm:py-3 sm:text-xs">
+                      <p
+                        aria-hidden="true"
+                        className="mb-1 text-xs font-medium text-slate-500 sm:hidden"
+                      >
+                        Mudanças
+                      </p>
                       {changes.length ? (
-                        <ul className="space-y-1">
+                        <ul className="space-y-1 break-words text-xs">
                           {changes.map((change) => (
                             <li key={change}>{change}</li>
                           ))}
@@ -191,7 +214,13 @@ export function PlatformAuditPanel({
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="min-w-0 sm:w-[14%] sm:px-4 sm:py-3">
+                      <p
+                        aria-hidden="true"
+                        className="mb-1 text-xs font-medium text-slate-500 sm:hidden"
+                      >
+                        Resultado
+                      </p>
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-semibold ${
                           item.outcome === "success"
@@ -203,8 +232,16 @@ export function PlatformAuditPanel({
                         {item.statusCode ? ` · ${item.statusCode}` : ""}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-xs tabular-nums text-slate-600 dark:text-slate-300">
-                      {formatDate(item.createdAt)}
+                    <td className="min-w-0 text-left sm:w-[14%] sm:px-4 sm:py-3 sm:text-right">
+                      <p
+                        aria-hidden="true"
+                        className="mb-1 text-xs font-medium text-slate-500 sm:hidden"
+                      >
+                        Horário
+                      </p>
+                      <p className="text-xs tabular-nums text-slate-600 dark:text-slate-300">
+                        {formatDate(item.createdAt)}
+                      </p>
                     </td>
                   </tr>
                 );

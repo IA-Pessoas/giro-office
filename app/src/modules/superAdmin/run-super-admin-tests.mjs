@@ -357,7 +357,10 @@ await runTest("mantém a paginação da auditoria visível no painel com tabela 
     auditPanelSource,
     /<section aria-labelledby="platform-audit-title" className="flex min-h-0 flex-1 flex-col">/,
   );
-  assert.match(auditPanelSource, /className="min-h-0 flex-1 overflow-auto"/);
+  assert.match(
+    auditPanelSource,
+    /className="min-h-0 flex-1 overflow-auto lg:min-h-\[24rem\]"/,
+  );
   assert.ok(
     auditPanelSource.indexOf("<PaginationControls") >
       auditPanelSource.indexOf('className="min-h-0 flex-1 overflow-auto"'),
