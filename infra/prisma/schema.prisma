@@ -177,6 +177,7 @@ model Organization {
   unionsPessoal                 UnionPessoal[]
   proposalConfigs               ProposalConfig[]
   commercialProspectings        CommercialProspecting[]
+  commercialTaskBillings        CommercialTaskBilling[]
   licenses                      License[]
   municipalTaxes                MunicipalTaxes[]
   partners                      Partners[]
@@ -978,6 +979,7 @@ model Task {
   responsible         User?        @relation("responsible", fields: [responsible_id], references: [id], onDelete: Restrict)
   license             License[]
   process             Process[]
+  commercialTaskBilling CommercialTaskBilling?
 
   @@map("integracao.tasks")
 }
@@ -1008,6 +1010,22 @@ model CommercialProspecting {
   @@unique([organization_id, client_id], map: "uq_commercial_prospecting_org_client")
   @@index([organization_id, status], map: "idx_commercial_prospecting_org_status")
   @@map("commercial.prospecting")
+}
+
+model CommercialTaskBilling {
+  id                  String   @id @default(uuid())
+  task_id             String   @unique
+  organization_id     String
+  hiring_status       String
+  payment             String?
+  billing_description String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  task                Task     @relation(fields: [task_id], references: [id])
+  organization        Organization @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, updated_at], map: "idx_commercial_task_billing_org_updated")
+  @@map("commercial.task_billing")
 }
 
 model CommercialOutboxEvent {
@@ -1043,6 +1061,19 @@ model ClientCommercialProjectionEvent {
 
   @@index([organization_id, client_id, applied_at], map: "idx_client_commercial_projection_client")
   @@map("client.commercial_projection_events")
+}
+
+model CommercialTaskBillingProjectionEvent {
+  id                   String   @id
+  organization_id      String
+  task_id              String
+  event_type           String
+  audit_correlation_id String
+  applied_at           DateTime @default(now())
+  created_at           DateTime @default(now())
+
+  @@index([organization_id, task_id, applied_at], map: "idx_commercial_task_billing_projection_task")
+  @@map("integracao.commercial_task_billing_projection_events")
 }
 
 model Emails {

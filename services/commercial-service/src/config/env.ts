@@ -36,6 +36,8 @@ const envSchema = z
     auditServiceToken: z.string().default("audit-service-token"),
     clientServiceUrl: z.string().url().default("http://localhost:3035"),
     clientServiceInternalToken: z.string().default("audit-service-token"),
+    taskServiceUrl: z.string().url().default("http://localhost:3032"),
+    taskServiceInternalToken: z.string().default("audit-service-token"),
     outboxWorkerPollIntervalMs: z.coerce.number().int().positive().default(1000),
     outboxWorkerMaxAttempts: z.coerce.number().int().positive().default(5),
     outboxWorkerRetryBaseMs: z.coerce.number().int().positive().default(1000),
@@ -63,6 +65,12 @@ const envSchema = z
       envName: "CLIENT_SERVICE_INTERNAL_TOKEN",
       token: env.clientServiceInternalToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: env.nodeEnv,
+      serviceName: "commercial-service",
+      envName: "TASK_SERVICE_INTERNAL_TOKEN",
+      token: env.taskServiceInternalToken,
+    });
     validateProductionCorsOrigins({
       nodeEnv: env.nodeEnv,
       serviceName: "commercial-service",
@@ -88,6 +96,8 @@ export function getCommercialServiceEnv(): CommercialServiceEnv {
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     clientServiceUrl: process.env.CLIENT_SERVICE_URL,
     clientServiceInternalToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,
+    taskServiceUrl: process.env.TASK_SERVICE_URL,
+    taskServiceInternalToken: process.env.TASK_SERVICE_INTERNAL_TOKEN,
     outboxWorkerPollIntervalMs: process.env.COMMERCIAL_OUTBOX_WORKER_POLL_INTERVAL_MS,
     outboxWorkerMaxAttempts: process.env.COMMERCIAL_OUTBOX_WORKER_MAX_ATTEMPTS,
     outboxWorkerRetryBaseMs: process.env.COMMERCIAL_OUTBOX_WORKER_RETRY_BASE_MS,

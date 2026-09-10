@@ -3574,6 +3574,41 @@ const handlers = {
     await httpRequest(op, { expectedStatus: [200] });
   },
 
+  async commercialTaskBillingList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async commercialTaskBillingUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/task-billing/${requireState("taskId")}`,
+      json: {
+        hiring_status: isBadExpectation(op) ? "invalid" : "Contratado",
+        payment: "Pago",
+        billing_description: "Smoke commercial task billing",
+      },
+    });
+  },
+
+  async taskCommercialTaskBillingProjection(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        event_id: crypto.randomUUID(),
+        event_type: "commercial.task_billing.updated",
+        event_version: 1,
+        organization_id: requireState("session").organization_id,
+        task_id: requireState("taskId"),
+        hiring_status: "Não Contratado",
+        payment: "Pago",
+        billing_description: "Smoke task projection",
+        audit_correlation_id: crypto.randomUUID(),
+        occurred_at: new Date().toISOString(),
+      },
+      headers: isBadExpectation(op) ? { "x-internal-service-token": "invalid-token" } : {},
+    });
+  },
+
   async clientList(op) {
     await httpRequest(op, {
       expectedStatus: [200],

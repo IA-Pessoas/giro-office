@@ -77,4 +77,30 @@ runTest("commercial prospecting uses the dedicated legacy-status contract", () =
   assert.doesNotMatch(catalog, /client\/[^"']+\/commercial/);
 });
 
+runTest("commercial task billing exposes an authorized task outbox surface", () => {
+  const contract = read("./services/commercialService.contract.ts");
+  const service = read("./services/commercialService.ts");
+  const hook = read("./hooks/useCommercialTaskBilling.ts");
+  const types = read("./types/index.ts");
+  const catalog = read("./components/CommercialCatalog.tsx");
+
+  assert.match(contract, /taskBillings:\s*["']\/commercial\/task-billing["']/);
+  assert.match(service, /listTaskBillings/);
+  assert.match(service, /updateTaskBilling/);
+  assert.match(hook, /useMutation/);
+  assert.match(types, /COMMERCIAL_TASK_HIRING_STATUSES/);
+  assert.match(catalog, /Cobrança de tarefas/);
+  assert.match(catalog, /useModuleAccess\("comercial"\)/);
+});
+
+runTest("commercial catalog uses the shared dark text ramps", () => {
+  const catalog = read("./components/CommercialCatalog.tsx");
+
+  assert.doesNotMatch(catalog, /text-slate-950/);
+  assert.doesNotMatch(catalog, /text-slate-600/);
+  assert.match(catalog, /text-slate-900 dark:text-white/);
+  assert.match(catalog, /text-slate-700 dark:text-slate-300/);
+  assert.match(catalog, /placeholder:text-slate-400[^"]*dark:placeholder:text-slate-500/);
+});
+
 console.log("commercial contract tests passed");

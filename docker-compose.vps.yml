@@ -578,6 +578,7 @@ services:
     environment:
       AUDIT_SERVICE_URL: http://audit-service:3020
       CLIENT_SERVICE_URL: http://client-service:3035
+      TASK_SERVICE_URL: http://task-service:3032
     expose:
       - "3045"
     healthcheck:
@@ -594,6 +595,8 @@ services:
       start_period: 20s
     depends_on:
       client-service:
+        condition: service_healthy
+      task-service:
         condition: service_healthy
       audit-service:
         condition: service_healthy

@@ -52,6 +52,7 @@ const envSchema = z
       .transform((value) => parseBoolean(value)),
     auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
+    commercialServiceToken: z.string().default("audit-service-token"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
     aiExtractionMode: z.enum(AI_TASK_EXTRACTION_MODES).optional().default("fake"),
     openaiApiKey: z.string().trim().min(1).optional(),
@@ -110,6 +111,12 @@ const envSchema = z
     validateProductionInternalServiceToken({
       nodeEnv: rest.nodeEnv,
       serviceName: "task-service",
+      envName: "COMMERCIAL_SERVICE_TOKEN",
+      token: rest.commercialServiceToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "task-service",
       envName: "REPORTS_INTERNAL_TOKEN",
       token: rest.reportsInternalToken,
     });
@@ -143,6 +150,7 @@ export function getTaskServiceEnv(): TaskServiceEnv {
     auditEnabled: process.env.AUDIT_ENABLED,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
+    commercialServiceToken: process.env.COMMERCIAL_SERVICE_TOKEN,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
     aiExtractionMode: process.env.AI_EXTRACTION_MODE,
     openaiApiKey: process.env.OPENAI_API_KEY,

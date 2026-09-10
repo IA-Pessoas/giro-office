@@ -143,6 +143,7 @@ export function createTestApp() {
     auditEnabled: false,
     auditServiceUrl: "http://localhost:3020",
     auditServiceToken: "audit-service-token",
+    commercialServiceToken: "audit-service-token",
     projectServiceUrl: "http://localhost:3033",
     aiExtractionMode: "fake" as const,
     aiExtractionTimeoutMs: 30_000,

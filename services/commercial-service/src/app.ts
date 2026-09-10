@@ -25,15 +25,21 @@ import {
   type CommercialProspectingRouteDeps,
   createProspectingRoutes,
 } from "./routes/prospecting.routes.js";
+import {
+  type CommercialTaskBillingRouteDeps,
+  createTaskBillingRoutes,
+} from "./routes/taskBilling.routes.js";
 import { CommercialOutboxStatusService } from "./services/commercialOutboxStatusService.js";
 import { CommercialProposalConfigService } from "./services/proposalConfigService.js";
 import { CommercialProspectingService } from "./services/prospectingService.js";
+import { CommercialTaskBillingService } from "./services/taskBillingService.js";
 
 interface CreateCommercialAppOptions {
   env: CommercialServiceEnv;
   logger: Logger;
   proposalConfigService?: CommercialProposalConfigRouteDeps;
   prospectingService?: CommercialProspectingRouteDeps;
+  taskBillingService?: CommercialTaskBillingRouteDeps;
   outboxStatusService?: CommercialOutboxRouteDeps;
 }
 
@@ -46,6 +52,7 @@ export function createCommercialApp(options: CreateCommercialAppOptions): Expres
   const { env, logger } = options;
   const service = options.proposalConfigService ?? new CommercialProposalConfigService();
   const prospectingService = options.prospectingService ?? new CommercialProspectingService();
+  const taskBillingService = options.taskBillingService ?? new CommercialTaskBillingService();
   const outboxStatusService = options.outboxStatusService ?? new CommercialOutboxStatusService();
   const app = express();
 
@@ -69,6 +76,7 @@ export function createCommercialApp(options: CreateCommercialAppOptions): Expres
 
   app.use("/commercial/proposal-configs", createProposalConfigRoutes(service));
   app.use("/commercial/prospecting", createProspectingRoutes(prospectingService));
+  app.use("/commercial/task-billing", createTaskBillingRoutes(taskBillingService));
   app.use("/commercial/outbox", createCommercialOutboxRoutes(outboxStatusService));
   app.use(
     createExpressErrorHandler({

@@ -873,6 +873,21 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Atualizado", ...successJson } },
         },
       },
+      "/internal/commercial/task-billing": {
+        post: {
+          tags: ["Commercial"],
+          summary: "Projetar cobrança comercial na tarefa",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: {
+            "200": successJson,
+            "400": { description: "Evento inválido." },
+            "403": { description: "Acesso negado." },
+          },
+        },
+      },
       "/task/conclusion": {
         put: {
           tags: ["Lifecycle"],

@@ -1,6 +1,9 @@
-import type { CommercialProspectingTransitionEvent } from "@workspace/shared";
-
-import type { ClientProjectionDelivery } from "../integrations/clientProjection.js";
+import {
+  COMMERCIAL_PROSPECTING_TRANSITION_EVENT,
+  COMMERCIAL_TASK_BILLING_UPDATED_EVENT,
+  type CommercialProspectingTransitionEvent,
+  type CommercialTaskBillingUpdatedEvent,
+} from "@workspace/shared";
 
 export interface CommercialOutboxEventRow {
   id: string;
@@ -8,6 +11,14 @@ export interface CommercialOutboxEventRow {
   status: string;
   attempts: number;
   created_at: Date;
+}
+
+export type CommercialOutboxEventPayload =
+  | CommercialProspectingTransitionEvent
+  | CommercialTaskBillingUpdatedEvent;
+
+export interface CommercialOutboxDelivery {
+  deliver(event: CommercialOutboxEventPayload): Promise<void>;
 }
 
 interface CommercialOutboxEventDelegate {
@@ -27,15 +38,19 @@ export interface CommercialOutboxWorkerOptions {
   now?: () => Date;
 }
 
-function isTransitionEvent(payload: unknown): payload is CommercialProspectingTransitionEvent {
+function isCommercialOutboxEvent(payload: unknown): payload is CommercialOutboxEventPayload {
   return (
     typeof payload === "object" &&
     payload !== null &&
     "event_id" in payload &&
     "event_type" in payload &&
     "organization_id" in payload &&
-    "client_id" in payload &&
-    "to_status" in payload &&
+    ((payload.event_type === COMMERCIAL_PROSPECTING_TRANSITION_EVENT &&
+      "client_id" in payload &&
+      "to_status" in payload) ||
+      (payload.event_type === COMMERCIAL_TASK_BILLING_UPDATED_EVENT &&
+        "task_id" in payload &&
+        "hiring_status" in payload)) &&
     "audit_correlation_id" in payload
   );
 }
@@ -52,7 +67,7 @@ export class CommercialOutboxWorkerService {
 
   constructor(
     private readonly prisma: CommercialOutboxWorkerPrisma,
-    private readonly delivery: ClientProjectionDelivery,
+    private readonly delivery: CommercialOutboxDelivery,
     options: CommercialOutboxWorkerOptions = {},
   ) {
     this.maxAttempts = options.maxAttempts ?? 5;
@@ -66,7 +81,7 @@ export class CommercialOutboxWorkerService {
     if (!event) return false;
 
     try {
-      if (!isTransitionEvent(event.payload)) {
+      if (!isCommercialOutboxEvent(event.payload)) {
         throw new Error("Payload de evento comercial inválido.");
       }
       await this.delivery.deliver(event.payload);

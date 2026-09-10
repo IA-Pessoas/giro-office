@@ -117,6 +117,45 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
             description: { type: "string", maxLength: 5000, nullable: true },
           },
         },
+        TaskBilling: {
+          type: "object",
+          required: [
+            "id",
+            "task_id",
+            "task_name",
+            "task_status",
+            "billing",
+            "hiring_status",
+            "payment",
+            "billing_description",
+          ],
+          properties: {
+            id: { type: ["string", "null"], format: "uuid" },
+            task_id: { type: "string", format: "uuid" },
+            task_name: { type: "string" },
+            task_status: { type: "string" },
+            billing: { type: "string" },
+            hiring_status: {
+              type: ["string", "null"],
+              enum: ["A Realizar", "Contratado", "Não Contratado", null],
+            },
+            payment: { type: ["string", "null"] },
+            billing_description: { type: ["string", "null"] },
+          },
+        },
+        TaskBillingInput: {
+          type: "object",
+          additionalProperties: false,
+          required: ["hiring_status"],
+          properties: {
+            hiring_status: {
+              type: "string",
+              enum: ["A Realizar", "Contratado", "Não Contratado"],
+            },
+            payment: { type: ["string", "null"], maxLength: 255 },
+            billing_description: { type: ["string", "null"], maxLength: 5000 },
+          },
+        },
       },
     },
     paths: {
@@ -244,6 +283,40 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
           responses: {
             "200": successResponse,
             "401": { description: "Não autenticado." },
+          },
+        },
+      },
+      "/commercial/task-billing": {
+        get: {
+          tags: ["Commercial"],
+          summary: "Listar cobranças comerciais de tarefas",
+          security: [{ bearerAuth: [] }],
+          responses: { "200": successResponse, "401": { description: "Não autenticado." } },
+        },
+      },
+      "/commercial/task-billing/{taskId}": {
+        put: {
+          tags: ["Commercial"],
+          summary: "Atualizar cobrança comercial de tarefa",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "taskId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/TaskBillingInput" } },
+            },
+          },
+          responses: {
+            "200": successResponse,
+            "400": { description: "Payload inválido." },
+            "404": { description: "Tarefa não encontrada." },
           },
         },
       },
