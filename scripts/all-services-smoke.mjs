@@ -3511,7 +3511,7 @@ const handlers = {
   async commercialProposalConfigCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],
-      json: { name: uniqueText("Smoke Proposal Config"), minimum_wage: 1800 },
+      json: { name: uniqueText("Smoke Proposal Config"), contract_value: 1800 },
     });
     if (isBadExpectation(op)) return;
     state.commercialProposalConfigId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
@@ -3521,7 +3521,7 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/commercial/proposal-configs/${requireState("commercialProposalConfigId")}`,
-      json: { name: uniqueText("Smoke Proposal Config Updated"), minimum_wage: 2000 },
+      json: { name: uniqueText("Smoke Proposal Config Updated"), contract_value: 2000 },
     });
   },
 

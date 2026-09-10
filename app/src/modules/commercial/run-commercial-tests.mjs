@@ -54,7 +54,7 @@ runTest("commercial catalog has a tenant-scoped CRUD contract and admin surface"
   assert.match(hooks, /useMutation/);
   assert.match(catalog, /useModuleAccess\("comercial"\)/);
   assert.match(catalog, /Catálogo de propostas/);
-  assert.match(catalog, /Salário mínimo/);
+  assert.match(catalog, /Valor base do contrato/);
   assert.match(page, /CommercialCatalog/);
 });
 

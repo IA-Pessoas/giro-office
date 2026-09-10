@@ -985,7 +985,7 @@ model Task {
 model ProposalConfig {
   id              String       @id @default(uuid())
   name            String
-  minimum_wage    Float
+  contract_value  Float
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
 

@@ -6,7 +6,7 @@ import prismaClient from "../integrations/prisma.js";
 const PROPOSAL_CONFIG_SELECT = {
   id: true,
   name: true,
-  minimum_wage: true,
+  contract_value: true,
 } as const;
 
 const DUPLICATE_CONFIG_MESSAGE = "Já existe uma configuração com esse nome.";
@@ -18,14 +18,14 @@ function isUniqueConstraintError(error: unknown): boolean {
 export interface CommercialProposalConfig {
   id: string;
   name: string;
-  minimum_wage: number;
+  contract_value: number;
 }
 
 export interface CreateCommercialProposalConfigRequest {
   user_id: string;
   organization_id: string;
   name: string;
-  minimum_wage: number;
+  contract_value: number;
 }
 
 export interface UpdateCommercialProposalConfigRequest {
@@ -33,7 +33,7 @@ export interface UpdateCommercialProposalConfigRequest {
   organization_id: string;
   config_id: string;
   name?: string;
-  minimum_wage?: number;
+  contract_value?: number;
 }
 
 export type CommercialProposalConfigPrismaDeps = Pick<typeof prismaClient, "proposalConfig">;
@@ -61,7 +61,7 @@ export class CommercialProposalConfigService {
       const created = await this.prisma.proposalConfig.create({
         data: {
           name: data.name,
-          minimum_wage: data.minimum_wage,
+          contract_value: data.contract_value,
           organization_id: data.organization_id,
         },
         select: PROPOSAL_CONFIG_SELECT,
@@ -134,7 +134,7 @@ export class CommercialProposalConfigService {
 
       const updateResult = await this.prisma.proposalConfig.updateMany({
         where: { id: data.config_id, organization_id: data.organization_id },
-        data: { name: nextName, minimum_wage: data.minimum_wage ?? current.minimum_wage },
+        data: { name: nextName, contract_value: data.contract_value ?? current.contract_value },
       });
       if (updateResult.count !== 1) {
         throw new ServiceError(404, "Configuração comercial não encontrada.");

@@ -93,12 +93,12 @@ export interface CommercialSuccessEnvelope<T> {
 export interface CommercialProposalConfig {
   id: string;
   name: string;
-  minimum_wage: number;
+  contract_value: number;
 }
 
 export interface CreateCommercialProposalConfigPayload {
   name: string;
-  minimum_wage: number;
+  contract_value: number;
 }
 
 export type UpdateCommercialProposalConfigPayload = Partial<CreateCommercialProposalConfigPayload>;

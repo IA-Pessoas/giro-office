@@ -27,20 +27,20 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
         },
         ProposalConfig: {
           type: "object",
-          required: ["id", "name", "minimum_wage"],
+          required: ["id", "name", "contract_value"],
           properties: {
             id: { type: "string", format: "uuid" },
             name: { type: "string", minLength: 1, maxLength: 120 },
-            minimum_wage: { type: "number", minimum: 0 },
+            contract_value: { type: "number", minimum: 0, description: "Valor base do contrato ou proposta em reais." },
           },
         },
         ProposalConfigInput: {
           type: "object",
           additionalProperties: false,
-          required: ["name", "minimum_wage"],
+          required: ["name", "contract_value"],
           properties: {
             name: { type: "string", minLength: 1, maxLength: 120 },
-            minimum_wage: { type: "number", minimum: 0 },
+            contract_value: { type: "number", minimum: 0, description: "Valor base do contrato ou proposta em reais." },
           },
         },
         ProposalConfigPatch: {
@@ -49,7 +49,7 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
           minProperties: 1,
           properties: {
             name: { type: "string", minLength: 1, maxLength: 120 },
-            minimum_wage: { type: "number", minimum: 0 },
+            contract_value: { type: "number", minimum: 0, description: "Valor base do contrato ou proposta em reais." },
           },
         },
         ProspectingClient: {
