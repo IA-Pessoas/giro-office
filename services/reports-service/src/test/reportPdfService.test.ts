@@ -156,6 +156,40 @@ describe("ReportPdfService", () => {
     expect(document.calls.some((call) => call.includes("department-secret"))).toBe(false);
   });
 
+  it("mantém títulos e estados vazios de cada bloco no mesmo PDF", async () => {
+    const document = new FakePdfDocument();
+    const service = new ReportPdfService(
+      { select: async () => ({ kind: "institutional" }) },
+      () => document,
+    );
+
+    await service.render({
+      author: "Ana",
+      generatedAt: new Date("2026-08-27T15:04:05.000Z"),
+      organizationId: "org-1",
+      scope: "personal",
+      presentation_json: { columns: [{ key: "name", label: "Nome" }] },
+      rows: [],
+      blocks: [
+        {
+          title: "Projetos",
+          presentation_json: { columns: [{ key: "name", label: "Nome" }] },
+          rows: [{ name: "Ana" }],
+        },
+        {
+          title: "Clientes",
+          presentation_json: { columns: [{ key: "name", label: "Nome" }] },
+          rows: [],
+        },
+      ],
+    });
+
+    expect(document.calls).toContain("text:Projetos");
+    expect(document.calls).toContain("text:Clientes");
+    expect(document.calls).toContain("text:Nenhum registro encontrado nesta área.");
+    expect(document.calls).toContain("text:Ana");
+  });
+
   it("gera bytes PDFKit A4 em memória com metadados permitidos", async () => {
     const service = new ReportPdfService(new ReportLetterheadService([]));
 

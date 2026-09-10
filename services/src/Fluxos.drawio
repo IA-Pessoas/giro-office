@@ -3660,7 +3660,7 @@
             <mxRectangle width="30" height="30" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="ZyGUWFbHUapzZLfJkPVg-2668" value="&quot;minimum_wage&quot; DOUBLE PRECISION NOT NULL" style="shape=partialRectangle;overflow=hidden;connectable=0;fillColor=none;align=left;strokeColor=inherit;top=0;left=0;bottom=0;right=0;spacingLeft=6;rounded=1;" parent="ZyGUWFbHUapzZLfJkPVg-2666" vertex="1">
+        <mxCell id="ZyGUWFbHUapzZLfJkPVg-2668" value="&quot;contract_value&quot; DOUBLE PRECISION NOT NULL" style="shape=partialRectangle;overflow=hidden;connectable=0;fillColor=none;align=left;strokeColor=inherit;top=0;left=0;bottom=0;right=0;spacingLeft=6;rounded=1;" parent="ZyGUWFbHUapzZLfJkPVg-2666" vertex="1">
           <mxGeometry x="30" width="290" height="30" as="geometry">
             <mxRectangle width="290" height="30" as="alternateBounds" />
           </mxGeometry>

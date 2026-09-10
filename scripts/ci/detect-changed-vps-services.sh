@@ -140,6 +140,9 @@ for f in "${files[@]}"; do
     services/reports-service/* )
       add_service reports-service
       ;;
+    services/commercial-service/* )
+      add_service commercial-service
+      ;;
     services/audit-service/* )
       add_service audit-service
       ;;

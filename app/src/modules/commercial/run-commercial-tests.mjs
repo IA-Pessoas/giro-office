@@ -39,4 +39,42 @@ runTest("commercial dashboard no longer embeds primary mock datasets", () => {
   assert.doesNotMatch(component, /const\s+monthlyConversions\s*=\s*\[/);
 });
 
+runTest("commercial catalog has a tenant-scoped CRUD contract and admin surface", () => {
+  const contract = read("./services/commercialService.contract.ts");
+  const service = read("./services/commercialService.ts");
+  const hooks = read("./hooks/useCommercialProposalConfigs.ts");
+  const catalog = read("./components/CommercialCatalog.tsx");
+  const page = read("../../pages/comercial/index.tsx");
+
+  assert.match(contract, /proposalConfigs:\s*["']\/commercial\/proposal-configs["']/);
+  assert.match(contract, /proposalConfig: \(id: string\)/);
+  assert.match(service, /listProposalConfigs/);
+  assert.match(service, /createProposalConfig/);
+  assert.match(service, /updateProposalConfig/);
+  assert.match(hooks, /useMutation/);
+  assert.match(catalog, /useModuleAccess\("comercial"\)/);
+  assert.match(catalog, /Catálogo de propostas/);
+  assert.match(catalog, /Valor base do contrato/);
+  assert.match(page, /CommercialCatalog/);
+});
+
+runTest("commercial prospecting uses the dedicated legacy-status contract", () => {
+  const contract = read("./services/commercialService.contract.ts");
+  const service = read("./services/commercialService.ts");
+  const hooks = read("./hooks/useCommercialProspecting.ts");
+  const types = read("./types/index.ts");
+  const catalog = read("./components/CommercialCatalog.tsx");
+
+  assert.match(contract, /prospecting:\s*["']\/commercial\/prospecting["']/);
+  assert.match(contract, /prospectingClients:\s*["']\/commercial\/prospecting\/clients["']/);
+  assert.match(service, /listProspecting/);
+  assert.match(service, /createProspecting/);
+  assert.match(service, /updateProspecting/);
+  assert.match(hooks, /invalidateQueries/);
+  assert.match(types, /COMMERCIAL_PROSPECTING_STATUSES/);
+  assert.match(catalog, /Nova prospecção/);
+  assert.match(catalog, /COMMERCIAL_PROSPECTING_STATUSES/);
+  assert.doesNotMatch(catalog, /client\/[^"']+\/commercial/);
+});
+
 console.log("commercial contract tests passed");

@@ -145,6 +145,12 @@ export class ReportSnapshotService {
     snapshot: { id: string; created_at: Date };
     job: { id: string; report_model_version_id: string; requester_id: string };
     rows: Array<Record<string, unknown>>;
+    blocks?: Array<{
+      source: string;
+      label: string;
+      columns: ReportResultColumn[];
+      rows: Array<Record<string, unknown>>;
+    }>;
   }> {
     const snapshot = await this.prisma.reportSnapshot.findFirst({
       where: {
@@ -185,11 +191,41 @@ export class ReportSnapshotService {
       }
     }
 
+    const blocks = this.prisma.reportSnapshotBlock
+      ? await this.prisma.reportSnapshotBlock.findMany({
+          where: { snapshot_id: snapshot.id, organization_id: input.organizationId },
+          orderBy: { position: "asc" },
+        })
+      : [];
     const records = await this.prisma.reportSnapshotRow.findMany({
       where: { snapshot_id: snapshot.id, organization_id: input.organizationId },
       orderBy: { row_number: "asc" },
-      select: { row_number: true, data_json: true },
+      select: { block_id: true, row_number: true, data_json: true },
     });
+    if (blocks.length > 0) {
+      const rowsByBlock = new Map<string, Array<Record<string, unknown>>>();
+      for (const block of blocks) rowsByBlock.set(block.id, []);
+      for (const record of records) {
+        if (record.block_id && rowsByBlock.has(record.block_id)) {
+          rowsByBlock.get(record.block_id)?.push(record.data_json as Record<string, unknown>);
+        }
+      }
+      return {
+        snapshot: { id: snapshot.id, created_at: snapshot.created_at },
+        job: {
+          id: job.id,
+          report_model_version_id: job.report_model_version_id,
+          requester_id: job.requester_id,
+        },
+        rows: [],
+        blocks: blocks.map((block) => ({
+          source: block.source,
+          label: block.label,
+          columns: block.columns_json as ReportResultColumn[],
+          rows: rowsByBlock.get(block.id) ?? [],
+        })),
+      };
+    }
     return {
       snapshot: { id: snapshot.id, created_at: snapshot.created_at },
       job: {

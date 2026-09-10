@@ -89,3 +89,54 @@ export interface CommercialSuccessEnvelope<T> {
   success: boolean;
   data: T;
 }
+
+export interface CommercialProposalConfig {
+  id: string;
+  name: string;
+  contract_value: number;
+}
+
+export interface CreateCommercialProposalConfigPayload {
+  name: string;
+  contract_value: number;
+}
+
+export type UpdateCommercialProposalConfigPayload = Partial<CreateCommercialProposalConfigPayload>;
+
+export const COMMERCIAL_PROSPECTING_STATUSES = [
+  "Análise Financeira",
+  "Análise/Agendamento",
+  "Envio de Proposta",
+  "Paralisado",
+  "Recusado pelo Cliente",
+  "Fechado",
+] as const;
+
+export type CommercialProspectingStatus = (typeof COMMERCIAL_PROSPECTING_STATUSES)[number];
+
+export interface CommercialProspectingClient {
+  id: string;
+  name: string;
+  company_name: string | null;
+  fantasy_name: string | null;
+}
+
+export interface CommercialProspecting {
+  id: string;
+  client_id: string;
+  status: CommercialProspectingStatus;
+  status_date: string | null;
+  description: string | null;
+  client: CommercialProspectingClient;
+}
+
+export interface CreateCommercialProspectingPayload {
+  client_id: string;
+  status: CommercialProspectingStatus;
+  status_date?: string | null;
+  description?: string | null;
+}
+
+export type UpdateCommercialProspectingPayload = Partial<
+  Omit<CreateCommercialProspectingPayload, "client_id">
+>;

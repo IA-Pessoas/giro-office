@@ -259,6 +259,7 @@ const state = {
   certificatePfId: "",
   reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
   reportsJobId: "",
+  commercialProposalConfigId: "",
 };
 
 const cleanupTasks = [];
@@ -3493,6 +3494,70 @@ const handlers = {
         status: "Ativo",
         solution: false,
       },
+    });
+  },
+
+  async commercialProposalConfigList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async commercialProposalConfigGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/proposal-configs/${requireState("commercialProposalConfigId")}`,
+    });
+  },
+
+  async commercialProposalConfigCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: { name: uniqueText("Smoke Proposal Config"), contract_value: 1800 },
+    });
+    if (isBadExpectation(op)) return;
+    state.commercialProposalConfigId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async commercialProposalConfigUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/proposal-configs/${requireState("commercialProposalConfigId")}`,
+      json: { name: uniqueText("Smoke Proposal Config Updated"), contract_value: 2000 },
+    });
+  },
+
+  async commercialProspectingClientList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async commercialProspectingList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async commercialProspectingCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        status: "Análise Financeira",
+        description: "Smoke commercial prospecting",
+      },
+    });
+    if (isBadExpectation(op)) return;
+    state.commercialProspectingId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async commercialProspectingGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
+    });
+  },
+
+  async commercialProspectingUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
+      json: { status: "Envio de Proposta", description: "Smoke commercial prospecting updated" },
     });
   },
 

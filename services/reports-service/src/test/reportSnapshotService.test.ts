@@ -367,7 +367,76 @@ describe("ReportSnapshotService", () => {
     expect(prisma.reportSnapshotRow.findMany).toHaveBeenCalledWith({
       where: { snapshot_id: "snapshot-1", organization_id: "org-1" },
       orderBy: { row_number: "asc" },
-      select: { row_number: true, data_json: true },
+      select: { block_id: true, row_number: true, data_json: true },
+    });
+  });
+
+  it("preserva blocos, colunas e linhas independentes ao preparar a exportação", async () => {
+    const prisma = {
+      reportSnapshot: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "snapshot-1",
+          report_job_id: "job-1",
+          created_at: new Date(),
+        }),
+      },
+      reportJob: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "job-1",
+          report_model_version_id: "version-1",
+        }),
+      },
+      reportSnapshotBlock: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "block-1",
+            source: "projects",
+            label: "Projetos / Ativos",
+            columns_json: [{ key: "name", label: "Nome" }],
+            row_count: 1,
+            position: 0,
+          },
+          {
+            id: "block-2",
+            source: "clients",
+            label: "Clientes",
+            columns_json: [{ key: "name", label: "Nome" }],
+            row_count: 1,
+            position: 1,
+          },
+        ]),
+      },
+      reportSnapshotRow: {
+        findMany: vi.fn().mockResolvedValue([
+          { block_id: "block-2", row_number: 2, data_json: { name: "Bia" } },
+          { block_id: "block-1", row_number: 1, data_json: { name: "Ana" } },
+        ]),
+      },
+    };
+    const service = new ReportSnapshotService(prisma as never);
+
+    await expect(
+      service.getForExport({ organizationId: "org-1", userId: "user-1", snapshotId: "snapshot-1" }),
+    ).resolves.toMatchObject({
+      blocks: [
+        {
+          source: "projects",
+          label: "Projetos / Ativos",
+          columns: [{ key: "name", label: "Nome" }],
+          rows: [{ name: "Ana" }],
+        },
+        {
+          source: "clients",
+          label: "Clientes",
+          rows: [{ name: "Bia" }],
+        },
+      ],
+      rows: [],
+    });
+    expect(prisma.reportSnapshotRow.findMany).toHaveBeenCalledWith({
+      where: { snapshot_id: "snapshot-1", organization_id: "org-1" },
+      orderBy: { row_number: "asc" },
+      select: { block_id: true, row_number: true, data_json: true },
     });
   });
 

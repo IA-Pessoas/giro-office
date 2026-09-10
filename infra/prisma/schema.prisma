@@ -99,6 +99,12 @@ generator reportsServiceClient {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator commercialServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/commercial-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -170,6 +176,7 @@ model Organization {
   situationsPessoal             SituationsPessoal[]
   unionsPessoal                 UnionPessoal[]
   proposalConfigs               ProposalConfig[]
+  commercialProspectings        CommercialProspecting[]
   licenses                      License[]
   municipalTaxes                MunicipalTaxes[]
   partners                      Partners[]
@@ -675,6 +682,7 @@ model Client {
   triageConfigs                 TriageConfig[]
   triageMonthlys                TriageMonthly[]
   responsiblesTriage            TriageResponsible[]
+  commercialProspectings        CommercialProspecting[]
 
   @@map("clients")
 }
@@ -977,11 +985,29 @@ model Task {
 model ProposalConfig {
   id              String       @id @default(uuid())
   name            String
-  minimum_wage    Float
+  contract_value  Float
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, name], map: "uq_proposal_config_org_name")
   @@map("proposal.config")
+}
+
+model CommercialProspecting {
+  id              String       @id @default(uuid())
+  client_id       String
+  organization_id String
+  status          String
+  status_date     DateTime?
+  description     String?
+  registered_at   DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, client_id], map: "uq_commercial_prospecting_org_client")
+  @@index([organization_id, status], map: "idx_commercial_prospecting_org_status")
+  @@map("commercial.prospecting")
 }
 
 model Emails {

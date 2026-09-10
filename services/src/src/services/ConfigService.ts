@@ -2,7 +2,7 @@ import prismaClient from "../prisma"
 import { LogService } from './LogService';
 
 class ConfigService {
-    async createCommercialProposal(my_id: string, name: string, minimum_wage: number) {
+    async createCommercialProposal(my_id: string, name: string, contract_value: number) {
         const exists = await prismaClient.proposalConfig.findFirst({ where:{ name } })
         if (exists) 
             throw new Error("Já cadastrado")
@@ -10,12 +10,12 @@ class ConfigService {
         const create = await prismaClient.proposalConfig.create({
             data:{
                 name, 
-                minimum_wage
+                contract_value
             },
             select:{
                 id: true,
                 name: true,
-                minimum_wage: true
+                contract_value: true
             }
         }) 
 
@@ -38,14 +38,14 @@ class ConfigService {
             select:{
                 id: true,
                 name: true,
-                minimum_wage: true
+                contract_value: true
             }
         })
 
         return { detail }
     }
 
-    async updateCommercialProposal(my_id: string, config_id: string, name: string, minimum_wage: number) {
+    async updateCommercialProposal(my_id: string, config_id: string, name: string, contract_value: number) {
         try{
             const exists = await prismaClient.proposalConfig.findFirst({ where:{ id: config_id } })
             if (!exists) 
@@ -57,11 +57,11 @@ class ConfigService {
                 },
                 data:{
                     name,
-                    minimum_wage
+                    contract_value
                 },
                 select:{
                     name: true,
-                    minimum_wage: true
+                    contract_value: true
                 }
             })
 

@@ -91,6 +91,9 @@ backend_check_url() {
     parcelamento-service)
       printf "%s\n" "http://parcelamento-service:3043/health"
       ;;
+    commercial-service)
+      printf "%s\n" "http://commercial-service:3045/health"
+      ;;
     reports-service)
       printf "%s\n" "http://reports-service:3044/health"
       ;;
@@ -118,6 +121,7 @@ ALL_BACKEND_SERVICES=(
   certificate-service
   pessoal-service
   parcelamento-service
+  commercial-service
   reports-service
   audit-service
 )

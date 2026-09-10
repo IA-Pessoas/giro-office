@@ -597,6 +597,9 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                 "application/pdf": {
                   schema: { type: "string", format: "binary" },
                 },
+                "application/zip": {
+                  schema: { type: "string", format: "binary" },
+                },
               },
             },
             "400": { description: "Formato inválido" },

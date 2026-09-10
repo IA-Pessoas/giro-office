@@ -88,6 +88,7 @@ async function run() {
   const models = [];
   let modelVersionId = "reports-fixture-model-version";
   let jobPolls = 0;
+  const exportRequests = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -177,6 +178,15 @@ async function run() {
             ],
           },
         },
+      });
+    }
+    if (path === "/reports/snapshots/reports-fixture-snapshot/export") {
+      const format = new URL(route.request().url()).searchParams.get("format");
+      exportRequests.push(format);
+      return route.fulfill({
+        contentType: format === "pdf" ? "application/pdf" : "application/zip",
+        headers: { "content-disposition": `attachment; filename="report-fixture.${format === "pdf" ? "pdf" : "zip"}"` },
+        body: format === "pdf" ? "%PDF-fixture" : "PK\u0003\u0004fixture",
       });
     }
     if (path === "/reports/preview") {
@@ -417,6 +427,11 @@ async function run() {
     await expect(
       panel.getByRole("region", { name: "Resultado de Clientes", exact: true }),
     ).toContainText("Nenhum registro encontrado");
+    const csvDownload = page.waitForEvent("download");
+    await panel.getByRole("button", { name: "Baixar resultado em CSV", exact: true }).click();
+    assert.equal((await csvDownload).suggestedFilename(), "report-fixture.zip");
+    assert.deepEqual(exportRequests, ["csv"]);
+    await expect(page.getByText("CSV pronto para download.", { exact: true })).toBeVisible();
     await checkLanguage();
     await screenshot("05-resultado-desktop");
     await panel.getByRole("button", { name: "Salvar para usar novamente", exact: true }).click();
