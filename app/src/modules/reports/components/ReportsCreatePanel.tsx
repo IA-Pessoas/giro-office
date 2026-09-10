@@ -20,6 +20,7 @@ import {
   useReportSnapshot,
 } from "../hooks/useReports";
 import { ReportResultBlocks } from "./ReportResultBlocks";
+import { ReportDownloadActions } from "./ReportDownloadActions";
 
 const steps = ["Escolher áreas", "Escolher campos", "Definir critérios", "Revisar relatório"];
 
@@ -528,8 +529,24 @@ export function ReportsCreatePanel() {
                       </Button>
                     ) : null}
                   </div>
-                  {job.data.status === "completed" && snapshot.data?.blocks ? (
-                    <ReportResultBlocks blocks={snapshot.data.blocks} snapshot />
+                  {job.data.status === "completed" && snapshot.data ? (
+                    <>
+                      {snapshot.data.blocks ? (
+                        <ReportResultBlocks blocks={snapshot.data.blocks} snapshot />
+                      ) : (
+                        <p role="status" className="text-sm text-gray-700 dark:text-slate-300">
+                          Resultado legado carregado. Consulte o histórico para visualizar a tabela completa.
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-200 pt-4 dark:border-blue-900">
+                        <p className="text-sm text-gray-700 dark:text-slate-300">
+                          {snapshot.data.blocks
+                            ? "Resultado concluído. Escolha um formato para baixar as áreas separadamente."
+                            : "Resultado concluído. Escolha um formato para baixar o snapshot."}
+                        </p>
+                        <ReportDownloadActions id={snapshot.data.snapshot.id} />
+                      </div>
+                    </>
                   ) : null}
                   {job.data.status === "completed" && snapshot.isPending ? (
                     <p role="status" className="text-sm text-gray-700 dark:text-slate-300">
