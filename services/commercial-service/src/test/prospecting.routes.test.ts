@@ -4,6 +4,7 @@ import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
+  ServiceError,
 } from "@workspace/shared";
 import { createLogger } from "@workspace/shared/logger";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
@@ -93,6 +94,59 @@ describe("commercial prospecting routes", () => {
       status_date: undefined,
       description: undefined,
     });
+  });
+
+  it("rejeita campos extras no payload de criação", async () => {
+    const service = createServiceMock();
+    const response = await request(createTestApp(service))
+      .post("/commercial/prospecting")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, status: "Análise Financeira", unexpected: true });
+
+    expect(response.status).toBe(400);
+    expect(service.create).not.toHaveBeenCalled();
+  });
+
+  it("encaminha atualização autenticada ao service", async () => {
+    const service = createServiceMock();
+    service.update = vi.fn(async () => ({
+      id: PROSPECTING_ID,
+      client_id: CLIENT_ID,
+      status: "Envio de Proposta",
+      status_date: null,
+      description: "Retorno confirmado",
+      client: { id: CLIENT_ID, name: "Cliente", company_name: null, fantasy_name: null },
+    }));
+
+    const response = await request(createTestApp(service))
+      .patch(`/commercial/prospecting/${PROSPECTING_ID}`)
+      .set(gatewayHeaders())
+      .send({ status: "Envio de Proposta", description: "Retorno confirmado" });
+
+    expect(response.status).toBe(200);
+    expect(service.update).toHaveBeenCalledWith({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      prospecting_id: PROSPECTING_ID,
+      status: "Envio de Proposta",
+      status_date: undefined,
+      description: "Retorno confirmado",
+    });
+  });
+
+  it("propaga conflito ao tentar reabrir prospecção fechada", async () => {
+    const service = createServiceMock();
+    service.update = vi.fn(async () => {
+      throw new ServiceError(409, "Uma prospecção fechada não pode ser reaberta.");
+    });
+
+    const response = await request(createTestApp(service))
+      .patch(`/commercial/prospecting/${PROSPECTING_ID}`)
+      .set(gatewayHeaders())
+      .send({ status: "Envio de Proposta" });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toBe("Uma prospecção fechada não pode ser reaberta.");
   });
 
   it("lista clientes no tenant encaminhado", async () => {

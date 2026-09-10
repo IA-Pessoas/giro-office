@@ -17,14 +17,14 @@ const statusDateSchema = z.coerce.date().nullable().optional();
 
 export const prospectingIdParamSchema = z.object({
   id: z.string().uuid("Id da prospecção inválido."),
-});
+}).strict();
 
 export const createProspectingBodySchema = z.object({
   client_id: z.string().uuid("Cliente inválido."),
   status: prospectingStatusSchema,
   status_date: statusDateSchema,
   description: descriptionSchema,
-});
+}).strict();
 
 export const updateProspectingBodySchema = z
   .object({
@@ -32,6 +32,7 @@ export const updateProspectingBodySchema = z
     status_date: statusDateSchema,
     description: descriptionSchema,
   })
+  .strict()
   .refine((body) => Object.keys(body).length > 0, {
     message: "Informe ao menos um campo para atualizar.",
   });
