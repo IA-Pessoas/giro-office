@@ -148,6 +148,16 @@ async function run() {
       document.documentElement.classList.add("dark");
       document.documentElement.setAttribute("data-theme", "dark");
     });
+    const darkTextColors = await page.evaluate(() => ({
+      heading: getComputedStyle(document.querySelector("h1")).color,
+      intro: getComputedStyle(document.querySelector("h1 + p")).color,
+      taskBillingHeading: getComputedStyle(document.querySelector("#commercial-task-billing-title")).color,
+    }));
+    assert.deepEqual(darkTextColors, {
+      heading: "rgb(226, 232, 240)",
+      intro: "rgb(226, 232, 240)",
+      taskBillingHeading: "rgb(226, 232, 240)",
+    });
     await page.screenshot({ path: `${evidenceDir}/05-commercial-mobile-dark.png`, fullPage: true });
     assert.deepEqual(pageErrors, []);
     assert.deepEqual(consoleErrors, []);

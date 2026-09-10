@@ -245,8 +245,8 @@ export function CommercialCatalog() {
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.14em] text-blue-600 dark:text-blue-300">Comercial</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 dark:text-white">Catálogo de propostas</h1>
-          <p className="mt-2 max-w-[65ch] text-base leading-7 text-slate-600 dark:text-slate-300">
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Catálogo de propostas</h1>
+          <p className="mt-2 max-w-[65ch] text-base leading-7 text-slate-700 dark:text-slate-300">
             Defina o nome e o valor base usados nas propostas comerciais da sua organização.
           </p>
         </div>
@@ -261,7 +261,7 @@ export function CommercialCatalog() {
       {editingId === null && canEdit ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">Você pode editar o catálogo da organização.</p>
       ) : !canEdit ? (
-        <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">Acesso somente leitura.</p>
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">Acesso somente leitura.</p>
       ) : null}
 
       {isCreating || editingId !== null ? (
@@ -271,7 +271,7 @@ export function CommercialCatalog() {
               <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white" autoFocus />
             </label>
             <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Valor base do contrato
-              <input type="text" inputMode="decimal" value={draft.contract_value} onChange={(event) => setDraft((current) => ({ ...current, contract_value: event.target.value }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white" placeholder="0,00" />
+              <input type="text" inputMode="decimal" value={draft.contract_value} onChange={(event) => setDraft((current) => ({ ...current, contract_value: event.target.value }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500" placeholder="0,00" />
             </label>
             <div className="flex gap-2 md:justify-end">
               <button type="submit" disabled={isSaving} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:flex-none">
@@ -297,19 +297,19 @@ export function CommercialCatalog() {
         </div>
       ) : configsQuery.data?.length ? (
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" aria-labelledby="commercial-catalog-title">
-          <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700"><h2 id="commercial-catalog-title" className="text-lg font-semibold text-slate-950 dark:text-white">Configurações cadastradas</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{configsQuery.data.length} {configsQuery.data.length === 1 ? "item" : "itens"}</p></div>
+          <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700"><h2 id="commercial-catalog-title" className="text-lg font-semibold text-slate-900 dark:text-white">Configurações cadastradas</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{configsQuery.data.length} {configsQuery.data.length === 1 ? "item" : "itens"}</p></div>
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
-            {configsQuery.data.map((config) => <div key={config.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-950 dark:text-white">{config.name}</p><p className="mt-1 text-sm tabular-nums text-slate-500 dark:text-slate-400">Valor base do contrato: {formatContractValue(config.contract_value)}</p></div>{canEdit ? <button type="button" onClick={() => startEdit(config)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button> : null}</div>)}
+            {configsQuery.data.map((config) => <div key={config.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{config.name}</p><p className="mt-1 text-sm tabular-nums text-slate-500 dark:text-slate-400">Valor base do contrato: {formatContractValue(config.contract_value)}</p></div>{canEdit ? <button type="button" onClick={() => startEdit(config)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button> : null}</div>)}
           </div>
         </section>
       ) : (
-        <section className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center dark:border-slate-700"><h2 className="text-lg font-semibold text-slate-950 dark:text-white">Nenhuma configuração cadastrada</h2><p className="mx-auto mt-2 max-w-[48ch] text-sm leading-6 text-slate-600 dark:text-slate-300">Crie a primeira configuração para disponibilizar um valor base nas propostas comerciais.</p>{canEdit ? <button type="button" onClick={startCreate} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"><Plus className="h-4 w-4" aria-hidden="true" />Criar configuração</button> : null}</section>
+        <section className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center dark:border-slate-700"><h2 className="text-lg font-semibold text-slate-900 dark:text-white">Nenhuma configuração cadastrada</h2><p className="mx-auto mt-2 max-w-[48ch] text-sm leading-6 text-slate-700 dark:text-slate-300">Crie a primeira configuração para disponibilizar um valor base nas propostas comerciais.</p>{canEdit ? <button type="button" onClick={startCreate} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"><Plus className="h-4 w-4" aria-hidden="true" />Criar configuração</button> : null}</section>
       )}
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" aria-labelledby="commercial-prospecting-title">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
           <div>
-            <h2 id="commercial-prospecting-title" className="text-lg font-semibold text-slate-950 dark:text-white">Prospecção</h2>
+            <h2 id="commercial-prospecting-title" className="text-lg font-semibold text-slate-900 dark:text-white">Prospecção</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Acompanhe os status legados por cliente, com histórico auditável.</p>
           </div>
           {canEdit && prospectingEditingId === null ? <button type="button" onClick={startProspectingCreate} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"><Plus className="h-4 w-4" aria-hidden="true" />Nova prospecção</button> : null}
@@ -339,7 +339,7 @@ export function CommercialCatalog() {
           </form>
         ) : null}
 
-        {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções.</div> : prospectingQuery.data?.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-950 dark:text-white">{item.client.fantasy_name || item.client.company_name || item.client.name}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.status}{item.description ? ` — ${item.description}` : ""}</p></div>{canEdit ? <button type="button" onClick={() => startProspectingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button> : null}</div>)}</div> : <div className="p-8 text-center text-sm text-slate-600 dark:text-slate-300">Nenhuma prospecção cadastrada.</div>}
+        {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções.</div> : prospectingQuery.data?.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{item.client.fantasy_name || item.client.company_name || item.client.name}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.status}{item.description ? ` — ${item.description}` : ""}</p></div>{canEdit ? <button type="button" onClick={() => startProspectingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button> : null}</div>)}</div> : <div className="p-8 text-center text-sm text-slate-700 dark:text-slate-300">Nenhuma prospecção cadastrada.</div>}
       </section>
 
       <section
@@ -347,7 +347,7 @@ export function CommercialCatalog() {
         aria-labelledby="commercial-task-billing-title"
       >
         <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700">
-          <h2 id="commercial-task-billing-title" className="text-lg font-semibold text-slate-950 dark:text-white">
+          <h2 id="commercial-task-billing-title" className="text-lg font-semibold text-slate-900 dark:text-white">
             Cobrança de tarefas
           </h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -369,7 +369,7 @@ export function CommercialCatalog() {
               taskBillingEditingId === item.task_id ? (
                 <form key={item.task_id} onSubmit={submitTaskBillingEdit} className="space-y-4 bg-blue-50/60 p-5 dark:bg-blue-950/20">
                   <div>
-                    <p className="font-semibold text-slate-950 dark:text-white">{item.task_name}</p>
+                    <p className="font-semibold text-slate-900 dark:text-white">{item.task_name}</p>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Status atual: {item.task_status}</p>
                   </div>
                   <div className="grid gap-4 md:grid-cols-3">
@@ -416,9 +416,9 @@ export function CommercialCatalog() {
               ) : (
                 <div key={item.task_id} className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-950 dark:text-white">{item.task_name}</p>
+                    <p className="font-semibold text-slate-900 dark:text-white">{item.task_name}</p>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.task_status} · {item.billing}</p>
-                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
                       {item.hiring_status ?? "Sem decisão comercial"} · {item.payment ?? "Pagamento não informado"}
                     </p>
                     {item.billing_description ? <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{item.billing_description}</p> : null}
@@ -429,7 +429,7 @@ export function CommercialCatalog() {
             )}
           </div>
         ) : (
-          <div className="p-8 text-center text-sm text-slate-600 dark:text-slate-300">Nenhuma tarefa disponível para cobrança comercial.</div>
+          <div className="p-8 text-center text-sm text-slate-700 dark:text-slate-300">Nenhuma tarefa disponível para cobrança comercial.</div>
         )}
       </section>
     </div>
