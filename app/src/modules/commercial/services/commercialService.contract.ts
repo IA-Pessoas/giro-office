@@ -7,6 +7,8 @@ export const COMMERCIAL_ENDPOINTS = {
   prospecting: "/commercial/prospecting",
   prospectingClients: "/commercial/prospecting/clients",
   prospectingItem: (id: string) => `/commercial/prospecting/${id}`,
+  taskBillings: "/commercial/task-billing",
+  taskBilling: (taskId: string) => `/commercial/task-billing/${taskId}`,
 } as const;
 
 export function unwrapCommercialEnvelope<T>(body: unknown): T {

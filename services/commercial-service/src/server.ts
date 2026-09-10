@@ -7,7 +7,9 @@ import { createLogger } from "@workspace/shared/logger";
 import { createCommercialApp } from "./app.js";
 import { getCommercialServiceEnv } from "./config/env.js";
 import { ClientProjectionHttpClient } from "./integrations/clientProjection.js";
+import { CommercialOutboxHttpDelivery } from "./integrations/commercialOutboxDelivery.js";
 import prismaClient from "./integrations/prisma.js";
+import { TaskProjectionHttpClient } from "./integrations/taskProjection.js";
 import {
   type CommercialOutboxWorkerPrisma,
   CommercialOutboxWorkerService,
@@ -24,7 +26,10 @@ const server = http.createServer(createCommercialApp({ env, logger }));
 
 const outboxWorker = new CommercialOutboxWorkerService(
   prismaClient as unknown as CommercialOutboxWorkerPrisma,
-  new ClientProjectionHttpClient(env.clientServiceUrl, env.clientServiceInternalToken),
+  new CommercialOutboxHttpDelivery(
+    new ClientProjectionHttpClient(env.clientServiceUrl, env.clientServiceInternalToken),
+    new TaskProjectionHttpClient(env.taskServiceUrl, env.taskServiceInternalToken),
+  ),
   {
     maxAttempts: env.outboxWorkerMaxAttempts,
     retryBaseMs: env.outboxWorkerRetryBaseMs,

@@ -19,6 +19,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `JWT_SECRET`
 - `PROJECT_SERVICE_URL`
 - `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` para fonte interna de relatórios
+- `COMMERCIAL_SERVICE_TOKEN` para receber projeções de cobrança do `commercial-service`
 - `AUDIT_*` quando a auditoria estiver ativa
 - `AI_EXTRACTION_MODE` (`fake` por padrao, ou `openai`) escolhe o provedor da extracao de tarefas
   do wizard de Projetos. `fake` usa um adapter deterministico local, sem rede nem creditos;
@@ -76,6 +77,7 @@ Exemplos de paths publicos:
   departamentos ativos e nomes de Modelos de tarefa do tipo `Projeto` da organização.
 
 `/internal/reporting` é contrato direto interno, não roteado pelo gateway.
+`/internal/commercial/task-billing` é contrato direto interno, protegido por `COMMERCIAL_SERVICE_TOKEN`.
 
 ## Desenvolvimento
 

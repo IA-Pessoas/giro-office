@@ -14,6 +14,7 @@ import "express-async-errors";
 import type { TaskServiceEnv } from "./config/env.js";
 import { createAiTaskExtractionProvider } from "./integrations/aiTaskExtraction.js";
 import { requestContext } from "./middlewares/requestContext.js";
+import { requireCommercialServiceToken } from "./middlewares/requireCommercialServiceToken.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
 import prismaClient from "./prisma/index.js";
 import {
@@ -21,6 +22,10 @@ import {
   type DepsTasksRouteDeps,
   depsTasksRoutes,
 } from "./routes/depsTasks.routes.js";
+import {
+  createInternalCommercialTaskBillingRouter,
+  type InternalCommercialTaskBillingRouteDeps,
+} from "./routes/internalCommercialTaskBilling.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import {
   createProjectPlanRoutes,
@@ -40,6 +45,7 @@ import { taskIntegrationRegularizeRoutes } from "./routes/taskIntegrationRegular
 import { taskLifecycleRoutes } from "./routes/taskLifecycle.routes.js";
 import { taskModelRoutes } from "./routes/taskModel.routes.js";
 import { MEETING_MINUTES_MAX_SOURCE_BYTES } from "./schemas/projectWizardExtraction.schemas.js";
+import { CommercialTaskBillingProjectionService } from "./services/commercialTaskBillingProjectionService.js";
 import { ProjectWizardExtractionService } from "./services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "./services/projectWizardService.js";
 import { TaskReportingService } from "./services/taskReportingService.js";
@@ -69,6 +75,7 @@ export function createTaskApp(
     projectWizardExtractionService?: ProjectWizardExtractionRouteDeps;
     depsTasksService?: DepsTasksRouteDeps;
     internalReportingService?: TaskReportingService;
+    commercialTaskBillingProjectionService?: InternalCommercialTaskBillingRouteDeps;
   },
 ): Express {
   const app = express();
@@ -101,6 +108,8 @@ export function createTaskApp(
   });
   const internalReportingService =
     options?.internalReportingService ?? new TaskReportingService(prismaClient);
+  const commercialTaskBillingProjectionService =
+    options?.commercialTaskBillingProjectionService ?? new CommercialTaskBillingProjectionService();
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "task-service")));
@@ -139,6 +148,13 @@ export function createTaskApp(
   app.use(
     "/internal",
     createInternalReportingRouter({ env, reportingService: internalReportingService }),
+  );
+  app.use(
+    "/internal",
+    createInternalCommercialTaskBillingRouter(
+      commercialTaskBillingProjectionService,
+      requireCommercialServiceToken(env),
+    ),
   );
 
   app.use(

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
@@ -8,7 +10,7 @@ import { chromium } from "@playwright/test";
 const PORT = process.env.COMMERCIAL_SMOKE_PORT || "3127";
 const baseUrl = (process.env.COMMERCIAL_SMOKE_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
-const evidenceDir = fileURLToPath(new URL("../../../../docs/superpowers/evidence/issue-957", import.meta.url));
+const evidenceDir = process.env.COMMERCIAL_SMOKE_EVIDENCE_DIR || join(tmpdir(), "girooffice-commercial-959-evidence");
 const smokeUser = {
   id: "user-commercial-smoke",
   name: "Comercial Smoke",
@@ -32,9 +34,20 @@ const prospecting = {
   description: "Retorno na próxima semana",
   client,
 };
+const taskBilling = {
+  id: "e0000000-0000-4000-8000-000000000001",
+  task_id: "f0000000-0000-4000-8000-000000000001",
+  task_name: "Entrega Smoke",
+  task_status: "A Realizar",
+  billing: "Realizar",
+  hiring_status: "A Realizar",
+  payment: null,
+  billing_description: null,
+};
 
 async function installMocks(page, context) {
   let prospectingList = [];
+  let taskBillingList = [taskBilling];
   await context.addCookies([
     { name: "cw.session", value: "opaque-commercial-smoke", url: baseUrl, httpOnly: true },
     { name: "cw.csrf", value: "A".repeat(43), url: baseUrl, httpOnly: false },
@@ -54,6 +67,19 @@ async function installMocks(page, context) {
   await page.route("**/chat", (route) => json(route, []));
   await page.route("**/socket.io/**", (route) => route.abort());
   await page.route("**/commercial/proposal-configs", (route) => json(route, []));
+  await page.route(/\/commercial\/task-billing(?:\/[^/]+)?$/, async (route) => {
+    if (route.request().method() === "PUT") {
+      taskBillingList = [{
+        ...taskBilling,
+        hiring_status: "Contratado",
+        payment: "Pago",
+        billing_description: "Cobrança confirmada",
+      }];
+      await json(route, taskBillingList[0]);
+      return;
+    }
+    await json(route, taskBillingList);
+  });
   await page.route(/\/commercial\/prospecting\/clients$/, (route) => json(route, [client]));
   await page.route(/\/commercial\/prospecting$/, async (route) => {
     if (route.request().method() === "POST") {
@@ -107,6 +133,13 @@ async function run() {
     await page.getByRole("button", { name: "Nova prospecção" }).click();
     await page.getByRole("form", { name: "Nova prospecção" }).waitFor();
     await page.getByRole("button", { name: "Cancelar" }).last().click();
+
+    await page.getByRole("button", { name: "Editar cobrança" }).click();
+    await page.getByLabel("Situação da contratação").selectOption("Contratado");
+    await page.getByLabel("Pagamento").fill("Pago");
+    await page.getByLabel("Descrição", { exact: true }).last().fill("Cobrança confirmada");
+    await page.getByRole("button", { name: "Salvar cobrança" }).click();
+    await page.getByText("Cobrança confirmada", { exact: true }).waitFor();
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: `${evidenceDir}/04-commercial-mobile-light.png`, fullPage: true });

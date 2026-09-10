@@ -83,6 +83,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/commercial\/outbox\/status$/,
+    description: { action: "consultou", item: "o estado de entrega da outbox comercial" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "consultou", item: "a lista global de organizações" },
   },
@@ -663,6 +668,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "uma prospecção comercial",
     newSingular: "uma nova prospecção comercial",
     plural: "prospecções comerciais",
+  },
+  {
+    pattern: /^\/commercial\/task-billing(?:\/|$)/,
+    singular: "uma cobrança comercial de tarefa",
+    newSingular: "uma nova cobrança comercial de tarefa",
+    plural: "cobranças comerciais de tarefas",
   },
   {
     pattern: /^\/reports\/models\/shared(?:\/|$)/,

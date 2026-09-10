@@ -6,10 +6,12 @@ import type {
   CommercialProspectingClient,
   CommercialProposalConfig,
   CommercialSuccessEnvelope,
+  CommercialTaskBilling,
   CreateCommercialProposalConfigPayload,
   CreateCommercialProspectingPayload,
   UpdateCommercialProspectingPayload,
   UpdateCommercialProposalConfigPayload,
+  UpdateCommercialTaskBillingPayload,
 } from "../types";
 import { COMMERCIAL_ENDPOINTS, unwrapCommercialEnvelope } from "./commercialService.contract";
 
@@ -91,5 +93,25 @@ export const commercialService = {
       payload,
     );
     return unwrapCommercialEnvelope<CommercialProspecting>(response.data);
+  },
+
+  async listTaskBillings(): Promise<CommercialTaskBilling[]> {
+    const api = setupAPIClient();
+    const response = await api.get<CommercialSuccessEnvelope<CommercialTaskBilling[]>>(
+      COMMERCIAL_ENDPOINTS.taskBillings,
+    );
+    return unwrapCommercialEnvelope<CommercialTaskBilling[]>(response.data);
+  },
+
+  async updateTaskBilling(
+    taskId: string,
+    payload: UpdateCommercialTaskBillingPayload,
+  ): Promise<CommercialTaskBilling> {
+    const api = setupAPIClient();
+    const response = await api.put<CommercialSuccessEnvelope<CommercialTaskBilling>>(
+      COMMERCIAL_ENDPOINTS.taskBilling(taskId),
+      payload,
+    );
+    return unwrapCommercialEnvelope<CommercialTaskBilling>(response.data);
   },
 };

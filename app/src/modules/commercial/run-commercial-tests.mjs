@@ -77,4 +77,20 @@ runTest("commercial prospecting uses the dedicated legacy-status contract", () =
   assert.doesNotMatch(catalog, /client\/[^"']+\/commercial/);
 });
 
+runTest("commercial task billing exposes an authorized task outbox surface", () => {
+  const contract = read("./services/commercialService.contract.ts");
+  const service = read("./services/commercialService.ts");
+  const hook = read("./hooks/useCommercialTaskBilling.ts");
+  const types = read("./types/index.ts");
+  const catalog = read("./components/CommercialCatalog.tsx");
+
+  assert.match(contract, /taskBillings:\s*["']\/commercial\/task-billing["']/);
+  assert.match(service, /listTaskBillings/);
+  assert.match(service, /updateTaskBilling/);
+  assert.match(hook, /useMutation/);
+  assert.match(types, /COMMERCIAL_TASK_HIRING_STATUSES/);
+  assert.match(catalog, /Cobrança de tarefas/);
+  assert.match(catalog, /useModuleAccess\("comercial"\)/);
+});
+
 console.log("commercial contract tests passed");

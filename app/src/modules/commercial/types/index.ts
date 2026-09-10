@@ -140,3 +140,28 @@ export interface CreateCommercialProspectingPayload {
 export type UpdateCommercialProspectingPayload = Partial<
   Omit<CreateCommercialProspectingPayload, "client_id">
 >;
+
+export const COMMERCIAL_TASK_HIRING_STATUSES = [
+  "A Realizar",
+  "Contratado",
+  "Não Contratado",
+] as const;
+
+export type CommercialTaskHiringStatus = (typeof COMMERCIAL_TASK_HIRING_STATUSES)[number];
+
+export interface CommercialTaskBilling {
+  id: string | null;
+  task_id: string;
+  task_name: string;
+  task_status: string;
+  billing: string;
+  hiring_status: CommercialTaskHiringStatus | null;
+  payment: string | null;
+  billing_description: string | null;
+}
+
+export interface UpdateCommercialTaskBillingPayload {
+  hiring_status: CommercialTaskHiringStatus;
+  payment?: string | null;
+  billing_description?: string | null;
+}

@@ -10,12 +10,19 @@ import {
   useUpdateCommercialProspecting,
 } from "../hooks/useCommercialProspecting";
 import {
+  useCommercialTaskBilling,
+  useUpdateCommercialTaskBilling,
+} from "../hooks/useCommercialTaskBilling";
+import {
   useCommercialProposalConfigs,
   useCreateCommercialProposalConfig,
   useUpdateCommercialProposalConfig,
 } from "../hooks/useCommercialProposalConfigs";
 import {
   COMMERCIAL_PROSPECTING_STATUSES,
+  COMMERCIAL_TASK_HIRING_STATUSES,
+  type CommercialTaskHiringStatus,
+  type CommercialTaskBilling,
   type CommercialProspecting,
   type CommercialProposalConfig,
 } from "../types";
@@ -57,6 +64,8 @@ export function CommercialCatalog() {
   const updateMutation = useUpdateCommercialProposalConfig();
   const createProspectingMutation = useCreateCommercialProspecting();
   const updateProspectingMutation = useUpdateCommercialProspecting();
+  const taskBillingsQuery = useCommercialTaskBilling();
+  const updateTaskBillingMutation = useUpdateCommercialTaskBilling();
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -65,11 +74,56 @@ export function CommercialCatalog() {
   const [isCreatingProspecting, setIsCreatingProspecting] = useState(false);
   const [prospectingEditingId, setProspectingEditingId] = useState<string | null>(null);
   const [prospectingFormError, setProspectingFormError] = useState("");
+  const [taskBillingEditingId, setTaskBillingEditingId] = useState<string | null>(null);
+  const [taskBillingDraft, setTaskBillingDraft] = useState<{
+    hiring_status: CommercialTaskHiringStatus;
+    payment: string;
+    billing_description: string;
+  }>({
+    hiring_status: COMMERCIAL_TASK_HIRING_STATUSES[0],
+    payment: "",
+    billing_description: "",
+  });
+  const [taskBillingFormError, setTaskBillingFormError] = useState("");
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isSavingProspecting =
     createProspectingMutation.isPending || updateProspectingMutation.isPending;
   const canEdit = access.canEdit;
+
+  function startTaskBillingEdit(item: CommercialTaskBilling) {
+    setTaskBillingEditingId(item.task_id);
+    setTaskBillingDraft({
+      hiring_status: item.hiring_status ?? COMMERCIAL_TASK_HIRING_STATUSES[0],
+      payment: item.payment ?? "",
+      billing_description: item.billing_description ?? "",
+    });
+    setTaskBillingFormError("");
+  }
+
+  function cancelTaskBillingEdit() {
+    setTaskBillingEditingId(null);
+    setTaskBillingFormError("");
+  }
+
+  async function submitTaskBillingEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!taskBillingEditingId) return;
+    setTaskBillingFormError("");
+    try {
+      await updateTaskBillingMutation.mutateAsync({
+        taskId: taskBillingEditingId,
+        payload: {
+          hiring_status: taskBillingDraft.hiring_status,
+          payment: taskBillingDraft.payment.trim() || null,
+          billing_description: taskBillingDraft.billing_description.trim() || null,
+        },
+      });
+      cancelTaskBillingEdit();
+    } catch (error) {
+      setTaskBillingFormError(getErrorMessage(error, "Não foi possível salvar a cobrança."));
+    }
+  }
 
   function startCreate() {
     setIsCreating(true);
@@ -286,6 +340,97 @@ export function CommercialCatalog() {
         ) : null}
 
         {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções.</div> : prospectingQuery.data?.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-950 dark:text-white">{item.client.fantasy_name || item.client.company_name || item.client.name}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.status}{item.description ? ` — ${item.description}` : ""}</p></div>{canEdit ? <button type="button" onClick={() => startProspectingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button> : null}</div>)}</div> : <div className="p-8 text-center text-sm text-slate-600 dark:text-slate-300">Nenhuma prospecção cadastrada.</div>}
+      </section>
+
+      <section
+        className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+        aria-labelledby="commercial-task-billing-title"
+      >
+        <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+          <h2 id="commercial-task-billing-title" className="text-lg font-semibold text-slate-950 dark:text-white">
+            Cobrança de tarefas
+          </h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Registre a decisão comercial, o pagamento e a descrição. A Integração receberá os efeitos por evento.
+          </p>
+        </div>
+
+        {taskBillingsQuery.isLoading ? (
+          <div className="space-y-3 p-5" aria-label="Carregando cobranças de tarefas">
+            {[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />)}
+          </div>
+        ) : taskBillingsQuery.isError ? (
+          <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">
+            Não foi possível carregar as cobranças de tarefas.
+          </div>
+        ) : taskBillingsQuery.data?.length ? (
+          <div className="divide-y divide-slate-200 dark:divide-slate-700">
+            {taskBillingsQuery.data.map((item) =>
+              taskBillingEditingId === item.task_id ? (
+                <form key={item.task_id} onSubmit={submitTaskBillingEdit} className="space-y-4 bg-blue-50/60 p-5 dark:bg-blue-950/20">
+                  <div>
+                    <p className="font-semibold text-slate-950 dark:text-white">{item.task_name}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Status atual: {item.task_status}</p>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <label className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                      Situação da contratação
+                      <select
+                        value={taskBillingDraft.hiring_status}
+                        onChange={(event) => setTaskBillingDraft((current) => ({ ...current, hiring_status: event.target.value as typeof current.hiring_status }))}
+                        className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      >
+                        {COMMERCIAL_TASK_HIRING_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                      </select>
+                    </label>
+                    <label className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                      Pagamento
+                      <input
+                        value={taskBillingDraft.payment}
+                        onChange={(event) => setTaskBillingDraft((current) => ({ ...current, payment: event.target.value }))}
+                        className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        maxLength={255}
+                      />
+                    </label>
+                    <label className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                      Descrição
+                      <input
+                        value={taskBillingDraft.billing_description}
+                        onChange={(event) => setTaskBillingDraft((current) => ({ ...current, billing_description: event.target.value }))}
+                        className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        maxLength={5000}
+                      />
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button type="submit" disabled={updateTaskBillingMutation.isPending} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+                      {updateTaskBillingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
+                      Salvar cobrança
+                    </button>
+                    <button type="button" onClick={cancelTaskBillingEdit} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+                      <X className="h-4 w-4" aria-hidden="true" /> Cancelar
+                    </button>
+                  </div>
+                  {taskBillingFormError ? <p className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300" role="alert"><CircleAlert className="h-4 w-4" aria-hidden="true" />{taskBillingFormError}</p> : null}
+                </form>
+              ) : (
+                <div key={item.task_id} className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-950 dark:text-white">{item.task_name}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.task_status} · {item.billing}</p>
+                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                      {item.hiring_status ?? "Sem decisão comercial"} · {item.payment ?? "Pagamento não informado"}
+                    </p>
+                    {item.billing_description ? <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{item.billing_description}</p> : null}
+                  </div>
+                  {canEdit ? <button type="button" onClick={() => startTaskBillingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar cobrança</button> : null}
+                </div>
+              ),
+            )}
+          </div>
+        ) : (
+          <div className="p-8 text-center text-sm text-slate-600 dark:text-slate-300">Nenhuma tarefa disponível para cobrança comercial.</div>
+        )}
       </section>
     </div>
   );
