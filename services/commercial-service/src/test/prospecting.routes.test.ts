@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createCommercialApp } from "../app.js";
 import { getCommercialServiceEnv } from "../config/env.js";
 import type { CommercialProspectingRouteDeps } from "../routes/prospecting.routes.js";
+import type { CommercialOutboxRouteDeps } from "../routes/outbox.routes.js";
 
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
 const USER_ID = "c0000000-0000-4000-8000-000000000001";
@@ -41,7 +42,10 @@ function createServiceMock(): CommercialProspectingRouteDeps {
   };
 }
 
-function createTestApp(service: CommercialProspectingRouteDeps) {
+function createTestApp(
+  service: CommercialProspectingRouteDeps,
+  outboxStatusService?: CommercialOutboxRouteDeps,
+) {
   return createCommercialApp({
     env: getCommercialServiceEnv(),
     logger: createLogger({
@@ -51,6 +55,7 @@ function createTestApp(service: CommercialProspectingRouteDeps) {
       destination: new MemoryLogStream(),
     }),
     prospectingService: service,
+    outboxStatusService,
   });
 }
 
@@ -89,6 +94,7 @@ describe("commercial prospecting routes", () => {
     expect(service.create).toHaveBeenCalledWith({
       user_id: USER_ID,
       organization_id: ORGANIZATION_ID,
+      audit_correlation_id: expect.any(String),
       client_id: CLIENT_ID,
       status: "Análise Financeira",
       status_date: undefined,
@@ -127,6 +133,7 @@ describe("commercial prospecting routes", () => {
     expect(service.update).toHaveBeenCalledWith({
       user_id: USER_ID,
       organization_id: ORGANIZATION_ID,
+      audit_correlation_id: expect.any(String),
       prospecting_id: PROSPECTING_ID,
       status: "Envio de Proposta",
       status_date: undefined,
@@ -156,5 +163,22 @@ describe("commercial prospecting routes", () => {
       .set(gatewayHeaders());
 
     expect(service.listClients).toHaveBeenCalledWith(ORGANIZATION_ID);
+  });
+
+  it("expõe o estado da outbox somente para o tenant autenticado", async () => {
+    const service = createServiceMock();
+    const outboxStatusService = {
+      status: vi.fn().mockResolvedValue({
+        counts: { pending: 1, delivered: 2 },
+        latestFailure: null,
+      }),
+    };
+
+    const response = await request(createTestApp(service, outboxStatusService))
+      .get("/commercial/outbox/status")
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(outboxStatusService.status).toHaveBeenCalledWith(ORGANIZATION_ID);
   });
 });

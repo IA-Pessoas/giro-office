@@ -577,6 +577,7 @@ services:
       - .env.vps.commercial-service
     environment:
       AUDIT_SERVICE_URL: http://audit-service:3020
+      CLIENT_SERVICE_URL: http://client-service:3035
     expose:
       - "3045"
     healthcheck:
@@ -592,6 +593,8 @@ services:
       retries: 5
       start_period: 20s
     depends_on:
+      client-service:
+        condition: service_healthy
       audit-service:
         condition: service_healthy
     networks:

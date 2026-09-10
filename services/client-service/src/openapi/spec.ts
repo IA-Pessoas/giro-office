@@ -841,6 +841,27 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+      "/internal/commercial/prospecting-transition": {
+        post: {
+          tags: ["Internal"],
+          summary: "Aplicar projeção comercial idempotente no Cliente",
+          security: [{ internalToken: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": { schema: { type: "object", additionalProperties: false } },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Projeção aplicada ou já processada",
+              ...successEnvelopeContent(),
+            },
+            "403": { description: "Token interno inválido" },
+            "409": { description: "Evento de outro tenant" },
+          },
+        },
+      },
       "/internal/reporting/catalog": {
         get: {
           tags: ["Internal"],

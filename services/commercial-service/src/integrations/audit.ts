@@ -26,6 +26,7 @@ export interface CreateLogParams {
   referring: string;
   referringId: string;
   changes: Record<string, unknown> | string;
+  auditCorrelationId?: string;
 }
 
 export interface LogUpdateParams extends Omit<CreateLogParams, "changes"> {
@@ -36,7 +37,7 @@ export interface LogUpdateParams extends Omit<CreateLogParams, "changes"> {
 export async function createLog(params: CreateLogParams): Promise<void> {
   const now = new Date().toISOString();
   const payload: CreateAuditRequestPayload = {
-    requestId: randomUUID(),
+    requestId: params.auditCorrelationId ?? randomUUID(),
     organizationId: params.organizationId ?? null,
     userId: params.userId,
     permission: null,

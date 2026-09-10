@@ -1,9 +1,18 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import { randomUUID } from "node:crypto";
+
+import {
+  COMMERCIAL_PROSPECTING_EVENT_VERSION,
+  COMMERCIAL_PROSPECTING_TRANSITION_EVENT,
+  type CommercialProspectingProjectionStatus,
+  error as logError,
+  ServiceError,
+} from "@workspace/shared";
+import type { Prisma } from "../generated/prisma/client.js";
 
 import * as commercialAudit from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
-import { assertProspectingTransition } from "./prospectingDomain.js";
 import type { ProspectingStatus } from "../schemas/prospecting.schemas.js";
+import { assertProspectingTransition } from "./prospectingDomain.js";
 
 const PROSPECTING_SELECT = {
   id: true,
@@ -19,6 +28,51 @@ const DUPLICATE_MESSAGE = "Este cliente já possui uma prospecção nesta organi
 
 function isUniqueConstraintError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
+function asProjectionStatus(status: string): CommercialProspectingProjectionStatus {
+  return status as CommercialProspectingProjectionStatus;
+}
+
+function toIsoDate(value: Date | null): string | null {
+  return value?.toISOString() ?? null;
+}
+
+function buildTransitionEvent({
+  eventId,
+  organizationId,
+  prospectingId,
+  clientId,
+  fromStatus,
+  toStatus,
+  statusDate,
+  description,
+  auditCorrelationId,
+}: {
+  eventId: string;
+  organizationId: string;
+  prospectingId: string;
+  clientId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  statusDate: Date | null;
+  description: string | null;
+  auditCorrelationId: string;
+}) {
+  return {
+    event_id: eventId,
+    event_type: COMMERCIAL_PROSPECTING_TRANSITION_EVENT,
+    event_version: COMMERCIAL_PROSPECTING_EVENT_VERSION,
+    organization_id: organizationId,
+    client_id: clientId,
+    prospecting_id: prospectingId,
+    from_status: fromStatus ? asProjectionStatus(fromStatus) : null,
+    to_status: asProjectionStatus(toStatus),
+    status_date: toIsoDate(statusDate),
+    description,
+    audit_correlation_id: auditCorrelationId,
+    occurred_at: new Date().toISOString(),
+  };
 }
 
 export interface CommercialProspecting {
@@ -44,6 +98,7 @@ export interface CreateCommercialProspectingRequest {
   status: ProspectingStatus;
   status_date?: Date | null;
   description?: string | null;
+  audit_correlation_id?: string;
 }
 
 export interface UpdateCommercialProspectingRequest {
@@ -53,11 +108,12 @@ export interface UpdateCommercialProspectingRequest {
   status?: ProspectingStatus;
   status_date?: Date | null;
   description?: string | null;
+  audit_correlation_id?: string;
 }
 
 export type CommercialProspectingPrismaDeps = Pick<
   typeof prismaClient,
-  "commercialProspecting" | "client"
+  "commercialProspecting" | "client" | "commercialOutboxEvent" | "$transaction"
 >;
 export interface CommercialProspectingAuditDeps {
   createLog: typeof commercialAudit.createLog;
@@ -118,27 +174,54 @@ export class CommercialProspectingService {
 
   async create(data: CreateCommercialProspectingRequest): Promise<CommercialProspecting> {
     try {
-      const client = await this.prisma.client.findFirst({
-        where: { id: data.client_id, organization_id: data.organization_id },
-        select: CLIENT_SELECT,
-      });
-      if (!client) throw new ServiceError(404, "Cliente não encontrado nesta organização.");
+      const eventId = randomUUID();
+      const auditCorrelationId = data.audit_correlation_id ?? eventId;
+      const created = await this.prisma.$transaction(async (tx) => {
+        const client = await tx.client.findFirst({
+          where: { id: data.client_id, organization_id: data.organization_id },
+          select: CLIENT_SELECT,
+        });
+        if (!client) throw new ServiceError(404, "Cliente não encontrado nesta organização.");
 
-      const duplicate = await this.prisma.commercialProspecting.findFirst({
-        where: { client_id: data.client_id, organization_id: data.organization_id },
-        select: { id: true },
-      });
-      if (duplicate) throw new ServiceError(409, DUPLICATE_MESSAGE);
+        const duplicate = await tx.commercialProspecting.findFirst({
+          where: { client_id: data.client_id, organization_id: data.organization_id },
+          select: { id: true },
+        });
+        if (duplicate) throw new ServiceError(409, DUPLICATE_MESSAGE);
 
-      const created = await this.prisma.commercialProspecting.create({
-        data: {
-          client_id: data.client_id,
-          organization_id: data.organization_id,
-          status: data.status,
-          status_date: data.status_date ?? new Date(),
-          description: data.description ?? null,
-        },
-        select: PROSPECTING_SELECT,
+        const created = await tx.commercialProspecting.create({
+          data: {
+            client_id: data.client_id,
+            organization_id: data.organization_id,
+            status: data.status,
+            status_date: data.status_date ?? new Date(),
+            description: data.description ?? null,
+          },
+          select: PROSPECTING_SELECT,
+        });
+        const event = buildTransitionEvent({
+          eventId,
+          organizationId: data.organization_id,
+          prospectingId: created.id,
+          clientId: created.client_id,
+          fromStatus: null,
+          toStatus: created.status,
+          statusDate: created.status_date,
+          description: created.description,
+          auditCorrelationId,
+        });
+        await tx.commercialOutboxEvent.create({
+          data: {
+            id: eventId,
+            organization_id: data.organization_id,
+            aggregate_id: created.id,
+            event_type: event.event_type,
+            event_version: event.event_version,
+            payload: event as Prisma.InputJsonValue,
+            audit_correlation_id: auditCorrelationId,
+          },
+        });
+        return created;
       });
       await this.audit.createLog({
         userId: data.user_id,
@@ -147,6 +230,7 @@ export class CommercialProspectingService {
         referring: "commercial.prospecting",
         referringId: created.id,
         changes: { status: created.status, client_id: created.client_id },
+        auditCorrelationId,
       });
       return created;
     } catch (err: unknown) {
@@ -159,26 +243,64 @@ export class CommercialProspectingService {
 
   async update(data: UpdateCommercialProspectingRequest): Promise<CommercialProspecting> {
     try {
-      const current = await this.prisma.commercialProspecting.findFirst({
-        where: { id: data.prospecting_id, organization_id: data.organization_id },
-        select: PROSPECTING_SELECT,
+      const eventId = randomUUID();
+      const auditCorrelationId = data.audit_correlation_id ?? eventId;
+      const result = await this.prisma.$transaction(async (tx) => {
+        const current = await tx.commercialProspecting.findFirst({
+          where: { id: data.prospecting_id, organization_id: data.organization_id },
+          select: PROSPECTING_SELECT,
+        });
+        if (!current) throw new ServiceError(404, "Prospecção comercial não encontrada.");
+
+        const nextStatus = data.status ?? (current.status as ProspectingStatus);
+        assertProspectingTransition(current.status, nextStatus);
+        const updateData: Record<string, unknown> = {};
+        if (data.status !== undefined) updateData.status = data.status;
+        if (data.status_date !== undefined) updateData.status_date = data.status_date;
+        if (data.description !== undefined) updateData.description = data.description;
+
+        const updateResult = await tx.commercialProspecting.updateMany({
+          where: { id: data.prospecting_id, organization_id: data.organization_id },
+          data: updateData,
+        });
+        if (updateResult.count !== 1) {
+          throw new ServiceError(404, "Prospecção comercial não encontrada.");
+        }
+
+        const updated = await tx.commercialProspecting.findFirst({
+          where: { id: data.prospecting_id, organization_id: data.organization_id },
+          select: PROSPECTING_SELECT,
+        });
+        if (!updated) throw new ServiceError(404, "Prospecção comercial não encontrada.");
+
+        if (data.status !== undefined && current.status !== updated.status) {
+          const event = buildTransitionEvent({
+            eventId,
+            organizationId: data.organization_id,
+            prospectingId: updated.id,
+            clientId: updated.client_id,
+            fromStatus: current.status,
+            toStatus: updated.status,
+            statusDate: updated.status_date,
+            description: updated.description,
+            auditCorrelationId,
+          });
+          await tx.commercialOutboxEvent.create({
+            data: {
+              id: eventId,
+              organization_id: data.organization_id,
+              aggregate_id: updated.id,
+              event_type: event.event_type,
+              event_version: event.event_version,
+              payload: event as Prisma.InputJsonValue,
+              audit_correlation_id: auditCorrelationId,
+            },
+          });
+        }
+
+        return { current, updated };
       });
-      if (!current) throw new ServiceError(404, "Prospecção comercial não encontrada.");
-
-      const nextStatus = data.status ?? (current.status as ProspectingStatus);
-      assertProspectingTransition(current.status, nextStatus);
-      const updateData: Record<string, unknown> = {};
-      if (data.status !== undefined) updateData.status = data.status;
-      if (data.status_date !== undefined) updateData.status_date = data.status_date;
-      if (data.description !== undefined) updateData.description = data.description;
-
-      const updateResult = await this.prisma.commercialProspecting.updateMany({
-        where: { id: data.prospecting_id, organization_id: data.organization_id },
-        data: updateData,
-      });
-      if (updateResult.count !== 1) throw new ServiceError(404, "Prospecção comercial não encontrada.");
-
-      const updated = await this.detail(data.prospecting_id, data.organization_id);
+      const { current, updated } = result;
       await this.audit.logUpdateIfChanged({
         userId: data.user_id,
         organizationId: data.organization_id,
@@ -187,6 +309,7 @@ export class CommercialProspectingService {
         referringId: data.prospecting_id,
         oldData: current,
         updatedData: updated as unknown as Record<string, unknown>,
+        auditCorrelationId,
       });
       return updated;
     } catch (err: unknown) {

@@ -25,7 +25,7 @@ const item = {
 };
 
 function createMockPrisma(): CommercialProspectingPrismaDeps {
-  return {
+  const prisma = {
     client: {
       findFirst: vi.fn(async () => client),
       findMany: vi.fn(async () => [client]),
@@ -36,7 +36,12 @@ function createMockPrisma(): CommercialProspectingPrismaDeps {
       create: vi.fn(async () => item),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
+    commercialOutboxEvent: {
+      create: vi.fn(async () => ({ id: "event-id" })),
+    },
   } as unknown as CommercialProspectingPrismaDeps;
+  prisma.$transaction = vi.fn(async (callback) => callback(prisma as never)) as never;
+  return prisma;
 }
 
 function createAuditMock(): CommercialProspectingAuditDeps {
@@ -147,6 +152,17 @@ describe("CommercialProspectingService", () => {
       where: { id: PROSPECTING_ID, organization_id: ORGANIZATION_ID },
       data: { status: "Análise/Agendamento" },
     });
+    expect(prisma.commercialOutboxEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          organization_id: ORGANIZATION_ID,
+          payload: expect.objectContaining({
+            from_status: "Paralisado",
+            to_status: "Análise/Agendamento",
+          }),
+        }),
+      }),
+    );
     expect(audit.logUpdateIfChanged).toHaveBeenCalled();
   });
 

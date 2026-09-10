@@ -3570,10 +3570,35 @@ const handlers = {
     });
   },
 
+  async commercialOutboxStatus(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
   async clientList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
       query: { page: 1, limit: 5 },
+    });
+  },
+
+  async clientCommercialProspectingTransition(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/internal/commercial/prospecting-transition",
+      json: {
+        event_id: crypto.randomUUID(),
+        event_type: "commercial.prospecting.transition",
+        event_version: 1,
+        organization_id: requireState("session").organization_id,
+        client_id: requireState("primaryClientId"),
+        prospecting_id: crypto.randomUUID(),
+        from_status: null,
+        to_status: "Análise Financeira",
+        status_date: new Date().toISOString(),
+        description: "Smoke commercial projection",
+        audit_correlation_id: crypto.randomUUID(),
+        occurred_at: new Date().toISOString(),
+      },
     });
   },
 
