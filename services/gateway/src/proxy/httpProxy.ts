@@ -51,6 +51,7 @@ export interface HttpProxyOptions {
   internalServiceToken?: string;
   permissionModule?: string;
   forwardSessionBinding?: boolean;
+  forwardValidatedAuthorization?: boolean;
   forwardPlatformSessionCredentials?: boolean;
   stripPathPrefix?: string;
   upstreamTimeoutMs?: number;
@@ -328,6 +329,10 @@ export function buildForwardHeaders(
   }
 
   if (request.auth) {
+    if (options.forwardValidatedAuthorization && request.auth.actorKind === "organization") {
+      headers.set("authorization", `Bearer ${request.auth.token}`);
+    }
+
     headers.set(FORWARDED_AUTH_USER_ID_HEADER, request.auth.userId);
     headers.set(FORWARDED_AUTH_KIND_HEADER, request.auth.actorKind);
 

@@ -395,6 +395,7 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
         internalServiceToken: service.internalServiceToken,
         permissionModule: service.permissionModule,
         forwardSessionBinding: service.forwardSessionBinding,
+        forwardValidatedAuthorization: service.forwardValidatedAuthorization,
         forwardPlatformSessionCredentials: service.forwardPlatformSessionCredentials,
         stripPathPrefix: service.stripPathPrefix,
       }),
