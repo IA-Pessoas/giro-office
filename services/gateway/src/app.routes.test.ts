@@ -17,9 +17,12 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
 import { MemoryLogStream } from "@workspace/shared/testUtils";
+import express from "express";
 import jwt from "jsonwebtoken";
 import { expect, it, vi } from "vitest";
 
+import { isAuthenticated as authenticateDepartment } from "../../department-service/src/middlewares/isAuthenticated.js";
+import { isAuthenticated as authenticateRh } from "../../rh-service/src/middlewares/isAuthenticated.js";
 import { createApp } from "./app.js";
 import type { GatewayEnv } from "./config/env.js";
 import { getGatewayServiceDefinitions } from "./config/serviceRegistry.js";
@@ -199,6 +202,88 @@ function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     ...overrides,
   };
 }
+
+it("autentica as quatro consultas de RH com cookie nos middlewares reais dos upstreams", async () => {
+  vi.stubEnv("JWT_SECRET", "test-secret");
+  vi.stubEnv("DATABASE_URL", "postgres://test:test@127.0.0.1:5432/test");
+  vi.stubEnv("NODE_ENV", "test");
+  const upstream = express();
+  upstream.use("/rh", authenticateRh);
+  upstream.use("/department", authenticateDepartment);
+  upstream.use((request, response) => {
+    response.json({
+      success: true,
+      data: { userId: request.user_id, organizationId: request.organization_id },
+    });
+  });
+  upstream.use(
+    (
+      error: Error,
+      _request: express.Request,
+      response: express.Response,
+      _next: express.NextFunction,
+    ) => {
+      response.status(401).json({ success: false, error: error.message });
+    },
+  );
+  const upstreamServer = createServer(upstream);
+  const upstreamUrl = await startServer(upstreamServer);
+  const app = createApp(
+    createEnv({ rhServiceUrl: upstreamUrl, departmentServiceUrl: upstreamUrl }),
+    createTestLogger(),
+  );
+  const server = createServer(app);
+  const url = await startServer(server);
+  const token = jwt.sign(
+    {
+      user_id: "rh-user",
+      organization_id: "rh-org",
+      permission: 1,
+      type: "user",
+      modules: { rh: 3, ti: 1 },
+    },
+    "test-secret",
+    { expiresIn: "5m" },
+  );
+  try {
+    for (const path of [
+      "/rh/requests",
+      "/rh/score/evaluations/pending",
+      "/rh/timesheets",
+      "/department/list",
+    ]) {
+      const response = await fetch(`${url}${path}`, {
+        headers: { cookie: `cw.session=${token}`, authorization: "Bearer untrusted-browser-token" },
+      });
+      expect(await response.json(), path).toEqual({
+        success: true,
+        data: { userId: "rh-user", organizationId: "rh-org" },
+      });
+      expect(response.status).toBe(200);
+    }
+    const anonymous = await fetch(`${url}/rh/requests`);
+    expect(anonymous.status).toBe(401);
+    const noRhToken = jwt.sign(
+      {
+        user_id: "rh-user",
+        organization_id: "rh-org",
+        permission: 1,
+        type: "user",
+        modules: { rh: 0 },
+      },
+      "test-secret",
+      { expiresIn: "5m" },
+    );
+    const forbidden = await fetch(`${url}/rh/requests`, {
+      headers: { cookie: `cw.session=${noRhToken}` },
+    });
+    expect(forbidden.status).toBe(403);
+  } finally {
+    await stopServer(server);
+    await stopServer(upstreamServer);
+    vi.unstubAllEnvs();
+  }
+});
 
 it("enforces bound CSRF on cookie-authenticated mutations", async () => {
   const csrfToken = "A".repeat(43);
