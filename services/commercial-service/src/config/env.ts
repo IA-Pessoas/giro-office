@@ -34,6 +34,11 @@ const envSchema = z
       .transform((value) => value === "true" || value === "1"),
     auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
+    clientServiceUrl: z.string().url().default("http://localhost:3035"),
+    clientServiceInternalToken: z.string().default("audit-service-token"),
+    outboxWorkerPollIntervalMs: z.coerce.number().int().positive().default(1000),
+    outboxWorkerMaxAttempts: z.coerce.number().int().positive().default(5),
+    outboxWorkerRetryBaseMs: z.coerce.number().int().positive().default(1000),
     enableApiDocsEnv: z.string().optional(),
     allowedOrigins: z
       .string()
@@ -51,6 +56,12 @@ const envSchema = z
       serviceName: "commercial-service",
       envName: "AUDIT_SERVICE_TOKEN",
       token: env.auditServiceToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: env.nodeEnv,
+      serviceName: "commercial-service",
+      envName: "CLIENT_SERVICE_INTERNAL_TOKEN",
+      token: env.clientServiceInternalToken,
     });
     validateProductionCorsOrigins({
       nodeEnv: env.nodeEnv,
@@ -75,6 +86,11 @@ export function getCommercialServiceEnv(): CommercialServiceEnv {
     auditEnabled: process.env.AUDIT_ENABLED,
     auditServiceUrl: process.env.AUDIT_SERVICE_URL,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
+    clientServiceUrl: process.env.CLIENT_SERVICE_URL,
+    clientServiceInternalToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,
+    outboxWorkerPollIntervalMs: process.env.COMMERCIAL_OUTBOX_WORKER_POLL_INTERVAL_MS,
+    outboxWorkerMaxAttempts: process.env.COMMERCIAL_OUTBOX_WORKER_MAX_ATTEMPTS,
+    outboxWorkerRetryBaseMs: process.env.COMMERCIAL_OUTBOX_WORKER_RETRY_BASE_MS,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
   });

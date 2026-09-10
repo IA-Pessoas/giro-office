@@ -14,6 +14,10 @@ import type { CommercialServiceEnv } from "./config/env.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildCommercialServiceOpenApiSpec } from "./openapi/spec.js";
 import {
+  type CommercialOutboxRouteDeps,
+  createCommercialOutboxRoutes,
+} from "./routes/outbox.routes.js";
+import {
   type CommercialProposalConfigRouteDeps,
   createProposalConfigRoutes,
 } from "./routes/proposalConfig.routes.js";
@@ -21,6 +25,7 @@ import {
   type CommercialProspectingRouteDeps,
   createProspectingRoutes,
 } from "./routes/prospecting.routes.js";
+import { CommercialOutboxStatusService } from "./services/commercialOutboxStatusService.js";
 import { CommercialProposalConfigService } from "./services/proposalConfigService.js";
 import { CommercialProspectingService } from "./services/prospectingService.js";
 
@@ -29,6 +34,7 @@ interface CreateCommercialAppOptions {
   logger: Logger;
   proposalConfigService?: CommercialProposalConfigRouteDeps;
   prospectingService?: CommercialProspectingRouteDeps;
+  outboxStatusService?: CommercialOutboxRouteDeps;
 }
 
 function errorContext(request: Request): Record<string, unknown> | undefined {
@@ -40,6 +46,7 @@ export function createCommercialApp(options: CreateCommercialAppOptions): Expres
   const { env, logger } = options;
   const service = options.proposalConfigService ?? new CommercialProposalConfigService();
   const prospectingService = options.prospectingService ?? new CommercialProspectingService();
+  const outboxStatusService = options.outboxStatusService ?? new CommercialOutboxStatusService();
   const app = express();
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -62,6 +69,7 @@ export function createCommercialApp(options: CreateCommercialAppOptions): Expres
 
   app.use("/commercial/proposal-configs", createProposalConfigRoutes(service));
   app.use("/commercial/prospecting", createProspectingRoutes(prospectingService));
+  app.use("/commercial/outbox", createCommercialOutboxRoutes(outboxStatusService));
   app.use(
     createExpressErrorHandler({
       logger,

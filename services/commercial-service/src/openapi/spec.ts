@@ -31,7 +31,11 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
           properties: {
             id: { type: "string", format: "uuid" },
             name: { type: "string", minLength: 1, maxLength: 120 },
-            contract_value: { type: "number", minimum: 0, description: "Valor base do contrato ou proposta em reais." },
+            contract_value: {
+              type: "number",
+              minimum: 0,
+              description: "Valor base do contrato ou proposta em reais.",
+            },
           },
         },
         ProposalConfigInput: {
@@ -40,7 +44,11 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
           required: ["name", "contract_value"],
           properties: {
             name: { type: "string", minLength: 1, maxLength: 120 },
-            contract_value: { type: "number", minimum: 0, description: "Valor base do contrato ou proposta em reais." },
+            contract_value: {
+              type: "number",
+              minimum: 0,
+              description: "Valor base do contrato ou proposta em reais.",
+            },
           },
         },
         ProposalConfigPatch: {
@@ -49,7 +57,11 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
           minProperties: 1,
           properties: {
             name: { type: "string", minLength: 1, maxLength: 120 },
-            contract_value: { type: "number", minimum: 0, description: "Valor base do contrato ou proposta em reais." },
+            contract_value: {
+              type: "number",
+              minimum: 0,
+              description: "Valor base do contrato ou proposta em reais.",
+            },
           },
         },
         ProspectingClient: {
@@ -70,7 +82,14 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
             client_id: { type: "string", format: "uuid" },
             status: {
               type: "string",
-              enum: ["Análise Financeira", "Análise/Agendamento", "Envio de Proposta", "Paralisado", "Recusado pelo Cliente", "Fechado"],
+              enum: [
+                "Análise Financeira",
+                "Análise/Agendamento",
+                "Envio de Proposta",
+                "Paralisado",
+                "Recusado pelo Cliente",
+                "Fechado",
+              ],
             },
             status_date: { type: "string", format: "date-time", nullable: true },
             description: { type: "string", nullable: true },
@@ -176,7 +195,9 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
-            content: { "application/json": { schema: { $ref: "#/components/schemas/ProspectingInput" } } },
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/ProspectingInput" } },
+            },
           },
           responses: {
             "201": successResponse,
@@ -190,22 +211,39 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
         get: {
           tags: ["Commercial"],
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
           responses: { "200": successResponse, "404": { description: "Não encontrado." } },
         },
         patch: {
           tags: ["Commercial"],
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
           requestBody: {
             required: true,
-            content: { "application/json": { schema: { $ref: "#/components/schemas/ProspectingPatch" } } },
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/ProspectingPatch" } },
+            },
           },
           responses: {
             "200": successResponse,
             "400": { description: "Payload inválido." },
             "404": { description: "Não encontrado." },
             "409": { description: "Transição inválida." },
+          },
+        },
+      },
+      "/commercial/outbox/status": {
+        get: {
+          tags: ["Commercial"],
+          summary: "Consultar estado de entrega da outbox comercial",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": successResponse,
+            "401": { description: "Não autenticado." },
           },
         },
       },

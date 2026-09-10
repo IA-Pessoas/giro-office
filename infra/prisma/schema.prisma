@@ -1010,6 +1010,41 @@ model CommercialProspecting {
   @@map("commercial.prospecting")
 }
 
+model CommercialOutboxEvent {
+  id                    String    @id @default(uuid())
+  organization_id       String
+  aggregate_id          String
+  event_type            String
+  event_version         Int       @default(1)
+  payload               Json
+  audit_correlation_id  String
+  status                String    @default("pending")
+  attempts              Int       @default(0)
+  available_at          DateTime  @default(now())
+  locked_at             DateTime?
+  processed_at          DateTime?
+  last_error            String?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  @@index([status, available_at, created_at], map: "idx_commercial_outbox_dispatch")
+  @@index([organization_id, aggregate_id, created_at], map: "idx_commercial_outbox_aggregate")
+  @@map("commercial.outbox_events")
+}
+
+model ClientCommercialProjectionEvent {
+  id                    String   @id
+  organization_id       String
+  client_id             String
+  event_type            String
+  audit_correlation_id  String
+  applied_at            DateTime @default(now())
+  created_at            DateTime @default(now())
+
+  @@index([organization_id, client_id, applied_at], map: "idx_client_commercial_projection_client")
+  @@map("client.commercial_projection_events")
+}
+
 model Emails {
   id                   String       @id @default(uuid())
   email                String

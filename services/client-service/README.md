@@ -47,6 +47,7 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 | `GET` | `/client/histories/pending` | Lista pendencias; query opcional `user_id`. |
 | `DELETE` | `/client/histories/pending/:pendingId` | Remover pendencia (admin). |
 | `POST` | `/internal/competence-output-update` | Rotina batch (token interno). |
+| `POST` | `/internal/commercial/prospecting-transition` | Projeção idempotente de transição comercial (token interno). |
 
 ## Competencia via Supabase Edge Function
 

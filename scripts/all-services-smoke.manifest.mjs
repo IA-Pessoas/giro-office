@@ -981,6 +981,14 @@ const baseManifest = [
     target: "gateway",
     auth: "admin-bearer",
   }),
+  op({
+    service: "commercial-service",
+    method: "GET",
+    path: "/commercial/outbox/status",
+    action: "commercialOutboxStatus",
+    target: "gateway",
+    auth: "bearer",
+  }),
 
   op({
     service: "reports-service",
@@ -1448,6 +1456,14 @@ const baseManifest = [
     action: "clientCommercialOverview",
     target: "gateway",
     auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "POST",
+    path: "/internal/commercial/prospecting-transition",
+    action: "clientCommercialProspectingTransition",
+    target: "direct",
+    auth: "internal-token",
   }),
   op({
     service: "client-service",

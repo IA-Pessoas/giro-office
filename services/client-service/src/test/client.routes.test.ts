@@ -90,6 +90,7 @@ function buildTestApp(
     prisma?: PrismaClient;
     historyStorage?: HistoryFileStorage;
     env?: Partial<ReturnType<typeof getClientServiceEnv>>;
+    commercialProjectionService?: { apply: ReturnType<typeof vi.fn> };
   },
 ) {
   const env = { ...getClientServiceEnv(), ...overrides?.env };
@@ -105,7 +106,14 @@ function buildTestApp(
       saveObjectPath: vi.fn(),
       createSignedAccessUrl: vi.fn(),
     } as unknown as HistoryFileStorage);
-  return createApp({ clientService: mock, env, logger, prisma, historyStorage });
+  return createApp({
+    clientService: mock,
+    env,
+    logger,
+    prisma,
+    historyStorage,
+    commercialProjectionService: overrides?.commercialProjectionService,
+  });
 }
 
 function buildPAPrismaMock() {
@@ -175,6 +183,38 @@ describe("client-service", () => {
     expect(res.body.paths?.["/client/commercial/overview"]).toBeDefined();
     expect(res.body.paths?.["/client/{id}/pa"]).toBeDefined();
     expect(res.body.paths?.["/internal/competence-output-update"]).toBeDefined();
+    expect(res.body.paths?.["/internal/commercial/prospecting-transition"]).toBeDefined();
+  });
+
+  it("POST /internal/commercial/prospecting-transition exige token e encaminha o evento", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const projection = { apply: vi.fn().mockResolvedValue({ applied: true, duplicate: false }) };
+    const app = buildTestApp(mock, {
+      commercialProjectionService: projection,
+      env: { internalServiceToken: TEST_INTERNAL_SERVICE_TOKEN },
+    });
+    const event = {
+      event_id: "770e8400-e29b-41d4-a716-446655440002",
+      event_type: "commercial.prospecting.transition",
+      event_version: 1,
+      organization_id: TEST_ORG_ID,
+      client_id: TEST_CLIENT_ID,
+      prospecting_id: "770e8400-e29b-41d4-a716-446655440003",
+      from_status: null,
+      to_status: "Fechado",
+      status_date: null,
+      description: null,
+      audit_correlation_id: "request-958-correlation",
+      occurred_at: "2026-09-10T00:00:00.000Z",
+    };
+
+    const response = await request(app)
+      .post("/internal/commercial/prospecting-transition")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, TEST_INTERNAL_SERVICE_TOKEN)
+      .send(event);
+
+    expect(response.status).toBe(200);
+    expect(projection.apply).toHaveBeenCalledWith(event);
   });
 
   it("GET /openapi.json documents client detail Regularize fields", async () => {
