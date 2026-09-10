@@ -2,9 +2,13 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   CommercialOverview,
+  CommercialProspecting,
+  CommercialProspectingClient,
   CommercialProposalConfig,
   CommercialSuccessEnvelope,
   CreateCommercialProposalConfigPayload,
+  CreateCommercialProspectingPayload,
+  UpdateCommercialProspectingPayload,
   UpdateCommercialProposalConfigPayload,
 } from "../types";
 import { COMMERCIAL_ENDPOINTS, unwrapCommercialEnvelope } from "./commercialService.contract";
@@ -48,5 +52,44 @@ export const commercialService = {
       payload,
     );
     return unwrapCommercialEnvelope<CommercialProposalConfig>(response.data);
+  },
+
+  async listProspectingClients(): Promise<CommercialProspectingClient[]> {
+    const api = setupAPIClient();
+    const response = await api.get<CommercialSuccessEnvelope<CommercialProspectingClient[]>>(
+      COMMERCIAL_ENDPOINTS.prospectingClients,
+    );
+    return unwrapCommercialEnvelope<CommercialProspectingClient[]>(response.data);
+  },
+
+  async listProspecting(): Promise<CommercialProspecting[]> {
+    const api = setupAPIClient();
+    const response = await api.get<CommercialSuccessEnvelope<CommercialProspecting[]>>(
+      COMMERCIAL_ENDPOINTS.prospecting,
+    );
+    return unwrapCommercialEnvelope<CommercialProspecting[]>(response.data);
+  },
+
+  async createProspecting(
+    payload: CreateCommercialProspectingPayload,
+  ): Promise<CommercialProspecting> {
+    const api = setupAPIClient();
+    const response = await api.post<CommercialSuccessEnvelope<CommercialProspecting>>(
+      COMMERCIAL_ENDPOINTS.prospecting,
+      payload,
+    );
+    return unwrapCommercialEnvelope<CommercialProspecting>(response.data);
+  },
+
+  async updateProspecting(
+    id: string,
+    payload: UpdateCommercialProspectingPayload,
+  ): Promise<CommercialProspecting> {
+    const api = setupAPIClient();
+    const response = await api.patch<CommercialSuccessEnvelope<CommercialProspecting>>(
+      COMMERCIAL_ENDPOINTS.prospectingItem(id),
+      payload,
+    );
+    return unwrapCommercialEnvelope<CommercialProspecting>(response.data);
   },
 };

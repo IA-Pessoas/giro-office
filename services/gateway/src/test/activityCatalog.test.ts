@@ -18,6 +18,8 @@ describe("activityCatalog", () => {
       "cadastrou",
       "uma nova configuração de proposta comercial",
     ],
+    ["GET", "/commercial/prospecting", "consultou", "a lista de prospecções comerciais"],
+    ["POST", "/commercial/prospecting", "cadastrou", "uma nova prospecção comercial"],
     ["POST", "/reports/definitions/validate", "revisou", "a configuração de um relatório"],
     ["POST", "/reports/preview", "gerou", "uma prévia de relatório"],
     ["GET", "/reports/jobs/list", "consultou", "o histórico de relatórios"],

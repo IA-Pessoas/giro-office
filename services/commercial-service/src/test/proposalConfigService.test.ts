@@ -38,7 +38,7 @@ describe("CommercialProposalConfigService", () => {
     prisma.proposalConfig.create = vi.fn(async () => ({
       id: CONFIG_ID,
       name: "Proposta padrão",
-      minimum_wage: 1800,
+      contract_value: 1800,
     }));
     const service = new CommercialProposalConfigService(prisma, createAuditMock());
 
@@ -47,12 +47,12 @@ describe("CommercialProposalConfigService", () => {
         user_id: USER_ID,
         organization_id: ORGANIZATION_ID,
         name: "Proposta padrão",
-        minimum_wage: 1800,
+        contract_value: 1800,
       }),
     ).resolves.toEqual({
       id: CONFIG_ID,
       name: "Proposta padrão",
-      minimum_wage: 1800,
+      contract_value: 1800,
     });
 
     expect(prisma.proposalConfig.create).toHaveBeenCalledWith(
@@ -88,7 +88,7 @@ describe("CommercialProposalConfigService", () => {
         user_id: USER_ID,
         organization_id: ORGANIZATION_ID,
         name: "Proposta padrão",
-        minimum_wage: 1800,
+        contract_value: 1800,
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
 
@@ -108,7 +108,7 @@ describe("CommercialProposalConfigService", () => {
         user_id: USER_ID,
         organization_id: ORGANIZATION_ID,
         name: "Proposta padrão",
-        minimum_wage: 1800,
+        contract_value: 1800,
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
   });
@@ -133,9 +133,9 @@ describe("CommercialProposalConfigService", () => {
     const prisma = createMockPrisma();
     prisma.proposalConfig.findFirst = vi
       .fn()
-      .mockResolvedValueOnce({ id: CONFIG_ID, name: "Atual", minimum_wage: 1800 })
+      .mockResolvedValueOnce({ id: CONFIG_ID, name: "Atual", contract_value: 1800 })
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: CONFIG_ID, name: "Atualizada", minimum_wage: 1900 });
+      .mockResolvedValueOnce({ id: CONFIG_ID, name: "Atualizada", contract_value: 1900 });
     const service = new CommercialProposalConfigService(prisma, createAuditMock());
 
     await service.update({
@@ -143,12 +143,12 @@ describe("CommercialProposalConfigService", () => {
       organization_id: ORGANIZATION_ID,
       config_id: CONFIG_ID,
       name: "Atualizada",
-      minimum_wage: 1900,
+      contract_value: 1900,
     });
 
     expect(prisma.proposalConfig.updateMany).toHaveBeenCalledWith({
       where: { id: CONFIG_ID, organization_id: ORGANIZATION_ID },
-      data: { name: "Atualizada", minimum_wage: 1900 },
+      data: { name: "Atualizada", contract_value: 1900 },
     });
   });
 });

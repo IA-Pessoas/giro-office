@@ -21,10 +21,10 @@ const CONFIG_ID = "d0000000-0000-4000-8000-000000000001";
 
 function createServiceMock(): CommercialProposalConfigRouteDeps {
   return {
-    create: vi.fn(async () => ({ id: CONFIG_ID, name: "Padrão", minimum_wage: 1800 })),
-    detail: vi.fn(async () => ({ id: CONFIG_ID, name: "Padrão", minimum_wage: 1800 })),
+    create: vi.fn(async () => ({ id: CONFIG_ID, name: "Padrão", contract_value: 1800 })),
+    detail: vi.fn(async () => ({ id: CONFIG_ID, name: "Padrão", contract_value: 1800 })),
     list: vi.fn(async () => []),
-    update: vi.fn(async () => ({ id: CONFIG_ID, name: "Atualizada", minimum_wage: 2000 })),
+    update: vi.fn(async () => ({ id: CONFIG_ID, name: "Atualizada", contract_value: 2000 })),
   };
 }
 
@@ -78,7 +78,7 @@ describe("commercial proposal-config routes", () => {
   });
 
   it("lista o catálogo usando a organização encaminhada pelo gateway", async () => {
-    service.list = vi.fn(async () => [{ id: CONFIG_ID, name: "Padrão", minimum_wage: 1800 }]);
+    service.list = vi.fn(async () => [{ id: CONFIG_ID, name: "Padrão", contract_value: 1800 }]);
 
     const response = await request(createTestApp(service))
       .get("/commercial/proposal-configs")
@@ -87,7 +87,7 @@ describe("commercial proposal-config routes", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       success: true,
-      data: [{ id: CONFIG_ID, name: "Padrão", minimum_wage: 1800 }],
+      data: [{ id: CONFIG_ID, name: "Padrão", contract_value: 1800 }],
     });
     expect(service.list).toHaveBeenCalledWith(ORGANIZATION_ID);
   });
@@ -96,7 +96,17 @@ describe("commercial proposal-config routes", () => {
     const response = await request(createTestApp(service))
       .post("/commercial/proposal-configs")
       .set(gatewayHeaders())
-      .send({ name: "", minimum_wage: -1 });
+      .send({ name: "", contract_value: -1 });
+
+    expect(response.status).toBe(400);
+    expect(service.create).not.toHaveBeenCalled();
+  });
+
+  it("não aceita o nome legado de salário mínimo na API", async () => {
+    const response = await request(createTestApp(service))
+      .post("/commercial/proposal-configs")
+      .set(gatewayHeaders())
+      .send({ name: "Padrão", minimum_wage: 1800 });
 
     expect(response.status).toBe(400);
     expect(service.create).not.toHaveBeenCalled();
@@ -108,20 +118,20 @@ describe("commercial proposal-config routes", () => {
     const createResponse = await request(app)
       .post("/commercial/proposal-configs")
       .set(gatewayHeaders())
-      .send({ name: "Padrão", minimum_wage: 1800 });
+      .send({ name: "Padrão", contract_value: 1800 });
 
     expect(createResponse.status).toBe(201);
     expect(service.create).toHaveBeenCalledWith({
       user_id: USER_ID,
       organization_id: ORGANIZATION_ID,
       name: "Padrão",
-      minimum_wage: 1800,
+      contract_value: 1800,
     });
 
     const updateResponse = await request(app)
       .patch(`/commercial/proposal-configs/${CONFIG_ID}`)
       .set(gatewayHeaders())
-      .send({ minimum_wage: 2000 });
+      .send({ contract_value: 2000 });
 
     expect(updateResponse.status).toBe(200);
     expect(service.update).toHaveBeenCalledWith({
@@ -129,7 +139,7 @@ describe("commercial proposal-config routes", () => {
       organization_id: ORGANIZATION_ID,
       config_id: CONFIG_ID,
       name: undefined,
-      minimum_wage: 2000,
+      contract_value: 2000,
     });
   });
 
