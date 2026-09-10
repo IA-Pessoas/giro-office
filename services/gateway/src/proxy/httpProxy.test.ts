@@ -43,6 +43,34 @@ const authenticatedRequest = {
 } as unknown as Request;
 
 describe("buildForwardHeaders", () => {
+  it("encaminha somente o token validado para o upstream legado habilitado", () => {
+    const headers = buildForwardHeaders(
+      {
+        ...authenticatedRequest,
+        headers: { authorization: "Bearer attacker-token", cookie: "cw.session=attacker-token" },
+      } as Request,
+      { forwardValidatedAuthorization: true },
+    );
+
+    expect(headers.get("authorization")).toBe("Bearer verified-token");
+    expect(headers.get("cookie")).toBeNull();
+  });
+
+  it("não encaminha Bearer sem opt-in, sem autenticação ou para identidade de plataforma", () => {
+    expect(buildForwardHeaders(authenticatedRequest).get("authorization")).toBeNull();
+    for (const auth of [undefined, { ...authenticatedRequest.auth, actorKind: "platform" }]) {
+      const headers = buildForwardHeaders(
+        {
+          ...authenticatedRequest,
+          headers: { authorization: "Bearer attacker-token" },
+          auth,
+        } as Request,
+        { forwardValidatedAuthorization: true },
+      );
+      expect(headers.get("authorization")).toBeNull();
+    }
+  });
+
   it("mantém o vínculo secreto da sessão fora de upstreams comuns", () => {
     const headers = buildForwardHeaders(authenticatedRequest, {
       internalServiceToken: "shared-token",

@@ -45,6 +45,7 @@ export interface GatewayServiceDefinition {
   internalServiceToken?: string;
   permissionModule?: string;
   forwardSessionBinding?: boolean;
+  forwardValidatedAuthorization?: boolean;
   forwardPlatformSessionCredentials?: boolean;
   stripPathPrefix?: string;
   routeMatchers?: Array<{ methods: string[]; path: RegExp }>;
@@ -74,6 +75,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       auditTarget: "rh-service",
       routePrefixes: [...RH_SERVICE_PREFIXES],
       permissionModule: "rh",
+      forwardValidatedAuthorization: true,
     },
     {
       key: "user-service",
