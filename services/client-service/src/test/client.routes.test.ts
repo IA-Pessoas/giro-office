@@ -90,6 +90,7 @@ function buildTestApp(
     prisma?: PrismaClient;
     historyStorage?: HistoryFileStorage;
     env?: Partial<ReturnType<typeof getClientServiceEnv>>;
+    commercialProjectionService?: { apply: ReturnType<typeof vi.fn> };
   },
 ) {
   const env = { ...getClientServiceEnv(), ...overrides?.env };
@@ -105,7 +106,14 @@ function buildTestApp(
       saveObjectPath: vi.fn(),
       createSignedAccessUrl: vi.fn(),
     } as unknown as HistoryFileStorage);
-  return createApp({ clientService: mock, env, logger, prisma, historyStorage });
+  return createApp({
+    clientService: mock,
+    env,
+    logger,
+    prisma,
+    historyStorage,
+    commercialProjectionService: overrides?.commercialProjectionService,
+  });
 }
 
 function buildPAPrismaMock() {
@@ -175,6 +183,38 @@ describe("client-service", () => {
     expect(res.body.paths?.["/client/commercial/overview"]).toBeDefined();
     expect(res.body.paths?.["/client/{id}/pa"]).toBeDefined();
     expect(res.body.paths?.["/internal/competence-output-update"]).toBeDefined();
+    expect(res.body.paths?.["/internal/commercial/prospecting-transition"]).toBeDefined();
+  });
+
+  it("POST /internal/commercial/prospecting-transition exige token e encaminha o evento", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const projection = { apply: vi.fn().mockResolvedValue({ applied: true, duplicate: false }) };
+    const app = buildTestApp(mock, {
+      commercialProjectionService: projection,
+      env: { internalServiceToken: TEST_INTERNAL_SERVICE_TOKEN },
+    });
+    const event = {
+      event_id: "770e8400-e29b-41d4-a716-446655440002",
+      event_type: "commercial.prospecting.transition",
+      event_version: 1,
+      organization_id: TEST_ORG_ID,
+      client_id: TEST_CLIENT_ID,
+      prospecting_id: "770e8400-e29b-41d4-a716-446655440003",
+      from_status: null,
+      to_status: "Fechado",
+      status_date: null,
+      description: null,
+      audit_correlation_id: "request-958-correlation",
+      occurred_at: "2026-09-10T00:00:00.000Z",
+    };
+
+    const response = await request(app)
+      .post("/internal/commercial/prospecting-transition")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, TEST_INTERNAL_SERVICE_TOKEN)
+      .send(event);
+
+    expect(response.status).toBe(200);
+    expect(projection.apply).toHaveBeenCalledWith(event);
   });
 
   it("GET /openapi.json documents client detail Regularize fields", async () => {
@@ -467,6 +507,67 @@ describe("client-service", () => {
       }),
       { userId: "user-test-1", level: 2, isOwner: false },
     );
+  });
+
+  it("PATCH /client/:id/commercial mapeia colisão ao reabrir tarefas legadas", async () => {
+    let persistedStatus = "Paralisado";
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 })
+      .mockRejectedValueOnce({ code: "P2002" });
+    const transactionClient = {
+      client: {
+        findFirst: vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID, status: "Paralisado" }),
+        update: vi.fn().mockImplementation(({ data }) => {
+          persistedStatus = data.status;
+          return Promise.resolve({
+            id: TEST_CLIENT_ID,
+            prospecting_status: "Fechado",
+          });
+        }),
+      },
+      task: { updateMany },
+    };
+    const transaction = vi.fn(async (callback: (tx: typeof transactionClient) => unknown) => {
+      const previousStatus = persistedStatus;
+      try {
+        return await callback(transactionClient);
+      } catch (error) {
+        persistedStatus = previousStatus;
+        throw error;
+      }
+    });
+    const prismaMock = {
+      ...transactionClient,
+      $transaction: transaction,
+    };
+    const prisma = prismaMock as unknown as PrismaClient;
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock, { prisma });
+    const token = jwt.sign(
+      {
+        user_id: "user-test-1",
+        organization_id: TEST_ORG_ID,
+        modules: { comercial: 2 },
+      },
+      TEST_JWT_SECRET,
+    );
+
+    const response = await request(app)
+      .patch(`/client/${TEST_CLIENT_ID}/commercial`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ prospecting_status: "Fechado" });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      success: false,
+      error: "Tarefa já foi cadastrada em andamento.",
+      code: "CONFLICT",
+      requestId: expect.any(String),
+    });
+    expect(updateMany).toHaveBeenCalledTimes(2);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(persistedStatus).toBe("Paralisado");
   });
 
   it("PATCH /client/:id aceita o contexto encaminhado pelo gateway", async () => {

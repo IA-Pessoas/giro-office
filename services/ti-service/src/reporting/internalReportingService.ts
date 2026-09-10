@@ -1,4 +1,6 @@
 import {
+  executeReportingQuery,
+  type ReportingQuery,
   ServiceError,
   type TiExtensionsReportingSource,
   type TiInventoryReportingSource,
@@ -6,6 +8,7 @@ import {
   tiExtensionsReportingCatalog,
   tiInventoryReportingCatalog,
   tiRequestsReportingCatalog,
+  withReportingSnapshot,
 } from "@workspace/shared";
 import { TiDepartmentResolverService } from "../services/tiDepartmentResolverService.js";
 import { TiExtensionsReportingService } from "./tiExtensionsReportingService.js";
@@ -44,6 +47,8 @@ type ReportingDelegate = {
     where: ReportingWhere;
     select: ReportingSelect;
     take: number;
+    skip?: number;
+    orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -52,6 +57,8 @@ type InventoryReportingDelegate = {
     where: { organization_id: string };
     select: Record<string, unknown>;
     take: number;
+    skip?: number;
+    orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -60,6 +67,8 @@ type RequestsReportingDelegate = {
     where: { organization_id: string };
     select: Record<string, unknown>;
     take: number;
+    skip?: number;
+    orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -124,6 +133,7 @@ export class InternalReportingService {
       tIRequest: RequestsReportingDelegate;
       stock: ReportingDelegate;
     },
+    private readonly inSnapshot = false,
   ) {
     this.extensions = new TiExtensionsReportingService({
       extensionsTecnologia: prisma.extensionsTecnologia,
@@ -136,17 +146,30 @@ export class InternalReportingService {
   }
 
   async extract(input: {
+    query?: ReportingQuery;
+    offset?: number;
     organizationId: string;
     source: ReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+    if (input.query && !this.inSnapshot) {
+      return withReportingSnapshot(this.prisma, (transaction) =>
+        new InternalReportingService(transaction, true).extract(input),
+      );
+    }
+    if (input.query) {
+      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
+        this.extract({ ...input, query: undefined, fields, limit, offset }),
+      );
+    }
     if (input.source === "ti.inventory") {
       return this.inventory.extract({
         organizationId: input.organizationId,
         source: input.source,
         fields: input.fields,
         limit: input.limit,
+        ...(input.offset !== undefined ? { offset: input.offset } : {}),
       });
     }
 
@@ -156,6 +179,7 @@ export class InternalReportingService {
         source: input.source,
         fields: input.fields,
         limit: input.limit,
+        ...(input.offset !== undefined ? { offset: input.offset } : {}),
       });
     }
 
@@ -165,6 +189,7 @@ export class InternalReportingService {
         source: input.source,
         fields: input.fields,
         limit: input.limit,
+        ...(input.offset !== undefined ? { offset: input.offset } : {}),
       });
     }
 
@@ -199,6 +224,9 @@ export class InternalReportingService {
     const rows = await this.prisma.stock.findMany({
       where,
       select,
+      ...(input.offset !== undefined
+        ? { skip: input.offset, orderBy: { id: "asc" as const } }
+        : {}),
       take: input.limit + 1,
     });
 

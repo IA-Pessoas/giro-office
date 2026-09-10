@@ -1,3 +1,5 @@
+import { reportingQueryOpenApiSchema } from "@workspace/shared";
+
 type OpenApiDocument = Record<string, unknown> & {
   openapi: string;
   info: { title: string; version: string; description?: string };
@@ -930,12 +932,14 @@ export function buildTiServiceOpenApiSpec(env?: TiServiceOpenApiEnv): OpenApiDoc
                       items: { type: "string" },
                     },
                     limit: { type: "integer", minimum: 1, maximum: 101 },
+                    query: reportingQueryOpenApiSchema,
                   },
                 },
               },
             },
           },
           responses: {
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
             "200": successResponse("Linhas projetadas e limite de origem"),
             "400": errorResponse(400),
             "403": errorResponse(403),

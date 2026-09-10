@@ -35,6 +35,39 @@ vi.mock("../services/taskWorkflowService.js", () => ({
 import { TaskLifecycleService } from "../services/taskLifecycleService.js";
 
 describe("TaskLifecycleService", () => {
+  it("conclusão preserva responsável nulo e vínculos secundários legados", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      department_id: "dep-1",
+      responsible_id: null,
+      responsible2_id: "legacy-user",
+      responsible3_id: null,
+      status: "Em Andamento",
+    });
+    prismaMock.task.update.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
+    await expect(
+      new TaskLifecycleService().concludeTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        integracaoLevel: 1,
+        isOwner: true,
+        body: {
+          task_id: "task-1",
+          status: "Concluída",
+          responsible_id: null,
+          observations: "",
+          justification: "",
+        },
+      }),
+    ).resolves.toMatchObject({
+      responsible_id: null,
+      responsible2_id: "legacy-user",
+      status: "Concluída",
+    });
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });

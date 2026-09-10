@@ -1,3 +1,4 @@
+import { reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ParcelamentoServiceEnv } from "../config/env.js";
@@ -182,12 +183,14 @@ export function buildParcelamentoServiceOpenApiSpec(env: ParcelamentoServiceEnv)
                     source: text,
                     fields: { type: "array", minItems: 1, items: text },
                     limit: { type: "integer", minimum: 1, maximum: 101 },
+                    query: reportingQueryOpenApiSchema,
                   },
                 },
               },
             },
           },
           responses: {
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
             "200": { description: "Linhas extraídas", ...successJson },
             "400": { description: "Entrada inválida" },
             "403": { description: "Grant, token ou campo inválido" },

@@ -31,6 +31,8 @@ const PARCELAMENTO_SERVICE_PREFIXES = ["/parcelamento"] as const;
 
 const REPORTS_SERVICE_PREFIXES = ["/reports"] as const;
 
+const COMMERCIAL_SERVICE_PREFIXES = ["/commercial"] as const;
+
 function matchesPrefix(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
 }
@@ -129,13 +131,14 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.departmentServiceUrl,
       auditTarget: "department-service",
       routePrefixes: [...DEPARTMENT_SERVICE_PREFIXES],
-      forwardValidatedAuthorization: true,
+      internalServiceToken: env.auditServiceToken,
     },
     {
       key: "task-service",
       targetUrl: env.taskServiceUrl,
       auditTarget: "task-service",
       routePrefixes: [...TASK_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
     },
     {
       key: "project-service",
@@ -207,6 +210,14 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.reportsServiceUrl,
       auditTarget: "reports-service",
       routePrefixes: [...REPORTS_SERVICE_PREFIXES],
+    },
+    {
+      key: "commercial-service",
+      targetUrl: env.commercialServiceUrl,
+      auditTarget: "commercial-service",
+      routePrefixes: [...COMMERCIAL_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
+      permissionModule: "comercial",
     },
     {
       key: "audit-service",

@@ -9,3 +9,9 @@ export const taskModelListQuerySchema = z
     limit: z.coerce.number().int().min(1).max(100).default(20),
   })
   .strict();
+
+export const taskModelOptionsQuerySchema = z
+  .object({
+    department_id: z.string().uuid({ message: "department_id inválido." }).optional(),
+  })
+  .strict();

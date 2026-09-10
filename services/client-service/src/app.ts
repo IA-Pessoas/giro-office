@@ -17,7 +17,9 @@ import { requestContext } from "./middlewares/requestContext.js";
 import { requireInternalToken } from "./middlewares/requireInternalToken.js";
 import { buildClientServiceOpenApiSpec } from "./openapi/spec.js";
 import { createClientRouter } from "./routes/client.routes.js";
+import { createInternalCommercialRouter } from "./routes/internalCommercial.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
+import { ClientCommercialProjectionService } from "./services/clientCommercialProjectionService.js";
 import { ClientIntegrationReportingService } from "./services/clientIntegrationReportingService.js";
 import type { IClientService } from "./services/clientService.js";
 import { runCompetenceOutputUpdate } from "./services/competenceOutputRoutineService.js";
@@ -42,6 +44,7 @@ export interface CreateAppOptions {
   env: ClientServiceEnv;
   logger: Logger;
   historyStorage: HistoryFileStorage;
+  commercialProjectionService?: Pick<ClientCommercialProjectionService, "apply">;
 }
 
 export function createApp({
@@ -50,6 +53,7 @@ export function createApp({
   env,
   logger,
   historyStorage,
+  commercialProjectionService,
 }: CreateAppOptions): express.Express {
   const app = express();
 
@@ -95,6 +99,14 @@ export function createApp({
         next(err);
       }
     },
+  );
+
+  app.use(
+    "/internal",
+    createInternalCommercialRouter(
+      commercialProjectionService ?? new ClientCommercialProjectionService(prisma),
+      requireInternalToken(env),
+    ),
   );
 
   app.use(

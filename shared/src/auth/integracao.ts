@@ -143,8 +143,6 @@ const TASK_UPDATE_FIELDS = [
   "department_id",
   "billing",
   "responsible_id",
-  "responsible2_id",
-  "responsible3_id",
   "prevision_date",
 ] as const;
 const TASK_OWN_FIELDS = ["status", "observations"] as const;
@@ -330,6 +328,26 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     audit: "required",
     test: "task.create",
   }),
+  routePolicy(
+    "POST",
+    "/task/project-wizard",
+    "project",
+    "create",
+    [writeRule(writeUser, PROJECT_FIELDS)],
+    { audit: "required", test: "task.projectWizard.create" },
+  ),
+  routePolicy("POST", "/task/project-wizard/extract-tasks", "task", "read", [readRule(writeUser)], {
+    audit: "required",
+    test: "task.projectWizard.extractTasks",
+  }),
+  routePolicy(
+    "POST",
+    "/task/project-wizard/preview",
+    "taskModel",
+    "read",
+    [writeRule(writeUser, [])],
+    { test: "task.projectWizard.preview" },
+  ),
   routePolicy(
     "PUT",
     "/task",

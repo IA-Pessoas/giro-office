@@ -99,6 +99,12 @@ generator reportsServiceClient {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator commercialServiceClient {
+  provider        = "prisma-client"
+  output          = "../../services/commercial-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -144,6 +150,7 @@ model Organization {
   projectPlans                  ProjectPlan[]
   projectPlanTasks              ProjectPlanTasks[]
   projects                      Project[]
+  projectWizardConfirmations    ProjectWizardConfirmation[]
   tasks                         Task[]
   taskDependents                TaskDependent[]
   tasksIntegrationRegularize    TasksIntegrationRegularize[]
@@ -169,6 +176,7 @@ model Organization {
   situationsPessoal             SituationsPessoal[]
   unionsPessoal                 UnionPessoal[]
   proposalConfigs               ProposalConfig[]
+  commercialProspectings        CommercialProspecting[]
   licenses                      License[]
   municipalTaxes                MunicipalTaxes[]
   partners                      Partners[]
@@ -674,6 +682,7 @@ model Client {
   triageConfigs                 TriageConfig[]
   triageMonthlys                TriageMonthly[]
   responsiblesTriage            TriageResponsible[]
+  commercialProspectings        CommercialProspecting[]
 
   @@map("clients")
 }
@@ -907,8 +916,27 @@ model Project {
   organization    Organization @relation(fields: [organization_id], references: [id])
   sponsor         User?        @relation("sponsor", fields: [sponsor_id], references: [id])
   tasks           Task[]
+  wizardConfirmations ProjectWizardConfirmation[]
 
   @@map("integracao.projects")
+}
+
+model ProjectWizardConfirmation {
+  id                String       @id @default(uuid())
+  project_id        String?
+  organization_id   String
+  idempotency_key   String       @db.VarChar(255)
+  command_hash      String       @db.Char(64)
+  response_snapshot Json
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  project           Project?     @relation(fields: [project_id], references: [id], onDelete: SetNull)
+
+  @@unique([organization_id, idempotency_key], map: "uq_project_wizard_confirmation_org_idempotency_key")
+  @@index([organization_id], map: "idx_project_wizard_confirmation_org")
+  @@index([project_id], map: "idx_project_wizard_confirmation_project")
+  @@map("integracao.project_wizard_confirmations")
 }
 
 model Task {
@@ -922,7 +950,7 @@ model Task {
   observations        String?
   billing             String
   urgency             String
-  responsible_id      String
+  responsible_id      String?
   responsible2_id     String?
   responsible3_id     String?
   start_date          DateTime?
@@ -947,7 +975,7 @@ model Task {
   project             Project      @relation(fields: [project_id], references: [id])
   responsible2        User?        @relation("responsible2", fields: [responsible2_id], references: [id])
   responsible3        User?        @relation("responsible3", fields: [responsible3_id], references: [id])
-  responsible         User         @relation("responsible", fields: [responsible_id], references: [id])
+  responsible         User?        @relation("responsible", fields: [responsible_id], references: [id], onDelete: Restrict)
   license             License[]
   process             Process[]
 
@@ -957,11 +985,64 @@ model Task {
 model ProposalConfig {
   id              String       @id @default(uuid())
   name            String
-  minimum_wage    Float
+  contract_value  Float
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, name], map: "uq_proposal_config_org_name")
   @@map("proposal.config")
+}
+
+model CommercialProspecting {
+  id              String       @id @default(uuid())
+  client_id       String
+  organization_id String
+  status          String
+  status_date     DateTime?
+  description     String?
+  registered_at   DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, client_id], map: "uq_commercial_prospecting_org_client")
+  @@index([organization_id, status], map: "idx_commercial_prospecting_org_status")
+  @@map("commercial.prospecting")
+}
+
+model CommercialOutboxEvent {
+  id                    String    @id @default(uuid())
+  organization_id       String
+  aggregate_id          String
+  event_type            String
+  event_version         Int       @default(1)
+  payload               Json
+  audit_correlation_id  String
+  status                String    @default("pending")
+  attempts              Int       @default(0)
+  available_at          DateTime  @default(now())
+  locked_at             DateTime?
+  processed_at          DateTime?
+  last_error            String?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  @@index([status, available_at, created_at], map: "idx_commercial_outbox_dispatch")
+  @@index([organization_id, aggregate_id, created_at], map: "idx_commercial_outbox_aggregate")
+  @@map("commercial.outbox_events")
+}
+
+model ClientCommercialProjectionEvent {
+  id                    String   @id
+  organization_id       String
+  client_id             String
+  event_type            String
+  audit_correlation_id  String
+  applied_at            DateTime @default(now())
+  created_at            DateTime @default(now())
+
+  @@index([organization_id, client_id, applied_at], map: "idx_client_commercial_projection_client")
+  @@map("client.commercial_projection_events")
 }
 
 model Emails {
@@ -2261,15 +2342,33 @@ model ReportSnapshot {
   @@map("reports.snapshots")
 }
 
+model ReportSnapshotBlock {
+  id              String   @id @default(uuid())
+  organization_id String
+  snapshot_id     String
+  position        Int
+  source          String
+  label           String
+  columns_json    Json
+  row_count       Int      @default(0)
+  created_at      DateTime @default(now())
+
+  @@unique([snapshot_id, position])
+  @@index([snapshot_id, position])
+  @@map("reports.snapshot_blocks")
+}
+
 model ReportSnapshotRow {
   id              String   @id @default(uuid())
   organization_id String
   snapshot_id     String
+  block_id        String?
   row_number      Int
   data_json       Json
   created_at      DateTime @default(now())
 
   @@index([snapshot_id, row_number])
+  @@index([snapshot_id, block_id, row_number])
   @@map("reports.snapshot_rows")
 }
 

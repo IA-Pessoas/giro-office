@@ -1,11 +1,15 @@
 import {
+  type CreateProjectCrudRequest,
+  createProjectInTransaction,
   INTEGRACAO_PERMISSION_LEVEL,
-  type IntegracaoPermissionLevel,
   error as logError,
+  type ProjectCreateRow,
+  type ProjectCrudAuthContext,
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
 
+import type { Prisma } from "../generated/prisma/client.js";
 import {
   type CreateLogParams,
   createLog,
@@ -21,21 +25,7 @@ type ProjectCrudAuditFns = {
   logUpdateIfChanged: (params: LogUpdateParams) => Promise<void>;
 };
 
-export interface ProjectCrudAuthContext {
-  userId: string;
-  organizationId: string;
-  permission?: number;
-  integracaoLevel?: IntegracaoPermissionLevel;
-  isOwner?: boolean;
-}
-
-export interface CreateProjectCrudRequest extends ProjectCrudAuthContext {
-  name: string;
-  client_id: string;
-  start_date: Date;
-  objective: string;
-  sponsor_id?: string;
-}
+export type { CreateProjectCrudRequest, ProjectCrudAuthContext } from "@workspace/shared";
 
 export interface UpdateProjectCrudRequest extends ProjectCrudAuthContext {
   project_id: string;
@@ -49,16 +39,6 @@ export interface UpdateProjectCrudRequest extends ProjectCrudAuthContext {
 export interface DeleteProjectCrudRequest extends ProjectCrudAuthContext {
   project_id: string;
 }
-
-const CREATE_SELECT = {
-  id: true,
-  name: true,
-  client_id: true,
-  status: true,
-  start_date: true,
-  objective: true,
-  sponsor_id: true,
-} as const;
 
 const UPDATE_SELECT = {
   id: true,
@@ -93,60 +73,31 @@ export class ProjectCrudService {
   ) {}
 
   async create(data: CreateProjectCrudRequest): Promise<{ create: unknown }> {
-    requireIntegracaoRouteAccess("POST", "/project", {
-      userId: data.userId,
-      level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
-      organizationId: data.organizationId,
-      resourceOrganizationId: data.organizationId,
-      isOwner: data.isOwner === true,
-      requestedFields: ["name", "client_id", "start_date", "objective", "sponsor_id"],
-    });
+    const result = await this.prisma.$transaction((tx) => this.createInTransaction(data, tx));
 
-    const client = await this.prisma.client.findFirst({
-      where: { id: data.client_id, organization_id: data.organizationId },
-    });
-
-    if (!client) {
-      throw new ServiceError(404, "Cliente não encontrado.");
+    try {
+      await this.audit.createLog({
+        userId: data.userId,
+        organizationId: data.organizationId,
+        permission: data.permission ?? null,
+        action: "Cadastro",
+        referring: "integracao.projects",
+        referringId: result.create.id,
+        changes: "{}",
+      });
+    } catch (err) {
+      logError("Erro ao auditar criação de projeto", { err, projectId: result.create.id });
     }
 
-    const duplicate = await this.prisma.project.findFirst({
-      where: {
-        name: data.name,
-        client_id: data.client_id,
-        organization_id: data.organizationId,
-      },
-    });
+    return result;
+  }
 
-    if (duplicate !== null) {
-      throw new ServiceError(409, "Um objetivo com esse nome nesse cliente já foi cadastrada");
-    }
-
-    const create = await this.prisma.project.create({
-      data: {
-        name: data.name,
-        client_id: data.client_id,
-        organization_id: data.organizationId,
-        status: "Em andamento",
-        start_date: data.start_date,
-        objective: data.objective,
-        sponsor_id: data.sponsor_id ?? null,
-        porcentage: 0,
-      },
-      select: CREATE_SELECT,
-    });
-
-    await this.audit.createLog({
-      userId: data.userId,
-      organizationId: data.organizationId,
-      permission: data.permission ?? null,
-      action: "Cadastro",
-      referring: "integracao.projects",
-      referringId: create.id,
-      changes: "{}",
-    });
-
-    return { create };
+  /** O chamador controla commit/rollback e emite auditoria somente após o commit. */
+  async createInTransaction(
+    data: CreateProjectCrudRequest,
+    tx: Prisma.TransactionClient,
+  ): Promise<{ create: ProjectCreateRow }> {
+    return createProjectInTransaction(data, tx);
   }
 
   async detail(

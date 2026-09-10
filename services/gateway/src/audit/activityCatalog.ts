@@ -53,6 +53,21 @@ const TECHNICAL_RULES = [
 const EXPLICIT_RULES: ExplicitRule[] = [
   {
     methods: ["POST"],
+    pattern: /^\/task\/project-wizard$/,
+    description: { action: "criou", item: "um projeto com tarefas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/project-wizard\/extract-tasks$/,
+    description: { action: "extraiu", item: "tarefas de uma Ata com IA" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/project-wizard\/preview$/,
+    description: { action: "gerou", item: "uma prévia de projeto com tarefas" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/platform\/organizations\/[^/]+\/users$/,
     description: { action: "criou", item: "um usuário da organização" },
   },
@@ -60,6 +75,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "criou", item: "uma organização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/commercial\/prospecting\/clients$/,
+    description: { action: "consultou", item: "a lista de clientes para prospecção" },
   },
   {
     methods: ["GET"],
@@ -135,6 +155,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/reports\/catalog$/,
     description: { action: "consultou", item: "o catálogo de relatórios" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/definitions\/validate$/,
+    description: { action: "revisou", item: "a configuração de um relatório" },
   },
   {
     methods: ["POST"],
@@ -627,6 +652,18 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 ];
 
 const RESOURCE_RULES: ResourceRule[] = [
+  {
+    pattern: /^\/commercial\/proposal-configs(?:\/|$)/,
+    singular: "uma configuração de proposta comercial",
+    newSingular: "uma nova configuração de proposta comercial",
+    plural: "configurações de proposta comercial",
+  },
+  {
+    pattern: /^\/commercial\/prospecting(?:\/|$)/,
+    singular: "uma prospecção comercial",
+    newSingular: "uma nova prospecção comercial",
+    plural: "prospecções comerciais",
+  },
   {
     pattern: /^\/reports\/models\/shared(?:\/|$)/,
     singular: "um modelo compartilhado de relatório",

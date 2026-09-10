@@ -464,6 +464,12 @@ describe("Central de Relatórios — regressões de segurança", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
     expect(render).toHaveBeenCalledOnce();
-    expect(assertExportable).not.toHaveBeenCalled();
+    expect(assertExportable).toHaveBeenCalledOnce();
+    expect(assertExportable).toHaveBeenCalledWith({
+      snapshotId: "snapshot-1",
+      userId,
+      organizationId,
+      allowShared: true,
+    });
   });
 });

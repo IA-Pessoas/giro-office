@@ -1,11 +1,14 @@
 import { setupAPIClient } from "@shared/services/api";
 
 import type {
-  ReportDefinition,
+  ReportComposition,
+  ReportCompositionPreview,
   ReportDownloadResult,
   ReportHistoryPage,
   ReportHistoryScope,
+  ReportJob,
   ReportModel,
+  ReportModelDefinition,
   ReportPreviewPayload,
   ReportPreviewResult,
   ReportSnapshotPage,
@@ -18,11 +21,34 @@ import {
   fetchReportsPreview,
   REPORTS_ENDPOINTS,
   unwrapReportDownload,
+  unwrapReportJobEnvelope,
   unwrapReportJobListEnvelope,
   unwrapReportsEnvelope,
+  unwrapReportCompositionPreview,
 } from "./reportsService.contract";
 
 export const reportsService = {
+  async previewComposition(definition: ReportComposition): Promise<ReportCompositionPreview> {
+    const response = await setupAPIClient().post(REPORTS_ENDPOINTS.preview, { definition });
+    return unwrapReportCompositionPreview(response.data);
+  },
+  async validateDefinition(definition: ReportComposition): Promise<void> {
+    const response = await setupAPIClient().post("/reports/definitions/validate", { definition });
+    unwrapReportsEnvelope(response.data);
+  },
+  async createJob(
+    input: ReportModelDefinition | { modelVersionId: string; parameterValues?: Record<string, unknown> },
+  ): Promise<ReportJob> {
+    const response = await setupAPIClient().post(
+      REPORTS_ENDPOINTS.createJob,
+      "modelVersionId" in input ? input : { definition: input },
+    );
+    return unwrapReportJobEnvelope(response.data);
+  },
+  async getJob(id: string): Promise<ReportJob> {
+    const response = await setupAPIClient().get(REPORTS_ENDPOINTS.job(id));
+    return unwrapReportJobEnvelope(response.data);
+  },
   async getCatalog(): Promise<ReportsCatalog> {
     const api = setupAPIClient();
     return fetchReportsCatalog((path) => api.get(path));
@@ -35,6 +61,25 @@ export const reportsService = {
   async listModels(): Promise<ReportModel[]> {
     const response = await setupAPIClient().get(REPORTS_ENDPOINTS.models);
     return unwrapReportsEnvelope<{ items: ReportModel[] }>(response.data).items;
+  },
+
+  async createModel(payload: {
+    name: string;
+    description?: string;
+    definition: ReportModelDefinition;
+  }): Promise<ReportModel> {
+    const response = await setupAPIClient().post(REPORTS_ENDPOINTS.createModel, payload);
+    return unwrapReportsEnvelope<ReportModel>(response.data);
+  },
+
+  async getModel(id: string): Promise<ReportModel> {
+    const response = await setupAPIClient().get(REPORTS_ENDPOINTS.model(id));
+    return unwrapReportsEnvelope<ReportModel>(response.data);
+  },
+
+  async getSharedModel(id: string): Promise<SharedReportModel> {
+    const response = await setupAPIClient().get(REPORTS_ENDPOINTS.sharedModel(id));
+    return unwrapReportsEnvelope<SharedReportModel>(response.data);
   },
 
   async listSharedModels(): Promise<SharedReportModel[]> {
@@ -53,7 +98,7 @@ export const reportsService = {
 
   async updateSharedModel(
     id: string,
-    payload: { name?: string; definition: ReportDefinition },
+    payload: { name?: string; description?: string | null; definition: ReportModelDefinition },
   ): Promise<SharedReportModel> {
     const response = await setupAPIClient().patch(REPORTS_ENDPOINTS.sharedModel(id), payload);
     return unwrapReportsEnvelope<SharedReportModel>(response.data);

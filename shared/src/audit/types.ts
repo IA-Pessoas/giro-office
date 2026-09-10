@@ -155,6 +155,8 @@ export interface PlatformAuditRequestRecord {
   referring?: string | null;
   referringId?: string | null;
   actorPlatformUserId?: string;
+  actorPlatformUserName?: string;
+  organizationName?: string;
   changes?: PlatformOrganizationAuditChanges | PlatformPermissionAuditChanges;
 }
 

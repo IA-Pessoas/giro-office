@@ -108,12 +108,15 @@ function recordAuditEvent(organizationId, action, referringId, changes) {
     path: `/platform/organizations/${organizationId}/users/${referringId}`,
     outcome: "success",
     statusCode: 200,
+    durationMs: 18,
     serviceSource: "user-service",
     createdAt: "2026-08-25T12:01:00.000Z",
     action,
     referring: "user",
     referringId,
     actorPlatformUserId: identity.id,
+    actorPlatformUserName: identity.name,
+    organizationName: organizations.find((item) => item.id === organizationId)?.name,
     changes,
   });
 }
@@ -165,6 +168,7 @@ const upstream = createServer(async (request, response) => {
   if (url.pathname === "/platform/audit/requests") {
     if (auditUnavailable) return reply(response, 503, "Auditoria indisponível no teste.");
     const organizationId = url.searchParams.get("organizationId");
+    const requestedPage = Number(url.searchParams.get("page") ?? "1");
     const auditOrganization =
       organizations.find((item) => item.id === organizationId) ?? organization;
     const baselineEvent = {
@@ -175,22 +179,32 @@ const upstream = createServer(async (request, response) => {
       path: `/platform/organizations/${auditOrganization.id}`,
       outcome: "success",
       statusCode: 200,
+      durationMs: 42,
       serviceSource: "organization-service",
       createdAt: "2026-08-25T12:00:00.000Z",
       action: "organization.subscription_plan.updated",
       referring: "organization",
       referringId: auditOrganization.id,
       actorPlatformUserId: identity.id,
+      actorPlatformUserName: identity.name,
+      organizationName: auditOrganization.name,
       changes: { subscription_plan: { from: "trial", to: "pro" } },
     };
-    const items = [
+    const allItems = [
       baselineEvent,
       ...auditEvents.filter((event) => !organizationId || event.organizationId === organizationId),
     ];
+    const pageTwoEvent = {
+      ...baselineEvent,
+      id: "audit-page-2",
+      requestId: "request-page-2",
+      action: "organization.audit.page_two",
+    };
+    const items = requestedPage === 2 ? [pageTwoEvent] : allItems;
     return reply(response, 200, {
       items,
-      total: items.length,
-      page: 1,
+      total: 26,
+      page: requestedPage,
       pageSize: 25,
     });
   }
@@ -219,7 +233,7 @@ const upstream = createServer(async (request, response) => {
         permissionsOrganization.id,
         "user.permissions.updated",
         permissionsMatch[2],
-        { permissions: { from: previousPermissions, to: body } },
+        { modules: { before: previousPermissions, after: body } },
       );
       return reply(response, 200, platformUserPermissions);
     }
@@ -572,6 +586,17 @@ try {
       .locator("aside")
       .filter({ has: page.getByLabel("Pesquisar organização") });
     const directoryBox = await directory.boundingBox();
+    if (viewport.width >= 1024) {
+      const detailsPanelBox = await directory.locator("xpath=following-sibling::div[1]").boundingBox();
+      assert.ok(
+        directoryBox &&
+          detailsPanelBox &&
+          Math.abs(
+            directoryBox.y + directoryBox.height - (detailsPanelBox.y + detailsPanelBox.height),
+          ) <= 1,
+        `Diretório e painel desalinhados: ${JSON.stringify({ directoryBox, detailsPanelBox })}`,
+      );
+    }
     for (const name of ["Próxima", "Última página"]) {
       const buttonBox = await directory.getByRole("button", { name, exact: true }).boundingBox();
       assert.ok(
@@ -875,6 +900,153 @@ try {
     );
     await page.getByRole("button", { name: "Auditoria", exact: true }).click();
     await page.getByText("Plano: Trial → Pro", { exact: true }).waitFor();
+    const auditContent = page.locator('[aria-labelledby="platform-audit-title"] [aria-busy]');
+    const auditDimensions = await auditContent.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    assert.ok(
+      auditDimensions.scrollWidth <= auditDimensions.clientWidth,
+      `Auditoria exige rolagem horizontal: ${JSON.stringify(auditDimensions)}`,
+    );
+    const subscriptionUpdate = page
+      .locator("tbody tr")
+      .filter({ hasText: "organization.subscription_plan.updated" })
+      .filter({ hasText: "Plano: Trial → Pro" });
+    assert.equal(
+      await subscriptionUpdate.count(),
+      1,
+      "Evento e alterações devem permanecer associados na mesma linha de auditoria",
+    );
+    if (viewport.width > 1000) {
+      assert.equal(
+        await auditContent.getByRole("columnheader", { name: "Evento", exact: true }).isVisible(),
+        true,
+        "Cabeçalhos devem permanecer visíveis no layout desktop",
+      );
+    }
+    const auditSearch = page.getByLabel("Pesquisar rota");
+    await auditSearch.focus();
+    assert.equal(await auditSearch.evaluate((element) => document.activeElement === element), true);
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes("/platform/audit/requests")),
+      auditSearch.fill("/platform/organizations"),
+    ]);
+    await page.getByText("organization.subscription_plan.updated", { exact: true }).waitFor();
+    const auditDetailTrigger = page.getByRole("button", {
+      name: "Ver detalhes da ação organization.subscription_plan.updated",
+      exact: true,
+    });
+    await auditDetailTrigger.click();
+    const auditDetails = page.getByRole("dialog", { name: "Detalhes da ação", exact: true });
+    await auditDetails.getByText("Ação selecionada", { exact: true }).waitFor();
+    await auditDetails.getByText("organization.subscription_plan.updated", { exact: true }).waitFor();
+    await auditDetails.getByText("request-safe-1", { exact: true }).waitFor();
+    await auditDetails.getByText(/Operador de teste · b4bc983b-1c5c-43d8-80f0-dab220f0c500/).waitFor();
+    await auditDetails
+      .getByText(/Organização Aurora · fc70c08e-1907-4268-b303-f88c6f5c5c01/)
+      .waitFor();
+    await auditDetails.getByText("42 ms", { exact: true }).waitFor();
+    assert.equal(await auditSearch.inputValue(), "/platform/organizations");
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await settleLayout();
+      await page.screenshot({
+        path: join(
+          screenshotDirectory,
+          viewport.width > 1000
+            ? "issue-971-audit-details-desktop-light.png"
+            : "issue-971-audit-details-mobile-light.png",
+        ),
+      });
+    }
+    await page.keyboard.press("Escape");
+    await auditDetails.waitFor({ state: "hidden" });
+    assert.equal(await auditSearch.inputValue(), "/platform/organizations");
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.textContent?.trim()),
+      "Ver detalhes da ação",
+    );
+    const permissionDetailTrigger = page.getByRole("button", {
+      name: "Ver detalhes da ação user.permissions.updated",
+      exact: true,
+    });
+    await permissionDetailTrigger.click();
+    await auditDetails.getByText(/^Módulo .+: /).first().waitFor();
+    await page.keyboard.press("Escape");
+    await auditDetails.waitFor({ state: "hidden" });
+    const auditRegion = page.locator('[aria-labelledby="platform-audit-title"]');
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes("page=2")),
+      auditRegion.getByRole("button", { name: "Próxima", exact: true }).click(),
+    ]);
+    const currentAuditDetailTrigger = auditRegion
+      .getByRole("button", { name: /Ver detalhes da ação/ })
+      .first();
+    await currentAuditDetailTrigger.click();
+    await auditDetails.getByText("Ação selecionada", { exact: true }).waitFor();
+    await page.keyboard.press("Escape");
+    await auditDetails.waitFor({ state: "hidden" });
+    assert.equal(await auditSearch.inputValue(), "/platform/organizations");
+    assert.equal(
+      requests
+        .filter((request) => request.path === "/platform/audit/requests")
+        .at(-1)
+        .query.get("page"),
+      "2",
+    );
+    if (viewport.width <= 1000 && screenshotDirectory) {
+      await page.evaluate(() => {
+        document.documentElement.classList.remove("light");
+        document.documentElement.classList.add("dark");
+      });
+      await settleLayout();
+      await currentAuditDetailTrigger.click();
+      await auditDetails.getByText("Ação selecionada", { exact: true }).waitFor();
+      await page.screenshot({
+        path: join(screenshotDirectory, "issue-971-audit-details-mobile-dark.png"),
+      });
+      await page.keyboard.press("Escape");
+      await auditDetails.waitFor({ state: "hidden" });
+      await page.evaluate(() => {
+        document.documentElement.classList.remove("dark");
+        document.documentElement.classList.add("light");
+      });
+    }
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await settleLayout();
+      await page.screenshot({
+        path: join(screenshotDirectory, `issue-970-audit-${viewport.width}-light.png`),
+      });
+      if (viewport.width > 1000) {
+        await page.screenshot({ path: join(screenshotDirectory, "issue-970-audit-desktop-focus.png") });
+      }
+      if (viewport.width <= 1000) {
+        await page.evaluate(() => {
+          document.documentElement.classList.remove("light");
+          document.documentElement.classList.add("dark");
+        });
+        await settleLayout();
+        await page.screenshot({ path: join(screenshotDirectory, "issue-970-audit-mobile-dark.png") });
+        await page.evaluate(() => {
+          document.documentElement.classList.remove("dark");
+          document.documentElement.classList.add("light");
+        });
+      }
+      if (viewport.width > 1000) {
+        await page.evaluate(() => {
+          document.documentElement.classList.remove("light");
+          document.documentElement.classList.add("dark");
+        });
+        await settleLayout();
+        await page.screenshot({ path: join(screenshotDirectory, "issue-970-audit-desktop-dark.png") });
+        await page.evaluate(() => {
+          document.documentElement.classList.remove("dark");
+          document.documentElement.classList.add("light");
+        });
+      }
+    }
     assert.equal(
       requests
         .filter((request) => request.path === "/platform/audit/requests")
@@ -917,9 +1089,12 @@ try {
     assert.ok(auditEvents.every((event) => event.referringId && event.changes));
     assert.ok(
       auditEvents.every((event) =>
-        Object.values(event.changes).every((change) =>
-          Object.hasOwn(change, "from") && Object.hasOwn(change, "to"),
-        ),
+        Object.values(event.changes).every((change) => {
+          if (Object.hasOwn(change, "before") && Object.hasOwn(change, "after")) {
+            return true;
+          }
+          return Object.hasOwn(change, "from") && Object.hasOwn(change, "to");
+        }),
       ),
     );
     auditUnavailable = true;
@@ -1179,10 +1354,12 @@ try {
   console.error("URL", page?.url());
   console.error(
     "ACTIVE_ELEMENT",
-    await page?.evaluate(() => ({
-      tag: document.activeElement?.tagName,
-      id: document.activeElement?.id,
-    })),
+    await page
+      ?.evaluate(() => ({
+        tag: document.activeElement?.tagName,
+        id: document.activeElement?.id,
+      }))
+      .catch(() => null),
   );
   console.error(
     "PAGE",
@@ -1212,7 +1389,12 @@ try {
             windowsHide: true,
           });
         } catch (error) {
-          await new Promise(setImmediate);
+          try {
+            serverProcess.kill();
+          } catch {
+            // taskkill já foi solicitado; a verificação abaixo confirma o encerramento.
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1_500));
           if (error && typeof error === "object" && error.code === "EPERM") throw error;
           if (!hasProcessExited(serverProcess.pid)) throw error;
         }

@@ -1,6 +1,10 @@
+import { reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { TaskServiceEnv } from "../config/env.js";
+import { TASK_ASSIGNMENT_FILTER_VALUES } from "../constants/integracaoTask.js";
+import { DOCX_MIME_TYPE } from "../utils/docx.js";
+import { PDF_MIME_TYPE } from "../utils/pdf.js";
 
 const successJson = {
   content: {
@@ -49,11 +53,16 @@ const createTaskRequestBody = createObjectRequestBody({
     billing: "Realizar",
     urgency: "ALTA",
     responsible_id: "user-uuid",
-    responsible2_id: "backup-user-uuid",
-    responsible3_id: null,
     prevision_date: "2026-04-10",
   },
-  required: ["model_id", "project_id", "client_id", "prospecting_status", "urgency"],
+  required: [
+    "model_id",
+    "project_id",
+    "client_id",
+    "prospecting_status",
+    "urgency",
+    "department_id",
+  ],
   properties: {
     model_id: { type: "string" },
     project_id: { type: "string" },
@@ -65,9 +74,7 @@ const createTaskRequestBody = createObjectRequestBody({
     observations: { type: "string" },
     billing: { type: "string" },
     urgency: { type: "string" },
-    responsible_id: { type: "string" },
-    responsible2_id: { type: ["string", "null"] },
-    responsible3_id: { type: ["string", "null"] },
+    responsible_id: { type: ["string", "null"] },
     prevision_date: { type: "string", format: "date" },
   },
 });
@@ -75,6 +82,7 @@ const createTaskRequestBody = createObjectRequestBody({
 const updateTaskRequestBody = createObjectRequestBody({
   example: {
     task_id: "task-uuid",
+    model_id: "task-model-uuid",
     name: "Contato com cliente",
     status: "Em Andamento",
     department_id: "department-uuid",
@@ -82,22 +90,19 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: "Realizar",
     urgency: "MEDIA",
     responsible_id: "user-uuid",
-    responsible2_id: "backup-user-uuid",
-    responsible3_id: null,
     prevision_date: "2026-04-10T09:00:00.000Z",
   },
   required: ["task_id"],
   properties: {
     task_id: { type: "string" },
+    model_id: { type: "string" },
     name: { type: "string" },
     status: { type: "string" },
     department_id: { type: "string" },
     observations: { type: "string" },
     billing: { type: "string" },
     urgency: { type: "string" },
-    responsible_id: { type: "string" },
-    responsible2_id: { type: ["string", "null"] },
-    responsible3_id: { type: ["string", "null"] },
+    responsible_id: { type: ["string", "null"] },
     prevision_date: { type: ["string", "null"], format: "date-time" },
   },
 });
@@ -236,7 +241,7 @@ const concludeTaskRequestBody = createObjectRequestBody({
     status: { type: "string" },
     prevision_date: { type: ["string", "null"], format: "date-time" },
     end_date: { type: ["string", "null"], format: "date-time" },
-    responsible_id: { type: "string" },
+    responsible_id: { type: ["string", "null"] },
     responsible2_id: { type: ["string", "null"] },
     responsible3_id: { type: ["string", "null"] },
     observations: { type: "string" },
@@ -328,6 +333,126 @@ const hireProjectPlanRequestBody = createObjectRequestBody({
   },
 });
 
+const createProjectWizardRequestBody = createObjectRequestBody({
+  example: {
+    client_id: "client-uuid",
+    name: "Novo projeto",
+    start_date: "2026-09-01T00:00:00.000Z",
+    end_date: "2026-09-30T00:00:00.000Z",
+    objective: "Objetivo do projeto",
+    revision: "revisao-opaca-da-previa",
+    tasks: [
+      {
+        name: "Revisar documentação",
+        department_id: "department-uuid",
+        model_id: "task-model-uuid",
+        prevision_date: "2026-09-15",
+        responsible_id: "user-uuid",
+      },
+    ],
+  },
+  required: ["client_id", "name", "start_date", "objective", "revision"],
+  properties: {
+    client_id: { type: "string", format: "uuid" },
+    name: { type: "string" },
+    start_date: { type: "string", format: "date-time" },
+    end_date: { type: "string", format: "date-time" },
+    objective: { type: "string" },
+    revision: { type: "string", description: "Revisão opaca retornada pela prévia do wizard." },
+    tasks: {
+      type: "array",
+      description: "Modelos repetidos na composição canônica retornam conflito.",
+      items: {
+        type: "object",
+        required: ["name", "department_id", "model_id"],
+        properties: {
+          name: { type: "string" },
+          department_id: { type: "string" },
+          model_id: { type: "string" },
+          prevision_date: { type: "string", format: "date" },
+          responsible_id: { type: ["string", "null"] },
+        },
+      },
+    },
+  },
+});
+
+const projectWizardPreviewRequestBody = createObjectRequestBody({
+  example: {
+    tasks: [
+      {
+        name: "Revisar documentação",
+        department_id: "department-uuid",
+        model_id: "task-model-uuid",
+      },
+    ],
+  },
+  properties: {
+    tasks: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["name", "department_id", "model_id"],
+        properties: {
+          name: { type: "string" },
+          department_id: { type: "string" },
+          model_id: { type: "string" },
+          prevision_date: { type: "string", format: "date" },
+          responsible_id: { type: ["string", "null"] },
+        },
+      },
+    },
+  },
+});
+
+const extractProjectWizardTasksProperties = {
+  content: {
+    type: "string",
+    description:
+      "Ata de reunião em texto, com conteúdo de até 10 MiB em bytes UTF-8. Conteúdo transitório: não é persistido, auditado nem registrado em log.",
+  },
+  name: { type: "string" },
+  objective: { type: "string" },
+  start_date: { type: "string", format: "date-time" },
+  end_date: { type: "string", format: "date-time" },
+};
+
+const extractProjectWizardTasksRequestBody = {
+  requestBody: {
+    required: true,
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["content", "name", "objective", "start_date"],
+          properties: extractProjectWizardTasksProperties,
+        },
+      },
+      "multipart/form-data": {
+        schema: {
+          type: "object",
+          required: ["file", "name", "objective", "start_date"],
+          properties: {
+            file: {
+              type: "string",
+              format: "binary",
+              description:
+                `Ata .txt, .md, .docx ou .pdf de até 10 MB; aceita text/plain para .txt, text/markdown, ` +
+                `text/plain ou text/x-markdown para .md, ${DOCX_MIME_TYPE} para .docx e ${PDF_MIME_TYPE} ` +
+                `para .pdf; só o texto já presente no arquivo é lido, sem OCR e sem executar macros, ` +
+                `campos ativos ou ações; conteúdo transitório.`,
+            },
+            name: extractProjectWizardTasksProperties.name,
+            objective: extractProjectWizardTasksProperties.objective,
+            start_date: extractProjectWizardTasksProperties.start_date,
+            end_date: extractProjectWizardTasksProperties.end_date,
+          },
+        },
+      },
+    },
+  },
+};
+
 export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
 
@@ -347,6 +472,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       { name: "IntegracaoTasks", description: "CRUD tarefas de integracao" },
       { name: "TaskModel", description: "Modelos de tarefa" },
       { name: "ProjectPlan", description: "Planos de projeto" },
+      { name: "ProjectWizard", description: "Criação de projeto com tarefas manuais" },
       { name: "TaskDependent", description: "Dependencias entre modelos" },
       { name: "TaskIntegration", description: "Vinculos integracao Regularize" },
       { name: "Financeiro", description: "Cobranca financeira" },
@@ -470,12 +596,14 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                     source: { type: "string", enum: ["integracao.tasks"] },
                     fields: { type: "array", minItems: 1, items: { type: "string" } },
                     limit: { type: "integer", minimum: 1, maximum: 101 },
+                    query: reportingQueryOpenApiSchema,
                   },
                 },
               },
             },
           },
           responses: {
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
             "200": { description: "Linhas extraídas" },
             "400": { description: "Entrada inválida" },
             "403": { description: "Grant, token ou campo inválido" },
@@ -540,6 +668,12 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             { name: "ref", in: "query", schema: { type: "string" } },
             { name: "ref_id", in: "query", schema: { type: "string" } },
             { name: "search", in: "query", schema: { type: "string" } },
+            { name: "client_id", in: "query", schema: { type: "string", format: "uuid" } },
+            {
+              name: "assignment",
+              in: "query",
+              schema: { type: "string", enum: TASK_ASSIGNMENT_FILTER_VALUES },
+            },
             { name: "page", in: "query", schema: { type: "integer" } },
             { name: "limit", in: "query", schema: { type: "integer" } },
           ],
@@ -561,10 +695,11 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                             type: "array",
                             items: {
                               type: "object",
-                              required: ["id", "isOwn"],
+                              required: ["id", "isOwn", "isUnassigned"],
                               properties: {
                                 id: { type: "string" },
                                 isOwn: { type: "boolean" },
+                                isUnassigned: { type: "boolean" },
                               },
                             },
                           },
@@ -835,6 +970,75 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Contratado", ...successJson } },
         },
       },
+      "/task/project-wizard": {
+        post: {
+          tags: ["ProjectWizard"],
+          summary: "Confirmar projeto e tarefas atomicamente pelo wizard",
+          description:
+            "Idempotência por organização e chave: o mesmo comando, inclusive concorrente, retorna o snapshot original sem novas criações. Auditoria após commit, somente na criação nova, com IDs e contagens; falha de auditoria não altera a resposta.",
+          security: bearer,
+          parameters: [
+            {
+              name: "Idempotency-Key",
+              in: "header",
+              required: true,
+              description: "Na mesma organização, reutilize a chave apenas para o mesmo comando.",
+              schema: { type: "string", minLength: 1, maxLength: 255 },
+            },
+          ],
+          ...createProjectWizardRequestBody,
+          responses: {
+            "201": {
+              description:
+                "Projeto, tarefas principais e dependências criados, ou snapshot original no replay",
+              ...successJson,
+            },
+            "400": { description: "Entrada ou chave inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão de Integração" },
+            "404": { description: "Cliente não encontrado na organização" },
+            "409": {
+              description: "Chave usada com outro comando, prévia desatualizada ou Modelo repetido",
+            },
+            "500": { description: "Falha na confirmação; nenhuma criação parcial é persistida" },
+          },
+        },
+      },
+      "/task/project-wizard/extract-tasks": {
+        post: {
+          tags: ["ProjectWizard"],
+          summary: "Extrair Tarefas propostas de uma Ata com a OpenAI",
+          description:
+            "Exige nível 2+ em Integração ou owner. Atas extensas são processadas integralmente em partes; uma falha em qualquer parte invalida a Ata inteira. A Ata e a resposta bruta do provedor são transitórias.",
+          security: bearer,
+          ...extractProjectWizardTasksRequestBody,
+          responses: {
+            "200": { description: "Tarefas propostas para revisão", ...successJson },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão de Integração" },
+            "422": { description: "Nenhuma tarefa identificada na Ata" },
+            "429": { description: "Muitas extrações seguidas" },
+            "502": { description: "Falha do provedor de IA" },
+          },
+        },
+      },
+      "/task/project-wizard/preview": {
+        post: {
+          tags: ["ProjectWizard"],
+          summary: "Gerar prévia canônica das tarefas e dependências do wizard",
+          security: bearer,
+          ...projectWizardPreviewRequestBody,
+          responses: {
+            "200": { description: "Prévia e revisão opaca", ...successJson },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão de Integração" },
+            "409": { description: "Modelo repetido na composição" },
+            "422": { description: "Modelo, departamento ou responsável inelegível" },
+          },
+        },
+      },
       "/task/deps/list": {
         get: {
           tags: ["TaskDependent"],
@@ -848,6 +1052,13 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["TaskDependent"],
           summary: "Listar opções ativas para modelos de tarefa",
           security: bearer,
+          parameters: [
+            {
+              name: "department_id",
+              in: "query",
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
           responses: { "200": { description: "Opções", ...successJson } },
         },
       },

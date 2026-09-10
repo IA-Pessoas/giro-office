@@ -5,13 +5,22 @@ import {
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
-import type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracaoTask.js";
+import {
+  type IntegracaoTaskStatus,
+  TASK_ASSIGNMENT_FILTER,
+  type TaskAssignmentFilter,
+  type TaskBilling,
+} from "../constants/integracaoTask.js";
 import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
+import {
+  assertResponsibleUsersInDepartment,
+  listEligibleTaskResponsibles,
+} from "./responsibleUserContext.js";
+import { ACTIVE_TASK_CONFLICT_MESSAGE, throwIfActiveTaskConflict } from "./taskActiveConflict.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
 
 const TASK_DETAIL_SELECT = {
@@ -71,6 +80,7 @@ const TASK_LIST_SELECT = {
 } as const;
 
 const TASK_UPDATE_SELECT = {
+  model_id: true,
   name: true,
   status: true,
   department_id: true,
@@ -99,6 +109,7 @@ export type TaskListRow = Omit<
   "responsible_id" | "responsible2_id" | "responsible3_id"
 > & {
   isOwn: boolean;
+  isUnassigned: boolean;
 };
 
 export type { IntegracaoTaskStatus, TaskBilling } from "../constants/integracaoTask.js";
@@ -119,10 +130,11 @@ export interface CreateTaskCrudRequest {
   observations: string;
   billing?: TaskBilling;
   urgency: string;
-  responsible_id?: string;
+  responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
   prevision_date?: Date | string | null;
+  createDependencies?: boolean;
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
 }
@@ -132,13 +144,14 @@ export interface UpdateTaskCrudRequest {
   user_id: string;
   organization_id: string;
   task_id: string;
+  model_id?: string;
   name?: string;
   status?: IntegracaoTaskStatus;
   department_id?: string;
   observations?: string;
   billing?: TaskBilling;
   urgency?: string;
-  responsible_id?: string;
+  responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
   prevision_date?: Date | string | null;
@@ -161,6 +174,8 @@ export interface ListTaskCrudParams {
   ref: string;
   ref_id: string;
   search: string;
+  client_id?: string;
+  assignment?: TaskAssignmentFilter;
   page: number;
   limit: number;
   integracaoLevel?: IntegracaoPermissionLevel;
@@ -179,6 +194,75 @@ function taskAuthorization(data: {
     organizationId: data.organization_id,
     isOwner: data.isOwner === true,
   };
+}
+
+async function assertTaskDepartmentInOrganization(
+  prisma: Pick<Prisma.TransactionClient, "department">,
+  organizationId: string,
+  departmentId: string,
+): Promise<void> {
+  const department = await prisma.department.findFirst({
+    where: { id: departmentId, organization_id: organizationId },
+    select: { id: true },
+  });
+  if (!department) {
+    throw new ServiceError(422, "Departamento não pertence à organização informada.");
+  }
+}
+
+async function assertNoActiveTaskForModel(
+  prisma: Pick<Prisma.TransactionClient, "task">,
+  params: {
+    organizationId: string;
+    projectId: string;
+    modelId: string;
+    excludeTaskId?: string;
+  },
+): Promise<void> {
+  const duplicate = await prisma.task.findFirst({
+    where: {
+      ...(params.excludeTaskId ? { id: { not: params.excludeTaskId } } : {}),
+      organization_id: params.organizationId,
+      project_id: params.projectId,
+      model_id: params.modelId,
+      status: { in: ACTIVE_TASK_STATUSES },
+    },
+  });
+
+  if (duplicate) {
+    throw new ServiceError(409, ACTIVE_TASK_CONFLICT_MESSAGE);
+  }
+}
+
+export function resolveEligibleTaskResponsible(
+  candidates: Array<{ id: string }>,
+  modelDefaultId: string | null | undefined,
+  requestedId: string | null | undefined,
+): string | null {
+  const eligibleIds = new Set(candidates.map(({ id }) => id));
+
+  if (typeof requestedId === "string") {
+    if (!eligibleIds.has(requestedId)) {
+      throw new ServiceError(422, "Responsável não é elegível para o departamento informado.");
+    }
+    return requestedId;
+  }
+
+  if (requestedId === null && candidates.length > 0) {
+    throw new ServiceError(422, "Sem responsável só é permitido quando não há candidato elegível.");
+  }
+
+  if (modelDefaultId && eligibleIds.has(modelDefaultId)) {
+    return modelDefaultId;
+  }
+  if (candidates.length === 1) {
+    return candidates[0].id;
+  }
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  throw new ServiceError(422, "Selecione um responsável elegível para a tarefa.");
 }
 
 export class TaskCrudService {
@@ -268,126 +352,168 @@ export class TaskCrudService {
     return { create };
   }
 
+  /** O chamador controla commit/rollback e os efeitos após o commit. */
+  async createTaskInTransaction(
+    data: CreateTaskCrudRequest,
+    tx: Prisma.TransactionClient,
+  ): Promise<{ create: TaskCreateRow; dependentCreates: Array<{ create: TaskCreateRow }> }> {
+    requireIntegracaoRouteAccess("POST", "/task", taskAuthorization(data));
+
+    const project = await tx.project.findFirst({
+      where: { id: data.project_id, organization_id: data.organization_id },
+      select: { client_id: true },
+    });
+
+    if (!project) {
+      throw new ServiceError(404, "Projeto nao encontrado.");
+    }
+
+    if (project.client_id !== data.client_id) {
+      throw new ServiceError(400, "Projeto nao pertence ao cliente informado.");
+    }
+
+    await assertNoActiveTaskForModel(tx, {
+      organizationId: data.organization_id,
+      projectId: data.project_id,
+      modelId: data.model_id,
+    });
+
+    const isManualFlow = data.department_id !== undefined;
+    const model = await tx.taskModel.findFirst({
+      where: {
+        id: data.model_id,
+        organization_id: data.organization_id,
+        ...(data.department_id !== undefined
+          ? {
+              department_id: data.department_id,
+              type: "Projeto",
+              department: { status: "Ativo" },
+            }
+          : {}),
+      },
+    });
+
+    if (!model) {
+      if (isManualFlow) {
+        throw new ServiceError(
+          422,
+          "Modelo de tarefa não é elegível para o departamento informado.",
+        );
+      }
+      throw new ServiceError(404, "Tarefa modelo não existe.");
+    }
+
+    const billing = data.billing ?? model.billing;
+    let defaultStatus = "A Realizar";
+    if (data.prospecting_status === "Fechado") {
+      defaultStatus = "Em Andamento";
+    }
+    if (billing === "Realizar") {
+      defaultStatus = "A Realizar";
+    }
+
+    const status = data.status ?? defaultStatus;
+    const departmentId = data.department_id ?? model.department_id;
+    let responsibleId =
+      data.responsible_id !== undefined ? data.responsible_id : model.responsible_id;
+    const responsible2Id = isManualFlow
+      ? null
+      : data.responsible2_id !== undefined
+        ? data.responsible2_id
+        : model.responsible2_id;
+    const responsible3Id = isManualFlow
+      ? null
+      : data.responsible3_id !== undefined
+        ? data.responsible3_id
+        : model.responsible3_id;
+    const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
+    const previsionDate =
+      data.prevision_date === undefined || data.prevision_date === null
+        ? null
+        : typeof data.prevision_date === "string"
+          ? new Date(`${data.prevision_date}T00:00:00.000Z`)
+          : data.prevision_date;
+
+    await assertTaskDepartmentInOrganization(tx, data.organization_id, departmentId);
+    if (isManualFlow) {
+      const eligibleResponsibles = await listEligibleTaskResponsibles(
+        tx,
+        data.organization_id,
+        departmentId,
+      );
+      responsibleId = resolveEligibleTaskResponsible(
+        eligibleResponsibles,
+        model.responsible_id,
+        data.responsible_id,
+      );
+    }
+    await assertResponsibleUsersInDepartment(tx, data.organization_id, departmentId, [
+      isManualFlow ? undefined : responsibleId,
+      responsible2Id,
+      responsible3Id,
+    ]);
+
+    const create = await tx.task.create({
+      data: {
+        organization_id: data.organization_id,
+        model_id: data.model_id,
+        project_id: data.project_id,
+        client_id: data.client_id,
+        name: data.name ?? model.name,
+        status,
+        department_id: departmentId,
+        observations: data.observations,
+        billing,
+        urgency: data.urgency,
+        responsible_id: responsibleId,
+        responsible2_id: responsible2Id,
+        responsible3_id: responsible3Id,
+        start_date: status === "Em Andamento" ? new Date() : null,
+        prevision_date: previsionDate,
+        pending_approval: false,
+        charge_comercial,
+        charge_financeiro: false,
+      },
+      select: TASK_CREATE_SELECT,
+    });
+
+    const dependents =
+      data.createDependencies === false
+        ? []
+        : await tx.taskDependent.findMany({
+            where: {
+              task_id: data.model_id,
+              organization_id: data.organization_id,
+            },
+            select: DEPENDENTS_FOR_CREATE_SELECT,
+          });
+
+    const dependentCreates = await Promise.all(
+      dependents.map((dep: (typeof dependents)[number]) => {
+        let statusDependent = data.prospecting_status === "Fechado" ? "Em Andamento" : "A Realizar";
+        statusDependent = dep.wait === false ? statusDependent : "Em Espera";
+
+        return this.#createDependentTaskInstance({
+          prisma: tx,
+          user_id: data.user_id,
+          organization_id: data.organization_id,
+          model_id: dep.dependent_id,
+          status: statusDependent,
+          project_id: data.project_id,
+          client_id: data.client_id,
+          observations: dep.observation,
+        });
+      }),
+    );
+
+    return { create, dependentCreates };
+  }
+
   async createTask(data: CreateTaskCrudRequest): Promise<{ create: TaskCreateRow }> {
     try {
-      requireIntegracaoRouteAccess("POST", "/task", taskAuthorization(data));
-
-      const project = await prismaClient.project.findFirst({
-        where: { id: data.project_id, organization_id: data.organization_id },
-        select: { client_id: true },
-      });
-
-      if (!project) {
-        throw new ServiceError(404, "Projeto nao encontrado.");
-      }
-
-      if (project.client_id !== data.client_id) {
-        throw new ServiceError(400, "Projeto nao pertence ao cliente informado.");
-      }
-
-      const dup = await prismaClient.task.findFirst({
-        where: {
-          organization_id: data.organization_id,
-          project_id: data.project_id,
-          model_id: data.model_id,
-          status: { in: ["Em Andamento", "A Realizar", "Em Espera"] },
-        },
-      });
-
-      if (dup) {
-        throw new ServiceError(409, "Tarefa já foi cadastrada em andamento.");
-      }
-
-      const model = await prismaClient.taskModel.findFirst({
-        where: { id: data.model_id, organization_id: data.organization_id },
-      });
-
-      if (!model) {
-        throw new ServiceError(404, "Tarefa modelo não existe.");
-      }
-
-      const billing = data.billing ?? model.billing;
-      let defaultStatus = "A Realizar";
-      if (data.prospecting_status === "Fechado") {
-        defaultStatus = "Em Andamento";
-      }
-      if (billing === "Realizar") {
-        defaultStatus = "A Realizar";
-      }
-
-      const status = data.status ?? defaultStatus;
-      const departmentId = data.department_id ?? model.department_id;
-      const responsibleId = data.responsible_id ?? model.responsible_id;
-      const responsible2Id = data.responsible2_id ?? model.responsible2_id;
-      const responsible3Id = data.responsible3_id ?? model.responsible3_id;
-      const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
-      const previsionDate =
-        data.prevision_date === undefined || data.prevision_date === null
-          ? null
-          : typeof data.prevision_date === "string"
-            ? new Date(`${data.prevision_date}T00:00:00.000Z`)
-            : data.prevision_date;
-
-      const { create, dependentCreates } = await this.#runTransaction(async (tx) => {
-        await assertResponsibleUsersInDepartment(tx, data.organization_id, departmentId, [
-          responsibleId,
-          responsible2Id,
-          responsible3Id,
-        ]);
-
-        const create = await tx.task.create({
-          data: {
-            organization_id: data.organization_id,
-            model_id: data.model_id,
-            project_id: data.project_id,
-            client_id: data.client_id,
-            name: data.name ?? model.name,
-            status,
-            department_id: departmentId,
-            observations: data.observations,
-            billing,
-            urgency: data.urgency,
-            responsible_id: responsibleId,
-            responsible2_id: responsible2Id,
-            responsible3_id: responsible3Id,
-            start_date: status === "Em Andamento" ? new Date() : null,
-            prevision_date: previsionDate,
-            pending_approval: false,
-            charge_comercial,
-            charge_financeiro: false,
-          },
-          select: TASK_CREATE_SELECT,
-        });
-
-        const dependents = await tx.taskDependent.findMany({
-          where: {
-            task_id: data.model_id,
-            organization_id: data.organization_id,
-          },
-          select: DEPENDENTS_FOR_CREATE_SELECT,
-        });
-
-        const dependentCreates = await Promise.all(
-          dependents.map((dep: (typeof dependents)[number]) => {
-            let statusDependent =
-              data.prospecting_status === "Fechado" ? "Em Andamento" : "A Realizar";
-            statusDependent = dep.wait === false ? statusDependent : "Em Espera";
-
-            return this.#createDependentTaskInstance({
-              prisma: tx,
-              user_id: data.user_id,
-              organization_id: data.organization_id,
-              model_id: dep.dependent_id,
-              status: statusDependent,
-              project_id: data.project_id,
-              client_id: data.client_id,
-              observations: dep.observation,
-            });
-          }),
-        );
-
-        return { create, dependentCreates };
-      });
+      const { create, dependentCreates } = await this.#runTransaction((tx) =>
+        this.createTaskInTransaction(data, tx),
+      );
 
       await audit.createLog({
         userId: data.user_id,
@@ -420,6 +546,7 @@ export class TaskCrudService {
       return { create };
     } catch (err: unknown) {
       logError("Erro ao criar tarefa", { err });
+      throwIfActiveTaskConflict(err);
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível criar a tarefa.", err);
     }
@@ -485,6 +612,23 @@ export class TaskCrudService {
       const where: Prisma.TaskWhereInput = {
         organization_id: params.organization_id,
       };
+
+      if (params.client_id) {
+        const client = await prismaClient.client.findFirst({
+          where: { id: params.client_id, organization_id: params.organization_id },
+          select: { id: true },
+        });
+        if (!client) {
+          throw new ServiceError(404, "Cliente não encontrado.");
+        }
+        where.client_id = params.client_id;
+      }
+
+      if (params.assignment === TASK_ASSIGNMENT_FILTER.ASSIGNED) {
+        where.responsible_id = { not: null };
+      } else if (params.assignment === TASK_ASSIGNMENT_FILTER.UNASSIGNED) {
+        where.responsible_id = null;
+      }
       const isBasicAccess =
         (params.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) ===
           INTEGRACAO_PERMISSION_LEVEL.BASIC && params.isOwner !== true;
@@ -558,6 +702,7 @@ export class TaskCrudService {
       const data = list.map(({ responsible_id, responsible2_id, responsible3_id, ...task }) => ({
         ...task,
         isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
+        isUnassigned: responsible_id === null,
       }));
 
       return {
@@ -615,23 +760,78 @@ export class TaskCrudService {
 
       const name = data.name !== undefined ? data.name : exists.name;
       const status = data.status !== undefined ? data.status : exists.status;
+      const model_id = data.model_id !== undefined ? data.model_id : exists.model_id;
       const department_id =
         data.department_id !== undefined ? data.department_id : exists.department_id;
       const observations =
         data.observations !== undefined ? data.observations : exists.observations;
       const billing = data.billing !== undefined ? data.billing : exists.billing;
       const urgency = data.urgency !== undefined ? data.urgency : exists.urgency;
-      const responsible_id =
-        data.responsible_id !== undefined ? data.responsible_id : exists.responsible_id;
-      const responsible2_id =
-        data.responsible2_id !== undefined ? data.responsible2_id : exists.responsible2_id;
-      const responsible3_id =
-        data.responsible3_id !== undefined ? data.responsible3_id : exists.responsible3_id;
+      const departmentChanged = department_id !== exists.department_id;
+      const modelChanged = model_id !== exists.model_id;
+      const assignmentChanged = data.responsible_id !== undefined;
+      let responsible_id = exists.responsible_id;
+      let responsible2_id = exists.responsible2_id;
+      let responsible3_id = exists.responsible3_id;
+
+      if (modelChanged) {
+        await assertNoActiveTaskForModel(prismaClient, {
+          organizationId: data.organization_id,
+          projectId: exists.project_id,
+          modelId: model_id,
+          excludeTaskId: data.task_id,
+        });
+      }
+
+      if (departmentChanged) {
+        await assertTaskDepartmentInOrganization(prismaClient, data.organization_id, department_id);
+      }
+
+      if (departmentChanged || modelChanged) {
+        const model = await prismaClient.taskModel.findFirst({
+          where: {
+            id: model_id,
+            organization_id: data.organization_id,
+            department_id,
+            type: "Projeto",
+            department: { status: "Ativo" },
+          },
+          select: { id: true, responsible_id: true },
+        });
+        if (!model) {
+          throw new ServiceError(
+            422,
+            "Modelo de tarefa não é elegível para o departamento informado.",
+          );
+        }
+        const candidates = await listEligibleTaskResponsibles(
+          prismaClient,
+          data.organization_id,
+          department_id,
+        );
+        responsible_id = resolveEligibleTaskResponsible(
+          candidates,
+          model.responsible_id,
+          data.responsible_id === null ? undefined : data.responsible_id,
+        );
+        responsible2_id = null;
+        responsible3_id = null;
+      } else if (assignmentChanged) {
+        const candidates = await listEligibleTaskResponsibles(
+          prismaClient,
+          data.organization_id,
+          department_id,
+        );
+        responsible_id = resolveEligibleTaskResponsible(candidates, undefined, data.responsible_id);
+      }
 
       await assertResponsibleUsersInDepartment(prismaClient, data.organization_id, department_id, [
-        responsible_id,
-        responsible2_id,
-        responsible3_id,
+        departmentChanged || responsible2_id !== exists.responsible2_id
+          ? responsible2_id
+          : undefined,
+        departmentChanged || responsible3_id !== exists.responsible3_id
+          ? responsible3_id
+          : undefined,
       ]);
 
       let prevision_date: Date | null;
@@ -649,6 +849,7 @@ export class TaskCrudService {
       const updated = await prismaClient.task.update({
         where: { id: data.task_id },
         data: {
+          model_id,
           name,
           status,
           department_id,
@@ -686,6 +887,7 @@ export class TaskCrudService {
       return updated;
     } catch (err: unknown) {
       logError("Erro ao atualizar tarefa", { err });
+      throwIfActiveTaskConflict(err);
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível atualizar a tarefa.", err);
     }

@@ -34,12 +34,18 @@ export function createReportPreviewRouter(options: {
 
     response.json(
       createSuccessResponse(
-        await options.previewService.preview(
-          body.definition,
-          scope,
-          request.get(REQUEST_ID_HEADER) ?? "reports-preview",
-          body.parameterValues,
-        ),
+        "version" in body.definition
+          ? await options.previewService.previewComposition(
+              body.definition,
+              scope,
+              request.get(REQUEST_ID_HEADER) ?? "reports-preview",
+            )
+          : await options.previewService.preview(
+              body.definition,
+              scope,
+              request.get(REQUEST_ID_HEADER) ?? "reports-preview",
+              body.parameterValues,
+            ),
       ),
     );
   });

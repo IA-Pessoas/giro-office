@@ -1,11 +1,15 @@
 import type {
   CreateProjectData,
   DeleteProjectData,
+  ExtractProjectTasksData,
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
+  ProjectWizardPreview,
+  ProjectWizardResult,
+  ProjectWizardTaskProposal,
 } from "../types";
 import { unwrapServiceEnvelope } from "./envelope.contract.js";
 
@@ -14,7 +18,13 @@ export const PROJECT_ENDPOINTS = {
   crud: "/project",
   progress: "/project/progress",
   metrics: "/project/metrics",
+  wizard: "/task/project-wizard",
+  wizardExtractTasks: "/task/project-wizard/extract-tasks",
+  wizardPreview: "/task/project-wizard/preview",
 } as const;
+
+export const PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE =
+  "Não foi possível extrair tarefas da Ata. Revise o conteúdo ou cadastre as tarefas manualmente.";
 
 export const PROJECT_DELETE_ADMIN_MESSAGE =
   "Somente usuários com permissão administrativa na Integração podem excluir projetos.";
@@ -68,6 +78,51 @@ export function buildCreateProjectPayload(payload: CreateProjectData) {
   };
 }
 
+export function buildExtractProjectTasksPayload(payload: ExtractProjectTasksData) {
+  if ("file" in payload) {
+    const formData = new FormData();
+    formData.append("file", payload.file);
+    formData.append("name", payload.name);
+    formData.append("objective", payload.objective);
+    formData.append("start_date", payload.start_date);
+    if (payload.end_date) formData.append("end_date", payload.end_date);
+    return formData;
+  }
+
+  return {
+    content: payload.content.trim(),
+    name: payload.name,
+    objective: payload.objective,
+    start_date: payload.start_date,
+    ...(payload.end_date ? { end_date: payload.end_date } : {}),
+  };
+}
+
+export function unwrapProjectTaskProposals(body: unknown): ProjectWizardTaskProposal[] {
+  const data = unwrapProjectEnvelope<{ tasks?: unknown }>(body);
+  const tasks = isRecord(data) ? data.tasks : undefined;
+
+  const proposals = (Array.isArray(tasks) ? tasks : [])
+    .filter(isRecord)
+    .filter((task) => typeof task.name === "string" && task.name.trim())
+    .map((task) => ({
+      name: String(task.name).trim(),
+      prevision_date: typeof task.prevision_date === "string" ? task.prevision_date : undefined,
+      department_id: typeof task.department_id === "string" ? task.department_id : "",
+      model_id: typeof task.model_id === "string" ? task.model_id : "",
+      responsible_id: null,
+      ...(typeof task.prevision_date_warning === "string" && task.prevision_date_warning
+        ? { prevision_date_warning: task.prevision_date_warning }
+        : {}),
+    }));
+
+  if (proposals.length === 0) {
+    throw new Error(PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE);
+  }
+
+  return proposals;
+}
+
 export function buildDeleteProjectPayload(projectId: string): DeleteProjectData {
   return { project_id: projectId };
 }
@@ -104,6 +159,13 @@ export function unwrapUpdatedProject(body: unknown): ProjectDetail {
   return unwrapProjectEnvelope<ProjectDetail>(body);
 }
 
+export function unwrapProjectWizardResult(body: unknown): ProjectWizardResult {
+  return unwrapProjectEnvelope<ProjectWizardResult>(body);
+}
+
+export function unwrapProjectWizardPreview(body: unknown): ProjectWizardPreview {
+  return unwrapProjectEnvelope<ProjectWizardPreview>(body);
+}
 
 export function unwrapProjectMetrics(body: unknown): ProjectMetrics {
   return unwrapProjectEnvelope<ProjectMetrics>(body);

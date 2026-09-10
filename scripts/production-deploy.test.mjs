@@ -251,7 +251,7 @@ test("production pool preflight validates actual envs against rollout capacity",
     env: { ...process.env, DATABASE_POOLER_SIZE: "40" },
   });
   assert.equal(valid.status, 0, valid.stderr);
-  assert.match(valid.stdout, /steady=18.*rollout=36.*pooler=40/u);
+  assert.match(valid.stdout, /steady=19.*rollout=38.*pooler=40/u);
 
   const oversizedEnvRoot = createPoolEnvRoot("1");
   writeFileSync(path.join(oversizedEnvRoot, ".env.vps.rh-service"), "DATABASE_POOL_MAX=5\n");
@@ -261,7 +261,7 @@ test("production pool preflight validates actual envs against rollout capacity",
     env: { ...process.env, DATABASE_POOLER_SIZE: "40" },
   });
   assert.equal(oversized.status, 1);
-  assert.match(oversized.stderr, /rollout requer 44 slots.*pooler possui 40/u);
+  assert.match(oversized.stderr, /rollout requer 46 slots.*pooler possui 40/u);
 });
 
 test("production token preflight rejects a contabil token that differs from the gateway", () => {

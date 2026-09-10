@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createProjectApplication } from "../app.js";
 import { getProjectServiceEnv } from "../config/env.js";
+import { buildProjectServiceOpenApiSpec } from "../openapi/spec.js";
 import type { ProjectCrudRouteDeps } from "../routes/projectCrud.routes.js";
 import { type ProjectCrudPrisma, ProjectCrudService } from "../services/projectCrudService.js";
 
@@ -59,6 +60,7 @@ function createProjectService() {
       delete: vi.fn(async () => ({ id: "d0000000-0000-4000-8000-000000000001" })),
     },
   } as unknown as ProjectCrudPrisma;
+  prisma.$transaction = vi.fn(async (callback) => callback(prisma));
   const audit = {
     createLog: vi.fn(async () => {}),
     logUpdateIfChanged: vi.fn(async () => {}),
@@ -68,6 +70,106 @@ function createProjectService() {
 }
 
 describe("projectcrud routes", () => {
+  it("OpenAPI publica data final opcional e erro de período no POST /project", () => {
+    const operation = buildProjectServiceOpenApiSpec(env).paths["/project"].post;
+    const schema = operation.requestBody.content["application/json"].schema;
+
+    expect(schema.properties.end_date).toMatchObject({ type: "string", format: "date-time" });
+    expect(schema.required).not.toContain("end_date");
+    expect(operation.responses).toHaveProperty("400");
+  });
+
+  it("POST /project rejeita período inválido sem criar registro", async () => {
+    const project = createProjectService();
+    const response = await request(
+      createProjectApplication({ env, logger, projectCrudService: project.service }),
+    )
+      .post("/project")
+      .set(gatewayHeaders())
+      .send({
+        name: "Novo",
+        client_id: "b0000000-0000-4000-8000-000000000001",
+        start_date: "2026-09-02",
+        end_date: "2026-09-01",
+        objective: "obj",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({ success: false, code: "BAD_REQUEST" });
+    expect(project.prisma.project.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      label: "nível 2 com data final",
+      level: 2,
+      type: "user" as const,
+      endDate: "2026-09-30T18:45:00.000Z",
+    },
+    { label: "nível 2 sem data final", level: 2, type: "user" as const, endDate: undefined },
+    {
+      label: "nível 3 com datas iguais",
+      level: 3,
+      type: "user" as const,
+      endDate: "2026-09-01T00:00:00.000Z",
+    },
+    { label: "nível 3 sem data final", level: 3, type: "user" as const, endDate: undefined },
+    {
+      label: "owner com data final",
+      level: 0,
+      type: "owner" as const,
+      endDate: "2026-09-30T18:45:00.000Z",
+    },
+    { label: "owner sem data final", level: 0, type: "owner" as const, endDate: undefined },
+  ])("POST /project persiste e retorna $label", async ({ endDate, level, type }) => {
+    const project = createProjectService();
+    project.prisma.project.create = vi.fn(async ({ data }) => ({ id: PROJECT_ID, ...data }));
+    const response = await request(
+      createProjectApplication({ env, logger, projectCrudService: project.service }),
+    )
+      .post("/project")
+      .set(gatewayHeaders(level, ORG_ID, type))
+      .send({
+        name: "Novo",
+        client_id: "b0000000-0000-4000-8000-000000000001",
+        start_date: "2026-09-01T00:00:00.000Z",
+        end_date: endDate,
+        objective: "obj",
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.create.end_date).toBe(endDate ?? null);
+    expect(project.prisma.project.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        end_date: endDate ? new Date(endDate) : null,
+        sponsor_id: null,
+      }),
+      select: expect.objectContaining({ end_date: true }),
+    });
+  });
+
+  it.each([
+    { end_date: "data-inválida" },
+    { sponsor_id: "patrocinador-inválido" },
+  ])("POST /project rejeita entrada inválida %j sem persistir", async (invalidFields) => {
+    const project = createProjectService();
+    const response = await request(
+      createProjectApplication({ env, logger, projectCrudService: project.service }),
+    )
+      .post("/project")
+      .set(gatewayHeaders())
+      .send({
+        name: "Novo",
+        client_id: "b0000000-0000-4000-8000-000000000001",
+        start_date: "2026-09-01",
+        objective: "obj",
+        ...invalidFields,
+      });
+
+    expect(response.status).toBe(400);
+    expect(project.prisma.project.create).not.toHaveBeenCalled();
+  });
+
   it("POST /project sem token interno retorna 401", async () => {
     const deps: ProjectCrudRouteDeps = {
       create: vi.fn(async () => ({ create: {} })),

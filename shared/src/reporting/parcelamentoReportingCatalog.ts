@@ -1,3 +1,4 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
 export const PARCELAMENTO_REPORTING_SOURCES = [
   "parcelamento.installments",
   "parcelamento.installment_competencies",
@@ -19,7 +20,15 @@ function field(
   filter_operators: readonly string[],
   aggregations: readonly string[],
 ) {
-  return { key, label, value_type, filter_operators, aggregations };
+  return {
+    groupable: true,
+    sortable: true,
+    key,
+    label,
+    value_type,
+    filter_operators,
+    aggregations: [...new Set([...aggregations, ...reportingAggregations(value_type)])],
+  };
 }
 
 export const parcelamentoReportingCatalog = {

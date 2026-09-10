@@ -5,10 +5,14 @@ export type TaskModelDepartment = {
   name: string;
 };
 
+type TaskModelWithDepartment = Pick<TaskModel, "id" | "department_id" | "name"> & {
+  department?: TaskModelDepartment;
+};
+
 export function enrichTaskModelsWithDepartments(
   models: Array<Pick<TaskModel, "id" | "department_id" | "name">>,
   departments: TaskModelDepartment[],
-): TaskModel[] {
+): TaskModelWithDepartment[] {
   const departmentById = new Map(departments.map((department) => [department.id, department]));
 
   return models.map((model) => {
@@ -38,7 +42,7 @@ export async function fetchTaskModelsWithOptionalDepartments({
   listModels,
   listDepartments,
   onDepartmentError,
-}: FetchTaskModelsWithOptionalDepartmentsParams): Promise<TaskModel[]> {
+}: FetchTaskModelsWithOptionalDepartmentsParams): Promise<TaskModelWithDepartment[]> {
   const models = await listModels();
 
   try {

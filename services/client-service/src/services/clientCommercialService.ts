@@ -1,5 +1,5 @@
 import { ServiceError } from "@workspace/shared";
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { UpdateCommercialBody } from "../schemas/clientVerticals.schemas.js";
 
 const OPEN_TASK_STATUSES = ["A Realizar", "Em andamento", "Em Espera", "Pendente"] as const;
@@ -70,31 +70,81 @@ export async function updateCommercialClient(
     status = "ProspecÃƒÂ§ÃƒÂ£o";
   }
 
-  const updated = await prisma.client.update({
-    where: { id: clientId },
-    data: {
-      status,
-      prospecting_status,
-      ...(input.date_status !== undefined ? { date_status: input.date_status } : {}),
-      ...(input.description_prospecting !== undefined
-        ? { description_prospecting: input.description_prospecting }
-        : {}),
-      ...(input.register_date_prospecting !== undefined
-        ? { register_date_prospecting: input.register_date_prospecting }
-        : {}),
-    },
-    select: {
-      id: true,
-      name: true,
-      company_name: true,
-      fantasy_name: true,
-      cpf_cnpj: true,
-      prospecting_status: true,
-      date_status: true,
-      description_prospecting: true,
-      register_date_prospecting: true,
-    },
-  });
+  const persistUpdate = async (database: PrismaClient | Prisma.TransactionClient) => {
+    const updated = await database.client.update({
+      where: { id: clientId },
+      data: {
+        status,
+        prospecting_status,
+        ...(input.date_status !== undefined ? { date_status: input.date_status } : {}),
+        ...(input.description_prospecting !== undefined
+          ? { description_prospecting: input.description_prospecting }
+          : {}),
+        ...(input.register_date_prospecting !== undefined
+          ? { register_date_prospecting: input.register_date_prospecting }
+          : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        company_name: true,
+        fantasy_name: true,
+        cpf_cnpj: true,
+        prospecting_status: true,
+        date_status: true,
+        description_prospecting: true,
+        register_date_prospecting: true,
+      },
+    });
+
+    if (prospecting_status !== "Fechado") {
+      return updated;
+    }
+
+    const reopenTaskStatuses = ["A Realizar", "Em andamento"];
+    const baseWhere = {
+      status: { in: reopenTaskStatuses },
+      charge_comercial: false,
+      client_id: clientId,
+      organization_id: organizationId,
+    };
+
+    try {
+      await database.task.updateMany({
+        where: {
+          ...baseWhere,
+          billing: "Realizar",
+        },
+        data: {
+          status: "A Realizar",
+        },
+      });
+
+      await database.task.updateMany({
+        where: {
+          ...baseWhere,
+          billing: { not: "Realizar" },
+        },
+        data: {
+          status: "Em andamento",
+        },
+      });
+    } catch (err) {
+      if (typeof err === "object" && err !== null && "code" in err && err.code === "P2002") {
+        throw new ServiceError(409, "Tarefa já foi cadastrada em andamento.", err);
+      }
+      throw err;
+    }
+
+    return updated;
+  };
+
+  if (prospecting_status === "Fechado") {
+    const updated = await prisma.$transaction((tx: Prisma.TransactionClient) => persistUpdate(tx));
+    return updated as Record<string, unknown>;
+  }
+
+  const updated = await persistUpdate(prisma);
 
   if (prospecting_status === "Recusado pelo Cliente" || prospecting_status === "Paralisado") {
     await prisma.task.updateMany({
@@ -105,34 +155,6 @@ export async function updateCommercialClient(
       },
       data: {
         status: prospecting_status === "Recusado pelo Cliente" ? "NÃƒÂ£o Contratado" : "Paralisado",
-      },
-    });
-  } else if (prospecting_status === "Fechado") {
-    const reopenTaskStatuses = ["A Realizar", "Em andamento"];
-    const baseWhere = {
-      status: { in: reopenTaskStatuses },
-      charge_comercial: false,
-      client_id: clientId,
-      organization_id: organizationId,
-    };
-
-    await prisma.task.updateMany({
-      where: {
-        ...baseWhere,
-        billing: "Realizar",
-      },
-      data: {
-        status: "A Realizar",
-      },
-    });
-
-    await prisma.task.updateMany({
-      where: {
-        ...baseWhere,
-        billing: { not: "Realizar" },
-      },
-      data: {
-        status: "Em andamento",
       },
     });
   }

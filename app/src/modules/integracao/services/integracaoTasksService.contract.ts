@@ -18,6 +18,8 @@ export function buildIntegracaoTaskListParams(params: IntegracaoTaskListParams) 
     ref: params.ref ?? "",
     ref_id: params.ref_id ?? "",
     search: params.search ?? "",
+    ...(params.clientId !== undefined ? { client_id: params.clientId } : {}),
+    ...(params.assignment ? { assignment: params.assignment } : {}),
     page: params.page ?? 1,
     limit: params.limit ?? 20,
   };
@@ -31,19 +33,17 @@ export function buildCreateIntegracaoTaskPayload(payload: CreateIntegracaoTaskBo
     prospecting_status: payload.prospecting_status,
     ...(payload.name ? { name: payload.name } : {}),
     ...(payload.status ? { status: payload.status } : {}),
-    ...(payload.department_id ? { department_id: payload.department_id } : {}),
+    department_id: payload.department_id,
     observations: payload.observations ?? "",
     ...(payload.billing ? { billing: payload.billing } : {}),
     urgency: payload.urgency,
-    ...(payload.responsible_id ? { responsible_id: payload.responsible_id } : {}),
-    ...(payload.responsible2_id ? { responsible2_id: payload.responsible2_id } : {}),
-    ...(payload.responsible3_id ? { responsible3_id: payload.responsible3_id } : {}),
+    ...(payload.responsible_id !== undefined && payload.responsible_id !== "" ? { responsible_id: payload.responsible_id } : {}),
     ...(payload.prevision_date ? { prevision_date: payload.prevision_date } : {}),
   };
 }
 
 export function buildUpdateIntegracaoTaskPayload(payload: UpdateIntegracaoTaskBody) {
-  return payload;
+  return payload.responsible_id === "" ? { ...payload, responsible_id: null } : payload;
 }
 
 export function buildDeleteIntegracaoTaskPayload(taskId: string) {

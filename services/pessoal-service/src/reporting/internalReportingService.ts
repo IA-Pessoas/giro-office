@@ -1,8 +1,11 @@
 import {
+  executeReportingQuery,
   PESSOAL_LDD_REPORTING_SOURCES,
   PESSOAL_PAYROLL_REPORTING_SOURCES,
   PESSOAL_SITUATIONS_REPORTING_SOURCES,
+  type ReportingQuery,
   ServiceError,
+  withReportingSnapshot,
 } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
@@ -17,6 +20,8 @@ type ReportingDelegate = {
     where: { organization_id: string };
     select: Record<string, true>;
     take: number;
+    skip?: number;
+    orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -26,14 +31,27 @@ export class InternalReportingService {
       PrismaClient,
       "lddPessoal" | "payroll" | "situationsPessoal" | "obrigationsPessoal" | "unionPessoal"
     >,
+    private readonly inSnapshot = false,
   ) {}
 
   async extract(input: {
+    query?: ReportingQuery;
+    offset?: number;
     organizationId: string;
     source: PessoalReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+    if (input.query && !this.inSnapshot) {
+      return withReportingSnapshot(this.prisma, (transaction) =>
+        new InternalReportingService(transaction, true).extract(input),
+      );
+    }
+    if (input.query) {
+      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
+        this.extract({ ...input, query: undefined, fields, limit, offset }),
+      );
+    }
     if (!PESSOAL_REPORTING_SOURCES.includes(input.source)) {
       throw new ServiceError(403, "Fonte não publicada para relatórios.");
     }
@@ -56,6 +74,9 @@ export class InternalReportingService {
     const rows = await (delegate as unknown as ReportingDelegate).findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
+      ...(input.offset !== undefined
+        ? { skip: input.offset, orderBy: { id: "asc" as const } }
+        : {}),
       take: input.limit + 1,
     });
 

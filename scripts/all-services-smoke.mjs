@@ -216,6 +216,7 @@ const state = {
   taskDependentId: "",
   taskIntegrationId: "",
   taskId: "",
+  projectWizardRevision: "",
   planId: "",
   planTaskId: "",
   rhPointId: "",
@@ -258,6 +259,7 @@ const state = {
   certificatePfId: "",
   reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
   reportsJobId: "",
+  commercialProposalConfigId: "",
 };
 
 const cleanupTasks = [];
@@ -1594,6 +1596,22 @@ const handlers = {
     });
   },
 
+  async reportsDefinitionValidate(op) {
+    await httpRequest(op, {
+      json: {
+        definition: {
+          version: 2,
+          areas: [
+            {
+              source: "parcelamento.installments",
+              fields: isBadExpectation(op) ? [] : ["agreement_number"],
+            },
+          ],
+        },
+      },
+    });
+  },
+
   async reportsPreviewInvalidDefinition(op) {
     await httpRequest(op, { json: { definition: { sources: [] } } });
   },
@@ -1655,6 +1673,13 @@ const handlers = {
 
   async reportsSharedModelList(op) {
     await httpRequest(op);
+  },
+
+  async reportsSharedModelGet(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/models/shared/${requireState("reportsSharedModelId")}`,
+    });
   },
 
   async reportsSharedModelPatch(op) {
@@ -2909,6 +2934,7 @@ const handlers = {
 
   async parcelamentoReportingExtract(op) {
     const body = { source: "parcelamento.installments", fields: ["status"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -2939,6 +2965,7 @@ const handlers = {
 
   async clientIntegrationReportingExtract(op) {
     const body = { source: "integracao.clients", fields: ["name"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -2969,6 +2996,7 @@ const handlers = {
 
   async projectReportingExtract(op) {
     const body = { source: "integracao.projects", fields: ["name"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -2999,6 +3027,7 @@ const handlers = {
 
   async taskReportingExtract(op) {
     const body = { source: "integracao.tasks", fields: ["name"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3029,6 +3058,7 @@ const handlers = {
 
   async rhReportingExtract(op) {
     const body = { source: "rh.requests", fields: ["title"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3059,6 +3089,7 @@ const handlers = {
 
   async contabilReportingExtract(op) {
     const body = { source: "contabil.control", fields: ["competence"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3105,6 +3136,7 @@ const handlers = {
     ];
 
     for (const { body, headers, secretValue, missingSecretMessage } of requests) {
+      body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
       await httpRequest(op, {
         path: "/internal/reporting/extract",
         json: body,
@@ -3146,6 +3178,7 @@ const handlers = {
       { source: "fiscal.ipi", fields: ["ncm"], limit: 1 },
     ];
     for (const body of bodies) {
+      body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
       await httpRequest(op, {
         path: "/internal/reporting/extract",
         json: body,
@@ -3177,6 +3210,7 @@ const handlers = {
 
   async pessoalReportingExtract(op) {
     const body = { source: "pessoal.ldd", fields: ["type"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3207,6 +3241,7 @@ const handlers = {
 
   async regularizeReportingExtract(op) {
     const body = { source: "regularize.licenses", fields: ["protocol"], limit: 1 };
+    body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
     await httpRequest(op, {
       path: "/internal/reporting/extract",
       json: body,
@@ -3241,6 +3276,7 @@ const handlers = {
       { source: "ti.stock", fields: ["name"], limit: 1 },
     ];
     for (const body of bodies) {
+      body.query = { order_by: [{ field: body.fields[0], direction: "asc" }] };
       await httpRequest(op, {
         path: "/internal/reporting/extract",
         json: body,
@@ -3468,10 +3504,101 @@ const handlers = {
     });
   },
 
+  async commercialProposalConfigList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async commercialProposalConfigGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/proposal-configs/${requireState("commercialProposalConfigId")}`,
+    });
+  },
+
+  async commercialProposalConfigCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: { name: uniqueText("Smoke Proposal Config"), contract_value: 1800 },
+    });
+    if (isBadExpectation(op)) return;
+    state.commercialProposalConfigId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async commercialProposalConfigUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/proposal-configs/${requireState("commercialProposalConfigId")}`,
+      json: { name: uniqueText("Smoke Proposal Config Updated"), contract_value: 2000 },
+    });
+  },
+
+  async commercialProspectingClientList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async commercialProspectingList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async commercialProspectingCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        status: "Análise Financeira",
+        description: "Smoke commercial prospecting",
+      },
+    });
+    if (isBadExpectation(op)) return;
+    state.commercialProspectingId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async commercialProspectingGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
+    });
+  },
+
+  async commercialProspectingUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
+      json: { status: "Envio de Proposta", description: "Smoke commercial prospecting updated" },
+    });
+  },
+
+  async commercialOutboxStatus(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
   async clientList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
       query: { page: 1, limit: 5 },
+    });
+  },
+
+  async clientCommercialProspectingTransition(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/internal/commercial/prospecting-transition",
+      json: {
+        event_id: crypto.randomUUID(),
+        event_type: "commercial.prospecting.transition",
+        event_version: 1,
+        organization_id: requireState("session").organization_id,
+        client_id: requireState("primaryClientId"),
+        prospecting_id: crypto.randomUUID(),
+        from_status: null,
+        to_status: "Análise Financeira",
+        status_date: new Date().toISOString(),
+        description: "Smoke commercial projection",
+        audit_correlation_id: crypto.randomUUID(),
+        occurred_at: new Date().toISOString(),
+      },
     });
   },
 
@@ -4600,6 +4727,46 @@ const handlers = {
       return;
     }
     state.taskId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
+  },
+
+  async taskProjectWizardPreview(op) {
+    const response = await httpRequest(op, { expectedStatus: [200], json: { tasks: [] } });
+    if (isBadExpectation(op)) return;
+    state.projectWizardRevision = pickFirst(response.body, "data.revision") ?? "";
+  },
+
+  async taskProjectWizardCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      headers: { "Idempotency-Key": uniqueText("smoke-project-wizard") },
+      json: {
+        client_id: requireState("primaryClientId"),
+        name: uniqueText("Smoke Project Wizard"),
+        start_date: new Date().toISOString(),
+        objective: "Validate project creation without tasks.",
+        tasks: [],
+        revision: requireState("projectWizardRevision"),
+      },
+    });
+  },
+
+  async taskProjectWizardExtractTasks(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      form: {
+        fields: {
+          name: uniqueText("Smoke Extract Wizard"),
+          objective: "Validate meeting minutes extraction.",
+          start_date: new Date().toISOString(),
+        },
+        file: {
+          fieldName: "file",
+          path: path.join(rootDir, "scripts", "fixtures", "smoke-meeting-minutes.txt"),
+          filename: "smoke-meeting-minutes.txt",
+          contentType: "text/plain",
+        },
+      },
+    });
   },
 
   async taskGet(op) {

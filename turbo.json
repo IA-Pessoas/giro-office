@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "concurrency": "2",
+  "concurrency": "50%",
   "globalDependencies": [
     ".env",
     ".env.*",
@@ -43,6 +43,7 @@
     },
     "test": {
       "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.md"],
       "outputs": []
     }
   }

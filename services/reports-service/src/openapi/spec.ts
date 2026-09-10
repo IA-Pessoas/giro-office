@@ -2,6 +2,136 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ReportsServiceEnv } from "../config/env.js";
 
+const fieldReference = {
+  source: { type: "string" },
+  field: { type: "string", pattern: "^[a-z][a-z0-9_]*$", maxLength: 64 },
+} as const;
+const reportDefinition = {
+  type: "object",
+  additionalProperties: false,
+  required: ["sources", "columns"],
+  description:
+    "Definição legada compatível. Critérios são independentes por área. Resumos retornam group_by e aliases (padrão field_function); não retornam colunas não agrupadas. count ignora nulos; demais resumos vazios retornam null. Valores dos parâmetros devem corresponder ao tipo declarado/campo e ao operador.",
+  properties: {
+    sources: {
+      type: "array",
+      minItems: 1,
+      maxItems: 2,
+      uniqueItems: true,
+      items: { type: "string" },
+    },
+    columns: {
+      type: "array",
+      minItems: 1,
+      maxItems: 25,
+      items: {
+        type: "object",
+        required: ["source", "field", "alias"],
+        additionalProperties: false,
+        properties: { ...fieldReference, alias: { type: "string" } },
+      },
+    },
+    joins: {
+      type: "array",
+      maxItems: 1,
+      items: {
+        type: "object",
+        required: ["relation", "type"],
+        additionalProperties: false,
+        properties: {
+          relation: { type: "string" },
+          type: { type: "string", enum: ["inner", "left"] },
+        },
+      },
+    },
+    filters: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["source", "field", "operator", "parameter"],
+        properties: {
+          ...fieldReference,
+          operator: {
+            type: "string",
+            enum: ["eq", "neq", "contains", "in", "gt", "gte", "lt", "lte", "between"],
+          },
+          parameter: { type: "string" },
+        },
+      },
+    },
+    filter_groups: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["operator", "filters"],
+        properties: {
+          operator: { type: "string", enum: ["and", "or"] },
+          filters: { type: "array", minItems: 1, items: { type: "string" } },
+        },
+      },
+    },
+    parameters: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "type"],
+        properties: {
+          name: { type: "string" },
+          type: { type: "string", enum: ["string", "number", "date", "boolean"] },
+        },
+      },
+    },
+    aggregations: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["source", "field", "function"],
+        additionalProperties: false,
+        properties: {
+          ...fieldReference,
+          function: { type: "string", enum: ["count", "sum", "avg", "min", "max"] },
+          alias: {
+            type: "string",
+            description: "Opcional; padrão field_function. Deve ser único no resultado.",
+          },
+        },
+      },
+    },
+    group_by: {
+      type: "array",
+      maxItems: 25,
+      items: {
+        type: "object",
+        required: ["source", "field"],
+        additionalProperties: false,
+        properties: fieldReference,
+      },
+    },
+    order_by: {
+      type: "array",
+      maxItems: 25,
+      items: {
+        type: "object",
+        required: ["source", "field", "direction"],
+        additionalProperties: false,
+        properties: { ...fieldReference, direction: { type: "string", enum: ["asc", "desc"] } },
+      },
+    },
+    declared_cost: {
+      type: "object",
+      additionalProperties: false,
+      required: ["rows", "bytes"],
+      properties: {
+        rows: { type: "integer", minimum: 0, maximum: 50000 },
+        bytes: { type: "integer", minimum: 0, maximum: 20971520 },
+      },
+    },
+  },
+} as const;
+
 const successResponse = {
   content: {
     "application/json": {
@@ -32,6 +162,115 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
         },
       },
       schemas: {
+        ReportDefinition: reportDefinition,
+        ReportModelDefinition: {
+          oneOf: [
+            { $ref: "#/components/schemas/ReportDefinition" },
+            { $ref: "#/components/schemas/ReportComposition" },
+          ],
+        },
+        ReportComposition: {
+          type: "object",
+          additionalProperties: false,
+          required: ["version", "areas"],
+          properties: {
+            version: { type: "integer", enum: [2] },
+            areas: {
+              type: "array",
+              minItems: 1,
+              maxItems: 32,
+              description: "Áreas únicas e independentes; ordem exclusivamente visual.",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["source", "fields"],
+                properties: {
+                  source: { type: "string" },
+                  filterLogic: { type: "string", enum: ["and", "or"], default: "and" },
+                  filters: {
+                    type: "array",
+                    maxItems: 100,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["field", "operator", "value"],
+                      properties: {
+                        field: { type: "string", minLength: 1, maxLength: 64 },
+                        operator: reportDefinition.properties.filters.items.properties.operator,
+                        value: {
+                          description:
+                            "Valor tipado; in usa lista e between usa dois extremos. Máximo 100 valores, textos até 2048 caracteres.",
+                          oneOf: [
+                            { type: "string", maxLength: 2048 },
+                            { type: "number" },
+                            { type: "boolean" },
+                            {
+                              type: "array",
+                              maxItems: 100,
+                              items: {
+                                nullable: true,
+                                oneOf: [
+                                  { type: "string", maxLength: 2048 },
+                                  { type: "number" },
+                                  { type: "boolean" },
+                                ],
+                              },
+                            },
+                          ],
+                          nullable: true,
+                        },
+                      },
+                    },
+                  },
+                  parameterValues: {
+                    type: "object",
+                    additionalProperties: true,
+                    description:
+                      "Parâmetros publicados e obrigatórios da própria área, com tipos e opções do catálogo.",
+                  },
+                  groupBy: {
+                    type: "array",
+                    maxItems: 25,
+                    items: { type: "string", minLength: 1, maxLength: 64 },
+                  },
+                  aggregations: {
+                    type: "array",
+                    maxItems: 25,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["field", "function"],
+                      properties: {
+                        field: { type: "string", minLength: 1, maxLength: 64 },
+                        function: { type: "string", enum: ["count", "sum", "avg", "min", "max"] },
+                      },
+                    },
+                  },
+                  orderBy: {
+                    type: "array",
+                    maxItems: 25,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["field", "direction"],
+                      properties: {
+                        field: { type: "string", minLength: 1, maxLength: 64 },
+                        direction: { type: "string", enum: ["asc", "desc"] },
+                      },
+                    },
+                  },
+                  fields: {
+                    type: "array",
+                    minItems: 1,
+                    maxItems: 100,
+                    uniqueItems: true,
+                    items: { type: "string", minLength: 1, maxLength: 64 },
+                  },
+                },
+              },
+            },
+          },
+        },
         SuccessEnvelope: {
           type: "object",
           required: ["success", "data"],
@@ -52,6 +291,42 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
       },
     },
     paths: {
+      "/reports/definitions/validate": {
+        post: {
+          tags: ["Reports"],
+          summary: "Revisar áreas e campos autorizados sem executar ou persistir",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["definition"],
+                  properties: {
+                    definition: {
+                      oneOf: [
+                        { $ref: "#/components/schemas/ReportComposition" },
+                        { $ref: "#/components/schemas/ReportDefinition" },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Definição validada, preservando versão e ordem",
+              ...successResponse,
+            },
+            "400": { description: "Escolhas inválidas, repetidas, vazias ou acima dos limites" },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Área ou campo não autorizado" },
+          },
+        },
+      },
       "/health": {
         get: {
           tags: ["Health"],
@@ -72,7 +347,11 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           summary: "Listar catalogo de relatorios",
           security: [{ bearerAuth: [] }],
           responses: {
-            "200": { description: "Catalogo de relatorios", ...successResponse },
+            "200": {
+              description:
+                "Áreas autorizadas com key, label, module, department_label, description e fields autorizados. Agrupar por department_label; identificadores internos não são rótulos de interface.",
+              ...successResponse,
+            },
             "401": {
               description: "Contexto autenticado ausente",
               content: {
@@ -87,7 +366,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
       "/reports/preview": {
         post: {
           tags: ["Reports"],
-          summary: "Gerar prévia limitada de relatório",
+          summary: "Visualizar prévia opcional e temporária, sem execução ou histórico",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -98,7 +377,12 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["definition"],
                   additionalProperties: false,
                   properties: {
-                    definition: { type: "object", additionalProperties: true },
+                    definition: {
+                      oneOf: [
+                        { $ref: "#/components/schemas/ReportDefinition" },
+                        { $ref: "#/components/schemas/ReportComposition" },
+                      ],
+                    },
                     parameterValues: { type: "object", additionalProperties: true },
                   },
                 },
@@ -106,8 +390,10 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
             },
           },
           responses: {
+            "422": { description: "Capacidade excedida; nenhum resultado parcial" },
             "200": {
-              description: "Prévia limitada com linhas, apresentação e hasMore",
+              description:
+                "Legado: rows, presentation.columns, limit e hasMore. Composição: blocks em ordem visual, cada um com source, label amigável, rows independentes, presentation.columns com key/label amigável, limit e hasMore. Bloco vazio é válido. Nenhum resultado parcial em falha.",
               ...successResponse,
             },
             "400": { description: "Definição inválida" },
@@ -129,7 +415,12 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   type: "object",
                   additionalProperties: false,
                   properties: {
-                    definition: { type: "object", additionalProperties: true },
+                    definition: {
+                      oneOf: [
+                        { $ref: "#/components/schemas/ReportComposition" },
+                        { $ref: "#/components/schemas/ReportDefinition" },
+                      ],
+                    },
                     modelVersionId: { type: "string", format: "uuid" },
                     parameterValues: { type: "object", additionalProperties: true },
                     format: { type: "string", enum: ["json", "csv"] },
@@ -306,6 +597,9 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                 "application/pdf": {
                   schema: { type: "string", format: "binary" },
                 },
+                "application/zip": {
+                  schema: { type: "string", format: "binary" },
+                },
               },
             },
             "400": { description: "Formato inválido" },
@@ -359,7 +653,8 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["name", "definition"],
                   properties: {
                     name: { type: "string" },
-                    definition: { type: "object", additionalProperties: true },
+                    description: { type: "string", maxLength: 240, nullable: true },
+                    definition: { $ref: "#/components/schemas/ReportModelDefinition" },
                   },
                 },
               },
@@ -386,6 +681,20 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
         },
       },
       "/reports/models/shared/{id}": {
+        get: {
+          tags: ["Reports"],
+          summary: "Consultar modelo compartilhado com acesso revalidado",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Modelo compartilhado autorizado", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Concessão ou departamento indisponível" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
         patch: {
           tags: ["Reports"],
           summary: "Criar nova versão de modelo compartilhado",
@@ -402,7 +711,8 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["definition"],
                   properties: {
                     name: { type: "string" },
-                    definition: { type: "object", additionalProperties: true },
+                    description: { type: "string", maxLength: 240, nullable: true },
+                    definition: { $ref: "#/components/schemas/ReportModelDefinition" },
                   },
                 },
               },
@@ -463,7 +773,8 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["name", "definition"],
                   properties: {
                     name: { type: "string", example: "Saldo mensal" },
-                    definition: { type: "object", additionalProperties: true },
+                    description: { type: "string", maxLength: 240, nullable: true },
+                    definition: { $ref: "#/components/schemas/ReportModelDefinition" },
                   },
                 },
               },
@@ -519,7 +830,8 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   type: "object",
                   properties: {
                     name: { type: "string" },
-                    definition: { type: "object", additionalProperties: true },
+                    description: { type: "string", maxLength: 240, nullable: true },
+                    definition: { $ref: "#/components/schemas/ReportModelDefinition" },
                   },
                 },
               },

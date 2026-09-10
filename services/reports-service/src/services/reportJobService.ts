@@ -2,6 +2,7 @@ import { ServiceError } from "@workspace/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type { ReportsPrismaClient } from "../prisma/index.js";
+import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import { DEFAULT_REPORT_RETENTION_DAYS } from "../schemas/reportRetention.schemas.js";
 
@@ -20,6 +21,13 @@ export interface ReportHistoryItem {
   requested_at: Date;
   started_at: Date | null;
   finished_at: Date | null;
+  error_message: string | null;
+}
+
+export interface ReportJobView {
+  id: string;
+  status: string;
+  error_message: string | null;
 }
 
 export class ReportJobService {
@@ -34,13 +42,14 @@ export class ReportJobService {
         status: "queued",
         payload_json: input.payload as Prisma.InputJsonValue,
       },
+      select: { id: true, status: true },
     });
   }
 
   async createFromDefinition(input: {
     organizationId: string;
     userId: string;
-    definition: ReportDefinition;
+    definition: ReportDefinition | ReportComposition;
     payload: Record<string, unknown>;
   }): Promise<{ id: string; status: string }> {
     return this.prisma.$transaction(async (transaction) => {
@@ -58,7 +67,7 @@ export class ReportJobService {
           organization_id: input.organizationId,
           report_model_id: model.id,
           version: 1,
-          definition_json: input.definition,
+          definition_json: input.definition as Prisma.InputJsonValue,
         },
       });
       const retentionDays = await this.getRetentionDaysFor(
@@ -74,6 +83,7 @@ export class ReportJobService {
           status: "queued",
           payload_json: { ...input.payload, retentionDays } as Prisma.InputJsonValue,
         },
+        select: { id: true, status: true },
       });
     });
   }
@@ -110,6 +120,20 @@ export class ReportJobService {
         organization_id: input.organizationId,
         requester_id: input.userId,
       },
+      select: { id: true, status: true, error_message: true },
+    });
+    if (!job) throw new ServiceError(404, "Job de relatório não encontrado.");
+    return job;
+  }
+
+  async getVersionId(input: { organizationId: string; id: string; userId?: string }) {
+    const job = await this.prisma.reportJob.findFirst({
+      where: {
+        id: input.id,
+        organization_id: input.organizationId,
+        ...(input.userId ? { requester_id: input.userId } : {}),
+      },
+      select: { id: true, report_model_version_id: true },
     });
     if (!job) throw new ServiceError(404, "Job de relatório não encontrado.");
     return job;
@@ -188,6 +212,7 @@ export class ReportJobService {
         requested_at: true,
         started_at: true,
         finished_at: true,
+        error_message: true,
       },
     });
     const items = jobs.slice(0, input.limit) as ReportHistoryItem[];
@@ -198,7 +223,15 @@ export class ReportJobService {
   }
 
   async cancel(input: { organizationId: string; userId: string; id: string }): Promise<void> {
-    const job = await this.get(input);
+    const job = await this.prisma.reportJob.findFirst({
+      where: {
+        id: input.id,
+        organization_id: input.organizationId,
+        requester_id: input.userId,
+      },
+      select: { id: true, status: true, report_model_version_id: true },
+    });
+    if (!job) throw new ServiceError(404, "Job de relatório não encontrado.");
     if (job.status !== "queued" && job.status !== "processing") {
       throw new ServiceError(409, "O job já está em estado terminal.");
     }

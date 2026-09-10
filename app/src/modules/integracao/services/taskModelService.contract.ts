@@ -32,6 +32,10 @@ export function buildTaskModelListParams(params: TaskModelListParams = {}) {
   };
 }
 
+export function buildTaskModelOptionsParams(departmentId?: string) {
+  return departmentId ? { department_id: departmentId } : {};
+}
+
 export function normalizeTaskModelResponsibleSequence(payload: Pick<
   CreateTaskModelData,
   "responsible_id" | "responsible2_id" | "responsible3_id"

@@ -3,6 +3,7 @@ import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import type { ComercialTaskUpdateBody } from "../schemas/comercialTaskUpdateBody.schema.js";
+import { throwIfActiveTaskConflict } from "./taskActiveConflict.js";
 
 const CHARGE_COMERCIAL_SELECT = {
   id: true,
@@ -75,6 +76,7 @@ export class TaskComercialService {
       return updated;
     } catch (err: unknown) {
       logError("Erro ao atualizar cobrança comercial", { err });
+      throwIfActiveTaskConflict(err);
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível atualizar a cobrança comercial.", err);
     }

@@ -48,7 +48,7 @@ export function useProjectForm(project?: ProjectDetail | null) {
     }
 
     return null;
-  }, [values.end_date, values.name, values.objective, values.start_date]);
+  }, [values.name, values.objective, values.start_date]);
 
   const buildCreatePayload = useCallback((clientId: string): CreateProjectData => {
     return {

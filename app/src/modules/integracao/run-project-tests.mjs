@@ -1,5 +1,26 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import * as taskFormUi from "./components/taskFormModalUi.ts";
+
+runTest("task edit accepts an unassigned task while retaining required operational fields", () => {
+  assert.equal(typeof taskFormUi.getTaskEditValidationMessage, "function");
+  const values = { name: "Tarefa", status: "Em Andamento", department_id: "dep-1", model_id: "model-1", urgency: "Alta", responsible_id: "" };
+  assert.equal(taskFormUi.getTaskEditValidationMessage(values), null);
+  for (const field of ["name", "status", "department_id", "model_id", "urgency"]) {
+    assert.ok(taskFormUi.getTaskEditValidationMessage({ ...values, [field]: "" }));
+  }
+});
+
+runTest("task edit sends actual null for an empty responsible select and preserves omission", () => {
+  assert.deepEqual(buildUpdateIntegracaoTaskPayload({ task_id: "task-1", responsible_id: "" }), { task_id: "task-1", responsible_id: null });
+  assert.deepEqual(buildUpdateIntegracaoTaskPayload({ task_id: "task-1", observations: "obs" }), { task_id: "task-1", observations: "obs" });
+});
+
+runTest("task creation preserves explicit null responsible and omits secondary assignments", () => {
+  const base = { model_id: "model-1", project_id: "project-1", client_id: "client-1", prospecting_status: "Fechado", department_id: "department-1", urgency: "Alta" };
+  assert.deepEqual(buildCreateIntegracaoTaskPayload({ ...base, responsible_id: null }), { ...base, observations: "", responsible_id: null });
+  assert.equal(Object.hasOwn(buildCreateIntegracaoTaskPayload(base), "responsible_id"), false);
+});
 
 import {
   buildCreateIntegracaoTaskPayload,
@@ -15,6 +36,7 @@ import {
 import {
   buildCreateTaskModelPayload,
   buildDeleteTaskModelPayload,
+  buildTaskModelOptionsParams,
   buildTaskModelListParams,
   buildUpdateTaskModelPayload,
   normalizeTaskModelResponsibleSequence,
@@ -31,6 +53,7 @@ import {
   buildProjectListParams,
   getProjectDeleteErrorMessage,
   PROJECT_DELETE_ADMIN_MESSAGE,
+  buildExtractProjectTasksPayload,
   PROJECT_ENDPOINTS,
   unwrapCreatedProject,
   unwrapProjectDetail,
@@ -38,9 +61,20 @@ import {
   unwrapProjectList,
   unwrapProjectMetrics,
   unwrapProjectProgress,
+  unwrapProjectWizardPreview,
   unwrapUpdatedProject,
+  unwrapProjectTaskProposals,
 } from "./services/projectService.contract.ts";
 import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
+import {
+  applyWizardTaskChange,
+  getWizardTaskDateWarning,
+  getWizardExtractionSourceValidationMessage,
+  canAttemptWizardExtraction,
+  WIZARD_EXTRACTION_MAX_ATTEMPTS,
+  WIZARD_EXTRACTION_MAX_SOURCE_BYTES,
+  WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING,
+} from "./components/projectWizardUi.ts";
 import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
@@ -66,6 +100,7 @@ import {
   TASK_FORM_TEXTAREA_CLASSNAME,
   TASK_URGENCY_OPTIONS,
   getDefaultTaskUrgency,
+  getAutomaticTaskResponsibleId,
   getTaskCreateValidationMessage,
   getProjectSelectPlaceholder,
   getTaskUrgencyOptions,
@@ -82,7 +117,11 @@ import {
   getTaskModelEmptyStateMessage,
 } from "./components/taskModelConfigUi.ts";
 import { fetchTaskModelsWithOptionalDepartments } from "./hooks/useTaskModels.helpers.ts";
-import { projectMetricsQueryKey } from "./hooks/queryKeys.ts";
+import {
+  integracaoTasksListQueryKey,
+  projectMetricsQueryKey,
+  taskResponsibleOptionsQueryKey,
+} from "./hooks/queryKeys.ts";
 import { collectAdminUsersFromPages } from "../users/services/adminUsersService.helpers.ts";
 
 function runTest(name, fn) {
@@ -256,6 +295,25 @@ runTest("project endpoints use only the v1 project contract", () => {
   assert.equal(PROJECT_ENDPOINTS.crud, "/project");
   assert.equal(PROJECT_ENDPOINTS.progress, "/project/progress");
   assert.equal(PROJECT_ENDPOINTS.metrics, "/project/metrics");
+  assert.equal(PROJECT_ENDPOINTS.wizardPreview, "/task/project-wizard/preview");
+});
+
+runTest("project wizard preview keeps the server revision and hierarchy", () => {
+  const preview = unwrapProjectWizardPreview({
+    success: true,
+    data: {
+      revision: "opaque-revision",
+      tasks: [
+        {
+          name: "Principal",
+          dependencies: [{ name: "Dependência", status: "Em Espera" }],
+        },
+      ],
+    },
+  });
+
+  assert.equal(preview.revision, "opaque-revision");
+  assert.equal(preview.tasks[0].dependencies[0].status, "Em Espera");
 });
 
 runTest("project metrics query key is stable and global", () => {
@@ -408,6 +466,33 @@ runTest("buildIntegracaoTaskListParams passes query fields literally", () => {
   );
 });
 
+runTest("task list contract maps client and assignment filters without cache collisions", () => {
+  const filters = {
+    clientId: "11111111-1111-4111-8111-111111111111",
+    assignment: "unassigned",
+  };
+
+  assert.deepEqual(buildIntegracaoTaskListParams(filters), {
+    status: "Todos",
+    ref: "",
+    ref_id: "",
+    search: "",
+    client_id: filters.clientId,
+    assignment: "unassigned",
+    page: 1,
+    limit: 20,
+  });
+  assert.notDeepEqual(integracaoTasksListQueryKey(filters), integracaoTasksListQueryKey({}));
+});
+
+runTest("task list contract preserves an empty client filter for explicit rejection", () => {
+  assert.equal(buildIntegracaoTaskListParams({ clientId: "" }).client_id, "");
+  assert.notDeepEqual(
+    integracaoTasksListQueryKey({ clientId: "" }),
+    integracaoTasksListQueryKey({}),
+  );
+});
+
 runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
   assert.deepEqual(
     buildCreateIntegracaoTaskPayload({
@@ -415,6 +500,7 @@ runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
       project_id: "project-1",
       client_id: "client-1",
       prospecting_status: "Fechado",
+      department_id: "department-1",
       urgency: "Alta",
     }),
     {
@@ -422,6 +508,7 @@ runTest("buildCreateIntegracaoTaskPayload maps create body", () => {
       project_id: "project-1",
       client_id: "client-1",
       prospecting_status: "Fechado",
+      department_id: "department-1",
       observations: "",
       urgency: "Alta",
     },
@@ -442,8 +529,6 @@ runTest("buildCreateIntegracaoTaskPayload preserves optional operational details
       billing: "Não Realizar",
       urgency: "Alta",
       responsible_id: "user-1",
-      responsible2_id: "user-2",
-      responsible3_id: "user-3",
       prevision_date: "2026-08-15",
     }),
     {
@@ -458,8 +543,6 @@ runTest("buildCreateIntegracaoTaskPayload preserves optional operational details
       billing: "Não Realizar",
       urgency: "Alta",
       responsible_id: "user-1",
-      responsible2_id: "user-2",
-      responsible3_id: "user-3",
       prevision_date: "2026-08-15",
     },
   );
@@ -527,6 +610,18 @@ runTest("task model endpoints match task-service contract", () => {
   assert.equal(TASK_MODEL_ENDPOINTS.options, "/task/deps/options");
 });
 
+runTest("task model options scope eligible responsibles by department", () => {
+  assert.deepEqual(buildTaskModelOptionsParams("department-1"), {
+    department_id: "department-1",
+  });
+  assert.deepEqual(buildTaskModelOptionsParams(), {});
+  assert.deepEqual(taskResponsibleOptionsQueryKey("department-1"), [
+    "task-models",
+    "responsible-options",
+    "department-1",
+  ]);
+});
+
 runTest("task model modal uses contextual user selectors", () => {
   const options = {
     users: [{ id: "user-1", name: "Ana" }],
@@ -542,12 +637,14 @@ runTest("task model modal uses contextual user selectors", () => {
   assert.doesNotMatch(source, /listAdminUsers/);
 });
 
-runTest("task edit form loads contextual auxiliary selectors", () => {
+runTest("task form obtains legacy edit responsibles independently from project models", () => {
   const source = readFileSync(new URL("./components/TaskFormModal.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /useAssignableUsers/);
-  assert.match(source, /module: "integracao"/);
-  assert.match(source, /departmentId:/);
+  assert.match(source, /taskModelService\.list\(\{ type: "Projeto" \}\)/);
+  assert.match(source, /model\.department_id === createValues\.department_id/);
+  assert.match(source, /selectedCreateTaskModel\?\.department\?\.users/);
+  assert.match(source, /taskModelService\.listOptions\(editValues\.department_id\)/);
+  assert.doesNotMatch(source, /useAssignableUsers/);
   assert.match(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
   assert.doesNotMatch(source, /listAdminUsers/);
 });
@@ -781,7 +878,8 @@ runTest("integration write actions use the modular access level", () => {
   assert.match(tasksSource, /canEditIntegracaoTask\(integracaoAccess, task\)/);
   assert.match(taskFormSource, /const isRestrictedEdit =/);
   assert.match(taskFormSource, /enabled: open && !isRestrictedEdit/);
-  assert.match(taskFormSource, /module: "integracao"/);
+  assert.doesNotMatch(taskFormSource, /useAssignableUsers/);
+  assert.match(taskFormSource, /selectedCreateTaskModel\?\.department\?\.users/);
   assert.match(taskFormSource, /departmentId:/);
   assert.match(taskFormSource, /task_id: taskId,\s*status,\s*observations/);
   assert.match(taskFormSource, /hasRestrictedTaskAccessDenied/);
@@ -930,13 +1028,51 @@ runTest("task create validation accepts blank observations before submit", () =>
     clientId: "client-1",
     projectId: "project-1",
     modelId: "model-1",
+    departmentId: "department-1",
     prospectingStatus: "Fechado",
     urgency: "Normal",
     observations: "Detalhes da tarefa",
+    eligibleResponsibleCount: 0,
+    responsibleId: "",
   };
 
   assert.equal(getTaskCreateValidationMessage(validValues), null);
   assert.equal(getTaskCreateValidationMessage({ ...validValues, observations: "   " }), null);
+});
+
+runTest("task responsible selection follows default, sole, explicit and unassigned branches", () => {
+  const candidates = [{ id: "leader-1" }, { id: "admin-1" }];
+
+  assert.equal(getAutomaticTaskResponsibleId("leader-1", candidates), "leader-1");
+  assert.equal(getAutomaticTaskResponsibleId("legacy", [{ id: "admin-1" }]), "admin-1");
+  assert.equal(getAutomaticTaskResponsibleId("legacy", candidates), "");
+  assert.equal(getAutomaticTaskResponsibleId("legacy", []), "");
+
+  const base = {
+    clientId: "client-1",
+    projectId: "project-1",
+    modelId: "model-1",
+    departmentId: "department-1",
+    prospectingStatus: "Fechado",
+    urgency: "Normal",
+    observations: "",
+  };
+  assert.match(
+    getTaskCreateValidationMessage({
+      ...base,
+      eligibleResponsibleCount: 2,
+      responsibleId: "",
+    }),
+    /responsável elegível/i,
+  );
+  assert.equal(
+    getTaskCreateValidationMessage({
+      ...base,
+      eligibleResponsibleCount: 2,
+      responsibleId: "leader-1",
+    }),
+    null,
+  );
 });
 
 runTest("task create form marks observations as optional", () => {
@@ -1105,4 +1241,291 @@ runTest("project date fields handle native input events", () => {
       .length,
     1,
   );
+});
+
+runTest("project wizard exposes the authenticated AI extraction endpoint", () => {
+  assert.equal(PROJECT_ENDPOINTS.wizard, "/task/project-wizard");
+  assert.equal(PROJECT_ENDPOINTS.wizardExtractTasks, "/task/project-wizard/extract-tasks");
+});
+
+runTest("wizard extraction allows only three provider attempts per opening", () => {
+  assert.equal(WIZARD_EXTRACTION_MAX_ATTEMPTS, 3);
+  assert.equal(canAttemptWizardExtraction(0), true);
+  assert.equal(canAttemptWizardExtraction(2), true);
+  assert.equal(canAttemptWizardExtraction(3), false);
+  assert.equal(canAttemptWizardExtraction(4), false);
+});
+
+runTest("wizard extraction validates text and file sources before sending", () => {
+  assert.equal(getWizardExtractionSourceValidationMessage({ text: "  Ata da reunião  " }), null);
+  assert.equal(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata da reunião"], "ata.md", { type: "text/markdown" }),
+    }),
+    null,
+  );
+  assert.equal(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata da reunião"], "ata.txt", { type: "text/plain" }),
+    }),
+    null,
+  );
+  assert.equal(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata da reunião"], "ata.md", { type: "text/plain" }),
+    }),
+    null,
+  );
+  assert.equal(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata da reunião"], "ata.docx", {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+    }),
+    null,
+  );
+  assert.equal(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata da reunião"], "ata.pdf", { type: "application/pdf" }),
+    }),
+    null,
+  );
+  assert.ok(getWizardExtractionSourceValidationMessage({ text: "   " }));
+  assert.ok(getWizardExtractionSourceValidationMessage({}));
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      text: "a".repeat(WIZARD_EXTRACTION_MAX_SOURCE_BYTES + 1),
+    }),
+  );
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      file: new File([], "ata.md", { type: "text/markdown" }),
+    }),
+  );
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata"], "ata.exe", { type: "application/octet-stream" }),
+    }),
+  );
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata"], ".md", { type: "text/markdown" }),
+    }),
+  );
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["Ata"], "ata.pdf", { type: "text/plain" }),
+    }),
+  );
+  assert.ok(
+    getWizardExtractionSourceValidationMessage({
+      file: new File(["a".repeat(WIZARD_EXTRACTION_MAX_SOURCE_BYTES + 1)], "ata.md", {
+        type: "text/markdown",
+      }),
+    }),
+  );
+});
+
+runTest("extraction payload carries only the project context allowed by the spec", () => {
+  const payload = buildExtractProjectTasksPayload({
+    content: "  Ata colada  ",
+    name: "Implantação fiscal",
+    objective: "Estruturar a operação",
+    start_date: "2026-09-01",
+    end_date: "2026-09-30",
+  });
+
+  assert.deepEqual(payload, {
+    content: "Ata colada",
+    name: "Implantação fiscal",
+    objective: "Estruturar a operação",
+    start_date: "2026-09-01",
+    end_date: "2026-09-30",
+  });
+  assert.equal(Object.hasOwn(payload, "client_id"), false);
+  assert.equal(
+    Object.hasOwn(
+      buildExtractProjectTasksPayload({
+        content: "Ata",
+        name: "Projeto",
+        objective: "Objetivo",
+        start_date: "2026-09-01",
+        end_date: "",
+      }),
+      "end_date",
+    ),
+    false,
+  );
+});
+
+runTest("file extraction payload uses multipart with only the permitted project context", () => {
+  const file = new File(["Ata importada"], "ata.md", { type: "text/markdown" });
+  const payload = buildExtractProjectTasksPayload({
+    content: "Texto colado antigo",
+    file,
+    name: "Implantação fiscal",
+    objective: "Estruturar a operação",
+    start_date: "2026-09-01",
+    end_date: "2026-09-30",
+  });
+
+  assert.equal(payload instanceof FormData, true);
+  assert.deepEqual([...payload.keys()], ["file", "name", "objective", "start_date", "end_date"]);
+  assert.equal(payload.get("file"), file);
+  assert.equal(payload.get("content"), null);
+  assert.equal(payload.get("client_id"), null);
+});
+
+runTest("extraction response becomes reviewable proposals with optional fields", () => {
+  assert.deepEqual(
+    unwrapProjectTaskProposals({
+      success: true,
+      data: {
+        tasks: [
+          {
+            name: "Apurar impostos",
+            prevision_date: "2026-09-10",
+            department_id: "department-1",
+            model_id: "model-1",
+          },
+          { name: "Reunir documentos" },
+        ],
+      },
+    }),
+    [
+      {
+        name: "Apurar impostos",
+        prevision_date: "2026-09-10",
+        department_id: "department-1",
+        model_id: "model-1",
+        responsible_id: null,
+      },
+      {
+        name: "Reunir documentos",
+        prevision_date: undefined,
+        department_id: "",
+        model_id: "",
+        responsible_id: null,
+      },
+    ],
+  );
+});
+
+runTest("extraction without usable proposals is treated as a failure", () => {
+  for (const body of [
+    { success: true, data: { tasks: [] } },
+    { success: true, data: { tasks: [{ name: "   " }] } },
+    { success: true, data: {} },
+    { success: true, data: { tasks: "nao-e-lista" } },
+  ]) {
+    assert.throws(() => unwrapProjectTaskProposals(body), /Ata/);
+  }
+});
+
+runTest("step 2 only sends the meeting minutes after an explicit click and warns about OpenAI", () => {
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+
+  assert.match(projectForm, /Extrair tarefas com IA/);
+  assert.match(projectForm, /OpenAI/);
+  assert.match(projectForm, /onClick=\{\(\) => void handleExtractTasks\(\)\}/);
+  assert.doesNotMatch(projectForm, /onChange=\{[^}]*handleExtractTasks/);
+});
+
+runTest("extraction proposals carry the AI deadline warning for review", () => {
+  const [proposal] = unwrapProjectTaskProposals({
+    success: true,
+    data: {
+      tasks: [
+        {
+          name: "Apurar impostos",
+          department_id: "department-1",
+          prevision_date_warning: "Prazo não reconhecido.",
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(proposal, {
+    name: "Apurar impostos",
+    prevision_date: undefined,
+    department_id: "department-1",
+    model_id: "",
+    responsible_id: null,
+    prevision_date_warning: "Prazo não reconhecido.",
+  });
+});
+
+runTest("changing department drops the incompatible model and responsible", () => {
+  const models = [
+    { id: "model-1", department_id: "department-1", responsible_id: "user-1", department: { users: [{ id: "user-1" }, { id: "user-2" }] } },
+  ];
+  const task = { name: "Tarefa", prevision_date: "2026-09-10", department_id: "department-1", model_id: "model-1", responsible_id: "user-1" };
+
+  assert.deepEqual(applyWizardTaskChange(task, "department_id", "department-2", models), {
+    ...task,
+    department_id: "department-2",
+    model_id: "",
+    responsible_id: null,
+  });
+});
+
+runTest("changing model assigns the automatic responsible and drops the previous one", () => {
+  const models = [
+    { id: "model-1", department_id: "department-1", responsible_id: "user-1", department: { users: [{ id: "user-1" }, { id: "user-2" }] } },
+    { id: "model-2", department_id: "department-1", responsible_id: "user-9", department: { users: [{ id: "user-2" }] } },
+    { id: "model-3", department_id: "department-2", responsible_id: "user-3", department: { users: [{ id: "user-3" }] } },
+  ];
+  const task = { name: "Tarefa", department_id: "department-1", model_id: "model-1", responsible_id: "user-1" };
+
+  assert.equal(applyWizardTaskChange(task, "model_id", "model-2", models).responsible_id, "user-2");
+  assert.equal(applyWizardTaskChange(task, "model_id", "model-3", models).responsible_id, null);
+});
+
+runTest("editing the deadline clears the AI warning attached to it", () => {
+  const task = { name: "Tarefa", department_id: "", model_id: "", responsible_id: null, prevision_date_warning: "Prazo não reconhecido." };
+
+  assert.deepEqual(applyWizardTaskChange(task, "prevision_date", "2026-09-10", []), {
+    name: "Tarefa",
+    department_id: "",
+    model_id: "",
+    responsible_id: null,
+    prevision_date: "2026-09-10",
+    prevision_date_warning: undefined,
+  });
+  assert.equal(applyWizardTaskChange(task, "name", "Outra", []).prevision_date_warning, "Prazo não reconhecido.");
+});
+
+runTest("wizard task warns about an unusable AI deadline and about one outside the project period", () => {
+  const start = "2026-09-01";
+  const end = "2026-09-30";
+
+  assert.equal(getWizardTaskDateWarning({ prevision_date_warning: "Prazo não reconhecido." }, start, end), "Prazo não reconhecido.");
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-09-10" }, start, end), null);
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-08-31" }, start, end), WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING);
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-10-01" }, start, end), WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING);
+  assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-10-01" }, start, ""), null);
+  assert.equal(getWizardTaskDateWarning({}, start, end), null);
+});
+
+runTest("AI proposals arrive with the automatic responsible of the proposed model", () => {
+  const models = [
+    { id: "model-1", department_id: "department-1", responsible_id: null, department: { users: [{ id: "user-1" }] } },
+    { id: "model-2", department_id: "department-1", responsible_id: null, department: { users: [{ id: "user-1" }, { id: "user-2" }] } },
+  ];
+  const proposal = { name: "Apurar impostos", department_id: "department-1", model_id: "model-1", responsible_id: null };
+
+  assert.equal(applyWizardTaskChange(proposal, "model_id", proposal.model_id, models).responsible_id, "user-1");
+  assert.equal(applyWizardTaskChange({ ...proposal, model_id: "model-2" }, "model_id", "model-2", models).responsible_id, null);
+  assert.equal(applyWizardTaskChange({ ...proposal, model_id: "" }, "model_id", "", models).responsible_id, null);
+});
+
+runTest("step 2 accepts DOCX and PDF meeting minutes alongside TXT and Markdown", () => {
+  const projectForm = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+
+  assert.match(projectForm, /Selecione um arquivo \.txt, \.md, \.docx ou \.pdf/);
+  assert.match(
+    projectForm,
+    /accept="[^"]*\.docx[^"]*application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/,
+  );
+  assert.match(projectForm, /accept="[^"]*\.pdf[^"]*application\/pdf"/);
 });

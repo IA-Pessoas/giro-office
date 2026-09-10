@@ -12,13 +12,15 @@ import type {
   ReportDownloadResult,
   ReportHistoryPage,
   ReportHistoryScope,
+  ReportJob,
   ReportModel,
-  ReportDefinition,
+  ReportModelDefinition,
   ReportSnapshotPage,
   SharedReportModel,
 } from "../types/report.types";
 import {
   reportsHistoryQueryKey,
+  reportsJobQueryKey,
   reportsModelsQueryKey,
   reportsSnapshotQueryKey,
   REPORTS_QUERY_KEY,
@@ -70,11 +72,41 @@ export function useReportSnapshot(
   );
 }
 
+export function useReportJob(id: string | null): UseQueryResult<ReportJob, Error> {
+  return useFetch(
+    reportsJobQueryKey(id ?? "missing"),
+    () => reportsService.getJob(id ?? ""),
+    {
+      enabled: Boolean(id),
+      refetchInterval: (query) => {
+        const status = query.state.data?.status;
+        return status === "queued" || status === "processing" ? 1500 : false;
+      },
+    },
+  );
+}
+
+export function useCreateReportJobMutation(): UseMutationResult<
+  ReportJob,
+  Error,
+  ReportModelDefinition | { modelVersionId: string; parameterValues?: Record<string, unknown> }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => reportsService.createJob(input),
+    onSuccess: async (job) => {
+      queryClient.setQueryData(reportsJobQueryKey(job.id), job);
+      await queryClient.invalidateQueries({ queryKey: [...REPORTS_QUERY_KEY, "history"] });
+    },
+  });
+}
+
 export function useCancelReportJobMutation(): UseMutationResult<void, Error, string> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id) => reportsService.cancelJob(id),
-    onSuccess: async () => {
+    onSuccess: async (_data, id) => {
+      await queryClient.invalidateQueries({ queryKey: reportsJobQueryKey(id) });
       await queryClient.invalidateQueries({ queryKey: [...REPORTS_QUERY_KEY, "history"] });
     },
   });
@@ -101,6 +133,21 @@ export function useDeleteReportModelMutation(): UseMutationResult<void, Error, s
   });
 }
 
+export function useCreateReportModelMutation(): UseMutationResult<
+  ReportModel,
+  Error,
+  { name: string; description?: string; definition: ReportModelDefinition }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => reportsService.createModel(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: reportsModelsQueryKey("personal") });
+    },
+  });
+}
+
 export function useCopySharedReportModelMutation(): UseMutationResult<ReportModel, Error, string> {
   const queryClient = useQueryClient();
 
@@ -115,13 +162,13 @@ export function useCopySharedReportModelMutation(): UseMutationResult<ReportMode
 export function useUpdateSharedReportModelMutation(): UseMutationResult<
   SharedReportModel,
   Error,
-  { id: string; name?: string; definition: ReportDefinition }
+  { id: string; name?: string; description?: string | null; definition: ReportModelDefinition }
 > {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, name, definition }) =>
-      reportsService.updateSharedModel(id, { name, definition }),
+    mutationFn: ({ id, name, description, definition }) =>
+      reportsService.updateSharedModel(id, { name, description, definition }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: reportsModelsQueryKey("shared") });
     },

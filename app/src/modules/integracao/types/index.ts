@@ -87,6 +87,66 @@ export interface CreateProjectData {
   end_date?: string | null;
 }
 
+export interface CreateProjectWizardData extends CreateProjectData {
+  idempotencyKey: string;
+  revision: string;
+  tasks?: ProjectWizardTask[];
+}
+
+export interface ProjectWizardTask {
+  name: string;
+  department_id: string;
+  model_id: string;
+  prevision_date?: string;
+  responsible_id: string | null;
+}
+
+interface ExtractProjectTasksContext {
+  content: string;
+  name: string;
+  objective: string;
+  start_date: string;
+  end_date?: string | null;
+}
+
+/** Proposta da IA: o aviso é estado de revisão e nunca faz parte do payload enviado. */
+export interface ProjectWizardTaskProposal extends ProjectWizardTask {
+  prevision_date_warning?: string;
+}
+
+export type ExtractProjectTasksData =
+  | ExtractProjectTasksContext
+  | (Omit<ExtractProjectTasksContext, "content"> & { file: File });
+
+export interface ProjectWizardResult {
+  project: ProjectListItem;
+  counts: {
+    main: number;
+    dependencies: number;
+    unassigned: number;
+  };
+}
+
+export interface ProjectWizardPreview {
+  tasks: ProjectWizardPreviewTask[];
+  revision: string;
+}
+
+export interface ProjectWizardPreviewTask extends ProjectWizardTask {
+  status: "A Realizar" | "Em Espera";
+  observation: string;
+  dependencies: ProjectWizardPreviewDependency[];
+}
+
+export interface ProjectWizardPreviewDependency {
+  name: string;
+  model_id: string;
+  department_id: string;
+  status: "A Realizar" | "Em Espera";
+  observation: string;
+  responsible_id: string | null;
+}
+
 export interface UpdateProjectData {
   project_id: string;
   name: string;
@@ -102,7 +162,6 @@ export interface DeleteProjectData {
 export interface RecalculateProjectProgressData {
   project_id: string;
 }
-
 
 export interface ProjectTaskMetrics {
   total: number;

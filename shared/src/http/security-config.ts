@@ -95,7 +95,13 @@ export function createServiceCorsOptions(
       callback(new ServiceError(403, `Origin não permitida pelo ${serviceLabel}.`));
     },
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-    allowedHeaders: ["Content-Type", "Authorization", "x-request-id", CSRF_HEADER_NAME],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Idempotency-Key",
+      "x-request-id",
+      CSRF_HEADER_NAME,
+    ],
     exposedHeaders: ["x-auth-session-state"],
     credentials: true,
   };

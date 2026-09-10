@@ -27,6 +27,9 @@ const expectedRoutes = [
   "GET /task/list",
   "GET /task",
   "POST /task",
+  "POST /task/project-wizard",
+  "POST /task/project-wizard/extract-tasks",
+  "POST /task/project-wizard/preview",
   "PUT /task",
   "DELETE /task",
   "PUT /task/conclusion",
@@ -139,6 +142,25 @@ test("níveis 0 e 1 só alteram tarefa própria nos campos permitidos", () => {
   );
 });
 
+test("a política manual de tarefa rejeita responsáveis secundários", () => {
+  const policy = requirePolicy("PUT", "/task");
+
+  for (const field of ["responsible2_id", "responsible3_id"]) {
+    assert.equal(
+      evaluateIntegracaoAction(policy, {
+        userId: "user-1",
+        level: 2,
+        organizationId: "org-1",
+        resourceOrganizationId: "org-1",
+        isOwner: false,
+        requestedFields: [field],
+      }),
+      "forbidden",
+      field,
+    );
+  }
+});
+
 test("a propriedade da tarefa vale para os três responsáveis", () => {
   const readPolicy = requirePolicy("GET", "/task");
   const updatePolicy = requirePolicy("PUT", "/task");
@@ -193,6 +215,8 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
     { method: "GET", path: "/task/list", allowedLevels: [0, 1, 2, 3] },
     { method: "GET", path: "/task", allowedLevels: [0, 1, 2, 3] },
     { method: "POST", path: "/task", allowedLevels: [2, 3] },
+    { method: "POST", path: "/task/project-wizard", allowedLevels: [2, 3] },
+    { method: "POST", path: "/task/project-wizard/preview", allowedLevels: [2, 3] },
     {
       method: "PUT",
       path: "/task",
@@ -345,5 +369,45 @@ test("owner possui bypass global e exclusões preservam conflito de dependência
     INTEGRACAO_ROUTE_POLICIES.filter((policy) => policy.action === "delete").every(
       (policy) => policy.responses.dependency === 409,
     ),
+  );
+});
+
+test("a extração de tarefas por IA exige nível 2+ ou owner", () => {
+  const policy = requirePolicy("POST", "/task/project-wizard/extract-tasks");
+
+  assert.equal(policy.audit, "required");
+  for (const level of [0, 1] as const) {
+    assert.equal(
+      evaluateIntegracaoAction(policy, {
+        userId: "user-1",
+        level,
+        organizationId: "org-1",
+        resourceOrganizationId: "org-1",
+        isOwner: false,
+      }),
+      "forbidden",
+    );
+  }
+  for (const level of [2, 3] as const) {
+    assert.equal(
+      evaluateIntegracaoAction(policy, {
+        userId: "user-1",
+        level,
+        organizationId: "org-1",
+        resourceOrganizationId: "org-1",
+        isOwner: false,
+      }),
+      "allow",
+    );
+  }
+  assert.equal(
+    evaluateIntegracaoAction(policy, {
+      userId: "user-1",
+      level: 0,
+      organizationId: "org-1",
+      resourceOrganizationId: "org-2",
+      isOwner: true,
+    }),
+    "allow",
   );
 });

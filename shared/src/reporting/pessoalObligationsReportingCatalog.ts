@@ -1,3 +1,5 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
+
 const noFilterOperators: readonly string[] = [];
 
 function field(
@@ -11,8 +13,18 @@ function field(
   value_type: "string" | "boolean";
   filter_operators: readonly string[];
   aggregations: readonly string[];
+  groupable: boolean;
+  sortable: boolean;
 } {
-  return { key, label, value_type, filter_operators, aggregations: [] };
+  return {
+    groupable: true,
+    sortable: true,
+    key,
+    label,
+    value_type,
+    filter_operators,
+    aggregations: reportingAggregations(value_type),
+  };
 }
 
 export const PESSOAL_OBLIGATIONS_REPORTING_SOURCES = ["pessoal.obligations"] as const;

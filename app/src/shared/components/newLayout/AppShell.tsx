@@ -146,6 +146,7 @@ const moduleCategories: NavigationCategory[] = [
         moduleKey: "pessoal" as ModuleKey,
       },
       { path: "/tecnologia", name: "Tecnologia", icon: Code, moduleKey: "ti" as ModuleKey },
+      { path: "/comercial", name: "Comercial", icon: BadgeDollarSign, moduleKey: "comercial" as ModuleKey },
     ],
   },
   {

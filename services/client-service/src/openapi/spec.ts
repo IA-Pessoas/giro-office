@@ -1,3 +1,4 @@
+import { reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ClientServiceEnv } from "../config/env.js";
@@ -840,6 +841,27 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+      "/internal/commercial/prospecting-transition": {
+        post: {
+          tags: ["Internal"],
+          summary: "Aplicar projeção comercial idempotente no Cliente",
+          security: [{ internalToken: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": { schema: { type: "object", additionalProperties: false } },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Projeção aplicada ou já processada",
+              ...successEnvelopeContent(),
+            },
+            "403": { description: "Token interno inválido" },
+            "409": { description: "Evento de outro tenant" },
+          },
+        },
+      },
       "/internal/reporting/catalog": {
         get: {
           tags: ["Internal"],
@@ -870,12 +892,14 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                     source: { type: "string", enum: ["integracao.clients"] },
                     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
                     limit: { type: "integer", minimum: 1, maximum: 101 },
+                    query: reportingQueryOpenApiSchema,
                   },
                 },
               },
             },
           },
           responses: {
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
             "200": { description: "Linhas autorizadas", ...successEnvelopeContent() },
             "403": { description: "Token, grant ou campos inválidos" },
           },

@@ -9,12 +9,11 @@ const {
   normalizeReportsError,
   normalizeReportsPreviewError,
   unwrapReportDownload,
+  unwrapReportJobEnvelope,
   unwrapReportJobListEnvelope,
   unwrapReportsCatalogEnvelope,
   unwrapReportsEnvelope,
-} = await import(
-  "./services/reportsService.contract.ts"
-);
+} = await import("./services/reportsService.contract.ts");
 const {
   reportsCatalogQueryKey,
   reportsHistoryQueryKey,
@@ -31,9 +30,36 @@ const {
   sanitizeReportPreviewResult,
 } = await import("./utils/reportBuilder.ts");
 const appPackage = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url)));
-const reportsPageSource = await readFile(new URL("./components/ReportsCatalogPage.tsx", import.meta.url), "utf8");
-const snapshotTableSource = await readFile(new URL("./components/ReportSnapshotTable.tsx", import.meta.url), "utf8");
-const downloadActionsSource = await readFile(new URL("./components/ReportDownloadActions.tsx", import.meta.url), "utf8");
+const { buildReportComposition } = await import("./utils/reportCriteria.ts");
+const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
+const reportsPageSource = await readFile(
+  new URL("./components/ReportsCatalogPage.tsx", import.meta.url),
+  "utf8",
+);
+const reportsCreateSource = await readFile(
+  new URL("./components/ReportsCreatePanel.tsx", import.meta.url),
+  "utf8",
+);
+const reportsModelsSource = await readFile(
+  new URL("./components/ReportModelsPanel.tsx", import.meta.url),
+  "utf8",
+);
+const snapshotTableSource = await readFile(
+  new URL("./components/ReportSnapshotTable.tsx", import.meta.url),
+  "utf8",
+);
+const createPanelSource = await readFile(
+  new URL("./components/ReportsCreatePanel.tsx", import.meta.url),
+  "utf8",
+);
+const resultBlocksSource = await readFile(
+  new URL("./components/ReportResultBlocks.tsx", import.meta.url),
+  "utf8",
+);
+const downloadActionsSource = await readFile(
+  new URL("./components/ReportDownloadActions.tsx", import.meta.url),
+  "utf8",
+);
 
 function runTest(name, callback) {
   try {
@@ -45,8 +71,99 @@ function runTest(name, callback) {
   }
 }
 
+runTest("composes typed criteria and parameters independently without requiring preview", () => {
+  const source = {
+    key: "test.items",
+    label: "Itens",
+    module: "test",
+    parameters: [{ key: "enabled", label: "Ativo", type: "boolean", required: true }],
+    fields: [
+      { key: "amount", label: "Valor", type: "number", operators: ["between"], selectable: true },
+    ],
+  };
+  assert.throws(
+    () => buildReportComposition([{ source: source.key, fields: ["amount"] }], [source]),
+    /Preencha Ativo/,
+  );
+  const definition = buildReportComposition(
+    [
+      {
+        source: source.key,
+        fields: ["amount"],
+        parameterValues: { enabled: "false" },
+        filters: [{ field: "amount", operator: "between", value: "10;20" }],
+      },
+    ],
+    [source],
+  );
+  assert.equal(definition.areas[0].parameterValues.enabled, false);
+  assert.deepEqual(definition.areas[0].filters[0].value, [10, 20]);
+  assert.throws(
+    () =>
+      buildReportComposition(
+        [
+          {
+            ...definition.areas[0],
+            filters: [{ field: "amount", operator: "between", value: "10;bad" }],
+          },
+        ],
+        [source],
+      ),
+    /número válido/,
+  );
+});
+
+runTest("preserves independent empty blocks and rejects malformed composed preview", () => {
+  const block = {
+    source: "test.items",
+    label: "Itens",
+    rows: [],
+    presentation: { columns: [{ key: "name", label: "Nome" }] },
+    limit: 100,
+    hasMore: false,
+  };
+  const result = unwrapReportCompositionPreview({
+    success: true,
+    data: { blocks: [block, { ...block, source: "test.other", label: "Outros" }] },
+  });
+  assert.equal(result.blocks.length, 2);
+  assert.deepEqual(result.blocks[0].rows, []);
+  assert.throws(() => unwrapReportCompositionPreview({ blocks: [{ ...block, rows: "invalid" }] }));
+});
+
 runTest("unwraps the shared success envelope", () => {
   assert.deepEqual(unwrapReportsEnvelope({ success: true, data: { items: [] } }), { items: [] });
+});
+
+runTest("normalizes a durable job without exposing technical failures", () => {
+  assert.deepEqual(
+    unwrapReportJobEnvelope({
+      success: true,
+      data: { id: "job-1", status: "failed", error_message: "Tente novamente." },
+    }),
+    { id: "job-1", status: "failed", error_message: "Tente novamente." },
+  );
+  assert.throws(() => unwrapReportJobEnvelope({ success: true, data: { id: "job-1" } }));
+});
+
+runTest("preserves friendly department and area descriptions from the authorized catalog", () => {
+  const catalog = unwrapReportsCatalogEnvelope({
+    success: true,
+    data: {
+      items: [
+        {
+          key: "internal.projects",
+          label: "Projetos",
+          module: "internal",
+          department_label: "Equipe de projetos",
+          description: "Prazos e responsáveis dos projetos.",
+          fields: [],
+        },
+      ],
+    },
+  });
+  assert.equal(catalog.items[0].department_label, "Equipe de projetos");
+  assert.equal(catalog.items[0].description, "Prazos e responsáveis dos projetos.");
 });
 
 runTest("rejects malformed catalog data", () => {
@@ -84,39 +201,42 @@ runTest("does not expose upstream error details", () => {
 });
 
 runTest("normalizes preview errors without exposing upstream details", () => {
-  assert.deepEqual(normalizeReportsPreviewError({ response: { status: 422, data: { error: "secret" } } }), {
-    message: "Não foi possível gerar a prévia agora.",
-    status: 422,
-  });
+  assert.deepEqual(
+    normalizeReportsPreviewError({ response: { status: 422, data: { error: "secret" } } }),
+    {
+      message: "Não foi possível gerar a prévia agora.",
+      status: 422,
+    },
+  );
 });
 
 await (async () => {
   let requestedPath;
   const catalog = await fetchReportsCatalog(async (path) => {
-      requestedPath = path;
-      return {
+    requestedPath = path;
+    return {
+      data: {
+        success: true,
         data: {
-          success: true,
-          data: {
-            items: [
-              {
-                key: "rh.requests",
-                label: "Solicitações",
-                module: "rh",
-                fields: [
-                  {
-                    key: "status",
-                    label: "Status",
-                    value_type: "string",
-                    filter_operators: ["eq"],
-                    aggregations: [],
-                  },
-                ],
-              },
-            ],
-          },
+          items: [
+            {
+              key: "rh.requests",
+              label: "Solicitações",
+              module: "rh",
+              fields: [
+                {
+                  key: "status",
+                  label: "Status",
+                  value_type: "string",
+                  filter_operators: ["eq"],
+                  aggregations: [],
+                },
+              ],
+            },
+          ],
         },
-      };
+      },
+    };
   });
 
   runTest("loads catalog from the public reports endpoint", () => {
@@ -151,16 +271,24 @@ await (async () => {
 await (async () => {
   let requestedPath;
   let requestedPayload;
-  const result = await fetchReportsPreview(async (path, payload) => {
-    requestedPath = path;
-    requestedPayload = payload;
-    return {
-      data: {
-        success: true,
-        data: { rows: [], presentation: { columns: [] }, limit: 100, hasMore: false },
+  const result = await fetchReportsPreview(
+    async (path, payload) => {
+      requestedPath = path;
+      requestedPayload = payload;
+      return {
+        data: {
+          success: true,
+          data: { rows: [], presentation: { columns: [] }, limit: 100, hasMore: false },
+        },
+      };
+    },
+    {
+      definition: {
+        sources: ["requests"],
+        columns: [{ source: "requests", field: "status", alias: "status" }],
       },
-    };
-  }, { definition: { sources: ["requests"], columns: [{ source: "requests", field: "status", alias: "status" }] } });
+    },
+  );
 
   runTest("loads a valid empty preview from the preview endpoint", () => {
     assert.equal(requestedPath, "/reports/preview");
@@ -183,7 +311,7 @@ const descriptor = {
   label: "Solicitações",
   module: "rh",
   fields: [
-  {
+    {
       key: "status",
       label: "Status",
       type: "string",
@@ -271,7 +399,9 @@ runTest("builds a governed preview payload from catalog capabilities", () => {
         { source: "requests", field: "amount", alias: "amount" },
       ],
       joins: [{ relation: "department", type: "inner" }],
-      filters: [{ source: "requests", field: "status", operator: "eq", parameter: "filter_value_1" }],
+      filters: [
+        { source: "requests", field: "status", operator: "eq", parameter: "filter_value_1" },
+      ],
       filter_groups: [{ operator: "and", filters: ["filter_value_1"] }],
       parameters: [
         { name: "period", type: "string" },
@@ -286,14 +416,25 @@ runTest("builds a governed preview payload from catalog capabilities", () => {
 
 runTest("keeps empty preview results valid and exposes the backend limit", () => {
   const payload = buildReportPreviewPayload(
-    { ...builderState, fieldKeys: [], filters: [], groupBy: [], aggregations: [], orderBy: [], limit: 0 },
+    {
+      ...builderState,
+      fieldKeys: [],
+      filters: [],
+      groupBy: [],
+      aggregations: [],
+      orderBy: [],
+      limit: 0,
+    },
     descriptor,
   );
   assert.equal(payload, undefined);
 });
 
 runTest("normalizes builder state without leaking unknown catalog keys", () => {
-  assert.deepEqual(normalizeReportBuilderState(builderState, descriptor).fieldKeys, ["status", "amount"]);
+  assert.deepEqual(normalizeReportBuilderState(builderState, descriptor).fieldKeys, [
+    "status",
+    "amount",
+  ]);
 });
 
 runTest("uses one stable preview query key", () => {
@@ -304,12 +445,15 @@ runTest("exposes the governed history, snapshot, and download contracts", () => 
   assert.equal(REPORTS_ENDPOINTS.models, "/reports/models/list");
   assert.equal(REPORTS_ENDPOINTS.sharedModels, "/reports/models/shared/list");
   assert.equal(REPORTS_ENDPOINTS.jobs, "/reports/jobs/list");
+  assert.equal(REPORTS_ENDPOINTS.createJob, "/reports/jobs");
+  assert.equal(REPORTS_ENDPOINTS.createModel, "/reports/models");
+  assert.equal(REPORTS_ENDPOINTS.model("model-1"), "/reports/models/model-1");
+  assert.equal(REPORTS_ENDPOINTS.sharedModel("model-1"), "/reports/models/shared/model-1");
   assert.equal(REPORTS_ENDPOINTS.snapshot("job-1"), "/reports/jobs/job-1/snapshot");
   assert.equal(REPORTS_ENDPOINTS.download("snapshot-1"), "/reports/snapshots/snapshot-1/export");
-  assert.deepEqual(
-    buildReportJobListParams({ scope: "personal", status: "", cursor: undefined }),
-    { scope: "personal" },
-  );
+  assert.deepEqual(buildReportJobListParams({ scope: "personal", status: "", cursor: undefined }), {
+    scope: "personal",
+  });
   assert.deepEqual(reportsModelsQueryKey("personal"), ["reports", "models", "personal"]);
   assert.deepEqual(reportsHistoryQueryKey({ scope: "library", status: "completed" }), [
     "reports",
@@ -331,12 +475,43 @@ runTest("exposes the governed history, snapshot, and download contracts", () => 
   ]);
 });
 
+runTest("salva modelos somente depois do resultado e reabre com nomes amigáveis", () => {
+  assert.match(reportsCreateSource, /Salvar para usar novamente/);
+  assert.match(reportsCreateSource, /useCreateReportModelMutation/);
+  assert.match(reportsCreateSource, /description/);
+  assert.match(reportsCreateSource, /modelVersionId/);
+  assert.match(reportsModelsSource, /Abrir modelo/);
+  assert.match(reportsModelsSource, /getSharedModel|getModel/);
+  assert.doesNotMatch(reportsModelsSource, /\{model\.(organization_id|department_id|version_id)\}/);
+});
+
 runTest("uses the materialized snapshot id for in-memory downloads", () => {
   assert.match(snapshotTableSource, /snapshotQuery\.data\?\.snapshot\.id/);
-  assert.match(snapshotTableSource, /ReportDownloadActions id=\{snapshotId \?\? ""\}/);
-  assert.match(snapshotTableSource, /disabled=\{!snapshotId\}/);
+  assert.match(snapshotTableSource, /snapshotId \? <ReportDownloadActions id=\{snapshotId\}/);
   assert.match(downloadActionsSource, /URL\.createObjectURL\(result\.blob\)/);
   assert.match(downloadActionsSource, /URL\.revokeObjectURL\(objectUrl\)/);
+});
+
+runTest("renders export actions only after a completed snapshot is available", () => {
+  assert.match(downloadActionsSource, /disabled=\{disabled \|\| downloadMutation\.isPending\}/);
+  assert.match(downloadActionsSource, /aria-busy=\{downloadMutation\.isPending\}/);
+  assert.match(downloadActionsSource, /role="status"/);
+  assert.match(downloadActionsSource, /Baixar resultado em/);
+  assert.match(snapshotTableSource, /snapshotId \? <ReportDownloadActions/);
+});
+
+runTest("keeps download actions available for legacy snapshots without blocks", () => {
+  assert.match(createPanelSource, /Resultado legado carregado/);
+  assert.match(createPanelSource, /snapshot\.data\.blocks/);
+  assert.match(createPanelSource, /ReportDownloadActions id=\{snapshot\.data\.snapshot\.id\}/);
+});
+
+runTest("keeps repeated report sources distinct in the composed result", () => {
+  assert.match(resultBlocksSource, /key=\{`\$\{block\.source\}-\$\{index\}`\}/);
+});
+
+runTest("keeps composed snapshots paginable in history", () => {
+  assert.match(snapshotTableSource, /snapshotQuery\.data\?\.blocks[\s\S]*PaginationControls/);
 });
 
 runTest("keeps reports tabs module-scoped", () => {

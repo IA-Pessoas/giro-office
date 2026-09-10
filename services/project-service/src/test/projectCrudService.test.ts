@@ -1,7 +1,9 @@
 import "./envBootstrap.js";
 
+import * as shared from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
+import type { Prisma } from "../generated/prisma/client.js";
 import type { ProjectCrudPrisma } from "../services/projectCrudService.js";
 import { ProjectCrudService } from "../services/projectCrudService.js";
 
@@ -21,7 +23,7 @@ const baseCreateInput = {
 };
 
 function createMockPrisma(): ProjectCrudPrisma {
-  return {
+  const prisma = {
     client: { findFirst: vi.fn(async () => null) },
     project: {
       findFirst: vi.fn(async () => null),
@@ -31,9 +33,175 @@ function createMockPrisma(): ProjectCrudPrisma {
       delete: vi.fn(async () => ({})),
     },
   } as unknown as ProjectCrudPrisma;
+  prisma.$transaction = vi.fn(async (callback) => callback(prisma));
+  return prisma;
 }
 
 describe("ProjectCrudService", () => {
+  it("helper compartilhado cria o projeto usando somente o tx fornecido", async () => {
+    const tx = createMockPrisma();
+    tx.client.findFirst = vi.fn(async () => ({ id: CLIENT_ID }));
+    tx.project.create = vi.fn(async ({ data }) => ({ id: PROJECT_ID, ...data }));
+
+    const result = await shared.createProjectInTransaction(baseCreateInput, tx);
+
+    expect(result.create).toMatchObject({
+      id: PROJECT_ID,
+      name: "Projeto Alpha",
+      client_id: CLIENT_ID,
+      organization_id: ORG_ID,
+      status: "Em andamento",
+      start_date: new Date("2025-01-15"),
+      end_date: null,
+      objective: "Objetivo",
+      sponsor_id: null,
+      porcentage: 0,
+    });
+    expect(tx.client.findFirst).toHaveBeenCalledWith({
+      where: { id: CLIENT_ID, organization_id: ORG_ID },
+    });
+    expect(tx.project.findFirst).toHaveBeenCalledWith({
+      where: { name: "Projeto Alpha", client_id: CLIENT_ID, organization_id: ORG_ID },
+    });
+    expect(tx.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      label: "nível 1",
+      level: 1,
+      client: true,
+      duplicate: false,
+      endDate: "2025-02-15",
+      status: 403,
+    },
+    {
+      label: "cliente fora da organização",
+      level: 2,
+      client: false,
+      duplicate: false,
+      endDate: "2025-02-15",
+      status: 404,
+    },
+    {
+      label: "duplicidade",
+      level: 2,
+      client: true,
+      duplicate: true,
+      endDate: "2025-02-15",
+      status: 409,
+    },
+    {
+      label: "período inválido",
+      level: 2,
+      client: true,
+      duplicate: false,
+      endDate: "2025-01-14",
+      status: 400,
+    },
+  ])("createInTransaction preserva rejeição de $label sem gravar", async ({
+    level,
+    client,
+    duplicate,
+    endDate,
+    status,
+  }) => {
+    const prisma = createMockPrisma();
+    const tx = createMockPrisma();
+    tx.client.findFirst = vi.fn(async () => (client ? { id: CLIENT_ID } : null));
+    tx.project.findFirst = vi.fn(async () => (duplicate ? { id: PROJECT_ID } : null));
+    const audit = { createLog: vi.fn(async () => {}), logUpdateIfChanged: vi.fn(async () => {}) };
+    const service = new ProjectCrudService(prisma, audit);
+
+    await expect(
+      service.createInTransaction(
+        { ...baseCreateInput, integracaoLevel: level, end_date: new Date(endDate) },
+        tx as Prisma.TransactionClient,
+      ),
+    ).rejects.toMatchObject({ statusCode: status });
+    expect(tx.project.create).not.toHaveBeenCalled();
+    expect(prisma.project.create).not.toHaveBeenCalled();
+    expect(audit.createLog).not.toHaveBeenCalled();
+  });
+
+  it("create retorna projeto confirmado mesmo quando auditoria falha", async () => {
+    const prisma = createMockPrisma();
+    prisma.client.findFirst = vi.fn(async () => ({ id: CLIENT_ID }));
+    prisma.project.create = vi.fn(async () => ({ id: PROJECT_ID }));
+    let committed = false;
+    let auditedAfterCommit = false;
+    prisma.$transaction = vi.fn(async (callback) => {
+      const result = await callback(prisma);
+      committed = true;
+      return result;
+    });
+    const audit = {
+      createLog: vi.fn(async () => {
+        auditedAfterCommit = committed;
+        throw new Error("audit unavailable");
+      }),
+      logUpdateIfChanged: vi.fn(async () => {}),
+    };
+    const service = new ProjectCrudService(prisma, audit);
+
+    await expect(service.create(baseCreateInput)).resolves.toEqual({ create: { id: PROJECT_ID } });
+    expect(audit.createLog).toHaveBeenCalledOnce();
+    expect(auditedAfterCommit).toBe(true);
+  });
+
+  it("createInTransaction usa apenas a transação do chamador e não audita", async () => {
+    const prisma = createMockPrisma();
+    const tx = createMockPrisma();
+    tx.client.findFirst = vi.fn(async () => ({ id: CLIENT_ID }));
+    tx.project.create = vi.fn(async () => ({ id: PROJECT_ID }));
+    const audit = { createLog: vi.fn(async () => {}), logUpdateIfChanged: vi.fn(async () => {}) };
+    const service = new ProjectCrudService(prisma, audit);
+
+    const result = await service.createInTransaction(
+      { ...baseCreateInput, end_date: new Date("2025-02-15"), sponsor_id: USER_ID },
+      tx as Prisma.TransactionClient,
+    );
+
+    expect(result.create.id).toBe(PROJECT_ID);
+    expect(tx.client.findFirst).toHaveBeenCalledWith({
+      where: { id: CLIENT_ID, organization_id: ORG_ID },
+    });
+    expect(tx.project.findFirst).toHaveBeenCalledWith({
+      where: { name: "Projeto Alpha", client_id: CLIENT_ID, organization_id: ORG_ID },
+    });
+    expect(tx.project.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: ORG_ID,
+        end_date: new Date("2025-02-15"),
+        sponsor_id: USER_ID,
+      }),
+      select: expect.objectContaining({ end_date: true }),
+    });
+    expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    expect(prisma.project.create).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(tx.$transaction).not.toHaveBeenCalled();
+    expect(audit.createLog).not.toHaveBeenCalled();
+  });
+
+  it("create aguarda commit antes de auditar e não audita se commit falhar", async () => {
+    const prisma = createMockPrisma();
+    const tx = createMockPrisma();
+    tx.client.findFirst = vi.fn(async () => ({ id: CLIENT_ID }));
+    tx.project.create = vi.fn(async () => ({ id: PROJECT_ID }));
+    const audit = { createLog: vi.fn(async () => {}), logUpdateIfChanged: vi.fn(async () => {}) };
+    prisma.$transaction = vi.fn(async (callback) => {
+      await callback(tx);
+      expect(audit.createLog).not.toHaveBeenCalled();
+      throw new Error("commit failed");
+    });
+    const service = new ProjectCrudService(prisma, audit);
+
+    await expect(service.create(baseCreateInput)).rejects.toThrow("commit failed");
+    expect(tx.project.create).toHaveBeenCalledOnce();
+    expect(audit.createLog).not.toHaveBeenCalled();
+  });
+
   it("create lança 404 quando cliente não existe na organização", async () => {
     const prisma = createMockPrisma();
     prisma.client.findFirst = vi.fn(async () => null);

@@ -28,6 +28,16 @@ Consulte [`src/config/env.ts`](src/config/env.ts).
 
 Prefixo público: `/reports`.
 
+`POST /reports/definitions/validate` aceita `{ definition: { version: 2, areas: [{ source,
+fields }] } }` para revisar áreas independentes, além da definição legada. Revalida todas as
+áreas e campos contra o acesso atual; não consulta registros nem persiste modelos ou execuções.
+A ordem das áreas determina somente apresentação. Exige áreas/campos únicos e não vazios,
+até 32 áreas e 100 campos por área. Catálogo fornece `department_label` e `description` para
+apresentação, sem mapeamento de códigos no frontend.
+
+Este contrato de revisão prepara #1016; prévia, modelos e geração continuam recebendo o
+contrato legado até suas entregas específicas. Não há migração de banco nesta etapa.
+
 `GET /reports/catalog` expõe somente fontes e campos de adapters internos habilitados para a
 organização e permissões atuais. `POST /reports/preview` valida a mesma definição e devolve uma
 amostra limitada; não cria job, snapshot, arquivo ou registro persistido.
@@ -87,3 +97,10 @@ internas do catálogo.
 O adapter de situações de Departamento Pessoal usa as mesmas credenciais e publica somente status,
 título e datas de registro/conclusão; `client_id`, registrador e concluidor permanecem como chaves
 internas do catálogo.
+
+## Critérios executados na origem
+
+Filtros, parâmetros, grupos AND/OR, ordenação e resumos são encaminhados às origens reais. A definição legada aceita `group_by` e `aggregations[].alias` opcionais. A [matriz de 29 áreas e a semântica completa](docs/criteria-origins.md) documentam capacidades, limites, aliases e conjuntos vazios. Não há execução composta nem nova UI nesta predecessora #1023.
+
+## Prévia composta
+POST /reports/preview aceita definition com version: 2 e areas. Cada área mantém source e fields e admite filters (field, operator, value), filterLogic (and/or), parameterValues, groupBy, aggregations (field, function) e orderBy (field, direction). Critérios vazios são válidos. A resposta contém blocks independentes com source, label, rows, presentation.columns, limit e hasMore. A validação de todas as áreas precede a extração; falhas não retornam blocos parciais. Não cria execução, histórico ou resultado persistido. A definição legada e sua resposta continuam compatíveis. Resumos retornam apenas grupos e totais; count conta valores não nulos. Ordenação de resumos usa campos agrupados.

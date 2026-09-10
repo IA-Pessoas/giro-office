@@ -1,3 +1,4 @@
+import { reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { RhEnv } from "../config/env.js";
@@ -36,6 +37,7 @@ const internalReportingExtractRequestBody = createObjectRequestBody({
     source: { type: "string", enum: ["rh.requests", "rh.attendance", "rh.holidays"] },
     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
     limit: { type: "integer", minimum: 1, maximum: 101 },
+    query: reportingQueryOpenApiSchema,
   },
 });
 
@@ -494,6 +496,7 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           parameters: internalReportingParameters,
           ...internalReportingExtractRequestBody,
           responses: {
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
             "200": { description: "Dados extraídos", ...successJson },
             "400": { description: "Payload inválido" },
             "403": { description: "Credenciais, grant ou campo inválido" },

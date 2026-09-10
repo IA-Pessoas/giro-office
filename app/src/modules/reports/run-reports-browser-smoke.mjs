@@ -1,0 +1,549 @@
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { mkdir, readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { chromium, expect } from "@playwright/test";
+
+const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
+const baseUrl = process.env.REPORTS_BROWSER_BASE_URL || "http://127.0.0.1:3115";
+const evidenceDir = process.env.REPORTS_EVIDENCE_DIR;
+const user = {
+  id: "reports-fixture-user",
+  login: "reports.fixture",
+  name: "Pessoa de teste",
+  type: "user",
+  permission: 1,
+  organization_id: "reports-fixture-org",
+  department_id: "reports-fixture-department",
+  modules: { integracao: 1, fiscal: 1 },
+};
+const field = (key, label) => ({
+  key,
+  label,
+  value_type: "string",
+  filter_operators: ["eq", "neq", "in"],
+  aggregations: ["count"],
+  groupable: true,
+  sortable: true,
+});
+const items = [
+  {
+    key: "integracao.projects",
+    label: "Projetos",
+    module: "integracao",
+    department_label: "Integração",
+    description: "Acompanhe projetos, prazos e responsáveis.",
+    fields: [field("name", "Nome"), field("status", "Situação")],
+  },
+  {
+    key: "integracao.clients",
+    label: "Clientes",
+    module: "integracao",
+    department_label: "Integração",
+    description: "Consulte informações dos clientes.",
+    fields: [field("name", "Nome"), field("email", "E-mail")],
+  },
+  {
+    key: "fiscal.tax",
+    label: "Tributos",
+    module: "fiscal",
+    department_label: "Fiscal",
+    description: "Consulte tributos e suas competências.",
+    fields: [field("period", "Competência")],
+  },
+];
+
+async function run() {
+  const browser = await chromium.launch({
+    headless: true,
+    ...(process.env.REPORTS_BROWSER_CHANNEL
+      ? { channel: process.env.REPORTS_BROWSER_CHANNEL }
+      : {}),
+  });
+  const context = await browser.newContext({
+    baseURL: baseUrl,
+    viewport: { width: 1440, height: 1000 },
+  });
+  await context.addCookies([
+    {
+      name: "cw.session",
+      value: "opaque-report-fixture",
+      url: baseUrl,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+    { name: "cw.csrf", value: "A".repeat(43), url: baseUrl, sameSite: "Lax" },
+  ]);
+  const page = await context.newPage();
+  const pageErrors = [];
+  const consoleErrors = [];
+  const definitions = [];
+  let reviewFailure = false;
+  let catalogRequests = 0;
+  let catalogMode = "ready";
+  let reviewGate;
+  const previews = [];
+  let previewFailure = 0;
+  let generatedJob;
+  const models = [];
+  let modelVersionId = "reports-fixture-model-version";
+  let jobPolls = 0;
+  const exportRequests = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  await page.route("**/socket.io/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/plain",
+      body:
+        route.request().method() === "POST"
+          ? "ok"
+          : '0{"sid":"reports-fixture","upgrades":[],"pingInterval":25000,"pingTimeout":20000}',
+    }),
+  );
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname.replace(/^\/api/, "");
+    if (path === "/reports/jobs" && route.request().method() === "POST") {
+      const payload = route.request().postDataJSON();
+      assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
+      assert.ok(
+        payload.modelVersionId === modelVersionId || payload.definition?.version === 2,
+        "Generation must use a validated definition or a saved model version",
+      );
+      generatedJob = { id: "reports-fixture-job", status: "queued", error_message: null };
+      jobPolls = 0;
+      return route.fulfill({ status: 201, json: { success: true, data: generatedJob } });
+    }
+    if (path === "/reports/models" && route.request().method() === "POST") {
+      const payload = route.request().postDataJSON();
+      assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
+      assert.equal(payload.definition.version, 2);
+      assert.ok(payload.name);
+      assert.ok(payload.description);
+      const model = {
+        id: "reports-fixture-model",
+        organization_id: user.organization_id,
+        name: payload.name,
+        description: payload.description,
+        version: 1,
+        version_id: modelVersionId,
+        definition: payload.definition,
+      };
+      models.splice(0, models.length, model);
+      return route.fulfill({ status: 201, json: { success: true, data: model } });
+    }
+    if (path === "/reports/models/reports-fixture-model" && route.request().method() === "GET") {
+      return route.fulfill({ json: { success: true, data: models[0] } });
+    }
+    if (path === "/reports/jobs/reports-fixture-job" && route.request().method() === "GET") {
+      if (generatedJob?.status === "queued") {
+        jobPolls += 1;
+        generatedJob.status = "processing";
+      } else if (generatedJob?.status === "processing") {
+        generatedJob.status = "completed";
+      }
+      return route.fulfill({ json: { success: true, data: generatedJob } });
+    }
+    if (path === "/reports/jobs/reports-fixture-job/cancel" && route.request().method() === "POST") {
+      generatedJob = { ...generatedJob, status: "cancelled" };
+      return route.fulfill({ status: 204, body: "" });
+    }
+    if (path === "/reports/jobs/reports-fixture-job/snapshot" && route.request().method() === "GET") {
+      return route.fulfill({
+        json: {
+          success: true,
+          data: {
+            snapshot: { id: "reports-fixture-snapshot", created_at: "2026-09-09T12:00:00.000Z" },
+            rows: [],
+            nextCursor: null,
+            blocks: [
+              {
+                source: "integracao.projects",
+                label: "Projetos",
+                columns: [{ key: "name", label: "Nome" }],
+                rowCount: 1,
+                rows: [{ row_number: 1, values: { name: "Projeto gerado" } }],
+                nextCursor: null,
+              },
+              {
+                source: "integracao.clients",
+                label: "Clientes",
+                columns: [{ key: "email", label: "E-mail" }],
+                rowCount: 0,
+                rows: [],
+                nextCursor: null,
+              },
+            ],
+          },
+        },
+      });
+    }
+    if (path === "/reports/snapshots/reports-fixture-snapshot/export") {
+      const format = new URL(route.request().url()).searchParams.get("format");
+      exportRequests.push(format);
+      return route.fulfill({
+        contentType: format === "pdf" ? "application/pdf" : "application/zip",
+        headers: { "content-disposition": `attachment; filename="report-fixture.${format === "pdf" ? "pdf" : "zip"}"` },
+        body: format === "pdf" ? "%PDF-fixture" : "PK\u0003\u0004fixture",
+      });
+    }
+    if (path === "/reports/preview") {
+      assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
+      const payload = route.request().postDataJSON();
+      previews.push(payload.definition);
+      if (previewFailure)
+        return route.fulfill({
+          status: previewFailure,
+          json: { success: false, error: "internal.secret_identifier", code: "INVALID" },
+        });
+      return route.fulfill({
+        json: {
+          success: true,
+          data: {
+            blocks: payload.definition.areas.map((area, index) => ({
+              source: area.source,
+              label: items.find((item) => item.key === area.source).label,
+              rows: index
+                ? []
+                : [{ name: area.filters?.[0]?.value ?? "Projeto de exemplo", status_count: 7 }],
+              presentation: {
+                columns: [
+                  { key: index ? "email" : "name", label: index ? "E-mail" : "Nome" },
+                  ...(!index && area.aggregations?.length
+                    ? [{ key: "status_count", label: "Contagem de Situação" }]
+                    : []),
+                ],
+              },
+              limit: 100,
+              hasMore: false,
+            })),
+          },
+        },
+      });
+    }
+    if (path === "/reports/definitions/validate") {
+      const payload = route.request().postDataJSON();
+      assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
+      definitions.push(payload.definition);
+      assert.ok(
+        payload.definition.areas.every((area) => !("catalog" in area)),
+        "Catalog metadata must stay outside definition",
+      );
+      if (reviewGate) await reviewGate;
+      return route.fulfill({
+        status: reviewFailure ? 403 : 200,
+        json: reviewFailure
+          ? { success: false, error: "internal.secret_identifier", code: "FORBIDDEN" }
+          : { success: true, data: payload },
+      });
+    }
+    if (path === "/reports/catalog") catalogRequests++;
+    const data =
+      path === "/user/me"
+        ? user
+          : path === "/reports/catalog"
+            ? { items: catalogMode === "empty" ? [] : catalogMode === "invalid" ? null : items }
+            : path === "/reports/models/list"
+              ? { items: models }
+              : path === "/reports/models/shared/list"
+                ? { items: [] }
+          : [];
+    await route.fulfill({ status: 200, json: { success: true, data } });
+  });
+  async function screenshot(name) {
+    if (!evidenceDir) return;
+    await mkdir(evidenceDir, { recursive: true });
+    await page.screenshot({
+      path: `${evidenceDir}/${name}.png`,
+      fullPage: true,
+      animations: "disabled",
+    });
+  }
+  async function checkLanguage() {
+    assert.doesNotMatch(
+      await page.getByRole("tabpanel").innerText(),
+      /integracao\.|fiscal\.|\b(?:source|snapshot|job|inner|left|join|alias|predicado|descritor)\b|internal.secret_identifier/i,
+    );
+  }
+  try {
+    await page.goto("/relatorios", { waitUntil: "domcontentloaded" });
+    const panel = page.getByRole("tabpanel");
+    await expect(panel.getByRole("checkbox", { name: "Projetos", exact: true })).toBeVisible();
+    await panel.getByRole("checkbox", { name: "Projetos", exact: true }).check();
+    await panel.getByRole("checkbox", { name: "Clientes", exact: true }).check();
+    await expect(panel.getByText("2 áreas selecionadas", { exact: true })).toBeVisible();
+    await expect(
+      panel.getByRole("group", { name: "Integração", exact: true }).getByRole("checkbox"),
+    ).toHaveCount(2);
+    await expect(
+      panel.getByRole("group", { name: "Fiscal", exact: true }).getByRole("checkbox"),
+    ).toHaveCount(1);
+    await checkLanguage();
+    await screenshot("01-areas-desktop");
+    await panel.getByRole("button", { name: "Escolher campos", exact: true }).click();
+    const projects = panel.getByRole("group", { name: "Campos de Projetos", exact: true });
+    const clients = panel.getByRole("group", { name: "Campos de Clientes", exact: true });
+    await expect(projects.getByRole("checkbox", { checked: true })).toHaveCount(0);
+    await expect(clients.getByRole("checkbox", { checked: true })).toHaveCount(0);
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(panel.getByRole("alert")).toContainText("Escolha ao menos um campo");
+    await expect(panel.getByRole("alert")).toBeFocused();
+    await screenshot("02-campos-vazios");
+    await projects.getByRole("checkbox", { name: "Nome", exact: true }).check();
+    await clients.getByRole("button", { name: "Selecionar todos", exact: true }).click();
+    await expect(clients.getByRole("checkbox", { checked: true })).toHaveCount(2);
+    await screenshot("03-campos-selecionados");
+    await clients.getByRole("button", { name: "Limpar todos", exact: true }).click();
+    await expect(clients.getByRole("checkbox", { checked: true })).toHaveCount(0);
+    await panel.getByRole("button", { name: "Remover Clientes", exact: true }).click();
+    await expect(projects.getByRole("checkbox", { name: "Nome", exact: true })).toBeChecked();
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(
+      panel.getByRole("heading", { name: "Revisar relatório", exact: true }),
+    ).toBeVisible();
+    assert.deepEqual(definitions[0], {
+      version: 2,
+      areas: [{ source: "integracao.projects", fields: ["name"], filters: [] }],
+    });
+    await checkLanguage();
+    await page.evaluate(() => {
+      document.documentElement.classList.replace("light", "dark");
+      document.documentElement.setAttribute("data-theme", "dark");
+    });
+    await screenshot("04-revisao-dark");
+    await page.evaluate(() => {
+      document.documentElement.classList.replace("dark", "light");
+      document.documentElement.setAttribute("data-theme", "light");
+    });
+    await panel.getByRole("button", { name: "1. Escolher áreas", exact: true }).click();
+    await panel.getByRole("checkbox", { name: "Clientes", exact: true }).focus();
+    await page.keyboard.press("Space");
+    await expect(panel.getByRole("checkbox", { name: "Clientes", exact: true })).toBeChecked();
+    await panel.getByRole("button", { name: "Escolher campos", exact: true }).click();
+    await expect(clients.getByRole("checkbox", { checked: true })).toHaveCount(0);
+    await clients.getByRole("checkbox", { name: "E-mail", exact: true }).check();
+    reviewFailure = true;
+    const previousCatalogRequests = catalogRequests;
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(panel.getByRole("alert")).toContainText("Seu acesso mudou");
+    await expect.poll(() => catalogRequests).toBeGreaterThan(previousCatalogRequests);
+    await expect(projects.getByRole("checkbox", { name: "Nome", exact: true })).toBeChecked();
+    await checkLanguage();
+    reviewFailure = false;
+    await panel.getByRole("button", { name: "1. Escolher áreas", exact: true }).click();
+    let finishReview;
+    reviewGate = new Promise((resolve) => {
+      finishReview = resolve;
+    });
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(panel.getByRole("checkbox", { name: "Projetos", exact: true })).toBeDisabled();
+    await expect(
+      panel.getByRole("button", { name: "Remover Clientes", exact: true }),
+    ).toBeDisabled();
+    finishReview();
+    reviewGate = undefined;
+    await expect(
+      panel.getByRole("heading", { name: "Revisar relatório", exact: true }),
+    ).toBeVisible();
+    assert.deepEqual(definitions.at(-1).areas, [
+      { source: "integracao.projects", fields: ["name"], filters: [] },
+      { source: "integracao.clients", fields: ["email"], filters: [] },
+    ]);
+    assert.equal(previews.length, 0, "Review never requires preview");
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    const criteria = panel.getByRole("group", { name: "Projetos", exact: true });
+    await expect(criteria.locator("details")).not.toHaveAttribute("open", "");
+    await criteria.getByRole("button", { name: "Adicionar critério" }).click();
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(panel.getByRole("alert")).toContainText("Preencha Nome");
+    await criteria.getByLabel("Valor do critério 1", { exact: true }).fill("Projeto de exemplo");
+    await criteria.getByLabel("Combinar critérios").selectOption("or");
+    await screenshot("01-criterios-desktop");
+    await criteria.getByText("Mais opções", { exact: true }).click();
+    await criteria.getByLabel("Ordenar por Situação").selectOption("asc");
+    await criteria
+      .getByRole("group", { name: "Agrupamento" })
+      .getByLabel("Nome", { exact: true })
+      .check();
+    await criteria.getByLabel("Resumo de Situação").selectOption("count");
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(panel.getByRole("alert")).toContainText(
+      "remova a ordenação de campos não agrupados",
+    );
+    await criteria.getByLabel("Ordenar por Situação").selectOption("");
+    await criteria.getByLabel("Ordenar por Nome").selectOption("desc");
+    await screenshot("02-opcoes-desktop");
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(panel.getByText("Pelo menos um critério", { exact: true })).toBeVisible();
+    await expect(panel.getByText("Contagem de Situação", { exact: true })).toBeVisible();
+    assert.equal(previews.length, 0);
+    await screenshot("03-revisao-desktop");
+    await panel.getByRole("button", { name: "Visualizar prévia", exact: true }).click();
+    await expect(
+      panel.getByRole("region", { name: "Prévia de Projetos", exact: true }),
+    ).toContainText("Projeto de exemplo");
+    await expect(
+      panel.getByRole("region", { name: "Prévia de Clientes", exact: true }),
+    ).toContainText("Nenhum registro encontrado");
+    assert.equal(previews.at(-1).areas[0].filterLogic, "or");
+    assert.deepEqual(previews.at(-1).areas[0].orderBy, [{ field: "name", direction: "desc" }]);
+    await page.evaluate(() => document.documentElement.classList.add("dark"));
+    await screenshot("04-previa-dark");
+    await page.evaluate(() => document.documentElement.classList.remove("dark"));
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    await criteria.getByLabel("Valor do critério 1", { exact: true }).fill("Outro projeto");
+    await expect(panel.getByText(/A amostra está desatualizada/)).toBeVisible();
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    previewFailure = 422;
+    await panel.getByRole("button", { name: "Visualizar prévia", exact: true }).click();
+    await expect(panel.getByRole("alert")).toContainText("capacidade");
+    await checkLanguage();
+    previewFailure = 403;
+    const catalogBeforePreviewError = catalogRequests;
+    await panel.getByRole("button", { name: "Visualizar prévia", exact: true }).click();
+    await expect(panel.getByRole("alert")).toContainText("Seu acesso mudou");
+    await expect.poll(() => catalogRequests).toBeGreaterThan(catalogBeforePreviewError);
+    await expect(
+      panel.getByRole("region", { name: "Prévia de Projetos", exact: true }),
+    ).toHaveCount(0);
+    previewFailure = 0;
+    await panel.getByRole("button", { name: "Visualizar prévia", exact: true }).click();
+    await expect(
+      panel.getByRole("region", { name: "Prévia de Projetos", exact: true }),
+    ).toBeVisible();
+    await panel.getByRole("button", { name: "Gerar relatório", exact: true }).click();
+    await expect(panel.getByText("Relatório aguardando na fila", { exact: true })).toBeVisible();
+    await expect(panel.getByRole("heading", { name: "Gerando relatório", exact: true })).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(panel.getByRole("heading", { name: "Relatório pronto", exact: true })).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(
+      panel.getByRole("region", { name: "Resultado de Projetos", exact: true }),
+    ).toContainText("Projeto gerado");
+    await expect(
+      panel.getByRole("region", { name: "Resultado de Clientes", exact: true }),
+    ).toContainText("Nenhum registro encontrado");
+    const csvDownload = page.waitForEvent("download");
+    await panel.getByRole("button", { name: "Baixar resultado em CSV", exact: true }).click();
+    assert.equal((await csvDownload).suggestedFilename(), "report-fixture.zip");
+    assert.deepEqual(exportRequests, ["csv"]);
+    await expect(page.getByText("CSV pronto para download.", { exact: true })).toBeVisible();
+    await checkLanguage();
+    await screenshot("05-resultado-desktop");
+    await panel.getByRole("button", { name: "Salvar para usar novamente", exact: true }).click();
+    const saveDialog = page.getByRole("dialog");
+    await saveDialog.getByLabel("Nome", { exact: true }).fill("Projetos acompanhados");
+    await saveDialog.getByLabel(/Descrição/).fill("Modelo para acompanhar projetos com clientes.");
+    await saveDialog.getByRole("button", { name: "Salvar modelo", exact: true }).click();
+    await expect(page.getByText("Modelo salvo para usar novamente.")).toBeVisible();
+    await page.getByRole("tab", { name: "Modelos", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Projetos acompanhados", exact: true })).toBeVisible();
+    await expect(page.getByText("Modelo para acompanhar projetos com clientes.", { exact: true })).toBeVisible();
+    await screenshot("07-modelos-salvos-desktop");
+    await page.getByRole("button", { name: "Abrir modelo", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Revisar relatório", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Gerar relatório", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Relatório pronto", exact: true })).toBeVisible({ timeout: 10000 });
+    await panel.getByRole("button", { name: "Gerar relatório", exact: true }).click();
+    await expect(panel.getByRole("button", { name: "Cancelar geração", exact: true })).toBeVisible();
+    await panel.getByRole("button", { name: "Cancelar geração", exact: true }).click();
+    await expect(panel.getByRole("heading", { name: "Geração cancelada", exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await checkLanguage();
+    await screenshot("06-resultado-mobile");
+    assert.ok(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      "Layout não deve transbordar no mobile",
+    );
+    await panel.getByRole("button", { name: "Remover Projetos", exact: true }).click();
+    await expect(clients.getByRole("checkbox", { name: "E-mail", exact: true })).toBeChecked();
+    await panel.getByRole("button", { name: "Remover Clientes", exact: true }).click();
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(panel.getByRole("alert")).toContainText("Escolha ao menos uma área");
+    catalogMode = "empty";
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(panel.getByRole("status")).toContainText("Nenhuma área está disponível");
+    catalogMode = "invalid";
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(panel.getByRole("alert")).toContainText("Não foi possível carregar as áreas", {
+      timeout: 15000,
+    });
+    await checkLanguage();
+    catalogMode = "ready";
+    await panel.getByRole("button", { name: "Tentar novamente", exact: true }).click();
+    await expect(panel.getByRole("checkbox", { name: "Projetos", exact: true })).toBeVisible();
+    assert.deepEqual(pageErrors, []);
+    items[0].parameters = [{ key: "period", label: "Competência", type: "date", required: true }];
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await panel.getByRole("checkbox", { name: "Projetos", exact: true }).check();
+    await panel.getByRole("button", { name: "Escolher campos", exact: true }).click();
+    await projects.getByRole("checkbox", { name: "Nome", exact: true }).check();
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(panel.getByRole("alert")).toContainText("Preencha Competência");
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    await criteria.getByLabel("Competência (obrigatório)", { exact: true }).fill("2026-09-01");
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(
+      panel.getByRole("heading", { name: "Revisar relatório", exact: true }),
+    ).toBeVisible();
+    assert.deepEqual(definitions.at(-1).areas[0].parameterValues, { period: "2026-09-01" });
+    const unexpectedConsoleErrors = consoleErrors.filter(
+      (message) =>
+        !message.includes("403 (Forbidden)") && !message.includes("422 (Unprocessable Entity)"),
+    );
+    assert.deepEqual(unexpectedConsoleErrors, []);
+    console.log(
+      "PASS áreas/campos/revisão: agrupamento, múltiplas escolhas, vazios, remoção, preservação, teclado/foco, linguagem, CSRF, atualização do catálogo, desktop/mobile/dark e console",
+    );
+  } catch (error) {
+    await screenshot("failure");
+    throw error;
+  } finally {
+    await browser.close();
+  }
+}
+
+await readFile(`${appRoot}/.next/BUILD_ID`, "utf8");
+if (process.env.REPORTS_BROWSER_BASE_URL) {
+  await run();
+} else {
+  const server = spawn(
+    process.execPath,
+    ["node_modules/next/dist/bin/next", "start", "--port", "3115", "--hostname", "127.0.0.1"],
+    {
+      cwd: appRoot,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    },
+  );
+  console.log(`Next compilado PID=${server.pid} porta=3115 worktree=${appRoot}`);
+  let output = "";
+  server.stdout.on("data", (chunk) => {
+    output += chunk;
+  });
+  server.stderr.on("data", (chunk) => {
+    output += chunk;
+  });
+  try {
+    let ready = false;
+    for (let attempt = 0; attempt < 60; attempt++) {
+      if (server.exitCode !== null) throw new Error(output);
+      try {
+        if ((await fetch(`${baseUrl}/login`)).status < 500) {
+          ready = true;
+          break;
+        }
+      } catch {}
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    assert.ok(ready, "Next compilado não iniciou");
+    await run();
+  } finally {
+    server.kill();
+  }
+}

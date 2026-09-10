@@ -28,6 +28,13 @@ Exemplos de paths publicos:
 - `/project/list`
 - `/project/progress`
 
+`POST /project` aceita `end_date` opcional, igual ou posterior a `start_date`.
+A resposta inclui `data.create.end_date` (ou `null` quando omitida); período invertido retorna 400.
+`ProjectCrudService.createInTransaction(data, tx)` reutiliza as validações e persistência com
+um `Prisma.TransactionClient` do chamador, sem abrir transação nem emitir auditoria.
+O chamador coordena commit/rollback e auditoria pós-commit; a criação normal já faz isso,
+com auditoria best-effort.
+
 As rotas internas `/internal/reporting/catalog` e `/internal/reporting/extract` não passam pelo
 gateway; exigem token interno e grant HMAC de curta duração emitido pelo reports-service.
 
@@ -38,3 +45,7 @@ pnpm --filter @workspace/project-service dev
 ```
 
 Gerar Prisma: `pnpm --filter @workspace/project-service prisma:generate`.
+
+## Critérios de relatórios
+
+`POST /internal/reporting/extract` aceita `query` opcional com filtros tipados, grupos AND/OR, ordenação, agrupamento e agregações. O corpo completo e todos os campos utilizados pertencem ao grant assinado. A origem aplica o escopo organizacional e processa o conjunto completo em snapshot consistente antes do limite de saída; excesso de 50.000 registros/20 MiB retorna 422, sem resultado parcial. Payloads sem `query` preservam o contrato legado. Consulte a [matriz e semântica dos critérios](../reports-service/docs/criteria-origins.md) e o OpenAPI do serviço.

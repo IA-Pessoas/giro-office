@@ -20,6 +20,8 @@ export const REPORT_AGGREGATIONS = ["count", "sum", "avg", "min", "max"] as cons
 export type ReportAggregation = (typeof REPORT_AGGREGATIONS)[number];
 
 export interface ReportCatalogField {
+  groupable?: boolean;
+  sortable?: boolean;
   key: string;
   label: string;
   value_type: ReportValueType;
@@ -28,9 +30,18 @@ export interface ReportCatalogField {
 }
 
 export interface ReportCatalogSource {
+  parameters?: readonly {
+    key: string;
+    label: string;
+    type: "text" | "number" | "date" | "boolean" | "select";
+    required?: boolean;
+    options?: readonly { value: string; label: string }[];
+  }[];
   key: ReportSourceKey;
   label: string;
   module: string;
+  department_label?: string;
+  description?: string;
   minimum_permission: number;
   fields: readonly ReportCatalogField[];
 }
@@ -52,6 +63,7 @@ export function deriveReportCatalogGrant(definition: {
   filters: readonly { source: string; field: string }[];
   aggregations: readonly { source: string; field: string }[];
   order_by: readonly { source: string; field: string }[];
+  group_by?: readonly { source: string; field: string }[];
   joins: readonly { relation: string }[];
 }): ReportCatalogGrant {
   const fieldsBySource = new Map<string, Set<string>>();
@@ -67,6 +79,7 @@ export function deriveReportCatalogGrant(definition: {
   for (const aggregation of definition.aggregations)
     addField(aggregation.source, aggregation.field);
   for (const orderBy of definition.order_by) addField(orderBy.source, orderBy.field);
+  for (const groupBy of definition.group_by ?? []) addField(groupBy.source, groupBy.field);
 
   return {
     sources: Object.fromEntries(
@@ -74,6 +87,35 @@ export function deriveReportCatalogGrant(definition: {
     ),
     relations: definition.joins.map((join) => join.relation),
   };
+}
+
+export function deriveReportCatalogGrantFromComposition(composition: {
+  areas: readonly {
+    source: string;
+    fields: readonly string[];
+    filters?: readonly { field: string }[];
+    aggregations?: readonly { field: string }[];
+    groupBy?: readonly string[];
+    orderBy?: readonly { field: string }[];
+  }[];
+}): ReportCatalogGrant {
+  const sources: Record<string, string[]> = {};
+  const addField = (source: string, field: string) => {
+    const fields = sources[source] ?? [];
+    if (!fields.includes(field)) fields.push(field);
+    sources[source] = fields;
+  };
+
+  for (const area of composition.areas) {
+    sources[area.source] ??= [];
+    for (const field of area.fields) addField(area.source, field);
+    for (const filter of area.filters ?? []) addField(area.source, filter.field);
+    for (const aggregation of area.aggregations ?? []) addField(area.source, aggregation.field);
+    for (const field of area.groupBy ?? []) addField(area.source, field);
+    for (const order of area.orderBy ?? []) addField(area.source, order.field);
+  }
+
+  return { sources, relations: [] };
 }
 
 export interface ReportCatalogScope {
