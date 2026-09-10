@@ -88,7 +88,10 @@ export class CommercialProspectingService {
   async listClients(organization_id: string): Promise<CommercialProspectingClient[]> {
     try {
       return await this.prisma.client.findMany({
-        where: { organization_id },
+        where: {
+          organization_id,
+          commercialProspectings: { none: { organization_id } },
+        },
         select: CLIENT_SELECT,
         orderBy: { name: "asc" },
       });

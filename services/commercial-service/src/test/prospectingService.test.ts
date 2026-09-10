@@ -58,6 +58,22 @@ describe("CommercialProspectingService", () => {
     );
   });
 
+  it("lista somente clientes sem prospecção na organização autenticada", async () => {
+    const prisma = createMockPrisma();
+    const service = new CommercialProspectingService(prisma, createAuditMock());
+
+    await service.listClients(ORGANIZATION_ID);
+
+    expect(prisma.client.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: ORGANIZATION_ID,
+          commercialProspectings: { none: { organization_id: ORGANIZATION_ID } },
+        },
+      }),
+    );
+  });
+
   it("não permite cadastrar cliente de outra organização", async () => {
     const prisma = createMockPrisma();
     prisma.client.findFirst = vi.fn(async () => null);
