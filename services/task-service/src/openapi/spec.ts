@@ -888,6 +888,21 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/internal/commercial/prospecting-close": {
+        post: {
+          tags: ["Commercial"],
+          summary: "Aplicar fechamento comercial e devolver competência",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: {
+            "200": successJson,
+            "400": { description: "Evento inválido." },
+            "403": { description: "Acesso negado." },
+          },
+        },
+      },
       "/task/conclusion": {
         put: {
           tags: ["Lifecycle"],

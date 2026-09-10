@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import { type CommercialClientProjection, ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CommercialProspectingTransitionEvent } from "../schemas/commercialProjection.schemas.js";
 
@@ -7,6 +7,7 @@ export interface ClientCommercialProjectionResult {
   applied: boolean;
   duplicate: boolean;
   client_id: string;
+  client: CommercialClientProjection;
 }
 
 export type ClientCommercialProjectionPrismaDeps = Pick<
@@ -31,6 +32,15 @@ function mapClientStatus(status: CommercialProspectingTransitionEvent["to_status
   }
 }
 
+const CLIENT_PROJECTION_SELECT = {
+  id: true,
+  name: true,
+  company_name: true,
+  fantasy_name: true,
+  service_unique: true,
+  type_registration: true,
+} as const;
+
 export class ClientCommercialProjectionService {
   constructor(private readonly prisma: ClientCommercialProjectionPrismaDeps) {}
 
@@ -50,17 +60,25 @@ export class ClientCommercialProjectionService {
           ) {
             throw new ServiceError(409, "Evento comercial pertence a outro tenant.");
           }
+          const existingClient = await tx.client.findFirst({
+            where: { id: event.client_id, organization_id: event.organization_id },
+            select: CLIENT_PROJECTION_SELECT,
+          });
+          if (!existingClient) {
+            throw new ServiceError(404, "Cliente não encontrado nesta organização.");
+          }
           return {
             event_id: event.event_id,
             applied: false,
             duplicate: true,
             client_id: event.client_id,
+            client: existingClient,
           };
         }
 
         const client = await tx.client.findFirst({
           where: { id: event.client_id, organization_id: event.organization_id },
-          select: { id: true },
+          select: CLIENT_PROJECTION_SELECT,
         });
         if (!client) throw new ServiceError(404, "Cliente não encontrado nesta organização.");
 
@@ -91,6 +109,7 @@ export class ClientCommercialProjectionService {
           applied: true,
           duplicate: false,
           client_id: event.client_id,
+          client,
         };
       });
     } catch (error) {

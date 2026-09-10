@@ -30,7 +30,14 @@ function createPrismaMock() {
   const ledger = new Map<string, { organization_id: string; client_id: string }>();
   const prisma = {
     client: {
-      findFirst: vi.fn(async () => ({ id: CLIENT_ID })),
+      findFirst: vi.fn(async (_args: unknown) => ({
+        id: CLIENT_ID,
+        name: "Cliente A",
+        company_name: null,
+        fantasy_name: null,
+        service_unique: false,
+        type_registration: "Novo",
+      })),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     clientCommercialProjectionEvent: {
@@ -44,8 +51,11 @@ function createPrismaMock() {
         },
       ),
     },
-    $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma)),
+    $transaction: vi.fn(),
   };
+  prisma.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+    callback(prisma),
+  );
   return prisma;
 }
 
@@ -63,12 +73,28 @@ describe("ClientCommercialProjectionService", () => {
       applied: true,
       duplicate: false,
       client_id: CLIENT_ID,
+      client: {
+        id: CLIENT_ID,
+        name: "Cliente A",
+        company_name: null,
+        fantasy_name: null,
+        service_unique: false,
+        type_registration: "Novo",
+      },
     });
     expect(duplicate).toEqual({
       event_id: event.event_id,
       applied: false,
       duplicate: true,
       client_id: CLIENT_ID,
+      client: {
+        id: CLIENT_ID,
+        name: "Cliente A",
+        company_name: null,
+        fantasy_name: null,
+        service_unique: false,
+        type_registration: "Novo",
+      },
     });
     expect(prisma.client.updateMany).toHaveBeenCalledTimes(1);
     expect(prisma.client.updateMany).toHaveBeenCalledWith({
@@ -95,10 +121,10 @@ describe("ClientCommercialProjectionService", () => {
 
   it("não aceita reentrega do mesmo evento para outro tenant", async () => {
     const prisma = createPrismaMock();
-    prisma.clientCommercialProjectionEvent.findUnique = vi.fn(async () => ({
+    prisma.clientCommercialProjectionEvent.findUnique.mockResolvedValue({
       organization_id: "a0000000-0000-4000-8000-000000000099",
       client_id: CLIENT_ID,
-    }));
+    });
     const service = new ClientCommercialProjectionService(prisma as never);
 
     await expect(service.apply(transition("Fechado"))).rejects.toMatchObject({ statusCode: 409 });

@@ -23,6 +23,10 @@ import {
   depsTasksRoutes,
 } from "./routes/depsTasks.routes.js";
 import {
+  createInternalCommercialProspectingRouter,
+  type InternalCommercialProspectingRouteDeps,
+} from "./routes/internalCommercialProspecting.routes.js";
+import {
   createInternalCommercialTaskBillingRouter,
   type InternalCommercialTaskBillingRouteDeps,
 } from "./routes/internalCommercialTaskBilling.routes.js";
@@ -45,6 +49,7 @@ import { taskIntegrationRegularizeRoutes } from "./routes/taskIntegrationRegular
 import { taskLifecycleRoutes } from "./routes/taskLifecycle.routes.js";
 import { taskModelRoutes } from "./routes/taskModel.routes.js";
 import { MEETING_MINUTES_MAX_SOURCE_BYTES } from "./schemas/projectWizardExtraction.schemas.js";
+import { CommercialProspectingCloseService } from "./services/commercialProspectingCloseService.js";
 import { CommercialTaskBillingProjectionService } from "./services/commercialTaskBillingProjectionService.js";
 import { ProjectWizardExtractionService } from "./services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "./services/projectWizardService.js";
@@ -76,6 +81,7 @@ export function createTaskApp(
     depsTasksService?: DepsTasksRouteDeps;
     internalReportingService?: TaskReportingService;
     commercialTaskBillingProjectionService?: InternalCommercialTaskBillingRouteDeps;
+    commercialProspectingCloseService?: InternalCommercialProspectingRouteDeps;
   },
 ): Express {
   const app = express();
@@ -110,6 +116,9 @@ export function createTaskApp(
     options?.internalReportingService ?? new TaskReportingService(prismaClient);
   const commercialTaskBillingProjectionService =
     options?.commercialTaskBillingProjectionService ?? new CommercialTaskBillingProjectionService();
+  const commercialProspectingCloseService =
+    options?.commercialProspectingCloseService ??
+    new CommercialProspectingCloseService(prismaClient);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "task-service")));
@@ -153,6 +162,13 @@ export function createTaskApp(
     "/internal",
     createInternalCommercialTaskBillingRouter(
       commercialTaskBillingProjectionService,
+      requireCommercialServiceToken(env),
+    ),
+  );
+  app.use(
+    "/internal",
+    createInternalCommercialProspectingRouter(
+      commercialProspectingCloseService,
       requireCommercialServiceToken(env),
     ),
   );

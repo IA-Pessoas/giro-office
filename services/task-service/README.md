@@ -19,7 +19,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `JWT_SECRET`
 - `PROJECT_SERVICE_URL`
 - `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` para fonte interna de relatórios
-- `COMMERCIAL_SERVICE_TOKEN` para receber projeções de cobrança do `commercial-service`
+- `COMMERCIAL_SERVICE_TOKEN` para os contratos internos de fechamento comercial e projeção de cobrança do `commercial-service`
 - `AUDIT_*` quando a auditoria estiver ativa
 - `AI_EXTRACTION_MODE` (`fake` por padrao, ou `openai`) escolhe o provedor da extracao de tarefas
   do wizard de Projetos. `fake` usa um adapter deterministico local, sem rede nem creditos;

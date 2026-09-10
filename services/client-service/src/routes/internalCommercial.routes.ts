@@ -2,10 +2,14 @@ import { createSuccessResponse, parseWithZod } from "@workspace/shared";
 import type { RequestHandler } from "express";
 import { Router } from "express";
 
-import { commercialProspectingTransitionEventSchema } from "../schemas/commercialProjection.schemas.js";
-import type { ClientCommercialProjectionService } from "../services/clientCommercialProjectionService.js";
+import {
+  type CommercialProspectingTransitionEvent,
+  commercialProspectingTransitionEventSchema,
+} from "../schemas/commercialProjection.schemas.js";
 
-export type InternalCommercialRouteDeps = Pick<ClientCommercialProjectionService, "apply">;
+export type InternalCommercialRouteDeps = {
+  apply: (event: CommercialProspectingTransitionEvent) => Promise<unknown>;
+};
 
 export function createInternalCommercialRouter(
   deps: InternalCommercialRouteDeps,
