@@ -1,6 +1,6 @@
 # commercial-service
 
-Serviço responsável pelo catálogo mínimo de configurações de proposta do módulo Comercial.
+Serviço responsável pelo catálogo de propostas e pela operação de prospecção do módulo Comercial.
 
 ## Operação local
 
@@ -24,6 +24,12 @@ Leitura exige nível 1; criação e edição exigem nível 2.
 - `GET /commercial/proposal-configs/:id`
 - `POST /commercial/proposal-configs`
 - `PATCH /commercial/proposal-configs/:id`
+- `GET /commercial/prospecting/clients`
+- `GET /commercial/prospecting`
+- `GET /commercial/prospecting/:id`
+- `POST /commercial/prospecting`
+- `PATCH /commercial/prospecting/:id`
 
 Cada consulta filtra `proposal.config` por `organization_id` derivado do contexto autenticado.
 O serviço não cria propostas transacionais nem altera o catálogo de Clientes.
+As prospecções pertencem à organização autenticada, referenciam um Cliente existente e usam somente os status legados aprovados. Alterações geram auditoria no recurso `commercial.prospecting`.

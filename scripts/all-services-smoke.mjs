@@ -3525,6 +3525,42 @@ const handlers = {
     });
   },
 
+  async commercialProspectingClientList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async commercialProspectingList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async commercialProspectingCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        status: "Análise Financeira",
+        description: "Smoke commercial prospecting",
+      },
+    });
+    if (isBadExpectation(op)) return;
+    state.commercialProspectingId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async commercialProspectingGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
+    });
+  },
+
+  async commercialProspectingUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
+      json: { status: "Envio de Proposta", description: "Smoke commercial prospecting updated" },
+    });
+  },
+
   async clientList(op) {
     await httpRequest(op, {
       expectedStatus: [200],

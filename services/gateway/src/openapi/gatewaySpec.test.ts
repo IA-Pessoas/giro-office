@@ -49,6 +49,9 @@ it("agrega o catálogo público do reports-service", () => {
   expect(spec.paths["/commercial/proposal-configs"]?.get?.["x-origin-service"]).toBe(
     "commercial-service",
   );
+  expect(spec.paths["/commercial/prospecting"]?.post?.["x-origin-service"]).toBe(
+    "commercial-service",
+  );
   expect(spec.paths["/internal/reporting/access-context"]).toBeUndefined();
   expect(
     spec.paths["/platform/organizations/{organizationId}/users/{userId}/permissions"]?.get

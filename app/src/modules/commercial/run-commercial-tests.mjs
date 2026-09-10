@@ -58,4 +58,23 @@ runTest("commercial catalog has a tenant-scoped CRUD contract and admin surface"
   assert.match(page, /CommercialCatalog/);
 });
 
+runTest("commercial prospecting uses the dedicated legacy-status contract", () => {
+  const contract = read("./services/commercialService.contract.ts");
+  const service = read("./services/commercialService.ts");
+  const hooks = read("./hooks/useCommercialProspecting.ts");
+  const types = read("./types/index.ts");
+  const catalog = read("./components/CommercialCatalog.tsx");
+
+  assert.match(contract, /prospecting:\s*["']\/commercial\/prospecting["']/);
+  assert.match(contract, /prospectingClients:\s*["']\/commercial\/prospecting\/clients["']/);
+  assert.match(service, /listProspecting/);
+  assert.match(service, /createProspecting/);
+  assert.match(service, /updateProspecting/);
+  assert.match(hooks, /invalidateQueries/);
+  assert.match(types, /COMMERCIAL_PROSPECTING_STATUSES/);
+  assert.match(catalog, /Nova prospecção/);
+  assert.match(catalog, /COMMERCIAL_PROSPECTING_STATUSES/);
+  assert.doesNotMatch(catalog, /client\/[^"']+\/commercial/);
+});
+
 console.log("commercial contract tests passed");

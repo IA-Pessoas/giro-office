@@ -78,6 +78,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/commercial\/prospecting\/clients$/,
+    description: { action: "consultou", item: "a lista de clientes para prospecção" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "consultou", item: "a lista global de organizações" },
   },
@@ -652,6 +657,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "uma configuração de proposta comercial",
     newSingular: "uma nova configuração de proposta comercial",
     plural: "configurações de proposta comercial",
+  },
+  {
+    pattern: /^\/commercial\/prospecting(?:\/|$)/,
+    singular: "uma prospecção comercial",
+    newSingular: "uma nova prospecção comercial",
+    plural: "prospecções comerciais",
   },
   {
     pattern: /^\/reports\/models\/shared(?:\/|$)/,
