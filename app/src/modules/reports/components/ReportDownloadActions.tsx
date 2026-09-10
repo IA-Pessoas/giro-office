@@ -14,6 +14,7 @@ const formats: Array<{ value: ReportExportFormat; label: string; icon: typeof Fi
 export function ReportDownloadActions({ id, disabled = false }: { id: string; disabled?: boolean }) {
   const downloadMutation = useDownloadReportMutation();
   const [activeFormat, setActiveFormat] = useState<ReportExportFormat | null>(null);
+  const activeLabel = formats.find((format) => format.value === activeFormat)?.label;
 
   async function handleDownload(format: ReportExportFormat) {
     setActiveFormat(format);
@@ -34,7 +35,16 @@ export function ReportDownloadActions({ id, disabled = false }: { id: string; di
   }
 
   return (
-    <div className="flex flex-wrap gap-2" aria-label="Downloads do snapshot">
+    <div
+      className="flex flex-wrap gap-2"
+      aria-busy={downloadMutation.isPending}
+      aria-label="Downloads do snapshot"
+    >
+      {downloadMutation.isPending && activeLabel ? (
+        <span className="sr-only" role="status">
+          Preparando download em {activeLabel}...
+        </span>
+      ) : null}
       {formats.map(({ value, label, icon: Icon }) => (
         <button
           key={value}

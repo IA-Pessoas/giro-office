@@ -40,6 +40,10 @@ const snapshotTableSource = await readFile(
   new URL("./components/ReportSnapshotTable.tsx", import.meta.url),
   "utf8",
 );
+const createPanelSource = await readFile(
+  new URL("./components/ReportsCreatePanel.tsx", import.meta.url),
+  "utf8",
+);
 const resultBlocksSource = await readFile(
   new URL("./components/ReportResultBlocks.tsx", import.meta.url),
   "utf8",
@@ -469,8 +473,16 @@ runTest("uses the materialized snapshot id for in-memory downloads", () => {
 
 runTest("renders export actions only after a completed snapshot is available", () => {
   assert.match(downloadActionsSource, /disabled=\{disabled \|\| downloadMutation\.isPending\}/);
+  assert.match(downloadActionsSource, /aria-busy=\{downloadMutation\.isPending\}/);
+  assert.match(downloadActionsSource, /role="status"/);
   assert.match(downloadActionsSource, /Baixar resultado em/);
   assert.match(snapshotTableSource, /snapshotId \? <ReportDownloadActions/);
+});
+
+runTest("keeps download actions available for legacy snapshots without blocks", () => {
+  assert.match(createPanelSource, /Resultado legado carregado/);
+  assert.match(createPanelSource, /snapshot\.data\.blocks/);
+  assert.match(createPanelSource, /ReportDownloadActions id=\{snapshot\.data\.snapshot\.id\}/);
 });
 
 runTest("keeps repeated report sources distinct in the composed result", () => {

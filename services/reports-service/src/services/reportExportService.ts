@@ -89,6 +89,13 @@ export class ReportExportService {
       const stems = uniqueStems(blocks.map((block) => block.label));
       const totalRows = tables.reduce((total, table) => total + table.rows.length, 0);
 
+      await this.snapshots.assertExportable({
+        snapshotId: input.snapshotId,
+        userId: input.userId,
+        organizationId: input.organizationId,
+        allowShared: exportContext.scope === "shared",
+      });
+
       const body =
         input.format === "pdf"
           ? await (renderer as ReportPdfRenderer).render({
@@ -110,11 +117,11 @@ export class ReportExportService {
             })
           : tables.length > 1
             ? createReportZip(
-                await Promise.all(
-                  tables.map(async (table, index) => ({
-                    fileName: `${stems[index]}.${input.format}`,
-                    body: await (renderer as ReportTableRenderer).render(table),
-                  })),
+                await renderZipEntries(
+                  tables,
+                  stems,
+                  input.format,
+                  renderer as ReportTableRenderer,
                 ),
               )
             : await (renderer as ReportTableRenderer).render(tables[0] ?? createTable([]));
@@ -201,6 +208,22 @@ export class ReportExportService {
     }
     return { scope: "shared", departmentId: authorized.department_id };
   }
+}
+
+async function renderZipEntries(
+  tables: readonly ReportTable[],
+  stems: readonly string[],
+  format: ReportExportFormat,
+  renderer: ReportTableRenderer,
+): Promise<Array<{ fileName: string; body: Buffer }>> {
+  const entries: Array<{ fileName: string; body: Buffer }> = [];
+  for (const [index, table] of tables.entries()) {
+    entries.push({
+      fileName: `${stems[index]}.${format}`,
+      body: await renderer.render(table),
+    });
+  }
+  return entries;
 }
 
 function inferValueType(value: unknown): ReportTable["columns"][number]["valueType"] {

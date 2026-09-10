@@ -144,6 +144,53 @@ describe("ReportExportService", () => {
     expect(render).toHaveBeenCalledTimes(2);
   });
 
+  it("renderiza áreas do ZIP com concorrência limitada a uma por vez", async () => {
+    let activeRenders = 0;
+    let maxActiveRenders = 0;
+    const render = vi.fn(async (table) => {
+      activeRenders += 1;
+      maxActiveRenders = Math.max(maxActiveRenders, activeRenders);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      activeRenders -= 1;
+      return Buffer.from(`${table.columns[0]?.label}\r\n`);
+    });
+    const service = new ReportExportService(
+      {
+        getForExport: vi.fn().mockResolvedValue({
+          snapshot: { id: "snapshot-1", created_at: new Date() },
+          job: { id: "job-1", report_model_version_id: "version-1" },
+          rows: [],
+          blocks: [
+            {
+              source: "projects",
+              label: "Projetos",
+              columns: [{ key: "name", label: "Nome" }],
+              rows: [{ name: "Ana" }],
+            },
+            {
+              source: "clients",
+              label: "Clientes",
+              columns: [{ key: "name", label: "Nome" }],
+              rows: [{ name: "Bia" }],
+            },
+          ],
+        }),
+        assertExportable: vi.fn().mockResolvedValue(undefined),
+      } as never,
+      { csv: { render } } as never,
+    );
+
+    await service.export({
+      snapshotId: "snapshot-1",
+      userId: "user-1",
+      organizationId: "org-1",
+      requestId: "request-1",
+      format: "csv",
+    });
+
+    expect(maxActiveRenders).toBe(1);
+  });
+
   it("gera PDF único com título e linhas de cada bloco", async () => {
     const render = vi.fn().mockResolvedValue(Buffer.from("%PDF-composed"));
     const service = new ReportExportService(
@@ -298,8 +345,14 @@ describe("ReportExportService", () => {
       rows: [{ name: "Ana" }],
     });
     expect(snapshotService.getForExport).toHaveBeenCalledOnce();
-    expect(snapshotService.assertExportable).toHaveBeenCalledOnce();
-    expect(snapshotService.assertExportable).toHaveBeenCalledWith({
+    expect(snapshotService.assertExportable).toHaveBeenCalledTimes(2);
+    expect(snapshotService.assertExportable).toHaveBeenNthCalledWith(1, {
+      snapshotId: "snapshot-1",
+      userId: "user-1",
+      organizationId: "org-1",
+      allowShared: false,
+    });
+    expect(snapshotService.assertExportable).toHaveBeenNthCalledWith(2, {
       snapshotId: "snapshot-1",
       userId: "user-1",
       organizationId: "org-1",
@@ -444,6 +497,7 @@ describe("ReportExportService", () => {
 
   it("rejects export when the snapshot expires during rendering and audits the failure", async () => {
     const record = vi.fn().mockResolvedValue(undefined);
+    const render = vi.fn().mockReturnValue(Buffer.from("Name\r\nAna\r\n"));
     const snapshotService = {
       getForExport: vi.fn().mockResolvedValue({
         snapshot: { id: "snapshot-1", created_at: new Date() },
@@ -454,7 +508,7 @@ describe("ReportExportService", () => {
     };
     const service = new ReportExportService(
       snapshotService as never,
-      { csv: { render: vi.fn().mockReturnValue(Buffer.from("Name\r\nAna\r\n")) } } as never,
+      { csv: { render } } as never,
       { record } as never,
     );
 
@@ -474,6 +528,7 @@ describe("ReportExportService", () => {
       organizationId: "org-1",
       allowShared: false,
     });
+    expect(render).not.toHaveBeenCalled();
     expect(record).toHaveBeenCalledWith(
       expect.objectContaining({
         event_type: "report.export",
