@@ -1675,6 +1675,13 @@ const handlers = {
     await httpRequest(op);
   },
 
+  async reportsSharedModelGet(op) {
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/reports/models/shared/${requireState("reportsSharedModelId")}`,
+    });
+  },
+
   async reportsSharedModelPatch(op) {
     await httpRequest(op, {
       path: `/reports/models/shared/${requireState("reportsSharedModelId")}`,
@@ -3514,7 +3521,8 @@ const handlers = {
       json: { name: uniqueText("Smoke Proposal Config"), contract_value: 1800 },
     });
     if (isBadExpectation(op)) return;
-    state.commercialProposalConfigId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    state.commercialProposalConfigId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
   async commercialProposalConfigUpdate(op) {
@@ -3543,7 +3551,8 @@ const handlers = {
       },
     });
     if (isBadExpectation(op)) return;
-    state.commercialProspectingId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    state.commercialProspectingId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
   async commercialProspectingGet(op) {
