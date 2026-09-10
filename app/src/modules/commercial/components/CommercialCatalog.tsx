@@ -62,6 +62,7 @@ export function CommercialCatalog() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const [prospectingDraft, setProspectingDraft] = useState<ProspectingDraft>(emptyProspectingDraft);
+  const [isCreatingProspecting, setIsCreatingProspecting] = useState(false);
   const [prospectingEditingId, setProspectingEditingId] = useState<string | null>(null);
   const [prospectingFormError, setProspectingFormError] = useState("");
 
@@ -119,12 +120,14 @@ export function CommercialCatalog() {
   }
 
   function startProspectingCreate() {
+    setIsCreatingProspecting(true);
     setProspectingEditingId(null);
     setProspectingDraft(emptyProspectingDraft);
     setProspectingFormError("");
   }
 
   function startProspectingEdit(item: CommercialProspecting) {
+    setIsCreatingProspecting(false);
     setProspectingEditingId(item.id);
     setProspectingDraft({
       client_id: item.client_id,
@@ -136,6 +139,7 @@ export function CommercialCatalog() {
   }
 
   function cancelProspectingForm() {
+    setIsCreatingProspecting(false);
     setProspectingEditingId(null);
     setProspectingDraft(emptyProspectingDraft);
     setProspectingFormError("");
@@ -257,7 +261,7 @@ export function CommercialCatalog() {
           {canEdit && prospectingEditingId === null ? <button type="button" onClick={startProspectingCreate} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"><Plus className="h-4 w-4" aria-hidden="true" />Nova prospecção</button> : null}
         </div>
 
-        {prospectingEditingId !== null || (!prospectingQuery.data?.length && canEdit) ? (
+        {isCreatingProspecting || prospectingEditingId !== null || (!prospectingQuery.data?.length && canEdit) ? (
           <form onSubmit={submitProspectingForm} className="border-b border-slate-200 bg-blue-50/60 p-5 dark:border-slate-700 dark:bg-blue-950/20" aria-label={prospectingEditingId ? "Editar prospecção" : "Nova prospecção"}>
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_180px]">
               <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Cliente

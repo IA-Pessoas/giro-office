@@ -104,6 +104,9 @@ async function run() {
     await page.getByRole("button", { name: "Salvar" }).click();
     await page.getByText("Análise Financeira").last().waitFor();
     await page.screenshot({ path: `${evidenceDir}/03-commercial-saved-light.png`, fullPage: true });
+    await page.getByRole("button", { name: "Nova prospecção" }).click();
+    await page.getByRole("form", { name: "Nova prospecção" }).waitFor();
+    await page.getByRole("button", { name: "Cancelar" }).last().click();
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: `${evidenceDir}/04-commercial-mobile-light.png`, fullPage: true });
