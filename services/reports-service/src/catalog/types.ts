@@ -89,6 +89,35 @@ export function deriveReportCatalogGrant(definition: {
   };
 }
 
+export function deriveReportCatalogGrantFromComposition(composition: {
+  areas: readonly {
+    source: string;
+    fields: readonly string[];
+    filters?: readonly { field: string }[];
+    aggregations?: readonly { field: string }[];
+    groupBy?: readonly string[];
+    orderBy?: readonly { field: string }[];
+  }[];
+}): ReportCatalogGrant {
+  const sources: Record<string, string[]> = {};
+  const addField = (source: string, field: string) => {
+    const fields = sources[source] ?? [];
+    if (!fields.includes(field)) fields.push(field);
+    sources[source] = fields;
+  };
+
+  for (const area of composition.areas) {
+    sources[area.source] ??= [];
+    for (const field of area.fields) addField(area.source, field);
+    for (const filter of area.filters ?? []) addField(area.source, filter.field);
+    for (const aggregation of area.aggregations ?? []) addField(area.source, aggregation.field);
+    for (const field of area.groupBy ?? []) addField(area.source, field);
+    for (const order of area.orderBy ?? []) addField(area.source, order.field);
+  }
+
+  return { sources, relations: [] };
+}
+
 export interface ReportCatalogScope {
   organization_id: string;
   modules: Readonly<Record<string, number>>;

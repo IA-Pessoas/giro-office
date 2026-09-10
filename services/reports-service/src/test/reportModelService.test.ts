@@ -69,6 +69,7 @@ describe("ReportModelService", () => {
       data: {
         organization_id: organizationId,
         department_id: "department-1",
+        description: null,
         name: "Saldo compartilhado",
       },
     });
@@ -188,6 +189,7 @@ describe("ReportModelService", () => {
         organization_id: organizationId,
         created_by_user_id: userId,
         department_id: null,
+        description: null,
         name: "Saldo",
       },
     });
@@ -197,6 +199,63 @@ describe("ReportModelService", () => {
         report_model_id: "model-1",
         version: 1,
         definition_json: definition,
+      },
+    });
+  });
+
+  it("persiste composição de várias áreas com nome e descrição", async () => {
+    const composition = {
+      version: 2 as const,
+      areas: [
+        { source: "finance.ledger", fields: ["balance"] },
+        { source: "finance.accounts", fields: ["name"] },
+      ],
+    };
+    const transaction = {
+      reportModel: {
+        create: vi.fn().mockResolvedValue({
+          id: "model-composed",
+          organization_id: organizationId,
+          name: "Saldo e contas",
+          description: "Consulta mensal",
+        }),
+      },
+      reportModelVersion: {
+        create: vi.fn().mockResolvedValue({
+          id: "version-composed",
+          version: 1,
+          definition_json: composition,
+        }),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof transaction) => unknown) =>
+        callback(transaction),
+      ),
+    };
+    const service = new ReportModelService(prisma as never);
+
+    await expect(
+      service.create({
+        organizationId,
+        userId,
+        name: "Saldo e contas",
+        description: "Consulta mensal",
+        definition: composition,
+      }),
+    ).resolves.toMatchObject({
+      name: "Saldo e contas",
+      description: "Consulta mensal",
+      version_id: "version-composed",
+      definition: composition,
+    });
+    expect(transaction.reportModel.create).toHaveBeenCalledWith({
+      data: {
+        organization_id: organizationId,
+        created_by_user_id: userId,
+        department_id: null,
+        description: "Consulta mensal",
+        name: "Saldo e contas",
       },
     });
   });

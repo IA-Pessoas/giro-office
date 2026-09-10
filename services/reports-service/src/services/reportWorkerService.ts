@@ -1,6 +1,10 @@
 import { ServiceError } from "@workspace/shared";
 
-import { deriveReportCatalogGrant, type ReportCatalogScope } from "../catalog/types.js";
+import {
+  deriveReportCatalogGrant,
+  deriveReportCatalogGrantFromComposition,
+  type ReportCatalogScope,
+} from "../catalog/types.js";
 import type { ReportsPrismaClient } from "../prisma/index.js";
 import type { ClaimedReportJob, ReportJobRepository } from "../prisma/reportJobRepository.js";
 import {
@@ -10,6 +14,7 @@ import {
 } from "../routes/reportingContext.js";
 import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
+import type { ReportModelDefinition } from "../schemas/reportModel.schemas.js";
 import { DEFAULT_REPORT_RETENTION_DAYS } from "../schemas/reportRetention.schemas.js";
 import { ReportAreaExecutionError, type ReportExecutionService } from "./reportExecutionService.js";
 import type { ReportLifecycleService } from "./reportLifecycleService.js";
@@ -111,7 +116,7 @@ export class ReportWorkerService {
 
     if (model.created_by_user_id === job.requester_id) {
       return {
-        definition: version.definition_json as ReportDefinition,
+        definition: version.definition_json as ReportModelDefinition,
         scope: await getReportingCatalogScope(this.accessContext, {
           userId: job.requester_id,
           organizationId: job.organization_id,
@@ -131,13 +136,16 @@ export class ReportWorkerService {
         "O modelo compartilhado não está mais autorizado para o solicitante.",
       );
     }
-    const definition = version.definition_json as ReportDefinition;
+    const definition = version.definition_json as ReportModelDefinition;
     return {
       definition,
       scope: {
         organization_id: job.organization_id,
         modules: context.modules,
-        grant: deriveReportCatalogGrant(definition),
+        grant:
+          "version" in definition
+            ? deriveReportCatalogGrantFromComposition(definition)
+            : deriveReportCatalogGrant(definition),
       },
     };
   }

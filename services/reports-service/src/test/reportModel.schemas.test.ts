@@ -9,6 +9,14 @@ const definition = {
   columns: [{ source: "finance.ledger", field: "balance", alias: "balance" }],
 };
 
+const composition = {
+  version: 2 as const,
+  areas: [
+    { source: "finance.ledger", fields: ["balance"] },
+    { source: "finance.accounts", fields: ["name"] },
+  ],
+};
+
 describe("reportModelSchema", () => {
   it("mantém a definição declarativa da versão pessoal", () => {
     expect(
@@ -22,11 +30,26 @@ describe("reportModelSchema", () => {
     ).toMatchObject({ definition });
   });
 
+  it("aceita modelo composto com descrição amigável", () => {
+    expect(
+      reportModelSchemas.createReportModelSchema.parse({
+        name: "Saldo e contas",
+        description: "Consulta financeira para revisão mensal.",
+        definition: composition,
+      }),
+    ).toMatchObject({
+      description: "Consulta financeira para revisão mensal.",
+      definition: composition,
+    });
+  });
+
   it("aceita atualização parcial e rejeita corpo vazio", () => {
     const schema = reportModelSchemas.updateReportModelSchema;
 
     expect(schema.parse({ name: "Saldo atualizado" })).toEqual({ name: "Saldo atualizado" });
-    expect(() => schema.parse({})).toThrow("Informe nome ou definição para atualizar o modelo.");
+    expect(() => schema.parse({})).toThrow(
+      "Informe nome, descrição ou definição para atualizar o modelo.",
+    );
   });
 
   it("mantém coluna de autor na migration de modelos pessoais", () => {

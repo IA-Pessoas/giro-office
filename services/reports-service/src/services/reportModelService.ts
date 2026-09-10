@@ -1,15 +1,22 @@
 import { ServiceError } from "@workspace/shared";
 
-import { deriveReportCatalogGrant, type ReportCatalogGrant } from "../catalog/types.js";
+import {
+  deriveReportCatalogGrant,
+  deriveReportCatalogGrantFromComposition,
+  type ReportCatalogGrant,
+} from "../catalog/types.js";
+import type { Prisma } from "../generated/prisma/client.js";
 import type { ReportsPrismaClient } from "../prisma/index.js";
-import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
+import type { ReportModelDefinition } from "../schemas/reportModel.schemas.js";
 
 export interface PersonalReportModel {
   id: string;
   organization_id: string;
   name: string;
+  description: string | null;
   version: number;
-  definition: ReportDefinition;
+  version_id?: string;
+  definition: ReportModelDefinition;
 }
 
 export interface ReportModelActor {
@@ -19,14 +26,16 @@ export interface ReportModelActor {
 
 export interface CreatePersonalReportModelInput extends ReportModelActor {
   name: string;
-  definition: ReportDefinition;
+  description?: string | null;
+  definition: ReportModelDefinition;
 }
 
 export interface CreateSharedReportModelInput {
   organizationId: string;
   departmentId: string;
   name: string;
-  definition: ReportDefinition;
+  description?: string | null;
+  definition: ReportModelDefinition;
 }
 
 export interface SharedReportModel extends PersonalReportModel {
@@ -42,13 +51,15 @@ export interface SharedReportModelActor {
 export interface UpdateSharedReportModelInput extends SharedReportModelActor {
   id: string;
   name?: string;
-  definition: ReportDefinition;
+  description?: string | null;
+  definition: ReportModelDefinition;
 }
 
 export interface UpdatePersonalReportModelInput extends ReportModelActor {
   id: string;
   name?: string;
-  definition: ReportDefinition;
+  description?: string | null;
+  definition: ReportModelDefinition;
 }
 
 const MODEL_NOT_FOUND = "Modelo de relatório não encontrado.";
@@ -68,6 +79,7 @@ export class ReportModelService {
           organization_id: input.organizationId,
           department_id: input.departmentId,
           name: input.name,
+          description: input.description ?? null,
         },
       });
       const version = await transaction.reportModelVersion.create({
@@ -75,12 +87,17 @@ export class ReportModelService {
           organization_id: input.organizationId,
           report_model_id: model.id,
           version: 1,
-          definition_json: input.definition,
+          definition_json: input.definition as Prisma.InputJsonValue,
         },
       });
 
       return this.toSharedModel(
-        { id: model.id, organization_id: input.organizationId, name: input.name },
+        {
+          id: model.id,
+          organization_id: input.organizationId,
+          name: input.name,
+          description: input.description ?? null,
+        },
         input.departmentId,
         version,
       );
@@ -142,14 +159,17 @@ export class ReportModelService {
 
           const updatedModel = await transaction.reportModel.update({
             where: { id: model.id },
-            data: input.name === undefined ? {} : { name: input.name },
+            data: {
+              ...(input.name === undefined ? {} : { name: input.name }),
+              ...(input.description === undefined ? {} : { description: input.description }),
+            },
           });
           const version = await transaction.reportModelVersion.create({
             data: {
               organization_id: input.organizationId,
               report_model_id: model.id,
               version: currentVersion.version + 1,
-              definition_json: input.definition,
+              definition_json: input.definition as Prisma.InputJsonValue,
             },
           });
 
@@ -171,6 +191,7 @@ export class ReportModelService {
           created_by_user_id: input.userId,
           department_id: null,
           name: input.name,
+          description: input.description ?? null,
         },
       });
       const version = await transaction.reportModelVersion.create({
@@ -178,7 +199,7 @@ export class ReportModelService {
           organization_id: input.organizationId,
           report_model_id: model.id,
           version: 1,
-          definition_json: input.definition,
+          definition_json: input.definition as Prisma.InputJsonValue,
         },
       });
 
@@ -232,14 +253,17 @@ export class ReportModelService {
 
           const updatedModel = await transaction.reportModel.update({
             where: { id: model.id },
-            data: input.name === undefined ? {} : { name: input.name },
+            data: {
+              ...(input.name === undefined ? {} : { name: input.name }),
+              ...(input.description === undefined ? {} : { description: input.description }),
+            },
           });
           const version = await transaction.reportModelVersion.create({
             data: {
               organization_id: input.organizationId,
               report_model_id: model.id,
               version: currentVersion.version + 1,
-              definition_json: input.definition,
+              definition_json: input.definition as Prisma.InputJsonValue,
             },
           });
 
@@ -303,28 +327,33 @@ export class ReportModelService {
   }
 
   private toModel(
-    model: { id: string; organization_id: string; name: string },
-    version: { version: number; definition_json: unknown },
+    model: { id: string; organization_id: string; name: string; description?: string | null },
+    version: { id?: string; version: number; definition_json: unknown },
   ): PersonalReportModel {
     return {
       id: model.id,
       organization_id: model.organization_id,
       name: model.name,
+      description: model.description ?? null,
       version: version.version,
-      definition: version.definition_json as ReportDefinition,
+      ...(version.id ? { version_id: version.id } : {}),
+      definition: version.definition_json as ReportModelDefinition,
     };
   }
 
   private toSharedModel(
-    model: { id: string; organization_id: string; name: string },
+    model: { id: string; organization_id: string; name: string; description?: string | null },
     departmentId: string,
-    version: { version: number; definition_json: unknown },
+    version: { id?: string; version: number; definition_json: unknown },
   ): SharedReportModel {
     const personal = this.toModel(model, version);
     return {
       ...personal,
       department_id: departmentId,
-      grant: deriveReportCatalogGrant(personal.definition),
+      grant:
+        "version" in personal.definition
+          ? deriveReportCatalogGrantFromComposition(personal.definition)
+          : deriveReportCatalogGrant(personal.definition),
     };
   }
 }

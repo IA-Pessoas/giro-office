@@ -36,6 +36,14 @@ const reportsPageSource = await readFile(
   new URL("./components/ReportsCatalogPage.tsx", import.meta.url),
   "utf8",
 );
+const reportsCreateSource = await readFile(
+  new URL("./components/ReportsCreatePanel.tsx", import.meta.url),
+  "utf8",
+);
+const reportsModelsSource = await readFile(
+  new URL("./components/ReportModelsPanel.tsx", import.meta.url),
+  "utf8",
+);
 const snapshotTableSource = await readFile(
   new URL("./components/ReportSnapshotTable.tsx", import.meta.url),
   "utf8",
@@ -438,6 +446,9 @@ runTest("exposes the governed history, snapshot, and download contracts", () => 
   assert.equal(REPORTS_ENDPOINTS.sharedModels, "/reports/models/shared/list");
   assert.equal(REPORTS_ENDPOINTS.jobs, "/reports/jobs/list");
   assert.equal(REPORTS_ENDPOINTS.createJob, "/reports/jobs");
+  assert.equal(REPORTS_ENDPOINTS.createModel, "/reports/models");
+  assert.equal(REPORTS_ENDPOINTS.model("model-1"), "/reports/models/model-1");
+  assert.equal(REPORTS_ENDPOINTS.sharedModel("model-1"), "/reports/models/shared/model-1");
   assert.equal(REPORTS_ENDPOINTS.snapshot("job-1"), "/reports/jobs/job-1/snapshot");
   assert.equal(REPORTS_ENDPOINTS.download("snapshot-1"), "/reports/snapshots/snapshot-1/export");
   assert.deepEqual(buildReportJobListParams({ scope: "personal", status: "", cursor: undefined }), {
@@ -462,6 +473,16 @@ runTest("exposes the governed history, snapshot, and download contracts", () => 
     "library",
     null,
   ]);
+});
+
+runTest("salva modelos somente depois do resultado e reabre com nomes amigáveis", () => {
+  assert.match(reportsCreateSource, /Salvar para usar novamente/);
+  assert.match(reportsCreateSource, /useCreateReportModelMutation/);
+  assert.match(reportsCreateSource, /description/);
+  assert.match(reportsCreateSource, /modelVersionId/);
+  assert.match(reportsModelsSource, /Abrir modelo/);
+  assert.match(reportsModelsSource, /getSharedModel|getModel/);
+  assert.doesNotMatch(reportsModelsSource, /\{model\.(organization_id|department_id|version_id)\}/);
 });
 
 runTest("uses the materialized snapshot id for in-memory downloads", () => {

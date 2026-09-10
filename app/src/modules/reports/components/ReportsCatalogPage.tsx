@@ -6,11 +6,13 @@ import { useModuleAccessMap } from "@modules/auth/hooks/useModuleAccess";
 import { ReportsCreatePanel } from "./ReportsCreatePanel";
 import { ReportHistoryPanel } from "./ReportHistoryPanel";
 import { ReportModelsPanel } from "./ReportModelsPanel";
+import type { ReportModel } from "../types/report.types";
 
 type ReportsTab = "create" | "models" | "history" | "library";
 
 export function ReportsCatalogPage() {
   const [activeTab, setActiveTab] = useState<ReportsTab>("create");
+  const [openedModel, setOpenedModel] = useState<ReportModel | null>(null);
   const { accessMap, departmentModule, user } = useModuleAccessMap();
   const [libraryAvailable, setLibraryAvailable] = useState(true);
   const canManageShared =
@@ -81,10 +83,21 @@ export function ReportsCatalogPage() {
           aria-labelledby="reports-tab-create"
           className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 dark:border-slate-700 dark:bg-slate-900"
         >
-          <ReportsCreatePanel />
+          <ReportsCreatePanel
+            model={openedModel}
+            onModelLoaded={() => setOpenedModel(null)}
+          />
         </section>
       ) : null}
-      {activeTab === "models" ? <ReportModelsPanel canManageShared={canManageShared} /> : null}
+      {activeTab === "models" ? (
+        <ReportModelsPanel
+          canManageShared={canManageShared}
+          onOpenModel={(model) => {
+            setOpenedModel(model);
+            setActiveTab("create");
+          }}
+        />
+      ) : null}
       {activeTab === "history" ? <ReportHistoryPanel scope="personal" /> : null}
       {activeTab === "library" ? (
         <ReportHistoryPanel scope="library" onAccessDenied={handleLibraryAccessDenied} />

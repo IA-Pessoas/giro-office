@@ -61,6 +61,8 @@ export type ReportComposition = {
   areas: ReportArea[];
 };
 
+export type ReportModelDefinition = ReportDefinition | ReportComposition;
+
 export type ReportArea = {
   source: string;
   fields: string[];
@@ -146,8 +148,10 @@ export type ReportModel = {
   id: string;
   organization_id: string;
   name: string;
+  description?: string | null;
   version: number;
-  definition: ReportDefinition;
+  version_id?: string;
+  definition: ReportModelDefinition;
   created_by_user_id?: string | null;
   owner_id?: string | null;
   owner_name?: string | null;

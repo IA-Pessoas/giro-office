@@ -163,6 +163,12 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
       },
       schemas: {
         ReportDefinition: reportDefinition,
+        ReportModelDefinition: {
+          oneOf: [
+            { $ref: "#/components/schemas/ReportDefinition" },
+            { $ref: "#/components/schemas/ReportComposition" },
+          ],
+        },
         ReportComposition: {
           type: "object",
           additionalProperties: false,
@@ -647,7 +653,8 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["name", "definition"],
                   properties: {
                     name: { type: "string" },
-                    definition: { $ref: "#/components/schemas/ReportDefinition" },
+                    description: { type: "string", maxLength: 240, nullable: true },
+                    definition: { $ref: "#/components/schemas/ReportModelDefinition" },
                   },
                 },
               },
@@ -674,6 +681,20 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
         },
       },
       "/reports/models/shared/{id}": {
+        get: {
+          tags: ["Reports"],
+          summary: "Consultar modelo compartilhado com acesso revalidado",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Modelo compartilhado autorizado", ...successResponse },
+            "401": { description: "Contexto autenticado ausente" },
+            "403": { description: "Concessão ou departamento indisponível" },
+            "404": { description: "Modelo não encontrado" },
+          },
+        },
         patch: {
           tags: ["Reports"],
           summary: "Criar nova versão de modelo compartilhado",
@@ -690,7 +711,8 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["definition"],
                   properties: {
                     name: { type: "string" },
-                    definition: { $ref: "#/components/schemas/ReportDefinition" },
+                    description: { type: "string", maxLength: 240, nullable: true },
+                    definition: { $ref: "#/components/schemas/ReportModelDefinition" },
                   },
                 },
               },
@@ -751,7 +773,8 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   required: ["name", "definition"],
                   properties: {
                     name: { type: "string", example: "Saldo mensal" },
-                    definition: { $ref: "#/components/schemas/ReportDefinition" },
+                    description: { type: "string", maxLength: 240, nullable: true },
+                    definition: { $ref: "#/components/schemas/ReportModelDefinition" },
                   },
                 },
               },
@@ -807,7 +830,8 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                   type: "object",
                   properties: {
                     name: { type: "string" },
-                    definition: { $ref: "#/components/schemas/ReportDefinition" },
+                    description: { type: "string", maxLength: 240, nullable: true },
+                    definition: { $ref: "#/components/schemas/ReportModelDefinition" },
                   },
                 },
               },
