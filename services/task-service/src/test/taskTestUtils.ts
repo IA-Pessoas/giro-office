@@ -32,9 +32,6 @@ interface TaskRouteMocks {
     concludeTask: Mock;
     approveTaskCompletion: Mock;
   };
-  taskComercialServiceMock: {
-    updateChargeComercial: Mock;
-  };
   taskFinanceiroServiceMock: {
     updateChargeFinanceiro: Mock;
   };
@@ -70,9 +67,6 @@ const taskRouteMocks: TaskRouteMocks = vi.hoisted(
       concludeTask: vi.fn(),
       approveTaskCompletion: vi.fn(),
     },
-    taskComercialServiceMock: {
-      updateChargeComercial: vi.fn(),
-    },
     taskFinanceiroServiceMock: {
       updateChargeFinanceiro: vi.fn(),
     },
@@ -106,12 +100,6 @@ vi.mock("../services/taskIntegrationRegularizeService.js", () => ({
 vi.mock("../services/taskLifecycleService.js", () => ({
   TaskLifecycleService: vi.fn(function TaskLifecycleService() {
     return taskRouteMocks.taskLifecycleServiceMock;
-  }),
-}));
-
-vi.mock("../services/taskComercialService.js", () => ({
-  TaskComercialService: vi.fn(function TaskComercialService() {
-    return taskRouteMocks.taskComercialServiceMock;
   }),
 }));
 
@@ -169,7 +157,6 @@ export function resetTaskRouteMocks() {
   const taskDependentServiceMock = taskRouteMocks.taskDependentServiceMock;
   const taskIntegrationRegularizeServiceMock = taskRouteMocks.taskIntegrationRegularizeServiceMock;
   const taskLifecycleServiceMock = taskRouteMocks.taskLifecycleServiceMock;
-  const taskComercialServiceMock = taskRouteMocks.taskComercialServiceMock;
   const taskFinanceiroServiceMock = taskRouteMocks.taskFinanceiroServiceMock;
 
   taskCrudServiceMock.createTask.mockResolvedValue({ id: "task-1" });
@@ -194,7 +181,6 @@ export function resetTaskRouteMocks() {
 
   taskLifecycleServiceMock.concludeTask.mockResolvedValue({ id: "task-1" });
   taskLifecycleServiceMock.approveTaskCompletion.mockResolvedValue({ id: "task-1" });
-  taskComercialServiceMock.updateChargeComercial.mockResolvedValue({ id: "task-1" });
   taskFinanceiroServiceMock.updateChargeFinanceiro.mockResolvedValue({ id: "task-1" });
 }
 
@@ -208,13 +194,10 @@ const taskIntegrationRegularizeServiceMock: TaskRouteMocks["taskIntegrationRegul
   taskRouteMocks.taskIntegrationRegularizeServiceMock;
 const taskLifecycleServiceMock: TaskRouteMocks["taskLifecycleServiceMock"] =
   taskRouteMocks.taskLifecycleServiceMock;
-const taskComercialServiceMock: TaskRouteMocks["taskComercialServiceMock"] =
-  taskRouteMocks.taskComercialServiceMock;
 const taskFinanceiroServiceMock: TaskRouteMocks["taskFinanceiroServiceMock"] =
   taskRouteMocks.taskFinanceiroServiceMock;
 
 export {
-  taskComercialServiceMock,
   taskCrudServiceMock,
   taskDependentServiceMock,
   taskFinanceiroServiceMock,

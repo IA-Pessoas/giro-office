@@ -7,11 +7,9 @@ import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { clientIdParamsSchema } from "../schemas/client.schemas.js";
 import {
   terminationBodySchema,
-  updateCommercialBodySchema,
   updateFinanceBodySchema,
   updateRegularizeBodySchema,
 } from "../schemas/clientVerticals.schemas.js";
-import { updateCommercialClient } from "../services/clientCommercialService.js";
 import { updateFinanceClient } from "../services/clientFinanceService.js";
 import { updateRegularizeClient } from "../services/clientRegularizeService.js";
 import { terminateClient } from "../services/clientTerminationService.js";
@@ -25,30 +23,6 @@ import { resolveOrganizationId } from "../utils/organizationContext.js";
 export function createClientVerticalsRouter(deps: ClientRouterDeps): Router {
   const { prisma } = deps;
   const router: ReturnType<typeof Router> = Router();
-
-  router.patch(
-    "/:id/commercial",
-    isAuthenticated,
-    async (request: Request, response: Response, next: NextFunction) => {
-      try {
-        const params = parseWithZod(clientIdParamsSchema, request.params);
-        const body = parseWithZod(updateCommercialBodySchema, request.body);
-        requireClientDomainModule(request, "comercial", CLIENT_DOMAIN_EDIT_PERMISSION);
-        const organizationId = resolveOrganizationId(request, undefined);
-        const updated = await updateCommercialClient(
-          prisma,
-          params.id,
-          organizationId,
-          request.user_id,
-          body,
-        );
-        response.json(createSuccessResponse(updated));
-      } catch (err) {
-        logError("Erro ao atualizar cliente (comercial)", { err });
-        next(err);
-      }
-    },
-  );
 
   router.patch(
     "/:id/termination",

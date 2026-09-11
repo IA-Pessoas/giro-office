@@ -31,6 +31,19 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 }
 
 describe("matriz de regressão das políticas modulares", () => {
+  it("protege Comercial: Viewer lê e Editor altera, sem bypass global", () => {
+    const readPolicy = requiredRoutePolicy("GET", "/commercial/prospecting");
+    const editPolicy = requiredRoutePolicy("PATCH", "/commercial/prospecting/prospecting-1");
+
+    expect(canAccessRoute(authContext({ modules: { comercial: 1 } }), readPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { comercial: 0 } }), readPolicy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { comercial: 1 } }), editPolicy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { comercial: 2 } }), editPolicy)).toBe(true);
+    expect(
+      canAccessRoute(authContext({ permission: 999, modules: { comercial: 0 } }), readPolicy),
+    ).toBe(false);
+  });
+
   it("permite Viewer global consultar a lista de clientes sem módulo", () => {
     const policy = requiredRoutePolicy("GET", "/client/list");
 

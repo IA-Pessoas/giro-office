@@ -53,8 +53,8 @@ async function installMocks(page, context) {
     { name: "cw.csrf", value: "A".repeat(43), url: baseUrl, httpOnly: false },
   ]);
   await page.addInitScript(() => {
-    window.localStorage.setItem("workspace-theme", "light");
-    window.localStorage.setItem("chakra-ui-color-mode", "light");
+    if (!window.localStorage.getItem("workspace-theme")) window.localStorage.setItem("workspace-theme", "light");
+    if (!window.localStorage.getItem("chakra-ui-color-mode")) window.localStorage.setItem("chakra-ui-color-mode", "light");
   });
   const json = (route, data, status = 200) => route.fulfill({
     status,
@@ -143,21 +143,34 @@ async function run() {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: `${evidenceDir}/04-commercial-mobile-light.png`, fullPage: true });
-    await page.evaluate(() => {
-      document.documentElement.classList.remove("light");
-      document.documentElement.classList.add("dark");
-      document.documentElement.setAttribute("data-theme", "dark");
+    await page.evaluate(() => window.localStorage.setItem("workspace-theme", "dark"));
+    await page.reload({ waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: "Catálogo de propostas" }).waitFor();
+    const darkTextEvidence = await page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Canvas indisponível para validar contraste dark.");
+      const read = (selector) => {
+        const element = document.querySelector(selector);
+        if (!element) throw new Error(`Elemento ausente: ${selector}`);
+        const color = getComputedStyle(element).color;
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        const [red, green, blue] = context.getImageData(0, 0, 1, 1).data;
+        return { color, luminance: (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255 };
+      };
+      return {
+        heading: read("h1"),
+        intro: read("h1 + p"),
+        taskBillingHeading: read("#commercial-task-billing-title"),
+      };
     });
-    const darkTextColors = await page.evaluate(() => ({
-      heading: getComputedStyle(document.querySelector("h1")).color,
-      intro: getComputedStyle(document.querySelector("h1 + p")).color,
-      taskBillingHeading: getComputedStyle(document.querySelector("#commercial-task-billing-title")).color,
-    }));
-    assert.deepEqual(darkTextColors, {
-      heading: "rgb(226, 232, 240)",
-      intro: "rgb(226, 232, 240)",
-      taskBillingHeading: "rgb(226, 232, 240)",
-    });
+    for (const evidence of [darkTextEvidence.heading, darkTextEvidence.intro, darkTextEvidence.taskBillingHeading]) {
+      assert.ok(evidence.luminance >= 0.65, `Texto dark com contraste baixo: ${JSON.stringify(evidence)}`);
+    }
     await page.screenshot({ path: `${evidenceDir}/05-commercial-mobile-dark.png`, fullPage: true });
     assert.deepEqual(pageErrors, []);
     assert.deepEqual(consoleErrors, []);

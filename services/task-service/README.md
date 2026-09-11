@@ -78,6 +78,7 @@ Exemplos de paths publicos:
 
 `/internal/reporting` é contrato direto interno, não roteado pelo gateway.
 `/internal/commercial/task-billing` é contrato direto interno, protegido por `COMMERCIAL_SERVICE_TOKEN`.
+O antigo `PUT /task/comercial` foi removido no corte; cobrança pública ocorre em `/commercial/task-billing`.
 
 ## Desenvolvimento
 

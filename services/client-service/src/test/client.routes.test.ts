@@ -181,7 +181,8 @@ describe("client-service", () => {
     expect(res.body.openapi).toBe("3.0.3");
     expect(res.body.info?.title).toBe("client-service");
     expect(res.body.paths?.["/client/list"]).toBeDefined();
-    expect(res.body.paths?.["/client/commercial/overview"]).toBeDefined();
+    expect(res.body.paths?.["/client/commercial/overview"]).toBeUndefined();
+    expect(res.body.paths?.["/client/{id}/commercial"]).toBeUndefined();
     expect(res.body.paths?.["/client/{id}/pa"]).toBeDefined();
     expect(res.body.paths?.["/internal/competence-output-update"]).toBeDefined();
     expect(res.body.paths?.["/internal/commercial/prospecting-transition"]).toBeDefined();
@@ -309,39 +310,16 @@ describe("client-service", () => {
     );
   });
 
-  it("GET /client/commercial/overview returns overview scoped to authenticated organization", async () => {
+  it("GET /client/commercial/overview is unavailable after the commercial cutover", async () => {
     const mock: IClientService = { ...mockServiceBase() };
-    const prisma = {
-      organization: {
-        findUnique: vi.fn().mockResolvedValue({ id: TEST_ORG_ID }),
-      },
-      client: {
-        count: vi.fn().mockResolvedValue(0),
-        findMany: vi.fn().mockResolvedValue([]),
-      },
-    } as unknown as PrismaClient;
-    const app = buildTestApp(mock, { prisma });
+    const app = buildTestApp(mock);
     const token = bearerToken(TEST_ORG_ID);
 
     const res = await request(app)
       .get("/client/commercial/overview")
       .set("Authorization", `Bearer ${token}`);
 
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data.summary).toEqual({
-      totalLeads: 0,
-      activeLeads: 0,
-      wonLeads: 0,
-      totalValue: 0,
-      conversionRate: 0,
-      activeProposals: 0,
-      activeContracts: 0,
-    });
-    expect(prisma.organization.findUnique).toHaveBeenCalledWith({
-      where: { id: TEST_ORG_ID },
-      select: { id: true },
-    });
+    expect(res.status).toBe(404);
   });
 
   it("GET /client/list passes status filter mapped to BD when query has status Ativo", async () => {
@@ -512,65 +490,17 @@ describe("client-service", () => {
     );
   });
 
-  it("PATCH /client/:id/commercial mapeia colisão ao reabrir tarefas legadas", async () => {
-    let persistedStatus = "Paralisado";
-    const updateMany = vi
-      .fn()
-      .mockResolvedValueOnce({ count: 1 })
-      .mockRejectedValueOnce({ code: "P2002" });
-    const transactionClient = {
-      client: {
-        findFirst: vi.fn().mockResolvedValue({ id: TEST_CLIENT_ID, status: "Paralisado" }),
-        update: vi.fn().mockImplementation(({ data }) => {
-          persistedStatus = data.status;
-          return Promise.resolve({
-            id: TEST_CLIENT_ID,
-            prospecting_status: "Fechado",
-          });
-        }),
-      },
-      task: { updateMany },
-    };
-    const transaction = vi.fn(async (callback: (tx: typeof transactionClient) => unknown) => {
-      const previousStatus = persistedStatus;
-      try {
-        return await callback(transactionClient);
-      } catch (error) {
-        persistedStatus = previousStatus;
-        throw error;
-      }
-    });
-    const prismaMock = {
-      ...transactionClient,
-      $transaction: transaction,
-    };
-    const prisma = prismaMock as unknown as PrismaClient;
+  it("PATCH /client/:id/commercial is unavailable after the commercial cutover", async () => {
     const mock: IClientService = { ...mockServiceBase() };
-    const app = buildTestApp(mock, { prisma });
-    const token = jwt.sign(
-      {
-        user_id: "user-test-1",
-        organization_id: TEST_ORG_ID,
-        modules: { comercial: 2 },
-      },
-      TEST_JWT_SECRET,
-    );
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
 
     const response = await request(app)
       .patch(`/client/${TEST_CLIENT_ID}/commercial`)
       .set("Authorization", `Bearer ${token}`)
       .send({ prospecting_status: "Fechado" });
 
-    expect(response.status).toBe(409);
-    expect(response.body).toEqual({
-      success: false,
-      error: "Tarefa já foi cadastrada em andamento.",
-      code: "CONFLICT",
-      requestId: expect.any(String),
-    });
-    expect(updateMany).toHaveBeenCalledTimes(2);
-    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
-    expect(persistedStatus).toBe("Paralisado");
+    expect(response.status).toBe(404);
   });
 
   it("PATCH /client/:id aceita o contexto encaminhado pelo gateway", async () => {

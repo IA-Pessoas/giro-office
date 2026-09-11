@@ -436,29 +436,6 @@ class ClientController {
         response.json(del)
     }
 
-    // Comercial
-    public updateComercial = async (request: Request, response: Response): Promise<void> => {
-        const {
-            client_id,
-            prospecting_status,
-            date_status,
-            description_prospecting,
-            register_date_prospecting,
-        } = request.body
-        const my_id = request.user_id
-
-        const clientService = new ClientService()
-        const update = await clientService.updateComercial({
-            my_id,
-            client_id,
-            prospecting_status,
-            date_status,
-            description_prospecting,
-            register_date_prospecting,
-        })
-
-        response.json(update)
-    }
     public termination = async (request: Request, response: Response): Promise<void> => {
         const {
             client_id,

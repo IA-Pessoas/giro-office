@@ -374,10 +374,7 @@ describe("elegibilidade manual de tarefas via rotas", () => {
     expect(auditMock.logUpdateIfChanged).not.toHaveBeenCalled();
   });
 
-  it("mapeia colisão atômica ao reabrir tarefa pela rota comercial", async () => {
-    prismaMock.task.findFirst.mockResolvedValue({ ...legacyTask, status: "Não Contratado" });
-    prismaMock.task.update.mockRejectedValue({ code: "P2002" });
-
+  it("mantém rota comercial legada indisponível após o corte", async () => {
     const response = await request(createApp()).put("/task/comercial").send({
       task_id: legacyTask.id,
       hiring_status: "Contratado",
@@ -385,14 +382,8 @@ describe("elegibilidade manual de tarefas via rotas", () => {
       billing_description: "Contrato reaberto",
     });
 
-    expect(response.status).toBe(409);
-    expect(response.body).toEqual({
-      success: false,
-      error: "Tarefa já foi cadastrada em andamento.",
-      code: "CONFLICT",
-      requestId: expect.any(String),
-    });
-    expect(prismaMock.task.update).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(404);
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
     expect(auditMock.logUpdateIfChanged).not.toHaveBeenCalled();
   });
 

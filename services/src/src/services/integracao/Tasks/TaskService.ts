@@ -98,16 +98,6 @@ interface CreateDependentRequest {
     observations: string
 }
 
-interface UpdateChargeComercialRequest {
-    my_id: string
-    task_id: string
-    /**
-     * @example "A Realizar", "Contratado", "Não Contratado"
-     */
-    hiring_status: string
-    payment: string
-    billing_description: string
-}
 interface UpdateChargeFinanceiroRequest {
     my_id: string
     task_id: string
@@ -870,69 +860,6 @@ class TaskService {
         return { create }
     }
 
-    // Cobranças
-    async updateChargeComercial({ 
-        my_id,
-        task_id,
-        hiring_status,
-        payment,
-        billing_description,
-    }: UpdateChargeComercialRequest) {
-        try {
-            const exists = await prismaClient.task.findFirst({
-                where: { id: task_id }
-            })
-            if (!exists)
-                throw new Error("Tarefa não existe")
-
-            let charge_comercial = (hiring_status === 'A Realizar') ? true : false
-            let charge_financeiro = (charge_comercial === false) ? true : false
-            let status = (hiring_status === 'Não Contratado') ? 'Não Contratado' : exists.status
-
-            if (hiring_status === 'Não Contratado') 
-                status = 'Não Contratado'
-            else if (hiring_status === 'Contratado') 
-                status = 'Em Andamento'
-
-            charge_financeiro = (status === 'Não Contratado') ? false : charge_financeiro
-
-            const updated = await prismaClient.task.update({
-                where:{
-                    id: task_id
-                },
-                data:{
-                    status,
-                    charge_comercial,
-                    hiring_status,
-                    payment,
-                    billing_description,
-                    charge_financeiro,
-                },
-                select:{
-                    charge_comercial: true,
-                    hiring_status: true,
-                    payment: true,
-                    billing_description: true,
-                    charge_financeiro: true
-                }
-            })
-            
-            const ls = new LogService();
-            await ls.logUpdateIfChanged({
-                my_id,
-                action: "Atualização de Cobrança Comercial",
-                referring: "integracao.tasks",
-                referring_id: task_id,
-                oldData: exists,
-                updatedData: updated,
-            });
-
-            return updated
-        } catch (error) {
-            console.log(error)
-            throw new Error("Erro ao atualizar")
-        }
-    }
     async updateChargeFinanciero({ 
         my_id,
         task_id,

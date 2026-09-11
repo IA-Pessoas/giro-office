@@ -18,20 +18,19 @@ function runTest(name, fn) {
   }
 }
 
-runTest("commercial dashboard consumes real overview endpoint", () => {
-  const component = read("../../shared/components/newLayout/Commercial.tsx");
+runTest("commercial dashboard uses the public commercial surface", () => {
+  const component = read("./components/CommercialCatalog.tsx");
   const contract = read("./services/commercialService.contract.ts");
   const service = read("./services/commercialService.ts");
-  const hook = read("./hooks/useCommercialOverview.ts");
 
-  assert.match(component, /useCommercialOverview\(/);
-  assert.match(contract, /overview:\s*["']\/client\/commercial\/overview["']/);
-  assert.match(service, /api\.get<.*>\(\s*COMMERCIAL_ENDPOINTS\.overview/s);
-  assert.match(hook, /commercialService\.getOverview\(\)/);
+  assert.match(component, /CommercialCatalog/);
+  assert.doesNotMatch(component, /client\/commercial/);
+  assert.doesNotMatch(contract, /client\/commercial/);
+  assert.doesNotMatch(service, /getOverview|COMMERCIAL_ENDPOINTS\.overview/);
 });
 
 runTest("commercial dashboard no longer embeds primary mock datasets", () => {
-  const component = read("../../shared/components/newLayout/Commercial.tsx");
+  const component = read("./components/CommercialCatalog.tsx");
 
   assert.doesNotMatch(component, /const\s+leads\s*:\s*Lead\[\]\s*=\s*\[/);
   assert.doesNotMatch(component, /const\s+proposals\s*:\s*Proposal\[\]\s*=\s*\[/);

@@ -10,7 +10,6 @@ import { useFetch } from "@shared/hooks";
 import { clientService } from "../services/clientService";
 import type {
   Client,
-  ClientCommercialRecord,
   ClientFinanceRecord,
   ClientPa,
   ClientPaResponse,
@@ -20,7 +19,6 @@ import type {
   CreateClientPayload,
   CreateClientIntegrationPayload,
   TerminateClientPayload,
-  UpdateClientCommercialPayload,
   UpdateClientFinancePayload,
   UpdateClientPaPayload,
   UpdateClientIntegrationPayload,
@@ -118,19 +116,6 @@ export function useUpdateClientIntegrationMutation(
 
   return useMutation({
     mutationFn: (payload) => clientService.updateIntegration(id, payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
-    },
-  });
-}
-
-export function useUpdateClientCommercialMutation(
-  id: string,
-): UseMutationResult<ClientCommercialRecord, Error, UpdateClientCommercialPayload> {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (payload) => clientService.updateCommercial(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: CLIENTS_QUERY_KEY });
     },

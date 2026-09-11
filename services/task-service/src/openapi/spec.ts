@@ -207,22 +207,6 @@ const updateFinanceiroRequestBody = createObjectRequestBody({
   },
 });
 
-const updateComercialRequestBody = createObjectRequestBody({
-  example: {
-    task_id: "task-uuid",
-    hiring_status: "Contratado",
-    payment: "Cartao",
-    billing_description: "Entrada de 50% e saldo em 30 dias.",
-  },
-  required: ["task_id", "hiring_status", "payment", "billing_description"],
-  properties: {
-    task_id: { type: "string" },
-    hiring_status: { type: "string" },
-    payment: { type: "string" },
-    billing_description: { type: "string" },
-  },
-});
-
 const concludeTaskRequestBody = createObjectRequestBody({
   example: {
     task_id: "task-uuid",
@@ -476,7 +460,6 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       { name: "TaskDependent", description: "Dependencias entre modelos" },
       { name: "TaskIntegration", description: "Vinculos integracao Regularize" },
       { name: "Financeiro", description: "Cobranca financeira" },
-      { name: "Comercial", description: "Cobranca comercial" },
       { name: "Lifecycle", description: "Conclusao e aprovacao" },
       { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
@@ -861,15 +844,6 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           summary: "Atualizar cobranca financeira",
           security: bearer,
           ...updateFinanceiroRequestBody,
-          responses: { "200": { description: "Atualizado", ...successJson } },
-        },
-      },
-      "/task/comercial": {
-        put: {
-          tags: ["Comercial"],
-          summary: "Atualizar cobranca comercial",
-          security: bearer,
-          ...updateComercialRequestBody,
           responses: { "200": { description: "Atualizado", ...successJson } },
         },
       },
