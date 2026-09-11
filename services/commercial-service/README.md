@@ -8,11 +8,10 @@ Serviço responsável pelo catálogo de propostas e pela operação de prospecç
 - Banco e autenticação: `DATABASE_URL`, `JWT_SECRET`.
 - Auditoria: `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN`.
 - Projeção de Cliente: `CLIENT_SERVICE_URL`, `CLIENT_SERVICE_INTERNAL_TOKEN`.
-- Contrato de fechamento de Tarefa: `TASK_SERVICE_URL`, `TASK_SERVICE_INTERNAL_TOKEN`.
+- Contrato de fechamento e projeção de Tarefa: `TASK_SERVICE_URL`, `TASK_SERVICE_INTERNAL_TOKEN`.
 - Adaptador de e-mail: `COMMERCIAL_EMAIL_ADAPTER_URL`, `COMMERCIAL_EMAIL_ADAPTER_TOKEN`,
   `COMMERCIAL_EMAIL_FROM` e `COMMERCIAL_EMAIL_ADAPTER_TIMEOUT_MS`. Em produção, o endpoint deve
   usar HTTPS e token interno; sem adaptador configurado o worker falha de modo reprocessável.
-- Projeção de Tarefa: `TASK_SERVICE_URL`, `TASK_SERVICE_INTERNAL_TOKEN`.
 - Worker da outbox: `COMMERCIAL_OUTBOX_WORKER_POLL_INTERVAL_MS`, `COMMERCIAL_OUTBOX_WORKER_MAX_ATTEMPTS` e `COMMERCIAL_OUTBOX_WORKER_RETRY_BASE_MS`.
 - CORS e documentação: `SERVICE_ALLOWED_ORIGINS`, `ENABLE_API_DOCS`.
 
