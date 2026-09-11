@@ -9,22 +9,18 @@ import jwt from "jsonwebtoken";
 import { expect, it } from "vitest";
 
 import { createApp } from "../app.js";
-import {
-  createTestEnv,
-  createTestLogger,
-  startServer,
-  stopServer,
-} from "./gatewayTestUtils.js";
+import { createTestEnv, createTestLogger, startServer, stopServer } from "./gatewayTestUtils.js";
 
 const CONFIG_ID = "d0000000-0000-4000-8000-000000000001";
 
-function createSessionToken(): string {
+function createSessionToken(overrides: Record<string, unknown> = {}): string {
   return jwt.sign(
     {
       user_id: "user-1",
       organization_id: "org-1",
       permission: 3,
       type: "owner",
+      ...overrides,
     },
     "test-secret",
   );
@@ -43,7 +39,9 @@ it("encaminha catálogo Comercial autenticado com contexto tenantizado", async (
     response.end(JSON.stringify({ success: true, data: [{ id: CONFIG_ID }] }));
   });
   const commercialServiceUrl = await startServer(commercialService);
-  const gateway = createServer(createApp(createTestEnv({ commercialServiceUrl }), createTestLogger()));
+  const gateway = createServer(
+    createApp(createTestEnv({ commercialServiceUrl }), createTestLogger()),
+  );
   const gatewayUrl = await startServer(gateway);
 
   try {
@@ -75,12 +73,46 @@ it("mantém catálogo Comercial protegido sem autenticação", async () => {
     response.end();
   });
   const commercialServiceUrl = await startServer(commercialService);
-  const gateway = createServer(createApp(createTestEnv({ commercialServiceUrl }), createTestLogger()));
+  const gateway = createServer(
+    createApp(createTestEnv({ commercialServiceUrl }), createTestLogger()),
+  );
   const gatewayUrl = await startServer(gateway);
 
   try {
     const response = await fetch(`${gatewayUrl}/commercial/proposal-configs`);
     expect(response.status).toBe(401);
+    expect(serviceCalls).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(commercialService);
+  }
+});
+
+it("aplica autorização modular antes de encaminhar o catálogo Comercial", async () => {
+  let serviceCalls = 0;
+  const commercialService = createServer((_request, response) => {
+    serviceCalls += 1;
+    response.statusCode = 200;
+    response.end();
+  });
+  const commercialServiceUrl = await startServer(commercialService);
+  const gateway = createServer(
+    createApp(createTestEnv({ commercialServiceUrl }), createTestLogger()),
+  );
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/commercial/proposal-configs`, {
+      headers: {
+        Authorization: `Bearer ${createSessionToken({
+          permission: 0,
+          type: "user",
+          modules: { comercial: 0 },
+        })}`,
+      },
+    });
+
+    expect(response.status).toBe(403);
     expect(serviceCalls).toBe(0);
   } finally {
     await stopServer(gateway);

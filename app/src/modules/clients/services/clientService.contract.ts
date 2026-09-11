@@ -6,7 +6,6 @@ export const CLIENT_ENDPOINTS = {
   createIntegration: "/client/integration",
   detail: (id: string) => `/client/${id}`,
   updateIntegration: (id: string) => `/client/${id}/integration`,
-  updateCommercial: (id: string) => `/client/${id}/commercial`,
   updateFinance: (id: string) => `/client/${id}/finance`,
   updateRegularize: (id: string) => `/client/${id}/regularize`,
   terminate: (id: string) => `/client/${id}/termination`,

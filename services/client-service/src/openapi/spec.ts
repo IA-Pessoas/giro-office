@@ -64,7 +64,6 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
     tags: [
       { name: "Health", description: "Saude do servico" },
       { name: "Clients", description: "CRUD principal de clientes" },
-      { name: "Commercial", description: "Overview comercial baseado em clientes reais" },
       { name: "Integration", description: "Fluxos de integracao de clientes" },
       { name: "Verticals", description: "Atualizacoes por vertical do cliente" },
       { name: "Histories", description: "Historicos e pendencias do cliente" },
@@ -211,21 +210,6 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           responses: {
             "200": {
               description: "Lista paginada de clientes",
-              ...successEnvelopeContent(),
-            },
-          },
-        },
-      },
-      "/client/commercial/overview": {
-        get: {
-          tags: ["Commercial"],
-          summary: "Overview comercial",
-          description:
-            "Retorna dados comerciais reais derivados de clientes. Dominios sem fonte real retornam zerados.",
-          security: [{ bearerAuth: [] }],
-          responses: {
-            "200": {
-              description: "Overview comercial",
               ...successEnvelopeContent(),
             },
           },
@@ -495,40 +479,6 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           responses: {
             "200": {
               description: "PA atualizado",
-              ...successEnvelopeContent(),
-            },
-          },
-        },
-      },
-      "/client/{id}/commercial": {
-        patch: {
-          tags: ["Verticals"],
-          summary: "Atualizar dados comerciais",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    prospecting_status: { type: "string" },
-                    date_status: { type: "string", format: "date-time" },
-                    description_prospecting: { type: ["string", "null"] },
-                    register_date_prospecting: { type: "string", format: "date-time" },
-                  },
-                  required: ["prospecting_status"],
-                  additionalProperties: false,
-                },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Dados comerciais atualizados",
               ...successEnvelopeContent(),
             },
           },

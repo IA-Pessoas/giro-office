@@ -27,7 +27,6 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 | Metodo | Caminho | Descricao |
 |--------|---------|-----------|
 | `GET` | `/client/list` | Listagem paginada. Query: `page`, `limit`, `search`, `status`, `ref` (`integracao` \| `deps`), `organization_id` opcional. |
-| `GET` | `/client/commercial/overview` | Overview comercial com dados reais de clientes e dominios sem fonte real zerados. |
 | `GET` | `/client/:id` | Detalhe. |
 | `POST` | `/client` | Criar (campos estendidos alinhados ao Prisma: endereco, fiscal, modulos, datas, etc.). |
 | `PATCH` | `/client/:id` | Atualizar parcial. |
@@ -35,7 +34,6 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 | `POST` | `/client/:id/activate` | Reativar. |
 | `POST` | `/client/integration` | Fluxo integracao (cadastro). |
 | `PATCH` | `/client/:id/integration` | Atualizacao integracao. |
-| `PATCH` | `/client/:id/commercial` | Comercial (prospeccao + efeitos em tarefas). |
 | `PATCH` | `/client/:id/termination` | Distrato. |
 | `PATCH` | `/client/:id/finance` | Contrato (`contract`). |
 | `PATCH` | `/client/:id/regularize` | Regularize (dados cadastrais estendidos). |
@@ -48,6 +46,10 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 | `DELETE` | `/client/histories/pending/:pendingId` | Remover pendencia (admin). |
 | `POST` | `/internal/competence-output-update` | Rotina batch (token interno). |
 | `POST` | `/internal/commercial/prospecting-transition` | Projeção idempotente de transição comercial (token interno). |
+
+Prospecção e cobrança públicas pertencem ao `commercial-service` (`/commercial/*`). Os antigos
+`GET /client/commercial/overview` e `PATCH /client/:id/commercial` foram removidos no corte; efeitos
+projetados continuam entrando por `POST /internal/commercial/prospecting-transition`.
 
 ## Competencia via Supabase Edge Function
 

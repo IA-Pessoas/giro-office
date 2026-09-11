@@ -19,14 +19,12 @@ export {
   useDeactivateClientMutation,
   useTerminateClientMutation,
   useUpdateClientMutation,
-  useUpdateClientCommercialMutation,
   useUpdateClientFinanceMutation,
   useUpdateClientIntegrationMutation,
   useUpdateClientPaMutation,
   useUpdateClientRegularizeMutation,
 } from './hooks/useClients';
 export { useClientList } from './hooks/useClientList';
-export { useClientFormComercial } from './hooks/useFormComercial';
 export { useClientFormIntegracao } from './hooks/useFormIntegracao';
 export { useClientFormRegularize } from './hooks/useFormRegularize';
 
@@ -43,8 +41,6 @@ export type {
   Client,
   ClientItem,
   ClientFormValues,
-  ClientCommercialFormValues,
-  ClientCommercialRecord,
   ClientFinanceFormValues,
   ClientFinanceRecord,
   ClientIntegrationFormValuesBase,
@@ -64,7 +60,6 @@ export type {
   CreateClientPayload,
   Perms,
   TerminateClientPayload,
-  UpdateClientCommercialPayload,
   UpdateClientFinancePayload,
   UpdateClientPaPayload,
   UpdateClientData,
