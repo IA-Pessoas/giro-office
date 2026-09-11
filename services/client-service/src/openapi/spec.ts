@@ -26,6 +26,15 @@ const reportingGrantParameters = [
   },
 ];
 
+const reportingExtractResponseSchema: OpenApiSchema = {
+  type: "object",
+  required: ["rows", "reachedLimit"],
+  properties: {
+    rows: { type: "array", items: { type: "object", additionalProperties: true } },
+    reachedLimit: { type: "boolean" },
+  },
+};
+
 function successEnvelopeContent(dataSchema?: OpenApiSchema) {
   return {
     content: {
@@ -900,7 +909,10 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
           responses: {
             "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
-            "200": { description: "Linhas autorizadas", ...successEnvelopeContent() },
+            "200": {
+              description: "Linhas autorizadas",
+              ...successEnvelopeContent(reportingExtractResponseSchema),
+            },
             "403": { description: "Token, grant ou campos inválidos" },
           },
         },

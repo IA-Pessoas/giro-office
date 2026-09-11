@@ -140,14 +140,14 @@ export function createInternalReportingRouter(options: {
       fields: reportingQueryFields(body.fields, body.query),
       body,
     });
-    const rows = await options.reportingService.extract({
+    const result = await options.reportingService.extract({
       organizationId: grant.organization_id,
       source: body.source,
       fields: body.fields,
       limit: body.limit,
       ...(body.query ? { query: body.query } : {}),
     });
-    response.json(createSuccessResponse({ rows }));
+    response.json(createSuccessResponse(result));
   });
 
   return router;

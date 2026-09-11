@@ -43,7 +43,12 @@ function signedGrant(body: unknown, encoding: "canonical" | "spaced" = "canonica
   return { grant, signature: createHmac("sha256", grantSecret).update(grant).digest("hex") };
 }
 
-function createApp(extract = vi.fn().mockResolvedValue([{ name: "Cliente seguro" }])) {
+function createApp(
+  extract = vi.fn().mockResolvedValue({
+    rows: [{ name: "Cliente seguro" }],
+    reachedLimit: true,
+  }),
+) {
   const app = express();
   app.use(express.json());
   app.use(
@@ -73,7 +78,7 @@ describe("internal reporting routes", () => {
     const { app, extract } = createApp();
 
     await request(app).post("/internal/reporting/extract").send(body).expect(403);
-    await request(app)
+    const valid = await request(app)
       .post("/internal/reporting/extract")
       .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
       .set("x-request-id", requestId)
@@ -81,6 +86,9 @@ describe("internal reporting routes", () => {
       .set("x-reports-grant-signature", signed.signature)
       .send(body)
       .expect(200);
+
+    expect(valid.body.data.rows).toEqual([{ name: "Cliente seguro" }]);
+    expect(valid.body.data.reachedLimit).toBe(true);
 
     expect(extract).toHaveBeenCalledWith({
       organizationId,

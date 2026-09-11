@@ -11,6 +11,15 @@ const successJson = {
   },
 } as const;
 
+const reportingExtractResponseSchema = {
+  type: "object",
+  required: ["rows", "reachedLimit"],
+  properties: {
+    rows: { type: "array", items: { type: "object", additionalProperties: true } },
+    reachedLimit: { type: "boolean" },
+  },
+} as const;
+
 const bearer = [{ bearerAuth: [] }] as const;
 
 const successResponse = (schema: Record<string, unknown>) =>
@@ -191,7 +200,10 @@ export function buildParcelamentoServiceOpenApiSpec(env: ParcelamentoServiceEnv)
           },
           responses: {
             "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
-            "200": { description: "Linhas extraídas", ...successJson },
+            "200": {
+              description: "Linhas extraídas",
+              ...successResponse(reportingExtractResponseSchema),
+            },
             "400": { description: "Entrada inválida" },
             "403": { description: "Grant, token ou campo inválido" },
           },
