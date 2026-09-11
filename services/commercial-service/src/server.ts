@@ -7,9 +7,18 @@ import { createLogger } from "@workspace/shared/logger";
 import { createCommercialApp } from "./app.js";
 import { getCommercialServiceEnv } from "./config/env.js";
 import { ClientProjectionHttpClient } from "./integrations/clientProjection.js";
+import {
+  CommercialEmailHttpAdapter,
+  MissingCommercialEmailAdapter,
+} from "./integrations/commercialEmailAdapter.js";
 import { CommercialOutboxHttpDelivery } from "./integrations/commercialOutboxDelivery.js";
 import prismaClient from "./integrations/prisma.js";
+import { ProspectingCloseHttpClient } from "./integrations/prospectingClose.js";
 import { TaskProjectionHttpClient } from "./integrations/taskProjection.js";
+import {
+  type CommercialEmailNotificationPrisma,
+  CommercialEmailNotificationService,
+} from "./services/commercialEmailNotificationService.js";
 import {
   type CommercialOutboxWorkerPrisma,
   CommercialOutboxWorkerService,
@@ -24,11 +33,25 @@ const logger = createLogger({
 });
 const server = http.createServer(createCommercialApp({ env, logger }));
 
+const emailAdapter = env.emailAdapterUrl
+  ? new CommercialEmailHttpAdapter(
+      env.emailAdapterUrl,
+      env.emailAdapterToken ?? "",
+      env.emailFrom,
+      env.emailAdapterTimeoutMs,
+    )
+  : new MissingCommercialEmailAdapter();
+
 const outboxWorker = new CommercialOutboxWorkerService(
   prismaClient as unknown as CommercialOutboxWorkerPrisma,
   new CommercialOutboxHttpDelivery(
     new ClientProjectionHttpClient(env.clientServiceUrl, env.clientServiceInternalToken),
     new TaskProjectionHttpClient(env.taskServiceUrl, env.taskServiceInternalToken),
+    new ProspectingCloseHttpClient(env.taskServiceUrl, env.taskServiceInternalToken),
+    new CommercialEmailNotificationService(
+      prismaClient as unknown as CommercialEmailNotificationPrisma,
+      emailAdapter,
+    ),
   ),
   {
     maxAttempts: env.outboxWorkerMaxAttempts,

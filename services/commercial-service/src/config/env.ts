@@ -38,6 +38,10 @@ const envSchema = z
     clientServiceInternalToken: z.string().default("audit-service-token"),
     taskServiceUrl: z.string().url().default("http://localhost:3032"),
     taskServiceInternalToken: z.string().default("audit-service-token"),
+    emailAdapterUrl: z.string().url().optional(),
+    emailAdapterToken: z.string().min(1).optional(),
+    emailFrom: z.string().trim().email().default("no-reply@girooffice.local"),
+    emailAdapterTimeoutMs: z.coerce.number().int().positive().default(10_000),
     outboxWorkerPollIntervalMs: z.coerce.number().int().positive().default(1000),
     outboxWorkerMaxAttempts: z.coerce.number().int().positive().default(5),
     outboxWorkerRetryBaseMs: z.coerce.number().int().positive().default(1000),
@@ -47,6 +51,30 @@ const envSchema = z
       .optional()
       .default("*")
       .transform((value) => parseAllowedOrigins(value)),
+  })
+  .superRefine((env, ctx) => {
+    if (env.nodeEnv === "production") {
+      if (!env.emailAdapterUrl) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "COMMERCIAL_EMAIL_ADAPTER_URL é obrigatória em produção.",
+          path: ["emailAdapterUrl"],
+        });
+      } else if (new URL(env.emailAdapterUrl).protocol !== "https:") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "COMMERCIAL_EMAIL_ADAPTER_URL deve usar HTTPS em produção.",
+          path: ["emailAdapterUrl"],
+        });
+      }
+      if (!env.emailAdapterToken) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "COMMERCIAL_EMAIL_ADAPTER_TOKEN é obrigatório em produção.",
+          path: ["emailAdapterToken"],
+        });
+      }
+    }
   })
   .transform((env) => {
     const enableApiDocs = env.enableApiDocsEnv
@@ -98,6 +126,10 @@ export function getCommercialServiceEnv(): CommercialServiceEnv {
     clientServiceInternalToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,
     taskServiceUrl: process.env.TASK_SERVICE_URL,
     taskServiceInternalToken: process.env.TASK_SERVICE_INTERNAL_TOKEN,
+    emailAdapterUrl: process.env.COMMERCIAL_EMAIL_ADAPTER_URL,
+    emailAdapterToken: process.env.COMMERCIAL_EMAIL_ADAPTER_TOKEN,
+    emailFrom: process.env.COMMERCIAL_EMAIL_FROM,
+    emailAdapterTimeoutMs: process.env.COMMERCIAL_EMAIL_ADAPTER_TIMEOUT_MS,
     outboxWorkerPollIntervalMs: process.env.COMMERCIAL_OUTBOX_WORKER_POLL_INTERVAL_MS,
     outboxWorkerMaxAttempts: process.env.COMMERCIAL_OUTBOX_WORKER_MAX_ATTEMPTS,
     outboxWorkerRetryBaseMs: process.env.COMMERCIAL_OUTBOX_WORKER_RETRY_BASE_MS,

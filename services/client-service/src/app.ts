@@ -17,7 +17,10 @@ import { requestContext } from "./middlewares/requestContext.js";
 import { requireInternalToken } from "./middlewares/requireInternalToken.js";
 import { buildClientServiceOpenApiSpec } from "./openapi/spec.js";
 import { createClientRouter } from "./routes/client.routes.js";
-import { createInternalCommercialRouter } from "./routes/internalCommercial.routes.js";
+import {
+  createInternalCommercialRouter,
+  type InternalCommercialRouteDeps,
+} from "./routes/internalCommercial.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { ClientCommercialProjectionService } from "./services/clientCommercialProjectionService.js";
 import { ClientIntegrationReportingService } from "./services/clientIntegrationReportingService.js";
@@ -44,7 +47,7 @@ export interface CreateAppOptions {
   env: ClientServiceEnv;
   logger: Logger;
   historyStorage: HistoryFileStorage;
-  commercialProjectionService?: Pick<ClientCommercialProjectionService, "apply">;
+  commercialProjectionService?: InternalCommercialRouteDeps;
 }
 
 export function createApp({

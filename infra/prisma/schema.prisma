@@ -1050,6 +1050,36 @@ model CommercialOutboxEvent {
   @@map("commercial.outbox_events")
 }
 
+model CommercialEmailNotification {
+  id              String   @id @default(uuid())
+  event_id        String   @unique
+  organization_id String
+  client_id       String
+  status          String   @default("pending")
+  attempts        Int      @default(0)
+  message         Json
+  locked_at       DateTime?
+  sent_at         DateTime?
+  last_error      String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([organization_id, status, updated_at], map: "idx_commercial_email_notification_status")
+  @@map("commercial.email_notifications")
+}
+
+model CommercialProspectingCloseEvent {
+  event_id        String   @id
+  organization_id String
+  client_id       String
+  competence      String
+  applied_at      DateTime @default(now())
+  created_at      DateTime @default(now())
+
+  @@index([organization_id, client_id, applied_at], map: "idx_commercial_prospecting_close_client")
+  @@map("commercial.prospecting_close_events")
+}
+
 model ClientCommercialProjectionEvent {
   id                    String   @id
   organization_id       String

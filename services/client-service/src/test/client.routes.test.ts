@@ -14,6 +14,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "../app.js";
 import { getClientServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import type { InternalCommercialRouteDeps } from "../routes/internalCommercial.routes.js";
 import {
   type ClientListPage,
   type ClientPublic,
@@ -90,7 +91,7 @@ function buildTestApp(
     prisma?: PrismaClient;
     historyStorage?: HistoryFileStorage;
     env?: Partial<ReturnType<typeof getClientServiceEnv>>;
-    commercialProjectionService?: { apply: ReturnType<typeof vi.fn> };
+    commercialProjectionService?: InternalCommercialRouteDeps;
   },
 ) {
   const env = { ...getClientServiceEnv(), ...overrides?.env };
@@ -188,7 +189,9 @@ describe("client-service", () => {
 
   it("POST /internal/commercial/prospecting-transition exige token e encaminha o evento", async () => {
     const mock: IClientService = { ...mockServiceBase() };
-    const projection = { apply: vi.fn().mockResolvedValue({ applied: true, duplicate: false }) };
+    const projection = {
+      apply: vi.fn().mockResolvedValue({ applied: true, duplicate: false }),
+    } as unknown as InternalCommercialRouteDeps;
     const app = buildTestApp(mock, {
       commercialProjectionService: projection,
       env: { internalServiceToken: TEST_INTERNAL_SERVICE_TOKEN },

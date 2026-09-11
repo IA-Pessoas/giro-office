@@ -31,3 +31,18 @@ export interface CommercialProspectingProjectionResult {
   duplicate: boolean;
   client_id: string;
 }
+
+export interface CommercialClientProjection {
+  id: string;
+  name: string;
+  company_name: string | null;
+  fantasy_name: string | null;
+  service_unique: boolean | null;
+  type_registration: string;
+}
+
+export interface CommercialProspectingCloseResult {
+  event_id: string;
+  client_id: string;
+  competence: string;
+}
