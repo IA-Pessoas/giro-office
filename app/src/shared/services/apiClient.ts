@@ -5,4 +5,6 @@ export const api = setupAPIClient(undefined, () => {
   if (readBrowserCookie("cw.csrf")) {
     signOut();
   }
+}, () => {
+  signOut("Sua sessão de segurança expirou. Faça login novamente.");
 });

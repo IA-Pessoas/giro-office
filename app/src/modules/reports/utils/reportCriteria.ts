@@ -1,4 +1,5 @@
 import type { ReportArea, ReportComposition, ReportsCatalogSource } from "../types/report.types";
+import { getSelectableReportFields } from "./reportBuilder.ts";
 
 export const operatorLabels: Record<string, string> = {
   eq: "é igual a",
@@ -46,6 +47,11 @@ export function buildReportComposition(
     areas: areas.map((area) => {
       const source = sources.find((item) => item.key === area.source);
       if (!source) throw new Error("Seu acesso mudou. Confira as áreas disponíveis.");
+      const selectableKeys = new Set(getSelectableReportFields(source).map((field) => field.key));
+      if (area.fields.some((field) => !selectableKeys.has(field)))
+        throw new Error(
+          `Um dos campos selecionados em ${source.label} não está mais disponível. Atualize os campos e tente novamente.`,
+        );
       const parameterValues: Record<string, unknown> = {};
       if (
         (area.groupBy?.length || area.aggregations?.length) &&

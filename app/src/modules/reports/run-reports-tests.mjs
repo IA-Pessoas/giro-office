@@ -32,6 +32,7 @@ const {
 const appPackage = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url)));
 const { buildReportComposition } = await import("./utils/reportCriteria.ts");
 const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
+const { getReportForbiddenMessage, isReportCsrfError } = await import("./components/reportUi.ts");
 const reportsPageSource = await readFile(
   new URL("./components/ReportsCatalogPage.tsx", import.meta.url),
   "utf8",
@@ -111,6 +112,40 @@ runTest("composes typed criteria and parameters independently without requiring 
       ),
     /número válido/,
   );
+});
+
+runTest("rejects fields that disappeared from the authorized catalog", () => {
+  const source = {
+    key: "test.items",
+    label: "Itens",
+    module: "test",
+    fields: [{ key: "amount", label: "Valor", type: "number", selectable: true }],
+  };
+
+  assert.throws(
+    () => buildReportComposition([{ source: source.key, fields: ["removed_field"] }], [source]),
+    /não está mais disponível/,
+  );
+});
+
+runTest("distinguishes a CSRF failure from a report authorization denial", () => {
+  const csrfError = {
+    response: {
+      status: 403,
+      data: { success: false, error: "Requisição não autorizada.", code: "FORBIDDEN" },
+    },
+  };
+  const authorizationError = {
+    response: { status: 403, data: { success: false, error: "Acesso negado.", code: "FORBIDDEN" } },
+  };
+
+  assert.equal(isReportCsrfError(csrfError), true);
+  assert.equal(
+    getReportForbiddenMessage(csrfError, "Seu acesso mudou."),
+    "Sua sessão de segurança expirou. Faça login novamente.",
+  );
+  assert.equal(isReportCsrfError(authorizationError), false);
+  assert.equal(getReportForbiddenMessage(authorizationError, "Seu acesso mudou."), "Seu acesso mudou.");
 });
 
 runTest("preserves independent empty blocks and rejects malformed composed preview", () => {
