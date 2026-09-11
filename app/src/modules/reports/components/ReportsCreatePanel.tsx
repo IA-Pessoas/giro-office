@@ -14,7 +14,7 @@ import { ReportCriteriaStep } from "./ReportCriteriaStep";
 import { buildReportComposition, operatorLabels, summaryLabels } from "../utils/reportCriteria";
 import type { ReportArea } from "../types/report.types";
 import { ReportSourceStep } from "./ReportSourceStep";
-import { getErrorStatus } from "./reportUi";
+import { getErrorStatus, getReportForbiddenMessage, isReportCsrfError } from "./reportUi";
 import {
   useCancelReportJobMutation,
   useCreateReportJobMutation,
@@ -172,14 +172,19 @@ export function ReportsCreatePanel({
       setGeneratedJobId(created.id);
     } catch (cause) {
       const status = getErrorStatus(cause);
+      const csrfFailure = isReportCsrfError(cause);
       setError(
         status === 403
-          ? "Seu acesso mudou. Confira as áreas e os campos disponíveis e tente novamente."
+          ? getReportForbiddenMessage(
+              cause,
+              "Seu acesso mudou. Confira as áreas e os campos disponíveis e tente novamente.",
+            )
           : status === 400
             ? "Confira os critérios, parâmetros e opções de cada área e tente novamente."
             : "Não foi possível iniciar a geração. Tente novamente.",
       );
-      if (status === 403) await queryClient.invalidateQueries({ queryKey: reportsCatalogQueryKey() });
+      if (status === 403 && !csrfFailure)
+        await queryClient.invalidateQueries({ queryKey: reportsCatalogQueryKey() });
     }
   }
   async function saveModel(event: FormEvent<HTMLFormElement>) {
@@ -204,12 +209,13 @@ export function ReportsCreatePanel({
       toast.success("Modelo salvo para usar novamente.");
     } catch (cause) {
       const status = getErrorStatus(cause);
+      const csrfFailure = isReportCsrfError(cause);
       setError(
         status === 403
-          ? "Seu acesso mudou. Não foi possível salvar este modelo."
+          ? getReportForbiddenMessage(cause, "Seu acesso mudou. Não foi possível salvar este modelo.")
           : "Não foi possível salvar o modelo. Tente novamente.",
       );
-      if (status === 403) {
+      if (status === 403 && !csrfFailure) {
         await queryClient.invalidateQueries({ queryKey: reportsCatalogQueryKey() });
       }
     }
@@ -230,16 +236,20 @@ export function ReportsCreatePanel({
       setPreviewConfiguration(configuration);
     } catch (cause) {
       const status = getErrorStatus(cause);
+      const csrfFailure = isReportCsrfError(cause);
       setError(
         status === 403
-          ? "Seu acesso mudou. Confira as áreas e os campos disponíveis e tente novamente."
+          ? getReportForbiddenMessage(
+              cause,
+              "Seu acesso mudou. Confira as áreas e os campos disponíveis e tente novamente.",
+            )
           : status === 422
             ? "Esta consulta excede a capacidade disponível. Reduza as áreas ou ajuste os critérios e tente novamente."
             : status === 400
               ? "Confira os critérios, parâmetros e opções de cada área e tente novamente."
               : "Não foi possível visualizar a prévia. Tente novamente.",
       );
-      if (status === 403) {
+      if (status === 403 && !csrfFailure) {
         preview.reset();
         await queryClient.invalidateQueries({ queryKey: reportsCatalogQueryKey() });
       }
@@ -288,14 +298,18 @@ export function ReportsCreatePanel({
       setStep(3);
     } catch (cause) {
       const status = getErrorStatus(cause);
+      const csrfFailure = isReportCsrfError(cause);
       setError(
         status === 403
-          ? "Seu acesso mudou. Confira as áreas e os campos disponíveis e tente novamente."
+          ? getReportForbiddenMessage(
+              cause,
+              "Seu acesso mudou. Confira as áreas e os campos disponíveis e tente novamente.",
+            )
           : status === 400
             ? "Não foi possível revisar essas escolhas. Confira campos, critérios, parâmetros e opções; reduza as áreas se necessário."
             : "Não foi possível revisar o relatório. Tente novamente.",
       );
-      if (status === 403) {
+      if (status === 403 && !csrfFailure) {
         preview.reset();
         await queryClient.invalidateQueries({ queryKey: reportsCatalogQueryKey() });
       }

@@ -44,6 +44,46 @@ await withServer(async (baseURL, requests) => {
 
 console.log("PASS API client forwards HttpOnly sessions and binds CSRF to unsafe requests");
 
+async function expectCsrfFailureCallback() {
+  let csrfFailureCalls = 0;
+  const server = createServer((_request, response) => {
+    response.writeHead(403, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify({ success: false, error: "Requisição não autorizada.", code: "FORBIDDEN" }),
+    );
+  });
+
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+
+  try {
+    assert.ok(address && typeof address !== "string");
+    globalThis.window = {};
+    const api = createApiClient({
+      baseURL: `http://127.0.0.1:${address.port}`,
+      onCsrfFailure: () => {
+        csrfFailureCalls += 1;
+      },
+    });
+
+    await assert.rejects(api.post("/reports/definitions/validate", {}), (error) => {
+      assert.equal(error.response?.status, 403);
+      assert.equal(error.response?.data?.error, "Requisição não autorizada.");
+      return true;
+    });
+    assert.equal(csrfFailureCalls, 1);
+  } finally {
+    delete globalThis.window;
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+}
+
+await expectCsrfFailureCallback();
+
+console.log("PASS API client notifies the browser about an invalid CSRF session");
+
 async function expectConflictHandling({ rotateBeforeResponse, expectedUnauthorizedCalls }) {
   let csrfToken = "old-browser-token";
   let unauthorizedCalls = 0;

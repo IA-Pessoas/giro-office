@@ -173,8 +173,7 @@ async function createLaunchDarklyAdapter(
   config: BrowserFeatureFlagConfig,
   context: BrowserFeatureFlagContext,
 ): Promise<BrowserFeatureFlagAdapter> {
-  const moduleName: string = "@launchdarkly/js-client-sdk";
-  const launchDarkly = (await import(moduleName)) as {
+  const launchDarkly = (await import("@launchdarkly/js-client-sdk")) as {
     createClient: (
       clientId: string,
       context: BrowserFeatureFlagContext,
