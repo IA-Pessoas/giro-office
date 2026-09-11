@@ -36,11 +36,11 @@ describe("InternalReportingService", () => {
         fields: ["status"],
         limit: 10,
       }),
-    ).resolves.toEqual([{ status: "active" }]);
+    ).resolves.toEqual({ rows: [{ status: "active" }], reachedLimit: false });
     expect(installments.findMany).toHaveBeenCalledWith({
       where: { organization_id: "00000000-0000-4000-8000-000000000002" },
       select: { status: true },
-      take: 10,
+      take: 11,
     });
   });
 });

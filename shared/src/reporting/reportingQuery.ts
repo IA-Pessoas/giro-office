@@ -102,6 +102,7 @@ type ReportingResult = {
 };
 
 export const MAX_REPORTING_QUERY_ROWS = 50_000;
+export const MAX_REPORTING_QUERY_LIMIT = MAX_REPORTING_QUERY_ROWS + 1;
 
 export function reportingQueryFields(fields: readonly string[], query?: ReportingQuery): string[] {
   return [

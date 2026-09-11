@@ -33,7 +33,7 @@ export class InternalReportingService {
     source: InternalReportingSource;
     fields: readonly string[];
     limit: number;
-  }): Promise<readonly Record<string, unknown>[]> {
+  }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
     if (input.query && !this.inSnapshot) {
       return withReportingSnapshot(this.prisma, (transaction) =>
         new InternalReportingService(transaction, true).extract(input),
@@ -47,21 +47,23 @@ export class InternalReportingService {
           return { rows, reachedLimit: rows.length === limit };
         },
       );
-      return result.rows;
+      return result;
     }
     const allowedFields = getInternalReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
 
-    return this.getDelegate(input.source).findMany({
+    const rows = await this.getDelegate(input.source).findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
       ...(input.offset !== undefined
         ? { skip: input.offset, orderBy: { id: "asc" as const } }
         : {}),
-      take: input.limit,
+      take: input.limit + 1,
     });
+
+    return { rows: rows.slice(0, input.limit), reachedLimit: rows.length > input.limit };
   }
 
   private getDelegate(source: InternalReportingSource): ReportingDelegate {

@@ -21,7 +21,7 @@ describe("ProjectAdapter", () => {
       ok: true,
       json: vi.fn().mockResolvedValue({
         success: true,
-        data: { rows: [{ name: "Projeto seguro" }], reachedLimit: false },
+        data: { rows: [{ name: "Projeto seguro" }], reachedLimit: true },
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -59,7 +59,7 @@ describe("ProjectAdapter", () => {
         limit: 10,
         request_id: "request-832",
       }),
-    ).resolves.toEqual([{ name: "Projeto seguro" }]);
+    ).resolves.toEqual({ rows: [{ name: "Projeto seguro" }], reachedLimit: true });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
     const body = { source: "integracao.projects", fields: ["name"], limit: 10 };

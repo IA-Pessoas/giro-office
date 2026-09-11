@@ -34,7 +34,7 @@ export class ClientIntegrationReportingService {
     source: ClientIntegrationReportingSource;
     fields: readonly string[];
     limit: number;
-  }): Promise<readonly Record<string, unknown>[]> {
+  }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
     if (input.query && !this.inSnapshot) {
       return withReportingSnapshot(this.prisma, (transaction) =>
         new ClientIntegrationReportingService(transaction, true).extract(input),
@@ -48,20 +48,22 @@ export class ClientIntegrationReportingService {
           return { rows, reachedLimit: rows.length === limit };
         },
       );
-      return result.rows;
+      return result;
     }
     const allowedFields = getClientIntegrationReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
 
-    return (this.prisma.client as unknown as ReportingDelegate).findMany({
+    const rows = await (this.prisma.client as unknown as ReportingDelegate).findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
       ...(input.offset !== undefined
         ? { skip: input.offset, orderBy: { id: "asc" as const } }
         : {}),
-      take: input.limit,
+      take: input.limit + 1,
     });
+
+    return { rows: rows.slice(0, input.limit), reachedLimit: rows.length > input.limit };
   }
 }

@@ -17,12 +17,15 @@ describe("ClientIntegrationReportingService", () => {
         fields: ["name", "status"],
         limit: 10,
       }),
-    ).resolves.toEqual([{ name: "Cliente seguro", status: "Ativo" }]);
+    ).resolves.toEqual({
+      rows: [{ name: "Cliente seguro", status: "Ativo" }],
+      reachedLimit: false,
+    });
 
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: organizationId },
       select: { name: true, status: true },
-      take: 10,
+      take: 11,
     });
   });
 

@@ -1,4 +1,4 @@
-import { reportingQueryOpenApiSchema } from "@workspace/shared";
+import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { TaskServiceEnv } from "../config/env.js";
@@ -595,7 +595,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                   properties: {
                     source: { type: "string", enum: ["integracao.tasks"] },
                     fields: { type: "array", minItems: 1, items: { type: "string" } },
-                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                    limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
                     query: reportingQueryOpenApiSchema,
                   },
                 },
