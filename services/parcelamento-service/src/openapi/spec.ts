@@ -1,4 +1,4 @@
-import { reportingQueryOpenApiSchema } from "@workspace/shared";
+import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ParcelamentoServiceEnv } from "../config/env.js";
@@ -8,6 +8,15 @@ const successJson = {
     "application/json": {
       schema: { $ref: "#/components/schemas/SuccessEnvelope" },
     },
+  },
+} as const;
+
+const reportingExtractResponseSchema = {
+  type: "object",
+  required: ["rows", "reachedLimit"],
+  properties: {
+    rows: { type: "array", items: { type: "object", additionalProperties: true } },
+    reachedLimit: { type: "boolean" },
   },
 } as const;
 
@@ -182,7 +191,7 @@ export function buildParcelamentoServiceOpenApiSpec(env: ParcelamentoServiceEnv)
                   properties: {
                     source: text,
                     fields: { type: "array", minItems: 1, items: text },
-                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                    limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
                     query: reportingQueryOpenApiSchema,
                   },
                 },
@@ -191,7 +200,10 @@ export function buildParcelamentoServiceOpenApiSpec(env: ParcelamentoServiceEnv)
           },
           responses: {
             "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
-            "200": { description: "Linhas extraídas", ...successJson },
+            "200": {
+              description: "Linhas extraídas",
+              ...successResponse(reportingExtractResponseSchema),
+            },
             "400": { description: "Entrada inválida" },
             "403": { description: "Grant, token ou campo inválido" },
           },

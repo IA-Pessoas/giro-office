@@ -21,7 +21,7 @@ describe("TaskAdapter", () => {
       ok: true,
       json: vi.fn().mockResolvedValue({
         success: true,
-        data: { rows: [{ name: "Tarefa segura", department: "Fiscal" }], reachedLimit: false },
+        data: { rows: [{ name: "Tarefa segura", department: "Fiscal" }], reachedLimit: true },
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -58,7 +58,10 @@ describe("TaskAdapter", () => {
         limit: 10,
         request_id: "request-833",
       }),
-    ).resolves.toEqual([{ name: "Tarefa segura", department: "Fiscal" }]);
+    ).resolves.toEqual({
+      rows: [{ name: "Tarefa segura", department: "Fiscal" }],
+      reachedLimit: true,
+    });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
     const body = { source: "integracao.tasks", fields: ["name", "department"], limit: 10 };

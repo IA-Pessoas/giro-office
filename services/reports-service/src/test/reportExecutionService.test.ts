@@ -1,3 +1,4 @@
+import { MAX_REPORTING_QUERY_LIMIT } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { SourceCatalogService } from "../catalog/sourceCatalogService.js";
@@ -56,6 +57,9 @@ describe("ReportExecutionService", () => {
       statusCode: 400,
       message: "A origem excedeu seu limite de linhas para o snapshot.",
     });
+    expect(adapter.preview).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: MAX_REPORTING_QUERY_LIMIT }),
+    );
   });
 
   it("executa uma composição em blocos independentes e preserva área vazia", async () => {

@@ -14,6 +14,7 @@ import type {
   ReportCatalogRelation,
   ReportCatalogSource,
   ReportPreviewAdapterInput,
+  ReportPreviewAdapterOutput,
   ReportSourceAdapter,
 } from "../catalog/types.js";
 import type { ReportsServiceEnv } from "../config/env.js";
@@ -78,7 +79,10 @@ function createGrant(input: {
 
 function isExtractResponse(
   value: unknown,
-): value is { success: true; data: { rows: readonly Record<string, unknown>[] } } {
+): value is {
+  success: true;
+  data: { rows: readonly Record<string, unknown>[]; reachedLimit?: boolean };
+} {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -105,7 +109,7 @@ export class ContabilControlAdapter implements ReportSourceAdapter {
     return (scope.modules.contabil ?? 0) >= 1;
   }
 
-  async preview(input: ReportPreviewAdapterInput): Promise<readonly Record<string, unknown>[]> {
+  async preview(input: ReportPreviewAdapterInput): Promise<ReportPreviewAdapterOutput> {
     const definition = input.definition as ReportDefinition;
     if (definition.sources.length !== 1 || definition.joins.length > 0) {
       throw new ServiceError(400, "A prévia contábil aceita somente colunas de uma fonte.");
@@ -151,7 +155,9 @@ export class ContabilControlAdapter implements ReportSourceAdapter {
       const payload: unknown = await response.json();
       if (!response.ok || !isExtractResponse(payload))
         throw new Error("Resposta interna inválida.");
-      return payload.data.rows;
+      return typeof payload.data.reachedLimit === "boolean"
+        ? { rows: payload.data.rows, reachedLimit: payload.data.reachedLimit }
+        : payload.data.rows;
     } catch (err: unknown) {
       logError("Falha ao extrair dados contábeis para relatório", {
         errorType: err instanceof Error ? err.name : typeof err,

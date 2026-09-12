@@ -75,7 +75,10 @@ function createApp() {
       enableApiDocs: false,
     },
     logger: { error: vi.fn() } as never,
-    prisma: { $queryRaw: vi.fn(), installment: { findMany: vi.fn() } } as never,
+    prisma: {
+      $queryRaw: vi.fn(),
+      installment: { findMany: vi.fn().mockResolvedValue([{ status: "active" }]) },
+    } as never,
     auditService: { recordChange: vi.fn() },
   });
 }
@@ -108,5 +111,28 @@ describe("internal reporting routes", () => {
         .set("x-reports-grant-signature", signed.signature)
         .expect(403);
     }
+  });
+
+  it("retorna rows e reachedLimit no extract autenticado", async () => {
+    const body = { source: "parcelamento.installments", fields: ["status"], limit: 10 };
+    const signed = grant("extract", body.source, body.fields, body);
+    const app = createApp();
+
+    const missing = await request(app)
+      .post("/internal/reporting/extract")
+      .send(body)
+      .expect(403);
+    const valid = await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")
+      .set("x-request-id", requestId)
+      .set("x-reports-grant", signed.encoded)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(missing.body.success).toBe(false);
+    expect(valid.body.data.rows).toEqual([{ status: "active" }]);
+    expect(valid.body.data.reachedLimit).toBe(false);
   });
 });

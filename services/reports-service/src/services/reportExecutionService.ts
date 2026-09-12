@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import { MAX_REPORTING_QUERY_LIMIT, ServiceError } from "@workspace/shared";
 
 import type { SourceCatalogService } from "../catalog/sourceCatalogService.js";
 import { normalizeReportPreviewAdapterOutput, type ReportCatalogScope } from "../catalog/types.js";
@@ -51,7 +51,7 @@ export class ReportExecutionService {
       scope: input.scope,
       parameterValues: input.parameterValues,
       requestId: input.requestId,
-      limit: MAX_SNAPSHOT_ROWS + 1,
+      limit: MAX_REPORTING_QUERY_LIMIT,
     });
     if (result.reachedLimit) {
       throw new ServiceError(400, "A origem excedeu seu limite de linhas para o snapshot.");

@@ -1,4 +1,4 @@
-import { reportingQueryOpenApiSchema } from "@workspace/shared";
+import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ClientServiceEnv } from "../config/env.js";
@@ -25,6 +25,15 @@ const reportingGrantParameters = [
     schema: { type: "string" },
   },
 ];
+
+const reportingExtractResponseSchema: OpenApiSchema = {
+  type: "object",
+  required: ["rows", "reachedLimit"],
+  properties: {
+    rows: { type: "array", items: { type: "object", additionalProperties: true } },
+    reachedLimit: { type: "boolean" },
+  },
+};
 
 function successEnvelopeContent(dataSchema?: OpenApiSchema) {
   return {
@@ -841,7 +850,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                   properties: {
                     source: { type: "string", enum: ["integracao.clients"] },
                     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
-                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                    limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
                     query: reportingQueryOpenApiSchema,
                   },
                 },
@@ -850,7 +859,10 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
           responses: {
             "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
-            "200": { description: "Linhas autorizadas", ...successEnvelopeContent() },
+            "200": {
+              description: "Linhas autorizadas",
+              ...successEnvelopeContent(reportingExtractResponseSchema),
+            },
             "403": { description: "Token, grant ou campos inválidos" },
           },
         },

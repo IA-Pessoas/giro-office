@@ -1,4 +1,4 @@
-import { reportingQuerySchema } from "@workspace/shared";
+import { MAX_REPORTING_QUERY_LIMIT, reportingQuerySchema } from "@workspace/shared";
 import { z } from "zod";
 
 import { CLIENT_INTEGRATION_REPORTING_SOURCES } from "../reporting/clientIntegrationReportingCatalog.js";
@@ -10,7 +10,7 @@ export const internalReportingExtractBodySchema = z
     query: reportingQuerySchema.optional(),
     source: z.enum(CLIENT_INTEGRATION_REPORTING_SOURCES),
     fields: z.array(reportingFieldSchema).min(1).max(25),
-    limit: z.number().int().min(1).max(101),
+    limit: z.number().int().min(1).max(MAX_REPORTING_QUERY_LIMIT),
   })
   .strict()
   .superRefine((value, context) => {

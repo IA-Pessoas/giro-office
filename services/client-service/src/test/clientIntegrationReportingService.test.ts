@@ -17,12 +17,15 @@ describe("ClientIntegrationReportingService", () => {
         fields: ["name", "status"],
         limit: 10,
       }),
-    ).resolves.toEqual([{ name: "Cliente seguro", status: "Ativo" }]);
+    ).resolves.toEqual({
+      rows: [{ name: "Cliente seguro", status: "Ativo" }],
+      reachedLimit: false,
+    });
 
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: organizationId },
       select: { name: true, status: true },
-      take: 10,
+      take: 11,
     });
   });
 
@@ -40,5 +43,32 @@ describe("ClientIntegrationReportingService", () => {
     ).rejects.toBeInstanceOf(ServiceError);
 
     expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it("processa query pelo callback e preserva reachedLimit do resultado", async () => {
+    const records = Array.from({ length: 150 }, (_, index) => ({
+      name: `Cliente ${String(index).padStart(3, "0")}`,
+    }));
+    const service = new ClientIntegrationReportingService({
+      $transaction: async function (read) {
+        return read(this);
+      },
+      client: {
+        findMany: async ({ take, skip = 0 }) => records.slice(skip, skip + take),
+      },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "integracao.clients",
+        fields: ["name"],
+        limit: 1,
+        query: { order_by: [{ field: "name", direction: "desc" }] },
+      }),
+    ).resolves.toEqual({
+      rows: [{ name: "Cliente 149" }],
+      reachedLimit: true,
+    });
   });
 });
