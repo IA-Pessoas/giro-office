@@ -87,6 +87,9 @@ it("executes signed adapter criteria through the origin router in one consistent
     limit: 1,
     parameter_values: { minimum: 100 },
   });
-  expect(rows).toEqual([{ status: "Open", total: 6225, count: 50 }]);
+  expect(rows).toEqual({
+    rows: [{ status: "Open", total: 6225, count: 50 }],
+    reachedLimit: false,
+  });
   expect(transaction).toHaveBeenCalledTimes(1);
 });
