@@ -41,14 +41,11 @@ export class ClientIntegrationReportingService {
       );
     }
     if (input.query) {
-      const result = await executeReportingQuery(
+      return executeReportingQuery(
         { ...input, query: input.query },
-        async (fields, limit, offset) => {
-          const rows = await this.extract({ ...input, query: undefined, fields, limit, offset });
-          return { rows, reachedLimit: rows.length === limit };
-        },
+        (fields, limit, offset) =>
+          this.extract({ ...input, query: undefined, fields, limit, offset }),
       );
-      return result;
     }
     const allowedFields = getClientIntegrationReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
