@@ -10,6 +10,8 @@ const MARGIN = 48;
 const CONTENT_TOP = 110;
 const FOOTER_BOTTOM = 40;
 const ROW_HEIGHT = 18;
+const TITLE_HEIGHT = 24;
+const BLOCK_GAP = 18;
 const FALLBACK_COLOR = "#f2f4f7";
 const BORDER_COLOR = "#cbd5e1";
 
@@ -194,9 +196,10 @@ export class ReportPdfService implements ReportPdfRenderer {
       try {
         this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
         let y = CONTENT_TOP;
-        for (const block of preparedBlocks) {
+        for (const [index, block] of preparedBlocks.entries()) {
           const title = block.title || block.presentation.title;
-          if (y + ROW_HEIGHT * (title ? 2 : 1) > A4_HEIGHT - FOOTER_BOTTOM) {
+          const blockHeaderHeight = (title ? TITLE_HEIGHT : 0) + ROW_HEIGHT;
+          if (y + blockHeaderHeight + ROW_HEIGHT > A4_HEIGHT - FOOTER_BOTTOM) {
             this.drawFooter(document, input.generatedAt);
             document.addPage({
               size: "A4",
@@ -206,13 +209,14 @@ export class ReportPdfService implements ReportPdfRenderer {
             this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
             y = CONTENT_TOP;
           }
-          y = this.drawTableHeader(document, block.presentation, title || undefined);
+          y = this.drawTableHeader(document, block.presentation, title || undefined, y);
           if (block.rows.length === 0) {
             document
               .fillColor("#4b5563")
               .fontSize(8)
               .text("Nenhum registro encontrado nesta área.", MARGIN, y);
             y += ROW_HEIGHT;
+            if (index < preparedBlocks.length - 1) y += BLOCK_GAP;
             continue;
           }
           for (const row of block.rows) {
@@ -224,11 +228,17 @@ export class ReportPdfService implements ReportPdfRenderer {
                 info: { Author: input.author, CreationDate: input.generatedAt },
               });
               this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
-              y = this.drawTableHeader(document, block.presentation, title || undefined);
+              y = this.drawTableHeader(
+                document,
+                block.presentation,
+                title || undefined,
+                CONTENT_TOP,
+              );
             }
             this.drawRow(document, block.presentation.columns, row, y);
             y += ROW_HEIGHT;
           }
+          if (index < preparedBlocks.length - 1) y += BLOCK_GAP;
         }
         this.drawFooter(document, input.generatedAt);
         document.end();
@@ -263,20 +273,21 @@ export class ReportPdfService implements ReportPdfRenderer {
     document: PdfDocumentLike,
     presentation: { columns: PresentationColumn[] },
     title?: string,
+    y = CONTENT_TOP,
   ): number {
-    let y = CONTENT_TOP;
+    let headerY = y;
     if (title) {
-      document.fillColor("#111827").fontSize(14).text(title, MARGIN, y);
-      y += 24;
+      document.fillColor("#111827").fontSize(14).text(title, MARGIN, headerY);
+      headerY += TITLE_HEIGHT;
     }
     document.fontSize(9);
     this.drawCells(
       document,
       presentation.columns.map((column) => column.label),
-      y,
+      headerY,
       true,
     );
-    return y + ROW_HEIGHT;
+    return headerY + ROW_HEIGHT;
   }
 
   private drawRow(
