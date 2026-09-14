@@ -249,4 +249,26 @@ describe("ReportPdfService", () => {
     expect(body.toString("latin1")).not.toContain("org-secret");
     expect(body.subarray(-6).toString("ascii")).toBe("%%EOF\n");
   });
+
+  it("normaliza autoria antes de escrever cabeçalho e metadados", async () => {
+    const document = new FakePdfDocument();
+    const service = new ReportPdfService(
+      { select: async () => ({ kind: "institutional" }) },
+      () => document,
+    );
+
+    await service.render({
+      author: "  Ana\nLima\u0000 com nome muito longo ".repeat(20),
+      generatedAt: new Date("2026-08-27T15:04:05.000Z"),
+      organizationId: "org-1",
+      scope: "personal",
+      presentation_json: { columns: [{ key: "name", label: "Nome" }] },
+      rows: [{ name: "Relatório" }],
+    });
+
+    const authorText = document.calls.find((call) => call.startsWith("text:Autor:"));
+    expect(authorText).toBeDefined();
+    expect(authorText).not.toContain("\n");
+    expect(authorText?.length).toBeLessThanOrEqual("text:Autor: ".length + 120);
+  });
 });

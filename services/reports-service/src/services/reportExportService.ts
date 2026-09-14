@@ -5,7 +5,12 @@ import type { ReportAuthorizationService } from "./reportAuthorizationService.js
 import { ReportCsvService, type ReportTable } from "./reportCsvService.js";
 import type { ReportJobService } from "./reportJobService.js";
 import { ReportLetterheadService } from "./reportLetterheadService.js";
-import { type ReportPdfRenderer, ReportPdfService } from "./reportPdfService.js";
+import {
+  normalizeReportAuthor,
+  type ReportPdfRenderer,
+  ReportPdfService,
+  UNKNOWN_REPORT_AUTHOR,
+} from "./reportPdfService.js";
 import type { ReportSnapshotService } from "./reportSnapshotService.js";
 import { ReportXlsxService } from "./reportXlsxService.js";
 import { createReportZip } from "./reportZipService.js";
@@ -40,6 +45,14 @@ interface SnapshotExportContext {
   departmentId?: string;
 }
 
+interface ReportAuthorContextClient {
+  getAccessContext(input: {
+    userId: string;
+    organizationId: string;
+    requestId: string;
+  }): Promise<unknown>;
+}
+
 function createDefaultRenderers(): ReportExportRenderers {
   return {
     csv: new ReportCsvService(),
@@ -55,6 +68,7 @@ export class ReportExportService {
     private readonly audit?: Pick<ReportAuditService, "record">,
     private readonly jobs?: Pick<ReportJobService, "getVersion">,
     private readonly authorization?: Pick<ReportAuthorizationService, "validateSharedDefinition">,
+    private readonly authorContext?: ReportAuthorContextClient,
   ) {}
 
   async export(input: {
@@ -99,7 +113,7 @@ export class ReportExportService {
       const body =
         input.format === "pdf"
           ? await (renderer as ReportPdfRenderer).render({
-              author: input.userId,
+              author: await this.resolveAuthorName(input, source.job.requester_id),
               generatedAt: source.snapshot.created_at,
               organizationId: input.organizationId,
               ...exportContext,
@@ -207,6 +221,30 @@ export class ReportExportService {
       throw new ServiceError(403, "O modelo compartilhado não pertence ao departamento atual.");
     }
     return { scope: "shared", departmentId: authorized.department_id };
+  }
+
+  private async resolveAuthorName(
+    input: { organizationId: string; requestId: string },
+    authorId: string,
+  ): Promise<string> {
+    if (!this.authorContext) return UNKNOWN_REPORT_AUTHOR;
+
+    try {
+      const context = await this.authorContext.getAccessContext({
+        userId: authorId,
+        organizationId: input.organizationId,
+        requestId: input.requestId,
+      });
+      if (typeof context !== "object" || context === null) return UNKNOWN_REPORT_AUTHOR;
+
+      const user = (context as { user?: { name?: unknown; login?: unknown } }).user;
+      for (const value of [user?.name, user?.login]) {
+        if (typeof value === "string" && value.trim()) return normalizeReportAuthor(value);
+      }
+    } catch {
+      return UNKNOWN_REPORT_AUTHOR;
+    }
+    return UNKNOWN_REPORT_AUTHOR;
   }
 }
 

@@ -17,6 +17,22 @@ const BORDER_COLOR = "#cbd5e1";
 
 export const REPORT_PDF_FORMAT = "pdf" as const;
 export const REPORT_PDF_CONTENT_TYPE = "application/pdf";
+export const UNKNOWN_REPORT_AUTHOR = "Usuário não identificado";
+
+export function normalizeReportAuthor(value: unknown): string {
+  if (typeof value !== "string") return UNKNOWN_REPORT_AUTHOR;
+  const normalized = value
+    .split("")
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f) ? " " : character;
+    })
+    .join("")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, 120);
+  return normalized || UNKNOWN_REPORT_AUTHOR;
+}
 
 export interface PdfDocumentOptions {
   size: "A4";
@@ -165,6 +181,7 @@ export class ReportPdfService implements ReportPdfRenderer {
   ) {}
 
   async render(input: ReportPdfRenderInput): Promise<Buffer> {
+    const author = normalizeReportAuthor(input.author);
     const blocks = input.blocks?.length
       ? input.blocks
       : [{ title: "", presentation_json: input.presentation_json, rows: input.rows }];
@@ -184,7 +201,7 @@ export class ReportPdfService implements ReportPdfRenderer {
     const document = this.createDocument({
       size: "A4",
       margin: 0,
-      info: { Author: input.author, CreationDate: input.generatedAt },
+      info: { Author: author, CreationDate: input.generatedAt },
     });
 
     const chunks: Buffer[] = [];
@@ -194,7 +211,7 @@ export class ReportPdfService implements ReportPdfRenderer {
       document.on("error", (error) => reject(error));
 
       try {
-        this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
+        this.drawPageStart(document, letterhead.bytes, author, input.generatedAt);
         let y = CONTENT_TOP;
         for (const [index, block] of preparedBlocks.entries()) {
           const title = block.title || block.presentation.title;
@@ -204,9 +221,9 @@ export class ReportPdfService implements ReportPdfRenderer {
             document.addPage({
               size: "A4",
               margin: 0,
-              info: { Author: input.author, CreationDate: input.generatedAt },
+              info: { Author: author, CreationDate: input.generatedAt },
             });
-            this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
+            this.drawPageStart(document, letterhead.bytes, author, input.generatedAt);
             y = CONTENT_TOP;
           }
           y = this.drawTableHeader(document, block.presentation, title || undefined, y);
@@ -225,9 +242,9 @@ export class ReportPdfService implements ReportPdfRenderer {
               document.addPage({
                 size: "A4",
                 margin: 0,
-                info: { Author: input.author, CreationDate: input.generatedAt },
+                info: { Author: author, CreationDate: input.generatedAt },
               });
-              this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
+              this.drawPageStart(document, letterhead.bytes, author, input.generatedAt);
               y = this.drawTableHeader(
                 document,
                 block.presentation,
