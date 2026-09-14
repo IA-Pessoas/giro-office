@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import handlebars from 'handlebars';
 import { generatePDF } from '../utils/pdf';
+import { formatReportDateTime } from '../utils/reportDateTime.js';
 import prismaClient from "../prisma"
 
 class ReportService {
@@ -114,16 +115,11 @@ class ReportService {
     `).join('');
     }
 
-    function getDataHoraAtual(): string {
-      const agora = new Date();
-      return `${String(agora.getDate()).padStart(2, '0')}/${String(agora.getMonth() + 1).padStart(2, '0')}/${agora.getFullYear()} ${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
-    }
-
     const html = template({
       ...clientInfo,
       logoUrl: logoBase64,
       dashOffset,
-      dataHoraAtual: getDataHoraAtual(),
+      dataHoraAtual: formatReportDateTime(new Date()),
       rows: generateRows(detail.tasks),
     });
 

@@ -16,7 +16,7 @@
     "prisma:generate": "pnpm --filter @workspace/infra run prisma:generate",
     "prisma:migrate": "pnpm --filter @workspace/infra run prisma:migrate",
     "prisma:seed": "pnpm --filter @workspace/infra run prisma:seed",
-    "test": "pnpm exec tsx --test src/test/uploadChatMedia.test.ts",
+    "test": "pnpm exec tsx --test src/test/uploadChatMedia.test.ts src/test/reportDateTime.test.ts",
     "test:watch": "pnpm exec tsx --test --watch src/test/uploadChatMedia.test.ts"
   },
   "dependencies": {
