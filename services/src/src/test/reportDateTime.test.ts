@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { formatReportDateTime } from "../utils/reportDateTime.js";
+import { formatReportDate, formatReportDateTime } from "../utils/reportDateTime.js";
+
+test("converte datas do relatório para a data local de São Paulo", () => {
+  assert.equal(formatReportDate(new Date("2026-01-01T02:30:00.000Z")), "31/12/2025");
+});
 
 test("converte a hora de criação para o fuso de São Paulo", () => {
   assert.equal(

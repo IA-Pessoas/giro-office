@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import handlebars from 'handlebars';
 import { generatePDF } from '../utils/pdf';
-import { formatReportDateTime } from '../utils/reportDateTime.js';
+import { formatReportDate, formatReportDateTime } from '../utils/reportDateTime.js';
 import prismaClient from "../prisma"
 
 class ReportService {
@@ -76,11 +76,11 @@ class ReportService {
       contact: detail.client.number,
       email: detail.client.email,
       instagram: detail.client.instagram,
-      start: detail.start_date ? new Date(detail.start_date).toLocaleDateString() : '-',
+      start: detail.start_date ? formatReportDate(new Date(detail.start_date)) : '-',
       regime: detail.client.regime ?? '-',
       projectObjective: detail.objective,
-      projectStartDate: detail.start_date ? new Date(detail.start_date).toLocaleDateString() : '-',
-      projectEndDate: detail.end_date ? new Date(detail.end_date).toLocaleDateString() : '-',
+      projectStartDate: detail.start_date ? formatReportDate(new Date(detail.start_date)) : '-',
+      projectEndDate: detail.end_date ? formatReportDate(new Date(detail.end_date)) : '-',
       percent: detail.porcentage,
     };
 
@@ -104,7 +104,7 @@ class ReportService {
         <td>-</td>
         <td>${item.name}</td>
         <td>${item.status}</td>
-        <td>${item.date_updated ? new Date(item.date_updated).toLocaleDateString() : '-'}</td>
+        <td>${item.date_updated ? formatReportDate(new Date(item.date_updated)) : '-'}</td>
         <td>${item.department.name ?? '-'}</td>
         <td>${[item.responsible?.name, item.responsible2?.name, item.responsible3?.name]
           .filter(Boolean)
