@@ -10,6 +10,7 @@ import {
 
 class FakePdfDocument implements PdfDocumentLike {
   readonly calls: string[] = [];
+  readonly textPositions: Array<{ value: string; x: number; y: number }> = [];
   private readonly listeners = new Map<string, Array<(value?: unknown) => void>>();
 
   on(event: string, listener: (value?: unknown) => void): this {
@@ -47,8 +48,9 @@ class FakePdfDocument implements PdfDocumentLike {
     return this;
   }
 
-  text(value: string, _x: number, _y: number, _options?: Record<string, unknown>): this {
+  text(value: string, x: number, y: number, _options?: Record<string, unknown>): this {
     this.calls.push(`text:${value}`);
+    this.textPositions.push({ value, x, y });
     return this;
   }
 
@@ -188,6 +190,45 @@ describe("ReportPdfService", () => {
     expect(document.calls).toContain("text:Clientes");
     expect(document.calls).toContain("text:Nenhum registro encontrado nesta área.");
     expect(document.calls).toContain("text:Ana");
+
+    const projectRow = document.textPositions.find((entry) => entry.value === "Ana");
+    const clientTitle = document.textPositions.find((entry) => entry.value === "Clientes");
+    expect(projectRow).toBeDefined();
+    expect(clientTitle).toBeDefined();
+    expect(clientTitle?.y).toBeGreaterThan((projectRow?.y ?? 0) + 18);
+  });
+
+  it("inicia o próximo bloco em nova página quando não há espaço suficiente", async () => {
+    const document = new FakePdfDocument();
+    const service = new ReportPdfService(
+      { select: async () => ({ kind: "institutional" }) },
+      () => document,
+    );
+
+    await service.render({
+      author: "Ana",
+      generatedAt: new Date("2026-08-27T15:04:05.000Z"),
+      organizationId: "org-1",
+      scope: "personal",
+      presentation_json: { columns: [{ key: "name", label: "Nome" }] },
+      rows: [],
+      blocks: [
+        {
+          title: "Projetos",
+          presentation_json: { columns: [{ key: "name", label: "Nome" }] },
+          rows: Array.from({ length: 36 }, (_, index) => ({ name: `Projeto ${index + 1}` })),
+        },
+        {
+          title: "Clientes",
+          presentation_json: { columns: [{ key: "name", label: "Nome" }] },
+          rows: [{ name: "Bia" }],
+        },
+      ],
+    });
+
+    expect(document.calls.filter((call) => call === "addPage")).toHaveLength(1);
+    expect(document.textPositions.find((entry) => entry.value === "Clientes")?.y).toBe(110);
+    expect(document.textPositions.find((entry) => entry.value === "Bia")?.y).toBe(152);
   });
 
   it("gera bytes PDFKit A4 em memória com metadados permitidos", async () => {
