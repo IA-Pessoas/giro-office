@@ -55,8 +55,13 @@ describe("matriz de regressão das políticas modulares", () => {
 
     expect(canAccessRoute(context, readPolicy)).toBe(canRead);
     expect(canAccessRoute(context, editPolicy)).toBe(canWrite);
+  });
+
+  it("não usa permission global como bypass do Comercial", () => {
+    const policy = requiredRoutePolicy("GET", "/commercial/prospecting");
+
     expect(
-      canAccessRoute(authContext({ permission: 999, modules: { comercial: 0 } }), readPolicy),
+      canAccessRoute(authContext({ permission: 999, modules: { comercial: 0 } }), policy),
     ).toBe(false);
   });
 
