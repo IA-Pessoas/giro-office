@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { createHash, createHmac } from "node:crypto";
+import { createServer } from "node:http";
 import { mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -10,6 +12,12 @@ import { chromium } from "@playwright/test";
 const PORT = process.env.COMMERCIAL_SMOKE_PORT || "3127";
 const baseUrl = (process.env.COMMERCIAL_SMOKE_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
+const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));
+const gatewayEntry = join(repoRoot, "services/gateway/dist/services/gateway/src/server.js");
+const gatewayPort = process.env.COMMERCIAL_SMOKE_GATEWAY_PORT || "3010";
+const gatewayUrl = `http://127.0.0.1:${gatewayPort}`;
+const gatewayJwtSecret = "commercial-smoke-jwt-secret";
+const smokeCsrfToken = "A".repeat(43);
 const evidenceDir = process.env.COMMERCIAL_SMOKE_EVIDENCE_DIR || join(tmpdir(), "girooffice-commercial-959-evidence");
 const smokeUser = {
   id: "user-commercial-smoke",
@@ -20,6 +28,34 @@ const smokeUser = {
   type: "admin",
   modules: { comercial: 2 },
 };
+const commercialAccessProfiles = [
+  ...["user", "admin"].flatMap((type) =>
+    [0, 1, 2, 3].map((commercialLevel) => ({
+      label: `${type} comercial=${commercialLevel}`,
+      user: {
+        ...smokeUser,
+        id: `commercial-${type}-${commercialLevel}`,
+        permission: type === "admin" ? 2 : 0,
+        type,
+        modules: { comercial: commercialLevel },
+      },
+      canView: commercialLevel > 0,
+      canEdit: commercialLevel >= 2,
+    })),
+  ),
+  ...[0, 1, 2, 3].map((commercialLevel) => ({
+    label: `owner comercial=${commercialLevel}`,
+    user: {
+      ...smokeUser,
+      id: `commercial-owner-${commercialLevel}`,
+      permission: 0,
+      type: "owner",
+      modules: { comercial: commercialLevel },
+    },
+    canView: true,
+    canEdit: true,
+  })),
+];
 const client = {
   id: "b0000000-0000-4000-8000-000000000001",
   name: "Cliente Smoke",
@@ -45,12 +81,140 @@ const taskBilling = {
   billing_description: null,
 };
 
-async function installMocks(page, context) {
-  let prospectingList = [];
-  let taskBillingList = [taskBilling];
+function encodeJwtPart(value) {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+function createSessionToken(user) {
+  const header = encodeJwtPart({ alg: "HS256", typ: "JWT" });
+  const payload = encodeJwtPart({
+    user_id: user.id,
+    organization_id: user.organization_id,
+    permission: user.permission,
+    type: user.type,
+    modules: user.modules,
+    session_id: `commercial-smoke-${user.id}`,
+    session_version: 1,
+    csrf_hash: createHash("sha256").update(smokeCsrfToken).digest("hex"),
+  });
+  const signature = createHmac("sha256", gatewayJwtSecret)
+    .update(`${header}.${payload}`)
+    .digest("base64url");
+
+  return `${header}.${payload}.${signature}`;
+}
+
+function respondJson(response, data, status = 200) {
+  response.statusCode = status;
+  response.setHeader("content-type", "application/json");
+  response.end(JSON.stringify({ success: true, data }));
+}
+
+async function startServer(handler) {
+  const server = createServer(handler);
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Upstream de smoke não abriu uma porta.");
+  return { server, url: `http://127.0.0.1:${address.port}` };
+}
+
+async function closeServer(server) {
+  await new Promise((resolve) => server.close(() => resolve()));
+}
+
+function stopProcessTree(child) {
+  if (child.exitCode !== null || child.pid === undefined) return;
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    return;
+  }
+  child.kill("SIGTERM");
+}
+
+function createUserUpstream() {
+  const usersById = new Map(commercialAccessProfiles.map((profile) => [profile.user.id, profile.user]));
+  return startServer((request, response) => {
+    if (request.url?.startsWith("/user/session/validate")) {
+      response.statusCode = 200;
+      response.end();
+      return;
+    }
+
+    const userId = request.headers["x-auth-user-id"];
+    const currentUser = usersById.get(Array.isArray(userId) ? userId[0] : userId) || smokeUser;
+    if (request.url?.startsWith("/user/me") || request.url?.startsWith("/user/session/refresh")) {
+      respondJson(response, currentUser);
+      return;
+    }
+
+    respondJson(response, {}, 404);
+  });
+}
+
+function createCommercialUpstream() {
+  const state = {
+    prospectingList: [],
+    taskBillingList: [taskBilling],
+  };
+
+  const upstream = startServer((request, response) => {
+    const pathname = new URL(request.url || "/", "http://commercial-smoke").pathname;
+    if (pathname === "/commercial/proposal-configs") {
+      respondJson(response, []);
+      return;
+    }
+    if (pathname === "/commercial/prospecting/clients") {
+      respondJson(response, [client]);
+      return;
+    }
+    if (pathname === "/commercial/prospecting" && request.method === "GET") {
+      respondJson(response, state.prospectingList);
+      return;
+    }
+    if (pathname === "/commercial/prospecting" && request.method === "POST") {
+      state.prospectingList = [prospecting];
+      respondJson(response, prospecting, 201);
+      return;
+    }
+    if (pathname.startsWith("/commercial/prospecting/") && request.method === "GET") {
+      respondJson(response, prospecting);
+      return;
+    }
+    if (pathname.startsWith("/commercial/prospecting/") && request.method === "PATCH") {
+      respondJson(response, { ...prospecting, status: "Envio de Proposta" });
+      return;
+    }
+    if (pathname === "/commercial/task-billing" && request.method === "GET") {
+      respondJson(response, state.taskBillingList);
+      return;
+    }
+    if (pathname.startsWith("/commercial/task-billing/") && request.method === "PUT") {
+      state.taskBillingList = [{
+        ...taskBilling,
+        hiring_status: "Contratado",
+        payment: "Pago",
+        billing_description: "Cobrança confirmada",
+      }];
+      respondJson(response, state.taskBillingList[0]);
+      return;
+    }
+
+    respondJson(response, {}, 404);
+  });
+
+  return upstream;
+}
+
+async function installMocks(page, context, currentUser = smokeUser) {
   await context.addCookies([
-    { name: "cw.session", value: "opaque-commercial-smoke", url: baseUrl, httpOnly: true },
-    { name: "cw.csrf", value: "A".repeat(43), url: baseUrl, httpOnly: false },
+    { name: "cw.session", value: createSessionToken(currentUser), url: baseUrl, httpOnly: true },
+    { name: "cw.csrf", value: smokeCsrfToken, url: baseUrl, httpOnly: false },
   ]);
   await page.addInitScript(() => {
     if (!window.localStorage.getItem("workspace-theme")) window.localStorage.setItem("workspace-theme", "light");
@@ -61,41 +225,58 @@ async function installMocks(page, context) {
     contentType: "application/json",
     body: JSON.stringify({ success: true, data }),
   });
-  await page.route("**/user/session/refresh", (route) => json(route, smokeUser));
-  await page.route("**/user/me", (route) => json(route, smokeUser));
   await page.route("**/department/list*", (route) => json(route, []));
   await page.route("**/chat", (route) => json(route, []));
   await page.route("**/socket.io/**", (route) => route.abort());
-  await page.route("**/commercial/proposal-configs", (route) => json(route, []));
-  await page.route(/\/commercial\/task-billing(?:\/[^/]+)?$/, async (route) => {
-    if (route.request().method() === "PUT") {
-      taskBillingList = [{
-        ...taskBilling,
-        hiring_status: "Contratado",
-        payment: "Pago",
-        billing_description: "Cobrança confirmada",
-      }];
-      await json(route, taskBillingList[0]);
-      return;
+}
+
+async function assertCommercialAccessMatrix(browser) {
+  for (const profile of commercialAccessProfiles) {
+    const context = await browser.newContext({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1000 },
+    });
+    const page = await context.newPage();
+    const pageErrors = [];
+    const consoleErrors = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+
+    try {
+      await installMocks(page, context, profile.user);
+      await page.goto("/comercial", { waitUntil: "networkidle" });
+
+      if (!profile.canView) {
+        try {
+          await page.getByRole("heading", { name: "Acesso indisponível", exact: true }).waitFor({ timeout: 10_000 });
+        } catch (error) {
+          throw new Error(
+            `${profile.label}: acesso negado não renderizou; url=${page.url()} body=${(await page.locator("body").innerText()).slice(0, 1200)}`,
+            { cause: error },
+          );
+        }
+        assert.equal(await page.getByRole("link", { name: "Comercial", exact: true }).count(), 0);
+      } else {
+        await page.getByRole("heading", { name: "Catálogo de propostas", exact: true }).waitFor({ timeout: 10_000 });
+        assert.equal(await page.getByRole("link", { name: "Comercial", exact: true }).count(), 1);
+        assert.equal(
+          await page.getByRole("button", { name: "Nova configuração", exact: true }).count(),
+          profile.canEdit ? 1 : 0,
+        );
+        assert.equal(
+          await page.getByText("Acesso somente leitura.", { exact: true }).count(),
+          profile.canEdit ? 0 : 1,
+        );
+      }
+
+      assert.deepEqual(pageErrors, [], `${profile.label}: erros de página`);
+      assert.deepEqual(consoleErrors, [], `${profile.label}: erros de console`);
+    } finally {
+      await context.close();
     }
-    await json(route, taskBillingList);
-  });
-  await page.route(/\/commercial\/prospecting\/clients$/, (route) => json(route, [client]));
-  await page.route(/\/commercial\/prospecting$/, async (route) => {
-    if (route.request().method() === "POST") {
-      prospectingList = [prospecting];
-      await json(route, prospecting, 201);
-      return;
-    }
-    await json(route, prospectingList);
-  });
-  await page.route(/\/commercial\/prospecting\/(?!clients$)[^/]+$/, async (route) => {
-    if (route.request().method() === "PATCH") {
-      await json(route, { ...prospecting, status: "Envio de Proposta" });
-      return;
-    }
-    await json(route, prospecting);
-  });
+  }
 }
 
 async function run() {
@@ -112,6 +293,7 @@ async function run() {
   await installMocks(page, context);
 
   try {
+    await assertCommercialAccessMatrix(browser);
     await page.goto("/comercial", { waitUntil: "networkidle" });
     try {
       await page.getByRole("heading", { name: "Prospecção" }).waitFor({ timeout: 10_000 });
@@ -181,15 +363,20 @@ async function run() {
 
 async function withNextServer(test) {
   if (process.env.COMMERCIAL_SMOKE_BASE_URL) return test();
+  const output = [];
   const serverProcess = spawn("cmd", ["/c", "corepack", "pnpm", "exec", "next", "start", "--port", PORT], {
     cwd: appRoot,
-    env: process.env,
+    env: { ...process.env, API_INTERNAL_URL: gatewayUrl },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
   await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Next start não iniciou a tempo.")), 30_000);
+    const timeout = setTimeout(
+      () => reject(new Error(`Next start não iniciou a tempo: ${output.join("\\n")}`)),
+      30_000,
+    );
     const onData = (chunk) => {
+      output.push(chunk.toString());
       if (chunk.toString().includes("Ready in") || chunk.toString().includes("started server")) {
         clearTimeout(timeout);
         resolve();
@@ -199,8 +386,66 @@ async function withNextServer(test) {
     serverProcess.stderr.on("data", onData);
     serverProcess.once("error", reject);
   });
-  try { await test(); } finally { serverProcess.kill(); }
+  try { await test(); } finally { stopProcessTree(serverProcess); }
 }
 
-await withNextServer(run);
+async function waitForGateway(serverProcess, output) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (serverProcess.exitCode !== null) {
+      throw new Error(`Gateway encerrou antes do smoke: ${output.join("\n")}`);
+    }
+    try {
+      const response = await fetch(`${gatewayUrl}/health`, { signal: AbortSignal.timeout(500) });
+      if (response.ok) return;
+    } catch {
+      // O processo ainda está inicializando.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Gateway não iniciou a tempo: ${output.join("\n")}`);
+}
+
+async function withGateway(test) {
+  if (process.env.COMMERCIAL_SMOKE_BASE_URL) return test();
+
+  const userUpstream = await createUserUpstream();
+  const commercialUpstream = await createCommercialUpstream();
+  const output = [];
+  const serverProcess = spawn(
+    process.execPath,
+    [gatewayEntry],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        NODE_ENV: "development",
+        JWT_SECRET: gatewayJwtSecret,
+        GATEWAY_PORT: gatewayPort,
+        USER_SERVICE_URL: userUpstream.url,
+        COMMERCIAL_SERVICE_URL: commercialUpstream.url,
+        AUDIT_ENABLED: "false",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    },
+  );
+  serverProcess.stdout.on("data", (chunk) => output.push(chunk.toString()));
+  serverProcess.stderr.on("data", (chunk) => output.push(chunk.toString()));
+
+  try {
+    await waitForGateway(serverProcess, output);
+    try {
+      await test();
+    } catch (error) {
+      throw new Error(`${error instanceof Error ? error.message : String(error)} gateway=${output.join("\\n")}`, { cause: error });
+    }
+  } finally {
+    stopProcessTree(serverProcess);
+    await closeServer(userUpstream.server);
+    await closeServer(commercialUpstream.server);
+  }
+}
+
+await withGateway(() => withNextServer(run));
 console.log(`commercial browser smoke passed; evidence=${evidenceDir}`);
