@@ -335,7 +335,7 @@ describe("ReportExportService", () => {
     });
 
     expect(render).toHaveBeenCalledWith({
-      author: "user-1",
+      author: "Usuário não identificado",
       generatedAt: new Date("2026-08-26T12:00:00.000Z"),
       organizationId: "org-1",
       scope: "personal",
@@ -358,6 +358,89 @@ describe("ReportExportService", () => {
       organizationId: "org-1",
       allowShared: false,
     });
+  });
+
+  it("usa nome amigável da pessoa autora no PDF, sem expor o UUID", async () => {
+    const render = vi.fn().mockResolvedValue(Buffer.from("%PDF-1.3"));
+    const authorId = "author-1";
+    const authorContext = {
+      getAccessContext: vi.fn().mockResolvedValue({
+        user: { id: authorId, name: "Ana Lima", login: "ana@example.com" },
+      }),
+    };
+    const service = new ReportExportService(
+      {
+        getForExport: vi.fn().mockResolvedValue({
+          snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
+          job: {
+            id: "job-1",
+            report_model_version_id: "version-1",
+            requester_id: authorId,
+          },
+          rows: [{ name: "Ana" }],
+        }),
+        assertExportable: vi.fn().mockResolvedValue(undefined),
+      } as never,
+      { pdf: { format: "pdf", contentType: "application/pdf", render } } as never,
+      { record: vi.fn() } as never,
+      undefined,
+      undefined,
+      authorContext as never,
+    );
+
+    await service.export({
+      snapshotId: "snapshot-1",
+      userId: "downloader-1",
+      organizationId: "org-1",
+      requestId: "request-1",
+      format: "pdf",
+    });
+
+    expect(authorContext.getAccessContext).toHaveBeenCalledWith({
+      userId: authorId,
+      organizationId: "org-1",
+      requestId: "request-1",
+    });
+    expect(render).toHaveBeenCalledWith(expect.objectContaining({ author: "Ana Lima" }));
+    expect(render).not.toHaveBeenCalledWith(expect.objectContaining({ author: authorId }));
+  });
+
+  it("mantém exportação com autoria genérica quando consulta de nome falha", async () => {
+    const render = vi.fn().mockResolvedValue(Buffer.from("%PDF-1.3"));
+    const service = new ReportExportService(
+      {
+        getForExport: vi.fn().mockResolvedValue({
+          snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
+          job: {
+            id: "job-1",
+            report_model_version_id: "version-1",
+            requester_id: "author-1",
+          },
+          rows: [{ name: "Ana" }],
+        }),
+        assertExportable: vi.fn().mockResolvedValue(undefined),
+      } as never,
+      { pdf: { format: "pdf", contentType: "application/pdf", render } } as never,
+      { record: vi.fn() } as never,
+      undefined,
+      undefined,
+      { getAccessContext: vi.fn().mockRejectedValue(new Error("user-service indisponível")) },
+    );
+
+    await expect(
+      service.export({
+        snapshotId: "snapshot-1",
+        userId: "downloader-1",
+        organizationId: "org-1",
+        requestId: "request-1",
+        format: "pdf",
+      }),
+    ).resolves.toMatchObject({ contentType: "application/pdf" });
+
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({ author: "Usuário não identificado" }),
+    );
+    expect(render).not.toHaveBeenCalledWith(expect.objectContaining({ author: "author-1" }));
   });
 
   it("revalida o departamento atual para snapshots de modelos compartilhados", async () => {

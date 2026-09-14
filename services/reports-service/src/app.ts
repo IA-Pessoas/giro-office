@@ -120,6 +120,7 @@ export function createReportsApp({
     auditService,
     jobService,
     authorizationService,
+    accessContextClient,
   );
   const retentionService = new ReportRetentionService(prisma, auditService);
   const lifecycleService = new ReportLifecycleService(prisma as never, auditService);
