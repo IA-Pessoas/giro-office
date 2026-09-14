@@ -450,6 +450,33 @@ await (async () => {
     );
   });
 
+  await runTest("commercial access follows the modular matrix for every user type", () => {
+    const expectedByType = {
+      user: ["none", "view", "edit", "admin"],
+      admin: ["none", "view", "edit", "admin"],
+      owner: ["admin", "admin", "admin", "admin"],
+    };
+
+    for (const [type, expectedLevels] of Object.entries(expectedByType)) {
+      for (const [commercialLevel, expectedLevel] of expectedLevels.entries()) {
+        const subject = {
+          type,
+          modules: { comercial: commercialLevel },
+        };
+        const persistedLevel = getModulePermissionLevel(subject, "comercial");
+        const access = resolveModuleAccess({
+          module: "comercial",
+          additionalModulePermissions: { comercial: persistedLevel ?? 0 },
+          isGlobalAdmin: subject.type === "owner",
+        });
+
+        assert.equal(access.level, expectedLevel, `${type} comercial=${commercialLevel}`);
+        assert.equal(access.canView, expectedLevel !== "none");
+        assert.equal(access.canEdit, expectedLevel === "edit" || expectedLevel === "admin");
+      }
+    }
+  });
+
   await runTest("resolveModuleAccess maps zero and invalid levels to no access", () => {
     assert.deepEqual(
       resolveModuleAccess({
