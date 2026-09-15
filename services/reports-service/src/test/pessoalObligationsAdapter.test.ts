@@ -38,9 +38,11 @@ describe("PessoalObligationsAdapter", () => {
 
     expect(adapter.sources[0]?.fields.map((field) => field.key)).toEqual([
       "competence",
-      "group_snapshot_id",
+      "client_name",
+      "responsible_name",
       "group_snapshot_name",
       "group_snapshot_policy",
+      "group_snapshot_state",
       "advance",
       "payroll",
       "charges",
@@ -51,9 +53,9 @@ describe("PessoalObligationsAdapter", () => {
       "vt",
     ]);
     expect(adapter.sources[0]?.fields.map((field) => field.key)).not.toContain("id");
-    expect(adapter.sources[0]?.fields.every((field) => field.filter_operators.length === 0)).toBe(
-      true,
-    );
+    expect(
+      adapter.sources[0]?.fields.find((field) => field.key === "competence")?.filter_operators,
+    ).toEqual(["eq", "neq", "contains", "in"]);
     expect(pessoalObligationsReportingCatalog.sources[0]?.keys.map((field) => field.key)).toEqual([
       "client_id",
       "responsavel_id",

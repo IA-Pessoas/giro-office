@@ -55,11 +55,15 @@ describe("PessoalPayrollAdapter", () => {
     });
 
     expect(adapter.sources[0]?.fields.map((field) => field.key)).toEqual([
+      "client_name",
+      "responsible_name",
+      "union_name",
+      "group_name",
+      "group_state",
       "advance",
       "advance_type",
       "advance_amount",
       "onvio",
-      "group",
       "vt",
       "vt_value",
       "vt_type",
@@ -72,10 +76,8 @@ describe("PessoalPayrollAdapter", () => {
     ]);
     expect(adapter.sources[0]?.fields.map((field) => field.key)).not.toContain("id");
     expect(
-      adapter.sources[0]?.fields.every(
-        (field) => field.filter_operators.length === 0 && field.aggregations.includes("count"),
-      ),
-    ).toBe(true);
+      adapter.sources[0]?.fields.find((field) => field.key === "group_state")?.filter_operators,
+    ).toEqual(["eq", "in"]);
     expect(pessoalPayrollReportingCatalog.sources[0]?.keys.map((field) => field.key)).toEqual([
       "client_id",
       "responsible_id",
