@@ -1002,6 +1002,7 @@ model CommercialProspecting {
   status          String
   status_date     DateTime?
   description     String?
+  archived_at     DateTime?
   registered_at   DateTime     @default(now())
   updated_at      DateTime     @updatedAt
   client          Client       @relation(fields: [client_id], references: [id])
@@ -1009,6 +1010,7 @@ model CommercialProspecting {
 
   @@unique([organization_id, client_id], map: "uq_commercial_prospecting_org_client")
   @@index([organization_id, status], map: "idx_commercial_prospecting_org_status")
+  @@index([organization_id, archived_at, updated_at], map: "idx_commercial_prospecting_org_archived_updated")
   @@map("commercial.prospecting")
 }
 
