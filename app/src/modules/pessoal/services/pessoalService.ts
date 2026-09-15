@@ -1,6 +1,12 @@
 import type { PessoalOverviewSummary } from "../types";
 import type { PessoalGroup, PessoalGroupPayload } from "../types/groups";
 import type {
+  PessoalGroupAssignmentApplyResult,
+  PessoalGroupAssignmentEligible,
+  PessoalGroupAssignmentEligibleParams,
+  PessoalGroupAssignmentPreview,
+} from "../types/groupAssignments";
+import type {
   PessoalObligation,
   PessoalObligationCreatePayload,
   PessoalObligationCreateResult,
@@ -59,6 +65,16 @@ export function buildPessoalUnionListParams(params: PessoalUnionListParams) {
     ...(params.search?.trim() ? { search: params.search.trim() } : {}),
     page: params.page,
     limit: params.limit,
+  };
+}
+
+export function buildPessoalGroupAssignmentEligibleParams(
+  params: PessoalGroupAssignmentEligibleParams,
+) {
+  return {
+    page: params.page,
+    limit: params.limit,
+    ...(params.search?.trim() ? { search: params.search.trim() } : {}),
   };
 }
 
@@ -138,6 +154,54 @@ function isNotFoundError(error: unknown): boolean {
 }
 
 export const pessoalService = {
+  async listEligibleGroupAssignments(
+    params: PessoalGroupAssignmentEligibleParams,
+  ): Promise<PaginatedResult<PessoalGroupAssignmentEligible>> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalPage } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.groupAssignmentEligible, {
+      params: buildPessoalGroupAssignmentEligibleParams(params),
+    });
+    return unwrapPessoalPage<PessoalGroupAssignmentEligible>(response.data, params);
+  },
+
+  async createGroupAssignmentPreview(
+    groupId: string,
+    clientIds: string[],
+  ): Promise<PessoalGroupAssignmentPreview> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.groupAssignmentPreviews, {
+      group_id: groupId,
+      client_ids: clientIds,
+    });
+    return unwrapPessoalEnvelope<PessoalGroupAssignmentPreview>(response.data);
+  },
+
+  async getGroupAssignmentPreview(
+    previewId: string,
+    page: number,
+    limit: number,
+  ): Promise<PessoalGroupAssignmentPreview> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.groupAssignmentPreview(previewId), {
+      params: { page, limit },
+    });
+    return unwrapPessoalEnvelope<PessoalGroupAssignmentPreview>(response.data);
+  },
+
+  async applyGroupAssignmentPreview(
+    previewId: string,
+    fingerprint: string,
+    idempotencyKey: string,
+  ): Promise<PessoalGroupAssignmentApplyResult> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(
+      PESSOAL_ENDPOINTS.groupAssignmentApply,
+      { preview_id: previewId, fingerprint },
+      { headers: { "Idempotency-Key": idempotencyKey } },
+    );
+    return unwrapPessoalEnvelope<PessoalGroupAssignmentApplyResult>(response.data);
+  },
+
   async listGroups(): Promise<PessoalGroup[]> {
     const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
     const response = await api.get(PESSOAL_ENDPOINTS.groups);

@@ -280,6 +280,22 @@ const updatePayrollRequestSchema = strictObjectSchema({
   contact: nullableTextSchema,
 });
 
+const groupAssignmentPreviewRequestSchema = strictObjectSchema(
+  {
+    group_id: uuidSchema,
+    client_ids: { type: "array", minItems: 1, maxItems: 500, items: uuidSchema },
+  },
+  ["group_id", "client_ids"],
+);
+
+const groupAssignmentApplyRequestSchema = strictObjectSchema(
+  {
+    preview_id: uuidSchema,
+    fingerprint: { type: "string", pattern: "^[a-f0-9]{64}$" },
+  },
+  ["preview_id", "fingerprint"],
+);
+
 const createObligationRequestSchema = strictObjectSchema(
   {
     client_id: uuidSchema,
@@ -439,6 +455,10 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
       { name: "Pessoal Situations", description: "Situacoes de clientes" },
       { name: "Pessoal Unions", description: "Sindicatos" },
       { name: "Pessoal Groups", description: "Catalogo de grupos da folha" },
+      {
+        name: "Pessoal Group Assignments",
+        description: "Selecao, previa persistida e aplicacao atomica de grupos",
+      },
       { name: "Pessoal Payroll", description: "Configuracao de folha" },
       { name: "Pessoal Obligations", description: "Obrigacoes mensais" },
       {
@@ -753,6 +773,72 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           summary: "Reativar grupo de pessoal",
           operationId: "reactivatePessoalGroup",
           parameters: [idParam("id")],
+          responses: mutationResponses,
+        },
+      },
+      "/pessoal/group-assignments/eligible": {
+        get: {
+          tags: ["Pessoal Group Assignments"],
+          security: bearerSecurity,
+          summary: "Listar folhas elegiveis para atribuicao em lote",
+          operationId: "listPessoalGroupAssignmentEligible",
+          parameters: [
+            queryParam("search", undefined, false),
+            { name: "page", in: "query", required: false, schema: { type: "integer", minimum: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+          ],
+          responses: readResponses,
+        },
+      },
+      "/pessoal/group-assignments/previews": {
+        post: {
+          tags: ["Pessoal Group Assignments"],
+          security: bearerSecurity,
+          summary: "Persistir previa de atribuicao de grupo",
+          operationId: "createPessoalGroupAssignmentPreview",
+          requestBody: jsonRequestBody(groupAssignmentPreviewRequestSchema),
+          responses: mutationResponses,
+        },
+      },
+      "/pessoal/group-assignments/previews/{preview_id}": {
+        get: {
+          tags: ["Pessoal Group Assignments"],
+          security: bearerSecurity,
+          summary: "Detalhar previa persistida com paginação",
+          operationId: "getPessoalGroupAssignmentPreview",
+          parameters: [
+            idParam("preview_id"),
+            { name: "page", in: "query", required: false, schema: { type: "integer", minimum: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+          ],
+          responses: readResponses,
+        },
+      },
+      "/pessoal/group-assignments/apply": {
+        post: {
+          tags: ["Pessoal Group Assignments"],
+          security: bearerSecurity,
+          summary: "Aplicar uma previa valida de forma idempotente",
+          operationId: "applyPessoalGroupAssignmentPreview",
+          parameters: [
+            {
+              name: "Idempotency-Key",
+              in: "header",
+              required: true,
+              schema: { type: "string", minLength: 1, maxLength: 255 },
+            },
+          ],
+          requestBody: jsonRequestBody(groupAssignmentApplyRequestSchema),
           responses: mutationResponses,
         },
       },

@@ -1,6 +1,7 @@
 export type PessoalTabId =
   | "overview"
   | "groups"
+  | "groupAssignments"
   | "unions"
   | "payroll"
   | "obligations"
@@ -37,3 +38,5 @@ export interface PessoalSuccessEnvelope<T> {
   success: true;
   data: T;
 }
+
+export * from "./groupAssignments";
