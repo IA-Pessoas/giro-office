@@ -15,6 +15,18 @@ import type { ReportSnapshotService } from "./reportSnapshotService.js";
 import { ReportXlsxService } from "./reportXlsxService.js";
 import { createReportZip } from "./reportZipService.js";
 
+const REPORT_TIME_ZONE = "UTC";
+const reportFileTimestampFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: REPORT_TIME_ZONE,
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
 export type ReportExportFormat = "csv" | "xlsx" | "pdf";
 
 export interface ReportExportResult {
@@ -166,12 +178,15 @@ export class ReportExportService {
               : input.format === "xlsx"
                 ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 : "application/pdf",
-        fileName:
+        fileName: buildReportFileName(
           input.format !== "pdf" && tables.length > 1
-            ? `report-${source.job.id}.zip`
+            ? `report-${source.job.id}`
             : tables.length === 1 && source.blocks?.length
-              ? `${stems[0]}.${input.format}`
-              : `report-${source.job.id}.${input.format}`,
+              ? (stems[0] ?? `report-${source.job.id}`)
+              : `report-${source.job.id}`,
+          source.snapshot.created_at,
+          input.format !== "pdf" && tables.length > 1 ? "zip" : input.format,
+        ),
         body: Buffer.from(body),
       };
     } catch (error) {
@@ -327,4 +342,14 @@ function uniqueStems(labels: readonly string[]): string[] {
     counts.set(base, occurrence + 1);
     return occurrence === 0 ? base : `${base}_${occurrence + 1}`;
   });
+}
+
+function buildReportFileName(stem: string, createdAt: Date, extension: string): string {
+  const parts = reportFileTimestampFormatter.formatToParts(createdAt);
+  const getPart = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  const timestamp = `${getPart("year")}-${getPart("month")}-${getPart("day")}_${getPart(
+    "hour",
+  )}-${getPart("minute")}-${getPart("second")}`;
+  return `${stem}-${timestamp}.${extension}`;
 }

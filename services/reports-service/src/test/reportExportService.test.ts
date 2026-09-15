@@ -100,7 +100,7 @@ describe("ReportExportService", () => {
     const service = new ReportExportService(
       {
         getForExport: vi.fn().mockResolvedValue({
-          snapshot: { id: "snapshot-1", created_at: new Date() },
+          snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
           job: { id: "job-1", report_model_version_id: "version-1" },
           rows: [],
           blocks: [
@@ -134,7 +134,7 @@ describe("ReportExportService", () => {
 
     expect(result).toMatchObject({
       contentType: "application/zip",
-      fileName: "report-job-1.zip",
+      fileName: "report-job-1-2026-08-26_12-00-00.zip",
     });
     expect(result.body.readUInt32LE(0)).toBe(0x04034b50);
     expect([...readZipEntries(result.body).entries()]).toEqual([
@@ -196,7 +196,7 @@ describe("ReportExportService", () => {
     const service = new ReportExportService(
       {
         getForExport: vi.fn().mockResolvedValue({
-          snapshot: { id: "snapshot-1", created_at: new Date() },
+          snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
           job: { id: "job-1", report_model_version_id: "version-1" },
           rows: [],
           blocks: [
@@ -230,7 +230,7 @@ describe("ReportExportService", () => {
       }),
     ).resolves.toMatchObject({
       contentType: "application/pdf",
-      fileName: "report-job-1.pdf",
+      fileName: "report-job-1-2026-08-26_12-00-00.pdf",
       body: Buffer.from("%PDF-composed"),
     });
     expect(render).toHaveBeenCalledWith(
@@ -272,7 +272,7 @@ describe("ReportExportService", () => {
       }),
     ).resolves.toMatchObject({
       contentType: "text/csv; charset=utf-8",
-      fileName: "report-job-1.csv",
+      fileName: "report-job-1-2026-08-26_12-00-00.csv",
       body: Buffer.from("Nome\r\nAna\r\n"),
     });
 
@@ -330,7 +330,7 @@ describe("ReportExportService", () => {
       }),
     ).resolves.toMatchObject({
       contentType: "application/pdf",
-      fileName: "report-job-1.pdf",
+      fileName: "report-job-1-2026-08-26_12-00-00.pdf",
       body: Buffer.from("%PDF-1.3"),
     });
 
