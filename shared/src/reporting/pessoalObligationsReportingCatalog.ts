@@ -44,6 +44,14 @@ export const pessoalObligationsReportingCatalog = {
       ],
       fields: [
         field("competence", "Competência", "string", noFilterOperators),
+        field("group_snapshot_id", "ID do grupo no snapshot", "string", noFilterOperators),
+        field("group_snapshot_name", "Grupo no snapshot", "string", noFilterOperators),
+        field(
+          "group_snapshot_policy",
+          "Política do grupo no snapshot",
+          "string",
+          noFilterOperators,
+        ),
         field("advance", "Adiantamento", "boolean", noFilterOperators),
         field("payroll", "Folha", "boolean", noFilterOperators),
         field("charges", "Encargos", "boolean", noFilterOperators),

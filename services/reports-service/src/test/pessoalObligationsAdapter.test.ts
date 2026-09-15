@@ -38,6 +38,9 @@ describe("PessoalObligationsAdapter", () => {
 
     expect(adapter.sources[0]?.fields.map((field) => field.key)).toEqual([
       "competence",
+      "group_snapshot_id",
+      "group_snapshot_name",
+      "group_snapshot_policy",
       "advance",
       "payroll",
       "charges",

@@ -152,6 +152,9 @@ describe("pessoal internal reporting routes", () => {
     });
     expect(obligationsSource.fields.map((field: { key: string }) => field.key)).toEqual([
       "competence",
+      "group_snapshot_id",
+      "group_snapshot_name",
+      "group_snapshot_policy",
       "advance",
       "payroll",
       "charges",

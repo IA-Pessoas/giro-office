@@ -121,8 +121,24 @@ describe("pessoal internal reporting service", () => {
 
   it("extrai obrigações pelo tenant assinado e retorna reachedLimit da origem", async () => {
     const findMany = vi.fn().mockResolvedValue([
-      { competence: "2026-08", advance: false, payroll: true, id: "hidden-id" },
-      { competence: "2026-09", advance: true, payroll: false, id: "hidden-id-2" },
+      {
+        competence: "2026-08",
+        advance: false,
+        payroll: true,
+        group_snapshot_id: null,
+        group_snapshot_name: null,
+        group_snapshot_policy: null,
+        id: "hidden-id",
+      },
+      {
+        competence: "2026-09",
+        advance: true,
+        payroll: false,
+        group_snapshot_id: "group-2",
+        group_snapshot_name: "Grupo atual",
+        group_snapshot_policy: "NORMAL",
+        id: "hidden-id-2",
+      },
     ]);
     const service = new InternalReportingService({ obrigationsPessoal: { findMany } } as never);
 
@@ -130,17 +146,40 @@ describe("pessoal internal reporting service", () => {
       service.extract({
         organizationId,
         source: "pessoal.obligations",
-        fields: ["competence", "advance", "payroll"],
+        fields: [
+          "competence",
+          "advance",
+          "payroll",
+          "group_snapshot_id",
+          "group_snapshot_name",
+          "group_snapshot_policy",
+        ],
         limit: 1,
       }),
     ).resolves.toEqual({
-      rows: [{ competence: "2026-08", advance: false, payroll: true }],
+      rows: [
+        {
+          competence: "2026-08",
+          advance: false,
+          payroll: true,
+          group_snapshot_id: null,
+          group_snapshot_name: null,
+          group_snapshot_policy: null,
+        },
+      ],
       reachedLimit: true,
     });
 
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: organizationId },
-      select: { competence: true, advance: true, payroll: true },
+      select: {
+        competence: true,
+        advance: true,
+        payroll: true,
+        group_snapshot_id: true,
+        group_snapshot_name: true,
+        group_snapshot_policy: true,
+      },
       take: 2,
     });
   });

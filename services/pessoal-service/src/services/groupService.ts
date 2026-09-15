@@ -3,6 +3,7 @@ import { error as logError, ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateGroupBody, UpdateGroupBody } from "../schemas/group.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
+import { NO_OBLIGATIONS_GROUP_POLICY, NORMAL_GROUP_POLICY } from "./pessoalGroupPolicy.js";
 import {
   PESSOAL_READ_PERMISSION,
   PESSOAL_WRITE_PERMISSION,
@@ -12,7 +13,7 @@ import {
 } from "./pessoalServiceTypes.js";
 
 export const NO_MOVEMENT_GROUP_SYSTEM_KEY = "NO_MOVEMENT";
-export const NO_MOVEMENT_GROUP_POLICY = "NO_OBLIGATIONS";
+export const NO_MOVEMENT_GROUP_POLICY = NO_OBLIGATIONS_GROUP_POLICY;
 
 const groupSelect = {
   id: true,
@@ -26,7 +27,7 @@ const groupSelect = {
 export type GroupRecord = {
   id: string;
   name: string;
-  policy: string | null;
+  policy: string;
   system_key: string | null;
   archived_at: Date | null;
   organization_id: string;
@@ -94,6 +95,7 @@ export class GroupService {
         data: {
           name,
           normalized_name: normalizePessoalGroupName(name),
+          policy: body.policy ?? NORMAL_GROUP_POLICY,
           organization_id: context.organizationId,
         },
         select: groupSelect,
@@ -133,10 +135,18 @@ export class GroupService {
       if (existing.system_key === NO_MOVEMENT_GROUP_SYSTEM_KEY) {
         throw new ServiceError(409, "O grupo Sem Movimento nao pode ser alterado.");
       }
-      const name = displayGroupName(body.name);
+      const data = {
+        ...(body.name
+          ? {
+              name: displayGroupName(body.name),
+              normalized_name: normalizePessoalGroupName(body.name),
+            }
+          : {}),
+        ...(body.policy ? { policy: body.policy } : {}),
+      };
       const updated = await this.prisma.pessoalGroup.update({
         where: { id },
-        data: { name, normalized_name: normalizePessoalGroupName(name) },
+        data,
         select: groupSelect,
       });
 
@@ -148,7 +158,7 @@ export class GroupService {
         action: "Atualizacao",
         referring: "pessoal.group",
         referringId: id,
-        changes: { name: { from: existing.name, to: updated.name } },
+        changes: data,
       });
 
       return updated;
