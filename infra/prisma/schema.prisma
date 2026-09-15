@@ -173,6 +173,7 @@ model Organization {
   obrigationsPessoal            ObrigationsPessoal[]
   passwordsPessoal              PasswordPessoal[]
   pessoalGroups                 PessoalGroup[]
+  pessoalGroupMigrationMappings PessoalGroupMigrationMapping[]
   payrolls                      Payroll[]
   situationsPessoal             SituationsPessoal[]
   unionsPessoal                 UnionPessoal[]
@@ -320,6 +321,7 @@ model User {
   permissionsSpecifics        PermissionSpecific?
   obrigationsPessoal          ObrigationsPessoal[]
   passPessoal                 PasswordPessoal[]
+  pessoalGroupMigrationMappings PessoalGroupMigrationMapping[] @relation("PessoalGroupMigrationMappedBy")
   payroll                     Payroll[]
   completedSituationsPessoal  SituationsPessoal[]    @relation("completed_by")
   registeredSituationsPessoal SituationsPessoal[]    @relation("registered_by")
@@ -1659,12 +1661,31 @@ model PessoalGroup {
   archived_at     DateTime?
   organization_id String
   organization    Organization  @relation(fields: [organization_id], references: [id])
+  migrationMappings PessoalGroupMigrationMapping[]
   payrolls        Payroll[]
 
   @@unique([organization_id, normalized_name], map: "uq_pessoal_group_org_normalized_name")
   @@unique([organization_id, system_key], map: "uq_pessoal_group_org_system_key")
   @@index([organization_id, archived_at, name], map: "idx_pessoal_group_org_archived_name")
   @@map("pessoal.group")
+}
+
+model PessoalGroupMigrationMapping {
+  id               String        @id @default(uuid())
+  legacy_value     String
+  normalized_value String
+  group_id         String
+  mapped_by_id     String
+  mapped_at        DateTime      @default(now())
+  resolution_kind  String
+  organization_id  String
+  group            PessoalGroup  @relation(fields: [group_id], references: [id], onDelete: Restrict)
+  mappedBy         User          @relation("PessoalGroupMigrationMappedBy", fields: [mapped_by_id], references: [id], onDelete: Restrict)
+  organization     Organization  @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, normalized_value], map: "uq_pessoal_group_migration_mapping_org_normalized")
+  @@index([organization_id, group_id], map: "idx_pessoal_group_migration_mapping_org_group")
+  @@map("pessoal.group_migration_mapping")
 }
 
 model ObrigationsPessoal {
