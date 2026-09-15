@@ -47,6 +47,7 @@ describe("matriz de regressão das políticas modulares", () => {
   ])("aplica a matriz Comercial para %s com comercial=%i", (type, commercialLevel, canRead, canWrite) => {
     const readPolicy = requiredRoutePolicy("GET", "/commercial/prospecting");
     const editPolicy = requiredRoutePolicy("PATCH", "/commercial/prospecting/prospecting-1");
+    const archivePolicy = requiredRoutePolicy("DELETE", "/commercial/prospecting/prospecting-1");
     const context = authContext({
       permission: type === "admin" ? 2 : 0,
       type: type as "user" | "admin" | "owner",
@@ -55,6 +56,7 @@ describe("matriz de regressão das políticas modulares", () => {
 
     expect(canAccessRoute(context, readPolicy)).toBe(canRead);
     expect(canAccessRoute(context, editPolicy)).toBe(canWrite);
+    expect(canAccessRoute(context, archivePolicy)).toBe(canWrite);
   });
 
   it("não usa permission global como bypass do Comercial", () => {

@@ -297,6 +297,7 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
           responses: {
             "200": successResponse,
             "401": { description: "Não autenticado." },
+            "400": { description: "Identificador inválido." },
             "404": { description: "Não encontrado." },
           },
         },

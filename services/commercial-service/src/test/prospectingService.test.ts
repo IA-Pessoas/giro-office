@@ -218,7 +218,7 @@ describe("CommercialProspectingService", () => {
     expect(prisma.commercialOutboxEvent.create).not.toHaveBeenCalled();
   });
 
-  it("torna a arquivação idempotente sem repetir auditoria", async () => {
+  it("torna a arquivação idempotente e repete auditoria para recuperar falha anterior", async () => {
     const prisma = createMockPrisma();
     prisma.commercialProspecting.updateMany = vi.fn(async () => ({ count: 0 }));
     prisma.commercialProspecting.findFirst = vi.fn(async () => ({
@@ -236,10 +236,45 @@ describe("CommercialProspectingService", () => {
       }),
     ).resolves.toEqual({ id: PROSPECTING_ID, deleted: true });
 
-    expect(audit.createLog).not.toHaveBeenCalled();
+    expect(audit.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Arquivamento",
+        referringId: PROSPECTING_ID,
+      }),
+    );
   });
 
-  it("retorna 404 ao arquivar prospecção ausente ou de outro tenant", async () => {
+  it("permite recuperar auditoria indisponível em uma nova tentativa idempotente", async () => {
+    const prisma = createMockPrisma();
+    prisma.commercialProspecting.updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    prisma.commercialProspecting.findFirst = vi.fn(async () => ({
+      id: PROSPECTING_ID,
+      archived_at: new Date("2026-09-12T00:00:00.000Z"),
+    }));
+    const audit = createAuditMock();
+    audit.createLog = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("audit indisponível"))
+      .mockResolvedValue(undefined);
+    const service = new CommercialProspectingService(prisma, audit);
+    const request = {
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      prospecting_id: PROSPECTING_ID,
+    };
+
+    await expect(service.archive(request)).rejects.toMatchObject({ statusCode: 500 });
+    await expect(service.archive(request)).resolves.toEqual({
+      id: PROSPECTING_ID,
+      deleted: true,
+    });
+    expect(audit.createLog).toHaveBeenCalledTimes(2);
+  });
+
+  it("retorna 404 ao arquivar prospecção ausente", async () => {
     const prisma = createMockPrisma();
     prisma.commercialProspecting.updateMany = vi.fn(async () => ({ count: 0 }));
     prisma.commercialProspecting.findFirst = vi.fn(async () => null);
@@ -252,5 +287,31 @@ describe("CommercialProspectingService", () => {
         prospecting_id: PROSPECTING_ID,
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("não arquiva registro pertencente a outro tenant", async () => {
+    const prisma = createMockPrisma();
+    const otherTenantRow = {
+      id: PROSPECTING_ID,
+      organization_id: OTHER_ORGANIZATION_ID,
+      archived_at: null,
+    };
+    prisma.commercialProspecting.updateMany = vi.fn(async ({ where }) => ({
+      count: where.organization_id === otherTenantRow.organization_id ? 1 : 0,
+    }));
+    prisma.commercialProspecting.findFirst = vi.fn(async ({ where }) =>
+      where.organization_id === otherTenantRow.organization_id ? otherTenantRow : null,
+    );
+    const audit = createAuditMock();
+    const service = new CommercialProspectingService(prisma, audit);
+
+    await expect(
+      service.archive({
+        user_id: USER_ID,
+        organization_id: ORGANIZATION_ID,
+        prospecting_id: PROSPECTING_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(audit.createLog).not.toHaveBeenCalled();
   });
 });

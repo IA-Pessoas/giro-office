@@ -186,6 +186,16 @@ describe("commercial prospecting routes", () => {
     expect(service.archive).not.toHaveBeenCalled();
   });
 
+  it("rejeita identificador inválido antes de chamar o service", async () => {
+    const service = createServiceMock();
+    const response = await request(createTestApp(service))
+      .delete("/commercial/prospecting/not-a-uuid")
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(400);
+    expect(service.archive).not.toHaveBeenCalled();
+  });
+
   it("lista clientes no tenant encaminhado", async () => {
     const service = createServiceMock();
     await request(createTestApp(service))

@@ -376,6 +376,18 @@ export class CommercialProspectingService {
         select: { id: true, archived_at: true },
       });
       if (!existing) throw new ServiceError(404, "Prospecção comercial não encontrada.");
+      if (!existing.archived_at)
+        throw new ServiceError(404, "Prospecção comercial não encontrada.");
+
+      await this.audit.createLog({
+        userId: data.user_id,
+        organizationId: data.organization_id,
+        action: "Arquivamento",
+        referring: "commercial.prospecting",
+        referringId: existing.id,
+        changes: { archived_at: existing.archived_at?.toISOString() ?? null },
+        auditCorrelationId: data.audit_correlation_id,
+      });
 
       return { id: existing.id, deleted: true };
     } catch (err: unknown) {
