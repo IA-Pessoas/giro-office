@@ -1,4 +1,5 @@
 import type { PessoalOverviewSummary } from "../types";
+import type { PessoalGroup, PessoalGroupPayload } from "../types/groups";
 import type {
   PessoalObligation,
   PessoalObligationCreatePayload,
@@ -49,6 +50,10 @@ export function buildPessoalUnionPayload(payload: PessoalUnionPayload): PessoalU
   };
 }
 
+export function buildPessoalGroupPayload(payload: PessoalGroupPayload): PessoalGroupPayload {
+  return { name: payload.name.trim() };
+}
+
 export function buildPessoalUnionListParams(params: PessoalUnionListParams) {
   return {
     ...(params.search?.trim() ? { search: params.search.trim() } : {}),
@@ -69,7 +74,7 @@ export function buildPessoalPayrollPayload(
     info: payload.info,
     previous: payload.previous,
     onvio: payload.onvio,
-    group: payload.group,
+    ...(payload.group_id ? { group_id: payload.group_id } : {}),
     vt: payload.vt,
     vt_value: payload.vt_value ?? null,
     vt_type: payload.vt_type ?? null,
@@ -133,6 +138,44 @@ function isNotFoundError(error: unknown): boolean {
 }
 
 export const pessoalService = {
+  async listGroups(): Promise<PessoalGroup[]> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.get(PESSOAL_ENDPOINTS.groups);
+
+    return unwrapPessoalEnvelope<PessoalGroup[]>(response.data);
+  },
+
+  async createGroup(payload: PessoalGroupPayload): Promise<PessoalGroup> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.groups, buildPessoalGroupPayload(payload));
+
+    return unwrapPessoalEnvelope<PessoalGroup>(response.data);
+  },
+
+  async updateGroup(id: string, payload: PessoalGroupPayload): Promise<PessoalGroup> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.patch(
+      PESSOAL_ENDPOINTS.groupDetail(id),
+      buildPessoalGroupPayload(payload),
+    );
+
+    return unwrapPessoalEnvelope<PessoalGroup>(response.data);
+  },
+
+  async archiveGroup(id: string): Promise<PessoalGroup> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.delete(PESSOAL_ENDPOINTS.groupDetail(id));
+
+    return unwrapPessoalEnvelope<PessoalGroup>(response.data);
+  },
+
+  async reactivateGroup(id: string): Promise<PessoalGroup> {
+    const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
+    const response = await api.post(PESSOAL_ENDPOINTS.groupReactivate(id));
+
+    return unwrapPessoalEnvelope<PessoalGroup>(response.data);
+  },
+
   async getOverview(): Promise<PessoalOverviewSummary> {
     const { api, PESSOAL_ENDPOINTS, unwrapPessoalEnvelope } = await getPessoalHttp();
     const response = await api.get(PESSOAL_ENDPOINTS.overview);

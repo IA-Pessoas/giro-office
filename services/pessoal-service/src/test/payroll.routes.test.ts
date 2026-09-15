@@ -7,6 +7,7 @@ import {
   clientId,
   createRouteTestApp,
   gatewayHeaders,
+  groupId,
   responsibleId,
   unionId,
 } from "./pessoalCoreTestUtils.js";
@@ -20,7 +21,7 @@ const payrollBody = {
   info: "Folha mensal",
   previous: false,
   onvio: true,
-  group: "A",
+  group_id: groupId,
   vt: true,
   vt_value: 250,
   vt_type: null,
@@ -76,6 +77,19 @@ describe("payroll routes", () => {
     expect(createResponse.status).toBe(400);
     expect(updateResponse.status).toBe(400);
     expect(service.create).not.toHaveBeenCalled();
+    expect(service.update).not.toHaveBeenCalled();
+  });
+
+  it("rejeita group_id nulo antes do service", async () => {
+    const service = { update: vi.fn() };
+    const app = createRouteTestApp("/pessoal/payroll", createPayrollRoutes(service as never));
+
+    const response = await request(app)
+      .patch(`/pessoal/payroll/${clientId}`)
+      .set(gatewayHeaders())
+      .send({ group_id: null });
+
+    expect(response.status).toBe(400);
     expect(service.update).not.toHaveBeenCalled();
   });
 });

@@ -8,7 +8,13 @@ export interface PessoalPayroll {
   info: string;
   previous: boolean;
   onvio: boolean;
-  group: string;
+  group_id: string | null;
+  legacy_group: string | null;
+  group: {
+    id: string;
+    name: string;
+    archived_at: string | null;
+  } | null;
   vt: boolean;
   vt_value: number | null;
   vt_type: string | null;
@@ -32,7 +38,7 @@ export interface PessoalPayrollPayload {
   info: string;
   previous: boolean;
   onvio: boolean;
-  group: string;
+  group_id?: string | null;
   vt: boolean;
   vt_value: number | null;
   vt_type: string | null;

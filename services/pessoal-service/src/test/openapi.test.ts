@@ -101,6 +101,8 @@ describe("pessoal-service OpenAPI", () => {
       paths["/pessoal/situations/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
       paths["/pessoal/unions"]?.post?.requestBody?.content?.["application/json"]?.schema,
       paths["/pessoal/unions/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/groups"]?.post?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/groups/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
       paths["/pessoal/payroll"]?.post?.requestBody?.content?.["application/json"]?.schema,
       paths["/pessoal/payroll/{client_id}"]?.patch?.requestBody?.content?.["application/json"]
         ?.schema,
@@ -118,6 +120,20 @@ describe("pessoal-service OpenAPI", () => {
         properties: expect.any(Object),
       });
     }
+  });
+
+  it("documenta catalogo de grupos e reativacao", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const paths = spec.paths as Record<
+      string,
+      Record<string, { operationId?: string; responses?: Record<string, unknown> }>
+    >;
+
+    expect(paths["/pessoal/groups"]?.get?.operationId).toBe("listPessoalGroups");
+    expect(paths["/pessoal/groups/{id}"]?.delete?.operationId).toBe("archivePessoalGroup");
+    expect(paths["/pessoal/groups/{id}/reactivate"]?.post?.operationId).toBe(
+      "reactivatePessoalGroup",
+    );
   });
 
   it("documenta busca e resposta dual de sindicatos", () => {

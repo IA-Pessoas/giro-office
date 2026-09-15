@@ -206,6 +206,9 @@ const updateUnionRequestSchema = strictObjectSchema({
   base_date: nullableDateSchema,
 });
 
+const createGroupRequestSchema = strictObjectSchema({ name: textSchema }, ["name"]);
+const updateGroupRequestSchema = strictObjectSchema({ name: textSchema }, ["name"]);
+
 const createPayrollRequestSchema = strictObjectSchema(
   {
     client_id: uuidSchema,
@@ -216,7 +219,8 @@ const createPayrollRequestSchema = strictObjectSchema(
     info: textSchema,
     previous: { type: "boolean" },
     onvio: { type: "boolean" },
-    group: textSchema,
+    group_id: uuidSchema,
+    group: { ...textSchema, deprecated: true },
     vt: { type: "boolean" },
     vt_value: nullableNonNegativeNumberSchema,
     vt_type: nullableTextSchema,
@@ -235,7 +239,7 @@ const createPayrollRequestSchema = strictObjectSchema(
     "info",
     "previous",
     "onvio",
-    "group",
+    "group_id",
     "vt",
     "va",
     "assistance_fee",
@@ -254,7 +258,8 @@ const updatePayrollRequestSchema = strictObjectSchema({
   info: textSchema,
   previous: { type: "boolean" },
   onvio: { type: "boolean" },
-  group: textSchema,
+  group_id: uuidSchema,
+  group: { ...textSchema, deprecated: true },
   vt: { type: "boolean" },
   vt_value: nullableNonNegativeNumberSchema,
   vt_type: nullableTextSchema,
@@ -426,6 +431,7 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
       { name: "Pessoal LDD", description: "Controle de LDD" },
       { name: "Pessoal Situations", description: "Situacoes de clientes" },
       { name: "Pessoal Unions", description: "Sindicatos" },
+      { name: "Pessoal Groups", description: "Catalogo de grupos da folha" },
       { name: "Pessoal Payroll", description: "Configuracao de folha" },
       { name: "Pessoal Obligations", description: "Obrigacoes mensais" },
       {
@@ -679,6 +685,60 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           security: bearerSecurity,
           summary: "Excluir sindicato",
           operationId: "deletePessoalUnion",
+          parameters: [idParam("id")],
+          responses: mutationResponses,
+        },
+      },
+      "/pessoal/groups": {
+        get: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Listar grupos de pessoal",
+          operationId: "listPessoalGroups",
+          responses: readResponses,
+        },
+        post: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Criar grupo de pessoal",
+          operationId: "createPessoalGroup",
+          requestBody: jsonRequestBody(createGroupRequestSchema),
+          responses: mutationResponses,
+        },
+      },
+      "/pessoal/groups/{id}": {
+        get: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Detalhar grupo de pessoal",
+          operationId: "getPessoalGroup",
+          parameters: [idParam("id")],
+          responses: readResponses,
+        },
+        patch: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Editar grupo de pessoal",
+          operationId: "updatePessoalGroup",
+          parameters: [idParam("id")],
+          requestBody: jsonRequestBody(updateGroupRequestSchema),
+          responses: mutationResponses,
+        },
+        delete: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Arquivar grupo de pessoal",
+          operationId: "archivePessoalGroup",
+          parameters: [idParam("id")],
+          responses: mutationResponses,
+        },
+      },
+      "/pessoal/groups/{id}/reactivate": {
+        post: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Reativar grupo de pessoal",
+          operationId: "reactivatePessoalGroup",
           parameters: [idParam("id")],
           responses: mutationResponses,
         },
