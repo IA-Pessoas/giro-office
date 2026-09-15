@@ -111,8 +111,31 @@ runTest("pessoal situations expose a permissioned delete confirmation with feedb
 runTest("pessoal tabs stay stable for branch integration", () => {
   assert.deepEqual(
     PESSOAL_TABS.map((tab) => tab.id),
-    ["overview", "groups", "unions", "payroll", "obligations", "tracking", "passwords"],
+    [
+      "overview",
+      "groups",
+      "groupAssignments",
+      "unions",
+      "payroll",
+      "obligations",
+      "tracking",
+      "passwords",
+    ],
   );
+});
+
+runTest("pessoal group assignments use the persisted preview contract", () => {
+  const service = readFileSync("src/modules/pessoal/services/pessoalService.ts", "utf8");
+  const section = readFileSync(
+    "src/modules/pessoal/components/PessoalGroupAssignmentSection.tsx",
+    "utf8",
+  );
+
+  assert.match(service, /createGroupAssignmentPreview\(\s*groupId: string,\s*clientIds: string\[\]/);
+  assert.match(service, /"Idempotency-Key": idempotencyKey/);
+  assert.match(section, /Prévia de atribuição em lote/);
+  assert.match(section, /Aplicar prévia/);
+  assert.match(section, /function clearPreview\(\)[\s\S]*createPreviewMutation\.reset\(\)/);
 });
 
 runTest("unwrapPessoalEnvelope extracts data and accepts raw fallback", () => {

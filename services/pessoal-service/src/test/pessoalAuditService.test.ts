@@ -295,7 +295,7 @@ describe("PessoalAuditService", () => {
         referringId: "union-1",
         changes: {},
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(false);
 
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -326,7 +326,7 @@ describe("PessoalAuditService", () => {
         referringId: "union-1",
         changes: {},
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(false);
 
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -367,7 +367,7 @@ describe("PessoalAuditService", () => {
 
     await vi.advanceTimersByTimeAsync(25);
 
-    await expect(recordPromise).resolves.toBeUndefined();
+    await expect(recordPromise).resolves.toBe(false);
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "audit.ingest.failed",

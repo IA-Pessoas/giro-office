@@ -174,6 +174,9 @@ model Organization {
   passwordsPessoal              PasswordPessoal[]
   pessoalGroups                 PessoalGroup[]
   pessoalGroupMigrationMappings PessoalGroupMigrationMapping[]
+  pessoalGroupAssignmentPreviews PessoalGroupAssignmentPreview[]
+  pessoalGroupAssignmentConfirmations PessoalGroupAssignmentConfirmation[]
+  pessoalAuditOutboxEvents      PessoalAuditOutboxEvent[]
   payrolls                      Payroll[]
   situationsPessoal             SituationsPessoal[]
   unionsPessoal                 UnionPessoal[]
@@ -1648,6 +1651,7 @@ model Payroll {
   group           PessoalGroup? @relation(fields: [group_id], references: [id], onDelete: Restrict)
   responsible     User?         @relation(fields: [responsible_id], references: [id])
   union           UnionPessoal? @relation(fields: [union_id], references: [id], onDelete: Restrict)
+  groupAssignmentPreviewDetails PessoalGroupAssignmentPreviewDetail[]
 
   @@map("pessoal.payroll")
 }
@@ -1663,11 +1667,83 @@ model PessoalGroup {
   organization    Organization  @relation(fields: [organization_id], references: [id])
   migrationMappings PessoalGroupMigrationMapping[]
   payrolls        Payroll[]
+  assignmentPreviews PessoalGroupAssignmentPreview[]
 
   @@unique([organization_id, normalized_name], map: "uq_pessoal_group_org_normalized_name")
   @@unique([organization_id, system_key], map: "uq_pessoal_group_org_system_key")
   @@index([organization_id, archived_at, name], map: "idx_pessoal_group_org_archived_name")
   @@map("pessoal.group")
+}
+
+model PessoalGroupAssignmentPreview {
+  id              String       @id @default(uuid())
+  organization_id String
+  target_group_id String
+  fingerprint     String       @db.Char(64)
+  version         Int          @default(1)
+  totals          Json
+  expires_at      DateTime
+  applied_at      DateTime?
+  created_by_id   String
+  created_at      DateTime     @default(now())
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  targetGroup     PessoalGroup @relation(fields: [target_group_id], references: [id], onDelete: Restrict)
+  details         PessoalGroupAssignmentPreviewDetail[]
+  confirmations   PessoalGroupAssignmentConfirmation[]
+  auditOutboxEvents PessoalAuditOutboxEvent[]
+
+  @@index([organization_id, expires_at], map: "idx_pessoal_group_assignment_preview_org_expiry")
+  @@map("pessoal.group_assignment_previews")
+}
+
+model PessoalGroupAssignmentPreviewDetail {
+  id                    String                         @id @default(uuid())
+  preview_id            String
+  client_id             String
+  client_name           String?
+  payroll_id            String?
+  previous_group_id     String?
+  previous_group_name   String?
+  outcome               String
+  skip_reason           String?
+  preview               PessoalGroupAssignmentPreview @relation(fields: [preview_id], references: [id], onDelete: Cascade)
+  payroll               Payroll?                       @relation(fields: [payroll_id], references: [id], onDelete: SetNull)
+
+  @@unique([preview_id, client_id], map: "uq_pessoal_group_assignment_preview_client")
+  @@index([preview_id, outcome, id], map: "idx_pessoal_group_assignment_detail_preview_outcome")
+  @@map("pessoal.group_assignment_preview_details")
+}
+
+model PessoalGroupAssignmentConfirmation {
+  id                String                         @id @default(uuid())
+  organization_id   String
+  preview_id        String
+  idempotency_key   String                         @db.VarChar(255)
+  command_hash      String                         @db.Char(64)
+  response_snapshot Json
+  created_at        DateTime                       @default(now())
+  organization      Organization                   @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  preview           PessoalGroupAssignmentPreview @relation(fields: [preview_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, idempotency_key], map: "uq_pessoal_group_assignment_confirmation_org_idempotency_key")
+  @@index([preview_id], map: "idx_pessoal_group_assignment_confirmation_preview")
+  @@map("pessoal.group_assignment_confirmations")
+}
+
+model PessoalAuditOutboxEvent {
+  id              String                         @id @default(uuid())
+  organization_id String
+  preview_id      String
+  payload         Json
+  status          String                         @default("pending")
+  created_at      DateTime                       @default(now())
+  processed_at    DateTime?
+  organization    Organization                   @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  preview         PessoalGroupAssignmentPreview @relation(fields: [preview_id], references: [id], onDelete: Cascade)
+
+  @@index([status, created_at], map: "idx_pessoal_audit_outbox_dispatch")
+  @@index([organization_id, preview_id], map: "idx_pessoal_audit_outbox_preview")
+  @@map("pessoal.audit_outbox_events")
 }
 
 model PessoalGroupMigrationMapping {

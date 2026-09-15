@@ -136,6 +136,27 @@ describe("pessoal-service OpenAPI", () => {
     );
   });
 
+  it("documenta selecao, previa paginada e aplicacao idempotente de grupos", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const paths = spec.paths as Record<
+      string,
+      Record<string, { operationId?: string; parameters?: Array<{ name?: string }> }>
+    >;
+
+    expect(paths["/pessoal/group-assignments/eligible"]?.get?.operationId).toBe(
+      "listPessoalGroupAssignmentEligible",
+    );
+    expect(paths["/pessoal/group-assignments/previews"]?.post?.operationId).toBe(
+      "createPessoalGroupAssignmentPreview",
+    );
+    expect(paths["/pessoal/group-assignments/previews/{preview_id}"]?.get?.parameters).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "preview_id" })]),
+    );
+    expect(paths["/pessoal/group-assignments/apply"]?.post?.parameters).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Idempotency-Key" })]),
+    );
+  });
+
   it("documenta politica explicita e contadores de geracao de obrigacoes", () => {
     const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
     const components = spec.components as {

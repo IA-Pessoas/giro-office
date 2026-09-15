@@ -6,6 +6,7 @@ import {
   ClipboardList,
   KeyRound,
   Landmark,
+  ListChecks,
   UserRoundCog,
   WalletCards,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { PESSOAL_TABS } from "../services/pessoalService.contract";
 import type { PessoalClientOption, PessoalTabId } from "../types";
 import { PessoalClientSelector } from "./PessoalClientSelector";
 import { PessoalGroupsSection } from "./PessoalGroupsSection";
+import { PessoalGroupAssignmentSection } from "./PessoalGroupAssignmentSection";
 import { PessoalObligationsSection } from "./PessoalObligationsSection";
 import { PessoalOverviewSection } from "./PessoalOverviewSection";
 import { PessoalPayrollSection } from "./PessoalPayrollSection";
@@ -26,6 +28,7 @@ import { PessoalUnionsSection } from "./PessoalUnionsSection";
 const tabIcons = {
   overview: BarChart3,
   groups: Boxes,
+  groupAssignments: ListChecks,
   unions: Landmark,
   payroll: WalletCards,
   obligations: CheckSquare,
@@ -108,6 +111,8 @@ export function PessoalShell() {
         <PessoalOverviewSection onSelectTab={setActiveTab} />
       ) : activeTab === "groups" ? (
         <PessoalGroupsSection canEdit={access.canEdit} />
+      ) : activeTab === "groupAssignments" ? (
+        <PessoalGroupAssignmentSection canEdit={access.canEdit} />
       ) : activeTab === "unions" ? (
         <PessoalUnionsSection canEdit={access.canEdit} />
       ) : activeTab === "payroll" ? (
