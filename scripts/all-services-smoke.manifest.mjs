@@ -929,6 +929,14 @@ const baseManifest = [
   }),
   op({
     service: "commercial-service",
+    method: "DELETE",
+    path: "/commercial/proposal-configs/{id}",
+    action: "commercialProposalConfigDelete",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "commercial-service",
     method: "POST",
     path: "/commercial/proposal-configs",
     action: "commercialProposalConfigCreateInvalid",

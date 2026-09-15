@@ -43,6 +43,7 @@ runTest("commercial catalog has a tenant-scoped CRUD contract and admin surface"
   const service = read("./services/commercialService.ts");
   const hooks = read("./hooks/useCommercialProposalConfigs.ts");
   const catalog = read("./components/CommercialCatalog.tsx");
+  const browserSmoke = read("./run-commercial-browser-smoke.mjs");
   const page = read("../../pages/comercial/index.tsx");
 
   assert.match(contract, /proposalConfigs:\s*["']\/commercial\/proposal-configs["']/);
@@ -50,10 +51,16 @@ runTest("commercial catalog has a tenant-scoped CRUD contract and admin surface"
   assert.match(service, /listProposalConfigs/);
   assert.match(service, /createProposalConfig/);
   assert.match(service, /updateProposalConfig/);
+  assert.match(service, /deleteProposalConfig/);
   assert.match(hooks, /useMutation/);
+  assert.match(hooks, /useDeleteCommercialProposalConfig/);
   assert.match(catalog, /useModuleAccess\("comercial"\)/);
   assert.match(catalog, /Catálogo de propostas/);
   assert.match(catalog, /Valor base do contrato/);
+  assert.match(catalog, /Excluir configuração/);
+  assert.match(catalog, /window\.confirm/);
+  assert.match(browserSmoke, /request\.method === "DELETE"/);
+  assert.match(browserSmoke, /02-commercial-config-deleted\.png/);
   assert.match(page, /CommercialCatalog/);
 });
 

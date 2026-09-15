@@ -4,6 +4,7 @@ import type {
   CommercialProspecting,
   CommercialProspectingClient,
   CommercialProposalConfig,
+  DeleteCommercialProposalConfigResult,
   CommercialSuccessEnvelope,
   CommercialTaskBilling,
   CreateCommercialProposalConfigPayload,
@@ -44,6 +45,14 @@ export const commercialService = {
       payload,
     );
     return unwrapCommercialEnvelope<CommercialProposalConfig>(response.data);
+  },
+
+  async deleteProposalConfig(id: string): Promise<DeleteCommercialProposalConfigResult> {
+    const api = setupAPIClient();
+    const response = await api.delete<
+      CommercialSuccessEnvelope<DeleteCommercialProposalConfigResult>
+    >(COMMERCIAL_ENDPOINTS.proposalConfig(id));
+    return unwrapCommercialEnvelope<DeleteCommercialProposalConfigResult>(response.data);
   },
 
   async listProspectingClients(): Promise<CommercialProspectingClient[]> {
