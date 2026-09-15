@@ -24,12 +24,13 @@ pnpm --filter @workspace/commercial-service test
 ## Contrato público
 
 O gateway publica o serviço sob `/commercial` e exige a permissão de módulo `comercial`.
-Leitura exige nível 1; criação, edição e arquivamento exigem nível 2.
+Leitura exige nível 1; criação, edição, exclusão e arquivamento exigem nível 2.
 
 - `GET /commercial/proposal-configs`
 - `GET /commercial/proposal-configs/:id`
 - `POST /commercial/proposal-configs`
 - `PATCH /commercial/proposal-configs/:id`
+- `DELETE /commercial/proposal-configs/:id` (exclusão condicionada à ausência de referências)
 - `GET /commercial/prospecting/clients`
 - `GET /commercial/prospecting`
 - `GET /commercial/prospecting/:id`
