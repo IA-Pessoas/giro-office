@@ -2,6 +2,7 @@ import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreatePayrollBody, UpdatePayrollBody } from "../schemas/payroll.schemas.js";
+import { normalizePessoalGroupName } from "./groupService.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
 import { ensurePessoalResponsible } from "./pessoalResponsibleService.js";
 import {
@@ -22,7 +23,15 @@ const payrollSelect = {
   info: true,
   previous: true,
   onvio: true,
-  group: true,
+  group_id: true,
+  legacy_group: true,
+  group: {
+    select: {
+      id: true,
+      name: true,
+      archived_at: true,
+    },
+  },
   vt: true,
   vt_value: true,
   vt_type: true,
@@ -47,7 +56,13 @@ export type PayrollRecord = {
   info: string;
   previous: boolean;
   onvio: boolean;
-  group: string;
+  group_id: string | null;
+  legacy_group: string | null;
+  group: {
+    id: string;
+    name: string;
+    archived_at: Date | null;
+  } | null;
   vt: boolean;
   vt_value: number | null;
   vt_type: string | null;
@@ -72,7 +87,7 @@ export class PayrollService {
     try {
       requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
-      await this.ensureRelationships(context.organizationId, body);
+      const groupId = await this.ensureRelationships(context.organizationId, body, undefined, true);
 
       const existing = await this.prisma.payroll.findFirst({
         where: { client_id: body.client_id, organization_id: context.organizationId },
@@ -82,9 +97,11 @@ export class PayrollService {
         throw new ServiceError(409, "Folha de pessoal ja cadastrada para o cliente.");
       }
 
+      const { group: _legacyGroup, group_id: _groupId, ...payrollData } = body;
       const created = await this.prisma.payroll.create({
         data: {
-          ...body,
+          ...payrollData,
+          group_id: groupId,
           responsible_id: body.responsible_id ?? null,
           advance_type: body.advance_type ?? null,
           advance_amount: body.advance_amount ?? null,
@@ -144,7 +161,7 @@ export class PayrollService {
         throw new ServiceError(404, "Folha de pessoal nao encontrada.");
       }
 
-      await this.ensureRelationships(
+      const groupId = await this.ensureRelationships(
         context.organizationId,
         { ...body, client_id: clientId },
         existing.responsible_id,
@@ -158,7 +175,7 @@ export class PayrollService {
         info: body.info,
         previous: body.previous,
         onvio: body.onvio,
-        group: body.group,
+        group_id: groupId,
         vt: body.vt,
         vt_value: body.vt_value,
         vt_type: body.vt_type,
@@ -201,7 +218,8 @@ export class PayrollService {
     organizationId: string,
     body: Partial<CreatePayrollBody> & { client_id: string },
     currentResponsibleId?: string | null,
-  ): Promise<void> {
+    requireGroup = false,
+  ): Promise<string | undefined> {
     const client = await this.prisma.client.findFirst({
       where: { id: body.client_id, organization_id: organizationId },
       select: { id: true },
@@ -226,5 +244,32 @@ export class PayrollService {
         throw new ServiceError(404, "Sindicato nao encontrado para a organizacao.");
       }
     }
+
+    if (!body.group_id && !body.group) {
+      if (requireGroup) {
+        throw new ServiceError(400, "Informe group_id para a folha de pessoal.");
+      }
+      return undefined;
+    }
+
+    const group = await this.prisma.pessoalGroup.findFirst({
+      where: body.group_id
+        ? {
+            id: body.group_id,
+            organization_id: organizationId,
+            archived_at: null,
+          }
+        : {
+            organization_id: organizationId,
+            normalized_name: normalizePessoalGroupName(body.group ?? ""),
+            archived_at: null,
+          },
+      select: { id: true },
+    });
+    if (!group) {
+      throw new ServiceError(409, "Grupo de pessoal inexistente ou arquivado.");
+    }
+
+    return group.id;
   }
 }

@@ -5,6 +5,9 @@ export const PESSOAL_ENDPOINTS = {
   ldd: "/pessoal/ldd",
   lddDetail: (id: string) => `/pessoal/ldd/${id}`,
   overview: "/pessoal/overview",
+  groups: "/pessoal/groups",
+  groupDetail: (id: string) => `/pessoal/groups/${id}`,
+  groupReactivate: (id: string) => `/pessoal/groups/${id}/reactivate`,
   situations: "/pessoal/situations",
   situationDetail: (id: string) => `/pessoal/situations/${id}`,
   unions: "/pessoal/unions",
@@ -21,6 +24,7 @@ export const PESSOAL_ENDPOINTS = {
 
 export const PESSOAL_TABS: PessoalTab[] = [
   { id: "overview", label: "Visao geral" },
+  { id: "groups", label: "Grupos" },
   { id: "unions", label: "Sindicatos" },
   { id: "payroll", label: "Folha" },
   { id: "obligations", label: "Obrigações" },

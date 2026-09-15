@@ -16,6 +16,7 @@ import { requestContext } from "./middlewares/requestContext.js";
 import { buildPessoalServiceOpenApiSpec } from "./openapi/spec.js";
 import { prismaClient } from "./prisma/index.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
+import { createGroupRoutes } from "./routes/group.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createLddRoutes } from "./routes/ldd.routes.js";
 import { createObligationRoutes } from "./routes/obligation.routes.js";
@@ -25,6 +26,7 @@ import { createPessoalOverviewRoutes } from "./routes/pessoalOverview.routes.js"
 import { createSituationRoutes } from "./routes/situation.routes.js";
 import { createUnionRoutes } from "./routes/union.routes.js";
 import { createPessoalInternalNotificationRoutes } from "./routes/unionNotification.routes.js";
+import { GroupService } from "./services/groupService.js";
 import { LddService } from "./services/lddService.js";
 import { ObligationService } from "./services/obligationService.js";
 import { PasswordService } from "./services/passwordService.js";
@@ -80,6 +82,7 @@ export function createPessoalApp({
       logger,
     });
   const lddService = new LddService(prisma, domainAuditService);
+  const groupService = new GroupService(prisma, domainAuditService);
   const situationService = new SituationService(prisma, domainAuditService);
   const unionService = new UnionService(prisma, domainAuditService);
   const payrollService = new PayrollService(prisma, domainAuditService);
@@ -120,6 +123,7 @@ export function createPessoalApp({
   });
 
   app.use("/pessoal/ldd", createLddRoutes(lddService));
+  app.use("/pessoal/groups", createGroupRoutes(groupService));
   app.use(
     "/internal",
     createInternalReportingRouter({

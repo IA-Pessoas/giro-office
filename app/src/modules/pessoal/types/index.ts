@@ -1,5 +1,6 @@
 export type PessoalTabId =
   | "overview"
+  | "groups"
   | "unions"
   | "payroll"
   | "obligations"

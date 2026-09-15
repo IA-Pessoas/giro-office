@@ -172,6 +172,7 @@ model Organization {
   lddPessoal                    LddPessoal[]
   obrigationsPessoal            ObrigationsPessoal[]
   passwordsPessoal              PasswordPessoal[]
+  pessoalGroups                 PessoalGroup[]
   payrolls                      Payroll[]
   situationsPessoal             SituationsPessoal[]
   unionsPessoal                 UnionPessoal[]
@@ -1627,7 +1628,8 @@ model Payroll {
   info            String
   previous        Boolean
   onvio           Boolean
-  group           String
+  legacy_group    String?       @map("group")
+  group_id        String?
   vt              Boolean
   vt_value        Float?
   vt_type         String?
@@ -1641,10 +1643,28 @@ model Payroll {
   contact         String?
   organization_id String
   organization    Organization  @relation(fields: [organization_id], references: [id])
+  group           PessoalGroup? @relation(fields: [group_id], references: [id], onDelete: Restrict)
   responsible     User?         @relation(fields: [responsible_id], references: [id])
   union           UnionPessoal? @relation(fields: [union_id], references: [id], onDelete: Restrict)
 
   @@map("pessoal.payroll")
+}
+
+model PessoalGroup {
+  id              String        @id @default(uuid())
+  name            String
+  normalized_name String
+  policy          String?
+  system_key      String?
+  archived_at     DateTime?
+  organization_id String
+  organization    Organization  @relation(fields: [organization_id], references: [id])
+  payrolls        Payroll[]
+
+  @@unique([organization_id, normalized_name], map: "uq_pessoal_group_org_normalized_name")
+  @@unique([organization_id, system_key], map: "uq_pessoal_group_org_system_key")
+  @@index([organization_id, archived_at, name], map: "idx_pessoal_group_org_archived_name")
+  @@map("pessoal.group")
 }
 
 model ObrigationsPessoal {
