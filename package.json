@@ -48,7 +48,7 @@
     "security:pnpm": "node scripts/pnpm-security-policy.mjs --root .",
     "security:pnpm:fixtures": "node --test scripts/pnpm-security-policy-fixtures.test.mjs",
     "security:rulesets": "node scripts/github-ruleset-policy.mjs --policy .github/security/rulesets-policy.json --actual scripts/fixtures/rulesets/approved.json",
-    "migration:test": "node --test scripts/migration-v2-build-load.test.mjs scripts/migration-v2-phase1-load.test.mjs scripts/migration-v2-phase2-load.test.mjs scripts/migration-v3-docs.test.mjs scripts/fix-rh-request-requesters.test.mjs scripts/commercial-backfill-reconciliation.test.mjs"
+    "migration:test": "node --test scripts/migration-v2-build-load.test.mjs scripts/migration-v2-phase1-load.test.mjs scripts/migration-v2-phase2-load.test.mjs scripts/migration-v3-docs.test.mjs scripts/fix-rh-request-requesters.test.mjs scripts/commercial-backfill-reconciliation.test.mjs scripts/migrate-pessoal-groups.test.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.5",
