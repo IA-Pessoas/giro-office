@@ -93,6 +93,19 @@ describe("payroll routes", () => {
     expect(service.update).not.toHaveBeenCalled();
   });
 
+  it("exige group_id em alteracoes", async () => {
+    const service = { update: vi.fn() };
+    const app = createRouteTestApp("/pessoal/payroll", createPayrollRoutes(service as never));
+
+    const response = await request(app)
+      .patch(`/pessoal/payroll/${clientId}`)
+      .set(gatewayHeaders())
+      .send({ info: "Novo prazo" });
+
+    expect(response.status).toBe(400);
+    expect(service.update).not.toHaveBeenCalled();
+  });
+
   it("rejeita o grupo textual legado antes do service", async () => {
     const service = { create: vi.fn(), update: vi.fn() };
     const app = createRouteTestApp("/pessoal/payroll", createPayrollRoutes(service as never));
