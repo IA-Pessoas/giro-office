@@ -1,18 +1,23 @@
-# Migração do catálogo de grupos de Pessoal
+# Rollout final do catálogo de grupos de Pessoal
 
-O script `scripts/migrate-pessoal-groups.mjs` transfere a referência canônica
-das folhas de `pessoal.payroll.group` para `pessoal.payroll.group_id` sem
-alterar o texto legado.
+O contrato final de `pessoal.payroll` usa exclusivamente `group_id`. O campo
+textual anterior é removido pela migration
+`20260916000000_finalize_pessoal_payroll_group_id`; não há escrita dupla nem
+fallback em API, frontend ou relatórios.
 
-## Pré-requisitos
+## Ordem obrigatória
 
-- As migrations do Prisma, inclusive `pessoal.group_migration_mapping`, foram
-  aplicadas no ambiente alvo.
-- `DATABASE_URL` e `MIGRATION_ORGANIZATION_ID` apontam para a organização a
-  migrar.
-- O operador informado existe na organização e possui Pessoal nível 2.
+1. Aplique as migrations de catálogo, mapeamento e snapshots de obrigações.
+2. Execute o dry-run de `scripts/migrate-pessoal-groups.mjs` para cada
+   organização alvo.
+3. Resolva toda a quarentena por decisão explícita e repita o dry-run até que
+   `unassignedPayrolls` e `quarantinedPayrolls` sejam zero.
+4. Aplique a migration final do Prisma. Ela falha sem alterar o schema se
+   encontrar folha sem `group_id`, grupo de outra organização, `Sem Movimento`
+   com política incorreta ou snapshot de obrigação sem grupo histórico.
+5. Execute os testes, typechecks e smoke do Pessoal antes de liberar a versão.
 
-## Dry-run
+## Dry-run e resolução
 
 ```bash
 MIGRATION_ORGANIZATION_ID=<organizacao> \
@@ -20,39 +25,42 @@ DATABASE_URL=<database-url> \
 node scripts/migrate-pessoal-groups.mjs
 ```
 
-O comando não escreve no banco. Ele gera, em `MIGRATION_OUT_DIR` (ou em
-`/tmp/giro-office-pessoal-group-migration`), o plano, a quarentena e o
-manifesto. Valores vazios, sem grupo, ambíguos, associados a grupo arquivado e
-qualquer correspondência automática com `Sem Movimento` ficam em quarentena.
+O dry-run não escreve no banco e gera plano, quarentena e manifesto em
+`MIGRATION_OUT_DIR` (por padrão,
+`/tmp/giro-office-pessoal-group-migration`). Valores vazios, ambíguos,
+associados a grupo arquivado ou candidatos a `Sem Movimento` exigem decisão
+explícita. O utilitário é somente uma etapa pré-deploy: depois da migration
+final, a coluna textual não existe mais.
 
-## Resolver a quarentena
-
-Mapeie para um grupo ativo existente:
+Mapeie um valor para grupo ativo existente:
 
 ```bash
 MIGRATION_ORGANIZATION_ID=<organizacao> DATABASE_URL=<database-url> \
 node scripts/migrate-pessoal-groups.mjs --apply \
-  --actor-id=<operador> --map-existing='Grupo legado' --group-id=<grupo>
+  --actor-id=<operador> --map-existing='Grupo anterior' --group-id=<grupo>
 ```
 
-Ou crie um grupo e registre a decisão no mesmo passo:
+Ou registre a criação de um grupo canônico:
 
 ```bash
 MIGRATION_ORGANIZATION_ID=<organizacao> DATABASE_URL=<database-url> \
 node scripts/migrate-pessoal-groups.mjs --apply \
-  --actor-id=<operador> --create-group='Grupo legado' \
+  --actor-id=<operador> --create-group='Grupo anterior' \
   --create-group-name='Grupo canônico'
 ```
 
-Cada decisão guarda valor bruto, valor normalizado, grupo escolhido, operador,
-data e tipo de resolução em `pessoal.group_migration_mapping`. O comando gera
-um novo dry-run após a decisão e só então escreve `group_id` para itens prontos.
+Cada decisão fica auditável em `pessoal.group_migration_mapping` com operador,
+data e tipo de resolução. `Sem Movimento` nunca é um fallback automático; seu
+bootstrap usa a política `NO_OBLIGATIONS`. Grupos arquivados seguem legíveis
+como histórico, e obrigações preservam o snapshot da competência.
 
-## Garantias
+## Rastreabilidade do milestone
 
-- Não há fallback automático para `Sem Movimento`.
-- `group_id` só é escrito para correspondência canônica segura ou decisão
-  explícita registrada.
-- O texto legado em `pessoal.payroll.group` não é apagado nem regravado.
-- Ao final, qualquer folha sem `group_id` permanece listada na quarentena;
-  qualquer folha pronta que não tenha sido atualizada interrompe a transação.
+| Issue | Entrega concluída |
+| --- | --- |
+| #1081 | Catálogo canônico e referência `group_id` |
+| #1082 | Dry-run, quarentena e mapeamento explícito |
+| #1083 | Política e snapshot histórico de obrigações |
+| #1084 | Atribuição em lote idempotente com prévia |
+| #1085 | Relatórios e presets de Pessoal |
+| #1086 | Remoção do contrato textual e guarda final de rollout |

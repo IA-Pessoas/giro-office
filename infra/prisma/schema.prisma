@@ -1633,8 +1633,7 @@ model Payroll {
   info            String
   previous        Boolean
   onvio           Boolean
-  legacy_group    String?       @map("group")
-  group_id        String?
+  group_id        String
   vt              Boolean
   vt_value        Float?
   vt_type         String?
@@ -1648,7 +1647,7 @@ model Payroll {
   contact         String?
   organization_id String
   organization    Organization  @relation(fields: [organization_id], references: [id])
-  group           PessoalGroup? @relation(fields: [group_id], references: [id], onDelete: Restrict)
+  group           PessoalGroup  @relation(fields: [group_id], references: [id], onDelete: Restrict)
   responsible     User?         @relation(fields: [responsible_id], references: [id])
   union           UnionPessoal? @relation(fields: [union_id], references: [id], onDelete: Restrict)
   groupAssignmentPreviewDetails PessoalGroupAssignmentPreviewDetail[]

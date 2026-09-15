@@ -534,7 +534,7 @@ runTest("payroll section binds the clarified labels to rendered payroll controls
   );
   assert.match(payroll, /htmlFor="payroll-group_id"/);
   assert.match(payroll, /usePessoalGroups/);
-  assert.match(payroll, /Grupo legado:/);
+  assert.doesNotMatch(payroll, /legacy_group|Grupo legado:/);
   assert.match(
     payroll,
     /\{numberFields\.map\(\(field\) => \([\s\S]*?htmlFor=\{`payroll-\$\{field\.name\}`\}[\s\S]*?<input[\s\S]*?id=\{`payroll-\$\{field\.name\}`\}/,

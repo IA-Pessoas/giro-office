@@ -43,7 +43,9 @@ Exemplos de paths publicos planejados:
 `/pessoal/groups` mantém o catálogo por organização. Leitura requer permissão Pessoal 1;
 criação, edição, arquivamento e reativação requerem Pessoal 2. O grupo sistêmico `Sem Movimento`
 é criado sob demanda com a política `NO_OBLIGATIONS`. Arquivamento preserva vínculos históricos de
-folha; apenas grupos ativos podem receber uma nova atribuição.
+folha; apenas grupos ativos podem receber uma nova atribuição. Toda folha usa `group_id` canônico;
+o contrato textual anterior não é aceito. Uma folha ligada a grupo arquivado continua legível como
+histórico, mas precisa receber um grupo ativo antes de ser alterada.
 
 ## Rotinas internas
 

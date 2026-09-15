@@ -227,7 +227,6 @@ const createPayrollRequestSchema = strictObjectSchema(
     previous: { type: "boolean" },
     onvio: { type: "boolean" },
     group_id: uuidSchema,
-    group: { ...textSchema, deprecated: true },
     vt: { type: "boolean" },
     vt_value: nullableNonNegativeNumberSchema,
     vt_type: nullableTextSchema,
@@ -257,28 +256,30 @@ const createPayrollRequestSchema = strictObjectSchema(
   ],
 );
 
-const updatePayrollRequestSchema = strictObjectSchema({
-  responsible_id: { ...uuidSchema, nullable: true },
-  advance: { type: "boolean" },
-  advance_type: nullableTextSchema,
-  advance_amount: nullableNonNegativeNumberSchema,
-  info: textSchema,
-  previous: { type: "boolean" },
-  onvio: { type: "boolean" },
-  group_id: uuidSchema,
-  group: { ...textSchema, deprecated: true },
-  vt: { type: "boolean" },
-  vt_value: nullableNonNegativeNumberSchema,
-  vt_type: nullableTextSchema,
-  va: { type: "boolean" },
-  assistance_fee: { type: "boolean" },
-  union_id: { ...uuidSchema, nullable: true },
-  bem_mais: { type: "boolean" },
-  bsf: { type: "boolean" },
-  reinf: { type: "boolean" },
-  employees: { type: "integer", minimum: 0 },
-  contact: nullableTextSchema,
-});
+const updatePayrollRequestSchema = strictObjectSchema(
+  {
+    responsible_id: { ...uuidSchema, nullable: true },
+    advance: { type: "boolean" },
+    advance_type: nullableTextSchema,
+    advance_amount: nullableNonNegativeNumberSchema,
+    info: textSchema,
+    previous: { type: "boolean" },
+    onvio: { type: "boolean" },
+    group_id: uuidSchema,
+    vt: { type: "boolean" },
+    vt_value: nullableNonNegativeNumberSchema,
+    vt_type: nullableTextSchema,
+    va: { type: "boolean" },
+    assistance_fee: { type: "boolean" },
+    union_id: { ...uuidSchema, nullable: true },
+    bem_mais: { type: "boolean" },
+    bsf: { type: "boolean" },
+    reinf: { type: "boolean" },
+    employees: { type: "integer", minimum: 0 },
+    contact: nullableTextSchema,
+  },
+  ["group_id"],
+);
 
 const groupAssignmentPreviewRequestSchema = strictObjectSchema(
   {

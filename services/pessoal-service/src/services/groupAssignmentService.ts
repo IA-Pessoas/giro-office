@@ -383,6 +383,7 @@ export class GroupAssignmentService {
           const client = clientsById.get(detail.client_id);
           const payroll = payrollsByClientId.get(detail.client_id);
           if (
+            detail.previous_group_id === null ||
             !client ||
             client.status !== ACTIVE_CLIENT_STATUS ||
             client.pessoal !== true ||
@@ -393,7 +394,10 @@ export class GroupAssignmentService {
             throw new ServiceError(409, "Previa obsoleta. Gere uma nova previa.");
           }
         }
-        for (const detail of actionable.filter((item) => item.outcome === OUTCOME_CHANGED)) {
+        for (const detail of actionable) {
+          if (detail.outcome !== OUTCOME_CHANGED) continue;
+          if (detail.previous_group_id === null)
+            throw new ServiceError(409, "Previa obsoleta. Gere uma nova previa.");
           const changed = await tx.payroll.updateMany({
             where: {
               id: detail.payroll_id ?? "",

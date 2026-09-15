@@ -71,7 +71,7 @@ describe("pessoal internal reporting service", () => {
     });
   });
 
-  it("enriquece a ficha permanente com nomes legíveis e estados distintos de grupo", async () => {
+  it("enriquece a ficha permanente somente pelo grupo canônico", async () => {
     const payrollFindMany = vi.fn().mockResolvedValue([
       {
         advance: true,
@@ -83,7 +83,7 @@ describe("pessoal internal reporting service", () => {
       },
       {
         advance: false,
-        client: { name: "Cliente em quarentena" },
+        client: { name: "Cliente sem grupo canônico" },
         responsible: null,
         union: null,
         group: null,
@@ -135,11 +135,11 @@ describe("pessoal internal reporting service", () => {
           advance: true,
         },
         {
-          client_name: "Cliente em quarentena",
+          client_name: "Cliente sem grupo canônico",
           responsible_name: null,
           union_name: null,
-          group_name: "Grupo legado sem mapa",
-          group_state: "QUARENTENA",
+          group_name: null,
+          group_state: "SEM_GRUPO",
           advance: false,
         },
         {

@@ -1,8 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { CreatePayrollBody, UpdatePayrollBody } from "../schemas/payroll.schemas.js";
-import { normalizePessoalGroupName } from "./groupService.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
 import { ensurePessoalResponsible } from "./pessoalResponsibleService.js";
 import {
@@ -24,7 +23,6 @@ const payrollSelect = {
   previous: true,
   onvio: true,
   group_id: true,
-  legacy_group: true,
   group: {
     select: {
       id: true,
@@ -44,7 +42,7 @@ const payrollSelect = {
   employees: true,
   contact: true,
   organization_id: true,
-} as const;
+} as const satisfies Prisma.PayrollSelect;
 
 export type PayrollRecord = {
   id: string;
@@ -56,13 +54,12 @@ export type PayrollRecord = {
   info: string;
   previous: boolean;
   onvio: boolean;
-  group_id: string | null;
-  legacy_group: string | null;
+  group_id: string;
   group: {
     id: string;
     name: string;
     archived_at: Date | null;
-  } | null;
+  };
   vt: boolean;
   vt_value: number | null;
   vt_type: string | null;
@@ -87,7 +84,7 @@ export class PayrollService {
     try {
       requireMinimumPermission(context, PESSOAL_WRITE_PERMISSION);
       const userId = requireUserId(context);
-      const groupId = await this.ensureRelationships(context.organizationId, body, undefined, true);
+      const groupId = await this.ensureRelationships(context.organizationId, body, undefined);
 
       const existing = await this.prisma.payroll.findFirst({
         where: { client_id: body.client_id, organization_id: context.organizationId },
@@ -97,7 +94,7 @@ export class PayrollService {
         throw new ServiceError(409, "Folha de pessoal ja cadastrada para o cliente.");
       }
 
-      const { group: _legacyGroup, group_id: _groupId, ...payrollData } = body;
+      const { group_id: _groupId, ...payrollData } = body;
       const created = await this.prisma.payroll.create({
         data: {
           ...payrollData,
@@ -216,10 +213,10 @@ export class PayrollService {
 
   private async ensureRelationships(
     organizationId: string,
-    body: Partial<CreatePayrollBody> & { client_id: string },
+    body: Pick<CreatePayrollBody, "client_id" | "group_id"> &
+      Partial<Pick<CreatePayrollBody, "responsible_id" | "union_id">>,
     currentResponsibleId?: string | null,
-    requireGroup = false,
-  ): Promise<string | undefined> {
+  ): Promise<string> {
     const client = await this.prisma.client.findFirst({
       where: { id: body.client_id, organization_id: organizationId },
       select: { id: true },
@@ -245,25 +242,12 @@ export class PayrollService {
       }
     }
 
-    if (!body.group_id && !body.group) {
-      if (requireGroup) {
-        throw new ServiceError(400, "Informe group_id para a folha de pessoal.");
-      }
-      return undefined;
-    }
-
     const group = await this.prisma.pessoalGroup.findFirst({
-      where: body.group_id
-        ? {
-            id: body.group_id,
-            organization_id: organizationId,
-            archived_at: null,
-          }
-        : {
-            organization_id: organizationId,
-            normalized_name: normalizePessoalGroupName(body.group ?? ""),
-            archived_at: null,
-          },
+      where: {
+        id: body.group_id,
+        organization_id: organizationId,
+        archived_at: null,
+      },
       select: { id: true },
     });
     if (!group) {
