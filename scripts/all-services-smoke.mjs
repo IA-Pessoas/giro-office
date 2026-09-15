@@ -3533,6 +3533,13 @@ const handlers = {
     });
   },
 
+  async commercialProposalConfigDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/proposal-configs/${requireState("commercialProposalConfigId")}`,
+    });
+  },
+
   async commercialProspectingClientList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },

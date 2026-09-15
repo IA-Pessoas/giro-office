@@ -19,6 +19,7 @@ function createMockPrisma(): CommercialProposalConfigPrismaDeps {
       findFirst: vi.fn(async () => null),
       findMany: vi.fn(async () => []),
       create: vi.fn(async () => ({})),
+      deleteMany: vi.fn(async () => ({ count: 1 })),
       update: vi.fn(async () => ({})),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
@@ -127,6 +128,69 @@ describe("CommercialProposalConfigService", () => {
         orderBy: { name: "asc" },
       }),
     );
+  });
+
+  it("exclui configuração somente dentro da organização e registra auditoria", async () => {
+    const prisma = createMockPrisma();
+    const audit = createAuditMock();
+    const service = new CommercialProposalConfigService(prisma, audit);
+
+    await expect(
+      service.delete({
+        user_id: USER_ID,
+        organization_id: ORGANIZATION_ID,
+        config_id: CONFIG_ID,
+      }),
+    ).resolves.toEqual({ id: CONFIG_ID, deleted: true });
+
+    expect(prisma.proposalConfig.deleteMany).toHaveBeenCalledWith({
+      where: { id: CONFIG_ID, organization_id: ORGANIZATION_ID },
+    });
+    expect(audit.createLog).toHaveBeenCalledWith({
+      userId: USER_ID,
+      organizationId: ORGANIZATION_ID,
+      action: "Exclusão",
+      referring: "proposal.config",
+      referringId: CONFIG_ID,
+      changes: {},
+    });
+  });
+
+  it("retorna conflito quando referência persistida impede exclusão", async () => {
+    const prisma = createMockPrisma();
+    prisma.proposalConfig.deleteMany = vi.fn(async () => {
+      throw { code: "P2003" };
+    });
+    const audit = createAuditMock();
+    const service = new CommercialProposalConfigService(prisma, audit);
+
+    await expect(
+      service.delete({
+        user_id: USER_ID,
+        organization_id: ORGANIZATION_ID,
+        config_id: CONFIG_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(audit.createLog).not.toHaveBeenCalled();
+  });
+
+  it("retorna 404 sem revelar configuração de outra organização", async () => {
+    const prisma = createMockPrisma();
+    prisma.proposalConfig.deleteMany = vi.fn(async () => ({ count: 0 }));
+    const audit = createAuditMock();
+    const service = new CommercialProposalConfigService(prisma, audit);
+
+    await expect(
+      service.delete({
+        user_id: USER_ID,
+        organization_id: OTHER_ORGANIZATION_ID,
+        config_id: CONFIG_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.proposalConfig.deleteMany).toHaveBeenCalledWith({
+      where: { id: CONFIG_ID, organization_id: OTHER_ORGANIZATION_ID },
+    });
+    expect(audit.createLog).not.toHaveBeenCalled();
   });
 
   it("atualiza somente dentro da organização autenticada", async () => {

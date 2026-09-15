@@ -215,6 +215,19 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
             "409": { description: "Nome duplicado." },
           },
         },
+        delete: {
+          tags: ["Commercial"],
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": successResponse,
+            "401": { description: "Não autenticado." },
+            "404": { description: "Não encontrado." },
+            "409": { description: "Configuração possui referências." },
+          },
+        },
       },
       "/commercial/prospecting/clients": {
         get: {

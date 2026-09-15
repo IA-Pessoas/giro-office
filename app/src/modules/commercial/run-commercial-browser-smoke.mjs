@@ -62,6 +62,11 @@ const client = {
   company_name: "Empresa Smoke",
   fantasy_name: "Smoke Ltda.",
 };
+const proposalConfig = {
+  id: "c0000000-0000-4000-8000-000000000001",
+  name: "Configuração Smoke",
+  contract_value: 1800,
+};
 const prospecting = {
   id: "d0000000-0000-4000-8000-000000000001",
   client_id: client.id,
@@ -159,14 +164,20 @@ function createUserUpstream() {
 
 function createCommercialUpstream() {
   const state = {
+    proposalConfigs: [proposalConfig],
     prospectingList: [],
     taskBillingList: [taskBilling],
   };
 
   const upstream = startServer((request, response) => {
     const pathname = new URL(request.url || "/", "http://commercial-smoke").pathname;
-    if (pathname === "/commercial/proposal-configs") {
-      respondJson(response, []);
+    if (pathname === "/commercial/proposal-configs" && request.method === "GET") {
+      respondJson(response, state.proposalConfigs);
+      return;
+    }
+    if (pathname.startsWith("/commercial/proposal-configs/") && request.method === "DELETE") {
+      state.proposalConfigs = state.proposalConfigs.filter((item) => item.id !== pathname.split("/").pop());
+      respondJson(response, { id: pathname.split("/").pop(), deleted: true });
       return;
     }
     if (pathname === "/commercial/prospecting/clients") {
@@ -266,6 +277,10 @@ async function assertCommercialAccessMatrix(browser) {
           profile.canEdit ? 1 : 0,
         );
         assert.equal(
+          await page.getByRole("button", { name: `Excluir configuração ${proposalConfig.name}`, exact: true }).count(),
+          profile.canEdit ? 1 : 0,
+        );
+        assert.equal(
           await page.getByText("Acesso somente leitura.", { exact: true }).count(),
           profile.canEdit ? 0 : 1,
         );
@@ -296,22 +311,47 @@ async function run() {
     await assertCommercialAccessMatrix(browser);
     await page.goto("/comercial", { waitUntil: "networkidle" });
     try {
-      await page.getByRole("heading", { name: "Prospecção" }).waitFor({ timeout: 10_000 });
+    await page.getByRole("heading", { name: "Prospecção" }).waitFor({ timeout: 10_000 });
     } catch (error) {
       throw new Error(`Comercial não renderizou: url=${page.url()} body=${(await page.locator("body").innerText()).slice(0, 1200)} requests=${requests.join(" | ")} console=${consoleErrors.join(" | ")} page=${pageErrors.join(" | ")}`, { cause: error });
     }
     await page.screenshot({ path: `${evidenceDir}/01-commercial-desktop-light.png`, fullPage: true });
 
+    const deleteConfigButton = page.getByRole("button", {
+      name: `Excluir configuração ${proposalConfig.name}`,
+      exact: true,
+    });
+    await deleteConfigButton.waitFor();
+    const deleteResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().includes(`/commercial/proposal-configs/${proposalConfig.id}`),
+    );
+    page.once("dialog", (dialog) => {
+      assert.equal(dialog.type(), "confirm");
+      assert.equal(dialog.message(), `Excluir a configuração "${proposalConfig.name}"?`);
+      void dialog.accept();
+    });
+    await deleteConfigButton.click();
+    const deleteResponse = await deleteResponsePromise;
+    assert.equal(deleteResponse.status(), 200);
+    assert.deepEqual(await deleteResponse.json(), {
+      success: true,
+      data: { id: proposalConfig.id, deleted: true },
+    });
+    await page.getByRole("heading", { name: "Nenhuma configuração cadastrada" }).waitFor();
+    await page.screenshot({ path: `${evidenceDir}/02-commercial-config-deleted.png`, fullPage: true });
+
     await page.getByRole("button", { name: "Nova prospecção" }).click();
     const clientSelect = page.locator('form[aria-label="Nova prospecção"] select').first();
     await clientSelect.focus();
     assert.equal(await page.evaluate(() => document.activeElement?.tagName), "SELECT");
-    await page.screenshot({ path: `${evidenceDir}/02-commercial-form-focus.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/03-commercial-form-focus.png`, fullPage: true });
     await clientSelect.selectOption(client.id);
     await page.getByLabel("Descrição").fill("Retorno na próxima semana");
     await page.getByRole("button", { name: "Salvar" }).click();
     await page.getByText("Análise Financeira").last().waitFor();
-    await page.screenshot({ path: `${evidenceDir}/03-commercial-saved-light.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/04-commercial-saved-light.png`, fullPage: true });
     await page.getByRole("button", { name: "Nova prospecção" }).click();
     await page.getByRole("form", { name: "Nova prospecção" }).waitFor();
     await page.getByRole("button", { name: "Cancelar" }).last().click();
@@ -324,7 +364,7 @@ async function run() {
     await page.getByText("Cobrança confirmada", { exact: true }).waitFor();
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({ path: `${evidenceDir}/04-commercial-mobile-light.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/05-commercial-mobile-light.png`, fullPage: true });
     await page.evaluate(() => window.localStorage.setItem("workspace-theme", "dark"));
     await page.reload({ waitUntil: "networkidle" });
     await page.getByRole("heading", { name: "Catálogo de propostas" }).waitFor();
@@ -353,7 +393,7 @@ async function run() {
     for (const evidence of [darkTextEvidence.heading, darkTextEvidence.intro, darkTextEvidence.taskBillingHeading]) {
       assert.ok(evidence.luminance >= 0.65, `Texto dark com contraste baixo: ${JSON.stringify(evidence)}`);
     }
-    await page.screenshot({ path: `${evidenceDir}/05-commercial-mobile-dark.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/06-commercial-mobile-dark.png`, fullPage: true });
     assert.deepEqual(pageErrors, []);
     assert.deepEqual(consoleErrors, []);
   } finally {
