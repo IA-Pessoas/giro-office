@@ -61,6 +61,7 @@ runTest("commercial catalog has a tenant-scoped CRUD contract and admin surface"
   assert.match(catalog, /window\.confirm/);
   assert.match(browserSmoke, /request\.method === "DELETE"/);
   assert.match(browserSmoke, /02-commercial-config-deleted\.png/);
+  assert.match(browserSmoke, /05-commercial-prospecting-archived\.png/);
   assert.match(page, /CommercialCatalog/);
 });
 
@@ -76,10 +77,14 @@ runTest("commercial prospecting uses the dedicated legacy-status contract", () =
   assert.match(service, /listProspecting/);
   assert.match(service, /createProspecting/);
   assert.match(service, /updateProspecting/);
+  assert.match(service, /archiveProspecting/);
   assert.match(hooks, /invalidateQueries/);
+  assert.match(hooks, /useArchiveCommercialProspecting/);
   assert.match(types, /COMMERCIAL_PROSPECTING_STATUSES/);
   assert.match(catalog, /Nova prospecção/);
   assert.match(catalog, /COMMERCIAL_PROSPECTING_STATUSES/);
+  assert.match(catalog, /Arquivar prospecção/);
+  assert.match(catalog, /window\.confirm/);
   assert.doesNotMatch(catalog, /client\/[^"']+\/commercial/);
 });
 

@@ -3577,6 +3577,13 @@ const handlers = {
     });
   },
 
+  async commercialProspectingArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
+    });
+  },
+
   async commercialOutboxStatus(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },

@@ -166,6 +166,7 @@ function createCommercialUpstream() {
   const state = {
     proposalConfigs: [proposalConfig],
     prospectingList: [],
+    archivedProspectingIds: new Set(),
     taskBillingList: [taskBilling],
   };
 
@@ -181,7 +182,7 @@ function createCommercialUpstream() {
       return;
     }
     if (pathname === "/commercial/prospecting/clients") {
-      respondJson(response, [client]);
+      respondJson(response, state.archivedProspectingIds.has(prospecting.id) ? [] : [client]);
       return;
     }
     if (pathname === "/commercial/prospecting" && request.method === "GET") {
@@ -199,6 +200,13 @@ function createCommercialUpstream() {
     }
     if (pathname.startsWith("/commercial/prospecting/") && request.method === "PATCH") {
       respondJson(response, { ...prospecting, status: "Envio de Proposta" });
+      return;
+    }
+    if (pathname.startsWith("/commercial/prospecting/") && request.method === "DELETE") {
+      const prospectingId = pathname.split("/").pop();
+      state.prospectingList = state.prospectingList.filter((item) => item.id !== prospectingId);
+      state.archivedProspectingIds.add(prospectingId);
+      respondJson(response, { id: prospectingId, deleted: true });
       return;
     }
     if (pathname === "/commercial/task-billing" && request.method === "GET") {
@@ -352,8 +360,41 @@ async function run() {
     await page.getByRole("button", { name: "Salvar" }).click();
     await page.getByText("Análise Financeira").last().waitFor();
     await page.screenshot({ path: `${evidenceDir}/04-commercial-saved-light.png`, fullPage: true });
+
+    const archiveProspectingButton = page.getByRole("button", {
+      name: `Arquivar prospecção ${client.fantasy_name}`,
+      exact: true,
+    });
+    await archiveProspectingButton.waitFor();
+    const archiveResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().includes(`/commercial/prospecting/${prospecting.id}`),
+    );
+    page.once("dialog", (dialog) => {
+      assert.equal(dialog.type(), "confirm");
+      assert.equal(
+        dialog.message(),
+        `Arquivar a prospecção de "${client.fantasy_name}"? O histórico será preservado.`,
+      );
+      void dialog.accept();
+    });
+    await archiveProspectingButton.click();
+    const archiveResponse = await archiveResponsePromise;
+    assert.equal(archiveResponse.status(), 200);
+    assert.deepEqual(await archiveResponse.json(), {
+      success: true,
+      data: { id: prospecting.id, deleted: true },
+    });
+    await page.getByText("Nenhuma prospecção cadastrada.", { exact: true }).waitFor();
+    await page.screenshot({ path: `${evidenceDir}/05-commercial-prospecting-archived.png`, fullPage: true });
+
     await page.getByRole("button", { name: "Nova prospecção" }).click();
     await page.getByRole("form", { name: "Nova prospecção" }).waitFor();
+    assert.equal(
+      await page.locator(`form[aria-label="Nova prospecção"] option[value="${client.id}"]`).count(),
+      0,
+    );
     await page.getByRole("button", { name: "Cancelar" }).last().click();
 
     await page.getByRole("button", { name: "Editar cobrança" }).click();
@@ -364,7 +405,7 @@ async function run() {
     await page.getByText("Cobrança confirmada", { exact: true }).waitFor();
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({ path: `${evidenceDir}/05-commercial-mobile-light.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/06-commercial-mobile-light.png`, fullPage: true });
     await page.evaluate(() => window.localStorage.setItem("workspace-theme", "dark"));
     await page.reload({ waitUntil: "networkidle" });
     await page.getByRole("heading", { name: "Catálogo de propostas" }).waitFor();
@@ -393,7 +434,7 @@ async function run() {
     for (const evidence of [darkTextEvidence.heading, darkTextEvidence.intro, darkTextEvidence.taskBillingHeading]) {
       assert.ok(evidence.luminance >= 0.65, `Texto dark com contraste baixo: ${JSON.stringify(evidence)}`);
     }
-    await page.screenshot({ path: `${evidenceDir}/06-commercial-mobile-dark.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/07-commercial-mobile-dark.png`, fullPage: true });
     assert.deepEqual(pageErrors, []);
     assert.deepEqual(consoleErrors, []);
   } finally {

@@ -13,8 +13,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createCommercialApp } from "../app.js";
 import { getCommercialServiceEnv } from "../config/env.js";
-import type { CommercialProspectingRouteDeps } from "../routes/prospecting.routes.js";
 import type { CommercialOutboxRouteDeps } from "../routes/outbox.routes.js";
+import type { CommercialProspectingRouteDeps } from "../routes/prospecting.routes.js";
 
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
 const USER_ID = "c0000000-0000-4000-8000-000000000001";
@@ -39,6 +39,7 @@ function createServiceMock(): CommercialProspectingRouteDeps {
     update: vi.fn(async () => {
       throw new Error("not used");
     }),
+    archive: vi.fn(async () => ({ id: PROSPECTING_ID, deleted: true })),
   };
 }
 
@@ -154,6 +155,45 @@ describe("commercial prospecting routes", () => {
 
     expect(response.status).toBe(409);
     expect(response.body.error).toBe("Uma prospecção fechada não pode ser reaberta.");
+  });
+
+  it("encaminha arquivamento autenticado com contexto tenantizado", async () => {
+    const service = createServiceMock();
+    const response = await request(createTestApp(service))
+      .delete(`/commercial/prospecting/${PROSPECTING_ID}`)
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: { id: PROSPECTING_ID, deleted: true },
+    });
+    expect(service.archive).toHaveBeenCalledWith({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      audit_correlation_id: expect.any(String),
+      prospecting_id: PROSPECTING_ID,
+    });
+  });
+
+  it("exige autenticação para arquivar prospecção", async () => {
+    const service = createServiceMock();
+    const response = await request(createTestApp(service)).delete(
+      `/commercial/prospecting/${PROSPECTING_ID}`,
+    );
+
+    expect(response.status).toBe(401);
+    expect(service.archive).not.toHaveBeenCalled();
+  });
+
+  it("rejeita identificador inválido antes de chamar o service", async () => {
+    const service = createServiceMock();
+    const response = await request(createTestApp(service))
+      .delete("/commercial/prospecting/not-a-uuid")
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(400);
+    expect(service.archive).not.toHaveBeenCalled();
   });
 
   it("lista clientes no tenant encaminhado", async () => {
