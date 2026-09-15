@@ -111,6 +111,18 @@ export interface UpdateCommercialProspectingRequest {
   audit_correlation_id?: string;
 }
 
+export interface ArchiveCommercialProspectingRequest {
+  user_id: string;
+  organization_id: string;
+  prospecting_id: string;
+  audit_correlation_id?: string;
+}
+
+export interface ArchiveCommercialProspectingResult {
+  id: string;
+  deleted: true;
+}
+
 export type CommercialProspectingPrismaDeps = Pick<
   typeof prismaClient,
   "commercialProspecting" | "client" | "commercialOutboxEvent" | "$transaction"
@@ -131,7 +143,7 @@ export class CommercialProspectingService {
   async list(organization_id: string): Promise<CommercialProspecting[]> {
     try {
       return await this.prisma.commercialProspecting.findMany({
-        where: { organization_id },
+        where: { organization_id, archived_at: null },
         select: PROSPECTING_SELECT,
         orderBy: [{ status: "asc" }, { updated_at: "desc" }],
       });
@@ -160,7 +172,7 @@ export class CommercialProspectingService {
   async detail(id: string, organization_id: string): Promise<CommercialProspecting> {
     try {
       const item = await this.prisma.commercialProspecting.findFirst({
-        where: { id, organization_id },
+        where: { id, organization_id, archived_at: null },
         select: PROSPECTING_SELECT,
       });
       if (!item) throw new ServiceError(404, "Prospecção comercial não encontrada.");
@@ -247,7 +259,11 @@ export class CommercialProspectingService {
       const auditCorrelationId = data.audit_correlation_id ?? eventId;
       const result = await this.prisma.$transaction(async (tx) => {
         const current = await tx.commercialProspecting.findFirst({
-          where: { id: data.prospecting_id, organization_id: data.organization_id },
+          where: {
+            id: data.prospecting_id,
+            organization_id: data.organization_id,
+            archived_at: null,
+          },
           select: PROSPECTING_SELECT,
         });
         if (!current) throw new ServiceError(404, "Prospecção comercial não encontrada.");
@@ -260,7 +276,11 @@ export class CommercialProspectingService {
         if (data.description !== undefined) updateData.description = data.description;
 
         const updateResult = await tx.commercialProspecting.updateMany({
-          where: { id: data.prospecting_id, organization_id: data.organization_id },
+          where: {
+            id: data.prospecting_id,
+            organization_id: data.organization_id,
+            archived_at: null,
+          },
           data: updateData,
         });
         if (updateResult.count !== 1) {
@@ -268,7 +288,11 @@ export class CommercialProspectingService {
         }
 
         const updated = await tx.commercialProspecting.findFirst({
-          where: { id: data.prospecting_id, organization_id: data.organization_id },
+          where: {
+            id: data.prospecting_id,
+            organization_id: data.organization_id,
+            archived_at: null,
+          },
           select: PROSPECTING_SELECT,
         });
         if (!updated) throw new ServiceError(404, "Prospecção comercial não encontrada.");
@@ -317,6 +341,47 @@ export class CommercialProspectingService {
       if (err instanceof ServiceError) throw err;
       if (isUniqueConstraintError(err)) throw new ServiceError(409, DUPLICATE_MESSAGE);
       throw new ServiceError(500, "Não foi possível atualizar a prospecção comercial.", err);
+    }
+  }
+
+  async archive(
+    data: ArchiveCommercialProspectingRequest,
+  ): Promise<ArchiveCommercialProspectingResult> {
+    try {
+      const archivedAt = new Date();
+      const result = await this.prisma.commercialProspecting.updateMany({
+        where: {
+          id: data.prospecting_id,
+          organization_id: data.organization_id,
+          archived_at: null,
+        },
+        data: { archived_at: archivedAt },
+      });
+
+      if (result.count === 1) {
+        await this.audit.createLog({
+          userId: data.user_id,
+          organizationId: data.organization_id,
+          action: "Arquivamento",
+          referring: "commercial.prospecting",
+          referringId: data.prospecting_id,
+          changes: { archived_at: archivedAt.toISOString() },
+          auditCorrelationId: data.audit_correlation_id,
+        });
+        return { id: data.prospecting_id, deleted: true };
+      }
+
+      const existing = await this.prisma.commercialProspecting.findFirst({
+        where: { id: data.prospecting_id, organization_id: data.organization_id },
+        select: { id: true, archived_at: true },
+      });
+      if (!existing) throw new ServiceError(404, "Prospecção comercial não encontrada.");
+
+      return { id: existing.id, deleted: true };
+    } catch (err: unknown) {
+      logError("Erro ao arquivar prospecção comercial", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "Não foi possível arquivar a prospecção comercial.", err);
     }
   }
 }

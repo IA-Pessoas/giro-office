@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { CircleAlert, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { Archive, CircleAlert, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
 
 import {
   useCommercialProspecting,
   useCommercialProspectingClients,
+  useArchiveCommercialProspecting,
   useCreateCommercialProspecting,
   useUpdateCommercialProspecting,
 } from "../hooks/useCommercialProspecting";
@@ -66,6 +67,7 @@ export function CommercialCatalog() {
   const updateMutation = useUpdateCommercialProposalConfig();
   const createProspectingMutation = useCreateCommercialProspecting();
   const updateProspectingMutation = useUpdateCommercialProspecting();
+  const archiveProspectingMutation = useArchiveCommercialProspecting();
   const taskBillingsQuery = useCommercialTaskBilling();
   const updateTaskBillingMutation = useUpdateCommercialTaskBilling();
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -77,6 +79,7 @@ export function CommercialCatalog() {
   const [isCreatingProspecting, setIsCreatingProspecting] = useState(false);
   const [prospectingEditingId, setProspectingEditingId] = useState<string | null>(null);
   const [prospectingFormError, setProspectingFormError] = useState("");
+  const [prospectingActionError, setProspectingActionError] = useState("");
   const [taskBillingEditingId, setTaskBillingEditingId] = useState<string | null>(null);
   const [taskBillingDraft, setTaskBillingDraft] = useState<{
     hiring_status: CommercialTaskHiringStatus;
@@ -243,6 +246,23 @@ export function CommercialCatalog() {
     }
   }
 
+  async function archiveProspecting(item: CommercialProspecting) {
+    const clientName = item.client.fantasy_name || item.client.company_name || item.client.name;
+    if (!window.confirm(`Arquivar a prospecção de "${clientName}"? O histórico será preservado.`)) {
+      return;
+    }
+
+    setProspectingActionError("");
+    try {
+      await archiveProspectingMutation.mutateAsync(item.id);
+      if (prospectingEditingId === item.id) cancelProspectingForm();
+    } catch (error) {
+      setProspectingActionError(
+        getErrorMessage(error, "Não foi possível arquivar a prospecção."),
+      );
+    }
+  }
+
   if (accessLoading) {
     return <div className="mx-auto max-w-[1200px] p-6 text-sm text-slate-500">Carregando acesso...</div>;
   }
@@ -356,7 +376,9 @@ export function CommercialCatalog() {
           </form>
         ) : null}
 
-        {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções.</div> : prospectingQuery.data?.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{item.client.fantasy_name || item.client.company_name || item.client.name}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.status}{item.description ? ` — ${item.description}` : ""}</p></div>{canEdit ? <button type="button" onClick={() => startProspectingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button> : null}</div>)}</div> : <div className="p-8 text-center text-sm text-slate-700 dark:text-slate-300">Nenhuma prospecção cadastrada.</div>}
+        {prospectingActionError ? <p className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300" role="alert">{prospectingActionError}</p> : null}
+
+        {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções.</div> : prospectingQuery.data?.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{item.client.fantasy_name || item.client.company_name || item.client.name}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.status}{item.description ? ` — ${item.description}` : ""}</p></div>{canEdit ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => startProspectingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button><button type="button" aria-label={`Arquivar prospecção ${item.client.fantasy_name || item.client.company_name || item.client.name}`} onClick={() => void archiveProspecting(item)} disabled={archiveProspectingMutation.isPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-amber-200 px-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-900/60 dark:text-amber-300 dark:hover:bg-amber-950/30"><Archive className="h-4 w-4" aria-hidden="true" />Arquivar prospecção</button></div> : null}</div>)}</div> : <div className="p-8 text-center text-sm text-slate-700 dark:text-slate-300">Nenhuma prospecção cadastrada.</div>}
       </section>
 
       <section

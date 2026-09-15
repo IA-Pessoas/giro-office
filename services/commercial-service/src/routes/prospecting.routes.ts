@@ -1,5 +1,6 @@
 import {
   createSuccessResponse,
+  error as logError,
   parseWithZod,
   requireAuthenticatedRequestContext,
 } from "@workspace/shared";
@@ -15,7 +16,7 @@ import type { CommercialProspectingService } from "../services/prospectingServic
 
 export type CommercialProspectingRouteDeps = Pick<
   CommercialProspectingService,
-  "create" | "detail" | "list" | "listClients" | "update"
+  "archive" | "create" | "detail" | "list" | "listClients" | "update"
 >;
 
 function authContext(req: Request): {
@@ -97,6 +98,23 @@ export function createProspectingRoutes(
       });
       res.json(createSuccessResponse(result));
     } catch (error) {
+      next(error);
+    }
+  });
+
+  router.delete("/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const { user_id, organization_id, audit_correlation_id } = authContext(req);
+      const { id } = parseWithZod(prospectingIdParamSchema, req.params);
+      const result = await service.archive({
+        user_id,
+        organization_id,
+        audit_correlation_id,
+        prospecting_id: id,
+      });
+      res.json(createSuccessResponse(result));
+    } catch (error) {
+      logError("Erro na rota de arquivamento de prospecção comercial", { err: error });
       next(error);
     }
   });

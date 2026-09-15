@@ -36,3 +36,17 @@ export function useUpdateCommercialProspecting() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospecting() }),
   });
 }
+
+export function useArchiveCommercialProspecting() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => commercialService.archiveProspecting(id),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospecting() }),
+        queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospectingClients() }),
+      ]);
+    },
+  });
+}

@@ -287,6 +287,19 @@ export function buildCommercialServiceOpenApiSpec(env: CommercialServiceEnv): Op
             "409": { description: "Transição inválida." },
           },
         },
+        delete: {
+          tags: ["Commercial"],
+          summary: "Arquivar prospecção comercial sem excluir histórico",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": successResponse,
+            "401": { description: "Não autenticado." },
+            "404": { description: "Não encontrado." },
+          },
+        },
       },
       "/commercial/outbox/status": {
         get: {

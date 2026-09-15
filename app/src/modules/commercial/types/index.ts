@@ -48,6 +48,11 @@ export interface CommercialProspecting {
   client: CommercialProspectingClient;
 }
 
+export interface ArchiveCommercialProspectingResult {
+  id: string;
+  deleted: true;
+}
+
 export interface CreateCommercialProspectingPayload {
   client_id: string;
   status: CommercialProspectingStatus;

@@ -990,6 +990,14 @@ const baseManifest = [
   }),
   op({
     service: "commercial-service",
+    method: "DELETE",
+    path: "/commercial/prospecting/{id}",
+    action: "commercialProspectingArchive",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "commercial-service",
     method: "GET",
     path: "/commercial/outbox/status",
     action: "commercialOutboxStatus",
