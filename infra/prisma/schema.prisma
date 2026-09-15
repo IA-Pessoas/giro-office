@@ -1656,7 +1656,7 @@ model PessoalGroup {
   id              String        @id @default(uuid())
   name            String
   normalized_name String
-  policy          String?
+  policy          String        @default("NORMAL")
   system_key      String?
   archived_at     DateTime?
   organization_id String
@@ -1689,22 +1689,25 @@ model PessoalGroupMigrationMapping {
 }
 
 model ObrigationsPessoal {
-  id              String       @id @default(uuid())
-  client_id       String
-  competence      String
-  responsavel_id  String?
-  advance         Boolean?
-  payroll         Boolean?
-  charges         Boolean?
-  assistance_fee  Boolean?
-  bem_mais        Boolean?
-  bsf             Boolean?
-  va              Boolean?
-  vt              Boolean?
-  organization_id String
-  client          Client       @relation(fields: [client_id], references: [id])
-  organization    Organization @relation(fields: [organization_id], references: [id])
-  responsible     User?        @relation(fields: [responsavel_id], references: [id])
+  id                    String       @id @default(uuid())
+  client_id             String
+  competence            String
+  responsavel_id        String?
+  advance               Boolean?
+  payroll               Boolean?
+  charges               Boolean?
+  assistance_fee        Boolean?
+  bem_mais              Boolean?
+  bsf                   Boolean?
+  va                    Boolean?
+  vt                    Boolean?
+  group_snapshot_id     String?
+  group_snapshot_name   String?
+  group_snapshot_policy String?
+  organization_id       String
+  client                Client       @relation(fields: [client_id], references: [id])
+  organization          Organization @relation(fields: [organization_id], references: [id])
+  responsible           User?        @relation(fields: [responsavel_id], references: [id])
 
   @@unique([organization_id, client_id, competence], map: "uq_pessoal_obligations_org_client_competence")
   @@index([organization_id, competence], map: "idx_pessoal_obligations_org_competence")

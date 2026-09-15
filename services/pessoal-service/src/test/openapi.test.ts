@@ -136,6 +136,29 @@ describe("pessoal-service OpenAPI", () => {
     );
   });
 
+  it("documenta politica explicita e contadores de geracao de obrigacoes", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const components = spec.components as {
+      schemas?: Record<string, { required?: string[]; properties?: Record<string, unknown> }>;
+    };
+    const paths = spec.paths as Record<
+      string,
+      {
+        post?: {
+          requestBody?: { content?: Record<string, { schema?: { properties?: unknown } }> };
+        };
+      }
+    >;
+
+    expect(
+      paths["/pessoal/groups"]?.post?.requestBody?.content?.["application/json"]?.schema
+        ?.properties,
+    ).toMatchObject({ policy: { enum: ["NORMAL", "NO_OBLIGATIONS"] } });
+    expect(components.schemas?.PessoalObligationGenerationResult?.required).toEqual(
+      expect.arrayContaining(["skippedArchivedGroup", "skippedNoObligations", "skippedNoGroup"]),
+    );
+  });
+
   it("documenta busca e resposta dual de sindicatos", () => {
     const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
     const operation = (spec.paths as Record<string, { get?: Record<string, unknown> }>)[

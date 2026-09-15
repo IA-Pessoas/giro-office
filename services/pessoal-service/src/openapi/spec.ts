@@ -206,8 +206,15 @@ const updateUnionRequestSchema = strictObjectSchema({
   base_date: nullableDateSchema,
 });
 
-const createGroupRequestSchema = strictObjectSchema({ name: textSchema }, ["name"]);
-const updateGroupRequestSchema = strictObjectSchema({ name: textSchema }, ["name"]);
+const groupPolicySchema = { type: "string", enum: ["NORMAL", "NO_OBLIGATIONS"] } as const;
+const createGroupRequestSchema = strictObjectSchema(
+  { name: textSchema, policy: groupPolicySchema },
+  ["name"],
+);
+const updateGroupRequestSchema = strictObjectSchema({
+  name: textSchema,
+  policy: groupPolicySchema,
+});
 
 const createPayrollRequestSchema = strictObjectSchema(
   {
@@ -505,6 +512,9 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
             "existing",
             "created",
             "skippedExisting",
+            "skippedArchivedGroup",
+            "skippedNoObligations",
+            "skippedNoGroup",
             "skippedNoPayroll",
           ],
           properties: {
@@ -513,6 +523,9 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
             existing: { type: "integer", minimum: 0 },
             created: { type: "integer", minimum: 0 },
             skippedExisting: { type: "integer", minimum: 0 },
+            skippedArchivedGroup: { type: "integer", minimum: 0 },
+            skippedNoObligations: { type: "integer", minimum: 0 },
+            skippedNoGroup: { type: "integer", minimum: 0 },
             skippedNoPayroll: { type: "integer", minimum: 0 },
           },
         },
