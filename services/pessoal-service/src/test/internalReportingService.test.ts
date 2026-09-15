@@ -71,6 +71,101 @@ describe("pessoal internal reporting service", () => {
     });
   });
 
+  it("enriquece a ficha permanente com nomes legíveis e estados distintos de grupo", async () => {
+    const payrollFindMany = vi.fn().mockResolvedValue([
+      {
+        advance: true,
+        client: { name: "Cliente sem grupo" },
+        responsible: { name: "Responsável A" },
+        union: { name: "Sindicato A" },
+        group: null,
+        legacy_group: null,
+      },
+      {
+        advance: false,
+        client: { name: "Cliente em quarentena" },
+        responsible: null,
+        union: null,
+        group: null,
+        legacy_group: "Grupo legado sem mapa",
+      },
+      {
+        advance: false,
+        client: { name: "Cliente sem movimento" },
+        responsible: null,
+        union: null,
+        group: { name: "Sem Movimento", archived_at: null, system_key: "NO_MOVEMENT" },
+        legacy_group: "Sem Movimento",
+      },
+      {
+        advance: false,
+        client: { name: "Cliente arquivado" },
+        responsible: null,
+        union: null,
+        group: { name: "Grupo antigo", archived_at: new Date("2026-01-01"), system_key: null },
+        legacy_group: "Grupo antigo",
+      },
+    ]);
+    const service = new InternalReportingService({
+      payroll: { findMany: payrollFindMany },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.payroll",
+        fields: [
+          "client_name",
+          "responsible_name",
+          "union_name",
+          "group_name",
+          "group_state",
+          "advance",
+        ],
+        limit: 4,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          client_name: "Cliente sem grupo",
+          responsible_name: "Responsável A",
+          union_name: "Sindicato A",
+          group_name: null,
+          group_state: "SEM_GRUPO",
+          advance: true,
+        },
+        {
+          client_name: "Cliente em quarentena",
+          responsible_name: null,
+          union_name: null,
+          group_name: "Grupo legado sem mapa",
+          group_state: "QUARENTENA",
+          advance: false,
+        },
+        {
+          client_name: "Cliente sem movimento",
+          responsible_name: null,
+          union_name: null,
+          group_name: "Sem Movimento",
+          group_state: "SEM_MOVIMENTO",
+          advance: false,
+        },
+        {
+          client_name: "Cliente arquivado",
+          responsible_name: null,
+          union_name: null,
+          group_name: "Grupo antigo",
+          group_state: "ARQUIVADO",
+          advance: false,
+        },
+      ],
+      reachedLimit: false,
+    });
+    expect(payrollFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: organizationId }, take: 5 }),
+    );
+  });
+
   it("rejeita campo sensível de payroll antes de consultar o banco", async () => {
     const findMany = vi.fn();
     const service = new InternalReportingService({ payroll: { findMany } } as never);
@@ -150,7 +245,6 @@ describe("pessoal internal reporting service", () => {
           "competence",
           "advance",
           "payroll",
-          "group_snapshot_id",
           "group_snapshot_name",
           "group_snapshot_policy",
         ],
@@ -162,7 +256,6 @@ describe("pessoal internal reporting service", () => {
           competence: "2026-08",
           advance: false,
           payroll: true,
-          group_snapshot_id: null,
           group_snapshot_name: null,
           group_snapshot_policy: null,
         },
@@ -176,12 +269,56 @@ describe("pessoal internal reporting service", () => {
         competence: true,
         advance: true,
         payroll: true,
-        group_snapshot_id: true,
         group_snapshot_name: true,
         group_snapshot_policy: true,
       },
       take: 2,
     });
+  });
+
+  it("mantém o estado do grupo da obrigação no snapshot histórico, sem consultar a folha atual", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        competence: "2026-08",
+        group_snapshot_name: "Sem Movimento",
+        group_snapshot_policy: "NO_OBLIGATIONS",
+        client: { name: "Cliente histórico" },
+        responsible: { name: "Responsável histórico" },
+      },
+    ]);
+    const service = new InternalReportingService({ obrigationsPessoal: { findMany } } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.obligations",
+        fields: [
+          "competence",
+          "client_name",
+          "responsible_name",
+          "group_snapshot_name",
+          "group_snapshot_state",
+        ],
+        limit: 1,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          competence: "2026-08",
+          client_name: "Cliente histórico",
+          responsible_name: "Responsável histórico",
+          group_snapshot_name: "Sem Movimento",
+          group_snapshot_state: "SEM_MOVIMENTO",
+        },
+      ],
+      reachedLimit: false,
+    });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: organizationId },
+        select: expect.not.objectContaining({ payroll: expect.anything() }),
+      }),
+    );
   });
 
   it("recusa campo não publicado nas obrigações antes de consultar o tenant", async () => {
