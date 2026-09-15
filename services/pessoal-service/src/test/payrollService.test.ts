@@ -59,7 +59,7 @@ describe("PayrollService", () => {
     const viewerContext = { organizationId, userId, permission: 1 };
     const operations = [
       () => service.create(viewerContext, payrollBody),
-      () => service.update(viewerContext, clientId, { info: "Novo prazo" }),
+      () => service.update(viewerContext, clientId, { info: "Novo prazo", group_id: groupId }),
     ];
 
     for (const operation of operations) {
@@ -150,13 +150,17 @@ describe("PayrollService", () => {
 
     await service.update({ organizationId, userId, permission: 2 }, clientId, {
       info: "Novo prazo",
+      group_id: groupId,
     });
 
     expect(prisma.payroll.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { client_id: clientId, organization_id: organizationId } }),
     );
     expect(prisma.payroll.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { client_id: clientId }, data: { info: "Novo prazo" } }),
+      expect.objectContaining({
+        where: { client_id: clientId },
+        data: { info: "Novo prazo", group_id: groupId },
+      }),
     );
   });
 });

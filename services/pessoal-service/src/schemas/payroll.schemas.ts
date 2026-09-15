@@ -14,7 +14,7 @@ const optionalUuid = (fieldName: string) =>
     .nullable()
     .optional();
 
-const optionalGroupId = z.string().uuid({ message: "group_id invalido." }).optional();
+const groupId = z.string().uuid({ message: "group_id invalido." });
 
 const optionalNonNegativeNumber = (fieldName: string) =>
   z
@@ -33,8 +33,7 @@ const payrollBodySchema = z
     info: zNonEmptyText("info"),
     previous: z.boolean(),
     onvio: z.boolean(),
-    group_id: optionalGroupId,
-    group: zNonEmptyText("group").optional(),
+    group_id: groupId,
     vt: z.boolean(),
     vt_value: optionalNonNegativeNumber("vt_value"),
     vt_type: z.string().trim().min(1).nullable().optional(),
@@ -49,22 +48,15 @@ const payrollBodySchema = z
   })
   .strict();
 
-export const createPayrollBodySchema = payrollBodySchema.refine(
-  (value) => Boolean(value.group_id || value.group),
-  {
-    message: "Informe group_id ou group durante a compatibilidade.",
-  },
-);
+export const createPayrollBodySchema = payrollBodySchema;
 
 export const updatePayrollBodySchema = payrollBodySchema
   .omit({ client_id: true })
   .partial()
+  .extend({ group_id: groupId })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {
     message: "Informe ao menos um campo para atualizar.",
-  })
-  .refine((value) => !(value.group_id && value.group), {
-    message: "Informe somente group_id ou group.",
   });
 
 export type CreatePayrollBody = z.infer<typeof createPayrollBodySchema>;

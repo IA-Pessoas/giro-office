@@ -90,7 +90,7 @@ export function buildPessoalPayrollPayload(
     info: payload.info,
     previous: payload.previous,
     onvio: payload.onvio,
-    ...(payload.group_id ? { group_id: payload.group_id } : {}),
+    group_id: payload.group_id,
     vt: payload.vt,
     vt_value: payload.vt_value ?? null,
     vt_type: payload.vt_type ?? null,

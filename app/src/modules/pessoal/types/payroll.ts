@@ -8,8 +8,7 @@ export interface PessoalPayroll {
   info: string;
   previous: boolean;
   onvio: boolean;
-  group_id: string | null;
-  legacy_group: string | null;
+  group_id: string;
   group: {
     id: string;
     name: string;
@@ -38,7 +37,7 @@ export interface PessoalPayrollPayload {
   info: string;
   previous: boolean;
   onvio: boolean;
-  group_id?: string | null;
+  group_id: string;
   vt: boolean;
   vt_value: number | null;
   vt_type: string | null;

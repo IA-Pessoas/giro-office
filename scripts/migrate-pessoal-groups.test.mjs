@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   buildPessoalGroupMigrationPlan,
@@ -7,6 +10,7 @@ import {
 } from "./migrate-pessoal-groups.mjs";
 
 const organizationId = "org-1";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function payroll(id, legacyGroup) {
   return { id, legacyGroup };
@@ -143,4 +147,31 @@ test("conflito de catálogo fica em quarentena em vez de escolher um grupo", () 
 
 test("normalização mantém a chave de mapeamento estável para espaço, caixa e acentos", () => {
   assert.equal(normalizePessoalGroupMigrationValue("  ÁREA   Pessoal "), "area pessoal");
+});
+
+test("rollout final de grupos exige group_id e remove o contrato textual", async () => {
+  const [migration, schema, payrollService, reporting] = await Promise.all([
+    readFile(
+      path.join(
+        root,
+        "infra/prisma/migrations/20260916000000_finalize_pessoal_payroll_group_id/migration.sql",
+      ),
+      "utf8",
+    ),
+    readFile(path.join(root, "infra/prisma/schema.prisma"), "utf8"),
+    readFile(path.join(root, "services/pessoal-service/src/services/payrollService.ts"), "utf8"),
+    readFile(
+      path.join(root, "services/pessoal-service/src/reporting/internalReportingService.ts"),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(migration, /payroll\."group_id" IS NULL/);
+  assert.match(migration, /ALTER COLUMN "group_id" SET NOT NULL/);
+  assert.match(migration, /DROP COLUMN "group"/);
+  assert.match(migration, /group_snapshot_id/);
+  assert.match(schema, /group_id\s+String\n/);
+  assert.doesNotMatch(schema, /legacy_group/);
+  assert.doesNotMatch(payrollService, /legacy_group|body\.group(?!_id)/);
+  assert.doesNotMatch(reporting, /legacy_group/);
 });

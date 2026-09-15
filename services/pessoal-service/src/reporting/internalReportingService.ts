@@ -71,12 +71,12 @@ function relationName(value: unknown): string | null {
   return typeof name === "string" ? name : null;
 }
 
-function legacyGroupName(value: unknown): string | null {
+function textValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
 function reportName(row: Record<string, unknown>, relation: string, field: string): string | null {
-  return relationName(row[relation]) ?? legacyGroupName(row[field]);
+  return relationName(row[relation]) ?? textValue(row[field]);
 }
 
 function payrollGroupState(row: Record<string, unknown>): string {
@@ -84,9 +84,7 @@ function payrollGroupState(row: Record<string, unknown>): string {
   if (group?.system_key === "NO_MOVEMENT") return "SEM_MOVIMENTO";
   if (group?.archived_at != null) return "ARQUIVADO";
   if (group) return "ATIVO";
-  return typeof row.legacy_group === "string" && row.legacy_group.trim()
-    ? "QUARENTENA"
-    : "SEM_GRUPO";
+  return "SEM_GRUPO";
 }
 
 function obligationSnapshotState(row: Record<string, unknown>): string {
@@ -161,7 +159,6 @@ export class InternalReportingService {
           ...(input.fields.includes("union_name") ? { union: { select: { name: true } } } : {}),
           ...(input.fields.some((field) => field === "group_name" || field === "group_state")
             ? {
-                legacy_group: true,
                 group: { select: { name: true, archived_at: true, system_key: true } },
               }
             : {}),
@@ -177,9 +174,9 @@ export class InternalReportingService {
           client_name: reportName(row, "client", "client_name"),
           responsible_name: reportName(row, "responsible", "responsible_name"),
           union_name: reportName(row, "union", "union_name"),
-          group_name: reportName(row, "group", "group_name") ?? legacyGroupName(row.legacy_group),
+          group_name: reportName(row, "group", "group_name"),
           group_state:
-            legacyGroupName((row as Record<string, unknown>).group_state) ?? payrollGroupState(row),
+            textValue((row as Record<string, unknown>).group_state) ?? payrollGroupState(row),
         })),
         input.fields,
         input.limit,
@@ -207,7 +204,7 @@ export class InternalReportingService {
           client_name: reportName(row, "client", "client_name"),
           responsible_name: reportName(row, "responsible", "responsible_name"),
           group_snapshot_state:
-            legacyGroupName((row as Record<string, unknown>).group_snapshot_state) ??
+            textValue((row as Record<string, unknown>).group_snapshot_state) ??
             obligationSnapshotState(row),
         })),
         input.fields,

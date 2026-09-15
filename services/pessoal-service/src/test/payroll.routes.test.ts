@@ -92,4 +92,23 @@ describe("payroll routes", () => {
     expect(response.status).toBe(400);
     expect(service.update).not.toHaveBeenCalled();
   });
+
+  it("rejeita o grupo textual legado antes do service", async () => {
+    const service = { create: vi.fn(), update: vi.fn() };
+    const app = createRouteTestApp("/pessoal/payroll", createPayrollRoutes(service as never));
+
+    const createResponse = await request(app)
+      .post("/pessoal/payroll")
+      .set(gatewayHeaders())
+      .send({ ...payrollBody, group_id: undefined, group: "Grupo textual legado" });
+    const updateResponse = await request(app)
+      .patch(`/pessoal/payroll/${clientId}`)
+      .set(gatewayHeaders())
+      .send({ group: "Grupo textual legado" });
+
+    expect(createResponse.status).toBe(400);
+    expect(updateResponse.status).toBe(400);
+    expect(service.create).not.toHaveBeenCalled();
+    expect(service.update).not.toHaveBeenCalled();
+  });
 });

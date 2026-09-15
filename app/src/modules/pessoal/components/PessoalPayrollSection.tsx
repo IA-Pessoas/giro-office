@@ -134,7 +134,7 @@ function buildPayrollFormValues(
     info: payroll.info,
     previous: payroll.previous,
     onvio: payroll.onvio,
-    group_id: payroll.group_id ?? "",
+    group_id: payroll.group_id,
     vt: payroll.vt,
     vt_value:
       payroll.vt_value === null ? "" : formatBrlInput(String(Math.round(payroll.vt_value * 100))),
@@ -163,7 +163,7 @@ function buildPayrollFormPayload(
     info: values.info.trim(),
     previous: values.previous,
     onvio: values.onvio,
-    group_id: values.group_id || null,
+    group_id: values.group_id,
     vt: values.vt,
     vt_value: optional(values.vt_value, parseBrlInput),
     vt_type: optional(values.vt_type),
@@ -245,6 +245,11 @@ export function PessoalPayrollSection({
       return;
     }
 
+    if (isCurrentGroupArchived) {
+      setFormError("Selecione um grupo ativo antes de alterar a folha.");
+      return;
+    }
+
     const hasNegativeMoneyValue =
       (typeof payload.advance_amount === "number" && payload.advance_amount < 0) ||
       (typeof payload.vt_value === "number" && payload.vt_value < 0);
@@ -263,9 +268,6 @@ export function PessoalPayrollSection({
     setSuccessMessage(null);
 
     try {
-      if (payroll && isCurrentGroupArchived) {
-        payload.group_id = undefined;
-      }
       const savedPayroll = payroll
         ? await updateMutation.mutateAsync(payload)
         : await createMutation.mutateAsync(payload);
@@ -491,11 +493,6 @@ export function PessoalPayrollSection({
               </select>
               <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
             </div>
-            {payroll?.legacy_group ? (
-              <span className="text-xs text-amber-700 dark:text-amber-300">
-                Grupo legado: {payroll.legacy_group}. Selecione um grupo para concluir a migração.
-              </span>
-            ) : null}
             {isCurrentGroupArchived ? (
               <span className="text-xs text-amber-700 dark:text-amber-300">
                 Este grupo está arquivado e permanece visível apenas como histórico.

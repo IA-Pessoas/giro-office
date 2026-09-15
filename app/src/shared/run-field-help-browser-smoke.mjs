@@ -78,7 +78,21 @@ async function installApiMocks(page) {
     });
   });
 
-  for (const endpoint of ["**/pessoal/unions*", "**/rh/operational-users*"]) {
+  await page.route("**/pessoal/overview", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: {
+          unions: { total: 0, withBaseDate: 0, withoutBaseDate: 0, withCnpj: 0 },
+          ldd: { total: 0, open: 0, overdue: 0, paid: 0 },
+        },
+      }),
+    });
+  });
+
+  for (const endpoint of ["**/pessoal/groups*", "**/pessoal/unions*", "**/rh/operational-users*"]) {
     await page.route(endpoint, async (route) => {
       await route.fulfill({
         status: 200,
