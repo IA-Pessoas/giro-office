@@ -32,6 +32,7 @@ export {
   useUpdateContabilRelationshipMutation,
   useUpdateContabilResponsibleMutation,
   useContabilPermissions,
+  useTriageEditability,
   useTriageMonthly,
   useTriageMutations,
   useTriageStatements,

@@ -40,6 +40,14 @@ export function useTriageMonthly(
   );
 }
 
+export function useTriageEditability(clientId: string): UseQueryResult<{ can_edit: boolean }, Error> {
+  return useFetch(
+    ["triagem", "editability", clientId],
+    () => triageDocumentsService.getEditability(clientId),
+    { enabled: Boolean(clientId) },
+  );
+}
+
 export function useTriageStatements(
   clientId: string,
   competence: ContabilCompetence,

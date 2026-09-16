@@ -165,6 +165,21 @@ export class TriageDocumentsService {
     return this.toMonthlyResponse(monthly);
   }
 
+  async getEditability(
+    clientId: string,
+    auth: TriageDocumentsAuthContext,
+  ): Promise<{ can_edit: boolean }> {
+    try {
+      await this.assertCanEdit(clientId, auth);
+      return { can_edit: true };
+    } catch (error: unknown) {
+      if (error instanceof ServiceError && error.statusCode === 403) {
+        return { can_edit: false };
+      }
+      throw error;
+    }
+  }
+
   async getOrCreateMonthly(
     request: TriageMonthlyRequest,
     auth: TriageDocumentsAuthContext,

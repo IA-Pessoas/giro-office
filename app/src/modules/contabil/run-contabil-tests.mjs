@@ -141,8 +141,17 @@ await (async () => {
       "/contabil/relationships/client/30",
     );
     assert.equal(CONTABIL_ENDPOINTS.triageMonthly, "/triagem/monthly");
+    assert.equal(CONTABIL_ENDPOINTS.triageEditability, "/triagem/editability");
     assert.equal(CONTABIL_ENDPOINTS.triageStatements, "/triagem/statements");
     assert.equal(CONTABIL_ENDPOINTS.triageClosing, "/triagem/closing");
+  });
+
+  await runTest("triagem só mostra mutações após verificar a atribuição do cliente", () => {
+    const pageSource = readFileSync(new URL("../../pages/triagem.tsx", import.meta.url), "utf8");
+
+    assert.match(pageSource, /useTriageEditability/);
+    assert.match(pageSource, /canEdit=\{editability\.data\?\.can_edit === true\}/);
+    assert.doesNotMatch(pageSource, /canEdit\s*\/>/);
   });
 
   await runTest("triagem apresenta os nove documentos, indicador e banco sem dados de conta", () => {

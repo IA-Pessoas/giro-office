@@ -21,6 +21,10 @@ export const triageMonthlyRequestSchema = z
   .object(monthlyRequestShape)
   .strict();
 
+export const triageEditabilityRequestSchema = z
+  .object({ client_id: monthlyRequestShape.client_id })
+  .strict();
+
 export const triageMonthlyIdParamsSchema = z
   .object({ id: z.string().uuid({ message: "id inválido." }) })
   .strict();

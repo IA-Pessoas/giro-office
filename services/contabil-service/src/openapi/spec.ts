@@ -727,6 +727,31 @@ export function buildContabilServiceOpenApiSpec(
           },
         },
       },
+      "/triagem/editability": {
+        get: {
+          tags: ["Triage Documents"],
+          summary: "Verificar edição de Triagem por cliente",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Permissão contextual do usuário autenticado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
       "/triagem/monthly": {
         get: {
           tags: ["Triage Documents"],
