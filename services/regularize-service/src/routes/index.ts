@@ -1,5 +1,6 @@
 import { Router } from "express";
-
+import { requireRegularizePermission } from "../middlewares/authorizeRegularize.js";
+import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { createClientPfRoutes } from "./clientPf.routes.js";
 import { createDashboardRoutes } from "./dashboard.routes.js";
 import { createGuidanceRoutes } from "./guidance.routes.js";
@@ -12,6 +13,8 @@ import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 
 export function createRegularizeRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();
+
+  router.use(isAuthenticated, requireRegularizePermission);
 
   router.use(createDashboardRoutes(deps));
   router.use(createPasswordRoutes(deps));

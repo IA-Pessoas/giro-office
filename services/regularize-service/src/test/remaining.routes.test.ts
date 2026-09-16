@@ -114,7 +114,7 @@ describe("regularize remaining routes", () => {
           cpf_cnpj: "12345678901",
           process_type: "Abertura",
           description: "Descricao",
-          status: "Aberto",
+          status: "Andamento",
         })),
       },
       client: {
@@ -135,7 +135,7 @@ describe("regularize remaining routes", () => {
       cpf_cnpj: "12345678901",
       process_type: "Abertura",
       description: "Descricao",
-      status: "Aberto",
+      status: "Andamento",
     });
 
     expect(response.status).toBe(201);
@@ -188,7 +188,7 @@ describe("regularize remaining routes", () => {
           type_license: "Alvara",
           entry_date: new Date("2025-01-01"),
           protocol: "PROTO-1",
-          status: "Ativo",
+          status: "Em Andamento",
           current_situation: "Regular",
           contact: "Contato",
           urgency: "Media",
@@ -209,7 +209,7 @@ describe("regularize remaining routes", () => {
       type_license: "Alvara",
       entry_date: "2025-01-01",
       protocol: "PROTO-1",
-      status: "Ativo",
+      status: "Em Andamento",
       current_situation: "Regular",
       contact: "Contato",
       urgency: "Media",

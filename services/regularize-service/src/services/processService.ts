@@ -2,6 +2,7 @@ import { ServiceError } from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { CreateProcessBody, UpdateProcessBody } from "../schemas/process.schemas.js";
+import { buildProcessStatusFilter } from "../schemas/status.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 
 const processSelect = {
@@ -136,7 +137,7 @@ export class ProcessService {
   }): Promise<Record<string, unknown>[] | Record<string, unknown>> {
     const where: Prisma.ProcessWhereInput = {
       organization_id: params.organizationId,
-      ...(params.status === "Todos" ? {} : { status: params.status }),
+      ...buildProcessStatusFilter(params.status),
       ...(params.search
         ? {
             OR: [

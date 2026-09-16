@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { guidanceWriteStatusSchema } from "./status.schemas.js";
+
 export const guidanceEconomicActivitySchema = z
   .object({
     id: z.string().uuid().optional(),
@@ -36,7 +38,7 @@ export const createGuidanceBodySchema = z
     carryng: z.string().optional(),
     regime: z.string().optional(),
     legal_representative: z.string().optional(),
-    status: z.string().min(1, "status obrigatorio."),
+    status: guidanceWriteStatusSchema,
     economic_activities: z.array(guidanceEconomicActivitySchema).optional(),
     partners: z.array(guidancePartnerSchema).optional(),
   })
@@ -59,7 +61,7 @@ export const updateGuidanceBodySchema = z
     carryng: z.string().optional(),
     regime: z.string().optional(),
     legal_representative: z.string().optional(),
-    status: z.string().optional(),
+    status: guidanceWriteStatusSchema.optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 1, "Informe ao menos um campo para atualizar.");

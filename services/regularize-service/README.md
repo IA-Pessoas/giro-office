@@ -2,6 +2,8 @@
 
 Micro-servico de regularize. Centraliza rotas, validacao, OpenAPI e rotinas internas de reconciliacao do modulo legado. O gateway encaminha as rotas de negocio pelo prefixo publico **`/regularize`**.
 
+As rotas de negocio exigem contexto autenticado e permissao modular `regularize`: nivel `1` permite leitura e nivel `2` permite mutacoes. Chamadas diretas precisam de JWT valido; chamadas do gateway precisam do token interno confiavel e da identidade encaminhada. A leitura preserva aliases de status antigos, mas novas escritas aceitam somente estados canonicos.
+
 ## Porta local
 
 Por defeito: **3039** (`PORT`).
@@ -16,7 +18,8 @@ Definicao e defaults em [`src/config/env.ts`](src/config/env.ts):
 - `PORT` - porta HTTP (default `3039`)
 - `MTK_ENCRYPTION_KEY` - chave usada para criptografar credenciais do legado
 - `AUDIT_SERVICE_TOKEN` - token usado na integracao de auditoria
-- `INTERNAL_SERVICE_TOKEN` - token exigido nas rotas `POST /internal/reconciliation/*` pelo header `x-internal-service-token` (opcional; se vazio, usa o mesmo valor que `AUDIT_SERVICE_TOKEN`)
+- `REGULARIZE_SERVICE_INTERNAL_TOKEN` - token exclusivo compartilhado apenas pelo gateway e pelo regularize-service para o contexto encaminhado e as rotas internas; em desenvolvimento, se ausente, mantem fallback de compatibilidade para `INTERNAL_SERVICE_TOKEN` e `AUDIT_SERVICE_TOKEN`
+- `INTERNAL_SERVICE_TOKEN` - nome legado aceito para as rotas `POST /internal/reconciliation/*` pelo header `x-internal-service-token`
 - `REGULARIZE_REPORTING_TOKEN` e `REGULARIZE_REPORTING_GRANT_SECRET` - credenciais exclusivas do adapter interno de relatórios
 - `SERVICE_ALLOWED_ORIGINS` - origens CORS aceitas; em producao nao pode ficar como `*`
 - `ENABLE_API_DOCS` - documentacao OpenAPI em `/docs` (default ligado fora de producao)
@@ -30,6 +33,7 @@ Definicao e defaults em [`src/config/env.ts`](src/config/env.ts):
 ## Gateway
 
 - URL upstream: `REGULARIZE_SERVICE_URL` (ex.: `http://localhost:3039`)
+- Token upstream: `REGULARIZE_SERVICE_INTERNAL_TOKEN` (deve ser o mesmo no gateway e no serviço; em produção, diferente de `AUDIT_SERVICE_TOKEN`)
 - Prefixo publico: `/regularize`
 - Endpoints internos `/internal/*` nao devem ser expostos via gateway
 

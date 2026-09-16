@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { idQuerySchema } from "./common.schemas.js";
+import { licenseReadStatusSchema, licenseWriteStatusSchema } from "./status.schemas.js";
 
 export const createLicenseBodySchema = z
   .object({
@@ -10,7 +11,7 @@ export const createLicenseBodySchema = z
     entry_date: z.coerce.date(),
     protocol: z.string().min(1, "protocol obrigatorio."),
     responsible_id: z.string().uuid().optional(),
-    status: z.string().min(1, "status obrigatorio."),
+    status: licenseWriteStatusSchema,
     date_last_consultation: z.coerce.date().optional(),
     current_situation: z.string().min(1, "current_situation obrigatorio."),
     contact: z.string().min(1, "contact obrigatorio."),
@@ -30,15 +31,7 @@ export const updateLicenseBodySchema = createLicenseBodySchema
 
 export const licenseDetailQuerySchema = idQuerySchema;
 
-export const licenseListStatusValues = [
-  "Todos",
-  "Ativo",
-  "Pendente",
-  "A vencer",
-  "Vencido",
-  "Inativo",
-  "Cancelado",
-] as const;
+export const licenseListStatusValues = [...licenseReadStatusSchema.options] as const;
 
 export const listLicensesQuerySchema = z
   .object({

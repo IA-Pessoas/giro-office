@@ -29,10 +29,10 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
     request.get(FORWARDED_AUTH_PERMISSION_HEADER) ?? undefined,
   );
   const internalToken = request.get(INTERNAL_SERVICE_TOKEN_HEADER);
-  const { auditServiceToken } = getRegularizeServiceEnv();
+  const { internalServiceToken } = getRegularizeServiceEnv();
 
   const isFromGateway =
-    internalToken && internalToken === auditServiceToken && forwardedUserId && forwardedOrgId;
+    internalToken && internalToken === internalServiceToken && forwardedUserId && forwardedOrgId;
 
   if (isFromGateway) {
     request.user_id = forwardedUserId;
@@ -53,9 +53,18 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
     const token = extractBearerToken(authorizationHeader);
     const claims = verifyJwtToken(token, jwtSecret);
 
+    if (!claims.organization_id) {
+      throw new ServiceError(401, "Organizacao autenticada nao informada.");
+    }
+
     request.user_id = claims.user_id;
-    request.organization_id = claims.organization_id ?? "";
-    request.permission = claims.permission;
+    request.organization_id = claims.organization_id;
+    request.permission =
+      claims.type === "owner"
+        ? 3
+        : claims.modulePermissionsPresent
+          ? (claims.modules?.regularize ?? 0)
+          : 0;
     next();
   } catch (err) {
     logError("Erro ao validar autenticacao do regularize-service", { err });

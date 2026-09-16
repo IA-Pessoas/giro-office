@@ -2,6 +2,7 @@ import { ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLicenseBody, UpdateLicenseBody } from "../schemas/license.schemas.js";
+import { buildLicenseStatusFilter } from "../schemas/status.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 import type { RegularizeReconciliationService } from "./regularizeReconciliationService.js";
 import { ensureRegularizeResponsible } from "./regularizeResponsibleService.js";
@@ -151,7 +152,7 @@ export class LicenseService {
   }): Promise<Record<string, unknown>[] | Record<string, unknown>> {
     const where = {
       organization_id: params.organizationId,
-      ...(params.status === "Todos" ? {} : { status: params.status }),
+      ...buildLicenseStatusFilter(params.status),
     };
     const findManyArgs = {
       where,

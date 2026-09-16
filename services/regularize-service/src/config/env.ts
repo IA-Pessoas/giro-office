@@ -61,9 +61,11 @@ const regularizeServiceEnvSchema = z
         ? parseBoolean(enableApiDocsEnv)
         : rest.nodeEnv !== "production";
     const internalServiceToken =
-      internalServiceTokenEnv !== undefined && internalServiceTokenEnv !== ""
+      rest.nodeEnv === "production"
         ? internalServiceTokenEnv
-        : rest.auditServiceToken;
+        : internalServiceTokenEnv !== undefined && internalServiceTokenEnv !== ""
+          ? internalServiceTokenEnv
+          : rest.auditServiceToken;
 
     validateProductionInternalServiceToken({
       nodeEnv: rest.nodeEnv,
@@ -74,9 +76,14 @@ const regularizeServiceEnvSchema = z
     validateProductionInternalServiceToken({
       nodeEnv: rest.nodeEnv,
       serviceName: "regularize-service",
-      envName: "INTERNAL_SERVICE_TOKEN",
+      envName: "REGULARIZE_SERVICE_INTERNAL_TOKEN",
       token: internalServiceToken,
     });
+    if (rest.nodeEnv === "production" && internalServiceToken === rest.auditServiceToken) {
+      throw new Error(
+        "REGULARIZE_SERVICE_INTERNAL_TOKEN deve ser diferente de AUDIT_SERVICE_TOKEN em produção.",
+      );
+    }
     validateProductionInternalServiceToken({
       nodeEnv: rest.nodeEnv,
       serviceName: "regularize-service",
@@ -110,13 +117,18 @@ export type RegularizeServiceEnv = z.infer<typeof regularizeServiceEnvSchema> & 
 };
 
 export function getRegularizeServiceEnv(): RegularizeServiceEnv {
+  const internalServiceTokenEnv =
+    process.env.NODE_ENV === "production"
+      ? process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN
+      : (process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN ?? process.env.INTERNAL_SERVICE_TOKEN);
+
   return regularizeServiceEnvSchema.parse({
     port: process.env.PORT,
     nodeEnv: process.env.NODE_ENV,
     databaseUrl: process.env.DATABASE_URL,
     jwtSecret: process.env.JWT_SECRET,
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
-    internalServiceTokenEnv: process.env.INTERNAL_SERVICE_TOKEN,
+    internalServiceTokenEnv,
     regularizeReportingToken: process.env.REGULARIZE_REPORTING_TOKEN,
     regularizeReportingGrantSecret: process.env.REGULARIZE_REPORTING_GRANT_SECRET,
     encryptionKey: process.env.MTK_ENCRYPTION_KEY,

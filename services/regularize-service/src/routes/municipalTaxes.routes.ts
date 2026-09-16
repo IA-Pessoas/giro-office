@@ -1,7 +1,6 @@
 import { createSuccessResponse, error as logError, parseWithZod } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   createMunicipalTaxesBodySchema,
   listMunicipalTaxesQuerySchema,
@@ -17,7 +16,6 @@ export function createMunicipalTaxesRoutes(deps: RegularizeRouteDeps): Router {
 
   router.post(
     "/municipal-taxes",
-    isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(createMunicipalTaxesBodySchema, request.body);
@@ -36,7 +34,6 @@ export function createMunicipalTaxesRoutes(deps: RegularizeRouteDeps): Router {
 
   router.put(
     "/municipal-taxes",
-    isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const body = parseWithZod(updateMunicipalTaxesBodySchema, request.body);
@@ -55,7 +52,6 @@ export function createMunicipalTaxesRoutes(deps: RegularizeRouteDeps): Router {
 
   router.get(
     "/municipal-taxes-detail",
-    isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(municipalTaxesDetailQuerySchema, request.query);
@@ -70,7 +66,6 @@ export function createMunicipalTaxesRoutes(deps: RegularizeRouteDeps): Router {
 
   router.get(
     "/municipal-taxes",
-    isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(listMunicipalTaxesQuerySchema, request.query);
