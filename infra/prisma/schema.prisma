@@ -287,6 +287,7 @@ model User {
   email                       String?
   phone                       String?
   hire_date                   DateTime?
+  dominio_hire_date           DateTime?
   termination_date            DateTime?
   allergies                   Json?
   emergency_contacts          Json?

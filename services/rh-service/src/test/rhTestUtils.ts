@@ -20,6 +20,7 @@ const rhMocks: {
   messageServiceMock: MockGroup;
   timeSheetServiceMock: MockGroup;
   scoreNitroServiceMock: MockGroup;
+  employeeDossierServiceMock: MockGroup;
 } = vi.hoisted(() => ({
   pointConfigServiceMock: {
     upsert: vi.fn(),
@@ -96,6 +97,17 @@ const rhMocks: {
   scoreNitroServiceMock: {
     updateMetric: vi.fn(),
   },
+  employeeDossierServiceMock: {
+    getDossier: vi.fn(),
+    listDossiers: vi.fn(),
+    updateDossier: vi.fn(),
+    listContacts: vi.fn(),
+    createContact: vi.fn(),
+    updateContact: vi.fn(),
+    deleteContact: vi.fn(),
+    listAllergies: vi.fn(),
+    replaceAllergies: vi.fn(),
+  },
 }));
 
 const {
@@ -113,6 +125,7 @@ const {
   messageServiceMock,
   timeSheetServiceMock,
   scoreNitroServiceMock,
+  employeeDossierServiceMock,
 } = rhMocks;
 
 vi.mock("../services/pointConfigService.js", () => ({
@@ -196,6 +209,12 @@ vi.mock("../services/timeSheetService.js", () => ({
 vi.mock("../services/scoreNitroService.js", () => ({
   ScoreNitroService: vi.fn(function ScoreNitroService() {
     return rhMocks.scoreNitroServiceMock;
+  }),
+}));
+
+vi.mock("../services/employeeDossierService.js", () => ({
+  EmployeeDossierService: vi.fn(function EmployeeDossierService() {
+    return rhMocks.employeeDossierServiceMock;
   }),
 }));
 
@@ -351,6 +370,29 @@ export function resetRhRouteMocks() {
   });
   timeSheetServiceMock.sign.mockResolvedValue({ ok: true });
   scoreNitroServiceMock.updateMetric.mockResolvedValue({ ok: true });
+  employeeDossierServiceMock.getDossier.mockResolvedValue({
+    id: "00000000-0000-4000-8000-000000000001",
+  });
+  employeeDossierServiceMock.listDossiers.mockResolvedValue([]);
+  employeeDossierServiceMock.updateDossier.mockResolvedValue({
+    id: "00000000-0000-4000-8000-000000000001",
+  });
+  employeeDossierServiceMock.listContacts.mockResolvedValue([]);
+  employeeDossierServiceMock.createContact.mockResolvedValue({
+    id: "00000000-0000-4000-8000-000000000010",
+    name: "Contato",
+    phone: "5511999999999",
+  });
+  employeeDossierServiceMock.updateContact.mockResolvedValue({
+    id: "00000000-0000-4000-8000-000000000010",
+    name: "Contato",
+    phone: "5511999999999",
+  });
+  employeeDossierServiceMock.deleteContact.mockResolvedValue({
+    id: "00000000-0000-4000-8000-000000000010",
+  });
+  employeeDossierServiceMock.listAllergies.mockResolvedValue([]);
+  employeeDossierServiceMock.replaceAllergies.mockResolvedValue([]);
 }
 
 export function setRhRoutePermission(permission: number) {
@@ -372,4 +414,5 @@ export {
   timeBankReleaseServiceMock,
   timeClockRequestServiceMock,
   timeSheetServiceMock,
+  employeeDossierServiceMock,
 };
