@@ -88,8 +88,11 @@ await runTest("regularize licenses list uses paginated hook and keeps mutation i
 
   assert.match(
     pageSource,
-    /const licensePageQuery = usePaginatedRegularizeLicenses\(\s*\{\s*status: "Todos",\s*page: licensePage,\s*limit: REGULARIZE_PAGE_SIZE,\s*\},\s*\{ enabled: activeTab === "licenses" \},\s*\);/,
+    /const licensePageQuery = usePaginatedRegularizeLicenses\(\s*\{\s*status: licenseStatus,\s*page: licensePage,\s*limit: REGULARIZE_PAGE_SIZE,\s*\},\s*\{ enabled: activeTab === "licenses" \},\s*\);/,
   );
+  assert.match(pageSource, /const \[licenseStatus, setLicenseStatus\] = useState\("Todos"\)/);
+  assert.match(pageSource, /regularizeLicenseStatusFilterOptions/);
+  assert.match(pageSource, /getRegularizeLicenseDisplayStatus\(item\.status, item\.due_date\)/);
   assert.match(pageSource, /const \[licensePage, setLicensePage\] = useState\(1\)/);
   assert.match(pageSource, /<PaginationControls[\s\S]{0,220}licensePageQuery\.data\?\.hasMore/);
   assert.deepEqual(
@@ -279,9 +282,9 @@ await runTest("regularize dashboard has a centralized aggregate data contract", 
   assert.match(serviceSource, /async getDashboard\(year: number\)/);
   assert.match(serviceSource, /REGULARIZE_ENDPOINTS\.dashboard/);
   assert.match(hookSource, /useRegularizeDashboard/);
-  assert.match(hookSource, /regularizeQueryKeys\.dashboard\(year\)/);
+  assert.match(hookSource, /regularizeQueryKeys\.dashboard\(year, scope\)/);
   assert.match(queryKeysSource, /dashboardRoot/);
-  assert.match(queryKeysSource, /dashboard: \(year: number\)/);
+  assert.match(queryKeysSource, /dashboard: \(year: number, scope:/);
 });
 
 await runTest("regularize mutations invalidate aggregate dashboard data", async () => {
@@ -291,7 +294,7 @@ await runTest("regularize mutations invalidate aggregate dashboard data", async 
     "hooks/useRegularizeOperations.ts",
   ]) {
     const source = await readModuleSource(hookPath);
-    assert.match(source, /regularizeQueryKeys\.dashboardRoot\(\)/);
+    assert.match(source, /regularizeQueryKeys\.(?:dashboardRoot\((?:scope)?\)|root)/);
   }
 });
 
@@ -909,6 +912,10 @@ await runTest("regularize finite status and urgency fields use native selects", 
   assert.match(licenseSource, /regularizeUrgencyOptions/);
   assert.match(licenseSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
   assert.match(licenseSource, /<RegularizeNativeSelect\s+value=\{formState\.urgency\}/);
+  assert.match(
+    controlsSource,
+    /regularizeLicenseStatusOptions = \[\s*"Em Processo de Solicitação",\s*"Em Andamento",\s*"Finalizado",\s*"Paralisado",\s*\]/,
+  );
 });
 
 await runTest("regularize process task id uses the real task selector", async () => {
@@ -1132,9 +1139,9 @@ await runTest("regularize mutations invalidate subdomain roots to avoid stale fi
   const peopleSource = await readModuleSource("hooks/useRegularizePeople.ts");
   const operationsSource = await readModuleSource("hooks/useRegularizeOperations.ts");
 
-  assert.match(credentialsSource, /queryKey: regularizeQueryKeys\.credentials\(\)/);
-  assert.match(peopleSource, /queryKey: regularizeQueryKeys\.people\(\)/);
-  assert.match(operationsSource, /queryKey: regularizeQueryKeys\.operations\(\)/);
+  assert.match(credentialsSource, /queryKey: regularizeQueryKeys\.credentials\(scope\)/);
+  assert.match(peopleSource, /queryKey: regularizeQueryKeys\.people\(scope\)/);
+  assert.match(operationsSource, /queryKey: regularizeQueryKeys\.root/);
   assert.doesNotMatch(peopleSource, /regularizeQueryKeys\.clientPfs\(\{ status: payload\.status \}\)/);
   assert.doesNotMatch(operationsSource, /regularizeQueryKeys\.processes\(\{ status: payload\.status \}\)/);
   assert.doesNotMatch(operationsSource, /regularizeQueryKeys\.licenses\(\{ status: payload\.status \}\)/);

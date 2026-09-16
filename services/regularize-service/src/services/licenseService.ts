@@ -44,6 +44,9 @@ export class LicenseService {
     if (input.body.client_id) {
       await this.ensureClientExists(input.organizationId, input.body.client_id);
     }
+    if (input.body.task_id) {
+      await this.ensureTaskExists(input.organizationId, input.body.task_id);
+    }
     await ensureRegularizeResponsible(this.prisma, input.organizationId, input.body.responsible_id);
 
     const exists = await this.prisma.license.findFirst({
@@ -96,6 +99,9 @@ export class LicenseService {
 
     if (input.body.client_id) {
       await this.ensureClientExists(input.organizationId, input.body.client_id);
+    }
+    if (input.body.task_id) {
+      await this.ensureTaskExists(input.organizationId, input.body.task_id);
     }
     await ensureRegularizeResponsible(
       this.prisma,
@@ -189,6 +195,16 @@ export class LicenseService {
     });
     if (!client) {
       throw new ServiceError(404, "Cliente nao encontrado.");
+    }
+  }
+
+  private async ensureTaskExists(organizationId: string, taskId: string): Promise<void> {
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, organization_id: organizationId },
+      select: { id: true },
+    });
+    if (!task) {
+      throw new ServiceError(404, "Tarefa nao encontrada na organizacao.");
     }
   }
 }

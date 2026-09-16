@@ -4,7 +4,10 @@ import { buildRegularizeServiceOpenApiSpec } from "../openapi/spec.js";
 import {
   buildLicenseStatusFilter,
   buildProcessStatusFilter,
+  getLicenseDueDateBounds,
+  getLicenseNotificationDateRange,
   guidanceWriteStatusSchema,
+  licenseUpdateStatusSchema,
   licenseWriteStatusSchema,
   processReadStatusSchema,
   processWriteStatusSchema,
@@ -29,11 +32,48 @@ describe("regularize status contracts", () => {
     expect(guidanceWriteStatusSchema.safeParse("Concluído").success).toBe(false);
     expect(licenseWriteStatusSchema.safeParse("Em Andamento").success).toBe(true);
     expect(licenseWriteStatusSchema.safeParse("Ativo").success).toBe(false);
+    expect(licenseUpdateStatusSchema.safeParse("Ativo").success).toBe(true);
   });
 
   it("keeps legacy license filters readable without changing stored values", () => {
     expect(buildLicenseStatusFilter("Ativo")).toEqual({ status: "Ativo" });
     expect(buildLicenseStatusFilter("Todos")).toEqual({});
+  });
+
+  it("derives license due filters from due_date", () => {
+    const referenceDate = new Date("2026-03-16T12:00:00.000Z");
+    const bounds = getLicenseDueDateBounds(referenceDate);
+    const dueDateFilter = buildLicenseStatusFilter("A vencer", referenceDate);
+
+    expect(dueDateFilter).toEqual({
+      due_date: {
+        gte: bounds.today,
+        lt: new Date(bounds.nextMonth.getTime() + 24 * 60 * 60 * 1000),
+      },
+    });
+    expect(buildLicenseStatusFilter("Vencido", referenceDate)).toEqual({
+      due_date: { lt: bounds.today },
+    });
+  });
+
+  it("uses a calendar-month date range for license notifications", () => {
+    const referenceDate = new Date("2026-01-31T12:00:00.000Z");
+    const range = getLicenseNotificationDateRange(referenceDate);
+
+    expect(range.gte.getUTCDate()).toBe(28);
+    expect(range.gte.getUTCMonth()).toBe(1);
+    expect(range.lt.getUTCDate()).toBe(1);
+    expect(range.lt.getUTCMonth()).toBe(2);
+  });
+
+  it("includes the end of the following month when the reference date is month-end", () => {
+    const referenceDate = new Date("2026-02-28T12:00:00.000Z");
+    const range = getLicenseNotificationDateRange(referenceDate);
+
+    expect(range).toEqual({
+      gte: new Date("2026-03-28T00:00:00.000Z"),
+      lt: new Date("2026-04-01T00:00:00.000Z"),
+    });
   });
 
   it("documents the access boundary and status compatibility in OpenAPI", () => {
@@ -70,6 +110,13 @@ describe("regularize status contracts", () => {
     };
     const licenseWritePath = spec.paths["/regularize/license"] as {
       post: {
+        requestBody: {
+          content: {
+            "application/json": { schema: { properties: { status: { enum: string[] } } } };
+          };
+        };
+      };
+      put: {
         requestBody: {
           content: {
             "application/json": { schema: { properties: { status: { enum: string[] } } } };
@@ -117,6 +164,9 @@ describe("regularize status contracts", () => {
         "Paralisado",
       ]),
     );
+    expect(
+      licenseWritePath.put.requestBody.content["application/json"].schema.properties.status.enum,
+    ).toEqual(expect.arrayContaining(["Ativo", "Pendente", "Inativo", "Cancelado"]));
 
     const sendToFiscalPath = spec.paths["/regularize/process/send-to-fiscal"] as {
       post: {

@@ -141,6 +141,8 @@ import {
 import {
   type RegularizeFormOption,
   regularizePrimaryButtonClassName,
+  getRegularizeLicenseDisplayStatus,
+  regularizeLicenseStatusFilterOptions,
   regularizeProcessStatusFilterOptions,
 } from "./regularizeFormControls";
 
@@ -231,6 +233,10 @@ function getStatusBadgeConfig(status: RegularizeStatus | null | undefined): Stat
 
   if (normalized === "pendente" || normalized === "a vencer" || normalized === "urgente") {
     return { label: formatText(status, "Pendente"), variant: "warning", icon: CalendarDays };
+  }
+
+  if (normalized === "vencido") {
+    return { label: formatText(status, "Vencido"), variant: "danger", icon: XCircle };
   }
 
   return { label: formatText(status, "Sem status"), variant: "neutral" };
@@ -1000,6 +1006,7 @@ export function RegularizePage() {
   const [taxType, setTaxType] = useState<"Todos" | "TFF" | "TLP" | "TLL">("Todos");
   const [taxYear, setTaxYear] = useState(() => new Date().getFullYear());
   const [taxPage, setTaxPage] = useState(1);
+  const [licenseStatus, setLicenseStatus] = useState("Todos");
   const [licensePage, setLicensePage] = useState(1);
   const debouncedProcessSearch = useDebouncedValue(processSearch.trim(), 300);
   const debouncedSiteSearch = useDebouncedValue(siteSearch.trim(), 300);
@@ -1055,7 +1062,7 @@ export function RegularizePage() {
   );
   const licensePageQuery = usePaginatedRegularizeLicenses(
     {
-      status: "Todos",
+      status: licenseStatus,
       page: licensePage,
       limit: REGULARIZE_PAGE_SIZE,
     },
@@ -1994,7 +2001,37 @@ export function RegularizePage() {
             }
           />
 
-          <QueryStatePanel query={licenseTableQuery} emptyTitle="Nenhuma licença encontrada.">
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_220px] dark:border-gray-700 dark:bg-gray-900">
+            <div className="text-sm text-gray-600 dark:text-slate-300">
+              Os estados de vencimento são calculados pela data de vencimento e não alteram o
+              status cadastrado.
+            </div>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Status</span>
+              <RegularizeNativeSelect
+                value={licenseStatus}
+                onChange={(event) => {
+                  setLicenseStatus(event.target.value);
+                  setLicensePage(1);
+                }}
+              >
+                {regularizeLicenseStatusFilterOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
+          </div>
+
+          <QueryStatePanel
+            query={licenseTableQuery}
+            emptyTitle={
+              licenseStatus === "Todos"
+                ? "Nenhuma licença encontrada."
+                : "Nenhuma licença corresponde ao filtro."
+            }
+          >
             {(licenseRows) => (
               <div>
                 <DataTable headers={["Licença", "Protocolo", "Contato", "Status", "Vencimento", ""]}>
@@ -2004,7 +2041,12 @@ export function RegularizePage() {
                       <td className="px-4 py-3">{formatText(item.protocol)}</td>
                       <td className="px-4 py-3">{formatText(item.contact)}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
+                        <StatusBadge
+                          config={getStatusBadgeConfig(
+                            getRegularizeLicenseDisplayStatus(item.status, item.due_date),
+                          )}
+                          size="sm"
+                        />
                       </td>
                       <td className="px-4 py-3">{formatDate(item.due_date)}</td>
                       <td className="px-4 py-3">

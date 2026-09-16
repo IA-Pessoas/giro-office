@@ -19,10 +19,10 @@ import {
 import { PasswordService } from "../services/passwordService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 
-const MIN_SITE_PASSWORD_REVEAL_PERMISSION = 2;
+const MIN_PASSWORD_REVEAL_PERMISSION = 2;
 
-function assertCanRevealSitePassword(permission: number | undefined): void {
-  if (Number(permission ?? 0) < MIN_SITE_PASSWORD_REVEAL_PERMISSION) {
+function assertCanRevealPassword(permission: number | undefined): void {
+  if (Number(permission ?? 0) < MIN_PASSWORD_REVEAL_PERMISSION) {
     throw new ServiceError(403, "Permissao insuficiente para revelar credencial.");
   }
 }
@@ -75,6 +75,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
   router.get("/password", async (request: Request, response: Response, next: NextFunction) => {
     try {
       const query = parseWithZod(passwordDetailQuerySchema, request.query);
+      assertCanRevealPassword(request.permission);
       const detail = await passwordService.detail(request.organization_id, query.id);
       response.json(createSuccessResponse(detail));
     } catch (err) {
@@ -133,7 +134,7 @@ export function createPasswordRoutes(deps: RegularizeRouteDeps): Router {
     async (request: Request, response: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(sitePasswordDetailQuerySchema, request.query);
-        assertCanRevealSitePassword(request.permission);
+        assertCanRevealPassword(request.permission);
         const detail = await passwordService.detailSite(request.organization_id, query.id);
         response.json(createSuccessResponse(detail));
       } catch (err) {

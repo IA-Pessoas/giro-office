@@ -549,11 +549,13 @@ model RegularizeNotification {
   regarding_id    String
   title           String
   message         String
+  reference_date  DateTime     @default(now())
   read            Boolean      @default(false)
   create_at       DateTime     @default(now())
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, user_id, regarding, regarding_id, title, reference_date], map: "uq_regularize_notification_identity")
   @@map("notification.regularize")
 }
 
@@ -1869,6 +1871,8 @@ model License {
   responsible            User?        @relation(fields: [responsible_id], references: [id])
   task                   Task?        @relation(fields: [task_id], references: [id])
 
+  @@index([organization_id, due_date], map: "idx_regularize_license_org_due_date")
+  @@index([organization_id, status], map: "idx_regularize_license_org_status")
   @@map("regularize.license")
 }
 
