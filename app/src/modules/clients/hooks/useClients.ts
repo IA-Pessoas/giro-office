@@ -1,29 +1,29 @@
+import { useFetch } from "@shared/hooks";
 import {
-  useMutation,
-  useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
+  useMutation,
+  useQueryClient,
 } from "@tanstack/react-query";
 
-import { useFetch } from "@shared/hooks";
-
 import { clientService } from "../services/clientService";
+import { buildClientListParams } from "../services/clientService.contract";
 import type {
   Client,
   ClientFinanceRecord,
+  ClientListFilters,
+  ClientListPage,
   ClientPa,
   ClientPaResponse,
   ClientTerminationRecord,
-  ClientListFilters,
-  ClientListPage,
-  CreateClientPayload,
   CreateClientIntegrationPayload,
+  CreateClientPayload,
   TerminateClientPayload,
   UpdateClientFinancePayload,
-  UpdateClientPaPayload,
   UpdateClientIntegrationPayload,
-  UpdateClientRegularizePayload,
+  UpdateClientPaPayload,
   UpdateClientPayload,
+  UpdateClientRegularizePayload,
 } from "../types";
 
 export const CLIENTS_QUERY_KEY = ["clients"] as const;
@@ -33,7 +33,7 @@ export function clientListQueryKey(filters: ClientListFilters) {
     ...CLIENTS_QUERY_KEY,
     "list",
     filters.search ?? "",
-    filters.ref ?? "",
+    buildClientListParams(filters).ref ?? "",
     filters.status ?? "",
     filters.page ?? 1,
     filters.limit ?? 20,
@@ -60,17 +60,19 @@ export function useClient(id: string | undefined): UseQueryResult<Client | null,
   });
 }
 
-export function useClientPa(id: string | undefined): UseQueryResult<ClientPaResponse | null, Error> {
-  return useFetch(clientPaDetailQueryKey(id ?? "missing"), () => clientService.getPaByClientId(id ?? ""), {
-    enabled: Boolean(id),
-  });
+export function useClientPa(
+  id: string | undefined,
+): UseQueryResult<ClientPaResponse | null, Error> {
+  return useFetch(
+    clientPaDetailQueryKey(id ?? "missing"),
+    () => clientService.getPaByClientId(id ?? ""),
+    {
+      enabled: Boolean(id),
+    },
+  );
 }
 
-export function useCreateClientMutation(): UseMutationResult<
-  Client,
-  Error,
-  CreateClientPayload
-> {
+export function useCreateClientMutation(): UseMutationResult<Client, Error, CreateClientPayload> {
   const queryClient = useQueryClient();
 
   return useMutation({

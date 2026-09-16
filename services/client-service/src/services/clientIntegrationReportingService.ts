@@ -41,10 +41,8 @@ export class ClientIntegrationReportingService {
       );
     }
     if (input.query) {
-      return executeReportingQuery(
-        { ...input, query: input.query },
-        (fields, limit, offset) =>
-          this.extract({ ...input, query: undefined, fields, limit, offset }),
+      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
+        this.extract({ ...input, query: undefined, fields, limit, offset }),
       );
     }
     const allowedFields = getClientIntegrationReportingFields(input.source);
