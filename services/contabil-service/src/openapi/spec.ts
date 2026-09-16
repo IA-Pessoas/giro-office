@@ -749,6 +749,7 @@ export function buildContabilServiceOpenApiSpec(
                 },
               },
             },
+          },
             responses: {
               "200": {
                 description: "Pendência criada ou existente",
@@ -954,7 +955,6 @@ export function buildContabilServiceOpenApiSpec(
             },
           },
         },
-      },
     },
   };
 }

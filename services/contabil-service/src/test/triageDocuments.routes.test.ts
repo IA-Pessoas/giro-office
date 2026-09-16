@@ -13,6 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createContabilApp } from "../app.js";
 import { getContabilServiceEnv } from "../config/env.js";
+import { buildContabilServiceOpenApiSpec } from "../openapi/spec.js";
 import type { TriageDocumentsRouteDeps } from "../routes/triageDocuments.routes.js";
 
 const ORG_ID = "a0000000-0000-4000-8000-000000000001";
@@ -50,6 +51,17 @@ function createMockDeps(): TriageDocumentsRouteDeps {
 }
 
 describe("triage document routes", () => {
+  it("publica cada operação de triagem como path OpenAPI de primeiro nível", () => {
+    const spec = buildContabilServiceOpenApiSpec(env);
+
+    expect(spec.paths).toHaveProperty("/triagem/monthly.get");
+    expect(spec.paths).toHaveProperty("/triagem/monthly.post.responses.200");
+    expect(spec.paths).toHaveProperty("/triagem/monthly/{id}/item.patch");
+    expect(spec.paths).toHaveProperty("/triagem/monthly/{id}/items.patch");
+    expect(spec.paths).toHaveProperty("/triagem/statements.get");
+    expect(spec.paths).toHaveProperty("/triagem/statements.put");
+  });
+
   it("POST /triagem/monthly usa a organização autenticada e os módulos encaminhados", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });

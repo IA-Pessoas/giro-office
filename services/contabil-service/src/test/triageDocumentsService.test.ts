@@ -1,6 +1,5 @@
 import "./envBootstrap.js";
 
-import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import {
