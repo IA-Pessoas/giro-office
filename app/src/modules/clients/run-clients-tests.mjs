@@ -14,6 +14,12 @@ import {
   unwrapClientPaDetail,
 } from "./services/clientService.contract.ts";
 import {
+  buildCreateClientPayload,
+  buildUpdateClientPayload,
+  CLIENT_TAX_REGIME_OPTIONS,
+  createClientFormInitialValues,
+} from "./utils/clientForm.ts";
+import {
   formatCpfCnpjInput,
   validateCpfCnpjDocument,
   validateOptionalCpfDocument,
@@ -35,21 +41,12 @@ import {
   getRegularizeUnsupportedDateClearError,
   hasRegularizeChanges,
 } from "./utils/regularizeForm.ts";
-import {
-  mapClientStatusFromApi,
-  mapClientStatusToApi,
-} from "./utils/statusMapper.ts";
+import { mapClientStatusFromApi, mapClientStatusToApi } from "./utils/statusMapper.ts";
 import {
   buildTerminationPayload,
   createTerminationInitialValues,
   isValidCompetenceOutput,
 } from "./utils/terminationForm.ts";
-import {
-  buildCreateClientPayload,
-  buildUpdateClientPayload,
-  CLIENT_TAX_REGIME_OPTIONS,
-  createClientFormInitialValues,
-} from "./utils/clientForm.ts";
 
 function runTest(name, fn) {
   try {
@@ -125,10 +122,7 @@ runTest("client form sends the selected tax regime on creation and update", () =
     "Lucro Presumido",
   );
   assert.equal(buildUpdateClientPayload({ ...values, regime: "" }).regime, null);
-  assert.equal(
-    "regime" in buildUpdateClientPayload({ ...values, regime: "" }, "MEI"),
-    false,
-  );
+  assert.equal("regime" in buildUpdateClientPayload({ ...values, regime: "" }, "MEI"), false);
 });
 
 runTest("client regime is constrained and bound in both shared client flows", () => {
@@ -165,10 +159,13 @@ runTest("status mapper converts API active and inactive values to UI labels", ()
   assert.equal(mapClientStatusFromApi("inactive"), "Inativo");
 });
 
-runTest("status mapper preserves already-normalized inactive values from mixed environments", () => {
-  assert.equal(mapClientStatusFromApi("Inativo"), "Inativo");
-  assert.equal(mapClientStatusFromApi("Ativo"), "Ativo");
-});
+runTest(
+  "status mapper preserves already-normalized inactive values from mixed environments",
+  () => {
+    assert.equal(mapClientStatusFromApi("Inativo"), "Inativo");
+    assert.equal(mapClientStatusFromApi("Ativo"), "Ativo");
+  },
+);
 
 runTest("client endpoints use only /client contract", () => {
   assert.equal(CLIENT_ENDPOINTS.list, "/client/list");
@@ -204,32 +201,38 @@ runTest("buildClientListParams forwards search, ref, status, page and limit", ()
   assert.deepEqual(buildClientListParams(filters), filters);
 });
 
-runTest("buildClientListParams uses legacy integration filter for active and inactive clients", () => {
-  assert.deepEqual(buildClientListParams({ status: "Ativo", page: 1, limit: 10 }), {
-    status: "Ativo",
-    ref: "integracao",
-    page: 1,
-    limit: 10,
-  });
-  assert.deepEqual(buildClientListParams({ status: "Inativo", page: 1, limit: 10 }), {
-    status: "Inativo",
-    ref: "integracao",
-    page: 1,
-    limit: 10,
-  });
-});
-
-runTest("buildClientListParams keeps the Regularize active-client query out of the legacy integration filter", () => {
-  assert.deepEqual(
-    buildClientListParams({
+runTest(
+  "buildClientListParams uses legacy integration filter for active and inactive clients",
+  () => {
+    assert.deepEqual(buildClientListParams({ status: "Ativo", page: 1, limit: 10 }), {
       status: "Ativo",
+      ref: "integracao",
       page: 1,
-      limit: 50,
-      legacyIntegrationStatusFilter: false,
-    }),
-    { status: "Ativo", page: 1, limit: 50 },
-  );
-});
+      limit: 10,
+    });
+    assert.deepEqual(buildClientListParams({ status: "Inativo", page: 1, limit: 10 }), {
+      status: "Inativo",
+      ref: "integracao",
+      page: 1,
+      limit: 10,
+    });
+  },
+);
+
+runTest(
+  "buildClientListParams keeps the Regularize active-client query out of the legacy integration filter",
+  () => {
+    assert.deepEqual(
+      buildClientListParams({
+        status: "Ativo",
+        page: 1,
+        limit: 50,
+        legacyIntegrationStatusFilter: false,
+      }),
+      { status: "Ativo", page: 1, limit: 50 },
+    );
+  },
+);
 
 runTest("client integration filters use backend-supported not-contracted token", () => {
   const filters = readFileSync("src/modules/clients/components/ClientFilters.tsx", "utf8");
@@ -412,17 +415,11 @@ runTest("integration phone comparison and payload use canonical digits", () => {
   const initialValues = createUpdateClientIntegrationInitialValues(client);
 
   assert.deepEqual(
-    buildUpdateClientIntegrationPayload(
-      { ...initialValues, number: "11 99999.9999" },
-      client,
-    ),
+    buildUpdateClientIntegrationPayload({ ...initialValues, number: "11 99999.9999" }, client),
     {},
   );
   assert.deepEqual(
-    buildUpdateClientIntegrationPayload(
-      { ...initialValues, number: "(11) 98888-7777" },
-      client,
-    ),
+    buildUpdateClientIntegrationPayload({ ...initialValues, number: "(11) 98888-7777" }, client),
     { number: "11988887777" },
   );
 });
@@ -454,53 +451,50 @@ runTest("document input formatter masks and limits by person type", () => {
   assert.equal(formatCpfCnpjInput("1234567", "PJ"), "12.345.67");
 });
 
-runTest("client input masks forward formatted document and phone values through event-compatible targets", () => {
-  assertFormattedInputEventContract(
-    formatCpfInput,
-    "12345678910",
-    "123.456.789-10",
-  );
-  assertFormattedInputEventContract(
-    formatCnpjInput,
-    "12345678000190",
-    "12.345.678/0001-90",
-  );
-  assertFormattedInputEventContract(
-    formatBrazilianPhoneInput,
-    "11999999999",
-    "(11) 99999-9999",
-  );
-});
+runTest(
+  "client input masks forward formatted document and phone values through event-compatible targets",
+  () => {
+    assertFormattedInputEventContract(formatCpfInput, "12345678910", "123.456.789-10");
+    assertFormattedInputEventContract(formatCnpjInput, "12345678000190", "12.345.678/0001-90");
+    assertFormattedInputEventContract(formatBrazilianPhoneInput, "11999999999", "(11) 99999-9999");
+  },
+);
 
-runTest("client integration fields route type-specific documents and phones through local mask adapters", () => {
-  const source = readFileSync("src/modules/clients/components/ClientIntegrationForm.tsx", "utf8");
+runTest(
+  "client integration fields route type-specific documents and phones through local mask adapters",
+  () => {
+    const source = readFileSync("src/modules/clients/components/ClientIntegrationForm.tsx", "utf8");
 
-  assert.match(source, /from "@shared\/utils\/inputFormatting"/);
-  assert.match(source, /formatCpfInput/);
-  assert.match(source, /formatCnpjInput/);
-  assert.match(source, /formatBrazilianPhoneInput/);
-  assert.match(source, /from "\.\/formattedInputChange"/);
-  assert.match(source, /forwardFormattedInputChange/);
-  assert.match(source, /values\.type === "PJ" \? formatCnpjInput : formatCpfInput/);
-  assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
-  assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
-  assert.match(source, /name="cpf_agent"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
-  assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
-});
+    assert.match(source, /from "@shared\/utils\/inputFormatting"/);
+    assert.match(source, /formatCpfInput/);
+    assert.match(source, /formatCnpjInput/);
+    assert.match(source, /formatBrazilianPhoneInput/);
+    assert.match(source, /from "\.\/formattedInputChange"/);
+    assert.match(source, /forwardFormattedInputChange/);
+    assert.match(source, /values\.type === "PJ" \? formatCnpjInput : formatCpfInput/);
+    assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
+    assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+    assert.match(source, /name="cpf_agent"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+    assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
+  },
+);
 
-runTest("client Regularize fields route generic documents, CPF, and phones through local mask adapters", () => {
-  const source = readFileSync("src/modules/clients/components/ClientRegularizeForm.tsx", "utf8");
+runTest(
+  "client Regularize fields route generic documents, CPF, and phones through local mask adapters",
+  () => {
+    const source = readFileSync("src/modules/clients/components/ClientRegularizeForm.tsx", "utf8");
 
-  assert.match(source, /from "@shared\/utils\/inputFormatting"/);
-  assert.match(source, /formatCpfCnpjInput/);
-  assert.match(source, /formatCpfInput/);
-  assert.match(source, /formatBrazilianPhoneInput/);
-  assert.match(source, /from "\.\/formattedInputChange"/);
-  assert.match(source, /forwardFormattedInputChange/);
-  assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
-  assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
-  assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
-});
+    assert.match(source, /from "@shared\/utils\/inputFormatting"/);
+    assert.match(source, /formatCpfCnpjInput/);
+    assert.match(source, /formatCpfInput/);
+    assert.match(source, /formatBrazilianPhoneInput/);
+    assert.match(source, /from "\.\/formattedInputChange"/);
+    assert.match(source, /forwardFormattedInputChange/);
+    assert.match(source, /name="cpf_cnpj"[\s\S]{0,180}onChange=\{handleCpfCnpjChange\}/);
+    assert.match(source, /name="cpf_responsible"[\s\S]{0,180}onChange=\{handleCpfChange\}/);
+    assert.match(source, /name="number"[\s\S]{0,180}onChange=\{handlePhoneChange\}/);
+  },
+);
 
 runTest("optional cpf validation accepts empty values and rejects invalid lengths", () => {
   assert.equal(validateOptionalCpfDocument("CPF do responsável", ""), null);
@@ -573,84 +567,84 @@ runTest("regularize payload normalizes documents, nullable text, and dates", () 
   assert.equal(hasRegularizeChanges(values, client), true);
 });
 
-runTest("regularize hydration masks documents and phone while phone payload stays canonical", () => {
-  const client = {
-    id: "client-1",
-    type: "PJ",
-    name: "Acme",
-    cpf_cnpj: "12345678000190",
-    cpf_responsible: "12345678910",
-    number: "11999999999",
-  };
-  const initialValues = createRegularizeInitialValues(client);
+runTest(
+  "regularize hydration masks documents and phone while phone payload stays canonical",
+  () => {
+    const client = {
+      id: "client-1",
+      type: "PJ",
+      name: "Acme",
+      cpf_cnpj: "12345678000190",
+      cpf_responsible: "12345678910",
+      number: "11999999999",
+    };
+    const initialValues = createRegularizeInitialValues(client);
 
-  assert.equal(initialValues.cpf_cnpj, "12.345.678/0001-90");
-  assert.equal(initialValues.cpf_responsible, "123.456.789-10");
-  assert.equal(initialValues.number, "(11) 99999-9999");
-  assert.deepEqual(
-    buildRegularizePayload(
-      { ...initialValues, number: "11 99999.9999" },
-      client,
-    ),
-    {},
-  );
-  assert.deepEqual(
-    buildRegularizePayload(
-      { ...initialValues, number: "(11) 98888-7777" },
-      client,
-    ),
-    { number: "11988887777" },
-  );
-});
+    assert.equal(initialValues.cpf_cnpj, "12.345.678/0001-90");
+    assert.equal(initialValues.cpf_responsible, "123.456.789-10");
+    assert.equal(initialValues.number, "(11) 99999-9999");
+    assert.deepEqual(
+      buildRegularizePayload({ ...initialValues, number: "11 99999.9999" }, client),
+      {},
+    );
+    assert.deepEqual(
+      buildRegularizePayload({ ...initialValues, number: "(11) 98888-7777" }, client),
+      { number: "11988887777" },
+    );
+  },
+);
 
-runTest("regularize blocks clearing non-nullable dates and ignores invalid clear as effective change", () => {
-  const client = {
-    dominio_code: "",
-    name: "Acme",
-    company_name: "",
-    fantasy_name: "",
-    cpf_cnpj: "12345678000190",
-    cnae: "",
-    cnae_secondary: "",
-    responsible: "",
-    cpf_responsible: "",
-    number: "",
-    email: "",
-    address: "",
-    cep: "",
-    neighborhood: "",
-    state: "",
-    city: "",
-    customer_since: "2026-04-01T00:00:00.000Z",
-    municipal_registration: "",
-    state_registration: "",
-    commercial_board_registration: "",
-    opening_date: null,
-    regime: "",
-    size: "",
-    segment: "",
-    contabil: false,
-    fiscal: false,
-    pessoal: false,
-    infoproduto: false,
-    consultoria: false,
-    start_strike: null,
-    end_strike: null,
-    deletion_date: null,
-  };
+runTest(
+  "regularize blocks clearing non-nullable dates and ignores invalid clear as effective change",
+  () => {
+    const client = {
+      dominio_code: "",
+      name: "Acme",
+      company_name: "",
+      fantasy_name: "",
+      cpf_cnpj: "12345678000190",
+      cnae: "",
+      cnae_secondary: "",
+      responsible: "",
+      cpf_responsible: "",
+      number: "",
+      email: "",
+      address: "",
+      cep: "",
+      neighborhood: "",
+      state: "",
+      city: "",
+      customer_since: "2026-04-01T00:00:00.000Z",
+      municipal_registration: "",
+      state_registration: "",
+      commercial_board_registration: "",
+      opening_date: null,
+      regime: "",
+      size: "",
+      segment: "",
+      contabil: false,
+      fiscal: false,
+      pessoal: false,
+      infoproduto: false,
+      consultoria: false,
+      start_strike: null,
+      end_strike: null,
+      deletion_date: null,
+    };
 
-  const values = {
-    ...createRegularizeInitialValues(client),
-    customer_since: "",
-  };
+    const values = {
+      ...createRegularizeInitialValues(client),
+      customer_since: "",
+    };
 
-  assert.deepEqual(buildRegularizePayload(values, client), {});
-  assert.equal(hasRegularizeChanges(values, client), false);
-  assert.equal(
-    getRegularizeUnsupportedDateClearError(values, client),
-    "Não é possível limpar cliente desde neste fluxo. Informe uma data válida.",
-  );
-});
+    assert.deepEqual(buildRegularizePayload(values, client), {});
+    assert.equal(hasRegularizeChanges(values, client), false);
+    assert.equal(
+      getRegularizeUnsupportedDateClearError(values, client),
+      "Não é possível limpar cliente desde neste fluxo. Informe uma data válida.",
+    );
+  },
+);
 
 runTest("termination helpers validate competence_output and build payload", () => {
   assert.deepEqual(createTerminationInitialValues(), {
@@ -680,7 +674,10 @@ runTest("client picker keeps paginated remote search and accessible feedback", (
 
   assert.match(moduleIndex, /ClientPickerModal/);
   assert.match(picker, /useDeferredValue/);
-  assert.match(picker, /useClients\(\{[\s\S]*?\.\.\.filters,[\s\S]*?search: deferredSearch,[\s\S]*?page,[\s\S]*?limit: CLIENT_PICKER_LIMIT/);
+  assert.match(
+    picker,
+    /useClients\(\{[\s\S]*?\.\.\.filters,[\s\S]*?search: deferredSearch,[\s\S]*?page,[\s\S]*?limit: CLIENT_PICKER_LIMIT/,
+  );
   assert.match(picker, /client\.company_name \|\| client\.name/);
   assert.match(picker, /role="dialog"/);
   assert.match(picker, /role="alert"/);
@@ -697,14 +694,23 @@ runTest("client pickers reuse shared pagination controls without inline paginati
 
   for (const source of sources) {
     assert.match(source, /import \{[^}]*PaginationControls[^}]*\} from "@shared\/components";/);
-    assert.match(source, /<PaginationControls[\s\S]*?page=\{page\}[\s\S]*?limit=\{pageSize\}[\s\S]*?total=\{total\}[\s\S]*?count=\{clients\.length\}/);
-    assert.match(source, /hasMore=\{Boolean\(clientsQuery\.data\?\.hasMore\) && page < totalPages\}/);
+    assert.match(
+      source,
+      /<PaginationControls[\s\S]*?page=\{page\}[\s\S]*?limit=\{pageSize\}[\s\S]*?total=\{total\}[\s\S]*?count=\{clients\.length\}/,
+    );
+    assert.match(
+      source,
+      /hasMore=\{Boolean\(clientsQuery\.data\?\.hasMore\) && page < totalPages\}/,
+    );
     assert.match(source, /isFetching=\{clientsQuery\.isFetching\}/);
     assert.match(source, /totalPages=\{totalPages\}/);
     assert.match(source, /onFirst=\{\(\) => setPage\(FIRST_CLIENT_PAGE\)\}/);
     assert.match(source, /onLast=\{\(\) => setPage\(totalPages\)\}/);
     assert.match(source, /onPageChange=\{setPage\}/);
-    assert.doesNotMatch(source, /Chevron(Left|Right)|handlePageChange|hasPreviousPage|hasNextPage|type="number"/);
+    assert.doesNotMatch(
+      source,
+      /Chevron(Left|Right)|handlePageChange|hasPreviousPage|hasNextPage|type="number"/,
+    );
   }
 });
 
@@ -774,3 +780,5 @@ runTest("legacy client tabs use toast warnings for validation", () => {
   assert.doesNotMatch(regularizeSource, /\balert\(/);
   assert.doesNotMatch(integrationSource, /\balert\(/);
 });
+
+await import("./run-client-picker-browser-smoke.mjs");

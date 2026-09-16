@@ -322,6 +322,84 @@ describe("client-service", () => {
     expect(res.status).toBe(404);
   });
 
+  it.each(
+    ["contabil", "pessoal"].flatMap((module) => [
+      ...[0, 1, 2, 3].map((level) => ({ module, level, type: "user" })),
+      { module, level: 0, type: "owner" },
+    ]),
+  )("GET /client/list respects $module=$level for $type with no global access", async ({
+    module,
+    level,
+    type,
+  }) => {
+    const findMany = vi.fn().mockResolvedValue([baseClient()]);
+    const count = vi.fn().mockResolvedValue(1);
+    const prisma = {
+      organization: { findUnique: vi.fn().mockResolvedValue(testOrganization()) },
+      client: { findMany, count },
+    } as unknown as PrismaClient;
+    const app = buildTestApp(new ClientService(prisma));
+    const token = jwt.sign(
+      {
+        user_id: "user-department-viewer",
+        organization_id: TEST_ORG_ID,
+        type,
+        permission: 0,
+        modules: { integracao: 0, [module]: level },
+      },
+      TEST_JWT_SECRET,
+    );
+
+    const response = await request(app)
+      .get("/client/list")
+      .query({ status: "Ativo", page: 1, limit: 50 })
+      .set("Authorization", `Bearer ${token}`);
+
+    const canRead = type === "owner" || level > 0;
+    expect(response.status).toBe(canRead ? 200 : 403);
+    if (!canRead) {
+      expect(findMany).not.toHaveBeenCalled();
+      expect(count).not.toHaveBeenCalled();
+      return;
+    }
+    expect(response.body.data.items).toEqual([baseClient()]);
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: TEST_ORG_ID, status: "Ativo" },
+        take: 50,
+        skip: 0,
+      }),
+    );
+    expect(count).toHaveBeenCalledWith({
+      where: { organization_id: TEST_ORG_ID, status: "Ativo" },
+    });
+  });
+
+  it.each([
+    "contabil",
+    "pessoal",
+  ])("GET /client/list rejects another organization for a %s viewer before querying", async (module) => {
+    const mock = mockServiceBase();
+    const app = buildTestApp(mock);
+    const token = jwt.sign(
+      {
+        user_id: "user-department-viewer",
+        organization_id: TEST_ORG_ID,
+        permission: 0,
+        modules: { [module]: 1 },
+      },
+      TEST_JWT_SECRET,
+    );
+
+    const response = await request(app)
+      .get("/client/list")
+      .query({ organization_id: "550e8400-e29b-41d4-a716-446655440099", search: "Cliente" })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(403);
+    expect(mock.listByOrganization).not.toHaveBeenCalled();
+  });
+
   it("GET /client/list passes status filter mapped to BD when query has status Ativo", async () => {
     const page = emptyListPage();
     const mock: IClientService = {
