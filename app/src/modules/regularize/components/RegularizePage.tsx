@@ -14,6 +14,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   ShieldCheck,
   Trash2,
@@ -88,6 +89,8 @@ import {
   usePaginatedRegularizeProcesses,
   useRemoveRegularizeGuidanceActivityMutation,
   useRemoveRegularizeGuidancePartnerMutation,
+  useReturnRegularizeProcessFromFiscalMutation,
+  useSendRegularizeProcessToFiscalMutation,
   useUpdateRegularizeGuidanceMutation,
   useUpdateRegularizeLicenseMutation,
   useUpdateRegularizeMunicipalTaxMutation,
@@ -113,6 +116,7 @@ import type {
   RegularizeMunicipalTaxesClientSummary,
   RegularizePartner,
   RegularizePasswordListItem,
+  RegularizeProcessActionPayload,
   RegularizeProcessListItem,
   RegularizeSitePasswordListItem,
   RegularizeStatus,
@@ -137,6 +141,7 @@ import {
 import {
   type RegularizeFormOption,
   regularizePrimaryButtonClassName,
+  regularizeProcessStatusFilterOptions,
 } from "./regularizeFormControls";
 
 const REGULARIZE_PAGE_SIZE = 20;
@@ -700,6 +705,8 @@ function ProcessDetailContent({
   guidanceQuery,
   onRemoveGuidanceActivity,
   onRemoveGuidancePartner,
+  onReturnProcessFromFiscal,
+  onSendProcessToFiscal,
   onSetActiveForm,
   processDetailQuery,
   processSelectionOrigin,
@@ -717,6 +724,10 @@ function ProcessDetailContent({
     processId: RegularizeId,
     itemId: RegularizeId | undefined,
   ) => void | Promise<void>;
+  onReturnProcessFromFiscal: (
+    payload: RegularizeProcessActionPayload,
+  ) => void | Promise<void>;
+  onSendProcessToFiscal: (payload: RegularizeProcessActionPayload) => void | Promise<void>;
   onSetActiveForm: (form: RegularizeFormState) => void;
   processDetailQuery: ReturnType<typeof useRegularizeProcessDetail>;
   processSelectionOrigin: ProcessSelectionOrigin;
@@ -748,7 +759,69 @@ function ProcessDetailContent({
           />
           <FieldLine label="Entrada" value={formatDate(processDetailQuery.data.entry_date)} />
           <FieldLine label="Previsto" value={formatDate(processDetailQuery.data.expected_date)} />
+          <FieldLine
+            label="Dias corridos"
+            value={
+              processDetailQuery.data.elapsed_days === null ||
+              processDetailQuery.data.elapsed_days === undefined
+                ? "-"
+                : String(processDetailQuery.data.elapsed_days)
+            }
+          />
           <FieldLine label="Urgência" value={formatText(processDetailQuery.data.urgency)} />
+          <FieldLine
+            label="Responsáveis"
+            value={
+              [
+                processDetailQuery.data.responsible1,
+                processDetailQuery.data.responsible2,
+                processDetailQuery.data.responsible3,
+              ]
+                .filter((responsible): responsible is NonNullable<typeof responsible> => Boolean(responsible))
+                .map((responsible) => responsible.name)
+                .join(", ") || "Sem responsáveis"
+            }
+          />
+          {canManageRegularizeCore ? (
+            <div className="flex flex-wrap gap-2 pt-2">
+              <PrimaryActionButton
+                icon={ArrowRight}
+                label="Enviar ao Fiscal"
+                onClick={() =>
+                  void onSendProcessToFiscal({ id: processDetailQuery.data?.id ?? currentProcessId ?? "" })
+                }
+              />
+              <PrimaryActionButton
+                icon={RotateCcw}
+                label="Registrar retorno do Fiscal"
+                onClick={() =>
+                  void onReturnProcessFromFiscal({ id: processDetailQuery.data?.id ?? currentProcessId ?? "" })
+                }
+              />
+            </div>
+          ) : null}
+          {(processDetailQuery.data.history?.length ?? 0) > 0 ? (
+            <div className="space-y-2 pt-2">
+              <p className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-500">
+                Histórico
+              </p>
+              <ol className="space-y-2">
+                {processDetailQuery.data.history?.map((item) => (
+                  <li
+                    key={item.id}
+                    className="rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-800/70"
+                  >
+                    <span className="font-medium text-gray-700 dark:text-slate-200">
+                      {item.action}
+                    </span>
+                    <span className="ml-2 text-gray-500 dark:text-slate-400">
+                      {formatDate(item.date)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
         </>
       ) : (
         <FieldLine label="Status" value="Sem seleção." />
@@ -1019,6 +1092,8 @@ export function RegularizePage() {
   const updateMunicipalTaxMutation = useUpdateRegularizeMunicipalTaxMutation();
   const createProcessMutation = useCreateRegularizeProcessMutation();
   const updateProcessMutation = useUpdateRegularizeProcessMutation();
+  const sendProcessToFiscalMutation = useSendRegularizeProcessToFiscalMutation();
+  const returnProcessFromFiscalMutation = useReturnRegularizeProcessFromFiscalMutation();
   const createGuidanceMutation = useCreateRegularizeGuidanceMutation();
   const updateGuidanceMutation = useUpdateRegularizeGuidanceMutation();
   const addGuidanceActivityMutation = useAddRegularizeGuidanceActivityMutation();
@@ -1391,6 +1466,32 @@ export function RegularizePage() {
     }
   }
 
+  async function handleSendProcessToFiscal(payload: RegularizeProcessActionPayload) {
+    try {
+      await sendProcessToFiscalMutation.mutateAsync(payload);
+      toast.success("Envio ao Fiscal registrado com sucesso.");
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível registrar o envio ao Fiscal.",
+      );
+      toast.error(message);
+    }
+  }
+
+  async function handleReturnProcessFromFiscal(payload: RegularizeProcessActionPayload) {
+    try {
+      await returnProcessFromFiscalMutation.mutateAsync(payload);
+      toast.success("Retorno do Fiscal registrado com sucesso.");
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível registrar o retorno do Fiscal.",
+      );
+      toast.error(message);
+    }
+  }
+
   async function handleSubmitGuidance(
     payload: CreateRegularizeGuidancePayload | UpdateRegularizeGuidancePayload,
   ) {
@@ -1757,7 +1858,7 @@ export function RegularizePage() {
                   setProcessPage(1);
                 }}
               >
-                {["Todos", "Aberto", "Em andamento", "Pendente", "Concluído", "Cancelado"].map(
+                {regularizeProcessStatusFilterOptions.map(
                   (status) => (
                     <option key={status} value={status}>
                       {status}
@@ -1842,6 +1943,8 @@ export function RegularizePage() {
                   guidanceQuery={guidanceQuery}
                   onRemoveGuidanceActivity={handleRemoveGuidanceActivity}
                   onRemoveGuidancePartner={handleRemoveGuidancePartner}
+                  onReturnProcessFromFiscal={handleReturnProcessFromFiscal}
+                  onSendProcessToFiscal={handleSendProcessToFiscal}
                   onSetActiveForm={setActiveForm}
                   processDetailQuery={processDetailQuery}
                   processSelectionOrigin={processSelectionOrigin}
@@ -1863,6 +1966,8 @@ export function RegularizePage() {
                 guidanceQuery={guidanceQuery}
                 onRemoveGuidanceActivity={handleRemoveGuidanceActivity}
                 onRemoveGuidancePartner={handleRemoveGuidancePartner}
+                onReturnProcessFromFiscal={handleReturnProcessFromFiscal}
+                onSendProcessToFiscal={handleSendProcessToFiscal}
                 onSetActiveForm={setActiveForm}
                 processDetailQuery={processDetailQuery}
                 processSelectionOrigin={processSelectionOrigin}

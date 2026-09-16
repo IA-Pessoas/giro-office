@@ -28,6 +28,8 @@ import type {
   RegularizeMunicipalTaxesPage,
   RegularizePartner,
   RegularizePartnerListFilters,
+  RegularizeProcessActionPayload,
+  RegularizeProcessActionResult,
   RegularizePasswordDetail,
   RegularizePasswordListFilters,
   RegularizePasswordListItem,
@@ -331,7 +333,7 @@ export const regularizeService = {
     const api = setupAPIClient();
     const response = await api.post(REGULARIZE_ENDPOINTS.process, payload);
 
-    return unwrapRegularizeEnvelope<RegularizeProcessDetail>(response.data);
+    return unwrapRegularizeEntity<RegularizeProcessDetail>(response.data, "create");
   },
 
   async updateProcess(
@@ -341,6 +343,24 @@ export const regularizeService = {
     const response = await api.put(REGULARIZE_ENDPOINTS.process, payload);
 
     return unwrapRegularizeEnvelope<RegularizeProcessDetail>(response.data);
+  },
+
+  async sendProcessToFiscal(
+    payload: RegularizeProcessActionPayload,
+  ): Promise<RegularizeProcessActionResult> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.sendToFiscal, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeProcessActionResult>(response.data);
+  },
+
+  async returnProcessFromFiscal(
+    payload: RegularizeProcessActionPayload,
+  ): Promise<RegularizeProcessActionResult> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.returnFromFiscal, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeProcessActionResult>(response.data);
   },
 
   async listGuidance(filters: RegularizeGuidanceListFilters): Promise<RegularizeGuidance[]> {

@@ -45,7 +45,16 @@ describe("regularize status contracts", () => {
       post: {
         requestBody: {
           content: {
-            "application/json": { schema: { properties: { status: { enum: string[] } } } };
+            "application/json": {
+              schema: {
+                required: string[];
+                additionalProperties: boolean;
+                properties: {
+                  status: { enum: string[] };
+                  client_pj_id: { type: string; format: string };
+                };
+              };
+            };
           };
         };
       };
@@ -87,6 +96,15 @@ describe("regularize status contracts", () => {
       expect.arrayContaining(["Pendente", "Andamento", "Protocolado", "Finalizado", "Paralisado"]),
     );
     expect(
+      processWritePath.post.requestBody.content["application/json"].schema.additionalProperties,
+    ).toBe(false);
+    expect(processWritePath.post.requestBody.content["application/json"].schema.required).toEqual(
+      expect.arrayContaining(["cpf_cnpj", "process_type", "description", "status"]),
+    );
+    expect(
+      processWritePath.post.requestBody.content["application/json"].schema.properties.client_pj_id,
+    ).toEqual({ type: "string", format: "uuid" });
+    expect(
       guidanceWritePath.post.requestBody.content["application/json"].schema.properties.status.enum,
     ).toEqual(expect.arrayContaining(["Em andamento", "Finalizado"]));
     expect(
@@ -99,5 +117,32 @@ describe("regularize status contracts", () => {
         "Paralisado",
       ]),
     );
+
+    const sendToFiscalPath = spec.paths["/regularize/process/send-to-fiscal"] as {
+      post: {
+        summary: string;
+        security: Array<Record<string, string[]>>;
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: { required: string[]; properties: { id: { format: string } } };
+            };
+          };
+        };
+      };
+    };
+    const returnFromFiscalPath = spec.paths["/regularize/process/return-from-fiscal"] as {
+      post: { summary: string };
+    };
+
+    expect(sendToFiscalPath.post.summary).toContain("envio");
+    expect(sendToFiscalPath.post.security).toEqual([{ bearerAuth: [] }]);
+    expect(sendToFiscalPath.post.requestBody.content["application/json"].schema.required).toEqual([
+      "id",
+    ]);
+    expect(
+      sendToFiscalPath.post.requestBody.content["application/json"].schema.properties.id.format,
+    ).toBe("uuid");
+    expect(returnFromFiscalPath.post.summary).toContain("retorno");
   });
 });

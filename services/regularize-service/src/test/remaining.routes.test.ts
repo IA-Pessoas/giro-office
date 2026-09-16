@@ -36,6 +36,8 @@ describe("regularize remaining routes", () => {
     ["GET", "/regularize/process"],
     ["POST", "/regularize/process"],
     ["PUT", "/regularize/process"],
+    ["POST", "/regularize/process/send-to-fiscal"],
+    ["POST", "/regularize/process/return-from-fiscal"],
     ["GET", "/regularize/processes"],
     ["POST", "/regularize/guidance"],
     ["PUT", "/regularize/guidance"],
@@ -118,7 +120,7 @@ describe("regularize remaining routes", () => {
         })),
       },
       client: {
-        findFirst: vi.fn(async () => ({ id: "client-1" })),
+        findFirst: vi.fn(async () => ({ id: "client-1", cpf_cnpj: "12345678901" })),
       },
       clientPF: {
         findFirst: vi.fn(async () => null),
@@ -127,6 +129,8 @@ describe("regularize remaining routes", () => {
         create: vi.fn(async () => ({})),
       },
     } as unknown as PrismaClient;
+
+    prisma.$transaction = vi.fn(async (callback) => callback(prisma));
 
     const app = createTestApp(prisma);
 

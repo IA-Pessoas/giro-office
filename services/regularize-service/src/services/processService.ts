@@ -5,6 +5,12 @@ import type { CreateProcessBody, UpdateProcessBody } from "../schemas/process.sc
 import { buildProcessStatusFilter } from "../schemas/status.schemas.js";
 import { RegularizeLogService } from "./regularizeLogService.js";
 
+const CALENDAR_DAY_MS = 24 * 60 * 60 * 1000;
+const PROCESS_ACTIONS = {
+  sendToFiscal: "Envio ao Fiscal",
+  returnFromFiscal: "Retorno do Fiscal",
+} as const;
+
 const processSelect = {
   id: true,
   client_pj_id: true,
@@ -23,14 +29,102 @@ const processSelect = {
   locking_type: true,
   urgency: true,
   task_id: true,
+  responsible1: { select: { id: true, name: true, organization_id: true } },
+  responsible2: { select: { id: true, name: true, organization_id: true } },
+  responsible3: { select: { id: true, name: true, organization_id: true } },
 } as const;
 
-export class ProcessService {
-  readonly #logs: RegularizeLogService;
+const processHistorySelect = {
+  id: true,
+  action: true,
+  referring: true,
+  referring_id: true,
+  changes: true,
+  date: true,
+  user: { select: { id: true, name: true, organization_id: true } },
+} as const;
 
-  constructor(private readonly prisma: PrismaClient) {
-    this.#logs = new RegularizeLogService(prisma);
+export function calculateElapsedCalendarDays(
+  startDate: Date | null | undefined,
+  endDate: Date | null | undefined,
+): number | null {
+  if (!startDate || !endDate) {
+    return null;
   }
+
+  const start = Date.UTC(
+    startDate.getUTCFullYear(),
+    startDate.getUTCMonth(),
+    startDate.getUTCDate(),
+  );
+  const end = Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate());
+
+  return Math.max(0, Math.floor((end - start) / CALENDAR_DAY_MS));
+}
+
+function normalizeDocument(value: string | null | undefined): string {
+  return value?.replace(/\D/g, "") ?? "";
+}
+
+function withoutResponsibleRelations(data: Record<string, unknown>): Record<string, unknown> {
+  const {
+    responsible1: _responsible1,
+    responsible2: _responsible2,
+    responsible3: _responsible3,
+    ...scalars
+  } = data;
+  return scalars;
+}
+
+function sanitizeOrganizationRelation(relation: unknown, organizationId: string): unknown {
+  if (relation === null || relation === undefined) {
+    return relation;
+  }
+  if (typeof relation !== "object") {
+    return null;
+  }
+
+  const candidate = relation as Record<string, unknown>;
+  if (
+    candidate.organization_id !== organizationId ||
+    typeof candidate.id !== "string" ||
+    typeof candidate.name !== "string"
+  ) {
+    return null;
+  }
+
+  return { id: candidate.id, name: candidate.name };
+}
+
+function sanitizeProcessRecord(
+  data: Record<string, unknown>,
+  organizationId: string,
+): Record<string, unknown> {
+  const sanitized = { ...data };
+  for (const key of ["responsible1", "responsible2", "responsible3"]) {
+    if (key in data) {
+      sanitized[key] = sanitizeOrganizationRelation(data[key], organizationId);
+    }
+  }
+  return sanitized;
+}
+
+function sanitizeProcessHistory(history: unknown[], organizationId: string): unknown[] {
+  return history.map((entry) => {
+    if (entry === null || typeof entry !== "object") {
+      return entry;
+    }
+
+    const sanitized = { ...(entry as Record<string, unknown>) };
+    if ("user" in sanitized) {
+      sanitized.user = sanitizeOrganizationRelation(sanitized.user, organizationId);
+    }
+    return sanitized;
+  });
+}
+
+export class ProcessService {
+  constructor(private readonly prisma: PrismaClient) {}
 
   async create(input: {
     organizationId: string;
@@ -53,27 +147,36 @@ export class ProcessService {
       throw new ServiceError(409, "Processo ja cadastrado.");
     }
 
-    const created = await this.prisma.process.create({
-      data: {
-        ...input.body,
-        observation: input.body.observation ?? null,
-        locking_type: input.body.locking_type ?? null,
-        urgency: input.body.urgency ?? null,
-        organization_id: input.organizationId,
-      },
-      select: processSelect,
+    const created = await this.withTransaction(async (prisma, logs) => {
+      const created = await prisma.process.create({
+        data: {
+          ...input.body,
+          observation: input.body.observation ?? null,
+          locking_type: input.body.locking_type ?? null,
+          urgency: input.body.urgency ?? null,
+          organization_id: input.organizationId,
+        },
+        select: processSelect,
+      });
+
+      await logs.createLog({
+        userId: input.userId,
+        organizationId: input.organizationId,
+        action: "Cadastro",
+        referring: "regularize.process",
+        referringId: created.id,
+        changes: "{}",
+      });
+
+      return created;
     });
 
-    await this.#logs.createLog({
-      userId: input.userId,
-      organizationId: input.organizationId,
-      action: "Cadastro",
-      referring: "regularize.process",
-      referringId: created.id,
-      changes: "{}",
-    });
-
-    return { create: created };
+    return {
+      create: sanitizeProcessRecord(
+        created as unknown as Record<string, unknown>,
+        input.organizationId,
+      ),
+    };
   }
 
   async update(input: {
@@ -91,28 +194,39 @@ export class ProcessService {
 
     await this.ensureRelations(input.organizationId, input.body);
 
-    const updated = await this.prisma.process.update({
-      where: { id: input.body.id },
-      data: {
-        ...input.body,
-        observation: input.body.observation ?? null,
-        locking_type: input.body.locking_type ?? null,
-        urgency: input.body.urgency ?? null,
-      },
-      select: processSelect,
+    const updated = await this.withTransaction(async (prisma, logs) => {
+      const updated = await prisma.process.update({
+        where: { id: input.body.id },
+        data: (() => {
+          const { id: _id, ...body } = input.body;
+
+          return {
+            ...body,
+            observation: body.observation ?? null,
+            locking_type: body.locking_type ?? null,
+            urgency: body.urgency ?? null,
+          };
+        })(),
+        select: processSelect,
+      });
+
+      await logs.logUpdateIfChanged({
+        userId: input.userId,
+        organizationId: input.organizationId,
+        action: "Atualizacao",
+        referring: "regularize.process",
+        referringId: existing.id,
+        oldData: withoutResponsibleRelations(existing as unknown as Record<string, unknown>),
+        updatedData: withoutResponsibleRelations(updated as unknown as Record<string, unknown>),
+      });
+
+      return updated;
     });
 
-    await this.#logs.logUpdateIfChanged({
-      userId: input.userId,
-      organizationId: input.organizationId,
-      action: "Atualizacao",
-      referring: "regularize.process",
-      referringId: existing.id,
-      oldData: existing as unknown as Record<string, unknown>,
-      updatedData: updated as unknown as Record<string, unknown>,
-    });
-
-    return updated as unknown as Record<string, unknown>;
+    return sanitizeProcessRecord(
+      updated as unknown as Record<string, unknown>,
+      input.organizationId,
+    );
   }
 
   async detail(organizationId: string, id: string): Promise<Record<string, unknown>> {
@@ -124,7 +238,42 @@ export class ProcessService {
       throw new ServiceError(404, "Processo nao encontrado.");
     }
 
-    return { detail };
+    const history = await this.prisma.logs.findMany({
+      where: {
+        organization_id: organizationId,
+        referring: "regularize.process",
+        referring_id: id,
+      },
+      select: processHistorySelect,
+      orderBy: { date: "asc" },
+    });
+
+    return {
+      detail: {
+        ...sanitizeProcessRecord(detail as unknown as Record<string, unknown>, organizationId),
+        elapsed_days: calculateElapsedCalendarDays(
+          detail.entry_date,
+          detail.completion_date ?? new Date(),
+        ),
+        history: sanitizeProcessHistory(history as unknown[], organizationId),
+      },
+    };
+  }
+
+  async sendToFiscal(input: {
+    organizationId: string;
+    userId: string;
+    processId: string;
+  }): Promise<Record<string, unknown>> {
+    return this.recordFiscalAction(input, PROCESS_ACTIONS.sendToFiscal);
+  }
+
+  async returnFromFiscal(input: {
+    organizationId: string;
+    userId: string;
+    processId: string;
+  }): Promise<Record<string, unknown>> {
+    return this.recordFiscalAction(input, PROCESS_ACTIONS.returnFromFiscal);
   }
 
   async list(params: {
@@ -203,24 +352,101 @@ export class ProcessService {
     organizationId: string,
     body: CreateProcessBody | UpdateProcessBody,
   ): Promise<void> {
-    if (body.client_pj_id) {
+    const hasPj = Boolean(body.client_pj_id);
+    const hasPf = Boolean(body.client_pf_id);
+    if (hasPj === hasPf) {
+      throw new ServiceError(400, "Informe exatamente um cliente PJ ou PF.");
+    }
+
+    if (hasPj) {
       const client = await this.prisma.client.findFirst({
         where: { id: body.client_pj_id, organization_id: organizationId },
-        select: { id: true },
+        select: { id: true, cpf_cnpj: true },
       });
       if (!client) {
         throw new ServiceError(404, "Cliente PJ nao encontrado.");
       }
-    }
-
-    if (body.client_pf_id) {
+      if (normalizeDocument(body.cpf_cnpj) !== normalizeDocument(client.cpf_cnpj)) {
+        throw new ServiceError(400, "CPF/CNPJ nao corresponde ao cliente PJ.");
+      }
+    } else {
       const clientPf = await this.prisma.clientPF.findFirst({
         where: { id: body.client_pf_id, organization_id: organizationId },
-        select: { id: true },
+        select: { id: true, cpf: true },
       });
       if (!clientPf) {
         throw new ServiceError(404, "Cliente PF nao encontrado.");
       }
+      if (normalizeDocument(body.cpf_cnpj) !== normalizeDocument(clientPf.cpf)) {
+        throw new ServiceError(400, "CPF/CNPJ nao corresponde ao cliente PF.");
+      }
     }
+
+    const responsibleIds = [
+      body.responsible1_id,
+      body.responsible2_id,
+      body.responsible3_id,
+    ].filter((id): id is string => Boolean(id));
+    const uniqueResponsibleIds = [...new Set(responsibleIds)];
+    if (uniqueResponsibleIds.length > 0) {
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: uniqueResponsibleIds }, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (users.length !== uniqueResponsibleIds.length) {
+        throw new ServiceError(404, "Responsavel nao encontrado na organizacao.");
+      }
+    }
+
+    if (body.task_id) {
+      const task = await this.prisma.task.findFirst({
+        where: { id: body.task_id, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (!task) {
+        throw new ServiceError(404, "Tarefa nao encontrada na organizacao.");
+      }
+    }
+  }
+
+  private async recordFiscalAction(
+    input: { organizationId: string; userId: string; processId: string },
+    action: string,
+  ): Promise<Record<string, unknown>> {
+    return this.withTransaction(async (prisma, logs) => {
+      const process = await prisma.process.findFirst({
+        where: { id: input.processId, organization_id: input.organizationId },
+        select: processSelect,
+      });
+      if (!process) {
+        throw new ServiceError(404, "Processo nao encontrado.");
+      }
+
+      await logs.createLog({
+        userId: input.userId,
+        organizationId: input.organizationId,
+        action,
+        referring: "regularize.process",
+        referringId: input.processId,
+        changes: { processId: input.processId, action },
+      });
+
+      return {
+        process: sanitizeProcessRecord(
+          process as unknown as Record<string, unknown>,
+          input.organizationId,
+        ),
+        action,
+      };
+    });
+  }
+
+  private async withTransaction<T>(
+    operation: (prisma: PrismaClient, logs: RegularizeLogService) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(async (transaction) => {
+      const prisma = transaction as unknown as PrismaClient;
+      return operation(prisma, new RegularizeLogService(prisma));
+    });
   }
 }

@@ -300,6 +300,21 @@ export type RegularizeProcessListItem = {
   clientPJ?: RegularizeProcessClientSummary | null;
 };
 
+export type RegularizeProcessResponsible = {
+  id: RegularizeId;
+  name: string;
+};
+
+export type RegularizeProcessHistoryItem = {
+  id: RegularizeId;
+  action: string;
+  referring: string;
+  referring_id: RegularizeId;
+  changes: unknown;
+  date: string;
+  user?: RegularizeProcessResponsible | null;
+};
+
 export type RegularizeProcessDetail = RegularizeProcessListItem & {
   description?: string | null;
   entry_date?: string | null;
@@ -312,6 +327,11 @@ export type RegularizeProcessDetail = RegularizeProcessListItem & {
   locking_type?: string | null;
   urgency?: string | null;
   task_id?: RegularizeId | null;
+  responsible1?: RegularizeProcessResponsible | null;
+  responsible2?: RegularizeProcessResponsible | null;
+  responsible3?: RegularizeProcessResponsible | null;
+  elapsed_days?: number | null;
+  history?: RegularizeProcessHistoryItem[];
 };
 
 export type CreateRegularizeProcessPayload = {
@@ -335,6 +355,15 @@ export type CreateRegularizeProcessPayload = {
 
 export type UpdateRegularizeProcessPayload = CreateRegularizeProcessPayload & {
   id: RegularizeId;
+};
+
+export type RegularizeProcessActionPayload = {
+  id: RegularizeId;
+};
+
+export type RegularizeProcessActionResult = {
+  process: RegularizeProcessDetail;
+  action: "Envio ao Fiscal" | "Retorno do Fiscal";
 };
 
 export type RegularizeGuidanceEconomicActivity = {

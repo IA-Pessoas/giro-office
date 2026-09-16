@@ -95,6 +95,43 @@ function statusRequestBody(statuses: readonly string[], required: string[]) {
   };
 }
 
+function processRequestBody(required: string[]) {
+  return {
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required,
+            description: "Informe exatamente um cliente PJ ou PF.",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              client_pj_id: { type: "string", format: "uuid" },
+              client_pf_id: { type: "string", format: "uuid" },
+              cpf_cnpj: { type: "string", minLength: 1 },
+              process_type: { type: "string", minLength: 1 },
+              description: { type: "string", minLength: 1 },
+              entry_date: { type: "string", format: "date-time" },
+              completion_date: { type: "string", format: "date-time" },
+              expected_date: { type: "string", format: "date-time" },
+              status: { type: "string", enum: [...CANONICAL_PROCESS_STATUSES] },
+              observation: { type: "string", nullable: true },
+              responsible1_id: { type: "string", format: "uuid" },
+              responsible2_id: { type: "string", format: "uuid" },
+              responsible3_id: { type: "string", format: "uuid" },
+              locking_type: { type: "string", nullable: true },
+              urgency: { type: "string", nullable: true },
+              task_id: { type: "string", format: "uuid" },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
 function paginatedClientPfSuccessEnvelopeContent() {
   return {
     content: {
@@ -519,7 +556,7 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/process": {
         get: {
           tags: ["Processes"],
-          summary: "Detalhar processo",
+          summary: "Detalhar processo com responsáveis, prazo e histórico",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
@@ -530,7 +567,7 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Processes"],
           summary: "Criar processo",
           security: [{ bearerAuth: [] }],
-          ...statusRequestBody(CANONICAL_PROCESS_STATUSES, ["status"]),
+          ...processRequestBody(["cpf_cnpj", "process_type", "description", "status"]),
           responses: {
             "201": { description: "Processo criado", ...successEnvelopeContent() },
             ...protectedErrorResponses(),
@@ -540,9 +577,59 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Processes"],
           summary: "Atualizar processo",
           security: [{ bearerAuth: [] }],
-          ...statusRequestBody(CANONICAL_PROCESS_STATUSES, ["id", "status"]),
+          ...processRequestBody(["id", "cpf_cnpj", "process_type", "description", "status"]),
           responses: {
             "200": { description: "Processo atualizado", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+          },
+        },
+      },
+      "/regularize/process/send-to-fiscal": {
+        post: {
+          tags: ["Processes"],
+          summary: "Registrar envio do processo ao Fiscal",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["id"],
+                  properties: { id: { type: "string", format: "uuid" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Envio ao Fiscal registrado", ...successEnvelopeContent() },
+            "404": { description: "Processo nao encontrado" },
+            ...protectedErrorResponses(),
+          },
+        },
+      },
+      "/regularize/process/return-from-fiscal": {
+        post: {
+          tags: ["Processes"],
+          summary: "Registrar retorno do processo pelo Fiscal",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["id"],
+                  properties: { id: { type: "string", format: "uuid" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Retorno do Fiscal registrado", ...successEnvelopeContent() },
+            "404": { description: "Processo nao encontrado" },
             ...protectedErrorResponses(),
           },
         },
