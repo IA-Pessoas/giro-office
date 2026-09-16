@@ -4,6 +4,7 @@ import { Router } from "express";
 import {
   createProcessBodySchema,
   listProcessesQuerySchema,
+  processActionBodySchema,
   processDetailQuerySchema,
   updateProcessBodySchema,
 } from "../schemas/process.schemas.js";
@@ -43,6 +44,42 @@ export function createProcessRoutes(deps: RegularizeRouteDeps): Router {
       next(err);
     }
   });
+
+  router.post(
+    "/process/send-to-fiscal",
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(processActionBodySchema, request.body);
+        const result = await processService.sendToFiscal({
+          organizationId: request.organization_id,
+          userId: request.user_id,
+          processId: body.id,
+        });
+        response.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao registrar envio do processo ao Fiscal", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/process/return-from-fiscal",
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(processActionBodySchema, request.body);
+        const result = await processService.returnFromFiscal({
+          organizationId: request.organization_id,
+          userId: request.user_id,
+          processId: body.id,
+        });
+        response.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao registrar retorno do processo pelo Fiscal", { err });
+        next(err);
+      }
+    },
+  );
 
   router.get("/process", async (request: Request, response: Response, next: NextFunction) => {
     try {

@@ -20,11 +20,21 @@ export const regularizePrimaryButtonClassName =
 export const regularizeClientStatusOptions = ["Ativo", "Inativo"] as const;
 
 export const regularizeProcessStatusOptions = [
+  "Pendente",
+  "Andamento",
+  "Protocolado",
+  "Finalizado",
+  "Paralisado",
+] as const;
+
+export const regularizeProcessStatusFilterOptions = [
+  "Todos",
+  ...regularizeProcessStatusOptions,
   "Aberto",
   "Em andamento",
-  "Pendente",
   "Concluído",
-  "Cancelado",
+  "Concluido",
+  "Paralizado",
 ] as const;
 
 export const regularizeGuidanceStatusOptions = [

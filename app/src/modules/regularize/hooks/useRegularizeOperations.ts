@@ -27,6 +27,8 @@ import type {
   RegularizeMunicipalTaxesDetail,
   RegularizeMunicipalTaxesListFilters,
   RegularizeMunicipalTaxesPage,
+  RegularizeProcessActionPayload,
+  RegularizeProcessActionResult,
   RegularizeProcessDetail,
   RegularizeProcessListFilters,
   RegularizeProcessListItem,
@@ -167,6 +169,32 @@ export function useUpdateRegularizeProcessMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.updateProcess(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useSendRegularizeProcessToFiscalMutation(): UseMutationResult<
+  RegularizeProcessActionResult,
+  Error,
+  RegularizeProcessActionPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.sendProcessToFiscal(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useReturnRegularizeProcessFromFiscalMutation(): UseMutationResult<
+  RegularizeProcessActionResult,
+  Error,
+  RegularizeProcessActionPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.returnProcessFromFiscal(payload),
     onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }

@@ -99,5 +99,32 @@ describe("regularize status contracts", () => {
         "Paralisado",
       ]),
     );
+
+    const sendToFiscalPath = spec.paths["/regularize/process/send-to-fiscal"] as {
+      post: {
+        summary: string;
+        security: Array<Record<string, string[]>>;
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: { required: string[]; properties: { id: { format: string } } };
+            };
+          };
+        };
+      };
+    };
+    const returnFromFiscalPath = spec.paths["/regularize/process/return-from-fiscal"] as {
+      post: { summary: string };
+    };
+
+    expect(sendToFiscalPath.post.summary).toContain("envio");
+    expect(sendToFiscalPath.post.security).toEqual([{ bearerAuth: [] }]);
+    expect(sendToFiscalPath.post.requestBody.content["application/json"].schema.required).toEqual([
+      "id",
+    ]);
+    expect(
+      sendToFiscalPath.post.requestBody.content["application/json"].schema.properties.id.format,
+    ).toBe("uuid");
+    expect(returnFromFiscalPath.post.summary).toContain("retorno");
   });
 });

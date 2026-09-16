@@ -26,6 +26,8 @@ export const REGULARIZE_ENDPOINTS = {
   municipalTaxesDetail: "/regularize/municipal-taxes-detail",
   processes: "/regularize/processes",
   process: "/regularize/process",
+  sendToFiscal: "/regularize/process/send-to-fiscal",
+  returnFromFiscal: "/regularize/process/return-from-fiscal",
   guidanceList: "/regularize/guidance/list",
   guidanceDetail: "/regularize/guidance/detail",
   guidance: "/regularize/guidance",

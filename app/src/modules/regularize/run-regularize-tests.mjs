@@ -65,6 +65,8 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
     "/regularize/municipal-taxes-detail",
     "/regularize/processes",
     "/regularize/process",
+    "/regularize/process/send-to-fiscal",
+    "/regularize/process/return-from-fiscal",
     "/regularize/guidance/list",
     "/regularize/guidance/detail",
     "/regularize/guidance",
@@ -413,6 +415,35 @@ await runTest("regularize list params carry server search and pagination", async
   );
   const page = { data: [{ id: "row-21" }], total: 21, page: 2, limit: 20, hasMore: false };
   assert.deepEqual(unwrapRegularizePage({ data: page }, { page: 2, limit: 20 }), page);
+});
+
+await runTest("regularize process contract keeps canonical states and explicit Fiscal actions", async () => {
+  const [controlsSource, formSource, pageSource, contractSource, serviceSource, hooksSource] =
+    await Promise.all([
+      readModuleSource("components/regularizeFormControls.tsx"),
+      readModuleSource("components/RegularizeProcessForm.tsx"),
+      readModuleSource("components/RegularizePage.tsx"),
+      readModuleSource("services/regularizeService.contract.ts"),
+      readModuleSource("services/regularizeService.ts"),
+      readModuleSource("hooks/useRegularizeOperations.ts"),
+    ]);
+
+  assert.match(
+    controlsSource,
+    /regularizeProcessStatusOptions = \[\s*"Pendente",\s*"Andamento",\s*"Protocolado",\s*"Finalizado",\s*"Paralisado",\s*\]/,
+  );
+  assert.match(formSource, /useAssignableUsers/);
+  assert.match(formSource, /responsible1_id/);
+  assert.match(formSource, /responsible2_id/);
+  assert.match(formSource, /responsible3_id/);
+  assert.match(contractSource, /sendToFiscal: "\/regularize\/process\/send-to-fiscal"/);
+  assert.match(contractSource, /returnFromFiscal: "\/regularize\/process\/return-from-fiscal"/);
+  assert.match(serviceSource, /api\.post\(REGULARIZE_ENDPOINTS\.sendToFiscal/);
+  assert.match(serviceSource, /api\.post\(REGULARIZE_ENDPOINTS\.returnFromFiscal/);
+  assert.match(hooksSource, /useSendRegularizeProcessToFiscalMutation/);
+  assert.match(hooksSource, /useReturnRegularizeProcessFromFiscalMutation/);
+  assert.match(pageSource, /Enviar ao Fiscal/);
+  assert.match(pageSource, /Registrar retorno do Fiscal/);
 });
 
 await runTest("regularize municipal tax contract carries filters and unwraps a page", async () => {

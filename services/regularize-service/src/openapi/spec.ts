@@ -519,7 +519,7 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/process": {
         get: {
           tags: ["Processes"],
-          summary: "Detalhar processo",
+          summary: "Detalhar processo com responsáveis, prazo e histórico",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
@@ -543,6 +543,56 @@ export function buildRegularizeServiceOpenApiSpec(
           ...statusRequestBody(CANONICAL_PROCESS_STATUSES, ["id", "status"]),
           responses: {
             "200": { description: "Processo atualizado", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+          },
+        },
+      },
+      "/regularize/process/send-to-fiscal": {
+        post: {
+          tags: ["Processes"],
+          summary: "Registrar envio do processo ao Fiscal",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["id"],
+                  properties: { id: { type: "string", format: "uuid" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Envio ao Fiscal registrado", ...successEnvelopeContent() },
+            "404": { description: "Processo nao encontrado" },
+            ...protectedErrorResponses(),
+          },
+        },
+      },
+      "/regularize/process/return-from-fiscal": {
+        post: {
+          tags: ["Processes"],
+          summary: "Registrar retorno do processo pelo Fiscal",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["id"],
+                  properties: { id: { type: "string", format: "uuid" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Retorno do Fiscal registrado", ...successEnvelopeContent() },
+            "404": { description: "Processo nao encontrado" },
             ...protectedErrorResponses(),
           },
         },
