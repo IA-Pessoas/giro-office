@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Archive, CircleAlert, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
@@ -98,6 +98,7 @@ export function CommercialCatalog() {
   });
   const [taskBillingFormError, setTaskBillingFormError] = useState("");
   const proposalConfigCreateTriggerRef = useRef<HTMLButtonElement>(null);
+  const proposalConfigDialogTriggerRef = useRef<HTMLButtonElement>(null);
   const prospectingCreateTriggerRef = useRef<HTMLButtonElement>(null);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -139,7 +140,8 @@ export function CommercialCatalog() {
     }
   }
 
-  function startCreate() {
+  function startCreate(event?: MouseEvent<HTMLButtonElement>) {
+    proposalConfigDialogTriggerRef.current = event?.currentTarget ?? proposalConfigCreateTriggerRef.current;
     setIsCreating(true);
     setEditingId(null);
     setDraft(emptyDraft);
@@ -471,7 +473,7 @@ export function CommercialCatalog() {
         preventClose={isSaving}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          proposalConfigCreateTriggerRef.current?.focus();
+          proposalConfigDialogTriggerRef.current?.focus();
         }}
         bodyClassName="!px-0 !py-0"
       >

@@ -471,6 +471,16 @@ async function run() {
     await page.getByRole("heading", { name: "Nenhuma configuração cadastrada" }).waitFor();
     await page.screenshot({ path: `${evidenceDir}/02-commercial-config-deleted.png`, fullPage: true });
 
+    const emptyConfigCreateButton = page.getByRole("button", { name: "Criar configuração", exact: true });
+    await emptyConfigCreateButton.click();
+    await proposalConfigDialog.waitFor({ state: "visible" });
+    await page.keyboard.press("Escape");
+    await proposalConfigDialog.waitFor({ state: "hidden" });
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.textContent?.trim()),
+      "Criar configuração",
+    );
+
     await page.getByRole("button", { name: "Nova prospecção" }).click();
     const prospectingDialog = page.getByRole("dialog", { name: "Nova prospecção" });
     await prospectingDialog.waitFor({ state: "visible" });
