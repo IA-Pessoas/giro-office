@@ -151,6 +151,7 @@ await (async () => {
 
     assert.match(pageSource, /useTriageEditability/);
     assert.match(pageSource, /canEdit=\{editability\.data\?\.can_edit === true\}/);
+    assert.match(pageSource, /canEditClosing=\{access\.canEdit\}/);
     assert.doesNotMatch(pageSource, /canEdit\s*\/>/);
   });
 

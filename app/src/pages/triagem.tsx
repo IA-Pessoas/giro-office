@@ -43,7 +43,11 @@ export default function TriagemPage() {
           </header>
           {client ? (
             <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-              <TriageDocumentsSection clientId={client.id} canEdit={editability.data?.can_edit === true} />
+              <TriageDocumentsSection
+                clientId={client.id}
+                canEdit={editability.data?.can_edit === true}
+                canEditClosing={access.canEdit}
+              />
             </div>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
