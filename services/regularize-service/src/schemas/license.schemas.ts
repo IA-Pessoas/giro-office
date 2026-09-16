@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import { idQuerySchema } from "./common.schemas.js";
-import { licenseReadStatusSchema, licenseWriteStatusSchema } from "./status.schemas.js";
+import {
+  licenseReadStatusSchema,
+  licenseUpdateStatusSchema,
+  licenseWriteStatusSchema,
+} from "./status.schemas.js";
 
 export const createLicenseBodySchema = z
   .object({
@@ -26,6 +30,7 @@ export const createLicenseBodySchema = z
 export const updateLicenseBodySchema = createLicenseBodySchema
   .extend({
     id: z.string().uuid("id invalido."),
+    status: licenseUpdateStatusSchema,
   })
   .strict();
 

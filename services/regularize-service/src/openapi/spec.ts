@@ -71,7 +71,11 @@ function protectedErrorResponses() {
   };
 }
 
-function statusRequestBody(statuses: readonly string[], required: string[]) {
+function statusRequestBody(
+  statuses: readonly string[],
+  required: string[],
+  statusDescription = "Estado canonico; aliases legados nao sao aceitos em novas escritas.",
+) {
   return {
     requestBody: {
       required: true,
@@ -85,7 +89,7 @@ function statusRequestBody(statuses: readonly string[], required: string[]) {
               status: {
                 type: "string",
                 enum: [...statuses],
-                description: "Estado canonico; aliases legados nao sao aceitos em novas escritas.",
+                description: statusDescription,
               },
             },
           },
@@ -330,11 +334,15 @@ export function buildRegularizeServiceOpenApiSpec(
         get: {
           tags: ["Passwords"],
           summary: "Detalhar senha",
+          description: "Revela login e senha somente para usuarios com permissao Regularize 2.",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
-          responses: { "200": { description: "Detalhe da senha", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Detalhe da senha", ...successEnvelopeContent() },
+            "403": { description: "Permissao insuficiente para revelar credencial" },
+          },
         },
       },
       "/regularize/sites-pass": {
@@ -776,7 +784,11 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Licenses"],
           summary: "Atualizar licenca",
           security: [{ bearerAuth: [] }],
-          ...statusRequestBody(CANONICAL_LICENSE_STATUSES, ["id", "status"]),
+          ...statusRequestBody(
+            [...CANONICAL_LICENSE_STATUSES, ...LEGACY_LICENSE_STATUS_ALIASES],
+            ["id", "status"],
+            "Estado canonico; aliases legados sao aceitos para preservar registros existentes.",
+          ),
           responses: {
             "200": { description: "Licenca atualizada", ...successEnvelopeContent() },
             ...protectedErrorResponses(),
@@ -793,7 +805,8 @@ export function buildRegularizeServiceOpenApiSpec(
               name: "status",
               in: "query",
               required: true,
-              description: "Use Todos para listar todos os status.",
+              description:
+                "Use Todos para listar todos os status. A vencer e Vencido são derivados de due_date; aliases legados permanecem disponíveis para leitura.",
               schema: {
                 type: "string",
                 enum: [

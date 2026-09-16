@@ -37,7 +37,7 @@ import type {
   UpdateRegularizeMunicipalTaxPayload,
   UpdateRegularizeProcessPayload,
 } from "../types";
-import { regularizeQueryKeys } from "./queryKeys";
+import { regularizeQueryKeys, useRegularizeQueryScope } from "./queryKeys";
 
 type RegularizeReadQueryOptions = {
   enabled?: boolean;
@@ -48,10 +48,10 @@ async function invalidateRegularizeOperations(
 ): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({
-      queryKey: regularizeQueryKeys.operations(),
+      queryKey: regularizeQueryKeys.root,
     }),
     queryClient.invalidateQueries({
-      queryKey: regularizeQueryKeys.dashboardRoot(),
+      queryKey: regularizeQueryKeys.root,
     }),
   ]);
 }
@@ -60,8 +60,10 @@ export function useRegularizeMunicipalTaxes(
   filters: RegularizeMunicipalTaxesListFilters,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeMunicipalTaxesPage, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.municipalTaxes(filters),
+    regularizeQueryKeys.municipalTaxes(filters, scope),
     () => regularizeService.listMunicipalTaxes(filters),
     {
       enabled: Boolean(filters.year) && (options?.enabled ?? true),
@@ -73,8 +75,10 @@ export function useRegularizeMunicipalTaxDetail(
   id: RegularizeId | undefined | null,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeMunicipalTaxesDetail, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.municipalTaxDetail(id),
+    regularizeQueryKeys.municipalTaxDetail(id, scope),
     () => regularizeService.getMunicipalTax(id ?? ""),
     {
       enabled: Boolean(id) && (options?.enabled ?? true),
@@ -112,8 +116,10 @@ export function useRegularizeProcesses(
   filters: RegularizeProcessListFilters,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeProcessListItem[], Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.processes(filters),
+    regularizeQueryKeys.processes(filters, scope),
     () => regularizeService.listProcesses(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
@@ -125,8 +131,10 @@ export function usePaginatedRegularizeProcesses(
   filters: RegularizeProcessListFilters & { page: number; limit: number },
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<PaginatedResult<RegularizeProcessListItem>, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.processesPage(filters),
+    regularizeQueryKeys.processesPage(filters, scope),
     () => regularizeService.listProcessesPage(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
@@ -138,8 +146,10 @@ export function useRegularizeProcessDetail(
   id: RegularizeId | undefined | null,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeProcessDetail, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.processDetail(id),
+    regularizeQueryKeys.processDetail(id, scope),
     () => regularizeService.getProcess(id ?? ""),
     {
       enabled: Boolean(id) && (options?.enabled ?? true),
@@ -204,9 +214,10 @@ export function useRegularizeGuidance(
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeGuidance[], Error> {
   const safeFilters = filters ?? { process_id: "" };
+  const scope = useRegularizeQueryScope();
 
   return useFetch(
-    regularizeQueryKeys.guidance(safeFilters),
+    regularizeQueryKeys.guidance(safeFilters, scope),
     () => regularizeService.listGuidance(safeFilters),
     {
       enabled: Boolean(filters?.process_id) && (options?.enabled ?? true),
@@ -218,8 +229,10 @@ export function useRegularizeGuidanceDetail(
   id: RegularizeId | undefined | null,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeGuidance, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.guidanceDetail(id),
+    regularizeQueryKeys.guidanceDetail(id, scope),
     () => regularizeService.getGuidance(id ?? ""),
     {
       enabled: Boolean(id) && (options?.enabled ?? true),
@@ -309,8 +322,10 @@ export function useRegularizeLicenses(
   filters: RegularizeLicenseListFilters,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeLicenseListItem[], Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.licenses(filters),
+    regularizeQueryKeys.licenses(filters, scope),
     () => regularizeService.listLicenses(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
@@ -322,8 +337,10 @@ export function usePaginatedRegularizeLicenses(
   filters: RegularizeLicenseListFilters & { page: number; limit: number },
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<PaginatedResult<RegularizeLicenseListItem>, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.licensesPage(filters),
+    regularizeQueryKeys.licensesPage(filters, scope),
     () => regularizeService.listLicensesPage(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
@@ -361,8 +378,10 @@ export function useRegularizeLicenseDetail(
   id: RegularizeId | undefined | null,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeLicenseDetail, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.licenseDetail(id),
+    regularizeQueryKeys.licenseDetail(id, scope),
     () => regularizeService.getLicense(id ?? ""),
     {
       enabled: Boolean(id) && (options?.enabled ?? true),

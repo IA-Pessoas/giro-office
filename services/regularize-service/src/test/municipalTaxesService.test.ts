@@ -156,3 +156,42 @@ describe("MunicipalTaxesService.list", () => {
     );
   });
 });
+
+describe("MunicipalTaxesService.update", () => {
+  it("rejects a new client from another organization before updating", async () => {
+    const update = vi.fn();
+    const prisma = {
+      client: {
+        findFirst: vi.fn(async () => null),
+      },
+      municipalTaxes: {
+        findFirst: vi.fn(async () => ({ id: "tax-1", client_id: "client-1" })),
+        update,
+      },
+    };
+    const service = new MunicipalTaxesService(prisma as unknown as PrismaClient);
+
+    await expect(
+      service.update({
+        organizationId,
+        userId: "b0000000-0000-4000-8000-000000000001",
+        body: {
+          id: "tax-1",
+          client_id: "client-from-other-org",
+          year: 2026,
+          tff_is_applicable: false,
+          tff_amount: 0,
+          tff_analysis_is_done: false,
+          tlp_is_applicable: false,
+          tlp_amount: 0,
+          tlp_is_sent: "Nao",
+          tlp_not_email: false,
+          tll_is_applicable: false,
+          tll_amount: 0,
+          tll_is_sent: "Nao",
+        },
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(update).not.toHaveBeenCalled();
+  });
+});

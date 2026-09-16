@@ -45,12 +45,21 @@ export const regularizeGuidanceStatusOptions = [
 ] as const;
 
 export const regularizeLicenseStatusOptions = [
+  "Em Processo de Solicitação",
+  "Em Andamento",
+  "Finalizado",
+  "Paralisado",
+] as const;
+
+export const regularizeLicenseStatusFilterOptions = [
+  "Todos",
+  ...regularizeLicenseStatusOptions,
   "Ativo",
   "Pendente",
-  "A vencer",
-  "Vencido",
   "Inativo",
   "Cancelado",
+  "A vencer",
+  "Vencido",
 ] as const;
 
 export const regularizeUrgencyOptions = ["Baixa", "Média", "Alta", "Urgente"] as const;
@@ -66,6 +75,48 @@ export function getRegularizePresetOptions(
   }
 
   return [...options, normalizedValue];
+}
+
+export function getRegularizeLicenseDisplayStatus(
+  status: string,
+  dueDate?: string | null,
+  referenceDate = new Date(),
+): string {
+  if (!dueDate) {
+    return status;
+  }
+
+  const parsedDueDate = new Date(dueDate);
+  if (Number.isNaN(parsedDueDate.getTime())) {
+    return status;
+  }
+
+  const dueDay = Date.UTC(
+    parsedDueDate.getUTCFullYear(),
+    parsedDueDate.getUTCMonth(),
+    parsedDueDate.getUTCDate(),
+  );
+  const today = new Date(
+    Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate()),
+  );
+  const nextMonth = new Date(today);
+  const originalDay = nextMonth.getUTCDate();
+  nextMonth.setUTCDate(1);
+  nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+  const lastDay = new Date(
+    Date.UTC(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  nextMonth.setUTCDate(Math.min(originalDay, lastDay));
+
+  if (dueDay < today.getTime()) {
+    return "Vencido";
+  }
+
+  if (dueDay <= nextMonth.getTime()) {
+    return "A vencer";
+  }
+
+  return status;
 }
 
 export type RegularizeFormOption = {
