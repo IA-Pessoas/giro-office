@@ -1,5 +1,6 @@
 export {
   buildContabilControlParams,
+  buildContabilPortfolioParams,
   CONTABIL_ENDPOINTS,
   executeNullableContabilRequest,
   isNotFoundError,

@@ -3,17 +3,29 @@ import { setupAPIClient } from "@shared/services/api";
 import type {
   ContabilControl,
   ContabilControlFilters,
+  ContabilCompetence,
+  ContabilControlPortfolio,
   CreateOrGetContabilControlPayload,
   PatchContabilControlFieldPayload,
 } from "../types";
 import {
   buildContabilControlParams,
+  buildContabilPortfolioParams,
   CONTABIL_ENDPOINTS,
   executeNullableContabilRequest,
   unwrapContabilEnvelope,
 } from "./contabilService.contract";
 
 export const contabilControlService = {
+  async getPortfolio(competence: ContabilCompetence): Promise<ContabilControlPortfolio> {
+    const api = setupAPIClient();
+    const response = await api.get(CONTABIL_ENDPOINTS.controlsList, {
+      params: buildContabilPortfolioParams(competence),
+    });
+
+    return unwrapContabilEnvelope<ContabilControlPortfolio>(response.data);
+  },
+
   async createOrGetControl(
     payload: CreateOrGetContabilControlPayload,
   ): Promise<ContabilControl> {

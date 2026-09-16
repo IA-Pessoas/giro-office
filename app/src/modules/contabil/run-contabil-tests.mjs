@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  buildContabilPortfolioParams,
   buildContabilControlParams,
   CONTABIL_ENDPOINTS,
   executeNullableContabilRequest,
@@ -86,7 +87,22 @@ const contabilServiceSources = {
 };
 
 await (async () => {
-  await runTest("contabil page lists every active client from the organization", () => {
+  await runTest("carteira operacional usa o contrato mensal de leitura", () => {
+    assert.equal(CONTABIL_ENDPOINTS.controlsList, "/contabil/controls/list");
+    assert.deepEqual(buildContabilPortfolioParams("2026-09"), { competence: "2026-09" });
+  });
+
+  await runTest("carteira operacional mostra competência, resumo, ausência e recuperação", () => {
+    const source = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
+
+    assert.match(source, /type="month"/);
+    assert.match(source, /Carteira operacional/);
+    assert.match(source, /sem controle mensal/i);
+    assert.match(source, /Tentar novamente/);
+    assert.match(source, /—/);
+  });
+
+  await runTest("contabil page preserva o seletor de cliente da organização", () => {
     const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
 
     assert.match(source, /ClientPickerModal/);

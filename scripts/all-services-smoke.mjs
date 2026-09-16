@@ -4200,8 +4200,7 @@ const handlers = {
   },
 
   async contabilControlCreate(op) {
-    const competence =
-      `${env.namespace}`.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || `comp-${uniqueDigits(8)}`;
+    const competence = "2026-09";
     state.contabilControlCompetence = competence;
     const response = await httpRequest(op, {
       expectedStatus: [200, 201],
@@ -4223,7 +4222,21 @@ const handlers = {
   async contabilControlCreateInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],
-      json: { client_id: "not-a-uuid", competence: "" },
+      json: { client_id: requireState("primaryClientId"), competence: "2026-13" },
+    });
+  },
+
+  async contabilControlPortfolio(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { competence: requireState("contabilControlCompetence") },
+    });
+  },
+
+  async contabilControlPortfolioInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      query: { competence: "2026-13" },
     });
   },
 

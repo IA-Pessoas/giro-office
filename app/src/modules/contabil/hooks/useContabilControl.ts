@@ -11,10 +11,20 @@ import { contabilControlService } from "../services";
 import type {
   ContabilControl,
   ContabilCompetence,
+  ContabilControlPortfolio,
   CreateOrGetContabilControlPayload,
   PatchContabilControlFieldPayload,
 } from "../types";
-import { contabilControlQueryKey } from "./queryKeys";
+import { contabilControlPortfolioQueryKey, contabilControlQueryKey } from "./queryKeys";
+
+export function useContabilControlPortfolio(
+  competence: ContabilCompetence,
+): UseQueryResult<ContabilControlPortfolio, Error> {
+  return useFetch(
+    contabilControlPortfolioQueryKey(competence),
+    () => contabilControlService.getPortfolio(competence),
+  );
+}
 
 interface PatchContabilControlFieldMutationPayload {
   clientId: string;
@@ -53,6 +63,9 @@ export function useContabilControlBootstrapMutation(): UseMutationResult<
         contabilControlQueryKey(payload.client_id, payload.competence),
         control,
       );
+      await queryClient.invalidateQueries({
+        queryKey: contabilControlPortfolioQueryKey(payload.competence),
+      });
     },
   });
 }
@@ -72,6 +85,9 @@ export function usePatchContabilControlFieldMutation(): UseMutationResult<
         contabilControlQueryKey(variables.clientId, variables.competence),
         control,
       );
+      await queryClient.invalidateQueries({
+        queryKey: contabilControlPortfolioQueryKey(variables.competence),
+      });
     },
   });
 }

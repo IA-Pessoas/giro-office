@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { ContabilControlSection } from "./ContabilControlSection";
+import { ContabilPortfolioSection } from "./ContabilPortfolioSection";
 import { ContabilResponsibleSection } from "./ContabilResponsibleSection";
 import { ContabilRelationshipSection } from "./ContabilRelationshipSection";
 import { ContabilStateBox } from "./ContabilStateBox";
@@ -131,6 +132,14 @@ function ContabilActiveTabPanel({
   canEdit: boolean;
 }) {
   if (!clientId) {
+    if (activeTab === "control") {
+      return (
+        <div role="tabpanel" id="contabil-panel-control" aria-labelledby="contabil-tab-control">
+          <ContabilPortfolioSection />
+        </div>
+      );
+    }
+
     return (
       <div
         role="tabpanel"

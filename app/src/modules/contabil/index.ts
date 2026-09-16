@@ -1,6 +1,7 @@
 export {
   AccessDeniedPanel,
   ContabilControlSection,
+  ContabilPortfolioSection,
   CONTABIL_CONTROL_FIELDS,
   CONTABIL_RELATIONSHIP_FIELDS,
   ContabilRelationshipSection,
@@ -10,6 +11,7 @@ export {
 } from "./components";
 export {
   contabilControlQueryKey,
+  contabilControlPortfolioQueryKey,
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
   CONTABIL_QUERY_KEY,
@@ -18,6 +20,7 @@ export {
   syncContabilRelationshipQueryCache,
   syncContabilResponsibleQueryCache,
   useContabilControlBootstrapMutation,
+  useContabilControlPortfolio,
   useContabilRelationship,
   useContabilResponsible,
   useCreateContabilRelationshipMutation,
@@ -32,6 +35,7 @@ export {
 export { resolveContabilPermissionAccess } from "./hooks/contabilPermissionAccess";
 export {
   buildContabilControlParams,
+  buildContabilPortfolioParams,
   contabilControlService,
   contabilRelationshipService,
   contabilResponsibleService,
@@ -45,6 +49,8 @@ export type {
   ContabilCompetence,
   ContabilControl,
   ContabilControlFilters,
+  ContabilControlPortfolio,
+  ContabilControlPortfolioItem,
   ContabilRelationship,
   ContabilResponsible,
   CreateContabilRelationshipPayload,

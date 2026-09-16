@@ -8,6 +8,7 @@ export {
 } from "./contabilQueryCache";
 export {
   contabilControlQueryKey,
+  contabilControlPortfolioQueryKey,
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
   CONTABIL_QUERY_KEY,
@@ -15,6 +16,7 @@ export {
 export {
   useContabilControlBootstrapMutation,
   useContabilControlDetail,
+  useContabilControlPortfolio,
   usePatchContabilControlFieldMutation,
 } from "./useContabilControl";
 export {

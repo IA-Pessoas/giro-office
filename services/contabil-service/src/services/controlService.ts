@@ -30,6 +30,15 @@ export interface CreateControlRequest extends ControlAuthContext {
   competence: string;
 }
 
+export interface ControlPortfolio {
+  competence: string;
+  items: Array<{
+    client_id: string;
+    legal_name: string;
+    control: ControlContabilEntity | null;
+  }>;
+}
+
 const UPDATABLE_FIELDS = new Set<string>([
   "regenerate_accounting_entries",
   "check_summary_by_accumulator",
@@ -72,11 +81,72 @@ const DEFAULT_CREATE_DATA = {
   notes: "",
 } as const;
 
+function getCompetenceInterval(competence: string): { start: Date; end: Date } {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(competence);
+  if (!match) {
+    throw new ServiceError(400, "competence deve estar no formato YYYY-MM.");
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1)),
+    end: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)),
+  };
+}
+
 export class ControlService {
   constructor(
     private readonly prisma: ControlServicePrisma = prismaClient,
     private readonly audit: ControlServiceAuditFns = { createLog, logUpdateIfChanged },
   ) {}
+
+  async list(competence: string, organizationId: string): Promise<ControlPortfolio> {
+    const { start, end } = getCompetenceInterval(competence);
+
+    try {
+      const clients = await this.prisma.client.findMany({
+        where: {
+          organization_id: organizationId,
+          contabil: true,
+          AND: [
+            {
+              OR: [{ competence_entry: null }, { competence_entry: { lte: end } }],
+            },
+            {
+              OR: [{ competence_output: null }, { competence_output: { gte: start } }],
+            },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          company_name: true,
+          controlContabil: {
+            where: { competence, organization_id: organizationId },
+            orderBy: { id: "asc" },
+            take: 1,
+          },
+        },
+      });
+
+      const items = clients
+        .map((client) => ({
+          client_id: client.id,
+          legal_name: client.company_name?.trim() || client.name,
+          control: client.controlContabil[0] ?? null,
+        }))
+        .sort((a, b) => a.legal_name.localeCompare(b.legal_name, "pt-BR", { sensitivity: "base" }));
+
+      return { competence, items };
+    } catch (err: unknown) {
+      logError("Erro ao listar carteira operacional contábil", { err });
+      if (err instanceof ServiceError) {
+        throw err;
+      }
+      throw new ServiceError(500, "Erro ao listar carteira operacional contábil.", err);
+    }
+  }
 
   async create(
     data: CreateControlRequest,

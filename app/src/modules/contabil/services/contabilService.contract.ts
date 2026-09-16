@@ -4,6 +4,7 @@ import type { ContabilControlFilters, ContabilCompetence } from "../types";
 
 export const CONTABIL_ENDPOINTS = {
   controls: "/contabil/controls",
+  controlsList: "/contabil/controls/list",
   controlById: (controlId: string) => `/contabil/controls/${controlId}`,
   responsibles: "/contabil/responsibles",
   responsibleById: (responsibleId: string) => `/contabil/responsibles/${responsibleId}`,
@@ -18,6 +19,10 @@ export function buildContabilControlParams(filters: ContabilControlFilters) {
     client_id: filters.clientId,
     competence: filters.competence,
   };
+}
+
+export function buildContabilPortfolioParams(competence: ContabilCompetence) {
+  return { competence };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
