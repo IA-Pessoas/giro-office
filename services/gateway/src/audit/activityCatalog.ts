@@ -678,6 +678,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/triagem\/editability$/,
+    description: { action: "consultou", item: "a permissão de edição da triagem" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/ti\/stock\/items\/[^/]+\/movements\/list$/,
     description: { action: "consultou", item: "a lista de movimentações de um item de estoque" },
   },
