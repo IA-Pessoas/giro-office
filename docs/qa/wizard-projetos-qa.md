@@ -62,7 +62,9 @@ o runner cria Projetos e Tarefas de verdade.
    pnpm --filter @workspace/infra prisma:seed:qa:wizard
    ```
 
-3. Configure a extração real em `services/task-service/.env`:
+3. Configure uma chave OpenAI temporária, com limite de uso, somente no ambiente do task-service
+   descartável. Não use a chave de produção nem registre seu valor em comandos, logs ou artefatos.
+   Revogue a chave ao terminar. Configure a extração real em `services/task-service/.env`:
 
    ```env
    AI_EXTRACTION_MODE=openai
@@ -84,9 +86,9 @@ Por padrão os dois cenários usam a Ata sintética de `docs/qa/fixtures/ata-qa-
 podem ser versionadas — é o que está em `docs/qa/evidence/issue-996/`.
 
 `WIZARD_QA_SENSITIVE_ATA=/fora/do/repo/ata.md` troca o cenário de arquivo por uma Ata real. Nesse
-modo o runner grava em `smoke-wizard-evidence-local/` (fora de `docs/`, já coberto pelo
-`.gitignore`), não grava vídeo — vídeo não tem máscara — e omite do log os nomes das Tarefas
-extraídas. Nada dessa rodada deve ser versionado.
+modo o runner registra somente contagens, sem capturas ou nomes de Tarefas. Desde a #997,
+nenhum modo grava vídeo ou trace, e os logs não incluem propostas extraídas nem erros brutos do
+Playwright. Os vídeos da evidência histórica da #996 não são gerados novamente.
 
 ## Dados de teste
 
@@ -125,3 +127,34 @@ Trabalha apenas com clientes de teste:
    como aplicada.
 4. A IA não mapeia toda proposta a um Modelo: sobram de uma a duas Tarefas sem departamento/Modelo,
    completadas na revisão. Comportamento esperado, e é o que torna a etapa de revisão obrigatória.
+
+
+## QA adversarial — issue #997
+
+O runner determinístico cobre rejeições locais (tipo, vazio e tamanho), respostas HTTP 400 de
+DOCX corrompido/PDF sem camada textual, três tentativas válidas, reextração, troca de fonte,
+rascunho transitório, permissões 0/1/2/3/owner, foco inicial/teclado e erros associados aos campos.
+Os testes de rota do task-service complementam o browser: analisam os arquivos reais e comprovam
+que rejeições não chamam o provedor, além da autorização HTTP. Mock de UI não prova autorização
+no servidor.
+
+```bash
+pnpm --filter @workspace/app test:projects
+pnpm --filter @workspace/app typecheck
+pnpm --filter @workspace/app build
+PROJECT_WIZARD_BROWSER_BASE_URL=http://127.0.0.1:33129 \
+  PROJECT_WIZARD_BROWSER_CAPTURE=1 \
+  PROJECT_WIZARD_BROWSER_ARTIFACT_DIR="$PWD/output/playwright/issue-997" \
+  pnpm --filter @workspace/app test:project-wizard-browser
+pnpm --filter @workspace/task-service exec vitest run src/test/projectWizard.routes.test.ts
+```
+
+`PROJECT_WIZARD_BROWSER_BASE_URL` deve apontar para o app compilado deste checkout; sem essa
+variável, o runner inicia seu próprio Next local. O runner substitui as chamadas HTTP por fixtures
+sintéticas e não envia Ata à OpenAI. O teste do comando opt-in usa fronteiras simuladas de browser
+e arquivos para provar ausência de vídeo, máscaras e sanitização de falhas; não acessa a stack.
+
+A execução real continua opcional e fora de `pnpm test`. Requer banco descartável sem dados de
+clientes e chave temporária; sua ausência deve ser registrada separadamente das validações
+locais. Não reutilize banco compartilhado para satisfazer esse critério. Evidências e limitações
+por head ficam em `output/playwright/issue-997/README.md`.
