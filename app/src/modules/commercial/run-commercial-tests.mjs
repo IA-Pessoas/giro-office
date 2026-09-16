@@ -106,6 +106,7 @@ runTest("commercial contract value uses the shared Brazilian currency mask", () 
   const catalog = read("./components/CommercialCatalog.tsx");
 
   assert.match(catalog, /formatBrlInput/);
+  assert.match(catalog, /normalizeDigits\(event\.target\.value\)/);
   assert.match(catalog, /parseBrlInput/);
   assert.match(catalog, /Math\.round\(value \* 100\)/);
 });

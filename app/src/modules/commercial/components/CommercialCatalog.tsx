@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { CircleAlert, Loader2, Pencil, Plus, Save, X } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
-import { formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
+import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCommercialProspecting,
@@ -282,7 +282,7 @@ export function CommercialCatalog() {
                   event.preventDefault();
                   setDraft((current) => ({ ...current, contract_value: "" }));
                 }
-              }} onChange={(event) => setDraft((current) => ({ ...current, contract_value: formatBrlInput(event.target.value) }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500" placeholder="R$ 0,00" />
+              }} onChange={(event) => setDraft((current) => ({ ...current, contract_value: formatBrlInput(normalizeDigits(event.target.value)) }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500" placeholder="R$ 0,00" />
             </label>
             <div className="flex gap-2 md:justify-end">
               <button type="submit" disabled={isSaving} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:flex-none">
