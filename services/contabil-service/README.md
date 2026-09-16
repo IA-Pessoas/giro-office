@@ -32,6 +32,9 @@ Exemplos de paths públicos (via gateway, com `Authorization: Bearer …`):
 - `GET http://localhost:3010/contabil/controls?client_id=<uuid>&competence=<YYYY-MM>`
 - `GET http://localhost:3010/contabil/controls/list?competence=<YYYY-MM>`
 - `POST http://localhost:3010/contabil/controls`
+- `POST http://localhost:3010/contabil/controls/year` (exige `confirmed: true`)
+- `PATCH http://localhost:3010/contabil/controls/<id>/items` (conclui os 17 itens)
+- `DELETE http://localhost:3010/contabil/controls` e `POST http://localhost:3010/contabil/controls/restore`
 - `PATCH http://localhost:3010/contabil/controls/<id>`
 - `POST http://localhost:3010/contabil/responsibles`
 - `GET http://localhost:3010/contabil/responsibles/client/<clientId>`
@@ -41,6 +44,9 @@ Exemplos de paths públicos (via gateway, com `Authorization: Bearer …`):
 - `GET http://localhost:3010/contabil/relationships/client/<clientId>`
 - `PUT http://localhost:3010/contabil/relationships/<id>`
 - `DELETE http://localhost:3010/contabil/relationships/<id>`
+- `GET|POST http://localhost:3010/triagem/monthly`
+- `GET|PUT http://localhost:3010/triagem/statements`
+- `GET|PUT|DELETE http://localhost:3010/triagem/closing`
 
 Infraestrutura direto no serviço: `GET http://localhost:3038/health` e `GET http://localhost:3038/ready`.
 `/internal/reporting/*` é contrato interno direto; não passa pelo gateway.
