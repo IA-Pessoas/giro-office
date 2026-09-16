@@ -91,6 +91,7 @@ const CLIENT_CREATE_FIELDS = [
   "service_unique",
   "status",
   "prospecting_status",
+  "regime",
 ] as const;
 
 const CLIENT_UPDATE_FIELDS = [

@@ -31,16 +31,39 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 }
 
 describe("matriz de regressão das políticas modulares", () => {
-  it("protege Comercial: Viewer lê e Editor altera, sem bypass global", () => {
+  it.each([
+    ["user", 0, false, false],
+    ["user", 1, true, false],
+    ["user", 2, true, true],
+    ["user", 3, true, true],
+    ["admin", 0, false, false],
+    ["admin", 1, true, false],
+    ["admin", 2, true, true],
+    ["admin", 3, true, true],
+    ["owner", 0, true, true],
+    ["owner", 1, true, true],
+    ["owner", 2, true, true],
+    ["owner", 3, true, true],
+  ])("aplica a matriz Comercial para %s com comercial=%i", (type, commercialLevel, canRead, canWrite) => {
     const readPolicy = requiredRoutePolicy("GET", "/commercial/prospecting");
     const editPolicy = requiredRoutePolicy("PATCH", "/commercial/prospecting/prospecting-1");
+    const archivePolicy = requiredRoutePolicy("DELETE", "/commercial/prospecting/prospecting-1");
+    const context = authContext({
+      permission: type === "admin" ? 2 : 0,
+      type: type as "user" | "admin" | "owner",
+      modules: { comercial: commercialLevel },
+    });
 
-    expect(canAccessRoute(authContext({ modules: { comercial: 1 } }), readPolicy)).toBe(true);
-    expect(canAccessRoute(authContext({ modules: { comercial: 0 } }), readPolicy)).toBe(false);
-    expect(canAccessRoute(authContext({ modules: { comercial: 1 } }), editPolicy)).toBe(false);
-    expect(canAccessRoute(authContext({ modules: { comercial: 2 } }), editPolicy)).toBe(true);
+    expect(canAccessRoute(context, readPolicy)).toBe(canRead);
+    expect(canAccessRoute(context, editPolicy)).toBe(canWrite);
+    expect(canAccessRoute(context, archivePolicy)).toBe(canWrite);
+  });
+
+  it("não usa permission global como bypass do Comercial", () => {
+    const policy = requiredRoutePolicy("GET", "/commercial/prospecting");
+
     expect(
-      canAccessRoute(authContext({ permission: 999, modules: { comercial: 0 } }), readPolicy),
+      canAccessRoute(authContext({ permission: 999, modules: { comercial: 0 } }), policy),
     ).toBe(false);
   });
 

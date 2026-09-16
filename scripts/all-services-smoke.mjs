@@ -3533,6 +3533,13 @@ const handlers = {
     });
   },
 
+  async commercialProposalConfigDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/proposal-configs/${requireState("commercialProposalConfigId")}`,
+    });
+  },
+
   async commercialProspectingClientList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
@@ -3567,6 +3574,13 @@ const handlers = {
       expectedStatus: [200],
       path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
       json: { status: "Envio de Proposta", description: "Smoke commercial prospecting updated" },
+    });
+  },
+
+  async commercialProspectingArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
     });
   },
 
@@ -4644,6 +4658,10 @@ const handlers = {
       expectedStatus: [200],
       path: "/internal/pessoal/union-notifications/run",
     });
+  },
+
+  async pessoalGroupAssignmentAuditOutboxReconcile(op) {
+    await httpRequest(op, { expectedStatus: op.expectedStatus });
   },
 
   async taskDepsList(op) {

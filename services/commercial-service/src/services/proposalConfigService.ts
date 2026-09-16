@@ -11,8 +11,16 @@ const PROPOSAL_CONFIG_SELECT = {
 
 const DUPLICATE_CONFIG_MESSAGE = "Já existe uma configuração com esse nome.";
 
+function isPrismaErrorCode(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
+}
+
 function isUniqueConstraintError(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+  return isPrismaErrorCode(error, "P2002");
+}
+
+function isForeignKeyConstraintError(error: unknown): boolean {
+  return isPrismaErrorCode(error, "P2003");
 }
 
 export interface CommercialProposalConfig {
@@ -34,6 +42,17 @@ export interface UpdateCommercialProposalConfigRequest {
   config_id: string;
   name?: string;
   contract_value?: number;
+}
+
+export interface DeleteCommercialProposalConfigRequest {
+  user_id: string;
+  organization_id: string;
+  config_id: string;
+}
+
+export interface DeleteCommercialProposalConfigResult {
+  id: string;
+  deleted: true;
 }
 
 export type CommercialProposalConfigPrismaDeps = Pick<typeof prismaClient, "proposalConfig">;
@@ -160,6 +179,36 @@ export class CommercialProposalConfigService {
       if (err instanceof ServiceError) throw err;
       if (isUniqueConstraintError(err)) throw new ServiceError(409, DUPLICATE_CONFIG_MESSAGE);
       throw new ServiceError(500, "Não foi possível atualizar a configuração comercial.", err);
+    }
+  }
+
+  async delete(
+    data: DeleteCommercialProposalConfigRequest,
+  ): Promise<DeleteCommercialProposalConfigResult> {
+    try {
+      const deleteResult = await this.prisma.proposalConfig.deleteMany({
+        where: { id: data.config_id, organization_id: data.organization_id },
+      });
+      if (deleteResult.count !== 1) {
+        throw new ServiceError(404, "Configuração comercial não encontrada.");
+      }
+
+      await this.audit.createLog({
+        userId: data.user_id,
+        organizationId: data.organization_id,
+        action: "Exclusão",
+        referring: "proposal.config",
+        referringId: data.config_id,
+        changes: {},
+      });
+      return { id: data.config_id, deleted: true };
+    } catch (err: unknown) {
+      logError("Erro ao excluir configuração comercial", { err });
+      if (err instanceof ServiceError) throw err;
+      if (isForeignKeyConstraintError(err)) {
+        throw new ServiceError(409, "Não é possível excluir uma configuração com referências.");
+      }
+      throw new ServiceError(500, "Não foi possível excluir a configuração comercial.", err);
     }
   }
 }

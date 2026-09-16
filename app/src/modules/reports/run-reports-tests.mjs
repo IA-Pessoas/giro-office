@@ -31,6 +31,7 @@ const {
 } = await import("./utils/reportBuilder.ts");
 const appPackage = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url)));
 const { buildReportComposition } = await import("./utils/reportCriteria.ts");
+const { getPessoalReportPresets } = await import("./utils/pessoalReportPresets.ts");
 const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
 const { getReportForbiddenMessage, isReportCsrfError } = await import("./components/reportUi.ts");
 const reportsPageSource = await readFile(
@@ -164,6 +165,78 @@ runTest("preserves independent empty blocks and rejects malformed composed previ
   assert.equal(result.blocks.length, 2);
   assert.deepEqual(result.blocks[0].rows, []);
   assert.throws(() => unwrapReportCompositionPreview({ blocks: [{ ...block, rows: "invalid" }] }));
+});
+
+runTest("offers Pessoal presets only when their authorized sources and fields are available", () => {
+  const sources = [
+    {
+      key: "pessoal.payroll",
+      label: "Folha",
+      module: "pessoal",
+      fields: [
+        "client_name",
+        "responsible_name",
+        "union_name",
+        "group_name",
+        "group_state",
+        "advance",
+        "advance_type",
+        "advance_amount",
+        "onvio",
+        "vt",
+        "vt_value",
+        "vt_type",
+        "va",
+        "assistance_fee",
+        "bem_mais",
+        "bsf",
+        "reinf",
+        "employees",
+      ].map((key) => ({ key, label: key, selectable: true })),
+    },
+    {
+      key: "pessoal.situations",
+      label: "Situações",
+      module: "pessoal",
+      fields: ["status", "title", "registration_date", "completion_date"].map((key) => ({
+        key,
+        label: key,
+        selectable: true,
+      })),
+    },
+    {
+      key: "pessoal.obligations",
+      label: "Obrigações",
+      module: "pessoal",
+      fields: [
+        "competence",
+        "client_name",
+        "responsible_name",
+        "group_snapshot_name",
+        "group_snapshot_policy",
+        "group_snapshot_state",
+        "advance",
+        "payroll",
+        "charges",
+        "assistance_fee",
+        "bem_mais",
+        "bsf",
+        "va",
+        "vt",
+      ].map((key) => ({ key, label: key, selectable: true })),
+    },
+  ];
+
+  const presets = getPessoalReportPresets(sources);
+  assert.deepEqual(
+    presets.map((preset) => preset.id),
+    ["pessoal-ficha-completa", "pessoal-campos-status", "pessoal-obrigacoes-competencia"],
+  );
+  assert.deepEqual(
+    presets[2].areas[0].filters,
+    [{ field: "competence", operator: "eq", value: "" }],
+  );
+  assert.equal(getPessoalReportPresets(sources.slice(0, 2)).length, 2);
 });
 
 runTest("unwraps the shared success envelope", () => {

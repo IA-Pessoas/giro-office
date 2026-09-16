@@ -32,6 +32,11 @@ tenant, job, versões da definição e dos catálogos usados, fontes, request ID
 contagens de linhas e bytes, timestamps e resultado. Nunca registra células ou
 linhas, filtros nem segredos.
 
+No adaptador de Pessoal, a folha usa apenas o `group_id` canônico. O nome e o
+estado do grupo são projetados localmente pelo serviço de Pessoal; o motor não
+recebe o identificador como campo público nem executa join distribuído.
+Obrigações usam somente o snapshot histórico da competência.
+
 No Gate G1, os únicos adaptadores liberados são Parcelamento (#811) e
 Integração (#812).
 

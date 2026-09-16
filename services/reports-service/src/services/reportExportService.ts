@@ -5,10 +5,27 @@ import type { ReportAuthorizationService } from "./reportAuthorizationService.js
 import { ReportCsvService, type ReportTable } from "./reportCsvService.js";
 import type { ReportJobService } from "./reportJobService.js";
 import { ReportLetterheadService } from "./reportLetterheadService.js";
-import { type ReportPdfRenderer, ReportPdfService } from "./reportPdfService.js";
+import {
+  normalizeReportAuthor,
+  type ReportPdfRenderer,
+  ReportPdfService,
+  UNKNOWN_REPORT_AUTHOR,
+} from "./reportPdfService.js";
 import type { ReportSnapshotService } from "./reportSnapshotService.js";
 import { ReportXlsxService } from "./reportXlsxService.js";
 import { createReportZip } from "./reportZipService.js";
+
+const REPORT_TIME_ZONE = "UTC";
+const reportFileTimestampFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: REPORT_TIME_ZONE,
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
 
 export type ReportExportFormat = "csv" | "xlsx" | "pdf";
 
@@ -40,6 +57,14 @@ interface SnapshotExportContext {
   departmentId?: string;
 }
 
+interface ReportAuthorContextClient {
+  getAccessContext(input: {
+    userId: string;
+    organizationId: string;
+    requestId: string;
+  }): Promise<unknown>;
+}
+
 function createDefaultRenderers(): ReportExportRenderers {
   return {
     csv: new ReportCsvService(),
@@ -55,6 +80,7 @@ export class ReportExportService {
     private readonly audit?: Pick<ReportAuditService, "record">,
     private readonly jobs?: Pick<ReportJobService, "getVersion">,
     private readonly authorization?: Pick<ReportAuthorizationService, "validateSharedDefinition">,
+    private readonly authorContext?: ReportAuthorContextClient,
   ) {}
 
   async export(input: {
@@ -99,7 +125,7 @@ export class ReportExportService {
       const body =
         input.format === "pdf"
           ? await (renderer as ReportPdfRenderer).render({
-              author: input.userId,
+              author: await this.resolveAuthorName(input, source.job.requester_id),
               generatedAt: source.snapshot.created_at,
               organizationId: input.organizationId,
               ...exportContext,
@@ -152,12 +178,15 @@ export class ReportExportService {
               : input.format === "xlsx"
                 ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 : "application/pdf",
-        fileName:
+        fileName: buildReportFileName(
           input.format !== "pdf" && tables.length > 1
-            ? `report-${source.job.id}.zip`
+            ? `report-${source.job.id}`
             : tables.length === 1 && source.blocks?.length
-              ? `${stems[0]}.${input.format}`
-              : `report-${source.job.id}.${input.format}`,
+              ? (stems[0] ?? `report-${source.job.id}`)
+              : `report-${source.job.id}`,
+          source.snapshot.created_at,
+          input.format !== "pdf" && tables.length > 1 ? "zip" : input.format,
+        ),
         body: Buffer.from(body),
       };
     } catch (error) {
@@ -207,6 +236,30 @@ export class ReportExportService {
       throw new ServiceError(403, "O modelo compartilhado não pertence ao departamento atual.");
     }
     return { scope: "shared", departmentId: authorized.department_id };
+  }
+
+  private async resolveAuthorName(
+    input: { organizationId: string; requestId: string },
+    authorId: string,
+  ): Promise<string> {
+    if (!this.authorContext) return UNKNOWN_REPORT_AUTHOR;
+
+    try {
+      const context = await this.authorContext.getAccessContext({
+        userId: authorId,
+        organizationId: input.organizationId,
+        requestId: input.requestId,
+      });
+      if (typeof context !== "object" || context === null) return UNKNOWN_REPORT_AUTHOR;
+
+      const user = (context as { user?: { name?: unknown; login?: unknown } }).user;
+      for (const value of [user?.name, user?.login]) {
+        if (typeof value === "string" && value.trim()) return normalizeReportAuthor(value);
+      }
+    } catch {
+      return UNKNOWN_REPORT_AUTHOR;
+    }
+    return UNKNOWN_REPORT_AUTHOR;
   }
 }
 
@@ -289,4 +342,14 @@ function uniqueStems(labels: readonly string[]): string[] {
     counts.set(base, occurrence + 1);
     return occurrence === 0 ? base : `${base}_${occurrence + 1}`;
   });
+}
+
+function buildReportFileName(stem: string, createdAt: Date, extension: string): string {
+  const parts = reportFileTimestampFormatter.formatToParts(createdAt);
+  const getPart = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  const timestamp = `${getPart("year")}-${getPart("month")}-${getPart("day")}_${getPart(
+    "hour",
+  )}-${getPart("minute")}-${getPart("second")}`;
+  return `${stem}-${timestamp}.${extension}`;
 }

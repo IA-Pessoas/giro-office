@@ -11,6 +11,7 @@ import {
   usePessoalPayroll,
   useUpdatePessoalPayrollMutation,
 } from "../hooks/usePessoalPayroll";
+import { usePessoalGroups } from "../hooks/usePessoalGroups";
 import { usePessoalUnions } from "../hooks/usePessoalUnions";
 import type { PessoalPayroll, PessoalPayrollPayload } from "../types/payroll";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
@@ -37,7 +38,7 @@ type PayrollFormValues = {
   info: string;
   previous: boolean;
   onvio: boolean;
-  group: string;
+  group_id: string;
   vt: boolean;
   vt_value: string;
   vt_type: string;
@@ -59,7 +60,7 @@ const emptyPayrollFormValues: PayrollFormValues = {
   info: "",
   previous: false,
   onvio: false,
-  group: "",
+  group_id: "",
   vt: false,
   vt_value: "",
   vt_type: "",
@@ -75,7 +76,6 @@ const emptyPayrollFormValues: PayrollFormValues = {
 
 const textFields = [
   { name: "info", label: "Informações da folha", type: "text", required: true },
-  { name: "group", label: "Grupo da folha", type: "text", required: true },
   {
     name: "advance_type",
     label: "Tipo de adiantamento",
@@ -134,7 +134,7 @@ function buildPayrollFormValues(
     info: payroll.info,
     previous: payroll.previous,
     onvio: payroll.onvio,
-    group: payroll.group,
+    group_id: payroll.group_id,
     vt: payroll.vt,
     vt_value:
       payroll.vt_value === null ? "" : formatBrlInput(String(Math.round(payroll.vt_value * 100))),
@@ -163,7 +163,7 @@ function buildPayrollFormPayload(
     info: values.info.trim(),
     previous: values.previous,
     onvio: values.onvio,
-    group: values.group.trim(),
+    group_id: values.group_id,
     vt: values.vt,
     vt_value: optional(values.vt_value, parseBrlInput),
     vt_type: optional(values.vt_type),
@@ -184,6 +184,7 @@ export function PessoalPayrollSection({
 }: PessoalPayrollSectionProps) {
   const hasClient = selectedClientId.length > 0;
   const payrollQuery = usePessoalPayroll(selectedClientId, hasClient);
+  const groupsQuery = usePessoalGroups();
   const unionsQuery = usePessoalUnions();
   const responsibleUsersQuery = useAssignableUsers({ enabled: canEdit, module: "pessoal" });
   const createMutation = useCreatePessoalPayrollMutation();
@@ -196,6 +197,7 @@ export function PessoalPayrollSection({
   const hasSelectedResponsible = responsibleUsers.some(
     (user) => user.id === formValues.responsible_id,
   );
+  const isCurrentGroupArchived = Boolean(payroll?.group?.archived_at);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const isFormDisabled = !canEdit || payrollQuery.isLoading || isSubmitting;
 
@@ -238,8 +240,13 @@ export function PessoalPayrollSection({
       payload.employees,
     ].some((value) => typeof value === "number" && Number.isNaN(value));
 
-    if (!payload.info || !payload.group) {
+    if (!payload.info || !payload.group_id) {
       setFormError("Informe pelo menos informações e grupo.");
+      return;
+    }
+
+    if (isCurrentGroupArchived) {
+      setFormError("Selecione um grupo ativo antes de alterar a folha.");
       return;
     }
 
@@ -460,6 +467,37 @@ export function PessoalPayrollSection({
               </select>
               <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
             </div>
+          </label>
+
+          <label
+            htmlFor="payroll-group_id"
+            className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300"
+          >
+            Grupo da folha
+            <div className="relative">
+              <select
+                id="payroll-group_id"
+                value={formValues.group_id}
+                onChange={(event) => handleFieldChange("group_id", event.target.value)}
+                disabled={isFormDisabled || groupsQuery.isLoading}
+                className={`${pessoalTextFieldClassName} appearance-none pr-12`}
+              >
+                <option value="">
+                  {groupsQuery.isLoading ? "Carregando grupos" : "Selecione um grupo"}
+                </option>
+                {(groupsQuery.data ?? []).map((group) => (
+                  <option key={group.id} value={group.id} disabled={Boolean(group.archived_at)}>
+                    {group.name}{group.archived_at ? " (arquivado)" : ""}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+            </div>
+            {isCurrentGroupArchived ? (
+              <span className="text-xs text-amber-700 dark:text-amber-300">
+                Este grupo está arquivado e permanece visível apenas como histórico.
+              </span>
+            ) : null}
           </label>
         </div>
 

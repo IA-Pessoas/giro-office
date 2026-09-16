@@ -16,6 +16,14 @@ import { TaskReportingService as Task } from "../../../task-service/src/services
 import { InternalReportingService as Ti } from "../../../ti-service/src/reporting/internalReportingService.js";
 
 const organizationId = "00000000-0000-4000-8000-000000000001";
+const pessoalDerivedFields = new Set([
+  "client_name",
+  "responsible_name",
+  "union_name",
+  "group_name",
+  "group_state",
+  "group_snapshot_state",
+]);
 it("rh.attendance: filters derived rows beyond 101 and counts the complete set", async () => {
   const points = Array.from({ length: 150 }, (_, index) => ({
     clock_in: new Date(2026, 0, 1, 0, index),
@@ -54,7 +62,11 @@ for (const source of reportingSources.filter((source) => source.key !== "rh.atte
   describe(source.key, () => {
     it("orders the entire authorized set before the output cap", async () => {
       const field =
-        source.fields.find((field) => field.value_type === "string") ?? source.fields[0];
+        source.fields.find(
+          (field) => field.value_type === "string" && !pessoalDerivedFields.has(field.key),
+        ) ??
+        source.fields.find((field) => !pessoalDerivedFields.has(field.key)) ??
+        source.fields[0];
       const value = (index: number) =>
         field.value_type === "boolean" ? index === 149 : `Value ${String(index).padStart(3, "0")}`;
       const rows = Array.from({ length: 150 }, (_, index) => ({

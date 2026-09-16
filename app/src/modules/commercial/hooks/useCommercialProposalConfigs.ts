@@ -33,3 +33,12 @@ export function useUpdateCommercialProposalConfig() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: COMMERCIAL_PROPOSAL_CONFIGS_QUERY_KEY }),
   });
 }
+
+export function useDeleteCommercialProposalConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => commercialService.deleteProposalConfig(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: COMMERCIAL_PROPOSAL_CONFIGS_QUERY_KEY }),
+  });
+}

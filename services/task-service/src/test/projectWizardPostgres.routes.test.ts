@@ -99,6 +99,7 @@ describe.skipIf(process.env.PROJECT_WIZARD_POSTGRES_TEST !== "1")(
         const schemaSql = execFileSync(
           "pnpm",
           [
+            "--silent",
             "exec",
             "prisma",
             "migrate",
