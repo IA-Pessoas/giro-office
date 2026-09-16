@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, CheckSquare, Loader2, Lock } from "lucide-react";
+import { AlertCircle, Archive, CheckCircle2, CheckSquare, Loader2, Lock, RotateCcw } from "lucide-react";
 
 import {
   useContabilControlBootstrapMutation,
+  useArchiveContabilCompetenceMutation,
+  useCompleteContabilControlMutation,
+  useCreateYearContabilControlsMutation,
   useContabilControlDetail,
   usePatchContabilControlFieldMutation,
+  useRestoreContabilCompetenceMutation,
 } from "../hooks";
 import { getContabilErrorMessage } from "../services";
 import type {
@@ -48,6 +52,10 @@ export function ContabilControlSection({
 }: ContabilControlSectionProps) {
   const bootstrapMutation = useContabilControlBootstrapMutation();
   const patchMutation = usePatchContabilControlFieldMutation();
+  const completeAllMutation = useCompleteContabilControlMutation();
+  const createYearMutation = useCreateYearContabilControlsMutation();
+  const archiveMutation = useArchiveContabilCompetenceMutation();
+  const restoreMutation = useRestoreContabilCompetenceMutation();
   const [competence, setCompetence] = useState(() => getCurrentContabilCompetence());
   const detailQuery = useContabilControlDetail({ clientId, competence }, { enabled: !canEdit });
   const remoteControl = canEdit ? bootstrapMutation.data : detailQuery.data;
@@ -57,6 +65,9 @@ export function ContabilControlSection({
     createContabilFieldStatusMap(CONTABIL_CONTROL_FIELDS),
   );
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [confirmYearCreation, setConfirmYearCreation] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [operationMessage, setOperationMessage] = useState<string | null>(null);
 
   const confirmedControlRef = useRef<ContabilControl | null>(null);
   const bootstrapRequestRef = useRef(0);
@@ -274,6 +285,35 @@ export function ContabilControlSection({
     queueFieldSave("notes", value);
   }
 
+  async function createYear() {
+    const year = Number(competence.slice(0, 4));
+    const result = await createYearMutation.mutateAsync({ client_id: clientId, year, confirmed: true });
+    setConfirmYearCreation(false);
+    setOperationMessage(`${result.created} competências criadas; ${result.existing} já existiam.`);
+  }
+
+  async function completeAll() {
+    if (!controlId) return;
+    const updated = await completeAllMutation.mutateAsync({ controlId, clientId, competence });
+    setControl(updated);
+    confirmedControlRef.current = updated;
+    setOperationMessage("Os 17 itens da competência foram marcados como concluídos.");
+  }
+
+  async function archiveCompetence() {
+    await archiveMutation.mutateAsync({ client_id: clientId, competence });
+    setConfirmArchive(false);
+    setControl(null);
+    setControlId(null);
+    setOperationMessage("Competência arquivada. Os registros foram preservados e podem ser restaurados.");
+  }
+
+  async function restoreCompetence() {
+    await restoreMutation.mutateAsync({ client_id: clientId, competence });
+    setOperationMessage("Competência restaurada. Recarregue o controle para continuar.");
+    void bootstrapControl(clientId, competence);
+  }
+
   return (
     <section className="space-y-4">
       {!canEdit ? (
@@ -380,6 +420,32 @@ export function ContabilControlSection({
                 </label>
               ))}
             </div>
+
+            {canEdit ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {confirmYearCreation ? (
+                  <button type="button" onClick={() => void createYear()} disabled={createYearMutation.isPending} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                    Confirmar criação do ano
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setConfirmYearCreation(true)} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 dark:border-blue-900/50 dark:text-blue-300">
+                    Criar 12 competências do ano
+                  </button>
+                )}
+                <button type="button" onClick={() => void completeAll()} disabled={completeAllMutation.isPending} className="rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 disabled:opacity-60 dark:border-emerald-900/50 dark:text-emerald-300">
+                  Marcar os 17 itens como concluídos
+                </button>
+                {confirmArchive ? (
+                  <button type="button" onClick={() => void archiveCompetence()} disabled={archiveMutation.isPending} className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                    Confirmar arquivamento
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 dark:border-red-900/50 dark:text-red-300">
+                    <Archive className="h-4 w-4" /> Arquivar competência
+                  </button>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {CONTABIL_CONTROL_NOTES_FIELD ? (
@@ -408,6 +474,17 @@ export function ContabilControlSection({
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {operationMessage ? (
+        <ContabilStateBox icon={CheckCircle2} title="Operação mensal concluída" compact>
+          <span>{operationMessage}</span>
+          {operationMessage.includes("arquivada") && canEdit ? (
+            <button type="button" onClick={() => void restoreCompetence()} disabled={restoreMutation.isPending} className="ml-2 inline-flex items-center gap-1 font-semibold text-blue-700 dark:text-blue-300">
+              <RotateCcw className="h-4 w-4" /> Restaurar competência
+            </button>
+          ) : null}
+        </ContabilStateBox>
       ) : null}
     </section>
   );

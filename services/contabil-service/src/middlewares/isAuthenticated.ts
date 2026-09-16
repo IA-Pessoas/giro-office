@@ -1,10 +1,13 @@
 import {
   extractBearerToken,
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
+  normalizeModulePermissions,
+  parseModulePermissions,
   ServiceError,
   verifyJwtToken,
 } from "@workspace/shared";
@@ -51,6 +54,7 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
     request.get(FORWARDED_AUTH_PERMISSION_HEADER) ?? undefined,
   );
   const internalToken = request.get(INTERNAL_SERVICE_TOKEN_HEADER);
+  const forwardedModules = request.get(FORWARDED_AUTH_MODULES_HEADER);
 
   const isFromGateway =
     internalToken &&
@@ -62,6 +66,7 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
     request.user_id = forwardedUserId;
     request.organization_id = forwardedOrgId;
     request.permission = forwardedPermission;
+    request.modules = parseModulePermissions(forwardedModules ?? undefined);
     next();
     return;
   }
@@ -79,6 +84,7 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
     request.user_id = claims.user_id;
     request.organization_id = claims.organization_id ?? "";
     request.permission = getContabilPermission(claims);
+    request.modules = normalizeModulePermissions(claims.modules);
     next();
   } catch (err) {
     logError("Erro ao validar autenticação", { err });

@@ -4,13 +4,22 @@ import type { ContabilControlFilters, ContabilCompetence } from "../types";
 
 export const CONTABIL_ENDPOINTS = {
   controls: "/contabil/controls",
+  controlsList: "/contabil/controls/list",
   controlById: (controlId: string) => `/contabil/controls/${controlId}`,
+  controlItems: (controlId: string) => `/contabil/controls/${controlId}/items`,
+  controlsYear: "/contabil/controls/year",
+  controlsRestore: "/contabil/controls/restore",
   responsibles: "/contabil/responsibles",
   responsibleById: (responsibleId: string) => `/contabil/responsibles/${responsibleId}`,
   responsibleByClient: (clientId: string) => `/contabil/responsibles/client/${clientId}`,
   relationships: "/contabil/relationships",
   relationshipById: (relationshipId: string) => `/contabil/relationships/${relationshipId}`,
   relationshipByClient: (clientId: string) => `/contabil/relationships/client/${clientId}`,
+  triageMonthly: "/triagem/monthly",
+  triageMonthlyItem: (monthlyId: string) => `/triagem/monthly/${monthlyId}/item`,
+  triageMonthlyItems: (monthlyId: string) => `/triagem/monthly/${monthlyId}/items`,
+  triageStatements: "/triagem/statements",
+  triageClosing: "/triagem/closing",
 } as const;
 
 export function buildContabilControlParams(filters: ContabilControlFilters) {
@@ -18,6 +27,10 @@ export function buildContabilControlParams(filters: ContabilControlFilters) {
     client_id: filters.clientId,
     competence: filters.competence,
   };
+}
+
+export function buildContabilPortfolioParams(competence: ContabilCompetence) {
+  return { competence };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

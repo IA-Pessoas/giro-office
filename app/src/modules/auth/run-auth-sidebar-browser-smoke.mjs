@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
@@ -8,6 +10,10 @@ const PORT = process.env.PLAYWRIGHT_PORT || "3115";
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const APP_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+const evidenceDir = process.env.CONTABIL_SMOKE_EVIDENCE_DIR;
+const browserViewport =
+  process.env.CONTABIL_SMOKE_MOBILE === "1" ? { width: 390, height: 844 } : { width: 1366, height: 768 };
+const isMobileSmoke = process.env.CONTABIL_SMOKE_MOBILE === "1";
 const MODULE_KEYS = [
   "certificado",
   "comercial",
@@ -88,6 +94,43 @@ async function installApiMocks(page, currentUser) {
     });
   });
 
+  await page.route("**/client/list**", async (route) => {
+    await route.fulfill({
+      body: JSON.stringify({
+        success: true,
+        data: { items: [], total: 0, page: 1, pageSize: 50, hasMore: false },
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.route("**/contabil/controls/list**", async (route) => {
+    const competence = new URL(route.request().url()).searchParams.get("competence");
+    await route.fulfill({
+      body: JSON.stringify({
+        success: true,
+        data: {
+          competence,
+          items: [
+            {
+              client_id: "contabil-smoke-client-initialized",
+              legal_name: "Alfa Contábil Ltda.",
+              control: { depreciation: true },
+            },
+            {
+              client_id: "contabil-smoke-client-missing",
+              legal_name: "Beta Contábil Ltda.",
+              control: null,
+            },
+          ],
+        },
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
   await page.route("**/socket.io/**", async (route) => {
     await route.fulfill({
       body: route.request().method() === "POST" ? "ok" : '0{"sid":"auth-sidebar-smoke"}',
@@ -111,6 +154,13 @@ function appendDiagnostics(message, pageErrors, consoleErrors) {
   return details.length > 0 ? `${message}\n${details.join("\n")}` : message;
 }
 
+async function captureContabilEvidence(page, userId) {
+  if (!evidenceDir) return;
+
+  await mkdir(evidenceDir, { recursive: true });
+  await page.screenshot({ path: join(evidenceDir, `${userId}.png`), fullPage: true });
+}
+
 async function assertContabilPageRendered(page, pageErrors, consoleErrors, label) {
   const heading = page.getByRole("heading", { name: "Contábil", level: 1 });
   const description = page.getByText(
@@ -120,18 +170,37 @@ async function assertContabilPageRendered(page, pageErrors, consoleErrors, label
     },
   );
   const controlTab = page.getByRole("tab", { name: "Controle", exact: true });
-  const emptyState = page.getByText("Selecione um cliente para começar", { exact: false });
+  const portfolio = page.getByRole("heading", { name: "Carteira operacional", exact: true });
+  const competence = page.getByLabel("Competência da carteira", { exact: true });
+  const initializedClient = page.getByRole("cell", { name: "Alfa Contábil Ltda.", exact: true });
+  const missingClient = page.getByRole("cell", { name: "Beta Contábil Ltda.", exact: true });
 
   await heading.waitFor({ state: "visible" });
   await description.waitFor({ state: "visible" });
   await controlTab.waitFor({ state: "visible" });
-  await emptyState.waitFor({ state: "visible" });
+  await portfolio.waitFor({ state: "visible" });
+  await competence.waitFor({ state: "visible" });
+  await initializedClient.waitFor({ state: "visible" });
+  await missingClient.waitFor({ state: "visible" });
 
   assert.equal(
     await controlTab.getAttribute("aria-selected"),
     "true",
     appendDiagnostics(
       `${label}: a aba Controle deve estar selecionada ao abrir o módulo Contábil.`,
+      pageErrors,
+      consoleErrors,
+    ),
+  );
+  await competence.fill("2026-08");
+  await page.getByText("2 clientes, 1 controles iniciados e 1 sem controle mensal.", { exact: true }).waitFor({
+    state: "visible",
+  });
+  assert.equal(
+    await competence.inputValue(),
+    "2026-08",
+    appendDiagnostics(
+      `${label}: a carteira deve atualizar a competência selecionada.`,
       pageErrors,
       consoleErrors,
     ),
@@ -174,7 +243,7 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     baseURL: baseUrl,
-    viewport: { width: 1366, height: 768 },
+    viewport: browserViewport,
   });
   const pageErrors = [];
   const consoleErrors = [];
@@ -225,6 +294,8 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
       consoleErrors,
       "Abertura direta de /contabil",
     );
+    await captureContabilEvidence(page, currentUser.id);
+    if (isMobileSmoke) return;
     assert.equal(
       await page.locator("aside").getByRole("link", { name: "Clientes", exact: true }).count(),
       0,
@@ -267,7 +338,7 @@ async function assertDashboardIsHiddenWithoutModuleAccess() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     baseURL: baseUrl,
-    viewport: { width: 1366, height: 768 },
+    viewport: browserViewport,
   });
 
   await context.addCookies([

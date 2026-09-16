@@ -633,6 +633,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/triagem\/(?:monthly|statements)\/?.*$/,
+    description: { action: "consultou", item: "as pendências documentais contábeis" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/ti\/stock\/items\/[^/]+\/movements\/list$/,
     description: { action: "consultou", item: "a lista de movimentações de um item de estoque" },
   },
@@ -824,6 +829,18 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um vínculo contábil",
     newSingular: "um novo vínculo contábil",
     plural: "vínculos contábeis",
+  },
+  {
+    pattern: /^\/triagem\/monthly(?:\/|$)/,
+    singular: "uma pendência documental contábil",
+    newSingular: "uma nova pendência documental contábil",
+    plural: "pendências documentais contábeis",
+  },
+  {
+    pattern: /^\/triagem\/statements(?:\/|$)/,
+    singular: "um marcador de extrato bancário",
+    newSingular: "um novo marcador de extrato bancário",
+    plural: "marcadores de extratos bancários",
   },
   {
     pattern: /^\/rh\/point-config(?:\/|$)/,

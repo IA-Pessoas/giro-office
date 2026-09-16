@@ -15,6 +15,7 @@ const baseRow = {
   competence: "2024-01",
   client_id: CLIENT_ID,
   organization_id: ORG_ID,
+  archived_at: null,
   regenerate_accounting_entries: false,
   check_summary_by_accumulator: false,
   post_accounting_transaction: false,
@@ -37,15 +38,161 @@ const baseRow = {
 
 function createMockPrisma(): ControlServicePrisma {
   return {
+    client: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
     controlContabil: {
       findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      findMany: vi.fn(),
+      createMany: vi.fn(),
+      updateMany: vi.fn(),
     },
   } as unknown as ControlServicePrisma;
 }
 
 describe("ControlService", () => {
+  it("cria as doze competências de um ano sem duplicar as já existentes", async () => {
+    const prisma = createMockPrisma();
+    const audit = { createLog: vi.fn(), logUpdateIfChanged: vi.fn() };
+    vi.mocked(prisma.client.findFirst).mockResolvedValue({ id: CLIENT_ID } as never);
+    vi.mocked(prisma.controlContabil.findMany).mockResolvedValue([
+      { ...baseRow, competence: "2024-01" },
+    ] as never);
+    vi.mocked(prisma.controlContabil.createMany).mockResolvedValue({ count: 11 } as never);
+    const service = new ControlService(prisma, audit);
+
+    const result = await service.createYear({
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      permission: 2,
+      clientId: CLIENT_ID,
+      year: 2024,
+      confirmed: true,
+    });
+
+    expect(result).toEqual({
+      competences: [
+        "2024-01",
+        "2024-02",
+        "2024-03",
+        "2024-04",
+        "2024-05",
+        "2024-06",
+        "2024-07",
+        "2024-08",
+        "2024-09",
+        "2024-10",
+        "2024-11",
+        "2024-12",
+      ],
+      created: 11,
+      existing: 1,
+    });
+    expect(prisma.controlContabil.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skipDuplicates: true,
+        data: expect.arrayContaining([expect.objectContaining({ competence: "2024-02" })]),
+      }),
+    );
+    expect(audit.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Criar controles contábeis anuais",
+        referring: "contabil.control.batch",
+      }),
+    );
+  });
+
+  it("list retorna uma linha ordenada por razão social, inclusive sem controle mensal", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      {
+        id: "b0000000-0000-4000-8000-000000000003",
+        name: "Cliente C",
+        company_name: null,
+        controlContabil: [],
+      },
+      {
+        id: "b0000000-0000-4000-8000-000000000002",
+        name: "Cliente B",
+        company_name: "Beta Contábil Ltda.",
+        controlContabil: [{ ...baseRow, client_id: "b0000000-0000-4000-8000-000000000002" }],
+      },
+      {
+        id: "b0000000-0000-4000-8000-000000000001",
+        name: "Cliente A",
+        company_name: "Alfa Contábil Ltda.",
+        controlContabil: [],
+      },
+    ] as never);
+    const service = new ControlService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+
+    await expect(service.list("2024-01", ORG_ID)).resolves.toEqual({
+      competence: "2024-01",
+      items: [
+        {
+          client_id: "b0000000-0000-4000-8000-000000000001",
+          legal_name: "Alfa Contábil Ltda.",
+          control: null,
+          closing: {
+            client_id: "b0000000-0000-4000-8000-000000000001",
+            competence: "2024-01",
+            status: "NOT_RECEIVED",
+            archived_at: null,
+          },
+        },
+        {
+          client_id: "b0000000-0000-4000-8000-000000000002",
+          legal_name: "Beta Contábil Ltda.",
+          control: { ...baseRow, client_id: "b0000000-0000-4000-8000-000000000002" },
+          closing: {
+            client_id: "b0000000-0000-4000-8000-000000000002",
+            competence: "2024-01",
+            status: "NOT_RECEIVED",
+            archived_at: null,
+          },
+        },
+        {
+          client_id: "b0000000-0000-4000-8000-000000000003",
+          legal_name: "Cliente C",
+          control: null,
+          closing: {
+            client_id: "b0000000-0000-4000-8000-000000000003",
+            competence: "2024-01",
+            status: "NOT_RECEIVED",
+            archived_at: null,
+          },
+        },
+      ],
+    });
+    expect(prisma.client.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: ORG_ID,
+          contabil: true,
+          AND: [
+            {
+              OR: [
+                { competence_entry: null },
+                { competence_entry: { lte: new Date("2024-01-31T23:59:59.999Z") } },
+              ],
+            },
+            {
+              OR: [
+                { competence_output: null },
+                { competence_output: { gte: new Date("2024-01-01T00:00:00.000Z") } },
+              ],
+            },
+          ],
+        }),
+      }),
+    );
+    expect(prisma.controlContabil.create).not.toHaveBeenCalled();
+    expect(prisma.controlContabil.update).not.toHaveBeenCalled();
+  });
+
   it("create retorna existente sem auditar quando já há registro", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.controlContabil.findFirst).mockResolvedValue(baseRow);
