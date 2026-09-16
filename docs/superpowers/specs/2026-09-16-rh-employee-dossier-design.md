@@ -11,8 +11,7 @@ outros domínios das issues seguintes.
 
 1. Estender o `user-service` e suas rotas `/user`.
    Reutiliza o dono atual do modelo `User`, mas mistura administração geral de
-   usuários com regras específicas do RH e não representa bem a permissão de
-   gestor de departamento.
+   usuários com regras específicas do RH.
 2. Criar um módulo de perfil no `rh-service` sobre o modelo `User` existente.
    Mantém a tela e a autorização no domínio RH, reaproveita o cliente Prisma
    já usado pelo serviço e permite uma projeção sensível diferente por papel.
@@ -68,6 +67,13 @@ servidor e `reference` opcional. Dados JSON inválidos ou chaves desconhecidas
 serão rejeitados na entrada.
 
 ## Autorização e isolamento
+
+A autorização do dossiê reutiliza o nível já encaminhado em `modules.rh`; não
+será criado um segundo campo ou claim de permissão. Nesta superfície, a matriz
+de negócio é deliberadamente específica do dossiê: nível 1 representa o
+colaborador, nível 2 representa o gestor departamental e nível 3 representa o
+RH administrativo. Os demais fluxos RH preservam sua interpretação atual dos
+mesmos níveis (incluindo o acesso a mensagens de workflow do nível 2).
 
 - Nível RH 1: lê e altera apenas o próprio dossiê nos campos `address`,
   `email`, `phone` e `allergies`; cria, edita, lista e remove os próprios

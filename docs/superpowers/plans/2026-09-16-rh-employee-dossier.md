@@ -4,7 +4,7 @@
 
 **Goal:** Entregar a issue #1134 com dossiê de colaborador, alergias e contatos de emergência protegidos por organização e permissão, com contrato HTTP, gateway, frontend e evidências de validação.
 
-**Architecture:** O `rh-service` será o dono do seam de perfil e continuará persistindo o agregado no modelo `User` compartilhado pelo Prisma. O service receberá identidade e nível RH do request, aplicará predicados de organização/departamento no banco e devolverá uma projeção completa apenas para o colaborador próprio ou RH nível 3, mantendo uma projeção não sensível para nível 2. O gateway liberará escrita de perfil para o módulo RH nível 1, enquanto o service continuará sendo a autoridade final sobre alvo e campos editáveis; o frontend consumirá somente os endpoints do contrato RH já existente.
+**Architecture:** O `rh-service` será o dono do seam de perfil e continuará persistindo o agregado no modelo `User` compartilhado pelo Prisma. O service receberá identidade e nível `modules.rh` do request, aplicará predicados de organização/departamento no banco e devolverá uma projeção completa apenas para o colaborador próprio ou RH nível 3, mantendo uma projeção não sensível para nível 2. Para esta superfície, o nível 1 é colaborador, o nível 2 é gestor departamental e o nível 3 é RH administrativo; os demais fluxos RH mantêm sua semântica existente. O gateway liberará escrita de perfil para o módulo RH nível 1, enquanto o service continuará sendo a autoridade final sobre alvo e campos editáveis; o frontend consumirá somente os endpoints do contrato RH já existente.
 
 **Tech Stack:** TypeScript ESM, Express, Prisma/PostgreSQL, Zod, Vitest, shared auth policy, Next/React, React Query, Biome, pnpm, Playwright e manifesto de smoke.
 
