@@ -222,12 +222,15 @@ describe("CertificatePfService", () => {
     " []",
     ' "senha"',
     '  {"v":"v1"}',
+    '  {"v":"v1","iv":"incompleto"',
+    ' ["incompleto"',
+    ' "incompleto',
   ])("fails closed for persisted JSON that is not an envelope: %s", async (password) => {
     const crypto = createCertificatePasswordCryptoForTest();
     const prisma = {
       certificatePF: {
         findFirst: vi.fn(async () => createCertificatePfRecord({ password })),
-        update: vi.fn(),
+        updateMany: vi.fn(),
       },
     };
     const service = new CertificatePfServiceBase(prisma as never, undefined, crypto);
@@ -239,7 +242,7 @@ describe("CertificatePfService", () => {
         canViewPassword: true,
       }),
     ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
-    expect(prisma.certificatePF.update).not.toHaveBeenCalled();
+    expect(prisma.certificatePF.updateMany).not.toHaveBeenCalled();
   });
 
   it("migrates a legacy password during an authorized detail read", async () => {
