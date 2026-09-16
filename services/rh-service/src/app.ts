@@ -17,6 +17,7 @@ import { requestContext } from "./middlewares/requestContext.js";
 import { buildRhServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
 import categoryRoutes from "./routes/category.routes.js";
+import employeeDossierRoutes from "./routes/employeeDossier.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import messageRoutes from "./routes/message.routes.js";
@@ -75,6 +76,7 @@ export function createApp(
   app.use("/rh/point", pointRoutes);
   app.use("/rh/point", timeClockRequestRoutes);
   app.use("/rh/categories", categoryRoutes);
+  app.use("/rh/profile", employeeDossierRoutes);
   app.use("/rh/operational-users", operationalUserRoutes);
   app.use("/rh/requests", requestRoutes);
   app.use("/rh/score/questions", scoreQuestionRoutes);

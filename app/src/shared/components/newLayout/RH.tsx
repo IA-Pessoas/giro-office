@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Award, BarChart3, Calendar, Clock, FileText, Users } from "lucide-react";
+import { Award, BarChart3, Calendar, Clock, FileText, UserRound, Users } from "lucide-react";
 
 import {
   RhDashboardSection,
+  RhDossierSection,
   RhHolidaysSection,
   RhPointSection,
   RhRequestsSection,
@@ -12,7 +13,7 @@ import {
 import { useRhPermissions } from "@modules/rh/hooks/useRhPermissions";
 import { Dialog } from "@shared/components";
 
-type RhMainTab = "dashboard" | "requests" | "evaluations" | "point";
+type RhMainTab = "dashboard" | "dossier" | "requests" | "evaluations" | "point";
 
 export function RH() {
   const [activeTab, setActiveTab] = useState<RhMainTab>("dashboard");
@@ -120,6 +121,12 @@ export function RH() {
               />
             ) : null}
             <RhTabButton
+              active={activeTab === "dossier"}
+              icon={UserRound}
+              label="Dossiê"
+              onClick={() => setActiveTab("dossier")}
+            />
+            <RhTabButton
               active={activeTab === "requests"}
               icon={FileText}
               label="Solicitações"
@@ -149,6 +156,7 @@ export function RH() {
         />
       ) : null}
 
+      {activeTab === "dossier" ? <RhDossierSection /> : null}
       {activeTab === "requests" ? <RhRequestsSection /> : null}
       {activeTab === "evaluations" ? <RhScoreSection /> : null}
       {activeTab === "point" ? <RhPointSection /> : null}

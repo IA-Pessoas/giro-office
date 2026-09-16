@@ -418,6 +418,95 @@ const scoreNitroUpdateRequestBody = createObjectRequestBody({
   },
 });
 
+const dossierUpdateRequestBody = createObjectRequestBody({
+  example: {
+    address: "Rua das Flores, 100",
+    email: "ana.silva@example.com",
+    phone: "+55 11 99999-9999",
+  },
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    full_name: { type: ["string", "null"] },
+    gender: { type: ["string", "null"] },
+    birth_date: { type: ["string", "null"], format: "date-time" },
+    cpf: { type: ["string", "null"] },
+    rg: { type: ["string", "null"] },
+    address: { type: ["string", "null"] },
+    job_title: { type: ["string", "null"] },
+    email: { type: ["string", "null"], format: "email" },
+    phone: { type: ["string", "null"] },
+    hire_date: { type: ["string", "null"], format: "date-time" },
+    dominio_hire_date: { type: ["string", "null"], format: "date-time" },
+    termination_date: { type: ["string", "null"], format: "date-time" },
+    photo_url: { type: ["string", "null"], format: "uri" },
+    status: { type: "string" },
+    department_id: { type: "string", format: "uuid" },
+  },
+});
+
+const contactCreateRequestBody = createObjectRequestBody({
+  example: { name: "Carlos Silva", phone: "+55 11 98888-8888", reference: "Irmão" },
+  required: ["name", "phone"],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    name: { type: "string", minLength: 1 },
+    phone: { type: "string", minLength: 1 },
+    reference: { type: "string" },
+  },
+});
+
+const contactUpdateRequestBody = createObjectRequestBody({
+  example: { id: "contact-uuid", phone: "+55 11 97777-7777" },
+  required: ["id"],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    id: { type: "string", format: "uuid" },
+    name: { type: "string", minLength: 1 },
+    phone: { type: "string", minLength: 1 },
+    reference: { type: ["string", "null"] },
+  },
+});
+
+const contactDeleteRequestBody = createObjectRequestBody({
+  example: { id: "contact-uuid" },
+  required: ["id"],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    id: { type: "string", format: "uuid" },
+  },
+});
+
+const allergyReplaceRequestBody = createObjectRequestBody({
+  example: {
+    allergies: [{ name: "Poeira", fonts: "Ambiental", action: "Evitar exposição" }],
+  },
+  required: ["allergies"],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    allergies: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["name", "fonts", "action"],
+        additionalProperties: false,
+        properties: {
+          name: { type: "string", minLength: 1 },
+          fonts: { type: "string", minLength: 1 },
+          action: { type: "string", minLength: 1 },
+        },
+      },
+    },
+  },
+});
+
+const dossierErrorResponses = {
+  "400": { description: "Payload ou parâmetros inválidos" },
+  "401": { description: "Autenticação ausente ou inválida" },
+  "403": { description: "Permissão insuficiente" },
+  "404": { description: "Colaborador ou contato não encontrado na organização" },
+  "409": { description: "Cadastro alterado por outra operação" },
+};
+
 export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
 
@@ -434,6 +523,7 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
       { name: "Ponto", description: "Configuracao, registro e ajuste de ponto" },
       { name: "Categorias", description: "Categorias de chamados RH" },
       { name: "OperacaoRH", description: "Dados auxiliares para operacao RH" },
+      { name: "DossieRH", description: "Dossie cadastral, alergias e contatos de emergencia" },
       { name: "Solicitacoes", description: "Chamados e solicitacoes RH" },
       { name: "Mensagens", description: "Mensagens vinculadas aos chamados RH" },
       { name: "ScoreQuestions", description: "Perguntas de score" },
@@ -694,6 +784,118 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           security: bearer,
           responses: {
             "200": { description: "Lista de colaboradores ativos", ...successJson },
+          },
+        },
+      },
+      "/rh/profile/colaborator": {
+        get: {
+          tags: ["DossieRH"],
+          summary: "Obter dossie autorizado de colaborador",
+          description:
+            "O dossie completo inclui dados cadastrais e de vinculo apenas para o proprio colaborador ou RH administrativo.",
+          security: bearer,
+          parameters: [
+            { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Dossie autorizado", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+        put: {
+          tags: ["DossieRH"],
+          summary: "Atualizar dossie autorizado",
+          description:
+            "Colaborador pode atualizar endereco, email e telefone; RH administrativo pode atualizar o cadastro completo.",
+          security: bearer,
+          ...dossierUpdateRequestBody,
+          responses: {
+            "200": { description: "Dossie atualizado", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+      },
+      "/rh/profile/colaborator/list": {
+        get: {
+          tags: ["DossieRH"],
+          summary: "Listar projecao nao sensivel de colaboradores",
+          description:
+            "A lista nunca retorna CPF, RG, endereco, datas de vinculo, alergias ou contatos.",
+          security: bearer,
+          parameters: [
+            { name: "department_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Projecao nao sensivel", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+      },
+      "/rh/profile/contact": {
+        get: {
+          tags: ["DossieRH"],
+          summary: "Listar contatos de emergencia",
+          security: bearer,
+          parameters: [
+            { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Contatos autorizados", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+        post: {
+          tags: ["DossieRH"],
+          summary: "Criar contato de emergencia",
+          security: bearer,
+          ...contactCreateRequestBody,
+          responses: {
+            "200": { description: "Contato criado", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+        put: {
+          tags: ["DossieRH"],
+          summary: "Atualizar contato de emergencia",
+          security: bearer,
+          ...contactUpdateRequestBody,
+          responses: {
+            "200": { description: "Contato atualizado", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+        delete: {
+          tags: ["DossieRH"],
+          summary: "Excluir contato de emergencia",
+          security: bearer,
+          ...contactDeleteRequestBody,
+          responses: {
+            "200": { description: "Contato excluido", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+      },
+      "/rh/profile/allergy": {
+        get: {
+          tags: ["DossieRH"],
+          summary: "Listar alergias autorizadas",
+          security: bearer,
+          parameters: [
+            { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Alergias autorizadas", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+        put: {
+          tags: ["DossieRH"],
+          summary: "Substituir alergias",
+          security: bearer,
+          ...allergyReplaceRequestBody,
+          responses: {
+            "200": { description: "Alergias atualizadas", ...successJson },
+            ...dossierErrorResponses,
           },
         },
       },

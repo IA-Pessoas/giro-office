@@ -518,3 +518,91 @@ export interface SubmitRhScoreEvaluationPayload {
 export interface RhMutationMessage {
   message: string;
 }
+
+export interface RhDepartmentSummary {
+  id: string;
+  name: string;
+}
+
+export interface RhAllergy {
+  name: string;
+  fonts: string;
+  action: string;
+}
+
+export interface RhEmergencyContact {
+  id: string;
+  name: string;
+  phone: string;
+  reference?: string;
+}
+
+export interface RhDossierListItem {
+  id: string;
+  full_name: string;
+  job_title: string | null;
+  department: RhDepartmentSummary | null;
+  photo_url: string | null;
+  status: string;
+}
+
+export interface RhDossier {
+  id: string;
+  full_name: string;
+  department_id: string;
+  gender: string | null;
+  birth_date: string | null;
+  cpf: string | null;
+  rg: string | null;
+  address: string | null;
+  job_title: string | null;
+  department: RhDepartmentSummary | null;
+  email: string | null;
+  phone: string | null;
+  hire_date: string | null;
+  dominio_hire_date: string | null;
+  termination_date: string | null;
+  photo_url: string | null;
+  status: string;
+  allergies: RhAllergy[];
+  emergency_contacts: RhEmergencyContact[];
+}
+
+export interface UpdateRhDossierPayload {
+  target_user_id?: string;
+  full_name?: string | null;
+  gender?: string | null;
+  birth_date?: string | null;
+  cpf?: string | null;
+  rg?: string | null;
+  address?: string | null;
+  job_title?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  hire_date?: string | null;
+  dominio_hire_date?: string | null;
+  termination_date?: string | null;
+  photo_url?: string | null;
+  status?: string;
+  department_id?: string;
+}
+
+export interface CreateRhEmergencyContactPayload {
+  target_user_id?: string;
+  name: string;
+  phone: string;
+  reference?: string;
+}
+
+export interface UpdateRhEmergencyContactPayload {
+  target_user_id?: string;
+  id: string;
+  name?: string;
+  phone?: string;
+  reference?: string | null;
+}
+
+export interface DeleteRhEmergencyContactPayload {
+  target_user_id?: string;
+  id: string;
+}

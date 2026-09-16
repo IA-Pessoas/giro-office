@@ -15,6 +15,10 @@ export const RH_ENDPOINTS = {
   requestDetail: (id: string) => `/rh/requests/${id}`,
   messages: "/rh/messages",
   operationalUsers: "/rh/operational-users",
+  dossier: "/rh/profile/colaborator",
+  dossierList: "/rh/profile/colaborator/list",
+  contact: "/rh/profile/contact",
+  allergy: "/rh/profile/allergy",
   pointConfig: "/rh/point-config",
   pointConfigByUser: (userId: string) => `/rh/point-config/${userId}`,
   points: "/rh/point",
@@ -45,6 +49,10 @@ export const RH_ENDPOINTS = {
   submitScoreEvaluation: "/rh/score/evaluations/submit",
   scoreNitroUpdate: "/rh/score/nitro/update",
 } as const;
+
+export function buildRhDossierTargetParams(userId?: string) {
+  return { user_id: userId };
+}
 
 export interface RhOperationalUserQueryParams {
   module?: string;
