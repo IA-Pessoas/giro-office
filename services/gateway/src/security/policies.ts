@@ -181,6 +181,16 @@ const routePolicyMatchers: Array<{
     path: /^\/rh\/timesheets\/reopen$/,
     policy: rhManagementPolicy,
   },
+  {
+    method: "PUT",
+    path: /^\/rh\/timesheets\/rebuild$/,
+    policy: rhManagementPolicy,
+  },
+  {
+    method: "GET",
+    path: /^\/rh\/timesheets\/[^/]+\/pdf$/,
+    policy: rhModulePolicy,
+  },
   { method: "POST", path: /^\/rh\/point\/register$/, policy: rhModulePolicy },
   { method: "PUT", path: /^\/rh\/timesheets\/sign$/, policy: rhModulePolicy },
   {

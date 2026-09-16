@@ -94,8 +94,10 @@ const rhMocks: {
   },
   timeSheetServiceMock: {
     create: vi.fn(),
+    rebuild: vi.fn(),
     list: vi.fn(),
     getById: vi.fn(),
+    getPdf: vi.fn(),
     sign: vi.fn(),
     reopen: vi.fn(),
   },
@@ -378,10 +380,21 @@ export function resetRhRouteMocks() {
     user_id: "00000000-0000-4000-8000-000000000001",
     status: "Gerada",
     days: [],
-    totals: { worked_minutes: 0, expected_minutes: 0, balance_minutes: 0, absence_count: 0 },
+    totals: {
+      worked_minutes: 0,
+      expected_minutes: 0,
+      balance_minutes: 0,
+      absence_count: 0,
+      bank_balance_minutes: 0,
+    },
   });
   timeSheetServiceMock.sign.mockResolvedValue({ ok: true });
   timeSheetServiceMock.reopen.mockResolvedValue({ ok: true });
+  timeSheetServiceMock.rebuild.mockResolvedValue({ ok: true });
+  timeSheetServiceMock.getPdf.mockResolvedValue({
+    buffer: Buffer.from("%PDF-1.7\n"),
+    fileName: "folha-ponto.pdf",
+  });
   scoreNitroServiceMock.updateMetric.mockResolvedValue({ ok: true });
   employeeDossierServiceMock.getDossier.mockResolvedValue({
     id: "00000000-0000-4000-8000-000000000001",

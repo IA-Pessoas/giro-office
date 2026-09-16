@@ -3353,6 +3353,22 @@ const baseManifest = [
   op({
     service: "rh-service",
     method: "PUT",
+    path: "/rh/timesheets/rebuild",
+    action: "rhTimeSheetRebuild",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "GET",
+    path: "/rh/timesheets/{id}/pdf",
+    action: "rhTimeSheetPdf",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
     path: "/rh/score/nitro/update",
     action: "rhScoreNitroUpdate",
     target: "gateway",

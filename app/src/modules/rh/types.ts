@@ -387,6 +387,7 @@ export interface RhTimeSheetTotals {
   expected_minutes: number;
   balance_minutes: number;
   absence_count: number;
+  bank_balance_minutes: number;
 }
 
 export interface RhTimeSheetListItem extends Omit<RhTimeSheetRecord, "organization_id"> {
@@ -406,18 +407,22 @@ export interface RhTimeSheetListFilters {
 
 export interface CreateRhTimeSheetPayload {
   user_id: string;
-  start_time: string;
-  end_time: string;
+  start_time?: string;
+  end_time?: string;
 }
 
 export interface SignRhTimeSheetPayload {
   id: string;
-  signature: string;
+  signature?: string;
 }
 
 export interface ReopenRhTimeSheetPayload {
   id: string;
   reason: string;
+}
+
+export interface RebuildRhTimeSheetPayload {
+  id: string;
 }
 
 export interface RhScoreQuestion {

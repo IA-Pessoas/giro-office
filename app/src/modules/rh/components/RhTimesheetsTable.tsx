@@ -9,9 +9,11 @@ interface RhTimesheetsTableProps {
   canManageTimesheets: boolean;
   signingSheetId: string | null;
   reopeningSheetId: string | null;
+  rebuildingSheetId: string | null;
   getUserLabel: (userId: string) => string;
   onSign: (sheet: RhTimeSheetListItem) => void;
   onReopen: (sheet: RhTimeSheetListItem) => void;
+  onRebuild: (sheet: RhTimeSheetListItem) => void;
   onViewDetail: (timesheetId: string) => void;
 }
 
@@ -41,9 +43,11 @@ export function RhTimesheetsTable({
   canManageTimesheets,
   signingSheetId,
   reopeningSheetId,
+  rebuildingSheetId,
   getUserLabel,
   onSign,
   onReopen,
+  onRebuild,
   onViewDetail,
 }: RhTimesheetsTableProps) {
   return (
@@ -78,6 +82,7 @@ export function RhTimesheetsTable({
           {timeSheets.map((sheet) => {
             const isSigning = signingSheetId === sheet.id;
             const isReopening = reopeningSheetId === sheet.id;
+            const isRebuilding = rebuildingSheetId === sheet.id;
             const canSign = sheet.user_id === currentUserId && !sheet.signature;
 
             return (
@@ -149,6 +154,17 @@ export function RhTimesheetsTable({
                         className={`${ACTION_BUTTON_CLASSNAME} border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-900/20`}
                       >
                         {isReopening ? "Reabrindo" : "Reabrir folha"}
+                      </button>
+                    ) : null}
+
+                    {canManageTimesheets && !sheet.signature ? (
+                      <button
+                        type="button"
+                        onClick={() => onRebuild(sheet)}
+                        disabled={isRebuilding}
+                        className={`${ACTION_BUTTON_CLASSNAME} border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-900/40 dark:text-violet-300 dark:hover:bg-violet-900/20`}
+                      >
+                        {isRebuilding ? "Atualizando" : "Atualizar folha"}
                       </button>
                     ) : null}
                   </div>
