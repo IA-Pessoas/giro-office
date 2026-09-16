@@ -190,12 +190,14 @@ describe("project wizard routes", () => {
     expect(service.preview).not.toHaveBeenCalled();
   });
 
-  it("POST /task/project-wizard/preview bloqueia Integração nível 1 com erro estável", async () => {
+  it.each([
+    0, 1,
+  ])("POST /task/project-wizard/preview bloqueia Integração nível %s com erro estável", async (level) => {
     const response = await request(createApp())
       .post("/task/project-wizard/preview")
       .set({
         ...gatewayHeaders(),
-        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 1 }),
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: level }),
       })
       .send({ tasks: [] });
 
@@ -458,12 +460,12 @@ describe("project wizard routes", () => {
     });
   });
 
-  it("POST /task/project-wizard bloqueia Integração nível 1", async () => {
+  it.each([0, 1])("POST /task/project-wizard bloqueia Integração nível %s", async (level) => {
     const response = await request(createApp())
       .post("/task/project-wizard")
       .set({
         ...gatewayHeaders(),
-        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 1 }),
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: level }),
       })
       .set("Idempotency-Key", "wizard-open-1")
       .send(validBody);
@@ -554,6 +556,20 @@ describe("project wizard routes", () => {
       .send({ ...validBody, start_date: "1969-01-01T00:00:00.000Z", [field]: value });
 
     expect(response.status).toBe(400);
+  });
+
+  it.each([2, 3])("POST /task/project-wizard permite Integração nível %s", async (level) => {
+    const response = await request(createApp())
+      .post("/task/project-wizard")
+      .set({
+        ...gatewayHeaders(),
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: level }),
+      })
+      .set("Idempotency-Key", `wizard-level-${level}`)
+      .send(validBody);
+
+    expect(response.status).toBe(201);
+    expect(response.body.success).toBe(true);
   });
 
   it("POST /task/project-wizard permite owner sem nível de Integração", async () => {
@@ -1177,12 +1193,12 @@ describe("project wizard task extraction routes", () => {
     expect(service.extractTasks).not.toHaveBeenCalled();
   });
 
-  it("bloqueia Integração nível 1", async () => {
+  it.each([0, 1])("bloqueia Integração nível %s", async (level) => {
     const response = await request(createExtractionApp())
       .post("/task/project-wizard/extract-tasks")
       .set({
         ...gatewayHeaders(),
-        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: 1 }),
+        [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ integracao: level }),
       })
       .send(validExtractionBody);
 
