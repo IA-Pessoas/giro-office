@@ -29,7 +29,8 @@ Prefixo público no gateway: **`/contabil`**.
 
 Exemplos de paths públicos (via gateway, com `Authorization: Bearer …`):
 
-- `GET http://localhost:3010/contabil/controls?client_id=<uuid>&competence=<texto>`
+- `GET http://localhost:3010/contabil/controls?client_id=<uuid>&competence=<YYYY-MM>`
+- `GET http://localhost:3010/contabil/controls/list?competence=<YYYY-MM>`
 - `POST http://localhost:3010/contabil/controls`
 - `PATCH http://localhost:3010/contabil/controls/<id>`
 - `POST http://localhost:3010/contabil/responsibles`

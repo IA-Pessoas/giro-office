@@ -75,6 +75,17 @@ export interface ContabilControlFilters {
   competence: ContabilCompetence;
 }
 
+export interface ContabilControlPortfolioItem {
+  client_id: string;
+  legal_name: string;
+  control: ContabilControl | null;
+}
+
+export interface ContabilControlPortfolio {
+  competence: ContabilCompetence;
+  items: ContabilControlPortfolioItem[];
+}
+
 export interface CreateOrGetContabilControlPayload {
   client_id: string;
   competence: ContabilCompetence;

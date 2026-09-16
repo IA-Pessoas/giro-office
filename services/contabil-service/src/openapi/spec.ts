@@ -236,7 +236,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    competence: { type: "string", minLength: 1 },
+                    competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
                   },
                   example: createControlExample,
                 },
@@ -277,7 +277,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               name: "competence",
               in: "query",
               required: true,
-              schema: { type: "string", minLength: 1 },
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
             },
           ],
           responses: {
@@ -289,6 +289,34 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                 },
               },
             },
+          },
+        },
+      },
+      "/contabil/controls/list": {
+        get: {
+          tags: ["Controls"],
+          summary: "Carteira operacional por competência",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+              example: "2026-01",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Uma linha por cliente Contábil elegível; controle ausente é null",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "400": { description: "Competência inválida" },
+            "401": { description: "Não autenticado" },
           },
         },
       },

@@ -2304,6 +2304,7 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/regularize/passwords"]).toBeTruthy();
     expect(body.paths["/fiscal/ncm"]).toBeTruthy();
     expect(body.paths["/contabil/controls"]).toBeTruthy();
+    expect(body.paths["/contabil/controls/list"]).toBeTruthy();
     expect(body.paths["/ti/requests/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/{id}/file"]).toBeTruthy();

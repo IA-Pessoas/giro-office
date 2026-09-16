@@ -52,6 +52,10 @@ function bearerToken(permission: number, modules?: Record<string, number>): stri
 
 function createMockDeps(): ControlRouteDeps {
   return {
+    list: vi.fn(async () => ({
+      competence: "2024-01",
+      items: [],
+    })) as unknown as ControlRouteDeps["list"],
     create: vi.fn(async () => ({
       control: { id: CONTROL_ID },
       created: true,
@@ -65,6 +69,63 @@ function createMockDeps(): ControlRouteDeps {
 }
 
 describe("control routes", () => {
+  it("GET /contabil/controls/list permite viewer e usa somente a organização autenticada", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/contabil/controls/list")
+      .query({ competence: "2024-01", organization_id: "forged-organization" })
+      .set(gatewayHeaders(0));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: { competence: "2024-01", items: [] } });
+    expect(deps.list).toHaveBeenCalledWith("2024-01", ORG_ID);
+  });
+
+  it("GET /contabil/controls/list rejeita competência inválida antes de consultar a carteira", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/contabil/controls/list")
+      .query({ competence: "2024-13" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(400);
+    expect(deps.list).not.toHaveBeenCalled();
+  });
+
+  it("GET /contabil/controls/list exige autenticação", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const res = await request(app).get("/contabil/controls/list").query({ competence: "2024-01" });
+
+    expect(res.status).toBe(401);
+    expect(deps.list).not.toHaveBeenCalled();
+  });
+
+  it("rejeita competência inválida nos contratos de criação e detalhe", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+
+    const create = await request(app)
+      .post("/contabil/controls")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, competence: "2024-13" });
+    const detail = await request(app)
+      .get("/contabil/controls")
+      .query({ client_id: CLIENT_ID, competence: "2024-13" })
+      .set(gatewayHeaders());
+
+    expect(create.status).toBe(400);
+    expect(detail.status).toBe(400);
+    expect(deps.create).not.toHaveBeenCalled();
+    expect(deps.detail).not.toHaveBeenCalled();
+  });
+
   it("GET /contabil/controls permite viewer", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, controlRouteDeps: deps });

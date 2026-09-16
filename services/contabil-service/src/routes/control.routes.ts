@@ -12,11 +12,12 @@ import {
   controlIdParamsSchema,
   createControlBodySchema,
   detailControlQuerySchema,
+  listControlQuerySchema,
   updateControlFieldBodySchema,
 } from "../schemas/control.schemas.js";
 import type { ControlService } from "../services/controlService.js";
 
-export type ControlRouteDeps = Pick<ControlService, "create" | "detail" | "updateField">;
+export type ControlRouteDeps = Pick<ControlService, "create" | "detail" | "list" | "updateField">;
 
 /**
  * Express pode entregar query como string ou array (chave repetida). Para Zod, normalizamos a um único string.
@@ -60,6 +61,25 @@ export function createControlRoutes(service: ControlRouteDeps): ReturnType<typeo
         res.status(created ? 201 : 200).json(createSuccessResponse(control));
       } catch (err) {
         logError("Erro ao criar ou obter controle contábil", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/controls/list",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(listControlQuerySchema, {
+          competence: firstQueryString(req.query.competence),
+        });
+        const auth = requireAuthenticatedRequestContext(req);
+        const result = await service.list(query.competence, auth.organization_id);
+
+        res.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao listar carteira operacional contábil", { err });
         next(err);
       }
     },
