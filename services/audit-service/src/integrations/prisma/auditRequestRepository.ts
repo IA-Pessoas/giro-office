@@ -532,8 +532,10 @@ export function createAuditRequestRepository(
         changes_json: normalizeChanges(payload.changes),
         department: payload.department ?? null,
       };
-      await client.auditRequest.create({
-        data: createData as Parameters<typeof client.auditRequest.create>[0]["data"],
+      await client.auditRequest.upsert({
+        where: { request_id: payload.requestId },
+        update: {},
+        create: createData as Parameters<typeof client.auditRequest.create>[0]["data"],
       });
     },
     async search(filters) {

@@ -26,6 +26,9 @@ const SKIP_CLIENT_NOT_FOUND = "CLIENT_NOT_FOUND";
 const SKIP_CLIENT_NOT_ACTIVE = "CLIENT_NOT_ACTIVE";
 const SKIP_CLIENT_NOT_PESSOAL = "CLIENT_NOT_PESSOAL";
 const SKIP_PAYROLL_NOT_FOUND = "PAYROLL_NOT_FOUND";
+const PENDING_AUDIT_OUTBOX_STATUS = "pending";
+const PROCESSED_AUDIT_OUTBOX_STATUS = "processed";
+const AUDIT_OUTBOX_RECONCILIATION_LIMIT = 100;
 
 type PreviewTotals = {
   changed: number;
@@ -62,6 +65,15 @@ function isPreviewTotals(value: unknown): value is PreviewTotals {
   return ["changed", "no_op", "skipped", "requested"].every(
     (key) => typeof totals[key] === "number",
   );
+}
+
+function isPessoalAuditChangeInput(value: unknown): value is PessoalAuditChangeInput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const input = value as Record<string, unknown>;
+  return ["organizationId", "userId", "action", "referring", "referringId"].every((field) => {
+    const fieldValue = input[field];
+    return typeof fieldValue === "string" && fieldValue.trim().length > 0;
+  });
 }
 
 function hash(value: unknown): string {
@@ -464,7 +476,7 @@ export class GroupAssignmentService {
       if (auditRecorded) {
         await this.prisma.pessoalAuditOutboxEvent.update({
           where: { id: result.outboxId },
-          data: { status: "processed", processed_at: this.now() },
+          data: { status: PROCESSED_AUDIT_OUTBOX_STATUS, processed_at: this.now() },
         });
       }
       return { ...result.response, idempotent: false };
@@ -473,5 +485,31 @@ export class GroupAssignmentService {
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao aplicar atribuicao de grupo em lote.", err);
     }
+  }
+
+  async reconcilePendingAuditEvents(): Promise<{ processed: number; pending: number }> {
+    const events = await this.prisma.pessoalAuditOutboxEvent.findMany({
+      where: { status: PENDING_AUDIT_OUTBOX_STATUS },
+      orderBy: { created_at: "asc" },
+      take: AUDIT_OUTBOX_RECONCILIATION_LIMIT,
+      select: { id: true, payload: true },
+    });
+    let processed = 0;
+
+    for (const event of events) {
+      if (!isPessoalAuditChangeInput(event.payload)) continue;
+      if (!(await this.auditService.recordChange(event.payload))) continue;
+
+      const updated = await this.prisma.pessoalAuditOutboxEvent.updateMany({
+        where: { id: event.id, status: PENDING_AUDIT_OUTBOX_STATUS },
+        data: { status: PROCESSED_AUDIT_OUTBOX_STATUS, processed_at: this.now() },
+      });
+      processed += updated.count;
+    }
+
+    const pending = await this.prisma.pessoalAuditOutboxEvent.count({
+      where: { status: PENDING_AUDIT_OUTBOX_STATUS },
+    });
+    return { processed, pending };
   }
 }
