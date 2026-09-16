@@ -357,6 +357,8 @@ async function run() {
     const contractForm = page.getByRole("form", { name: "Editar configuração" });
     const contractValueInput = contractForm.getByLabel("Valor base do contrato");
     assert.equal(await contractValueInput.inputValue(), "R$ 1.500.000,00");
+    await contractValueInput.fill("abc");
+    assert.equal(await contractValueInput.inputValue(), "");
     await contractValueInput.fill("123456");
     assert.equal(await contractValueInput.inputValue(), "R$ 1.234,56");
     await page.screenshot({ path: `${evidenceDir}/02-commercial-contract-value-mask.png`, fullPage: true });
