@@ -21,7 +21,7 @@ export const regularizeTestEnv: RegularizeServiceEnv = {
   databaseUrl: "postgresql://localhost/test",
   jwtSecret: "secret",
   auditServiceToken: "audit-service-token",
-  internalServiceToken: "internal-token",
+  internalServiceToken: "regularize-service-internal-token",
   regularizeReportingToken: "regularize-reporting-token",
   regularizeReportingGrantSecret: "regularize-reporting-grant-secret",
   encryptionKey: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
@@ -33,7 +33,7 @@ export const regularizeTestEnv: RegularizeServiceEnv = {
 
 export function gatewayHeaders(options: { permission?: number } = {}) {
   return {
-    [INTERNAL_SERVICE_TOKEN_HEADER]: regularizeTestEnv.auditServiceToken,
+    [INTERNAL_SERVICE_TOKEN_HEADER]: regularizeTestEnv.internalServiceToken,
     [FORWARDED_AUTH_USER_ID_HEADER]: "user-1",
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "a0000000-0000-4000-8000-000000000001",
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(options.permission ?? 10),

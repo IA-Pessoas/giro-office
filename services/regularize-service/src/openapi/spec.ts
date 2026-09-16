@@ -1,5 +1,13 @@
 import { reportingQueryOpenApiSchema } from "@workspace/shared";
 
+import {
+  CANONICAL_GUIDANCE_STATUSES,
+  CANONICAL_LICENSE_STATUSES,
+  CANONICAL_PROCESS_STATUSES,
+  LEGACY_LICENSE_STATUS_ALIASES,
+  LEGACY_PROCESS_STATUS_ALIASES,
+} from "../schemas/status.schemas.js";
+
 type OpenApiDocument = Record<string, unknown> & {
   openapi: string;
   info: { title: string; version: string; description?: string };
@@ -49,6 +57,38 @@ function dualListSuccessEnvelopeContent() {
               },
             },
           ],
+        },
+      },
+    },
+  };
+}
+
+function protectedErrorResponses() {
+  return {
+    "400": { description: "Dados de entrada invalidos" },
+    "401": { description: "Autenticacao ausente ou invalida" },
+    "403": { description: "Permissao insuficiente para o modulo Regularize" },
+  };
+}
+
+function statusRequestBody(statuses: readonly string[], required: string[]) {
+  return {
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: true,
+            required,
+            properties: {
+              status: {
+                type: "string",
+                enum: [...statuses],
+                description: "Estado canonico; aliases legados nao sao aceitos em novas escritas.",
+              },
+            },
+          },
         },
       },
     },
@@ -152,7 +192,8 @@ export function buildRegularizeServiceOpenApiSpec(
     info: {
       title: "regularize-service",
       version: "1.0.0",
-      description: "API do modulo regularize, com rotas autenticadas e endpoints internos.",
+      description:
+        "API do modulo regularize. As rotas de negocio exigem contexto autenticado, permissao Regularize 1 para leitura e 2 para mutacoes; chamadas internas usam token de servico. Status legados continuam aceitos nas leituras, enquanto novas escritas usam somente estados canonicos.",
     },
     servers: [{ url: baseUrl }],
     tags: [
@@ -489,13 +530,21 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Processes"],
           summary: "Criar processo",
           security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Processo criado", ...successEnvelopeContent() } },
+          ...statusRequestBody(CANONICAL_PROCESS_STATUSES, ["status"]),
+          responses: {
+            "201": { description: "Processo criado", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+          },
         },
         put: {
           tags: ["Processes"],
           summary: "Atualizar processo",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Processo atualizado", ...successEnvelopeContent() } },
+          ...statusRequestBody(CANONICAL_PROCESS_STATUSES, ["id", "status"]),
+          responses: {
+            "200": { description: "Processo atualizado", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+          },
         },
       },
       "/regularize/processes": {
@@ -504,7 +553,15 @@ export function buildRegularizeServiceOpenApiSpec(
           summary: "Listar processos",
           security: [{ bearerAuth: [] }],
           parameters: [
-            { name: "status", in: "query", required: true, schema: { type: "string" } },
+            {
+              name: "status",
+              in: "query",
+              required: true,
+              schema: {
+                type: "string",
+                enum: ["Todos", ...CANONICAL_PROCESS_STATUSES, ...LEGACY_PROCESS_STATUS_ALIASES],
+              },
+            },
             { name: "search", in: "query", schema: { type: "string" } },
             { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
             {
@@ -526,14 +583,20 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Guidance"],
           summary: "Criar orientacao procedural",
           security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Orientacao criada", ...successEnvelopeContent() } },
+          ...statusRequestBody(CANONICAL_GUIDANCE_STATUSES, ["status"]),
+          responses: {
+            "201": { description: "Orientacao criada", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+          },
         },
         put: {
           tags: ["Guidance"],
           summary: "Atualizar orientacao procedural",
           security: [{ bearerAuth: [] }],
+          ...statusRequestBody(CANONICAL_GUIDANCE_STATUSES, ["id"]),
           responses: {
             "200": { description: "Orientacao atualizada", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
           },
         },
       },
@@ -616,13 +679,21 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Licenses"],
           summary: "Criar licenca",
           security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Licenca criada", ...successEnvelopeContent() } },
+          ...statusRequestBody(CANONICAL_LICENSE_STATUSES, ["status"]),
+          responses: {
+            "201": { description: "Licenca criada", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+          },
         },
         put: {
           tags: ["Licenses"],
           summary: "Atualizar licenca",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Licenca atualizada", ...successEnvelopeContent() } },
+          ...statusRequestBody(CANONICAL_LICENSE_STATUSES, ["id", "status"]),
+          responses: {
+            "200": { description: "Licenca atualizada", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+          },
         },
       },
       "/regularize/licenses": {
@@ -638,7 +709,13 @@ export function buildRegularizeServiceOpenApiSpec(
               description: "Use Todos para listar todos os status.",
               schema: {
                 type: "string",
-                enum: ["Todos", "Ativo", "Pendente", "A vencer", "Vencido", "Inativo", "Cancelado"],
+                enum: [
+                  "Todos",
+                  ...CANONICAL_LICENSE_STATUSES,
+                  ...LEGACY_LICENSE_STATUS_ALIASES,
+                  "A vencer",
+                  "Vencido",
+                ],
               },
             },
             { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },

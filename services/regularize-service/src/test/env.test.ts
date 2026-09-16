@@ -16,6 +16,8 @@ function setBaseEnv() {
     SERVICE_ALLOWED_ORIGINS: "*",
     ENABLE_API_DOCS: "false",
   };
+  delete process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN;
+  delete process.env.INTERNAL_SERVICE_TOKEN;
 }
 
 describe("regularize service env", () => {
@@ -33,6 +35,15 @@ describe("regularize service env", () => {
     const env = getRegularizeServiceEnv();
 
     expect(env.internalServiceToken).toBe("internal-token");
+  });
+
+  it("prefers the scoped internal token when configured", () => {
+    process.env.INTERNAL_SERVICE_TOKEN = "internal-token";
+    process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN = "regularize-token";
+
+    const env = getRegularizeServiceEnv();
+
+    expect(env.internalServiceToken).toBe("regularize-token");
   });
 
   it("falls back to AUDIT_SERVICE_TOKEN when INTERNAL_SERVICE_TOKEN is empty", () => {

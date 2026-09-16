@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { idQuerySchema } from "./common.schemas.js";
+import { processReadStatusSchema, processWriteStatusSchema } from "./status.schemas.js";
 
 export const createProcessBodySchema = z
   .object({
@@ -12,7 +13,7 @@ export const createProcessBodySchema = z
     entry_date: z.coerce.date().optional(),
     completion_date: z.coerce.date().optional(),
     expected_date: z.coerce.date().optional(),
-    status: z.string().min(1, "status obrigatorio."),
+    status: processWriteStatusSchema,
     observation: z.string().nullable().optional(),
     responsible1_id: z.string().uuid().optional(),
     responsible2_id: z.string().uuid().optional(),
@@ -33,7 +34,7 @@ export const processDetailQuerySchema = idQuerySchema;
 
 export const listProcessesQuerySchema = z
   .object({
-    status: z.string().min(1, "status obrigatorio."),
+    status: processReadStatusSchema,
     search: z.string().trim().default(""),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
