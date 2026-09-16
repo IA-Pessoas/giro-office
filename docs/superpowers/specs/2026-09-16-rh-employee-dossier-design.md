@@ -28,6 +28,9 @@ Manter os paths legados do fluxo de perfil, sob o prefixo público `/rh`:
 - `GET /rh/profile/colaborator`: detalhe do próprio colaborador; RH admin
   pode informar `user_id` de um colaborador da organização; gestor pode abrir
   apenas colaborador do próprio departamento e recebe projeção não sensível.
+- `GET /rh/profile/colaborator/list`: lista a projeção não sensível da
+  organização para RH admin ou do departamento do gestor; colaborador comum
+  recebe apenas a própria linha.
 - `PUT /rh/profile/colaborator`: atualiza o dossiê. O alvo é o usuário
   autenticado por padrão; `target_user_id` só será aceito para RH admin e será
   validado contra a organização no servidor.
