@@ -102,6 +102,19 @@ await (async () => {
     assert.match(source, /—/);
   });
 
+  await runTest("carteira associa o fechamento e o controle às colunas corretas", () => {
+    const source = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
+    const closingStatus = source.indexOf('NOT_RECEIVED: "Não recebido"');
+    const monthlyControl = source.indexOf('item.control ? "Iniciado" : "—"');
+
+    assert.ok(closingStatus >= 0);
+    assert.ok(monthlyControl >= 0);
+    assert.ok(
+      closingStatus < monthlyControl,
+      "o status do fechamento deve ser renderizado antes do estado do controle mensal",
+    );
+  });
+
   await runTest("contabil page preserva o seletor de cliente da organização", () => {
     const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
 

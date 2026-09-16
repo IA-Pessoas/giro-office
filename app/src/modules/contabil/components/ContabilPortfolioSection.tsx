@@ -96,9 +96,6 @@ export function ContabilPortfolioSection() {
                     <tr key={item.client_id}>
                       <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{item.legal_name}</td>
                       <td className="px-4 py-3 text-gray-700 dark:text-slate-300">
-                        {item.control ? "Iniciado" : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-gray-700 dark:text-slate-300">
                         {{
                           NOT_RECEIVED: "Não recebido",
                           RECEIVED: "Recebido",
@@ -106,6 +103,9 @@ export function ContabilPortfolioSection() {
                           CLOSED: "Fechado",
                           REOPENED: "Reaberto",
                         }[item.closing.status]}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-slate-300">
+                        {item.control ? "Iniciado" : "—"}
                       </td>
                       <td className="px-4 py-3 tabular-nums text-gray-700 dark:text-slate-300">
                         {complete === null ? "—" : `${complete}/${CONTABIL_CONTROL_CHECKLIST_FIELDS.length}`}
