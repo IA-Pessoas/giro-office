@@ -44,7 +44,6 @@ const GLOBAL_PREFIXES = [
 
 const GLOBAL_COMMANDS = [
   ["pnpm", ["audit:ci"]],
-  ["pnpm", ["check"]],
   ["pnpm", ["typecheck"]],
   ["pnpm", ["test"]],
 ];
@@ -76,6 +75,17 @@ function cloneCommands(commands) {
   return commands.map(([command, args]) => [command, [...args]]);
 }
 
+function buildBiomeCheckCommand(changedFiles) {
+  if (changedFiles.length === 0) {
+    return ["pnpm", ["check"]];
+  }
+
+  return [
+    "pnpm",
+    ["exec", "biome", "check", "--files-ignore-unknown=true", ...changedFiles],
+  ];
+}
+
 export function classifyChangedFiles(changedFiles) {
   const filePaths = [...new Set(changedFiles.map(normalizeGitPath).filter(Boolean))];
 
@@ -102,13 +112,14 @@ export function classifyChangedFiles(changedFiles) {
   return { mode: "affected", reason: "workspace-packages" };
 }
 
-export function buildHookPlan(classification, bases = []) {
+export function buildHookPlan(classification, bases = [], changedFiles = []) {
   if (classification.mode === "skip") {
     return [];
   }
 
   if (classification.mode === "global" || bases.length === 0) {
-    return cloneCommands(GLOBAL_COMMANDS);
+    const [[auditCommand, auditArgs], ...remainingCommands] = cloneCommands(GLOBAL_COMMANDS);
+    return [[auditCommand, auditArgs], buildBiomeCheckCommand(changedFiles), ...remainingCommands];
   }
 
   const filters = bases.map((base) => `--filter=...[${base}]`);
@@ -390,7 +401,7 @@ function main() {
   const classification = resolution.forceGlobal
     ? { mode: "global", reason: resolution.reason }
     : classifyChangedFiles(resolution.files);
-  const commands = buildHookPlan(classification, resolution.bases ?? []);
+  const commands = buildHookPlan(classification, resolution.bases ?? [], resolution.files);
 
   console.log(
     `git-hook-scope: ${classification.mode} (${classification.reason}); files=${resolution.files.length}`,

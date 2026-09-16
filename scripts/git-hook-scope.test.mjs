@@ -100,13 +100,29 @@ describe("buildHookPlan", () => {
     ]);
   });
 
-  it("builds the current global command sequence for global changes", () => {
-    assert.deepEqual(buildHookPlan(classifyChangedFiles(["infra/prisma/schema.prisma"]), ["abc"]), [
-      ["pnpm", ["audit:ci"]],
-      ["pnpm", ["check"]],
-      ["pnpm", ["typecheck"]],
-      ["pnpm", ["test"]],
-    ]);
+  it("checks somente os arquivos alterados antes da sequência global", () => {
+    assert.deepEqual(
+      buildHookPlan(
+        classifyChangedFiles(["infra/prisma/schema.prisma"]),
+        ["abc"],
+        ["infra/prisma/schema.prisma"],
+      ),
+      [
+        ["pnpm", ["audit:ci"]],
+        [
+          "pnpm",
+          [
+            "exec",
+            "biome",
+            "check",
+            "--files-ignore-unknown=true",
+            "infra/prisma/schema.prisma",
+          ],
+        ],
+        ["pnpm", ["typecheck"]],
+        ["pnpm", ["test"]],
+      ],
+    );
   });
 
   it("skips every command for docs-only changes", () => {
