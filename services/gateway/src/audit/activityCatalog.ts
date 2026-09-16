@@ -87,6 +87,36 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "o estado de entrega da outbox comercial" },
   },
   {
+    methods: ["DELETE"],
+    pattern: /^\/pessoal\/groups\/[^/]+$/,
+    description: { action: "arquivou", item: "um grupo de pessoal" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/groups\/[^/]+\/reactivate$/,
+    description: { action: "reativou", item: "um grupo de pessoal" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/group-assignments\/eligible$/,
+    description: { action: "consultou", item: "os clientes elegíveis para atribuição de grupo" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/group-assignments\/previews$/,
+    description: { action: "gerou", item: "uma prévia de atribuição de grupo" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/group-assignments\/previews\/[^/]+$/,
+    description: { action: "consultou", item: "uma prévia de atribuição de grupo" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/group-assignments\/apply$/,
+    description: { action: "aplicou", item: "uma atribuição de grupo" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "consultou", item: "a lista global de organizações" },
@@ -707,6 +737,12 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 ];
 
 const RESOURCE_RULES: ResourceRule[] = [
+  {
+    pattern: /^\/pessoal\/groups(?:\/|$)/,
+    singular: "um grupo de pessoal",
+    newSingular: "um novo grupo de pessoal",
+    plural: "grupos de pessoal",
+  },
   {
     pattern: /^\/commercial\/proposal-configs(?:\/|$)/,
     singular: "uma configuração de proposta comercial",

@@ -117,11 +117,23 @@ async function installApiMocks(page, currentUser) {
               client_id: "contabil-smoke-client-initialized",
               legal_name: "Alfa Contábil Ltda.",
               control: { depreciation: true },
+              closing: {
+                client_id: "contabil-smoke-client-initialized",
+                competence,
+                status: "NOT_RECEIVED",
+                archived_at: null,
+              },
             },
             {
               client_id: "contabil-smoke-client-missing",
               legal_name: "Beta Contábil Ltda.",
               control: null,
+              closing: {
+                client_id: "contabil-smoke-client-missing",
+                competence,
+                status: "NOT_RECEIVED",
+                archived_at: null,
+              },
             },
           ],
         },
