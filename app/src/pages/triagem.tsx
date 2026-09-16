@@ -7,6 +7,7 @@ import { AccessDeniedPanel, TriageDocumentsSection, useTriageEditability } from 
 
 export default function TriagemPage() {
   const { access, isLoading } = useModuleAccess("triagem");
+  const { access: contabilAccess } = useModuleAccess("contabil");
   const [client, setClient] = useState<ClientPickerOption | null>(null);
   const editability = useTriageEditability(client?.id ?? "");
 
@@ -46,7 +47,7 @@ export default function TriagemPage() {
               <TriageDocumentsSection
                 clientId={client.id}
                 canEdit={editability.data?.can_edit === true}
-                canEditClosing={access.canEdit}
+                canEditClosing={contabilAccess.canEdit}
               />
             </div>
           ) : (
