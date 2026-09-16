@@ -1,5 +1,7 @@
 # QA adversarial do wizard — #997
 
+Commit inicial de implementação: `6fa5f2c6cb8ba80a2abdc9ef369135ad39f365d9`.
+
 Base de implementação: `edfc9a2c6602b1600bb0209880e147bd1f57d6ce` (`develop`). Branch
 `codex/issue-997`, integração `feature/milestone-15`. Os hashes dos arquivos testados estão em
 [validation.json](validation.json); o PR registra o head final. Sem merge ou deploy nesta evidência.
@@ -24,6 +26,7 @@ Base de implementação: `edfc9a2c6602b1600bb0209880e147bd1f57d6ce` (`develop`).
   consumindo tentativa e preservam as propostas anteriores.
 - Campos obrigatórios e falhas de extração/criação dependiam de notificações fora do diálogo.
   Os erros agora aparecem dentro dele; os campos referenciam a mensagem correspondente.
+  O efeito de descarte também declara as funções estáveis de reset das mutações como dependências.
 - O comando de evidência real gravava vídeo sem máscara e propagava erros do Playwright com
   conteúdo de campos/DOM. Vídeo e dumps foram removidos; falhas são sanitizadas. Capturas também
   ficam desativadas quando se usa uma Ata sensível.
@@ -37,13 +40,19 @@ Base de implementação: `edfc9a2c6602b1600bb0209880e147bd1f57d6ce` (`develop`).
 - `pnpm --filter @workspace/app typecheck`: aprovado, incluindo tipos de useFetch.
 - `pnpm --filter @workspace/app build`: aprovado em build de produção.
 - Biome direto nos cinco arquivos JS/TS do app alterados: aprovado; o script de lint do app é noop,
-  portanto a checagem usou as regras do Biome do repositório com a exclusão de app removida.
+  portanto a checagem usou as regras do Biome do repositório com a exclusão de app removida. A configuração exata
+  está em `biome-frontend.json` neste diretório.
 - Biome no teste da rota: aprovado.
 - Browser no app compilado: aprovado; sem banco ou tráfego de provedor. Os mocks HTTP do browser
   são complementados pelos testes da rota real do task-service.
 - Task-service completo: 395 testes aprovados e 6 testes opt-in de banco ignorados por falta
   de banco configurado; 41 arquivos aprovados e 1 ignorado. Typecheck do serviço aprovado.
-- Suíte completa do app: em execução; resultado final será registrado antes de publicar o PR.
+- Suíte completa do app: 36 etapas aprovadas; Turbo 3/3 tarefas concluídas em 7m11s com
+  `--env-mode=loose` e endpoints dos runners apontando para o build isolado. A tentativa inicial
+  em modo strict descartou essas variáveis e falhou por timeout do servidor de desenvolvimento.
+- Check completo do task-service: 109 arquivos aprovados. Foi necessário ajustar somente a
+  quebra de linha e vírgula final do teste preexistente `internalReportingLimit.schemas.test.ts`;
+  seu teste também passou, sem alterar valores ou condições.
 
 O ciclo vermelho/verde reproduziu o contador incorreto (esperado 0, observado 1), a falta de
 associação do erro no campo Nome, o alerta de arquivo vazio ausente do diálogo e o vazamento

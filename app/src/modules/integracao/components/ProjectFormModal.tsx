@@ -176,7 +176,7 @@ export function ProjectFormModal({
     } else if (!isEditing && !idempotencyKeyRef.current) {
       idempotencyKeyRef.current = crypto.randomUUID();
     }
-  }, [isEditing, open, reset]);
+  }, [extractTasksMutation.reset, isEditing, open, previewMutation.reset, reset]);
 
   const isBusy =
     createWizardMutation.isPending ||
