@@ -65,10 +65,54 @@ function createMockDeps(): ControlRouteDeps {
       id: CONTROL_ID,
       depreciation: true,
     })) as unknown as ControlRouteDeps["updateField"],
+    createYear: vi.fn(async () => ({
+      competences: ["2024-01"],
+      created: 1,
+      existing: 11,
+    })) as unknown as ControlRouteDeps["createYear"],
+    archiveCompetence: vi.fn(async () => ({
+      controls: 1,
+      monthly: 1,
+      statements: 0,
+      closings: 0,
+    })) as unknown as ControlRouteDeps["archiveCompetence"],
+    restoreCompetence: vi.fn(async () => ({
+      controls: 1,
+      monthly: 1,
+      statements: 0,
+      closings: 0,
+    })) as unknown as ControlRouteDeps["restoreCompetence"],
+    completeAll: vi.fn(async () => ({
+      id: CONTROL_ID,
+    })) as unknown as ControlRouteDeps["completeAll"],
   };
 }
 
 describe("control routes", () => {
+  it("POST /contabil/controls/year exige confirmação e escreve somente no contexto autenticado", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, controlRouteDeps: deps });
+    const invalid = await request(app)
+      .post("/contabil/controls/year")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, year: 2024, confirmed: false });
+    const forged = await request(app)
+      .post("/contabil/controls/year")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, year: 2024, confirmed: true, organization_id: "forged" });
+    const valid = await request(app)
+      .post("/contabil/controls/year")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, year: 2024, confirmed: true });
+
+    expect(invalid.status).toBe(400);
+    expect(forged.status).toBe(400);
+    expect(valid.status).toBe(200);
+    expect(deps.createYear).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORG_ID, clientId: CLIENT_ID, confirmed: true }),
+    );
+  });
+
   it("GET /contabil/controls/list permite viewer e usa somente a organização autenticada", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, controlRouteDeps: deps });

@@ -97,6 +97,17 @@ export interface PatchContabilControlFieldPayload {
   value: boolean | string | null;
 }
 
+export interface CreateYearContabilControlsPayload {
+  client_id: string;
+  year: number;
+  confirmed: true;
+}
+
+export interface ContabilCompetenceOperationPayload {
+  client_id: string;
+  competence: ContabilCompetence;
+}
+
 export interface CreateContabilResponsiblePayload {
   client_id: string;
   person_responsible_id?: string | null;

@@ -1399,11 +1399,13 @@ model ControlContabil {
   reconcile_icms_pis_cofins        Boolean
   depreciation                     Boolean
   notes                            String
+  archived_at                      DateTime?
   organization_id                  String
   client                           Client       @relation(fields: [client_id], references: [id])
   organization                     Organization @relation(fields: [organization_id], references: [id])
 
-  @@index([client_id, competence, organization_id], map: "idx_contabil_control_client_competence_org")
+  @@unique([organization_id, client_id, competence], map: "uq_contabil_control_org_client_competence")
+  @@index([client_id, competence, organization_id, archived_at], map: "idx_contabil_control_client_competence_org_archived")
   @@map("contabil.control")
 }
 
@@ -2429,13 +2431,14 @@ model TriageMonthly {
   justification   String?
   created_at      DateTime     @default(now())
   updated_at      DateTime     @updatedAt
+  archived_at     DateTime?
   organization_id String
   client          Client       @relation(fields: [client_id], references: [id])
   organization    Organization @relation(fields: [organization_id], references: [id])
   responsible     User?        @relation(fields: [responsible_id], references: [id])
 
   @@unique([organization_id, client_id, competence, type])
-  @@index([organization_id, client_id, competence])
+  @@index([organization_id, client_id, competence, archived_at])
   @@map("triagem.monthly")
 }
 
@@ -2447,12 +2450,13 @@ model TriageBankStatement {
   status          String       @default("PENDING")
   created_at      DateTime     @default(now())
   updated_at      DateTime     @updatedAt
+  archived_at     DateTime?
   organization_id String
   client          Client       @relation(fields: [client_id], references: [id])
   organization    Organization @relation(fields: [organization_id], references: [id])
 
   @@unique([organization_id, client_id, competence, bank_id])
-  @@index([organization_id, client_id, competence])
+  @@index([organization_id, client_id, competence, archived_at])
   @@map("triagem.bank_statements")
 }
 

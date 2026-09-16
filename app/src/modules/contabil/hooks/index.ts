@@ -18,9 +18,13 @@ export {
 } from "./queryKeys";
 export {
   useContabilControlBootstrapMutation,
+  useCompleteContabilControlMutation,
+  useCreateYearContabilControlsMutation,
+  useArchiveContabilCompetenceMutation,
   useContabilControlDetail,
   useContabilControlPortfolio,
   usePatchContabilControlFieldMutation,
+  useRestoreContabilCompetenceMutation,
 } from "./useContabilControl";
 export {
   useContabilRelationship,

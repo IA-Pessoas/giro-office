@@ -12,10 +12,12 @@ import type {
   ContabilControl,
   ContabilCompetence,
   ContabilControlPortfolio,
+  ContabilCompetenceOperationPayload,
+  CreateYearContabilControlsPayload,
   CreateOrGetContabilControlPayload,
   PatchContabilControlFieldPayload,
 } from "../types";
-import { contabilControlPortfolioQueryKey, contabilControlQueryKey } from "./queryKeys";
+import { CONTABIL_QUERY_KEY, contabilControlPortfolioQueryKey, contabilControlQueryKey } from "./queryKeys";
 
 export function useContabilControlPortfolio(
   competence: ContabilCompetence,
@@ -90,4 +92,43 @@ export function usePatchContabilControlFieldMutation(): UseMutationResult<
       });
     },
   });
+}
+
+function invalidateControlQueries(queryClient: ReturnType<typeof useQueryClient>, clientId: string, competence: string) {
+  queryClient.removeQueries({ queryKey: contabilControlQueryKey(clientId, competence) });
+  return queryClient.invalidateQueries({ queryKey: contabilControlPortfolioQueryKey(competence) });
+}
+
+export function useCompleteContabilControlMutation(): UseMutationResult<ContabilControl, Error, { controlId: string; clientId: string; competence: ContabilCompetence }> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ controlId }) => contabilControlService.completeAll(controlId),
+    onSuccess: async (control, variables) => {
+      queryClient.setQueryData(contabilControlQueryKey(variables.clientId, variables.competence), control);
+      await queryClient.invalidateQueries({ queryKey: contabilControlPortfolioQueryKey(variables.competence) });
+    },
+  });
+}
+
+export function useCreateYearContabilControlsMutation(): UseMutationResult<{ competences: string[]; created: number; existing: number }, Error, CreateYearContabilControlsPayload> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => contabilControlService.createYear(payload),
+    onSuccess: async (_result, payload) => {
+      await queryClient.invalidateQueries({ queryKey: [...CONTABIL_QUERY_KEY, "controls", "list"] });
+      for (const competence of payload.year ? Array.from({ length: 12 }, (_, index) => `${payload.year}-${String(index + 1).padStart(2, "0")}`) : []) {
+        queryClient.removeQueries({ queryKey: contabilControlQueryKey(payload.client_id, competence) });
+      }
+    },
+  });
+}
+
+export function useArchiveContabilCompetenceMutation(): UseMutationResult<Record<string, number>, Error, ContabilCompetenceOperationPayload> {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: contabilControlService.archiveCompetence, onSuccess: async (_result, payload) => invalidateControlQueries(queryClient, payload.client_id, payload.competence) });
+}
+
+export function useRestoreContabilCompetenceMutation(): UseMutationResult<Record<string, number>, Error, ContabilCompetenceOperationPayload> {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: contabilControlService.restoreCompetence, onSuccess: async (_result, payload) => invalidateControlQueries(queryClient, payload.client_id, payload.competence) });
 }

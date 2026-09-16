@@ -165,7 +165,7 @@ await (async () => {
 
     assert.equal(
       contabilServiceSources.controlRoute.match(/requireContabilWritePermission/g)?.length,
-      3,
+      7,
     );
     assert.equal(
       contabilServiceSources.responsibleRoute.match(/requireContabilWritePermission/g)?.length,

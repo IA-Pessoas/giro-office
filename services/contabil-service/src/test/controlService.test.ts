@@ -15,6 +15,7 @@ const baseRow = {
   competence: "2024-01",
   client_id: CLIENT_ID,
   organization_id: ORG_ID,
+  archived_at: null,
   regenerate_accounting_entries: false,
   check_summary_by_accumulator: false,
   post_accounting_transaction: false,
@@ -38,17 +39,72 @@ const baseRow = {
 function createMockPrisma(): ControlServicePrisma {
   return {
     client: {
+      findFirst: vi.fn(),
       findMany: vi.fn(),
     },
     controlContabil: {
       findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      findMany: vi.fn(),
+      createMany: vi.fn(),
+      updateMany: vi.fn(),
     },
   } as unknown as ControlServicePrisma;
 }
 
 describe("ControlService", () => {
+  it("cria as doze competências de um ano sem duplicar as já existentes", async () => {
+    const prisma = createMockPrisma();
+    const audit = { createLog: vi.fn(), logUpdateIfChanged: vi.fn() };
+    vi.mocked(prisma.client.findFirst).mockResolvedValue({ id: CLIENT_ID } as never);
+    vi.mocked(prisma.controlContabil.findMany).mockResolvedValue([
+      { ...baseRow, competence: "2024-01" },
+    ] as never);
+    vi.mocked(prisma.controlContabil.createMany).mockResolvedValue({ count: 11 } as never);
+    const service = new ControlService(prisma, audit);
+
+    const result = await service.createYear({
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      permission: 2,
+      clientId: CLIENT_ID,
+      year: 2024,
+      confirmed: true,
+    });
+
+    expect(result).toEqual({
+      competences: [
+        "2024-01",
+        "2024-02",
+        "2024-03",
+        "2024-04",
+        "2024-05",
+        "2024-06",
+        "2024-07",
+        "2024-08",
+        "2024-09",
+        "2024-10",
+        "2024-11",
+        "2024-12",
+      ],
+      created: 11,
+      existing: 1,
+    });
+    expect(prisma.controlContabil.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skipDuplicates: true,
+        data: expect.arrayContaining([expect.objectContaining({ competence: "2024-02" })]),
+      }),
+    );
+    expect(audit.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Criar controles contábeis anuais",
+        referring: "contabil.control.batch",
+      }),
+    );
+  });
+
   it("list retorna uma linha ordenada por razão social, inclusive sem controle mensal", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.client.findMany).mockResolvedValue([
