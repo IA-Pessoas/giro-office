@@ -1,6 +1,7 @@
 # QA adversarial do wizard — #997
 
-Commit inicial de implementação: `6fa5f2c6cb8ba80a2abdc9ef369135ad39f365d9`.
+Head de código validado: `41655b3d7333913a7d9683fe2e9367cc7c520c35`.
+Este registro posterior altera somente a evidência, preservando os hashes do código testado.
 
 Base de implementação: `edfc9a2c6602b1600bb0209880e147bd1f57d6ce` (`develop`). Branch
 `codex/issue-997`, integração `feature/milestone-15`. Os hashes dos arquivos testados estão em
@@ -50,6 +51,8 @@ Base de implementação: `edfc9a2c6602b1600bb0209880e147bd1f57d6ce` (`develop`).
 - Suíte completa do app: 36 etapas aprovadas; Turbo 3/3 tarefas concluídas em 7m11s com
   `--env-mode=loose` e endpoints dos runners apontando para o build isolado. A tentativa inicial
   em modo strict descartou essas variáveis e falhou por timeout do servidor de desenvolvimento.
+- Hook normal de `git push -u origin codex/issue-997`: 10/10 tarefas aprovadas em 8m13s,
+  incluindo repetição completa do app e task-service no head acima. Nenhum hook foi contornado.
 - Check completo do task-service: 109 arquivos aprovados. Foi necessário ajustar somente a
   quebra de linha e vírgula final do teste preexistente `internalReportingLimit.schemas.test.ts`;
   seu teste também passou, sem alterar valores ou condições.

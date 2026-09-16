@@ -1,6 +1,6 @@
 {
   "base_head": "edfc9a2c6602b1600bb0209880e147bd1f57d6ce",
-  "collected_at": "2026-09-16T05:33:07.459277+00:00",
+  "collected_at": "2026-09-16T06:05:55.025927+00:00",
   "source_sha256": {
     "app/scripts/wizard-evidence.mjs": "91e30ae64a4e321e3ccb981a2d4040e47541f0d2f7da062a15e6f05e8203f381",
     "app/scripts/wizard-evidence.test.mjs": "cccb2448818a51b8361aba68aadbf7fe6ae17aed536b5bc58f8ea6efdb625122",
@@ -42,9 +42,18 @@
     },
     "task_check": "109 files passed after line wrapping/trailing comma in pre-existing internalReportingLimit.schemas.test.ts",
     "task_format_regression": "1 test passed",
-    "final_hook": "pending after stable mutation reset dependencies were added to the existing effect"
+    "final_hook": {
+      "status": "passed",
+      "command": "git push -u origin codex/issue-997",
+      "tasks_passed": 10,
+      "tasks_total": 10,
+      "cached_tasks": 5,
+      "duration": "8m13.641s",
+      "bypass": false,
+      "environment": "TURBO_ENV_MODE=loose; immutable standalone fixture at validated_head; synthetic DATABASE_URL; NODE_OPTIONS=--max-old-space-size=2048"
+    }
   },
-  "remote_ci": "not submitted",
+  "remote_ci": "pending PR; local push hook is not remote CI",
   "merge": "not performed",
   "deploy": "not performed",
   "real_stack_smoke": {
@@ -65,5 +74,6 @@
     "05-revisao-mobile-dark.png",
     "06-revisao-manual-apos-limite.png"
   ],
-  "implementation_checkpoint": "6fa5f2c6cb8ba80a2abdc9ef369135ad39f365d9"
+  "implementation_checkpoint": "6fa5f2c6cb8ba80a2abdc9ef369135ad39f365d9",
+  "validated_head": "41655b3d7333913a7d9683fe2e9367cc7c520c35"
 }
