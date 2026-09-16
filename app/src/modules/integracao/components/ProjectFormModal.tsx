@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from "react";
-import { CalendarDays, FileText, LoaderCircle, Save, Sparkles } from "lucide-react";
-import { useRouter } from "next/router";
-import { toast } from "react-toastify";
-
 import { ClientSelectionField } from "@modules/clients";
 import { departmentService } from "@modules/departments";
 import { ConfirmationDialog, Dialog } from "@shared/components";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { useFetch } from "@shared/hooks";
+import { isAxiosError } from "axios";
+import { CalendarDays, FileText, LoaderCircle, Save, Sparkles } from "lucide-react";
+import { useRouter } from "next/router";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "react-toastify";
 
 import {
   TASK_FORM_DEPARTMENTS_QUERY_KEY,
@@ -22,13 +22,13 @@ import {
   useUpdateProjectMutation,
 } from "../hooks/useProjects";
 import { PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE } from "../services/projectService.contract";
+import { taskModelService } from "../services/taskModelService";
 import type {
   ProjectDetail,
   ProjectWizardPreview,
   ProjectWizardTask,
   ProjectWizardTaskProposal,
 } from "../types";
-import { taskModelService } from "../services/taskModelService";
 import {
   formatProjectDate,
   PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME,
@@ -115,13 +115,15 @@ export function ProjectFormModal({
   const createWizardMutation = useCreateProjectWizardMutation();
   const previewMutation = useProjectWizardPreviewMutation();
   const updateMutation = useUpdateProjectMutation();
+  const [hasValidated, setHasValidated] = useState(false);
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
   const [tasks, setTasks] = useState<WizardTask[]>([]);
   const [meetingMinutes, setMeetingMinutes] = useState("");
   const [meetingMinutesFile, setMeetingMinutesFile] = useState<File | null>(null);
-  const [pendingConfirmation, setPendingConfirmation] =
-    useState<PendingWizardConfirmation>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingWizardConfirmation>(null);
   const extractTasksMutation = useExtractProjectTasksMutation();
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [extractionAttempts, setExtractionAttempts] = useState(0);
   const [preview, setPreview] = useState<ProjectWizardPreview | null>(null);
   const [dependenciesChanged, setDependenciesChanged] = useState(false);
@@ -140,12 +142,22 @@ export function ProjectFormModal({
   const meetingMinutesFileRef = useRef<HTMLInputElement>(null);
   const extractionRequestLockRef = useRef(false);
   const previewRequestLockRef = useRef(false);
-  const { values, updateValue, validate, reset, buildCreatePayload, buildUpdatePayload } =
-    useProjectForm(detailQuery.data);
+  const {
+    values,
+    updateValue,
+    validate,
+    validationErrors,
+    reset,
+    buildCreatePayload,
+    buildUpdatePayload,
+  } = useProjectForm(detailQuery.data);
 
   useEffect(() => {
     if (!open) {
       reset(null);
+      setHasValidated(false);
+      setExtractionError(null);
+      setSubmitError(null);
       setCreateStep(1);
       setTasks([]);
       setMeetingMinutes("");
@@ -234,12 +246,13 @@ export function ProjectFormModal({
       return;
     }
 
+    setExtractionError(null);
     const sourceValidationMessage = getWizardExtractionSourceValidationMessage({
       text: meetingMinutes,
       file: meetingMinutesFile,
     });
     if (sourceValidationMessage) {
-      toast.error(sourceValidationMessage);
+      setExtractionError(sourceValidationMessage);
       return;
     }
 
@@ -270,7 +283,10 @@ export function ProjectFormModal({
       ]);
       toast.success(`Tarefas propostas pela IA: ${proposals.length}. Revise antes de continuar.`);
     } catch (error) {
-      toast.error(getRequestErrorMessage(error, PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE));
+      if (isAxiosError(error) && error.response?.status === 400) {
+        setExtractionAttempts((current) => current - 1);
+      }
+      setExtractionError(getRequestErrorMessage(error, PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE));
     } finally {
       extractionRequestLockRef.current = false;
     }
@@ -279,6 +295,7 @@ export function ProjectFormModal({
   function changeMeetingMinutesSource(
     action: Exclude<PendingWizardConfirmation, "discard-wizard" | null>,
   ) {
+    setExtractionError(null);
     setTasks((current) => current.filter(({ source }) => source === "manual"));
 
     if (action === "clear-meeting-minutes") {
@@ -356,12 +373,11 @@ export function ProjectFormModal({
       return;
     }
 
+    setSubmitError(null);
+    setHasValidated(true);
     const validationError = validate();
 
-    if (validationError) {
-      toast.error(validationError);
-      return;
-    }
+    if (validationError) return;
 
     try {
       if (isEditing && projectId && detailQuery.data) {
@@ -376,17 +392,16 @@ export function ProjectFormModal({
 
       onOpenChange(false);
     } catch (error) {
-      toast.error(getRequestErrorMessage(error));
+      setSubmitError(getRequestErrorMessage(error));
     }
   }
 
   function handleCreateStepOne() {
+    setSubmitError(null);
+    setHasValidated(true);
     const validationError = validate();
 
-    if (validationError) {
-      toast.error(validationError);
-      return;
-    }
+    if (validationError) return;
 
     if (dateRangeError) return;
 
@@ -405,6 +420,7 @@ export function ProjectFormModal({
       return;
     }
 
+    setSubmitError(null);
     try {
       const result = await createWizardMutation.mutateAsync({
         ...buildCreatePayload(clientId),
@@ -419,7 +435,7 @@ export function ProjectFormModal({
       onOpenChange(false);
       await router.push(`/tasks?clientId=${clientId}`);
     } catch (error) {
-      toast.error(getRequestErrorMessage(error));
+      setSubmitError(getRequestErrorMessage(error));
     }
   }
 
@@ -537,9 +553,7 @@ export function ProjectFormModal({
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setPendingConfirmation(null);
         }}
-        title={
-          isSourceChangeConfirmation ? "Descartar propostas da IA?" : "Descartar rascunho?"
-        }
+        title={isSourceChangeConfirmation ? "Descartar propostas da IA?" : "Descartar rascunho?"}
         description={
           isSourceChangeConfirmation
             ? "Trocar a fonte da Ata descartará as propostas da IA atuais. Deseja continuar?"
@@ -578,6 +592,22 @@ export function ProjectFormModal({
             }
           }}
         >
+          {submitError ? (
+            <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">
+              {submitError}
+            </p>
+          ) : null}
+          {hasValidated ? (
+            <div className="space-y-1 text-sm text-rose-600 dark:text-rose-400">
+              {Object.entries(validationErrors).map(([field, message]) =>
+                message ? (
+                  <p key={field} id={`project-${field}-error`} role="alert">
+                    {message}
+                  </p>
+                ) : null,
+              )}
+            </div>
+          ) : null}
           {!isEditing ? (
             <div className="space-y-2">
               <span className="text-sm font-medium text-slate-700 dark:text-white">Cliente</span>
@@ -596,6 +626,10 @@ export function ProjectFormModal({
                     Nome
                   </RequiredFieldLabel>
                   <input
+                    aria-invalid={hasValidated && Boolean(validationErrors.name)}
+                    aria-describedby={
+                      hasValidated && validationErrors.name ? "project-name-error" : undefined
+                    }
                     type="text"
                     value={values.name}
                     onChange={(event) => updateValue("name", event.target.value)}
@@ -615,6 +649,12 @@ export function ProjectFormModal({
                   <div className="relative">
                     <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
+                      aria-invalid={hasValidated && Boolean(validationErrors.start_date)}
+                      aria-describedby={
+                        hasValidated && validationErrors.start_date
+                          ? "project-start_date-error"
+                          : undefined
+                      }
                       type="date"
                       value={values.start_date}
                       onChange={(event) => updateValue("start_date", event.target.value)}
@@ -663,6 +703,12 @@ export function ProjectFormModal({
                 <div className="relative">
                   <FileText className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-slate-400" />
                   <textarea
+                    aria-invalid={hasValidated && Boolean(validationErrors.objective)}
+                    aria-describedby={
+                      hasValidated && validationErrors.objective
+                        ? "project-objective-error"
+                        : undefined
+                    }
                     value={values.objective}
                     onChange={(event) => updateValue("objective", event.target.value)}
                     className={`${PROJECT_INPUT_CLASSNAME} min-h-32 resize-y pl-10`}
@@ -679,8 +725,7 @@ export function ProjectFormModal({
               <fieldset className={`${PROJECT_SUBPANEL_CLASSNAME} space-y-3 p-3`}>
                 <legend className="px-1 text-sm font-semibold">Ata de reunião</legend>
                 <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Tentativas de extração: {extractionAttempts} de{" "}
-                  {WIZARD_EXTRACTION_MAX_ATTEMPTS}.
+                  Tentativas de extração: {extractionAttempts} de {WIZARD_EXTRACTION_MAX_ATTEMPTS}.
                 </p>
                 <label className="space-y-2" htmlFor="project-meeting-minutes">
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
@@ -689,10 +734,18 @@ export function ProjectFormModal({
                   <textarea
                     id="project-meeting-minutes"
                     value={meetingMinutes}
-                    onChange={(event) => setMeetingMinutes(event.target.value)}
+                    onChange={(event) => {
+                      setMeetingMinutes(event.target.value);
+                      setExtractionError(null);
+                    }}
                     className={`${PROJECT_INPUT_CLASSNAME} min-h-32 resize-y`}
                     placeholder="Cole aqui o texto da Ata de reunião."
-                    aria-describedby="project-meeting-minutes-notice"
+                    aria-invalid={Boolean(extractionError)}
+                    aria-describedby={
+                      extractionError
+                        ? "project-meeting-minutes-notice project-extraction-error"
+                        : "project-meeting-minutes-notice"
+                    }
                     disabled={extractTasksMutation.isPending || Boolean(meetingMinutesFile)}
                   />
                 </label>
@@ -715,9 +768,17 @@ export function ProjectFormModal({
                     id="project-meeting-minutes-file"
                     type="file"
                     accept=".txt,.md,.docx,.pdf,text/plain,text/markdown,text/x-markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
-                    onChange={(event) => setMeetingMinutesFile(event.target.files?.[0] ?? null)}
+                    onChange={(event) => {
+                      setMeetingMinutesFile(event.target.files?.[0] ?? null);
+                      setExtractionError(null);
+                    }}
                     className={PROJECT_INPUT_CLASSNAME}
-                    aria-describedby="project-meeting-minutes-notice"
+                    aria-invalid={Boolean(extractionError)}
+                    aria-describedby={
+                      extractionError
+                        ? "project-meeting-minutes-notice project-extraction-error"
+                        : "project-meeting-minutes-notice"
+                    }
                     disabled={extractTasksMutation.isPending || hasMeetingMinutesText}
                   />
                 </label>
@@ -748,9 +809,7 @@ export function ProjectFormModal({
                   className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
                   onClick={() => void handleExtractTasks()}
                   disabled={
-                    (!hasMeetingMinutesText && !meetingMinutesFile) ||
-                    !canExtractTasks ||
-                    isBusy
+                    (!hasMeetingMinutesText && !meetingMinutesFile) || !canExtractTasks || isBusy
                   }
                 >
                   {extractTasksMutation.isPending ? (
@@ -760,10 +819,19 @@ export function ProjectFormModal({
                   )}
                   Extrair tarefas com IA
                 </button>
-                {!canExtractTasks ? (
-                  <p role="status" className="text-sm text-slate-600 dark:text-slate-300">
-                    Limite de 3 tentativas atingido. Continue adicionando tarefas manualmente.
+                {extractionError ? (
+                  <p
+                    id="project-extraction-error"
+                    role="alert"
+                    className="text-sm text-rose-600 dark:text-rose-400"
+                  >
+                    {extractionError}
                   </p>
+                ) : null}
+                {!canExtractTasks ? (
+                  <output className="block text-sm text-slate-600 dark:text-slate-300">
+                    Limite de 3 tentativas atingido. Continue adicionando tarefas manualmente.
+                  </output>
                 ) : null}
                 {extractTasksMutation.isPending ? (
                   <output className="block text-sm">Extraindo tarefas da Ata...</output>

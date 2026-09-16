@@ -1,0 +1,59 @@
+{
+  "base_head": "edfc9a2c6602b1600bb0209880e147bd1f57d6ce",
+  "collected_at": "2026-09-16T05:33:07.459277+00:00",
+  "source_sha256": {
+    "app/scripts/wizard-evidence.mjs": "91e30ae64a4e321e3ccb981a2d4040e47541f0d2f7da062a15e6f05e8203f381",
+    "app/scripts/wizard-evidence.test.mjs": "cccb2448818a51b8361aba68aadbf7fe6ae17aed536b5bc58f8ea6efdb625122",
+    "app/src/modules/integracao/components/ProjectFormModal.tsx": "fa4a2d5052df498de7abc6260a750fea977dc6d7383deb0fcd334869f0748437",
+    "app/src/modules/integracao/hooks/useProjectForm.ts": "0902fd81427c36b9d1e2089a6cf17e3f38d3d226e3b89802e8d4ebdade0e079a",
+    "app/src/modules/integracao/run-project-wizard-browser-smoke.mjs": "20f30122b314438a35e949a3d18e461ab8f25a60a0ea7f084ddc3b2a7f189ef1",
+    "services/task-service/src/test/projectWizard.routes.test.ts": "318f8c100a07fe9e71984327c47c1a3ef49d050d2f88ffc1fe2b0c63a1abca19"
+  },
+  "local": {
+    "project_module_tests": {
+      "passed": 90
+    },
+    "task_route_tests": {
+      "passed": 98
+    },
+    "privacy_command_tests": {
+      "passed": 3
+    },
+    "browser": {
+      "status": "passed including final manual-continuation and full reload discard"
+    },
+    "typecheck_app": "passed",
+    "build_app": "passed twice",
+    "lint_scoped": "passed",
+    "task_typecheck": "passed",
+    "task_suite": {
+      "files_passed": 41,
+      "files_skipped": 1,
+      "tests_passed": 395,
+      "tests_skipped": 6,
+      "skip_reason": "Existing opt-in real database tests; isolated database not configured."
+    },
+    "app_suite": "First Turbo strict run timed out in auth-sidebar because fixture env was not forwarded; full fixture run in loose mode running."
+  },
+  "remote_ci": "not submitted",
+  "merge": "not performed",
+  "deploy": "not performed",
+  "real_stack_smoke": {
+    "status": "not executed",
+    "reason": "No disposable stack and temporary OpenAI key supplied; optional clarification pending. No provider requests made."
+  },
+  "red_evidence": {
+    "corrupt_docx": "400 response previously consumed attempt; browser expected0 received1",
+    "required_fields": "Name had no aria-invalid or accessible error description",
+    "extraction_alert": "Empty-file error outside dialog; no accessible alert inside it",
+    "privacy": "Original runner leaked simulated confidential error in both modes; capture failure also reproduced"
+  },
+  "artifacts": [
+    "01-erros-campos-desktop.png",
+    "02-pdf-sem-texto-zero-tentativas.png",
+    "03-limite-reextracao-preservada.png",
+    "04-revisao-mobile.png",
+    "05-revisao-mobile-dark.png",
+    "06-revisao-manual-apos-limite.png"
+  ]
+}
