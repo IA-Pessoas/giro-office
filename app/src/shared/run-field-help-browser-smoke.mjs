@@ -107,7 +107,7 @@ async function installApiMocks(page) {
   });
 }
 
-async function assertFieldHelp({ viewport, theme, screenshotPath }) {
+async function assertFieldHelp({ viewport, theme, screenshotPath, groupScreenshotPath }) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ baseURL: baseUrl, viewport });
 
@@ -164,6 +164,18 @@ async function assertFieldHelp({ viewport, theme, screenshotPath }) {
     assert.ok(box.x >= 0 && box.x + box.width <= viewport.width + 1);
 
     await page.screenshot({ path: screenshotPath, fullPage: true });
+
+    await page.getByRole("tab", { name: "Grupos" }).click();
+    assert.equal(
+      await page.getByRole("tab", { name: "Grupos" }).getAttribute("aria-selected"),
+      "true",
+    );
+    await page.getByRole("button", { name: "Novo grupo" }).click();
+    const policy = page.getByLabel("Política de obrigações");
+    assert.equal(await policy.inputValue(), "NORMAL");
+    await policy.selectOption("NO_OBLIGATIONS");
+    assert.equal(await policy.inputValue(), "NO_OBLIGATIONS");
+    await page.screenshot({ path: groupScreenshotPath, fullPage: true });
   } finally {
     await context.close();
     await browser.close();
@@ -175,6 +187,7 @@ await withNextServer(async () => {
     viewport: { width: 1440, height: 900 },
     theme: "light",
     screenshotPath: "output/playwright/issue-487-contextual-help-real-desktop.png",
+    groupScreenshotPath: "output/playwright/issue-1081/02-group-policy-desktop.png",
   });
   console.log("PASS FieldHelp desktop light theme and keyboard/mouse interaction");
 
@@ -182,6 +195,7 @@ await withNextServer(async () => {
     viewport: { width: 390, height: 844 },
     theme: "dark",
     screenshotPath: "output/playwright/issue-487-contextual-help-real-mobile-dark.png",
+    groupScreenshotPath: "output/playwright/issue-1081/03-group-policy-mobile-dark.png",
   });
   console.log("PASS FieldHelp mobile dark theme and responsive positioning");
 });

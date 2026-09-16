@@ -57,7 +57,7 @@ export function buildPessoalUnionPayload(payload: PessoalUnionPayload): PessoalU
 }
 
 export function buildPessoalGroupPayload(payload: PessoalGroupPayload): PessoalGroupPayload {
-  return { name: payload.name.trim() };
+  return { name: payload.name.trim(), policy: payload.policy };
 }
 
 export function buildPessoalUnionListParams(params: PessoalUnionListParams) {
