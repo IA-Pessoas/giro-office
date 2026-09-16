@@ -7,6 +7,18 @@ export { RhPointSection } from "./components/RhPointSection";
 export { RhScoreSection } from "./components/score/RhScoreSection";
 export { useAssignableUsers } from "./hooks/useAssignableUsers";
 export { useRhRequests } from "./hooks/useRhRequests";
+export { RhDossierSection } from "./components/RhDossierSection";
+export {
+  useCreateRhContactMutation,
+  useDeleteRhContactMutation,
+  useRhAllergies,
+  useRhContacts,
+  useRhDossier,
+  useRhDossierList,
+  useReplaceRhAllergiesMutation,
+  useUpdateRhContactMutation,
+  useUpdateRhDossierMutation,
+} from "./hooks/useRhProfile";
 export { formatRhDate, formatRhDateTime } from "./utils/rhDate";
 
 export {
