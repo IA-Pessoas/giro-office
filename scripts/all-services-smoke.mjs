@@ -231,6 +231,7 @@ const state = {
   rhTimeBankReleaseId: "",
   rhTimeSheetId: "",
   rhTargetUserId: "",
+  rhTargetUserLogin: "",
   rhTargetUserSessionCookies: null,
   rhManagerUserId: "",
   rhManagerLogin: "",
@@ -1299,6 +1300,7 @@ async function ensureSecondaryTaskModel() {
 
 async function ensureRhTargetUser() {
   if (state.rhTargetUserId) return state.rhTargetUserId;
+  state.rhTargetUserLogin = uniqueEmail("smoke-rh-target");
   const response = await helperCall("rh-target-user-create", {
     method: "POST",
     path: "/user",
@@ -1307,7 +1309,7 @@ async function ensureRhTargetUser() {
     auth: "admin-bearer",
     json: {
       name: uniqueText("Smoke RH Target"),
-      login: uniqueEmail("smoke-rh-target"),
+      login: state.rhTargetUserLogin,
       password: env.password,
       department_id: await ensureDepartmentId(),
       permission: 1,
@@ -1358,7 +1360,7 @@ async function ensureRhTargetUserSessionCookies() {
   await ensureRhTargetUser();
   state.rhTargetUserSessionCookies = await loginWithCookies(
     "rh-target-user-login",
-    uniqueEmail("smoke-rh-target"),
+    requireState("rhTargetUserLogin"),
     env.password,
   );
   return state.rhTargetUserSessionCookies;

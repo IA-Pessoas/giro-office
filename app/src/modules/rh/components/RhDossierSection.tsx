@@ -55,6 +55,12 @@ type DossierListProps = {
   onSelect?: (id: string) => void;
 };
 
+type DossierListRowProps = {
+  item: RhDossierListItem;
+  selected: boolean;
+  onSelect?: (id: string) => void;
+};
+
 type DossierDetailProps = {
   dossier?: RhDossier;
   isLoading: boolean;
@@ -201,7 +207,11 @@ export function RhDossierSection() {
 }
 
 function StatusPanel({ text }: { text: string }) {
-  return <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">{text}</div>;
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+      {text}
+    </div>
+  );
 }
 
 function DossierList({ items, isLoading, error, selectedUserId, onSelect }: DossierListProps) {
@@ -217,19 +227,49 @@ function DossierList({ items, isLoading, error, selectedUserId, onSelect }: Doss
       </div>
       <div className="divide-y divide-gray-100 dark:divide-gray-700">
         {items.map((item) => (
-          onSelect ? <button key={item.id} type="button" onClick={() => onSelect(item.id)} className={`flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${selectedUserId === item.id ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"><UserRound className="h-4 w-4" /></span>
-            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-gray-900 dark:text-white">{item.full_name}</span><span className="block truncate text-xs text-gray-500 dark:text-gray-400">{item.job_title || "Cargo não informado"} · {item.department?.name || "Sem departamento"}</span></span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">{item.status}</span>
-          </button> : <div key={item.id} className="flex items-center gap-3 px-5 py-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"><UserRound className="h-4 w-4" /></span>
-            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-gray-900 dark:text-white">{item.full_name}</span><span className="block truncate text-xs text-gray-500 dark:text-gray-400">{item.job_title || "Cargo não informado"} · {item.department?.name || "Sem departamento"}</span></span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">{item.status}</span>
-          </div>
+          <DossierListRow
+            key={item.id}
+            item={item}
+            selected={selectedUserId === item.id}
+            onSelect={onSelect}
+          />
         ))}
       </div>
     </div>
   );
+}
+
+function DossierListRow({ item, selected, onSelect }: DossierListRowProps) {
+  const content = (
+    <>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
+        <UserRound className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium text-gray-900 dark:text-white">
+          {item.full_name}
+        </span>
+        <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
+          {item.job_title || "Cargo não informado"} · {item.department?.name || "Sem departamento"}
+        </span>
+      </span>
+      <span className="text-xs text-gray-500 dark:text-gray-400">{item.status}</span>
+    </>
+  );
+
+  if (onSelect) {
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(item.id)}
+        className={`flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div className="flex items-center gap-3 px-5 py-3">{content}</div>;
 }
 
 function DossierDetail({
@@ -265,19 +305,34 @@ function DossierDetail({
       setDraft(values as Partial<UpdateRhDossierPayload>);
     }
   }, [dossier]);
-  useEffect(() => setAllergiesDraft(allergies), [allergies]);
+  useEffect(() => {
+    setAllergiesDraft(allergies);
+  }, [allergies]);
 
-  if (isLoading) return <StatusPanel text="Carregando dossiê..." />;
-  if (error) return <StatusPanel text="Não foi possível carregar o dossiê autorizado." />;
-  if (!dossier) return <StatusPanel text="Selecione um colaborador para consultar o dossiê." />;
+  if (isLoading) {
+    return <StatusPanel text="Carregando dossiê..." />;
+  }
+  if (error) {
+    return <StatusPanel text="Não foi possível carregar o dossiê autorizado." />;
+  }
+  if (!dossier) {
+    return <StatusPanel text="Selecione um colaborador para consultar o dossiê." />;
+  }
 
   const editableFields = isAdmin ? ADMIN_FIELDS : SELF_FIELDS;
   async function saveDossier() {
     try {
-      await updateDossierMutation.mutateAsync({ ...draft, ...(targetUserId ? { target_user_id: targetUserId } : {}) });
+      await updateDossierMutation.mutateAsync({
+        ...draft,
+        ...(targetUserId ? { target_user_id: targetUserId } : {}),
+      });
       toast.success("Dossiê atualizado.");
     } catch (saveError) {
-      toast.error(saveError instanceof Error ? saveError.message : "Não foi possível atualizar o dossiê.");
+      toast.error(
+        saveError instanceof Error
+          ? saveError.message
+          : "Não foi possível atualizar o dossiê.",
+      );
     }
   }
   async function saveAllergies() {
@@ -285,7 +340,11 @@ function DossierDetail({
       await replaceAllergiesMutation.mutateAsync({ allergies: allergiesDraft, targetUserId });
       toast.success("Alergias atualizadas.");
     } catch (saveError) {
-      toast.error(saveError instanceof Error ? saveError.message : "Não foi possível atualizar as alergias.");
+      toast.error(
+        saveError instanceof Error
+          ? saveError.message
+          : "Não foi possível atualizar as alergias.",
+      );
     }
   }
   async function saveContact() {
@@ -315,7 +374,11 @@ function DossierDetail({
       setEditingContactId(null);
       toast.success(editingContactId ? "Contato atualizado." : "Contato adicionado.");
     } catch (saveError) {
-      toast.error(saveError instanceof Error ? saveError.message : "Não foi possível salvar o contato.");
+      toast.error(
+        saveError instanceof Error
+          ? saveError.message
+          : "Não foi possível salvar o contato.",
+      );
     }
   }
   async function removeContact(id: string) {
