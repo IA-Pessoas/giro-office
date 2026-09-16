@@ -31,6 +31,17 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 }
 
 describe("matriz de regressão das políticas modulares", () => {
+  it("permite RH nível 1 no próprio perfil, sem liberar as demais mutações RH", () => {
+    const profilePolicy = requiredRoutePolicy("PUT", "/rh/profile/colaborator");
+    const requestsPolicy = requiredRoutePolicy("PUT", "/rh/requests");
+
+    expect(profilePolicy).toEqual({ modulePermission: { module: "rh", minPermission: 1 } });
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), profilePolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), requestsPolicy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { rh: 2 } }), requestsPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 0 } }), profilePolicy)).toBe(false);
+  });
+
   it("protege Comercial: Viewer lê e Editor altera, sem bypass global", () => {
     const readPolicy = requiredRoutePolicy("GET", "/commercial/prospecting");
     const editPolicy = requiredRoutePolicy("PATCH", "/commercial/prospecting/prospecting-1");

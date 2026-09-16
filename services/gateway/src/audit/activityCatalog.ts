@@ -332,6 +332,51 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "registrou", item: "um ponto" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/colaborator$/,
+    description: { action: "consultou", item: "o dossiê de um colaborador" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/colaborator\/list$/,
+    description: { action: "consultou", item: "a lista de dossiês de colaboradores" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/profile\/colaborator$/,
+    description: { action: "atualizou", item: "o dossiê de um colaborador" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "consultou", item: "os contatos de emergência" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "cadastrou", item: "um contato de emergência" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "atualizou", item: "um contato de emergência" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "removeu", item: "um contato de emergência" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/allergy$/,
+    description: { action: "consultou", item: "as alergias de um colaborador" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/profile\/allergy$/,
+    description: { action: "atualizou", item: "as alergias de um colaborador" },
+  },
+  {
     methods: ["POST", "PATCH"],
     pattern: /^\/rh\/point\/[^/]+\/calculate$/,
     description: { action: "recalculou", item: "um ponto" },

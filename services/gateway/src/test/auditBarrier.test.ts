@@ -4,7 +4,11 @@ import { type CreateAuditRequestPayload, createAuditRecorder } from "@workspace/
 import type { Request, Response } from "express";
 import { describe, expect, it, vi } from "vitest";
 import type { GatewayEnv } from "../config/env.js";
-import { buildAuditCapacityGuard, buildAuditLifecycleMiddleware } from "../middlewares/audit.js";
+import {
+  addRhProfileBodyTarget,
+  buildAuditCapacityGuard,
+  buildAuditLifecycleMiddleware,
+} from "../middlewares/audit.js";
 
 const logger = { error: vi.fn(), warn: vi.fn(), debug: vi.fn() };
 const paths = [
@@ -80,6 +84,20 @@ function fixture(fetchImpl: typeof fetch, maxInFlight = 1) {
 }
 
 describe("durable organization mutation audit barrier", () => {
+  it("pseudonymizes RH profile mutation targets without retaining the raw id", () => {
+    const query: Record<string, unknown> = {};
+    const targetUserId = "9a68a809-9a78-4ef9-94d0-b9bb9787ad2e";
+
+    addRhProfileBodyTarget(query, "/rh/profile/contact", {
+      target_user_id: targetUserId,
+    });
+
+    expect(query).toEqual({
+      target_user_id_sha256: createHash("sha256").update(targetUserId).digest("hex"),
+    });
+    expect(JSON.stringify(query)).not.toContain(targetUserId);
+  });
+
   it("denied anonymous mutations cannot consume the protected audit quota", () => {
     const recorder = createAuditRecorder({
       enabled: true,

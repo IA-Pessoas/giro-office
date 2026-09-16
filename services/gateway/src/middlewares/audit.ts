@@ -434,8 +434,20 @@ function buildQueryFromUrl(url: string, method: string, path: string): AuditQuer
 
   const query: AuditQuery = {};
   const isTiPasswordDeactivation = method === "POST" && TI_PASSWORD_DEACTIVATION_PATH.test(path);
+  const isRhProfileQuery = /^\/rh\/profile(?:\/|$)/u.test(path);
 
   parsedUrl.searchParams.forEach((value, key) => {
+    if (isRhProfileQuery && key.toLowerCase() === "user_id") {
+      const targetKey = "target_user_id_sha256";
+      const hashedValue = createHash("sha256").update(value).digest("hex");
+      const current = query[targetKey];
+      query[targetKey] = current
+        ? Array.isArray(current)
+          ? [...current, hashedValue]
+          : [current, hashedValue]
+        : hashedValue;
+      return;
+    }
     if (
       isTiPasswordDeactivation &&
       TI_PASSWORD_DEACTIVATION_SENSITIVE_QUERY_KEYS.has(key.toLowerCase())
@@ -454,6 +466,19 @@ function buildQueryFromUrl(url: string, method: string, path: string): AuditQuer
   });
 
   return query;
+}
+
+export function addRhProfileBodyTarget(query: AuditQuery, path: string, body: unknown): void {
+  if (!/^\/rh\/profile(?:\/|$)/u.test(path) || !body || typeof body !== "object") {
+    return;
+  }
+
+  const targetUserId = (body as { target_user_id?: unknown }).target_user_id;
+  if (typeof targetUserId !== "string" || targetUserId.length === 0) {
+    return;
+  }
+
+  query.target_user_id_sha256 = createHash("sha256").update(targetUserId).digest("hex");
 }
 
 function getPublicPath(originalUrl: string, fallbackPath: string): string {
@@ -521,6 +546,9 @@ export function buildAuditLifecycleMiddleware({
       const explicitPlatformActor =
         isPlatform && usesExplicitPlatformActor(request.method, publicPath);
 
+      const query = buildQueryFromUrl(request.originalUrl, request.method, publicPath);
+      addRhProfileBodyTarget(query, publicPath, request.body);
+
       const payload: CreateAuditRequestPayload = {
         requestId: request.requestId,
         organizationId: isPlatform
@@ -535,7 +563,7 @@ export function buildAuditLifecycleMiddleware({
             : undefined,
         method: request.method,
         path: publicPath,
-        query: buildQueryFromUrl(request.originalUrl, request.method, publicPath),
+        query,
         statusCode,
         outcome,
         durationMs: getDurationMs(startedAt),

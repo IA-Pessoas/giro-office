@@ -154,6 +154,7 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/commercial(?:\/|$)/, policy: commercialEditPolicy },
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
+  { method: "ANY", path: /^\/rh\/profile(?:\/|$)/, policy: rhModulePolicy },
   { method: "GET", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhEditPolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },
