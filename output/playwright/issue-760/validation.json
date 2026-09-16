@@ -1,0 +1,52 @@
+{
+  "collected_at": "2026-09-16T06:30:15.448377+00:00",
+  "base_head": "edfc9a2c6602b1600bb0209880e147bd1f57d6ce",
+  "validated_code_head": "701b614281b7b455ca63a05b835177136d3e7611",
+  "source_sha256": {
+    "app/src/modules/clients/hooks/useClients.ts": "0a95406af425a05d39e07ca0fa584c96d9556e29dce9c4bc0c08c46878c7cf86",
+    "app/src/modules/clients/run-clients-tests.mjs": "feb3618f19e2a37708e880f363dc5455b82a11c4f82214a91ec3fcb429dbcb90",
+    "app/src/modules/clients/run-client-picker-browser-smoke.mjs": "557a56cf6c846b1f02953f38498fe6fd801dc6225b94a9baaa17b9cb171d5692",
+    "services/client-service/src/test/client.routes.test.ts": "7c25c34016780d793371aa9d9b591c398dcaf5a6ee20f93ef6c53779f0d92460",
+    "services/client-service/src/services/clientIntegrationReportingService.ts": "d893d4bf2884fd794b602f0e3666b45ffd489055f947699d24027a85be8abc07",
+    "services/client-service/src/test/clientIntegrationReportingService.test.ts": "a95b35c19a755ae7620ee876d30f220132756bf627a37ac71aa084eb04da5b32",
+    "services/client-service/src/test/internalReportingLimit.schemas.test.ts": "0045a8a3d2e0288686d050abb50d825ebda753d0b3ad53dffd869b82352c1e34"
+  },
+  "fixture_build": "vUuBMav9bgRTr6oOvbq9S",
+  "local": {
+    "tdd": "browser red on prior source: stale empty legacy list after SPA navigation; green after effective ref key fix",
+    "client_tests": {
+      "contract_cases": 39,
+      "browser_scenarios": 10,
+      "status": "passed"
+    },
+    "related_app_modules": "Clients,Contabil,Pessoal,Parcelamento passed (145 PASS lines before browser addition)",
+    "client_service": {
+      "tests_passed": 90,
+      "tests_skipped": 2,
+      "files_passed": 15,
+      "files_skipped": 1,
+      "skip_reason": "existing opt-in database tests; no real database used"
+    },
+    "gateway_permission_tests_passed": 54,
+    "typecheck_app": "passed including useFetch types",
+    "typecheck_client_service": "passed",
+    "build_app": "passed for validated code head",
+    "biome_app": "3 files passed with committed explicit config",
+    "biome_client_service": "59 files passed",
+    "quality_regression": "4 tests passed for reporting formatter/type annotations",
+    "full_push_hook": "pending"
+  },
+  "remote_ci": "not submitted; base has6 invalid commented workflow failures in addition to passing policy checks",
+  "merge": "not performed",
+  "deploy": "not performed",
+  "artifacts": [
+    "contabil-clientes-mobile.png",
+    "contabil-clientes-viewer.png",
+    "departamento-pessoal-clientes-mobile.png",
+    "departamento-pessoal-clientes-viewer.png"
+  ],
+  "limitations": [
+    "HTTP browser responses are synthetic; route tests exercise real auth and service with injected Prisma",
+    "No production data, database writes, deploy or external provider requests"
+  ]
+}
