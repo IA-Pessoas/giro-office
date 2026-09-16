@@ -8,7 +8,11 @@ import {
   useReactivatePessoalGroupMutation,
   useUpdatePessoalGroupMutation,
 } from "../hooks/usePessoalGroups";
-import type { PessoalGroup } from "../types/groups";
+import {
+  PESSOAL_GROUP_POLICIES,
+  type PessoalGroup,
+  type PessoalGroupPolicy,
+} from "../types/groups";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
   pessoalPrimaryButtonClassName,
@@ -28,6 +32,7 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
   const [selectedGroup, setSelectedGroup] = useState<PessoalGroup | null>(null);
   const updateMutation = useUpdatePessoalGroupMutation(selectedGroup?.id ?? "");
   const [name, setName] = useState("");
+  const [policy, setPolicy] = useState<PessoalGroupPolicy>("NORMAL");
   const [formError, setFormError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -35,6 +40,7 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
   function openCreate() {
     setSelectedGroup(null);
     setName("");
+    setPolicy("NORMAL");
     setFormError(null);
     setIsFormOpen(true);
   }
@@ -42,6 +48,7 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
   function openEdit(group: PessoalGroup) {
     setSelectedGroup(group);
     setName(group.name);
+    setPolicy(group.policy);
     setFormError(null);
     setIsFormOpen(true);
   }
@@ -60,10 +67,11 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
 
     try {
       const saved = selectedGroup
-        ? await updateMutation.mutateAsync({ name })
-        : await createMutation.mutateAsync({ name });
+        ? await updateMutation.mutateAsync({ name, policy })
+        : await createMutation.mutateAsync({ name, policy });
       setSelectedGroup(saved);
       setName(saved.name);
+      setPolicy(saved.policy);
       setIsFormOpen(false);
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível salvar o grupo."));
@@ -133,6 +141,21 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
                   autoFocus
                 />
               </label>
+              <label className="flex flex-1 flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+                Política de obrigações
+                <select
+                  value={policy}
+                  onChange={(event) => setPolicy(event.target.value as PessoalGroupPolicy)}
+                  disabled={isSubmitting}
+                  className={pessoalTextFieldClassName}
+                >
+                  {PESSOAL_GROUP_POLICIES.map((option) => (
+                    <option key={option} value={option}>
+                      {option === "NORMAL" ? "Normal" : "Sem obrigações"}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="flex gap-2">
                 <button type="button" onClick={closeForm} disabled={isSubmitting} className={pessoalSecondaryButtonClassName}>
                   Cancelar
@@ -156,7 +179,7 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
             </StateMessage>
           ) : groups.length === 0 ? (
             <StateMessage icon={Boxes} title="Nenhum grupo disponível">
-              O grupo Sem Movimento será criado ao carregar o catálogo.
+              O grupo Sem Movimento é provisionado com a organização.
             </StateMessage>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">

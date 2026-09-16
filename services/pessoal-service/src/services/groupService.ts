@@ -3,7 +3,7 @@ import { error as logError, ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateGroupBody, UpdateGroupBody } from "../schemas/group.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
-import { NO_OBLIGATIONS_GROUP_POLICY, NORMAL_GROUP_POLICY } from "./pessoalGroupPolicy.js";
+import { NORMAL_GROUP_POLICY } from "./pessoalGroupPolicy.js";
 import {
   PESSOAL_READ_PERMISSION,
   PESSOAL_WRITE_PERMISSION,
@@ -12,8 +12,7 @@ import {
   requireUserId,
 } from "./pessoalServiceTypes.js";
 
-export const NO_MOVEMENT_GROUP_SYSTEM_KEY = "NO_MOVEMENT";
-export const NO_MOVEMENT_GROUP_POLICY = NO_OBLIGATIONS_GROUP_POLICY;
+const NO_MOVEMENT_GROUP_SYSTEM_KEY = "NO_MOVEMENT";
 
 const groupSelect = {
   id: true,
@@ -63,7 +62,6 @@ export class GroupService {
 
   async list(context: PessoalAuthContext): Promise<GroupRecord[]> {
     requireMinimumPermission(context, PESSOAL_READ_PERMISSION);
-    await this.ensureNoMovementGroup(context.organizationId);
 
     return this.prisma.pessoalGroup.findMany({
       where: { organization_id: context.organizationId },
@@ -233,24 +231,5 @@ export class GroupService {
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao reativar grupo de pessoal.", err);
     }
-  }
-
-  private async ensureNoMovementGroup(organizationId: string): Promise<void> {
-    await this.prisma.pessoalGroup.upsert({
-      where: {
-        organization_id_system_key: {
-          organization_id: organizationId,
-          system_key: NO_MOVEMENT_GROUP_SYSTEM_KEY,
-        },
-      },
-      create: {
-        name: "Sem Movimento",
-        normalized_name: "sem movimento",
-        policy: NO_MOVEMENT_GROUP_POLICY,
-        system_key: NO_MOVEMENT_GROUP_SYSTEM_KEY,
-        organization_id: organizationId,
-      },
-      update: {},
-    });
   }
 }

@@ -47,28 +47,13 @@ function createPrismaMock() {
 }
 
 describe("GroupService", () => {
-  it("cria Sem Movimento uma vez e lista apenas grupos da organizacao para Pessoal >= 1", async () => {
+  it("lista apenas grupos da organizacao para Pessoal >= 1 sem escrever", async () => {
     const prisma = createPrismaMock();
     const service = new GroupService(prisma as never, createAuditMock());
 
     await service.list({ organizationId, userId, permission: 1 });
 
-    expect(prisma.pessoalGroup.upsert).toHaveBeenCalledWith({
-      where: {
-        organization_id_system_key: {
-          organization_id: organizationId,
-          system_key: "NO_MOVEMENT",
-        },
-      },
-      create: {
-        name: "Sem Movimento",
-        normalized_name: "sem movimento",
-        policy: "NO_OBLIGATIONS",
-        system_key: "NO_MOVEMENT",
-        organization_id: organizationId,
-      },
-      update: {},
-    });
+    expect(prisma.pessoalGroup.upsert).not.toHaveBeenCalled();
     expect(prisma.pessoalGroup.findMany).toHaveBeenCalledWith({
       where: { organization_id: organizationId },
       orderBy: [{ archived_at: "asc" }, { name: "asc" }],

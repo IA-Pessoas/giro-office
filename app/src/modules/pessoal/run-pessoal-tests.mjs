@@ -253,8 +253,11 @@ runTest("union payload builder keeps backend field names", () => {
   );
 });
 
-runTest("group payload trims input before sending the catalog mutation", () => {
-  assert.deepEqual(buildPessoalGroupPayload({ name: "  Grupo A  " }), { name: "Grupo A" });
+runTest("group payload trims input and preserves its policy before sending the catalog mutation", () => {
+  assert.deepEqual(buildPessoalGroupPayload({ name: "  Grupo A  ", policy: "NO_OBLIGATIONS" }), {
+    name: "Grupo A",
+    policy: "NO_OBLIGATIONS",
+  });
 });
 
 runTest("union cnpj helper formats progressively and keeps the 14-digit cap", () => {
@@ -668,12 +671,16 @@ runTest("pessoal shell wires access, active client selector, and functional tabs
 
 runTest("group catalog supports create, edit, archive and reactivation without a destructive delete", () => {
   const groups = readFileSync("src/modules/pessoal/components/PessoalGroupsSection.tsx", "utf8");
+  const groupTypes = readFileSync("src/modules/pessoal/types/groups.ts", "utf8");
 
   assert.match(groups, /useCreatePessoalGroupMutation/);
   assert.match(groups, /useUpdatePessoalGroupMutation/);
   assert.match(groups, /useArchivePessoalGroupMutation/);
   assert.match(groups, /useReactivatePessoalGroupMutation/);
   assert.match(groups, /Novo grupo/);
+  assert.match(groups, /Política de obrigações/);
+  assert.match(groups, /PESSOAL_GROUP_POLICIES/);
+  assert.match(groupTypes, /NO_OBLIGATIONS/);
   assert.match(groups, /Arquivar/);
   assert.match(groups, /Reativar/);
   assert.doesNotMatch(groups, /Trash2|Remover grupo/);
