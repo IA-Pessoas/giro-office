@@ -469,7 +469,13 @@ function buildQueryFromUrl(url: string, method: string, path: string): AuditQuer
 }
 
 export function addRhProfileBodyTarget(query: AuditQuery, path: string, body: unknown): void {
-  if (!/^\/rh\/profile(?:\/|$)/u.test(path) || !body || typeof body !== "object") {
+  if (
+    !/^\/rh\/(?:profile(?:\/|$)|point\/(?:recalculate|adjustment\/retroactive)(?:\/|$))/u.test(
+      path,
+    ) ||
+    !body ||
+    typeof body !== "object"
+  ) {
     return;
   }
 

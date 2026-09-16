@@ -17,6 +17,7 @@ import {
 import {
   createTimeSheetBodySchema,
   listTimeSheetsQuerySchema,
+  reopenTimeSheetBodySchema,
   signTimeSheetBodySchema,
   timeSheetIdParamsSchema,
 } from "../schemas/timeSheet.schemas.js";
@@ -121,6 +122,36 @@ router.get(
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao obter detalhe da folha de ponto", { err });
+      next(err);
+    }
+  },
+);
+
+router.put(
+  "/reopen",
+  isAuthenticated,
+  requireRhPermission(RH_MANAGEMENT_PERMISSION),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = req.organization_id;
+      const actorUserId = req.user_id;
+      if (!organizationId) {
+        throw new ServiceError(400, "organization_id e obrigatorio.");
+      }
+      if (!actorUserId) {
+        throw new ServiceError(400, "user_id e obrigatorio.");
+      }
+
+      const body = parseWithZod(reopenTimeSheetBodySchema, req.body);
+      const result = await timeSheetService.reopen({
+        organization_id: organizationId,
+        timesheet_id: body.id,
+        reopened_by_user_id: actorUserId,
+        reason: body.reason,
+      });
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao reabrir folha de ponto", { err });
       next(err);
     }
   },

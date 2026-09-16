@@ -88,22 +88,92 @@ const pointConfigRequestBody = createObjectRequestBody({
 const timeClockAdjustmentRequestBody = createObjectRequestBody({
   example: {
     point_id: "point-uuid",
+    date: "2026-04-02",
     clock_in: "2026-04-02T08:00:00.000Z",
     lunch_out: "2026-04-02T12:00:00.000Z",
     lunch_in: "2026-04-02T13:00:00.000Z",
     clock_out: "2026-04-02T17:30:00.000Z",
     justification: "Esqueci de bater o retorno do almoço.",
-    attachment: "https://cdn.castelo.com/rh/adjustment-proof.pdf",
   },
-  required: ["point_id", "clock_in", "lunch_out", "lunch_in", "clock_out", "justification"],
+  required: ["clock_in", "lunch_out", "lunch_in", "clock_out", "justification"],
   properties: {
-    point_id: { type: "string" },
+    point_id: { type: "string", format: "uuid" },
+    date: { type: "string", format: "date" },
     clock_in: { type: "string", format: "date-time" },
     lunch_out: { type: "string", format: "date-time" },
     lunch_in: { type: "string", format: "date-time" },
     clock_out: { type: "string", format: "date-time" },
     justification: { type: "string" },
-    attachment: { type: ["string", "null"] },
+  },
+});
+
+const bulkApproveTimeClockAdjustmentRequestBody = createObjectRequestBody({
+  example: {
+    request_ids: ["request-uuid-1", "request-uuid-2"],
+    obs_approver: "Conferido pelo RH.",
+  },
+  required: ["request_ids"],
+  properties: {
+    request_ids: {
+      type: "array",
+      minItems: 1,
+      maxItems: 100,
+      items: { type: "string", format: "uuid" },
+    },
+    obs_approver: { type: ["string", "null"] },
+  },
+});
+
+const retroactiveTimeClockAdjustmentRequestBody = createObjectRequestBody({
+  example: {
+    target_user_id: "user-uuid",
+    date: "2026-04-02",
+    clock_in: "2026-04-02T08:00:00.000Z",
+    lunch_out: "2026-04-02T12:00:00.000Z",
+    lunch_in: "2026-04-02T13:00:00.000Z",
+    clock_out: "2026-04-02T17:30:00.000Z",
+    justification: "Entrada retroativa autorizada pelo RH.",
+  },
+  required: [
+    "target_user_id",
+    "date",
+    "clock_in",
+    "lunch_out",
+    "lunch_in",
+    "clock_out",
+    "justification",
+  ],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    date: { type: "string", format: "date" },
+    clock_in: { type: "string", format: "date-time" },
+    lunch_out: { type: "string", format: "date-time" },
+    lunch_in: { type: "string", format: "date-time" },
+    clock_out: { type: "string", format: "date-time" },
+    justification: { type: "string" },
+  },
+});
+
+const recalculatePointsRequestBody = createObjectRequestBody({
+  example: {
+    target_user_id: "user-uuid",
+    date_from: "2026-04-01T00:00:00.000Z",
+    date_to: "2026-04-30T00:00:00.000Z",
+  },
+  required: ["target_user_id", "date_from", "date_to"],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    date_from: { type: "string", format: "date-time" },
+    date_to: { type: "string", format: "date-time" },
+  },
+});
+
+const reopenTimeSheetRequestBody = createObjectRequestBody({
+  example: { id: "timesheet-uuid", reason: "Correção autorizada antes do fechamento." },
+  required: ["id", "reason"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    reason: { type: "string" },
   },
 });
 
@@ -644,6 +714,17 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/point/recalculate": {
+        post: {
+          tags: ["Ponto"],
+          summary: "Recalcular pontos de um colaborador em um periodo",
+          security: bearer,
+          ...recalculatePointsRequestBody,
+          responses: {
+            "200": { description: "Pontos recalculados", ...successJson },
+          },
+        },
+      },
       "/rh/point": {
         get: {
           tags: ["Ponto"],
@@ -695,7 +776,62 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           security: bearer,
           ...timeClockAdjustmentRequestBody,
           responses: {
-            "200": { description: "Solicitacao criada", ...successJson },
+            "201": { description: "Solicitacao criada", ...successJson },
+          },
+        },
+      },
+      "/rh/point/adjustment/approve-bulk": {
+        put: {
+          tags: ["Ponto"],
+          summary: "Aprovar lote de ajustes de ponto",
+          security: bearer,
+          ...bulkApproveTimeClockAdjustmentRequestBody,
+          responses: {
+            "200": { description: "Lote aprovado", ...successJson },
+          },
+        },
+      },
+      "/rh/point/adjustment/retroactive": {
+        post: {
+          tags: ["Ponto"],
+          summary: "Criar entrada retroativa de ponto",
+          security: bearer,
+          ...retroactiveTimeClockAdjustmentRequestBody,
+          responses: {
+            "201": { description: "Entrada retroativa criada", ...successJson },
+          },
+        },
+      },
+      "/rh/point/adjustment/{requestId}/attachment": {
+        post: {
+          tags: ["Ponto"],
+          summary: "Enviar comprovante privado de ajuste",
+          security: bearer,
+          parameters: [
+            {
+              name: "requestId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["file"],
+                  properties: {
+                    file: { type: "string", format: "binary" },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Comprovante anexado", ...successJson },
           },
         },
       },
@@ -1286,6 +1422,17 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           ...timeSheetSignRequestBody,
           responses: {
             "200": { description: "Folha assinada", ...successJson },
+          },
+        },
+      },
+      "/rh/timesheets/reopen": {
+        put: {
+          tags: ["TimeSheets"],
+          summary: "Reabrir folha de ponto assinada",
+          security: bearer,
+          ...reopenTimeSheetRequestBody,
+          responses: {
+            "200": { description: "Folha reaberta", ...successJson },
           },
         },
       },

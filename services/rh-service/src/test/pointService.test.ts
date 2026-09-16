@@ -18,6 +18,12 @@ const { prismaMock, envMock } = vi.hoisted(() => ({
       findFirst: vi.fn(),
       findMany: vi.fn(),
     },
+    timeSheets: {
+      findFirst: vi.fn(),
+    },
+    organization: {
+      findUnique: vi.fn(),
+    },
     timeClockRequest: {
       count: vi.fn(),
     },
@@ -38,6 +44,18 @@ describe("PointService", () => {
     await expect(
       service.registerPoint({ user_id: "", organization_id: "org-1" }),
     ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it("registerPoint bloqueia dia coberto por folha assinada", async () => {
+    prismaMock.organization.findUnique.mockResolvedValue({ timezone: "UTC" });
+    prismaMock.point.findFirst.mockResolvedValue(null);
+    prismaMock.timeSheets.findFirst.mockResolvedValue({ id: "sheet-1" });
+
+    const service = new PointService();
+    await expect(
+      service.registerPoint({ user_id: "user-1", organization_id: "org-1" }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prismaMock.point.create).not.toHaveBeenCalled();
   });
 
   it("calculateDailyHours lanca 404 quando ponto nao existe", async () => {

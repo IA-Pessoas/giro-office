@@ -339,4 +339,30 @@ describe("matriz de regressão das políticas modulares", () => {
       special: "manageUsers",
     });
   });
+
+  it("reutiliza o módulo RH com limiares distintos por operação de ponto", () => {
+    const selfServicePolicy = requiredRoutePolicy("POST", "/rh/point/adjustment/request");
+    const registerPolicy = requiredRoutePolicy("POST", "/rh/point/register");
+    const signPolicy = requiredRoutePolicy("PUT", "/rh/timesheets/sign");
+    const managerPolicy = requiredRoutePolicy("PUT", "/rh/point/adjustment/approve-bulk");
+    const managementRoutes = [
+      ["POST", "/rh/point/recalculate"],
+      ["POST", "/rh/point/adjustment/retroactive"],
+      ["PUT", "/rh/timesheets/reopen"],
+      ["POST", "/rh/point/point-1/calculate"],
+      ["POST", "/rh/timesheets"],
+    ] as const;
+
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), selfServicePolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), registerPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), signPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), managerPolicy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { rh: 2 } }), managerPolicy)).toBe(true);
+
+    for (const [method, path] of managementRoutes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(authContext({ modules: { rh: 2 } }), policy)).toBe(false);
+      expect(canAccessRoute(authContext({ modules: { rh: 3 } }), policy)).toBe(true);
+    }
+  });
 });

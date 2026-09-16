@@ -17,6 +17,7 @@ const rhModulePolicy: AuthPolicy = {
   },
 };
 const rhEditPolicy = createModulePolicy("rh", moduleEditPermission);
+const rhManagementPolicy = createModulePolicy("rh", 3);
 const tiModulePolicy = createModulePolicy("ti", moduleAccessPermission);
 const tiEditPolicy = createModulePolicy("ti", moduleEditPermission);
 const integracaoEditPolicy = createModulePolicy("integracao", moduleEditPermission);
@@ -155,6 +156,39 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
   { method: "ANY", path: /^\/rh\/profile(?:\/|$)/, policy: rhModulePolicy },
+  {
+    method: "POST",
+    path: /^\/rh\/point\/adjustment\/request$/,
+    policy: rhModulePolicy,
+  },
+  {
+    method: "POST",
+    path: /^\/rh\/point\/adjustment\/[^/]+\/attachment$/,
+    policy: rhModulePolicy,
+  },
+  {
+    method: "POST",
+    path: /^\/rh\/point\/recalculate$/,
+    policy: rhManagementPolicy,
+  },
+  {
+    method: "POST",
+    path: /^\/rh\/point\/adjustment\/retroactive$/,
+    policy: rhManagementPolicy,
+  },
+  {
+    method: "PUT",
+    path: /^\/rh\/timesheets\/reopen$/,
+    policy: rhManagementPolicy,
+  },
+  { method: "POST", path: /^\/rh\/point\/register$/, policy: rhModulePolicy },
+  { method: "PUT", path: /^\/rh\/timesheets\/sign$/, policy: rhModulePolicy },
+  {
+    method: "POST",
+    path: /^\/rh\/point\/[^/]+\/calculate$/,
+    policy: rhManagementPolicy,
+  },
+  { method: "POST", path: /^\/rh\/timesheets\/?$/, policy: rhManagementPolicy },
   { method: "GET", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhEditPolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },

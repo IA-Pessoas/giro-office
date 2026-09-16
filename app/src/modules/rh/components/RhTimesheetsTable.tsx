@@ -6,9 +6,12 @@ import { formatRhDateTime } from "../utils/rhDate";
 interface RhTimesheetsTableProps {
   timeSheets: RhTimeSheetListItem[];
   currentUserId: string;
+  canManageTimesheets: boolean;
   signingSheetId: string | null;
+  reopeningSheetId: string | null;
   getUserLabel: (userId: string) => string;
   onSign: (sheet: RhTimeSheetListItem) => void;
+  onReopen: (sheet: RhTimeSheetListItem) => void;
   onViewDetail: (timesheetId: string) => void;
 }
 
@@ -35,9 +38,12 @@ function formatMinutes(value: number) {
 export function RhTimesheetsTable({
   timeSheets,
   currentUserId,
+  canManageTimesheets,
   signingSheetId,
+  reopeningSheetId,
   getUserLabel,
   onSign,
+  onReopen,
   onViewDetail,
 }: RhTimesheetsTableProps) {
   return (
@@ -71,6 +77,7 @@ export function RhTimesheetsTable({
         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
           {timeSheets.map((sheet) => {
             const isSigning = signingSheetId === sheet.id;
+            const isReopening = reopeningSheetId === sheet.id;
             const canSign = sheet.user_id === currentUserId && !sheet.signature;
 
             return (
@@ -133,6 +140,17 @@ export function RhTimesheetsTable({
                         {sheet.signature ? "Concluído" : "Sem ação"}
                       </span>
                     )}
+
+                    {canManageTimesheets && sheet.signature ? (
+                      <button
+                        type="button"
+                        onClick={() => onReopen(sheet)}
+                        disabled={isReopening}
+                        className={`${ACTION_BUTTON_CLASSNAME} border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-900/20`}
+                      >
+                        {isReopening ? "Reabrindo" : "Reabrir folha"}
+                      </button>
+                    ) : null}
                   </div>
                 </td>
               </tr>

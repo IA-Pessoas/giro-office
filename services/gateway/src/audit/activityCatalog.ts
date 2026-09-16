@@ -383,13 +383,33 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/rh\/point\/recalculate$/,
+    description: { action: "recalculou", item: "os pontos de um colaborador" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/rh\/point\/adjustment\/request$/,
     description: { action: "solicitou", item: "um ajuste de ponto" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/point\/adjustment\/retroactive$/,
+    description: { action: "registrou", item: "uma entrada retroativa de ponto" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/point\/adjustment\/[^/]+\/attachment$/,
+    description: { action: "anexou", item: "um comprovante de ajuste de ponto" },
   },
   {
     methods: ["POST", "PATCH"],
     pattern: /^\/rh\/point\/adjustment\/approve$/,
     description: { action: "aprovou", item: "um ajuste de ponto" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/point\/adjustment\/approve-bulk$/,
+    description: { action: "aprovou", item: "um lote de ajustes de ponto" },
   },
   {
     methods: ["POST"],
@@ -630,6 +650,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/rh\/point\/adjustment\/requests$/,
     description: { action: "consultou", item: "a lista de solicitações de ajuste de ponto" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/timesheets\/reopen$/,
+    description: { action: "reabriu", item: "uma folha de ponto assinada" },
   },
   {
     methods: ["PATCH"],
