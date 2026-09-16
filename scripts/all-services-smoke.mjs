@@ -4266,6 +4266,67 @@ const handlers = {
     });
   },
 
+  async triageMonthlyCreate(op) {
+    const competence = "2026-09";
+    state.triageMonthlyCompetence = competence;
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      json: { client_id: requireState("primaryClientId"), competence },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triageMonthlyId = id;
+  },
+
+  async triageMonthlyGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
+  async triageMonthlyItemUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/monthly/${requireState("triageMonthlyId")}/item`,
+      json: { field: "financial_transactions", status: "ATTENTION" },
+    });
+  },
+
+  async triageMonthlyBulkUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/monthly/${requireState("triageMonthlyId")}/items`,
+      json: { status: "COMPLETED" },
+    });
+  },
+
+  async triageStatementUpsert(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+        bank_id: "001",
+        status: "PENDING",
+      },
+    });
+  },
+
+  async triageStatementList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
   async contabilResponsibleCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

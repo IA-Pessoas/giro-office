@@ -8,6 +8,7 @@ export {
   ContabilResponsibleSection,
   ContabilShell,
   ContabilStateBox,
+  TriageDocumentsSection,
 } from "./components";
 export {
   contabilControlQueryKey,
@@ -31,6 +32,9 @@ export {
   useUpdateContabilRelationshipMutation,
   useUpdateContabilResponsibleMutation,
   useContabilPermissions,
+  useTriageMonthly,
+  useTriageMutations,
+  useTriageStatements,
 } from "./hooks";
 export { resolveContabilPermissionAccess } from "./hooks/contabilPermissionAccess";
 export {
@@ -39,6 +43,7 @@ export {
   contabilControlService,
   contabilRelationshipService,
   contabilResponsibleService,
+  triageDocumentsService,
   CONTABIL_ENDPOINTS,
   getContabilErrorMessage,
   isNotFoundError,
@@ -61,4 +66,7 @@ export type {
   PatchContabilControlFieldPayload,
   UpdateContabilRelationshipPayload,
   UpdateContabilResponsiblePayload,
+  TriageBankStatement,
+  TriageDocumentStatus,
+  TriageDocumentsMonthly,
 } from "./types";

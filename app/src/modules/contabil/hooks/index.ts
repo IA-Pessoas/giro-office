@@ -11,6 +11,8 @@ export {
   contabilControlPortfolioQueryKey,
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
+  triageMonthlyQueryKey,
+  triageStatementsQueryKey,
   CONTABIL_QUERY_KEY,
 } from "./queryKeys";
 export {
@@ -34,6 +36,7 @@ export {
 export {
   useContabilPermissions,
 } from "./useContabilPermissions";
+export { useTriageMonthly, useTriageMutations, useTriageStatements } from "./useTriageDocuments";
 export {
   resolveContabilPermissionAccess,
 } from "./contabilPermissionAccess";

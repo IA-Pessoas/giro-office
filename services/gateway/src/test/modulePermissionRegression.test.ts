@@ -31,6 +31,14 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 }
 
 describe("matriz de regressão das políticas modulares", () => {
+  it("permite consulta de triagem para Contábil ou Triagem e não permite quem não tem ambos", () => {
+    const policy = requiredRoutePolicy("GET", "/triagem/monthly");
+
+    expect(canAccessRoute(authContext({ modules: { contabil: 1, triagem: 0 } }), policy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 1 } }), policy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 0 } }), policy)).toBe(false);
+  });
+
   it.each([
     ["user", 0, false, false],
     ["user", 1, true, false],

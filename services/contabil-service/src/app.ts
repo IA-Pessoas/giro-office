@@ -21,10 +21,15 @@ import {
   type RelationshipRouteDeps,
 } from "./routes/relationship.routes.js";
 import { createResponsibleRoutes, type ResponsibleRouteDeps } from "./routes/responsible.routes.js";
+import {
+  createTriageDocumentsRoutes,
+  type TriageDocumentsRouteDeps,
+} from "./routes/triageDocuments.routes.js";
 import { ControlService } from "./services/controlService.js";
 import { InternalReportingService } from "./services/internalReportingService.js";
 import { RelationshipService } from "./services/relationshipService.js";
 import { ResponsibleService } from "./services/responsibleService.js";
+import { TriageDocumentsService } from "./services/triageDocumentsService.js";
 
 function contabilServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -52,12 +57,14 @@ export function createContabilApp(options: {
   controlRouteDeps?: ControlRouteDeps;
   responsibleRouteDeps?: ResponsibleRouteDeps;
   relationshipRouteDeps?: RelationshipRouteDeps;
+  triageDocumentsRouteDeps?: TriageDocumentsRouteDeps;
   internalReportingService?: InternalReportingService;
 }): express.Express {
   const { env, logger } = options;
   const controlRouteDeps = options.controlRouteDeps ?? new ControlService();
   const responsibleRouteDeps = options.responsibleRouteDeps ?? new ResponsibleService();
   const relationshipRouteDeps = options.relationshipRouteDeps ?? new RelationshipService();
+  const triageDocumentsRouteDeps = options.triageDocumentsRouteDeps ?? new TriageDocumentsService();
   const internalReportingService =
     options.internalReportingService ?? new InternalReportingService(prismaClient);
 
@@ -86,6 +93,7 @@ export function createContabilApp(options: {
   app.use("/contabil", createControlRoutes(controlRouteDeps));
   app.use("/contabil", createResponsibleRoutes(responsibleRouteDeps));
   app.use("/contabil", createRelationshipRoutes(relationshipRouteDeps));
+  app.use("/triagem", createTriageDocumentsRoutes(triageDocumentsRouteDeps));
   app.use(
     "/internal",
     createInternalReportingRouter({ env, reportingService: internalReportingService }),

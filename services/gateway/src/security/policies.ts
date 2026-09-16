@@ -26,6 +26,12 @@ const fiscalModulePolicy = createModulePolicy("fiscal", moduleAccessPermission);
 const fiscalEditPolicy = createModulePolicy("fiscal", moduleEditPermission);
 const contabilModulePolicy = createModulePolicy("contabil", moduleAccessPermission);
 const contabilEditPolicy = createModulePolicy("contabil", moduleEditPermission);
+const triagemModulePolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["contabil", "triagem"],
+    minPermission: moduleAccessPermission,
+  },
+};
 const certificateModulePolicy = createModulePolicy("certificado", moduleAccessPermission);
 const certificateEditPolicy = createModulePolicy("certificado", moduleEditPermission);
 const commercialModulePolicy = createModulePolicy("comercial", moduleAccessPermission);
@@ -191,6 +197,7 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/fiscal(?:\/|$)/, policy: fiscalEditPolicy },
   { method: "GET", path: /^\/contabil(?:\/|$)/, policy: contabilModulePolicy },
   { method: "ANY", path: /^\/contabil(?:\/|$)/, policy: contabilEditPolicy },
+  { method: "ANY", path: /^\/triagem(?:\/|$)/, policy: triagemModulePolicy },
   { method: "GET", path: /^\/ti(?:\/|$)/, policy: tiModulePolicy },
   { method: "ANY", path: /^\/ti(?:\/|$)/, policy: tiEditPolicy },
   { method: "GET", path: /^\/certificate(?:\/|$)/, policy: certificateModulePolicy },

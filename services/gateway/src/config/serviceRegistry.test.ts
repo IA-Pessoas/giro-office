@@ -37,6 +37,23 @@ describe("commercial-service gateway registry", () => {
   });
 });
 
+describe("triagem gateway registry", () => {
+  it("encaminha triagem ao contabil-service sem reduzir a autorização ao módulo Contábil", () => {
+    const env = {
+      contabilServiceUrl: "http://contabil-service:3038",
+      auditServiceToken: "gateway-triagem-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, "/triagem/monthly")).toMatchObject({
+      key: "triagem-service",
+      targetUrl: "http://contabil-service:3038",
+      internalServiceToken: "gateway-triagem-token",
+      routePrefixes: ["/triagem"],
+    });
+    expect(resolveGatewayService(env, "/triagem/monthly")?.permissionModule).toBeUndefined();
+  });
+});
+
 describe("user-service gateway registry", () => {
   it("forwards the trusted gateway token with authenticated identity", () => {
     const env = {

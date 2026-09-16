@@ -135,3 +135,24 @@ export interface UpdateContabilRelationshipPayload {
 export interface DeleteContabilRelationshipPayload {
   id: string;
 }
+
+export type TriageDocumentStatus =
+  | "PENDING"
+  | "COMPLETED"
+  | "ATTENTION"
+  | "NOT_PRESENT"
+  | "NOT_APPLICABLE";
+
+export interface TriageDocumentsMonthly {
+  id: string;
+  client_id: string;
+  competence: ContabilCompetence;
+  checklist: Record<string, TriageDocumentStatus>;
+  summary: { applicable: number; completed: number; attention: number; pending: number; notApplicable: number; notPresent: number; percentage: number };
+}
+
+export interface TriageBankStatement {
+  id: string;
+  bank_id: string;
+  status: TriageDocumentStatus;
+}

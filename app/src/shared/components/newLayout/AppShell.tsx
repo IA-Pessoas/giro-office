@@ -23,6 +23,7 @@ import {
   Shield,
   ShieldCheck,
   SquareCheck,
+  ListChecks,
   ContactRound,
   FolderKanban,
   UserRoundCog,
@@ -137,6 +138,7 @@ const moduleCategories: NavigationCategory[] = [
       },
       { path: "/fiscal", name: "Fiscal", icon: Receipt, moduleKey: "fiscal" as ModuleKey },
       { path: "/contabil", name: "Contábil", icon: Calculator },
+      { path: "/triagem", name: "Triagem", icon: ListChecks, moduleKey: "triagem" as ModuleKey },
       { path: "/parcelamento", name: "Parcelamento", icon: BadgeDollarSign, moduleKey: "parcelamento" as ModuleKey },
       { path: "/rh", name: "RH", icon: Users, moduleKey: "rh" as ModuleKey },
       {

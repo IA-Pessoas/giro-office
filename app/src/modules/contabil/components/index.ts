@@ -7,3 +7,4 @@ export { ContabilRelationshipSection } from "./ContabilRelationshipSection";
 export { ContabilResponsibleSection } from "./ContabilResponsibleSection";
 export { ContabilShell } from "./ContabilShell";
 export { ContabilStateBox } from "./ContabilStateBox";
+export { TriageDocumentsSection } from "./TriageDocumentsSection";
