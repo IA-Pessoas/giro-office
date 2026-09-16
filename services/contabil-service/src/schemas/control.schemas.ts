@@ -11,6 +11,23 @@ export const createControlBodySchema = z
   })
   .strict();
 
+export const createYearControlsBodySchema = z
+  .object({
+    client_id: z.string().uuid({ message: "client_id inválido." }),
+    year: z.number().int().min(2000).max(2100),
+    confirmed: z.literal(true, {
+      errorMap: () => ({ message: "Confirmação explícita é obrigatória." }),
+    }),
+  })
+  .strict();
+
+export const controlCompetenceBodySchema = z
+  .object({
+    client_id: z.string().uuid({ message: "client_id inválido." }),
+    competence: competenceSchema,
+  })
+  .strict();
+
 export const updateControlFieldBodySchema = z
   .object({
     field: z.string().min(1, "Campo obrigatório."),

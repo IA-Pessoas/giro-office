@@ -350,6 +350,13 @@ export function buildContabilServiceOpenApiSpec(
             },
           },
         },
+        delete: {
+          tags: ["Controls"],
+          summary: "Arquivar competência e rastreadores relacionados",
+          security: [{ bearerAuth: [] }],
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["client_id", "competence"], additionalProperties: false, properties: { client_id: { type: "string", format: "uuid" }, competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" } } } } } },
+          responses: { "200": { description: "Competência arquivada", content: { "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }, "404": { description: "Competência ativa ausente" } },
+        },
       },
       "/contabil/controls/list": {
         get: {
@@ -378,6 +385,29 @@ export function buildContabilServiceOpenApiSpec(
             "400": { description: "Competência inválida" },
             "401": { description: "Não autenticado" },
           },
+        },
+      },
+      "/contabil/controls/year": {
+        post: {
+          tags: ["Controls"],
+          summary: "Criar as doze competências de um cliente",
+          security: [{ bearerAuth: [] }],
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["client_id", "year", "confirmed"], additionalProperties: false, properties: { client_id: { type: "string", format: "uuid" }, year: { type: "integer", minimum: 2000, maximum: 2100 }, confirmed: { type: "boolean", enum: [true] } } } } } },
+          responses: { "200": { description: "Lote criado ou já existente", content: { "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }, "400": { description: "Confirmação ou payload inválido" }, "403": { description: "Sem permissão" } },
+        },
+      },
+      "/contabil/controls/restore": {
+        post: {
+          tags: ["Controls"], summary: "Restaurar competência arquivada", security: [{ bearerAuth: [] }],
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["client_id", "competence"], additionalProperties: false, properties: { client_id: { type: "string", format: "uuid" }, competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" } } } } } },
+          responses: { "200": { description: "Competência restaurada", content: { "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }, "404": { description: "Competência arquivada ausente" } },
+        },
+      },
+      "/contabil/controls/{id}/items": {
+        patch: {
+          tags: ["Controls"], summary: "Concluir os 17 itens do controle", security: [{ bearerAuth: [] }],
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+          responses: { "200": { description: "Itens concluídos", content: { "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }, "403": { description: "Sem permissão" } },
         },
       },
       "/contabil/controls/{id}": {

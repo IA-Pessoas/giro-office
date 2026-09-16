@@ -151,6 +151,7 @@ export class TriageDocumentsService {
         competence: request.competence,
         organization_id: organizationId,
         type: "CONTABIL",
+        archived_at: null,
       },
     });
 
@@ -174,6 +175,7 @@ export class TriageDocumentsService {
         competence: request.competence,
         organization_id: auth.organizationId,
         type: "CONTABIL",
+        archived_at: null,
       },
     });
 
@@ -212,6 +214,7 @@ export class TriageDocumentsService {
           competence: request.competence,
           organization_id: auth.organizationId,
           type: "CONTABIL",
+          archived_at: null,
           checklist,
         },
       });
@@ -332,6 +335,7 @@ export class TriageDocumentsService {
         client_id: request.client_id,
         competence: request.competence,
         organization_id: organizationId,
+        archived_at: null,
       },
       orderBy: { bank_id: "asc" },
     });
@@ -355,7 +359,7 @@ export class TriageDocumentsService {
       bank_id: request.bank_id,
     };
     const existing = await this.prisma.triageBankStatement.findFirst({
-      where: identity,
+      where: { ...identity, archived_at: null },
     });
     const statement = await this.prisma.triageBankStatement.upsert({
       where: { organization_id_client_id_competence_bank_id: identity },
@@ -392,6 +396,7 @@ export class TriageDocumentsService {
         id: monthlyId,
         organization_id: organizationId,
         type: "CONTABIL",
+        archived_at: null,
       },
     });
     if (!monthly) {

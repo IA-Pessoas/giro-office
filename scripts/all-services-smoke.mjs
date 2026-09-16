@@ -4226,6 +4226,33 @@ const handlers = {
     });
   },
 
+  async contabilControlYearCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { client_id: requireState("primaryClientId"), year: 2026, confirmed: true },
+    });
+  },
+
+  async contabilControlArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+      },
+    });
+  },
+
+  async contabilControlRestore(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+      },
+    });
+  },
+
   async contabilControlPortfolio(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -4255,6 +4282,13 @@ const handlers = {
       expectedStatus: [200],
       path: `/contabil/controls/${requireState("contabilControlId")}`,
       json: { field: "monthly_closing", value: true },
+    });
+  },
+
+  async contabilControlCompleteAll(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/controls/${requireState("contabilControlId")}/items`,
     });
   },
 

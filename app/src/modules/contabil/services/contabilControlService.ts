@@ -5,6 +5,8 @@ import type {
   ContabilControlFilters,
   ContabilCompetence,
   ContabilControlPortfolio,
+  ContabilCompetenceOperationPayload,
+  CreateYearContabilControlsPayload,
   CreateOrGetContabilControlPayload,
   PatchContabilControlFieldPayload,
 } from "../types";
@@ -52,5 +54,25 @@ export const contabilControlService = {
     const response = await api.patch(CONTABIL_ENDPOINTS.controlById(controlId), payload);
 
     return unwrapContabilEnvelope<ContabilControl>(response.data);
+  },
+
+  async completeAll(controlId: string): Promise<ContabilControl> {
+    const response = await setupAPIClient().patch(CONTABIL_ENDPOINTS.controlItems(controlId));
+    return unwrapContabilEnvelope<ContabilControl>(response.data);
+  },
+
+  async createYear(payload: CreateYearContabilControlsPayload): Promise<{ competences: string[]; created: number; existing: number }> {
+    const response = await setupAPIClient().post(CONTABIL_ENDPOINTS.controlsYear, payload);
+    return unwrapContabilEnvelope(response.data);
+  },
+
+  async archiveCompetence(payload: ContabilCompetenceOperationPayload): Promise<Record<string, number>> {
+    const response = await setupAPIClient().delete(CONTABIL_ENDPOINTS.controls, { data: payload });
+    return unwrapContabilEnvelope(response.data);
+  },
+
+  async restoreCompetence(payload: ContabilCompetenceOperationPayload): Promise<Record<string, number>> {
+    const response = await setupAPIClient().post(CONTABIL_ENDPOINTS.controlsRestore, payload);
+    return unwrapContabilEnvelope(response.data);
   },
 };
