@@ -65,7 +65,7 @@ const client = {
 const proposalConfig = {
   id: "c0000000-0000-4000-8000-000000000001",
   name: "Configuração Smoke",
-  contract_value: 1_500_000,
+  contract_value: 1800.125,
 };
 const prospecting = {
   id: "d0000000-0000-4000-8000-000000000001",
@@ -405,16 +405,33 @@ async function run() {
     await page.getByRole("button", { name: "Editar", exact: true }).first().click();
     const contractForm = page.getByRole("form", { name: "Editar configuração" });
     const contractValueInput = contractForm.getByLabel("Valor base do contrato");
-    assert.equal(await contractValueInput.inputValue(), "R$ 1.500.000,00");
-    await contractValueInput.fill("abc");
-    assert.equal(await contractValueInput.inputValue(), "");
-    await contractValueInput.fill("123456");
-    assert.equal(await contractValueInput.inputValue(), "R$ 1.234,56");
+    assert.equal(await contractValueInput.inputValue(), "R$ 1.800,13");
+    const unchangedUpdateResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "PATCH" &&
+        response.url().endsWith(`/commercial/proposal-configs/${proposalConfig.id}`),
+    );
+    await contractForm.getByRole("button", { name: "Salvar", exact: true }).click();
+    const unchangedUpdateResponse = await unchangedUpdateResponsePromise;
+    assert.deepEqual(JSON.parse(unchangedUpdateResponse.request().postData() || "{}"), {
+      name: "Configuração Smoke",
+      contract_value: 1800.125,
+    });
+    await page.getByText("Valor base do contrato: R$ 1.800,13", { exact: true }).waitFor();
+
+    await page.getByRole("button", { name: "Editar", exact: true }).first().click();
+    const editableContractForm = page.getByRole("form", { name: "Editar configuração" });
+    const editableContractValueInput = editableContractForm.getByLabel("Valor base do contrato");
+    assert.equal(await editableContractValueInput.inputValue(), "R$ 1.800,13");
+    await editableContractValueInput.fill("abc");
+    assert.equal(await editableContractValueInput.inputValue(), "");
+    await editableContractValueInput.fill("123456");
+    assert.equal(await editableContractValueInput.inputValue(), "R$ 1.234,56");
     await page.screenshot({ path: `${evidenceDir}/02-commercial-contract-value-mask.png`, fullPage: true });
     const updateResponsePromise = page.waitForResponse(
       (response) => response.request().method() === "PATCH" && response.url().includes("/commercial/proposal-configs/"),
     );
-    await contractForm.getByRole("button", { name: "Salvar", exact: true }).click();
+    await editableContractForm.getByRole("button", { name: "Salvar", exact: true }).click();
     const updateResponse = await updateResponsePromise;
     assert.deepEqual(JSON.parse(updateResponse.request().postData() || "{}"), {
       name: "Configuração Smoke",

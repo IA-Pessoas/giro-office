@@ -100,6 +100,8 @@ export function CommercialCatalog() {
   const proposalConfigCreateTriggerRef = useRef<HTMLButtonElement>(null);
   const proposalConfigDialogTriggerRef = useRef<HTMLButtonElement>(null);
   const prospectingCreateTriggerRef = useRef<HTMLButtonElement>(null);
+  const originalContractValueRef = useRef<number | null>(null);
+  const contractValueEditedRef = useRef(false);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isSavingProspecting =
@@ -142,6 +144,8 @@ export function CommercialCatalog() {
 
   function startCreate(event?: MouseEvent<HTMLButtonElement>) {
     proposalConfigDialogTriggerRef.current = event?.currentTarget ?? proposalConfigCreateTriggerRef.current;
+    originalContractValueRef.current = null;
+    contractValueEditedRef.current = false;
     setIsCreating(true);
     setEditingId(null);
     setDraft(emptyDraft);
@@ -151,6 +155,8 @@ export function CommercialCatalog() {
   function startEdit(config: CommercialProposalConfig) {
     setIsCreating(false);
     setEditingId(config.id);
+    originalContractValueRef.current = config.contract_value;
+    contractValueEditedRef.current = false;
     setDraft({ name: config.name, contract_value: formatContractValueForInput(config.contract_value) });
     setFormError("");
   }
@@ -158,6 +164,8 @@ export function CommercialCatalog() {
   function cancelForm() {
     setIsCreating(false);
     setEditingId(null);
+    originalContractValueRef.current = null;
+    contractValueEditedRef.current = false;
     setDraft(emptyDraft);
     setFormError("");
   }
@@ -165,7 +173,11 @@ export function CommercialCatalog() {
   async function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = draft.name.trim();
-    const contractValue = parseBrlInput(draft.contract_value);
+    const parsedContractValue = parseBrlInput(draft.contract_value);
+    const contractValue =
+      editingId && !contractValueEditedRef.current && originalContractValueRef.current !== null
+        ? originalContractValueRef.current
+        : parsedContractValue;
 
     if (!name) {
       setFormError("Informe o nome da configuração.");
@@ -218,15 +230,17 @@ export function CommercialCatalog() {
                   parseBrlInput(event.currentTarget.value) === 0
                 ) {
                   event.preventDefault();
+                  contractValueEditedRef.current = true;
                   setDraft((current) => ({ ...current, contract_value: "" }));
                 }
               }}
-              onChange={(event) =>
+              onChange={(event) => {
+                contractValueEditedRef.current = true;
                 setDraft((current) => ({
                   ...current,
                   contract_value: formatBrlInput(normalizeDigits(event.target.value)),
-                }))
-              }
+                }));
+              }}
               className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
               placeholder="R$ 0,00"
             />
