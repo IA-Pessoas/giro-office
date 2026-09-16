@@ -9,6 +9,11 @@ export interface CommercialProposalConfig {
   contract_value: number;
 }
 
+export interface DeleteCommercialProposalConfigResult {
+  id: string;
+  deleted: true;
+}
+
 export interface CreateCommercialProposalConfigPayload {
   name: string;
   contract_value: number;
@@ -41,6 +46,11 @@ export interface CommercialProspecting {
   status_date: string | null;
   description: string | null;
   client: CommercialProspectingClient;
+}
+
+export interface ArchiveCommercialProspectingResult {
+  id: string;
+  deleted: true;
 }
 
 export interface CreateCommercialProspectingPayload {

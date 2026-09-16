@@ -107,11 +107,15 @@ describe("pessoal internal reporting routes", () => {
       keys: [{ key: "client_id" }, { key: "responsible_id" }, { key: "union_id" }],
     });
     expect(payrollSource.fields.map((field: { key: string }) => field.key)).toEqual([
+      "client_name",
+      "responsible_name",
+      "union_name",
+      "group_name",
+      "group_state",
       "advance",
       "advance_type",
       "advance_amount",
       "onvio",
-      "group",
       "vt",
       "vt_value",
       "vt_type",
@@ -152,6 +156,11 @@ describe("pessoal internal reporting routes", () => {
     });
     expect(obligationsSource.fields.map((field: { key: string }) => field.key)).toEqual([
       "competence",
+      "client_name",
+      "responsible_name",
+      "group_snapshot_name",
+      "group_snapshot_policy",
+      "group_snapshot_state",
       "advance",
       "payroll",
       "charges",
