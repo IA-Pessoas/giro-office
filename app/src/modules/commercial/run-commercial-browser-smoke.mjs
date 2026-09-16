@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, createHmac } from "node:crypto";
+import { once } from "node:events";
 import { createServer } from "node:http";
 import { mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
@@ -145,16 +146,25 @@ async function closeServer(server) {
   await new Promise((resolve) => server.close(() => resolve()));
 }
 
-function stopProcessTree(child) {
+async function stopProcessTree(child) {
   if (child.exitCode !== null || child.pid === undefined) return;
   if (process.platform === "win32") {
-    spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+    const taskkill = spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
       stdio: "ignore",
       windowsHide: true,
     });
+    await once(taskkill, "close");
     return;
   }
   child.kill("SIGTERM");
+  const exited = await Promise.race([
+    once(child, "exit").then(() => true),
+    new Promise((resolve) => setTimeout(() => resolve(false), 3_000)),
+  ]);
+  if (!exited && child.exitCode === null) {
+    child.kill("SIGKILL");
+    await once(child, "exit");
+  }
 }
 
 function createUserUpstream() {
@@ -615,7 +625,10 @@ async function run() {
 async function withNextServer(test) {
   if (process.env.COMMERCIAL_SMOKE_BASE_URL) return test();
   const output = [];
-  const serverProcess = spawn("cmd", ["/c", "corepack", "pnpm", "exec", "next", "start", "--port", PORT], {
+  const [command, args] = process.platform === "win32"
+    ? ["cmd", ["/c", "corepack", "pnpm", "exec", "next", "start", "--port", PORT]]
+    : ["corepack", ["pnpm", "exec", "next", "start", "--port", PORT]];
+  const serverProcess = spawn(command, args, {
     cwd: appRoot,
     env: { ...process.env, API_INTERNAL_URL: gatewayUrl },
     stdio: ["ignore", "pipe", "pipe"],
@@ -637,7 +650,7 @@ async function withNextServer(test) {
     serverProcess.stderr.on("data", onData);
     serverProcess.once("error", reject);
   });
-  try { await test(); } finally { stopProcessTree(serverProcess); }
+  try { await test(); } finally { await stopProcessTree(serverProcess); }
 }
 
 async function waitForGateway(serverProcess, output) {
@@ -692,7 +705,7 @@ async function withGateway(test) {
       throw new Error(`${error instanceof Error ? error.message : String(error)} gateway=${output.join("\\n")}`, { cause: error });
     }
   } finally {
-    stopProcessTree(serverProcess);
+    await stopProcessTree(serverProcess);
     await closeServer(userUpstream.server);
     await closeServer(commercialUpstream.server);
   }

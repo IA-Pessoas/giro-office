@@ -140,4 +140,14 @@ runTest("commercial creation actions open the shared dialogs", () => {
   assert.doesNotMatch(catalog, /prospectingEditingId !== null \|\| \(!prospectingQuery\.data\?\.length/);
 });
 
+runTest("commercial browser smoke starts Next on the current platform", () => {
+  const browserSmoke = read("./run-commercial-browser-smoke.mjs");
+
+  assert.match(browserSmoke, /process\.platform === "win32"/);
+  assert.match(browserSmoke, /corepack/, "o smoke deve manter o gerenciador de pacotes fixado");
+  assert.doesNotMatch(browserSmoke, /spawn\("cmd", \["\/c", "corepack"/);
+  assert.match(browserSmoke, /async function stopProcessTree/);
+  assert.match(browserSmoke, /await stopProcessTree\(serverProcess\)/);
+});
+
 console.log("commercial contract tests passed");
