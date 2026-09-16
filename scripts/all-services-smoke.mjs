@@ -275,11 +275,16 @@ const cleanupTasks = [];
 const executed = [];
 const skipped = [];
 const actionExecutionRank = {
-  // rhPointCalculate needs to run AFTER rhPointAdjustmentApprove because:
+  // Adjustment lifecycle actions need a deterministic order because:
   // - completeRhPointLifecycle fails the min-interval check (runs too fast)
   // - Adjustment approval sets clock_out and runs calculateDailyHours automatically
   // - After approval, the point is complete so calculate succeeds
-  rhPointCalculate: 500,
+  rhPointAdjustmentAttachment: 2920,
+  rhPointAdjustmentApprove: 2922,
+  rhPointCalculate: 2923,
+  rhPointAdjustmentApproveBulk: 2924,
+  rhPointAdjustmentRetroactive: 2925,
+  rhPointRecalculate: 2926,
   projectDelete: 8000,
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
@@ -5455,7 +5460,7 @@ const handlers = {
   },
 
   async rhPointCalculate(op) {
-    // Runs after rhPointAdjustmentApprove (via actionExecutionRank:500).
+    // Runs after rhPointAdjustmentApprove (via actionExecutionRank:2923).
     // Approval sets clock_in/lunch_out/lunch_in/clock_out on the point, so calculate succeeds.
     const targetToken = await ensureRhTargetUserSessionCookies();
     if (!state.rhPointId) {
@@ -5483,7 +5488,7 @@ const handlers = {
 
     const targetToken = await ensureRhTargetUserSessionCookies();
     const response = await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [201],
       path: "/rh/point/adjustment/request",
       auth: "public",
       headers: getSessionHeaders("POST", targetToken),
@@ -5500,6 +5505,21 @@ const handlers = {
       return;
     }
     state.rhAdjustmentId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async rhPointAdjustmentAttachment(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/rh/point/adjustment/${requireState("rhAdjustmentId")}/attachment`,
+      form: {
+        file: {
+          fieldName: "file",
+          path: env.fixturePath,
+          filename: "smoke-point-adjustment.png",
+          contentType: "image/png",
+        },
+      },
+    });
   },
 
   async rhPointAdjustmentList(op) {
@@ -5534,6 +5554,80 @@ const handlers = {
     });
   },
 
+  async rhPointAdjustmentApproveBulk(op) {
+    const targetToken = await ensureRhTargetUserSessionCookies();
+    const requestIds = [];
+    for (const daysAgo of [2, 3]) {
+      const base = new Date();
+      base.setUTCDate(base.getUTCDate() - daysAgo);
+      const at = (hour) => {
+        const value = new Date(base);
+        value.setUTCHours(hour, 0, 0, 0);
+        return value.toISOString();
+      };
+      const response = await httpRequest(op, {
+        expectedStatus: [201],
+        path: "/rh/point/adjustment/request",
+        auth: "public",
+        headers: getSessionHeaders("POST", targetToken),
+        json: {
+          date: at(12),
+          clock_in: at(8),
+          lunch_out: at(12),
+          lunch_in: at(13),
+          clock_out: at(17),
+          justification: `Smoke bulk adjustment ${daysAgo}`,
+        },
+      });
+      const requestId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+      if (!requestId) throw new Error("Bulk adjustment smoke did not return a request id.");
+      requestIds.push(requestId);
+    }
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/point/adjustment/approve-bulk",
+      json: { request_ids: requestIds, obs_approver: "Bulk smoke approval" },
+    });
+  },
+
+  async rhPointAdjustmentRetroactive(op) {
+    const base = new Date();
+    base.setUTCDate(base.getUTCDate() - 5);
+    const at = (hour) => {
+      const value = new Date(base);
+      value.setUTCHours(hour, 0, 0, 0);
+      return value.toISOString();
+    };
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/rh/point/adjustment/retroactive",
+      json: {
+        target_user_id: await ensureRhTargetUser(),
+        date: at(12),
+        clock_in: at(8),
+        lunch_out: at(12),
+        lunch_in: at(13),
+        clock_out: at(17),
+        justification: "Smoke retroactive adjustment",
+      },
+    });
+  },
+
+  async rhPointRecalculate(op) {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/point/recalculate",
+      json: {
+        target_user_id: await ensureRhTargetUser(),
+        date_from: start.toISOString(),
+        date_to: end.toISOString(),
+      },
+    });
+  },
+
   async rhPointAdjustmentReject(op) {
     if (isBadExpectation(op)) {
       await httpRequest(op, {
@@ -5557,7 +5651,7 @@ const handlers = {
     clockOut.setUTCHours(17, 0, 0, 0);
     const targetToken = await ensureRhTargetUserSessionCookies();
     const createResponse = await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [201],
       path: "/rh/point/adjustment/request",
       auth: "public",
       headers: getSessionHeaders("POST", targetToken),
@@ -5978,6 +6072,17 @@ const handlers = {
       auth: "public",
       headers: getSessionHeaders("POST", targetToken),
       json: { id: requireState("rhTimeSheetId"), signature: "smoke-signature" },
+    });
+  },
+
+  async rhTimeSheetReopen(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/timesheets/reopen",
+      json: {
+        id: requireState("rhTimeSheetId"),
+        reason: "Smoke authorized reopen",
+      },
     });
   },
 

@@ -15,6 +15,7 @@ import type {
   RhTimeSheetDetail,
   RhTimeSheetListItem,
   RhTimeSheetListFilters,
+  ReopenRhTimeSheetPayload,
   SignRhTimeSheetPayload,
   UpdateRhHolidayPayload,
 } from "../types";
@@ -130,6 +131,13 @@ export const rhCalendarService = {
   async signTimeSheet(payload: SignRhTimeSheetPayload): Promise<RhTimeSheetDetail> {
     const api = setupAPIClient();
     const response = await api.put(RH_ENDPOINTS.signTimeSheet, payload);
+
+    return unwrapRhEnvelope<RhTimeSheetDetail>(response.data);
+  },
+
+  async reopenTimeSheet(payload: ReopenRhTimeSheetPayload): Promise<RhTimeSheetDetail> {
+    const api = setupAPIClient();
+    const response = await api.put(RH_ENDPOINTS.reopenTimeSheet, payload);
 
     return unwrapRhEnvelope<RhTimeSheetDetail>(response.data);
   },

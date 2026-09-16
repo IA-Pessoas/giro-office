@@ -32,12 +32,16 @@ const rhMocks: {
     listPoints: vi.fn(),
     getTodayPointForUser: vi.fn(),
     getMonthlySummary: vi.fn(),
+    recalculateRange: vi.fn(),
   },
   timeClockRequestServiceMock: {
     create: vi.fn(),
     approve: vi.fn(),
     reject: vi.fn(),
     list: vi.fn(),
+    approveBulk: vi.fn(),
+    createRetroactive: vi.fn(),
+    uploadAttachment: vi.fn(),
   },
   categoryServiceMock: {
     create: vi.fn(),
@@ -93,6 +97,7 @@ const rhMocks: {
     list: vi.fn(),
     getById: vi.fn(),
     sign: vi.fn(),
+    reopen: vi.fn(),
   },
   scoreNitroServiceMock: {
     updateMetric: vi.fn(),
@@ -141,6 +146,9 @@ vi.mock("../services/pointService.js", () => ({
 }));
 
 vi.mock("../services/timeClockRequestService.js", () => ({
+  RH_MANAGEMENT_PERMISSION: 3,
+  RH_MANAGER_PERMISSION: 2,
+  RH_SELF_SERVICE_PERMISSION: 1,
   TimeClockRequestService: vi.fn(function TimeClockRequestService() {
     return rhMocks.timeClockRequestServiceMock;
   }),
@@ -291,9 +299,13 @@ export function resetRhRouteMocks() {
     absence_days: 0,
     pending_adjustments: 0,
   });
+  pointServiceMock.recalculateRange.mockResolvedValue({ processed: 0 });
   timeClockRequestServiceMock.create.mockResolvedValue({ ok: true });
   timeClockRequestServiceMock.approve.mockResolvedValue({ ok: true });
   timeClockRequestServiceMock.reject.mockResolvedValue({ ok: true });
+  timeClockRequestServiceMock.approveBulk.mockResolvedValue({ ok: true });
+  timeClockRequestServiceMock.createRetroactive.mockResolvedValue({ ok: true });
+  timeClockRequestServiceMock.uploadAttachment.mockResolvedValue({ ok: true });
   timeClockRequestServiceMock.list.mockResolvedValue([
     { id: "00000000-0000-4000-8000-000000000010", status: "Pendente" },
   ]);
@@ -369,6 +381,7 @@ export function resetRhRouteMocks() {
     totals: { worked_minutes: 0, expected_minutes: 0, balance_minutes: 0, absence_count: 0 },
   });
   timeSheetServiceMock.sign.mockResolvedValue({ ok: true });
+  timeSheetServiceMock.reopen.mockResolvedValue({ ok: true });
   scoreNitroServiceMock.updateMetric.mockResolvedValue({ ok: true });
   employeeDossierServiceMock.getDossier.mockResolvedValue({
     id: "00000000-0000-4000-8000-000000000001",

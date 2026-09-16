@@ -30,8 +30,12 @@ import scoreNitroRoutes from "./routes/scoreNitro.routes.js";
 import scoreQuarterRoutes from "./routes/scoreQuarter.routes.js";
 import scoreQuestionRoutes from "./routes/scoreQuestion.routes.js";
 import timeBankReleaseRoutes from "./routes/timeBankRelease.routes.js";
-import timeClockRequestRoutes from "./routes/timeClockRequest.routes.js";
+import { createTimeClockRequestRoutes } from "./routes/timeClockRequest.routes.js";
 import timeSheetRoutes from "./routes/timeSheet.routes.js";
+import {
+  createSupabaseRhPointAdjustmentStorage,
+  UnavailableRhPointAdjustmentStorage,
+} from "./services/rhPointAdjustmentStorage.js";
 
 function rhErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -52,6 +56,14 @@ export function createApp(
   options: { internalReportingService?: InternalReportingService } = {},
 ): express.Express {
   const app = express();
+  const attachmentStorage =
+    env.supabaseUrl && env.supabaseServiceRoleKey
+      ? createSupabaseRhPointAdjustmentStorage(
+          env.supabaseUrl,
+          env.supabaseServiceRoleKey,
+          env.rhPointAdjustmentBucket ?? "rh-point-adjustments",
+        )
+      : new UnavailableRhPointAdjustmentStorage();
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -74,7 +86,7 @@ export function createApp(
 
   app.use("/rh/point-config", pointConfigRoutes);
   app.use("/rh/point", pointRoutes);
-  app.use("/rh/point", timeClockRequestRoutes);
+  app.use("/rh/point", createTimeClockRequestRoutes({ attachmentStorage }));
   app.use("/rh/categories", categoryRoutes);
   app.use("/rh/profile", employeeDossierRoutes);
   app.use("/rh/operational-users", operationalUserRoutes);

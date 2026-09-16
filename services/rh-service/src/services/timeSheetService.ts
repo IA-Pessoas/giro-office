@@ -16,6 +16,9 @@ const TIME_SHEET_SELECT = {
   end_time: true,
   signature: true,
   status: true,
+  reopen_reason: true,
+  reopened_at: true,
+  reopened_by_user_id: true,
   days: true,
   totals: true,
   organization_id: true,
@@ -77,6 +80,13 @@ export interface TimeSheetSignInput {
   timesheet_id: string;
   signer_user_id: string;
   signature: string;
+}
+
+export interface TimeSheetReopenInput {
+  organization_id: string;
+  timesheet_id: string;
+  reopened_by_user_id: string;
+  reason: string;
 }
 
 const ZERO_TOTALS: TimeSheetTotals = {
@@ -332,6 +342,9 @@ class TimeSheetService {
           end_time: detail.end_time,
           signature: detail.signature,
           status: detail.status,
+          reopen_reason: detail.reopen_reason,
+          reopened_at: detail.reopened_at,
+          reopened_by_user_id: detail.reopened_by_user_id,
           has_details: detail.days.length > 0 || sheet.totals !== null,
           worked_minutes: detail.totals.worked_minutes,
           balance_minutes: detail.totals.balance_minutes,
@@ -402,6 +415,44 @@ class TimeSheetService {
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao assinar folha de ponto. ${msg}`, err);
+    }
+  }
+
+  async reopen(input: TimeSheetReopenInput): Promise<TimeSheetSnapshot> {
+    try {
+      const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
+      const timesheetId = assertNonEmptyString(input.timesheet_id, "timesheet_id");
+      const reopenedByUserId = assertNonEmptyString(
+        input.reopened_by_user_id,
+        "reopened_by_user_id",
+      );
+      const reason = assertNonEmptyString(input.reason, "reason");
+
+      const sheet = await prismaClient.timeSheets.findFirst({
+        where: { id: timesheetId, organization_id: organizationId },
+        select: TIME_SHEET_SELECT,
+      });
+      if (!sheet) throw new ServiceError(404, "Folha nao encontrada.");
+      if (!sheet.signature && sheet.status !== "Assinada") {
+        throw new ServiceError(409, "Folha nao esta assinada.");
+      }
+
+      return (await prismaClient.timeSheets.update({
+        where: { id: timesheetId },
+        data: {
+          signature: null,
+          status: "Reaberta",
+          reopen_reason: reason,
+          reopened_at: new Date(),
+          reopened_by_user_id: reopenedByUserId,
+        } as never,
+        select: TIME_SHEET_SELECT,
+      })) as TimeSheetSnapshot;
+    } catch (err: unknown) {
+      logError("Erro ao reabrir folha de ponto", { err });
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao reabrir folha de ponto. ${msg}`, err);
     }
   }
 }

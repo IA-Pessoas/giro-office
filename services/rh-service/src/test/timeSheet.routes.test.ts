@@ -87,4 +87,31 @@ describe("timeSheet routes", () => {
     expect(res.status).toBe(200);
     expect(timeSheetServiceMock.sign).toHaveBeenCalledTimes(1);
   });
+
+  it("PUT /rh/timesheets/reopen reabre folha assinada", async () => {
+    const app = createTestApp();
+    const res = await request(app).put("/rh/timesheets/reopen").send({
+      id: itemId,
+      reason: "Correcao de ajuste aprovada",
+    });
+
+    expect(res.status).toBe(200);
+    expect(timeSheetServiceMock.reopen).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      timesheet_id: itemId,
+      reopened_by_user_id: userId,
+      reason: "Correcao de ajuste aprovada",
+    });
+  });
+
+  it("PUT /rh/timesheets/reopen bloqueia self-service", async () => {
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).put("/rh/timesheets/reopen").send({
+      id: itemId,
+      reason: "Nao permitido",
+    });
+
+    expect(res.status).toBe(403);
+    expect(timeSheetServiceMock.reopen).not.toHaveBeenCalled();
+  });
 });

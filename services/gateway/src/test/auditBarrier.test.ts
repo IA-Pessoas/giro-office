@@ -98,6 +98,19 @@ describe("durable organization mutation audit barrier", () => {
     expect(JSON.stringify(query)).not.toContain(targetUserId);
   });
 
+  it("pseudonymizes targets of RH point recalculation and retroactive entry", () => {
+    const targetUserId = "9a68a809-9a78-4ef9-94d0-b9bb9787ad2e";
+    const expectedHash = createHash("sha256").update(targetUserId).digest("hex");
+
+    for (const path of ["/rh/point/recalculate", "/rh/point/adjustment/retroactive"]) {
+      const query: Record<string, unknown> = {};
+      addRhProfileBodyTarget(query, path, { target_user_id: targetUserId });
+
+      expect(query).toEqual({ target_user_id_sha256: expectedHash });
+      expect(JSON.stringify(query)).not.toContain(targetUserId);
+    }
+  });
+
   it("denied anonymous mutations cannot consume the protected audit quota", () => {
     const recorder = createAuditRecorder({
       enabled: true,

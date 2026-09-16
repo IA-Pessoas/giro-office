@@ -233,7 +233,8 @@ export interface RhPointMonthlySummary {
 }
 
 export interface CreateRhPointAdjustmentPayload {
-  point_id: string;
+  point_id?: string;
+  date?: string;
   clock_in: string;
   lunch_out: string;
   lunch_in: string;
@@ -249,6 +250,27 @@ export interface ApproveRhPointAdjustmentPayload {
 
 export type RejectRhPointAdjustmentPayload = ApproveRhPointAdjustmentPayload;
 
+export interface ApproveRhPointAdjustmentsBulkPayload {
+  request_ids: string[];
+  obs_approver?: string | null;
+}
+
+export interface CreateRhRetroactivePointPayload {
+  target_user_id: string;
+  date: string;
+  clock_in: string;
+  lunch_out: string;
+  lunch_in: string;
+  clock_out: string;
+  justification: string;
+}
+
+export interface RecalculateRhPointsPayload {
+  target_user_id: string;
+  date_from: string;
+  date_to: string;
+}
+
 export type RhPointAdjustmentStatus = "Pendente" | "Aprovado" | "Rejeitado";
 
 export interface RhPointAdjustmentListFilters {
@@ -259,7 +281,7 @@ export interface RhPointAdjustmentListFilters {
 export interface RhPointAdjustmentRequest {
   id: string;
   user_id: string;
-  point_id: string;
+  point_id: string | null;
   clock_in: string;
   lunch_out: string;
   lunch_in: string;
@@ -391,6 +413,11 @@ export interface CreateRhTimeSheetPayload {
 export interface SignRhTimeSheetPayload {
   id: string;
   signature: string;
+}
+
+export interface ReopenRhTimeSheetPayload {
+  id: string;
+  reason: string;
 }
 
 export interface RhScoreQuestion {

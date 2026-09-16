@@ -34,3 +34,10 @@ export const signTimeSheetBodySchema = z
     signature: zNonEmptyText("signature"),
   })
   .strict();
+
+export const reopenTimeSheetBodySchema = z
+  .object({
+    id: z.string().uuid({ message: "id invalido." }),
+    reason: zNonEmptyText("reason"),
+  })
+  .strict();

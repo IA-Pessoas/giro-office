@@ -120,6 +120,7 @@ model Organization {
   logo_url                      String?
   subscription_plan             String                        @default("trial")
   status                        status                        @default(active)
+  timezone                      String                        @default("UTC")
   agendas                       Agenda[]
   recurringAgendas              RecurringAgenda[]
   auditRequests                 AuditRequest[]
@@ -1891,6 +1892,9 @@ model TimeSheets {
   end_time        DateTime
   signature       String?
   status          String       @default("Gerada")
+  reopen_reason   String?
+  reopened_at     DateTime?
+  reopened_by_user_id String?
   days            Json?
   totals          Json?
   organization_id String
@@ -1939,7 +1943,7 @@ model Point {
 model TimeClockRequest {
   id               String       @id @default(uuid())
   user_id          String
-  point_id         String
+  point_id         String?
   clock_in         DateTime
   lunch_out        DateTime?
   lunch_in         DateTime?
@@ -1953,7 +1957,7 @@ model TimeClockRequest {
   organization_id  String
   approver         User?        @relation("approver", fields: [approver_user_id], references: [id])
   organization     Organization @relation(fields: [organization_id], references: [id])
-  point            Point        @relation(fields: [point_id], references: [id])
+  point            Point?       @relation(fields: [point_id], references: [id])
   user             User         @relation("user", fields: [user_id], references: [id])
 
   @@map("rh.timeClockRequest")

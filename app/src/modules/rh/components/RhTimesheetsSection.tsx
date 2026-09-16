@@ -7,6 +7,7 @@ import { useRhPermissions } from "../hooks/useRhPermissions";
 import type { RhTimeSheetListFilters, RhTimeSheetListItem } from "../types";
 import { RhTimesheetGenerateModal } from "./RhTimesheetGenerateModal";
 import { RhTimesheetSignDialog } from "./RhTimesheetSignDialog";
+import { RhTimesheetReopenDialog } from "./RhTimesheetReopenDialog";
 import { RhTimesheetsFilters } from "./RhTimesheetsFilters";
 import { RhTimesheetsTable } from "./RhTimesheetsTable";
 
@@ -72,6 +73,8 @@ export function RhTimesheetsSection() {
   const [dateTo, setDateTo] = useState(getTodayInputValue);
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [sheetPendingSignature, setSheetPendingSignature] =
+    useState<RhTimeSheetListItem | null>(null);
+  const [sheetPendingReopen, setSheetPendingReopen] =
     useState<RhTimeSheetListItem | null>(null);
 
   const assignableUsersQuery = useAssignableUsers({
@@ -175,6 +178,12 @@ export function RhTimesheetsSection() {
         onClose={() => setSheetPendingSignature(null)}
       />
 
+      <RhTimesheetReopenDialog
+        open={Boolean(sheetPendingReopen)}
+        sheet={sheetPendingReopen}
+        onClose={() => setSheetPendingReopen(null)}
+      />
+
       {!isLoading && !error && auxiliaryError ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
           Não foi possível carregar a lista de colaboradores agora.
@@ -203,9 +212,12 @@ export function RhTimesheetsSection() {
         <RhTimesheetsTable
           timeSheets={filteredTimeSheets}
           currentUserId={user?.id ?? ""}
+          canManageTimesheets={canManageTimesheets}
           signingSheetId={sheetPendingSignature?.id ?? null}
+          reopeningSheetId={sheetPendingReopen?.id ?? null}
           getUserLabel={getUserLabel}
           onSign={setSheetPendingSignature}
+          onReopen={setSheetPendingReopen}
           onViewDetail={(timesheetId) => void router.push(`/rh/timesheets/${timesheetId}`)}
         />
       ) : null}

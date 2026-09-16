@@ -23,6 +23,7 @@ import type {
   RhTimeSheetDetail,
   RhTimeSheetListItem,
   RhTimeSheetListFilters,
+  ReopenRhTimeSheetPayload,
   SignRhTimeSheetPayload,
   UpdateRhHolidayPayload,
 } from "../types";
@@ -223,6 +224,21 @@ export function useSignRhTimeSheetMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => rhCalendarService.signTimeSheet(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+    },
+  });
+}
+
+export function useReopenRhTimeSheetMutation(): UseMutationResult<
+  RhTimeSheetDetail,
+  Error,
+  ReopenRhTimeSheetPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => rhCalendarService.reopenTimeSheet(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
     },
