@@ -13,8 +13,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createCommercialApp } from "../app.js";
 import { getCommercialServiceEnv } from "../config/env.js";
-import type { CommercialProspectingRouteDeps } from "../routes/prospecting.routes.js";
 import type { CommercialOutboxRouteDeps } from "../routes/outbox.routes.js";
+import type { CommercialProspectingRouteDeps } from "../routes/prospecting.routes.js";
 
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
 const USER_ID = "c0000000-0000-4000-8000-000000000001";
