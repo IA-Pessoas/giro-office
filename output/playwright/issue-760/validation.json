@@ -1,5 +1,5 @@
 {
-  "collected_at": "2026-09-16T06:30:15.448377+00:00",
+  "collected_at": "2026-09-16T06:39:18.378325+00:00",
   "base_head": "edfc9a2c6602b1600bb0209880e147bd1f57d6ce",
   "validated_code_head": "701b614281b7b455ca63a05b835177136d3e7611",
   "source_sha256": {
@@ -34,7 +34,18 @@
     "biome_app": "3 files passed with committed explicit config",
     "biome_client_service": "59 files passed",
     "quality_regression": "4 tests passed for reporting formatter/type annotations",
-    "full_push_hook": "pending"
+    "full_push_hook": {
+      "status": "passed",
+      "command": "git push -u origin codex/issue-760",
+      "pushed_head": "c366bd77dfab3f38dc88ab11fcc0f05b2f57dd66",
+      "tasks_passed": 10,
+      "tasks_total": 10,
+      "cached_tasks": 2,
+      "duration": "7m15.873s",
+      "bypass": false,
+      "app_suite": "36 top-level steps passed including new client picker browser smoke",
+      "mode": "TURBO_ENV_MODE=loose;immutable fixture compiled from validated_code_head;synthetic DATABASE_URL"
+    }
   },
   "remote_ci": "not submitted; base has6 invalid commented workflow failures in addition to passing policy checks",
   "merge": "not performed",

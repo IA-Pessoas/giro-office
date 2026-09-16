@@ -57,6 +57,7 @@ Critical/Important. A UI mantém o desenho existente. Os mocks de HTTP do browse
 como prova isolada de autorização: os testes da rota exercitam autenticação e serviço reais,
 com Prisma injetado, verificando o filtro de organização e rejeições antes da consulta.
 
-Hook completo de push e CI remoto serão registrados no PR. A base possui seis workflows
+Hook normal do primeiro push:10/10 tarefas aprovadas em7m15s, incluindo as36 etapas do app
+e90 testes do client-service; sem bypass. O CI remoto será registrado no PR. A base possui seis workflows
 integralmente comentados que falham na validação do GitHub antes de executar jobs. Checks de
 política verdes não significam CI integralmente aprovado. Nenhum merge ou deploy foi realizado.
