@@ -161,7 +161,7 @@ test("rollout final de grupos exige group_id, remove o contrato textual e semeia
     readFile(
       path.join(
         root,
-        "infra/prisma/migrations/20260916010000_seed_pessoal_no_movement_groups/migration.sql",
+        "infra/prisma/migrations/20260915240000_pessoal_seed_no_movement_before_finalize/migration.sql",
       ),
       "utf8",
     ),

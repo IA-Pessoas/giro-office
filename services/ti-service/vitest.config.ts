@@ -5,5 +5,6 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts"],
     pool: "threads",
+    maxWorkers: 1,
   },
 });
