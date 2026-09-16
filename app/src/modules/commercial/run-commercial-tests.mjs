@@ -149,5 +149,4 @@ runTest("commercial browser smoke starts Next on the current platform", () => {
   assert.match(browserSmoke, /async function stopProcessTree/);
   assert.match(browserSmoke, /await stopProcessTree\(serverProcess\)/);
 });
-
 console.log("commercial contract tests passed");
