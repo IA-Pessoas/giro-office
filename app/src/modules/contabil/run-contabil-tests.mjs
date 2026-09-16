@@ -127,6 +127,19 @@ await (async () => {
       CONTABIL_ENDPOINTS.relationshipByClient("30"),
       "/contabil/relationships/client/30",
     );
+    assert.equal(CONTABIL_ENDPOINTS.triageMonthly, "/triagem/monthly");
+    assert.equal(CONTABIL_ENDPOINTS.triageStatements, "/triagem/statements");
+  });
+
+  await runTest("triagem apresenta os nove documentos, indicador e banco sem dados de conta", () => {
+    const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+
+    assert.equal((source.match(/\["[a-z_]+", "/g) ?? []).length, 9);
+    assert.match(source, /não entram no\s+indicador/i);
+    assert.match(source, /Marcar todos os itens abertos/);
+    assert.match(source, /Identificador do banco/);
+    assert.match(source, /dados de\s+conta não são solicitados/i);
+    assert.match(source, /useTriageStatements/);
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {

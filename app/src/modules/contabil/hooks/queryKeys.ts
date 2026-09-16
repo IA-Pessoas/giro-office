@@ -15,3 +15,11 @@ export function contabilResponsibleQueryKey(clientId: string) {
 export function contabilRelationshipQueryKey(clientId: string) {
   return [...CONTABIL_QUERY_KEY, "relationship", clientId] as const;
 }
+
+export function triageMonthlyQueryKey(clientId: string, competence: string) {
+  return [...CONTABIL_QUERY_KEY, "triage", "monthly", clientId, competence] as const;
+}
+
+export function triageStatementsQueryKey(clientId: string, competence: string) {
+  return [...CONTABIL_QUERY_KEY, "triage", "statements", clientId, competence] as const;
+}

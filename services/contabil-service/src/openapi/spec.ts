@@ -1,9 +1,14 @@
-import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
+import {
+  MAX_REPORTING_QUERY_LIMIT,
+  reportingQueryOpenApiSchema,
+} from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ContabilServiceEnv } from "../config/env.js";
 
-export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenApiDocument {
+export function buildContabilServiceOpenApiSpec(
+  env: ContabilServiceEnv,
+): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
 
   const createControlExample = {
@@ -51,9 +56,22 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
     servers: [{ url: baseUrl }],
     tags: [
       { name: "Health", description: "Saúde e readiness do serviço" },
-      { name: "Controls", description: "Checklist operacional por cliente e competência" },
-      { name: "Responsibles", description: "Responsáveis contábeis por cliente" },
-      { name: "Relationships", description: "Relacionamento contábil do cliente" },
+      {
+        name: "Controls",
+        description: "Checklist operacional por cliente e competência",
+      },
+      {
+        name: "Responsibles",
+        description: "Responsáveis contábeis por cliente",
+      },
+      {
+        name: "Relationships",
+        description: "Relacionamento contábil do cliente",
+      },
+      {
+        name: "Triage Documents",
+        description: "Pendências documentais e marcadores de extrato",
+      },
     ],
     components: {
       securitySchemes: {
@@ -97,7 +115,10 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             fields: { type: "array", items: { type: "string" } },
             request_id: { type: "string" },
             issued_at: { type: "integer" },
-            expires_at: { type: "integer", description: "Máximo de 60 segundos após issued_at." },
+            expires_at: {
+              type: "integer",
+              description: "Máximo de 60 segundos após issued_at.",
+            },
             body_sha256: { type: "string" },
           },
         },
@@ -116,8 +137,18 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               required: true,
               schema: { type: "string" },
             },
-            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
-            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-request-id",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              name: "x-reports-grant",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
             {
               name: "x-reports-grant-signature",
               in: "header",
@@ -129,7 +160,9 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             "200": {
               description: "Catálogo",
               content: {
-                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
               },
             },
             "403": { description: "Grant inválido" },
@@ -148,8 +181,18 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               required: true,
               schema: { type: "string" },
             },
-            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
-            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-request-id",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              name: "x-reports-grant",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
             {
               name: "x-reports-grant-signature",
               in: "header",
@@ -167,10 +210,18 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   properties: {
                     source: {
                       type: "string",
-                      enum: ["contabil.control", "contabil.responsibles", "contabil.relationship"],
+                      enum: [
+                        "contabil.control",
+                        "contabil.responsibles",
+                        "contabil.relationship",
+                      ],
                     },
                     fields: { type: "array", items: { type: "string" } },
-                    limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
+                    limit: {
+                      type: "integer",
+                      minimum: 1,
+                      maximum: MAX_REPORTING_QUERY_LIMIT,
+                    },
                     query: reportingQueryOpenApiSchema,
                   },
                 },
@@ -178,11 +229,16 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             },
           },
           responses: {
-            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
+            "422": {
+              description:
+                "Capacidade de consulta excedida; nenhum resultado parcial",
+            },
             "200": {
               description: "Linhas limitadas",
               content: {
-                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
               },
             },
             "403": { description: "Grant ou campo inválido" },
@@ -236,7 +292,10 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+                    competence: {
+                      type: "string",
+                      pattern: "^\\d{4}-(0[1-9]|1[0-2])$",
+                    },
                   },
                   example: createControlExample,
                 },
@@ -308,7 +367,8 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           ],
           responses: {
             "200": {
-              description: "Uma linha por cliente Contábil elegível; controle ausente é null",
+              description:
+                "Uma linha por cliente Contábil elegível; controle ausente é null",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/SuccessEnvelope" },
@@ -422,8 +482,16 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    person_responsible_id: { type: "string", format: "uuid", nullable: true },
-                    posted_by_id: { type: "string", format: "uuid", nullable: true },
+                    person_responsible_id: {
+                      type: "string",
+                      format: "uuid",
+                      nullable: true,
+                    },
+                    posted_by_id: {
+                      type: "string",
+                      format: "uuid",
+                      nullable: true,
+                    },
                     customer_with_movement: { type: "boolean" },
                   },
                   example: updateResponsibleExample,
@@ -502,7 +570,14 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               "application/json": {
                 schema: {
                   type: "object",
-                  required: ["client_id", "bidding", "chart_accounts", "tool", "system", "note"],
+                  required: [
+                    "client_id",
+                    "bidding",
+                    "chart_accounts",
+                    "tool",
+                    "system",
+                    "note",
+                  ],
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
@@ -618,6 +693,264 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   schema: { $ref: "#/components/schemas/SuccessEnvelope" },
                 },
               },
+            },
+          },
+        },
+      },
+      "/triagem/monthly": {
+        get: {
+          tags: ["Triage Documents"],
+          summary: "Consultar pendência documental mensal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Pendência",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        post: {
+          tags: ["Triage Documents"],
+          summary: "Criar ou obter pendência documental mensal",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: {
+                      type: "string",
+                      pattern: "^\\d{4}-(0[1-9]|1[0-2])$",
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              "200": {
+                description: "Pendência criada ou existente",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  },
+                },
+              },
+              "403": { description: "Sem permissão para criar" },
+            },
+          },
+        },
+        "/triagem/monthly/{id}/item": {
+          patch: {
+            tags: ["Triage Documents"],
+            summary: "Atualizar documento",
+            security: [{ bearerAuth: [] }],
+            parameters: [
+              {
+                name: "id",
+                in: "path",
+                required: true,
+                schema: { type: "string", format: "uuid" },
+              },
+            ],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["field", "status"],
+                    additionalProperties: false,
+                    properties: {
+                      field: {
+                        type: "string",
+                        enum: [
+                          "financial_transactions",
+                          "inventory_control",
+                          "accounts_payable_report",
+                          "accounts_receivable_report",
+                          "card_statements",
+                          "loan_agreements",
+                          "bank_reconciliation",
+                          "bank_investments",
+                          "card_sales_report",
+                        ],
+                      },
+                      status: {
+                        type: "string",
+                        enum: [
+                          "PENDING",
+                          "COMPLETED",
+                          "ATTENTION",
+                          "NOT_PRESENT",
+                          "NOT_APPLICABLE",
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              "200": {
+                description: "Atualizado",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  },
+                },
+              },
+              "403": { description: "Sem permissão" },
+            },
+          },
+        },
+        "/triagem/monthly/{id}/items": {
+          patch: {
+            tags: ["Triage Documents"],
+            summary: "Atualizar todos os documentos aplicáveis",
+            security: [{ bearerAuth: [] }],
+            parameters: [
+              {
+                name: "id",
+                in: "path",
+                required: true,
+                schema: { type: "string", format: "uuid" },
+              },
+            ],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["status"],
+                    additionalProperties: false,
+                    properties: {
+                      status: {
+                        type: "string",
+                        enum: [
+                          "PENDING",
+                          "COMPLETED",
+                          "ATTENTION",
+                          "NOT_PRESENT",
+                          "NOT_APPLICABLE",
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              "200": {
+                description: "Atualizado",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  },
+                },
+              },
+              "403": { description: "Sem permissão" },
+            },
+          },
+        },
+        "/triagem/statements": {
+          get: {
+            tags: ["Triage Documents"],
+            summary: "Listar marcadores de extrato por banco",
+            security: [{ bearerAuth: [] }],
+            parameters: [
+              {
+                name: "client_id",
+                in: "query",
+                required: true,
+                schema: { type: "string", format: "uuid" },
+              },
+              {
+                name: "competence",
+                in: "query",
+                required: true,
+                schema: { type: "string" },
+              },
+            ],
+            responses: {
+              "200": {
+                description: "Marcadores",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  },
+                },
+              },
+            },
+          },
+          put: {
+            tags: ["Triage Documents"],
+            summary: "Criar ou atualizar marcador de extrato",
+            security: [{ bearerAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["client_id", "competence", "bank_id", "status"],
+                    additionalProperties: false,
+                    properties: {
+                      client_id: { type: "string", format: "uuid" },
+                      competence: { type: "string" },
+                      bank_id: {
+                        type: "string",
+                        description:
+                          "Identificador operacional do banco; não armazena dados de conta.",
+                      },
+                      status: {
+                        type: "string",
+                        enum: [
+                          "PENDING",
+                          "COMPLETED",
+                          "ATTENTION",
+                          "NOT_PRESENT",
+                          "NOT_APPLICABLE",
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              "200": {
+                description: "Marcador atualizado",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  },
+                },
+              },
+              "403": { description: "Sem permissão" },
             },
           },
         },

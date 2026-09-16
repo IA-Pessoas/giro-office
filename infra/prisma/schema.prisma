@@ -222,6 +222,7 @@ model Organization {
   triageConfigs                 TriageConfig[]
   triageMonthlys                TriageMonthly[]
   triageResponsibles            TriageResponsible[]
+  triageBankStatements          TriageBankStatement[]
 
   @@index([name, id], map: "idx_organizations_name_id")
   @@map("organizations")
@@ -689,6 +690,7 @@ model Client {
   triageConfigs                 TriageConfig[]
   triageMonthlys                TriageMonthly[]
   responsiblesTriage            TriageResponsible[]
+  triageBankStatements          TriageBankStatement[]
   commercialProspectings        CommercialProspecting[]
 
   @@map("clients")
@@ -2405,7 +2407,8 @@ model TriageConfig {
   client          Client       @relation(fields: [client_id], references: [id])
   organization    Organization @relation(fields: [organization_id], references: [id])
 
-  @@unique([client_id, type])
+  @@unique([organization_id, client_id, type])
+  @@index([organization_id, client_id])
   @@map("triagem.configs")
 }
 
@@ -2429,8 +2432,26 @@ model TriageMonthly {
   organization    Organization @relation(fields: [organization_id], references: [id])
   responsible     User?        @relation(fields: [responsible_id], references: [id])
 
-  @@unique([client_id, competence, type])
+  @@unique([organization_id, client_id, competence, type])
+  @@index([organization_id, client_id, competence])
   @@map("triagem.monthly")
+}
+
+model TriageBankStatement {
+  id              String       @id @default(uuid())
+  client_id       String
+  competence      String
+  bank_id         String
+  status          String       @default("PENDING")
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, client_id, competence, bank_id])
+  @@index([organization_id, client_id, competence])
+  @@map("triagem.bank_statements")
 }
 
 model ClientClouds {
@@ -2459,7 +2480,8 @@ model TriageResponsible {
   organization    Organization @relation(fields: [organization_id], references: [id])
   user            User         @relation(fields: [user_id], references: [id])
 
-  @@unique([client_id, type])
+  @@unique([organization_id, client_id, type])
+  @@index([organization_id, client_id])
   @@map("triagem.responsibles")
 }
 

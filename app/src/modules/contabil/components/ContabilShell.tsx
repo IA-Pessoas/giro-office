@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import {
   Calculator,
   CheckSquare,
+  FileText,
   ReceiptText,
   UserCog,
   Waypoints,
@@ -13,8 +14,9 @@ import { ContabilPortfolioSection } from "./ContabilPortfolioSection";
 import { ContabilResponsibleSection } from "./ContabilResponsibleSection";
 import { ContabilRelationshipSection } from "./ContabilRelationshipSection";
 import { ContabilStateBox } from "./ContabilStateBox";
+import { TriageDocumentsSection } from "./TriageDocumentsSection";
 
-type ContabilTabId = "control" | "responsible" | "relationship";
+type ContabilTabId = "control" | "responsible" | "relationship" | "documents";
 
 interface ContabilShellProps {
   clientId?: string;
@@ -53,6 +55,7 @@ export function ContabilShell({
       label: "Relacionamento",
       icon: Waypoints,
     },
+    { id: "documents", label: "Documentos", icon: FileText },
   ];
 
   return (
@@ -171,6 +174,10 @@ function ContabilActiveTabPanel({
         <ContabilResponsibleSection clientId={clientId} canEdit={canEdit} />
       </div>
     );
+  }
+
+  if (activeTab === "documents") {
+    return <div role="tabpanel" id="contabil-panel-documents" aria-labelledby="contabil-tab-documents"><TriageDocumentsSection clientId={clientId} canEdit={canEdit} /></div>;
   }
 
   return (

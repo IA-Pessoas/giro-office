@@ -12,6 +12,10 @@ export const CONTABIL_ENDPOINTS = {
   relationships: "/contabil/relationships",
   relationshipById: (relationshipId: string) => `/contabil/relationships/${relationshipId}`,
   relationshipByClient: (clientId: string) => `/contabil/relationships/client/${clientId}`,
+  triageMonthly: "/triagem/monthly",
+  triageMonthlyItem: (monthlyId: string) => `/triagem/monthly/${monthlyId}/item`,
+  triageMonthlyItems: (monthlyId: string) => `/triagem/monthly/${monthlyId}/items`,
+  triageStatements: "/triagem/statements",
 } as const;
 
 export function buildContabilControlParams(filters: ContabilControlFilters) {
