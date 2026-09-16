@@ -114,4 +114,12 @@ runTest("commercial catalog uses the shared dark text ramps", () => {
   assert.match(catalog, /placeholder:text-slate-400[^"]*dark:placeholder:text-slate-500/);
 });
 
+runTest("commercial contract value uses the shared Brazilian currency mask", () => {
+  const catalog = read("./components/CommercialCatalog.tsx");
+
+  assert.match(catalog, /formatBrlInput/);
+  assert.match(catalog, /parseBrlInput/);
+  assert.match(catalog, /Math\.round\(value \* 100\)/);
+});
+
 console.log("commercial contract tests passed");

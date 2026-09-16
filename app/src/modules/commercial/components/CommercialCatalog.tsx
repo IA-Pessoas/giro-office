@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Archive, CircleAlert, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
+import { formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCommercialProspecting,
@@ -31,6 +32,10 @@ import {
 
 function formatContractValue(value: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+}
+
+function formatContractValueForInput(value: number): string {
+  return formatBrlInput(String(Math.round(value * 100)));
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -141,7 +146,7 @@ export function CommercialCatalog() {
   function startEdit(config: CommercialProposalConfig) {
     setIsCreating(false);
     setEditingId(config.id);
-    setDraft({ name: config.name, contract_value: String(config.contract_value) });
+    setDraft({ name: config.name, contract_value: formatContractValueForInput(config.contract_value) });
     setFormError("");
   }
 
@@ -155,13 +160,13 @@ export function CommercialCatalog() {
   async function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = draft.name.trim();
-    const contractValue = Number(draft.contract_value.replace(",", "."));
+    const contractValue = parseBrlInput(draft.contract_value);
 
     if (!name) {
       setFormError("Informe o nome da configuração.");
       return;
     }
-    if (!Number.isFinite(contractValue) || contractValue < 0) {
+    if (contractValue === null || contractValue < 0) {
       setFormError("Informe um valor base maior ou igual a zero.");
       return;
     }
@@ -307,7 +312,12 @@ export function CommercialCatalog() {
               <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white" autoFocus />
             </label>
             <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Valor base do contrato
-              <input type="text" inputMode="decimal" value={draft.contract_value} onChange={(event) => setDraft((current) => ({ ...current, contract_value: event.target.value }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500" placeholder="0,00" />
+              <input type="text" inputMode="decimal" value={draft.contract_value} onKeyDown={(event) => {
+                if ((event.key === "Backspace" || event.key === "Delete") && parseBrlInput(event.currentTarget.value) === 0) {
+                  event.preventDefault();
+                  setDraft((current) => ({ ...current, contract_value: "" }));
+                }
+              }} onChange={(event) => setDraft((current) => ({ ...current, contract_value: formatBrlInput(event.target.value) }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500" placeholder="R$ 0,00" />
             </label>
             <div className="flex gap-2 md:justify-end">
               <button type="submit" disabled={isSaving} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:flex-none">
