@@ -9,6 +9,7 @@ import { useReportsCatalog } from "../hooks/useReportsCatalog";
 import { reportsCatalogQueryKey } from "../hooks/queryKeys";
 import { reportsService } from "../services/reportsService";
 import { getSelectableReportFields } from "../utils/reportBuilder";
+import { getPessoalReportPresets, type PessoalReportPreset } from "../utils/pessoalReportPresets";
 import { ReportFieldsStep } from "./ReportFieldsStep";
 import { ReportCriteriaStep } from "./ReportCriteriaStep";
 import { buildReportComposition, operatorLabels, summaryLabels } from "../utils/reportCriteria";
@@ -116,6 +117,7 @@ export function ReportsCreatePanel({
   }, [model]);
 
   const sources = catalog.data?.items ?? [];
+  const pessoalPresets = getPessoalReportPresets(sources);
   const selected = builder.areas.map((area) => ({
     ...area,
     catalog: sources.find((source) => source.key === area.source),
@@ -160,6 +162,22 @@ export function ReportsCreatePanel({
     clearGeneratedResult();
     setError("");
     review.reset();
+  }
+  function applyPreset(preset: PessoalReportPreset) {
+    if (busy) return;
+    builder.setAreas(
+      preset.areas.map((area) => ({
+        ...area,
+        fields: [...area.fields],
+        ...(area.filters ? { filters: area.filters.map((filter) => ({ ...filter })) } : {}),
+      })),
+    );
+    clearLoadedModel();
+    clearGeneratedResult();
+    setError("");
+    review.reset();
+    preview.reset();
+    setStep(1);
   }
   async function generateReport() {
     if (busy || unavailable) return;
@@ -343,6 +361,28 @@ export function ReportsCreatePanel({
 
   return (
     <div className="space-y-6">
+      {pessoalPresets.length ? (
+        <section className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Presets de Pessoal</h2>
+          <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+            Comece por uma estrutura pronta e ajuste os critérios antes de gerar.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {pessoalPresets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                disabled={busy}
+                title={preset.description}
+                onClick={() => applyPreset(preset)}
+                className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <ol aria-label="Etapas do relatório" className="grid gap-2 sm:grid-cols-4">
         {steps.map((label, index) => (
           <li key={label}>

@@ -12,7 +12,7 @@ import {
   userId,
 } from "./pessoalCoreTestUtils.js";
 
-function payrollRow(id: string) {
+function payrollRow(id: string, policy = "NORMAL", archivedAt: Date | null = null) {
   return {
     id: `payroll-${id}`,
     client_id: id,
@@ -23,6 +23,13 @@ function payrollRow(id: string) {
     bsf: true,
     va: true,
     vt: false,
+    group: {
+      id: `group-${id}`,
+      name: `Grupo ${id}`,
+      policy,
+      archived_at: archivedAt,
+      organization_id: organizationId,
+    },
   };
 }
 
@@ -104,6 +111,9 @@ describe("ObligationService", () => {
           bsf: false,
           va: false,
           vt: null,
+          group_snapshot_id: `group-${clientId}`,
+          group_snapshot_name: `Grupo ${clientId}`,
+          group_snapshot_policy: "NORMAL",
         }),
       }),
     );
@@ -249,6 +259,9 @@ describe("ObligationService", () => {
       existing: 1,
       created: 1,
       skippedExisting: 1,
+      skippedArchivedGroup: 0,
+      skippedNoObligations: 0,
+      skippedNoGroup: 0,
       skippedNoPayroll: 0,
     });
   });
@@ -277,5 +290,103 @@ describe("ObligationService", () => {
       skippedExisting: 1,
       skippedNoPayroll: 0,
     });
+  });
+
+  it("ignora folhas NO_OBLIGATIONS sem criar obrigacao", async () => {
+    const prisma = createPrismaMock();
+    prisma.payroll.findMany.mockResolvedValueOnce([
+      payrollRow(clientId, "NO_OBLIGATIONS"),
+      payrollRow(otherClientId),
+    ]);
+    prisma.obrigationsPessoal.findMany.mockResolvedValueOnce([]);
+    const service = new ObligationService(prisma as never, createAuditMock());
+
+    const result = await service.generateForCompetence(
+      { organizationId, userId, permission: 2 },
+      "2026-07",
+    );
+
+    expect(prisma.obrigationsPessoal.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ client_id: otherClientId })],
+      skipDuplicates: true,
+    });
+    expect(result).toMatchObject({ created: 1, skippedNoObligations: 1 });
+  });
+
+  it("usa politica e nome atuais somente na proxima competencia", async () => {
+    const prisma = createPrismaMock();
+    const first = payrollRow(clientId, "NORMAL");
+    const changed = {
+      ...payrollRow(clientId, "NO_OBLIGATIONS"),
+      group: {
+        id: `group-${clientId}`,
+        name: "Grupo Renomeado",
+        policy: "NO_OBLIGATIONS",
+        archived_at: null,
+        organization_id: organizationId,
+      },
+    };
+    prisma.client.findMany
+      .mockResolvedValueOnce([{ id: clientId }])
+      .mockResolvedValueOnce([{ id: clientId }]);
+    prisma.payroll.findMany.mockResolvedValueOnce([first]).mockResolvedValueOnce([changed]);
+    prisma.obrigationsPessoal.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const service = new ObligationService(prisma as never, createAuditMock());
+
+    await service.generateForCompetence({ organizationId, userId, permission: 2 }, "2026-07");
+    const second = await service.generateForCompetence(
+      { organizationId, userId, permission: 2 },
+      "2026-08",
+    );
+
+    expect(prisma.obrigationsPessoal.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          group_snapshot_name: `Grupo ${clientId}`,
+          group_snapshot_policy: "NORMAL",
+        }),
+      ],
+      skipDuplicates: true,
+    });
+    expect(second).toMatchObject({ created: 0, skippedNoObligations: 1 });
+  });
+
+  it("ignora grupo arquivado somente nas novas competencias", async () => {
+    const prisma = createPrismaMock();
+    prisma.client.findMany.mockResolvedValueOnce([{ id: clientId }]);
+    prisma.payroll.findMany.mockResolvedValueOnce([
+      payrollRow(clientId, "NORMAL", new Date("2026-07-01T00:00:00.000Z")),
+    ]);
+    prisma.obrigationsPessoal.findMany.mockResolvedValueOnce([]);
+    const service = new ObligationService(prisma as never, createAuditMock());
+
+    const result = await service.generateForCompetence(
+      { organizationId, userId, permission: 2 },
+      "2026-08",
+    );
+
+    expect(prisma.obrigationsPessoal.createMany).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ created: 0, skippedArchivedGroup: 1 });
+  });
+
+  it("ignora grupo de outra organizacao sem gravar snapshot", async () => {
+    const prisma = createPrismaMock();
+    prisma.client.findMany.mockResolvedValueOnce([{ id: clientId }]);
+    prisma.payroll.findMany.mockResolvedValueOnce([
+      {
+        ...payrollRow(clientId),
+        group: { ...payrollRow(clientId).group, organization_id: "other-organization" },
+      },
+    ]);
+    prisma.obrigationsPessoal.findMany.mockResolvedValueOnce([]);
+    const service = new ObligationService(prisma as never, createAuditMock());
+
+    const result = await service.generateForCompetence(
+      { organizationId, userId, permission: 2 },
+      "2026-08",
+    );
+
+    expect(prisma.obrigationsPessoal.createMany).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ created: 0, skippedNoGroup: 1 });
   });
 });

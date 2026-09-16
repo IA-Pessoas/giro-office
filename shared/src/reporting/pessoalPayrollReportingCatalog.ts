@@ -1,13 +1,21 @@
 import { reportingAggregations } from "./reportingCapabilities.js";
 
-function field(key: string, label: string, value_type: "string" | "number" | "boolean") {
+const textOperators = ["eq", "neq", "contains", "in"] as const;
+const groupStateOperators = ["eq", "in"] as const;
+
+function field(
+  key: string,
+  label: string,
+  value_type: "string" | "number" | "boolean",
+  filter_operators: readonly string[] = [],
+) {
   return {
     groupable: true,
     sortable: true,
     key,
     label,
     value_type,
-    filter_operators: [],
+    filter_operators,
     aggregations: reportingAggregations(value_type),
   } as const;
 }
@@ -28,11 +36,15 @@ export const pessoalPayrollReportingCatalog = {
         field("union_id", "Sindicato", "string"),
       ],
       fields: [
+        field("client_name", "Cliente", "string", textOperators),
+        field("responsible_name", "Responsável", "string", textOperators),
+        field("union_name", "Sindicato", "string", textOperators),
+        field("group_name", "Grupo", "string", textOperators),
+        field("group_state", "Estado do grupo", "string", groupStateOperators),
         field("advance", "Adiantamento", "boolean"),
         field("advance_type", "Tipo de adiantamento", "string"),
         field("advance_amount", "Valor do adiantamento", "number"),
         field("onvio", "Envio via Onvio", "boolean"),
-        field("group", "Grupo", "string"),
         field("vt", "Vale-transporte", "boolean"),
         field("vt_value", "Valor do vale-transporte", "number"),
         field("vt_type", "Tipo do vale-transporte", "string"),

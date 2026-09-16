@@ -4660,6 +4660,10 @@ const handlers = {
     });
   },
 
+  async pessoalGroupAssignmentAuditOutboxReconcile(op) {
+    await httpRequest(op, { expectedStatus: op.expectedStatus });
+  },
+
   async taskDepsList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
