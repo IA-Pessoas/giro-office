@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,7 +57,17 @@ const GLOBAL_COMMANDS = [
   ["pnpm", ["test"]],
 ];
 
-const AFFECTED_TASKS = ["check", "typecheck", "test"];
+const PRE_PUSH_TURBO_CONFIG = ".turbo/git-hooks/turbo.pre-push.json";
+const DEPENDENCY_FILES = new Set([
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "package-lock.json",
+  "npm-shrinkwrap.json",
+  "yarn.lock",
+  ".npmrc",
+  ".pnpmfile.cjs",
+]);
 
 function normalizeGitPath(filePath) {
   return filePath
@@ -102,17 +120,86 @@ export function classifyChangedFiles(changedFiles) {
   return { mode: "affected", reason: "workspace-packages" };
 }
 
-export function buildHookPlan(classification, bases = []) {
+export function buildHookPlan(
+  classification,
+  bases = [],
+  { changedFiles = [], full = false } = {},
+) {
+  if (full) {
+    return cloneCommands(GLOBAL_COMMANDS);
+  }
+
   if (classification.mode === "skip") {
     return [];
   }
 
-  if (classification.mode === "global" || bases.length === 0) {
+  if (bases.length === 0) {
     return cloneCommands(GLOBAL_COMMANDS);
   }
 
-  const filters = bases.map((base) => `--filter=...[${base}]`);
-  return [["pnpm", ["exec", "turbo", "run", ...AFFECTED_TASKS, ...filters]]];
+  const global = classification.mode === "global";
+  const filters = global ? [] : bases.map((base) => `--filter=...[${base}]`);
+  const commands = [];
+
+  if (
+    changedFiles.some((file) => DEPENDENCY_FILES.has(path.posix.basename(normalizeGitPath(file))))
+  ) {
+    commands.push(["pnpm", ["audit:ci"]]);
+  }
+
+  if (global) {
+    commands.push(["pnpm", ["check"]], ["pnpm", ["typecheck"]], ["pnpm", ["test:scripts"]]);
+  } else {
+    commands.push([
+      "pnpm",
+      ["exec", "turbo", "run", "check", "typecheck", ...filters, "--output-logs=new-only"],
+    ]);
+  }
+
+  commands.push([
+    "pnpm",
+    [
+      "exec",
+      "turbo",
+      "run",
+      "test",
+      `--root-turbo-json=${PRE_PUSH_TURBO_CONFIG}`,
+      ...filters,
+      "--output-logs=new-only",
+    ],
+  ]);
+
+  if (global) {
+    commands.push(["pnpm", ["qa:integracao"]]);
+  }
+
+  return commands;
+}
+
+export function buildPrePushTurboConfig(config) {
+  const test = config.tasks.test;
+  return {
+    ...config,
+    tasks: {
+      ...config.tasks,
+      test: {
+        ...test,
+        // Os testes dos serviços executam TypeScript diretamente. Preserve ^build
+        // para preparar as bibliotecas e invalidar os caches dos dependentes.
+        dependsOn: (test.dependsOn ?? []).filter((task) => task !== "build"),
+      },
+      // Os smokes do app usam next start e precisam do build de produção.
+      "@workspace/app#test": { ...test, ...config.tasks["@workspace/app#test"] },
+    },
+  };
+}
+
+function preparePrePushTurboConfig() {
+  const config = JSON.parse(readFileSync("turbo.json", "utf8"));
+  mkdirSync(path.dirname(PRE_PUSH_TURBO_CONFIG), { recursive: true });
+  const temporaryPath = `${PRE_PUSH_TURBO_CONFIG}.${process.pid}.tmp`;
+  writeFileSync(temporaryPath, `${JSON.stringify(buildPrePushTurboConfig(config), null, 2)}\n`);
+  renameSync(temporaryPath, PRE_PUSH_TURBO_CONFIG);
 }
 
 export function parsePrePushInput(input) {
@@ -343,6 +430,7 @@ export function runCommands(
 ) {
   for (const [command, args] of commands) {
     console.log(`$ ${formatCommand([command, args])}`);
+    const startedAt = performance.now();
 
     let result = spawn(command, args, {
       stdio: "inherit",
@@ -363,6 +451,10 @@ export function runCommands(
       }
     }
 
+    console.log(
+      `git-hook-scope: command finished in ${((performance.now() - startedAt) / 1000).toFixed(1)}s`,
+    );
+
     if (result.status !== 0) {
       return result.status ?? 1;
     }
@@ -373,13 +465,14 @@ export function runCommands(
 
 function parseCliArgs(argv) {
   const dryRun = argv.includes("--dry-run");
+  const full = argv.includes("--full");
   const hook = argv.find((arg) => !arg.startsWith("-")) ?? "pre-push";
 
-  return { dryRun, hook };
+  return { dryRun, full, hook };
 }
 
 function main() {
-  const { dryRun, hook } = parseCliArgs(process.argv.slice(2));
+  const { dryRun, full, hook } = parseCliArgs(process.argv.slice(2));
 
   if (hook !== "pre-push") {
     console.error(`Unsupported hook: ${hook}`);
@@ -387,10 +480,15 @@ function main() {
   }
 
   const resolution = resolvePrePushChangedFiles(readHookInput());
-  const classification = resolution.forceGlobal
-    ? { mode: "global", reason: resolution.reason }
-    : classifyChangedFiles(resolution.files);
-  const commands = buildHookPlan(classification, resolution.bases ?? []);
+  const classification = full
+    ? { mode: "global", reason: "explicit-full" }
+    : resolution.forceGlobal
+      ? { mode: "global", reason: resolution.reason }
+      : classifyChangedFiles(resolution.files);
+  const commands = buildHookPlan(classification, resolution.bases ?? [], {
+    changedFiles: resolution.files,
+    full,
+  });
 
   console.log(
     `git-hook-scope: ${classification.mode} (${classification.reason}); files=${resolution.files.length}`,
@@ -407,6 +505,10 @@ function main() {
     }
 
     return;
+  }
+
+  if (commands.some(([, args]) => args.includes(`--root-turbo-json=${PRE_PUSH_TURBO_CONFIG}`))) {
+    preparePrePushTurboConfig();
   }
 
   process.exit(runCommands(commands));
