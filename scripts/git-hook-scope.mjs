@@ -80,10 +80,7 @@ function buildBiomeCheckCommand(changedFiles) {
     return ["pnpm", ["check"]];
   }
 
-  return [
-    "pnpm",
-    ["exec", "biome", "check", "--files-ignore-unknown=true", ...changedFiles],
-  ];
+  return ["pnpm", ["exec", "biome", "check", "--files-ignore-unknown=true", ...changedFiles]];
 }
 
 export function classifyChangedFiles(changedFiles) {

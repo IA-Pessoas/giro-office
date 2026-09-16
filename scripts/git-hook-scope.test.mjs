@@ -111,13 +111,7 @@ describe("buildHookPlan", () => {
         ["pnpm", ["audit:ci"]],
         [
           "pnpm",
-          [
-            "exec",
-            "biome",
-            "check",
-            "--files-ignore-unknown=true",
-            "infra/prisma/schema.prisma",
-          ],
+          ["exec", "biome", "check", "--files-ignore-unknown=true", "infra/prisma/schema.prisma"],
         ],
         ["pnpm", ["typecheck"]],
         ["pnpm", ["test"]],
