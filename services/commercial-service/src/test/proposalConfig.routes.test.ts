@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCommercialApp } from "../app.js";
 import { getCommercialServiceEnv } from "../config/env.js";
 import type { CommercialProposalConfigRouteDeps } from "../routes/proposalConfig.routes.js";
+import { proposalConfigIdParamSchema } from "../schemas/proposalConfig.schemas.js";
 
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
 const USER_ID = "c0000000-0000-4000-8000-000000000001";
@@ -111,6 +112,31 @@ describe("commercial proposal-config routes", () => {
 
     expect(response.status).toBe(400);
     expect(service.create).not.toHaveBeenCalled();
+  });
+
+  it("rejeita campos extras em payloads válidos de criação e atualização", async () => {
+    const app = createTestApp(service);
+
+    const createResponse = await request(app)
+      .post("/commercial/proposal-configs")
+      .set(gatewayHeaders())
+      .send({ name: "Padrão", contract_value: 1800, unexpected: true });
+
+    const updateResponse = await request(app)
+      .patch(`/commercial/proposal-configs/${CONFIG_ID}`)
+      .set(gatewayHeaders())
+      .send({ name: "Atualizada", unexpected: true });
+
+    expect(createResponse.status).toBe(400);
+    expect(updateResponse.status).toBe(400);
+    expect(service.create).not.toHaveBeenCalled();
+    expect(service.update).not.toHaveBeenCalled();
+  });
+
+  it("rejeita chaves inesperadas nos parâmetros de identificação", () => {
+    expect(proposalConfigIdParamSchema.safeParse({ id: CONFIG_ID, unexpected: true }).success).toBe(
+      false,
+    );
   });
 
   it("cria e atualiza item com identidade do contexto", async () => {
