@@ -1,5 +1,18 @@
 # Mapeamento V4.1 — deltas sobre a V4
 
+**Goal geral iniciado em 14/09/2026:** o usuário autorizou a continuidade automática da
+análise, testes, backups e cargas comprovadamente elegíveis, dentro das restrições do objetivo.
+Avisos antigos de aprovação por lote permanecem como registro histórico. Para conhecer a
+autorização vigente, o trabalho em andamento e os pontos de retomada, consultar o
+[estado geral](./ESTADO-GERAL-MIGRACAO.md) e a [revisão em construção](./REVISAO-FINAL-MIGRACAO.md).
+O objetivo ainda não está concluído; não repetir PF12 nem assumir o escopo do agente das 122.
+
+**Atualização de 14/09/2026 — 12 PF concluídos:** carga específica autorizada, 12 inserções
+confirmadas e leitura posterior sem colisões, com os 810 PF anteriores preservados.
+Não repetir esse lote nem seus ensaios. Consultar o
+[registro de execução e passagem](./CARGA-PF-12-2026-09-14.md) antes de continuar;
+as demais regras/lotes e as dez migrations não foram executados por essa aprovação.
+
 Implementação posterior e delimitada: [ensaio local dos 17 grupos RH](./ENSAIO-RH-2026-09-13.md)
 e [carga real autorizada e concluída](./CARGA-RH-PRODUCAO-2026-09-13.md).
 O executor aplica G01–G03/R01–R04 somente nesse lote, sem alterar o contrato do banco novo.
@@ -131,6 +144,19 @@ As estratégias localizadas nessa cópia foram V4 usual e V4 especializada; não
 
 Ausência de campo obrigatório impede um payload apto e encaminha o registro à quarentena, conforme D01.
 Não alterar agora registros que já contenham sentinelas no GIRO Office: sua correção seria outro escopo.
+
+### Aprovação delimitada de datas civis — lote de 12 PF
+
+O usuário aprovou, após a simulação de clientes de 13/09/2026, preservar exatamente o
+dia das datas civis válidas dos 12 PF identificados em
+`dry-run/proposta-pf-12-sem-gravacao.json`, representando-as tecnicamente como
+`YYYY-MM-DDT00:00:00.000Z`. A meia-noite UTC é convenção de representação, não horário
+de nascimento atribuído ao legado. Essa aprovação não abrange datas inválidas, o 13º PF
+com telefone sem destino, outros clientes, competências mensais ou timestamps comerciais.
+Essa aprovação inicial cobria preparar o payload local. Os pontos posteriores de revisão,
+ensaio, recuperação e aprovação de identidade/carga foram concluídos para esses 12 PF;
+a [carga de 14/09 está confirmada](./CARGA-PF-12-2026-09-14.md). A aprovação foi utilizada
+e arquivada; não autoriza reexecutar, ampliar o lote, aplicar DDL ou alterar Docker.
 
 ## G03 — operações incrementais
 
