@@ -1,7 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Archive, CircleAlert, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
+import { Dialog } from "@shared/components";
+import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCommercialProspecting,
@@ -31,6 +33,10 @@ import {
 
 function formatContractValue(value: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+}
+
+function formatContractValueForInput(value: number): string {
+  return formatBrlInput(String(Math.round(value * 100)));
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -91,6 +97,11 @@ export function CommercialCatalog() {
     billing_description: "",
   });
   const [taskBillingFormError, setTaskBillingFormError] = useState("");
+  const proposalConfigCreateTriggerRef = useRef<HTMLButtonElement>(null);
+  const proposalConfigDialogTriggerRef = useRef<HTMLButtonElement>(null);
+  const prospectingCreateTriggerRef = useRef<HTMLButtonElement>(null);
+  const originalContractValueRef = useRef<number | null>(null);
+  const contractValueEditedRef = useRef(false);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isSavingProspecting =
@@ -131,7 +142,10 @@ export function CommercialCatalog() {
     }
   }
 
-  function startCreate() {
+  function startCreate(event?: MouseEvent<HTMLButtonElement>) {
+    proposalConfigDialogTriggerRef.current = event?.currentTarget ?? proposalConfigCreateTriggerRef.current;
+    originalContractValueRef.current = null;
+    contractValueEditedRef.current = false;
     setIsCreating(true);
     setEditingId(null);
     setDraft(emptyDraft);
@@ -141,13 +155,17 @@ export function CommercialCatalog() {
   function startEdit(config: CommercialProposalConfig) {
     setIsCreating(false);
     setEditingId(config.id);
-    setDraft({ name: config.name, contract_value: String(config.contract_value) });
+    originalContractValueRef.current = config.contract_value;
+    contractValueEditedRef.current = false;
+    setDraft({ name: config.name, contract_value: formatContractValueForInput(config.contract_value) });
     setFormError("");
   }
 
   function cancelForm() {
     setIsCreating(false);
     setEditingId(null);
+    originalContractValueRef.current = null;
+    contractValueEditedRef.current = false;
     setDraft(emptyDraft);
     setFormError("");
   }
@@ -155,13 +173,17 @@ export function CommercialCatalog() {
   async function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = draft.name.trim();
-    const contractValue = Number(draft.contract_value.replace(",", "."));
+    const parsedContractValue = parseBrlInput(draft.contract_value);
+    const contractValue =
+      editingId && !contractValueEditedRef.current && originalContractValueRef.current !== null
+        ? originalContractValueRef.current
+        : parsedContractValue;
 
     if (!name) {
       setFormError("Informe o nome da configuração.");
       return;
     }
-    if (!Number.isFinite(contractValue) || contractValue < 0) {
+    if (contractValue === null || contractValue < 0) {
       setFormError("Informe um valor base maior ou igual a zero.");
       return;
     }
@@ -179,6 +201,74 @@ export function CommercialCatalog() {
     }
   }
 
+  function renderProposalConfigForm(mode: "create" | "edit") {
+    const isEditing = mode === "edit";
+
+    return (
+      <form
+        onSubmit={submitForm}
+        className="rounded-xl border border-blue-200 bg-blue-50/60 p-5 dark:border-blue-900/50 dark:bg-blue-950/20"
+        aria-label={isEditing ? "Editar configuração" : "Nova configuração"}
+      >
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Nome
+            <input
+              value={draft.name}
+              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+              className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+              autoFocus
+            />
+          </label>
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Valor base do contrato
+            <input
+              type="text"
+              inputMode="decimal"
+              value={draft.contract_value}
+              onKeyDown={(event) => {
+                if (
+                  (event.key === "Backspace" || event.key === "Delete") &&
+                  parseBrlInput(event.currentTarget.value) === 0
+                ) {
+                  event.preventDefault();
+                  contractValueEditedRef.current = true;
+                  setDraft((current) => ({ ...current, contract_value: "" }));
+                }
+              }}
+              onChange={(event) => {
+                contractValueEditedRef.current = true;
+                setDraft((current) => ({
+                  ...current,
+                  contract_value: formatBrlInput(normalizeDigits(event.target.value)),
+                }));
+              }}
+              className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+              placeholder="R$ 0,00"
+            />
+          </label>
+          <div className="flex gap-2 md:justify-end">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:flex-none"
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
+              {isSaving ? "Salvando..." : "Salvar"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelForm}
+              disabled={isSaving}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <X className="h-4 w-4" aria-hidden="true" /> Cancelar
+            </button>
+          </div>
+        </div>
+        {formError ? <p className="mt-3 flex items-center gap-2 text-sm text-red-700 dark:text-red-300" role="alert"><CircleAlert className="h-4 w-4" aria-hidden="true" />{formError}</p> : null}
+      </form>
+    );
+  }
+
   async function deleteConfig(config: CommercialProposalConfig) {
     if (!window.confirm(`Excluir a configuração "${config.name}"?`)) return;
 
@@ -188,7 +278,7 @@ export function CommercialCatalog() {
       if (editingId === config.id) cancelForm();
     } catch (error) {
       setDeleteError(getErrorMessage(error, "Não foi possível excluir a configuração."));
-    }
+  }
   }
 
   function startProspectingCreate() {
@@ -246,6 +336,92 @@ export function CommercialCatalog() {
     }
   }
 
+  function renderProspectingForm(mode: "create" | "edit") {
+    const isEditing = mode === "edit";
+
+    return (
+      <form
+        onSubmit={submitProspectingForm}
+        className="border-b border-slate-200 bg-blue-50/60 p-5 dark:border-slate-700 dark:bg-blue-950/20"
+        aria-label={isEditing ? "Editar prospecção" : "Nova prospecção"}
+      >
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_180px]">
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Cliente
+            <select
+              disabled={isEditing}
+              value={prospectingDraft.client_id}
+              onChange={(event) =>
+                setProspectingDraft((current) => ({ ...current, client_id: event.target.value }))
+              }
+              className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            >
+              <option value="">Selecione um cliente</option>
+              {(prospectingClientsQuery.data ?? []).map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}{client.fantasy_name ? ` — ${client.fantasy_name}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Status
+            <select
+              value={prospectingDraft.status}
+              onChange={(event) =>
+                setProspectingDraft((current) => ({
+                  ...current,
+                  status: event.target.value as ProspectingDraft["status"],
+                }))
+              }
+              className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            >
+              {COMMERCIAL_PROSPECTING_STATUSES.map((status) => <option key={status}>{status}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Data do status
+            <input
+              type="date"
+              value={prospectingDraft.status_date}
+              onChange={(event) =>
+                setProspectingDraft((current) => ({ ...current, status_date: event.target.value }))
+              }
+              className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
+          </label>
+        </div>
+        <label className="mt-4 block text-sm font-medium text-slate-800 dark:text-slate-100">Descrição
+          <textarea
+            value={prospectingDraft.description}
+            onChange={(event) =>
+              setProspectingDraft((current) => ({ ...current, description: event.target.value }))
+            }
+            rows={3}
+            maxLength={5000}
+            className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+          />
+        </label>
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <button
+            type="submit"
+            disabled={isSavingProspecting}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSavingProspecting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
+            {isSavingProspecting ? "Salvando..." : "Salvar"}
+          </button>
+          <button
+            type="button"
+            onClick={cancelProspectingForm}
+            disabled={isSavingProspecting}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />Cancelar
+          </button>
+        </div>
+        {prospectingFormError ? <p className="mt-3 flex items-center gap-2 text-sm text-red-700 dark:text-red-300" role="alert"><CircleAlert className="h-4 w-4" aria-hidden="true" />{prospectingFormError}</p> : null}
+      </form>
+    );
+  }
+
   async function archiveProspecting(item: CommercialProspecting) {
     const clientName = item.client.fantasy_name || item.client.company_name || item.client.name;
     if (!window.confirm(`Arquivar a prospecção de "${clientName}"? O histórico será preservado.`)) {
@@ -286,8 +462,8 @@ export function CommercialCatalog() {
             Defina o nome e o valor base usados nas propostas comerciais da sua organização.
           </p>
         </div>
-      {canEdit && !editingId && !isCreating ? (
-          <button type="button" onClick={startCreate} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950">
+      {canEdit && !editingId ? (
+          <button ref={proposalConfigCreateTriggerRef} type="button" onClick={startCreate} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950">
             <Plus className="h-4 w-4" aria-hidden="true" />
             Nova configuração
           </button>
@@ -300,28 +476,23 @@ export function CommercialCatalog() {
         <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">Acesso somente leitura.</p>
       ) : null}
 
-      {isCreating || editingId !== null ? (
-        <form onSubmit={submitForm} className="rounded-xl border border-blue-200 bg-blue-50/60 p-5 dark:border-blue-900/50 dark:bg-blue-950/20" aria-label={editingId ? "Editar configuração" : "Nova configuração"}>
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
-            <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Nome
-              <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white" autoFocus />
-            </label>
-            <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Valor base do contrato
-              <input type="text" inputMode="decimal" value={draft.contract_value} onChange={(event) => setDraft((current) => ({ ...current, contract_value: event.target.value }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500" placeholder="0,00" />
-            </label>
-            <div className="flex gap-2 md:justify-end">
-              <button type="submit" disabled={isSaving} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:flex-none">
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
-                Salvar
-              </button>
-              <button type="button" onClick={cancelForm} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
-                <X className="h-4 w-4" aria-hidden="true" /> Cancelar
-              </button>
-            </div>
-          </div>
-          {formError ? <p className="mt-3 flex items-center gap-2 text-sm text-red-700 dark:text-red-300" role="alert"><CircleAlert className="h-4 w-4" aria-hidden="true" />{formError}</p> : null}
-        </form>
-      ) : null}
+      {editingId !== null ? renderProposalConfigForm("edit") : null}
+      <Dialog
+        open={isCreating}
+        onOpenChange={(open) => {
+          if (!open) cancelForm();
+        }}
+        title="Nova configuração"
+        description="Cadastre o nome e o valor base da configuração comercial."
+        preventClose={isSaving}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          proposalConfigDialogTriggerRef.current?.focus();
+        }}
+        bodyClassName="!px-0 !py-0"
+      >
+        {renderProposalConfigForm("create")}
+      </Dialog>
 
       {configsQuery.isLoading ? (
         <div className="space-y-3" aria-label="Carregando catálogo">
@@ -349,32 +520,26 @@ export function CommercialCatalog() {
             <h2 id="commercial-prospecting-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">Prospecção</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Acompanhe os status legados por cliente, com histórico auditável.</p>
           </div>
-          {canEdit && prospectingEditingId === null ? <button type="button" onClick={startProspectingCreate} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"><Plus className="h-4 w-4" aria-hidden="true" />Nova prospecção</button> : null}
+          {canEdit && prospectingEditingId === null ? <button ref={prospectingCreateTriggerRef} type="button" onClick={startProspectingCreate} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"><Plus className="h-4 w-4" aria-hidden="true" />Nova prospecção</button> : null}
         </div>
 
-        {isCreatingProspecting || prospectingEditingId !== null || (!prospectingQuery.data?.length && canEdit) ? (
-          <form onSubmit={submitProspectingForm} className="border-b border-slate-200 bg-blue-50/60 p-5 dark:border-slate-700 dark:bg-blue-950/20" aria-label={prospectingEditingId ? "Editar prospecção" : "Nova prospecção"}>
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_180px]">
-              <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Cliente
-                <select disabled={prospectingEditingId !== null} value={prospectingDraft.client_id} onChange={(event) => setProspectingDraft((current) => ({ ...current, client_id: event.target.value }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-white">
-                  <option value="">Selecione um cliente</option>
-                  {(prospectingClientsQuery.data ?? []).map((client) => <option key={client.id} value={client.id}>{client.name}{client.fantasy_name ? ` — ${client.fantasy_name}` : ""}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Status
-                <select value={prospectingDraft.status} onChange={(event) => setProspectingDraft((current) => ({ ...current, status: event.target.value as ProspectingDraft["status"] }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white">{COMMERCIAL_PROSPECTING_STATUSES.map((status) => <option key={status}>{status}</option>)}</select>
-              </label>
-              <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Data do status
-                <input type="date" value={prospectingDraft.status_date} onChange={(event) => setProspectingDraft((current) => ({ ...current, status_date: event.target.value }))} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
-              </label>
-            </div>
-            <label className="mt-4 block text-sm font-medium text-slate-800 dark:text-slate-100">Descrição
-              <textarea value={prospectingDraft.description} onChange={(event) => setProspectingDraft((current) => ({ ...current, description: event.target.value }))} rows={3} maxLength={5000} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
-            </label>
-            <div className="mt-4 flex flex-wrap justify-end gap-2"><button type="submit" disabled={isSavingProspecting} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"><Save className="h-4 w-4" aria-hidden="true" />Salvar</button><button type="button" onClick={cancelProspectingForm} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><X className="h-4 w-4" aria-hidden="true" />Cancelar</button></div>
-            {prospectingFormError ? <p className="mt-3 flex items-center gap-2 text-sm text-red-700 dark:text-red-300" role="alert"><CircleAlert className="h-4 w-4" aria-hidden="true" />{prospectingFormError}</p> : null}
-          </form>
-        ) : null}
+        {prospectingEditingId !== null ? renderProspectingForm("edit") : null}
+        <Dialog
+          open={isCreatingProspecting}
+          onOpenChange={(open) => {
+            if (!open) cancelProspectingForm();
+          }}
+          title="Nova prospecção"
+          description="Cadastre uma nova prospecção comercial."
+          preventClose={isSavingProspecting}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            prospectingCreateTriggerRef.current?.focus();
+          }}
+          bodyClassName="!px-0 !py-0"
+        >
+          {renderProspectingForm("create")}
+        </Dialog>
 
         {prospectingActionError ? <p className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300" role="alert">{prospectingActionError}</p> : null}
 

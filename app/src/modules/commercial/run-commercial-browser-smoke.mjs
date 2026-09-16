@@ -65,7 +65,7 @@ const client = {
 const proposalConfig = {
   id: "c0000000-0000-4000-8000-000000000001",
   name: "Configuração Smoke",
-  contract_value: 1800,
+  contract_value: 1800.125,
 };
 const prospecting = {
   id: "d0000000-0000-4000-8000-000000000001",
@@ -113,6 +113,21 @@ function respondJson(response, data, status = 200) {
   response.statusCode = status;
   response.setHeader("content-type", "application/json");
   response.end(JSON.stringify({ success: true, data }));
+}
+
+function readJsonBody(request) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      try {
+        resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {});
+      } catch (error) {
+        reject(error);
+      }
+    });
+    request.on("error", reject);
+  });
 }
 
 async function startServer(handler) {
@@ -176,6 +191,30 @@ function createCommercialUpstream() {
       respondJson(response, state.proposalConfigs);
       return;
     }
+    if (pathname === "/commercial/proposal-configs" && request.method === "POST") {
+      readJsonBody(request).then((body) => {
+        const created = {
+          ...body,
+          id: "c0000000-0000-4000-8000-000000000002",
+        };
+        state.proposalConfigs.push(created);
+        setTimeout(() => respondJson(response, created, 201), 250);
+      });
+      return;
+    }
+    if (pathname.startsWith("/commercial/proposal-configs/") && request.method === "PATCH") {
+      readJsonBody(request).then((body) => {
+        const id = pathname.split("/").at(-1);
+        const updated = state.proposalConfigs.find((item) => item.id === id);
+        if (!updated) {
+          respondJson(response, {}, 404);
+          return;
+        }
+        Object.assign(updated, body);
+        respondJson(response, updated);
+      });
+      return;
+    }
     if (pathname.startsWith("/commercial/proposal-configs/") && request.method === "DELETE") {
       state.proposalConfigs = state.proposalConfigs.filter((item) => item.id !== pathname.split("/").pop());
       respondJson(response, { id: pathname.split("/").pop(), deleted: true });
@@ -191,7 +230,7 @@ function createCommercialUpstream() {
     }
     if (pathname === "/commercial/prospecting" && request.method === "POST") {
       state.prospectingList = [prospecting];
-      respondJson(response, prospecting, 201);
+      setTimeout(() => respondJson(response, prospecting, 201), 250);
       return;
     }
     if (pathname.startsWith("/commercial/prospecting/") && request.method === "GET") {
@@ -325,6 +364,82 @@ async function run() {
     }
     await page.screenshot({ path: `${evidenceDir}/01-commercial-desktop-light.png`, fullPage: true });
 
+    assert.equal(await page.locator('form[aria-label="Nova configuração"]').count(), 0);
+    await page.getByRole("button", { name: "Nova configuração", exact: true }).click();
+    const proposalConfigDialog = page.getByRole("dialog", { name: "Nova configuração" });
+    await proposalConfigDialog.waitFor({ state: "visible" });
+    await proposalConfigDialog.screenshot({ path: `${evidenceDir}/08-commercial-config-create-modal.png` });
+    const proposalConfigForm = proposalConfigDialog.getByRole("form", { name: "Nova configuração" });
+    const proposalConfigSaveButton = proposalConfigForm.locator('button[type="submit"]');
+    await proposalConfigSaveButton.click();
+    await proposalConfigDialog.getByRole("alert").waitFor({ state: "visible" });
+    await page.keyboard.press("Escape");
+    await proposalConfigDialog.waitFor({ state: "hidden" });
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.textContent?.trim()),
+      "Nova configuração",
+    );
+    await page.getByRole("button", { name: "Nova configuração", exact: true }).click();
+    await proposalConfigDialog.waitFor({ state: "visible" });
+    await proposalConfigForm.getByLabel("Nome").fill("Configuração criada");
+    await proposalConfigForm.getByLabel("Valor base do contrato").fill("150000");
+    const createConfigResponsePromise = page.waitForResponse(
+      (response) => response.request().method() === "POST" && response.url().endsWith("/commercial/proposal-configs"),
+    );
+    await proposalConfigSaveButton.click();
+    await page.waitForTimeout(100);
+    const proposalConfigLoadingState = {
+      disabled: await proposalConfigSaveButton.isDisabled(),
+      text: await proposalConfigSaveButton.textContent(),
+    };
+    const createConfigResponse = await createConfigResponsePromise;
+    assert.equal(proposalConfigLoadingState.disabled, true);
+    assert.equal(proposalConfigLoadingState.text, "Salvando...");
+    assert.deepEqual(JSON.parse(createConfigResponse.request().postData() || "{}"), {
+      name: "Configuração criada",
+      contract_value: 1500,
+    });
+    await proposalConfigDialog.waitFor({ state: "hidden" });
+    await page.getByText("Configuração criada", { exact: true }).waitFor();
+
+    await page.getByRole("button", { name: "Editar", exact: true }).first().click();
+    const contractForm = page.getByRole("form", { name: "Editar configuração" });
+    const contractValueInput = contractForm.getByLabel("Valor base do contrato");
+    assert.equal(await contractValueInput.inputValue(), "R$ 1.800,13");
+    const unchangedUpdateResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "PATCH" &&
+        response.url().endsWith(`/commercial/proposal-configs/${proposalConfig.id}`),
+    );
+    await contractForm.getByRole("button", { name: "Salvar", exact: true }).click();
+    const unchangedUpdateResponse = await unchangedUpdateResponsePromise;
+    assert.deepEqual(JSON.parse(unchangedUpdateResponse.request().postData() || "{}"), {
+      name: "Configuração Smoke",
+      contract_value: 1800.125,
+    });
+    await page.getByText("Valor base do contrato: R$ 1.800,13", { exact: true }).waitFor();
+
+    await page.getByRole("button", { name: "Editar", exact: true }).first().click();
+    const editableContractForm = page.getByRole("form", { name: "Editar configuração" });
+    const editableContractValueInput = editableContractForm.getByLabel("Valor base do contrato");
+    assert.equal(await editableContractValueInput.inputValue(), "R$ 1.800,13");
+    await editableContractValueInput.fill("abc");
+    assert.equal(await editableContractValueInput.inputValue(), "");
+    await editableContractValueInput.fill("123456");
+    assert.equal(await editableContractValueInput.inputValue(), "R$ 1.234,56");
+    await page.screenshot({ path: `${evidenceDir}/02-commercial-contract-value-mask.png`, fullPage: true });
+    const updateResponsePromise = page.waitForResponse(
+      (response) => response.request().method() === "PATCH" && response.url().includes("/commercial/proposal-configs/"),
+    );
+    await editableContractForm.getByRole("button", { name: "Salvar", exact: true }).click();
+    const updateResponse = await updateResponsePromise;
+    assert.deepEqual(JSON.parse(updateResponse.request().postData() || "{}"), {
+      name: "Configuração Smoke",
+      contract_value: 1234.56,
+    });
+    await page.getByText("Valor base do contrato: R$ 1.234,56", { exact: true }).waitFor();
+    await page.screenshot({ path: `${evidenceDir}/03-commercial-contract-value-saved.png`, fullPage: true });
+
     const deleteConfigButton = page.getByRole("button", {
       name: `Excluir configuração ${proposalConfig.name}`,
       exact: true,
@@ -347,19 +462,71 @@ async function run() {
       success: true,
       data: { id: proposalConfig.id, deleted: true },
     });
+
+    const createdDeleteConfigButton = page.getByRole("button", {
+      name: "Excluir configuração Configuração criada",
+      exact: true,
+    });
+    await createdDeleteConfigButton.waitFor();
+    const createdDeleteResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().includes("/commercial/proposal-configs/c0000000-0000-4000-8000-000000000002"),
+    );
+    page.once("dialog", (dialog) => {
+      assert.equal(dialog.type(), "confirm");
+      assert.equal(dialog.message(), 'Excluir a configuração "Configuração criada"?');
+      void dialog.accept();
+    });
+    await createdDeleteConfigButton.click();
+    const createdDeleteResponse = await createdDeleteResponsePromise;
+    assert.equal(createdDeleteResponse.status(), 200);
+    assert.deepEqual(await createdDeleteResponse.json(), {
+      success: true,
+      data: { id: "c0000000-0000-4000-8000-000000000002", deleted: true },
+    });
     await page.getByRole("heading", { name: "Nenhuma configuração cadastrada" }).waitFor();
     await page.screenshot({ path: `${evidenceDir}/02-commercial-config-deleted.png`, fullPage: true });
 
+    const emptyConfigCreateButton = page.getByRole("button", { name: "Criar configuração", exact: true });
+    await emptyConfigCreateButton.click();
+    await proposalConfigDialog.waitFor({ state: "visible" });
+    await page.keyboard.press("Escape");
+    await proposalConfigDialog.waitFor({ state: "hidden" });
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.textContent?.trim()),
+      "Criar configuração",
+    );
+
     await page.getByRole("button", { name: "Nova prospecção" }).click();
-    const clientSelect = page.locator('form[aria-label="Nova prospecção"] select').first();
+    const prospectingDialog = page.getByRole("dialog", { name: "Nova prospecção" });
+    await prospectingDialog.waitFor({ state: "visible" });
+    await prospectingDialog.screenshot({ path: `${evidenceDir}/09-commercial-prospecting-create-modal.png` });
+    const prospectingForm = prospectingDialog.getByRole("form", { name: "Nova prospecção" });
+    const clientSelect = prospectingForm.locator("select").first();
     await clientSelect.focus();
     assert.equal(await page.evaluate(() => document.activeElement?.tagName), "SELECT");
-    await page.screenshot({ path: `${evidenceDir}/03-commercial-form-focus.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/04-commercial-form-focus.png`, fullPage: true });
     await clientSelect.selectOption(client.id);
-    await page.getByLabel("Descrição").fill("Retorno na próxima semana");
-    await page.getByRole("button", { name: "Salvar" }).click();
+    await prospectingForm.getByLabel("Data do status").fill("2026-09-15");
+    await prospectingForm.getByLabel("Descrição").fill("Retorno na próxima semana");
+    const prospectingSaveButton = prospectingForm.locator('button[type="submit"]');
+    const createProspectingResponsePromise = page.waitForResponse(
+      (response) => response.request().method() === "POST" && response.url().endsWith("/commercial/prospecting"),
+    );
+    await prospectingSaveButton.click();
+    await page.waitForTimeout(100);
+    assert.equal(await prospectingSaveButton.isDisabled(), true);
+    assert.equal(await prospectingSaveButton.textContent(), "Salvando...");
+    const createProspectingResponse = await createProspectingResponsePromise;
+    assert.deepEqual(JSON.parse(createProspectingResponse.request().postData() || "{}"), {
+      client_id: client.id,
+      status: "Análise Financeira",
+      status_date: new Date("2026-09-15T12:00:00").toISOString(),
+      description: "Retorno na próxima semana",
+    });
     await page.getByText("Análise Financeira").last().waitFor();
-    await page.screenshot({ path: `${evidenceDir}/04-commercial-saved-light.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/05-commercial-saved-light.png`, fullPage: true });
 
     const archiveProspectingButton = page.getByRole("button", {
       name: `Arquivar prospecção ${client.fantasy_name}`,
@@ -390,12 +557,15 @@ async function run() {
     await page.screenshot({ path: `${evidenceDir}/05-commercial-prospecting-archived.png`, fullPage: true });
 
     await page.getByRole("button", { name: "Nova prospecção" }).click();
-    await page.getByRole("form", { name: "Nova prospecção" }).waitFor();
+    await prospectingDialog.waitFor({ state: "visible" });
+    const archivedProspectingForm = prospectingDialog.getByRole("form", { name: "Nova prospecção" });
+    await archivedProspectingForm.waitFor();
     assert.equal(
-      await page.locator(`form[aria-label="Nova prospecção"] option[value="${client.id}"]`).count(),
+      await archivedProspectingForm.locator(`option[value="${client.id}"]`).count(),
       0,
     );
-    await page.getByRole("button", { name: "Cancelar" }).last().click();
+    await archivedProspectingForm.getByRole("button", { name: "Cancelar", exact: true }).click();
+    await prospectingDialog.waitFor({ state: "hidden" });
 
     await page.getByRole("button", { name: "Editar cobrança" }).click();
     await page.getByLabel("Situação da contratação").selectOption("Contratado");
