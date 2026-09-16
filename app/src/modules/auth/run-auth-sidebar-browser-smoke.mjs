@@ -360,6 +360,11 @@ async function waitForServer(serverProcess, getOutput) {
       throw new Error(`Next server failed to compile the app before smoke test.\n${output}`);
     }
 
+    if (useProductionBuild && !output.includes("Ready in")) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      continue;
+    }
+
     try {
       const response = await fetch(baseUrl);
       if (response.ok || response.status < 500) {

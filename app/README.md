@@ -28,10 +28,12 @@ This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-opti
 
 ## Learn More
 
-### Smoke da navegação autenticada
+### Smokes de navegador com build pronto
 
 `pnpm test:auth-sidebar` inicia o servidor de desenvolvimento. Para usar um build
 já preparado, execute `pnpm build` e depois `pnpm test:auth-sidebar --production`.
+O smoke de perfil também aceita esse modo com `pnpm test:me-password-update --production`.
+O assistente de projetos aceita `pnpm test:project-wizard-browser --production`.
 A suíte `pnpm test` usa esse modo após o build realizado pelo teste de sessão,
 evitando compilar rotas durante as asserções de navegação.
 

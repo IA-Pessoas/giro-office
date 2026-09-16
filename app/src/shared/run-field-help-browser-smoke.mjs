@@ -122,6 +122,8 @@ async function assertFieldHelp({ viewport, theme, screenshotPath }) {
     const helpButton = page.getByRole("button", { name: "Ajuda: Tipo de adiantamento" });
     assert.equal(await helpButton.getAttribute("aria-label"), "Ajuda: Tipo de adiantamento");
 
+    // O tooltip fecha quando um ancestral rola; posicione o campo antes de focar.
+    await helpButton.scrollIntoViewIfNeeded();
     await helpButton.focus();
     assert.equal(
       await helpButton.evaluate((element) => document.activeElement === element),
