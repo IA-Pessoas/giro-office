@@ -111,4 +111,21 @@ runTest("commercial contract value uses the shared Brazilian currency mask", () 
   assert.match(catalog, /Math\.round\(value \* 100\)/);
 });
 
+runTest("commercial creation actions open the shared dialogs", () => {
+  const catalog = read("./components/CommercialCatalog.tsx");
+
+  assert.match(catalog, /import \{ Dialog \} from "@shared\/components";/);
+  assert.match(catalog, /<Dialog[\s\S]*open=\{isCreating\}[\s\S]*title="Nova configuração"/);
+  assert.match(catalog, /<Dialog[\s\S]*open=\{isCreatingProspecting\}[\s\S]*title="Nova prospecção"/);
+  assert.match(catalog, /onCloseAutoFocus=/);
+  assert.match(catalog, /disabled=\{isSaving\}/);
+  assert.match(catalog, /disabled=\{isSavingProspecting\}/);
+  assert.match(catalog, /isSaving \? "Salvando\.\.\."/);
+  assert.match(catalog, /isSavingProspecting \? <Loader2/);
+  assert.match(catalog, /editingId !== null/);
+  assert.match(catalog, /prospectingEditingId !== null/);
+  assert.doesNotMatch(catalog, /\{isCreating \|\| editingId !== null \?/);
+  assert.doesNotMatch(catalog, /prospectingEditingId !== null \|\| \(!prospectingQuery\.data\?\.length/);
+});
+
 console.log("commercial contract tests passed");

@@ -190,6 +190,17 @@ function createCommercialUpstream() {
       respondJson(response, state.proposalConfigs);
       return;
     }
+    if (pathname === "/commercial/proposal-configs" && request.method === "POST") {
+      readJsonBody(request).then((body) => {
+        const created = {
+          ...body,
+          id: "c0000000-0000-4000-8000-000000000002",
+        };
+        state.proposalConfigs.push(created);
+        setTimeout(() => respondJson(response, created, 201), 250);
+      });
+      return;
+    }
     if (pathname.startsWith("/commercial/proposal-configs/") && request.method === "PATCH") {
       readJsonBody(request).then((body) => {
         const id = pathname.split("/").at(-1);
@@ -213,7 +224,7 @@ function createCommercialUpstream() {
     }
     if (pathname === "/commercial/prospecting" && request.method === "POST") {
       state.prospectingList = [prospecting];
-      respondJson(response, prospecting, 201);
+      setTimeout(() => respondJson(response, prospecting, 201), 250);
       return;
     }
     if (pathname.startsWith("/commercial/prospecting/") && request.method === "GET") {
@@ -336,6 +347,44 @@ async function run() {
     }
     await page.screenshot({ path: `${evidenceDir}/01-commercial-desktop-light.png`, fullPage: true });
 
+    assert.equal(await page.locator('form[aria-label="Nova configuração"]').count(), 0);
+    await page.getByRole("button", { name: "Nova configuração", exact: true }).click();
+    const proposalConfigDialog = page.getByRole("dialog", { name: "Nova configuração" });
+    await proposalConfigDialog.waitFor({ state: "visible" });
+    await proposalConfigDialog.screenshot({ path: `${evidenceDir}/08-commercial-config-create-modal.png` });
+    const proposalConfigForm = proposalConfigDialog.getByRole("form", { name: "Nova configuração" });
+    const proposalConfigSaveButton = proposalConfigForm.locator('button[type="submit"]');
+    await proposalConfigSaveButton.click();
+    await proposalConfigDialog.getByRole("alert").waitFor({ state: "visible" });
+    await page.keyboard.press("Escape");
+    await proposalConfigDialog.waitFor({ state: "hidden" });
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.textContent?.trim()),
+      "Nova configuração",
+    );
+    await page.getByRole("button", { name: "Nova configuração", exact: true }).click();
+    await proposalConfigDialog.waitFor({ state: "visible" });
+    await proposalConfigForm.getByLabel("Nome").fill("Configuração criada");
+    await proposalConfigForm.getByLabel("Valor base do contrato").fill("150000");
+    const createConfigResponsePromise = page.waitForResponse(
+      (response) => response.request().method() === "POST" && response.url().endsWith("/commercial/proposal-configs"),
+    );
+    await proposalConfigSaveButton.click();
+    await page.waitForTimeout(100);
+    const proposalConfigLoadingState = {
+      disabled: await proposalConfigSaveButton.isDisabled(),
+      text: await proposalConfigSaveButton.textContent(),
+    };
+    const createConfigResponse = await createConfigResponsePromise;
+    assert.equal(proposalConfigLoadingState.disabled, true);
+    assert.equal(proposalConfigLoadingState.text, "Salvando...");
+    assert.deepEqual(JSON.parse(createConfigResponse.request().postData() || "{}"), {
+      name: "Configuração criada",
+      contract_value: 1500,
+    });
+    await proposalConfigDialog.waitFor({ state: "hidden" });
+    await page.getByText("Configuração criada", { exact: true }).waitFor();
+
     await page.getByRole("button", { name: "Editar", exact: true }).first().click();
     const contractForm = page.getByRole("form", { name: "Editar configuração" });
     const contractValueInput = contractForm.getByLabel("Valor base do contrato");
@@ -357,19 +406,40 @@ async function run() {
     await page.getByText("Valor base do contrato: R$ 1.234,56", { exact: true }).waitFor();
     await page.screenshot({ path: `${evidenceDir}/03-commercial-contract-value-saved.png`, fullPage: true });
 
+    assert.equal(await page.locator('form[aria-label="Nova prospecção"]').count(), 0);
     await page.getByRole("button", { name: "Nova prospecção" }).click();
-    const clientSelect = page.locator('form[aria-label="Nova prospecção"] select').first();
+    const prospectingDialog = page.getByRole("dialog", { name: "Nova prospecção" });
+    await prospectingDialog.waitFor({ state: "visible" });
+    await prospectingDialog.screenshot({ path: `${evidenceDir}/09-commercial-prospecting-create-modal.png` });
+    const prospectingForm = prospectingDialog.getByRole("form", { name: "Nova prospecção" });
+    const clientSelect = prospectingForm.locator("select").first();
     await clientSelect.focus();
     assert.equal(await page.evaluate(() => document.activeElement?.tagName), "SELECT");
     await page.screenshot({ path: `${evidenceDir}/04-commercial-form-focus.png`, fullPage: true });
     await clientSelect.selectOption(client.id);
-    await page.getByLabel("Descrição").fill("Retorno na próxima semana");
-    await page.getByRole("button", { name: "Salvar" }).click();
+    await prospectingForm.getByLabel("Data do status").fill("2026-09-15");
+    await prospectingForm.getByLabel("Descrição").fill("Retorno na próxima semana");
+    const prospectingSaveButton = prospectingForm.locator('button[type="submit"]');
+    const createProspectingResponsePromise = page.waitForResponse(
+      (response) => response.request().method() === "POST" && response.url().endsWith("/commercial/prospecting"),
+    );
+    await prospectingSaveButton.click();
+    await page.waitForTimeout(100);
+    assert.equal(await prospectingSaveButton.isDisabled(), true);
+    assert.equal(await prospectingSaveButton.textContent(), "Salvando...");
+    const createProspectingResponse = await createProspectingResponsePromise;
+    assert.deepEqual(JSON.parse(createProspectingResponse.request().postData() || "{}"), {
+      client_id: client.id,
+      status: "Análise Financeira",
+      status_date: new Date("2026-09-15T12:00:00").toISOString(),
+      description: "Retorno na próxima semana",
+    });
     await page.getByText("Análise Financeira").last().waitFor();
     await page.screenshot({ path: `${evidenceDir}/05-commercial-saved-light.png`, fullPage: true });
     await page.getByRole("button", { name: "Nova prospecção" }).click();
-    await page.getByRole("form", { name: "Nova prospecção" }).waitFor();
-    await page.getByRole("button", { name: "Cancelar" }).last().click();
+    await prospectingDialog.waitFor({ state: "visible" });
+    await prospectingDialog.getByRole("button", { name: "Cancelar", exact: true }).click();
+    await prospectingDialog.waitFor({ state: "hidden" });
 
     await page.getByRole("button", { name: "Editar cobrança" }).click();
     await page.getByLabel("Situação da contratação").selectOption("Contratado");
