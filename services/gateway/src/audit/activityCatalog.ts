@@ -637,6 +637,46 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "as pendências documentais contábeis" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/contabil\/controls\/year$/,
+    description: { action: "criou", item: "os controles contábeis anuais" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/controls\/restore$/,
+    description: { action: "restaurou", item: "uma competência contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/contabil\/controls\/[^/]+\/items$/,
+    description: { action: "atualizou", item: "os itens de um controle contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/monthly\/[^/]+\/item$/,
+    description: { action: "atualizou", item: "uma pendência documental contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/monthly\/[^/]+\/items$/,
+    description: { action: "atualizou", item: "as pendências documentais contábeis" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "consultou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "atualizou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "arquivou", item: "o fechamento recebido" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/ti\/stock\/items\/[^/]+\/movements\/list$/,
     description: { action: "consultou", item: "a lista de movimentações de um item de estoque" },

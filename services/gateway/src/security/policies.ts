@@ -35,7 +35,7 @@ const triagemModulePolicy: AuthPolicy = {
 const triagemEditPolicy: AuthPolicy = {
   anyModulePermission: {
     modules: ["contabil", "triagem"],
-    minPermission: moduleEditPermission,
+    minPermission: moduleAccessPermission,
   },
 };
 const certificateModulePolicy = createModulePolicy("certificado", moduleAccessPermission);

@@ -11,6 +11,7 @@ import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   triageDocumentItemBodySchema,
   triageDocumentsBulkBodySchema,
+  triageEditabilityRequestSchema,
   triageMonthlyIdParamsSchema,
   triageMonthlyRequestSchema,
   triageStatementBodySchema,
@@ -20,6 +21,7 @@ import type { TriageDocumentsService } from "../services/triageDocumentsService.
 export type TriageDocumentsRouteDeps = Pick<
   TriageDocumentsService,
   | "getMonthly"
+  | "getEditability"
   | "getOrCreateMonthly"
   | "updateItem"
   | "updateAll"
@@ -41,6 +43,20 @@ export function createTriageDocumentsRoutes(
   service: TriageDocumentsRouteDeps,
 ): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
+
+  router.get(
+    "/editability",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(triageEditabilityRequestSchema, req.query);
+        res.json(createSuccessResponse(await service.getEditability(query.client_id, authenticatedContext(req))));
+      } catch (err) {
+        logError("Erro ao verificar permissão de edição da Triagem", { err });
+        next(err);
+      }
+    },
+  );
 
   router.get(
     "/monthly",

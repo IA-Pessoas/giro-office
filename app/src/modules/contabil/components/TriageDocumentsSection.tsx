@@ -50,9 +50,11 @@ const CLOSING_STATUSES: Array<[TriageClosingStatus, string]> = [
 export function TriageDocumentsSection({
   clientId,
   canEdit,
+  canEditClosing,
 }: {
   clientId: string;
   canEdit: boolean;
+  canEditClosing: boolean;
 }) {
   const [competence, setCompetence] = useState<ContabilCompetence>(
     getCurrentContabilCompetence(),
@@ -116,7 +118,7 @@ export function TriageDocumentsSection({
         <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
           Estado independente das pendências documentais e do checklist mensal.
         </p>
-        {canEdit ? (
+        {canEditClosing ? (
           <select
             aria-label="Estado do fechamento recebido"
             value={closing.data?.status ?? "NOT_RECEIVED"}

@@ -15,8 +15,15 @@ import {
 } from "./contabilService.contract";
 
 type MonthlyParams = { clientId: string; competence: ContabilCompetence };
+type Editability = { can_edit: boolean };
 
 export const triageDocumentsService = {
+  async getEditability(clientId: string): Promise<Editability> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageEditability, {
+      params: { client_id: clientId },
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
   getMonthly(params: MonthlyParams): Promise<TriageDocumentsMonthly | null> {
     const api = setupAPIClient();
     return executeNullableContabilRequest(() =>

@@ -3,11 +3,13 @@ import Head from "next/head";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
-import { AccessDeniedPanel, TriageDocumentsSection } from "@modules/contabil";
+import { AccessDeniedPanel, TriageDocumentsSection, useTriageEditability } from "@modules/contabil";
 
 export default function TriagemPage() {
   const { access, isLoading } = useModuleAccess("triagem");
+  const { access: contabilAccess } = useModuleAccess("contabil");
   const [client, setClient] = useState<ClientPickerOption | null>(null);
+  const editability = useTriageEditability(client?.id ?? "");
 
   return (
     <>
@@ -42,7 +44,11 @@ export default function TriagemPage() {
           </header>
           {client ? (
             <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-              <TriageDocumentsSection clientId={client.id} canEdit />
+              <TriageDocumentsSection
+                clientId={client.id}
+                canEdit={editability.data?.can_edit === true}
+                canEditClosing={contabilAccess.canEdit}
+              />
             </div>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
