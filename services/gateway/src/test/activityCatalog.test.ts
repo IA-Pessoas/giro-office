@@ -94,6 +94,8 @@ describe("activityCatalog", () => {
     ],
     ["PUT", "/rh/point/adjustment/approve-bulk", "aprovou", "um lote de ajustes de ponto"],
     ["PUT", "/rh/timesheets/reopen", "reabriu", "uma folha de ponto assinada"],
+    ["PUT", "/rh/timesheets/rebuild", "reconstruiu", "uma folha de ponto aberta"],
+    ["GET", "/rh/timesheets/sheet-1/pdf", "baixou", "o PDF de uma folha de ponto"],
     ["GET", "/rh/profile/colaborator", "consultou", "o dossiê de um colaborador"],
     ["GET", "/rh/profile/colaborator/list", "consultou", "a lista de dossiês de colaboradores"],
     ["PUT", "/rh/profile/colaborator", "atualizou", "o dossiê de um colaborador"],

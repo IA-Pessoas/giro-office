@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/router";
+import { toast } from "react-toastify";
 
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
-import { useRhTimeSheets } from "../hooks/useRhCalendar";
+import {
+  useRebuildRhTimeSheetMutation,
+  useRhTimeSheets,
+} from "../hooks/useRhCalendar";
 import { useRhPermissions } from "../hooks/useRhPermissions";
 import type { RhTimeSheetListFilters, RhTimeSheetListItem } from "../types";
 import { RhTimesheetGenerateModal } from "./RhTimesheetGenerateModal";
@@ -76,6 +80,8 @@ export function RhTimesheetsSection() {
     useState<RhTimeSheetListItem | null>(null);
   const [sheetPendingReopen, setSheetPendingReopen] =
     useState<RhTimeSheetListItem | null>(null);
+  const [rebuildingSheetId, setRebuildingSheetId] = useState<string | null>(null);
+  const rebuildMutation = useRebuildRhTimeSheetMutation();
 
   const assignableUsersQuery = useAssignableUsers({
     enabled: canManageTimesheets,
@@ -139,6 +145,18 @@ export function RhTimesheetsSection() {
     }
 
     setIsGenerateOpen(true);
+  }
+
+  async function handleRebuild(sheet: RhTimeSheetListItem) {
+    setRebuildingSheetId(sheet.id);
+    try {
+      await rebuildMutation.mutateAsync({ id: sheet.id });
+      toast.success("Folha atualizada com os registros atuais.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar a folha.");
+    } finally {
+      setRebuildingSheetId(null);
+    }
   }
 
   const isLoading = timeSheetsQuery.isLoading;
@@ -215,9 +233,11 @@ export function RhTimesheetsSection() {
           canManageTimesheets={canManageTimesheets}
           signingSheetId={sheetPendingSignature?.id ?? null}
           reopeningSheetId={sheetPendingReopen?.id ?? null}
+          rebuildingSheetId={rebuildingSheetId}
           getUserLabel={getUserLabel}
           onSign={setSheetPendingSignature}
           onReopen={setSheetPendingReopen}
+          onRebuild={(sheet) => void handleRebuild(sheet)}
           onViewDetail={(timesheetId) => void router.push(`/rh/timesheets/${timesheetId}`)}
         />
       ) : null}

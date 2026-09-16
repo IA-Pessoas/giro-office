@@ -657,6 +657,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "reabriu", item: "uma folha de ponto assinada" },
   },
   {
+    methods: ["PUT"],
+    pattern: /^\/rh\/timesheets\/rebuild$/,
+    description: { action: "reconstruiu", item: "uma folha de ponto aberta" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/timesheets\/[^/]+\/pdf$/,
+    description: { action: "baixou", item: "o PDF de uma folha de ponto" },
+  },
+  {
     methods: ["PATCH"],
     pattern: /^\/rh\/score\/quarters\/nitro$/,
     description: { action: "atualizou", item: "a pontuação Nitro de um ciclo de avaliação" },

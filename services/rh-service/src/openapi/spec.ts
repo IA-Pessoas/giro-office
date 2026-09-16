@@ -451,14 +451,22 @@ const messageCreateRequestBody = createObjectRequestBody({
 const timeSheetCreateRequestBody = createObjectRequestBody({
   example: {
     user_id: "user-uuid",
-    start_time: "2026-04-01T00:00:00.000Z",
-    end_time: "2026-04-30T23:59:59.999Z",
+    start_time: "2026-04-22T00:00:00.000Z",
+    end_time: "2026-05-22T23:59:59.999Z",
   },
-  required: ["user_id", "start_time", "end_time"],
+  required: ["user_id"],
   properties: {
     user_id: { type: "string", format: "uuid" },
     start_time: { type: "string", format: "date-time" },
     end_time: { type: "string", format: "date-time" },
+  },
+});
+
+const timeSheetRebuildRequestBody = createObjectRequestBody({
+  example: { id: "timesheet-uuid" },
+  required: ["id"],
+  properties: {
+    id: { type: "string", format: "uuid" },
   },
 });
 
@@ -467,7 +475,7 @@ const timeSheetSignRequestBody = createObjectRequestBody({
     id: "timesheet-uuid",
     signature: "Joao Silva",
   },
-  required: ["id", "signature"],
+  required: ["id"],
   properties: {
     id: { type: "string", format: "uuid" },
     signature: { type: "string" },
@@ -1414,6 +1422,22 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/timesheets/{id}/pdf": {
+        get: {
+          tags: ["TimeSheets"],
+          summary: "Baixar PDF privado da folha de ponto",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "PDF da folha",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+            },
+          },
+        },
+      },
       "/rh/timesheets/sign": {
         put: {
           tags: ["TimeSheets"],
@@ -1433,6 +1457,17 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           ...reopenTimeSheetRequestBody,
           responses: {
             "200": { description: "Folha reaberta", ...successJson },
+          },
+        },
+      },
+      "/rh/timesheets/rebuild": {
+        put: {
+          tags: ["TimeSheets"],
+          summary: "Reconstruir uma folha de ponto aberta",
+          security: bearer,
+          ...timeSheetRebuildRequestBody,
+          responses: {
+            "200": { description: "Folha reconstruida", ...successJson },
           },
         },
       },

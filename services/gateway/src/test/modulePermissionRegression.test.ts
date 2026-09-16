@@ -344,11 +344,13 @@ describe("matriz de regressão das políticas modulares", () => {
     const selfServicePolicy = requiredRoutePolicy("POST", "/rh/point/adjustment/request");
     const registerPolicy = requiredRoutePolicy("POST", "/rh/point/register");
     const signPolicy = requiredRoutePolicy("PUT", "/rh/timesheets/sign");
+    const pdfPolicy = requiredRoutePolicy("GET", "/rh/timesheets/sheet-1/pdf");
     const managerPolicy = requiredRoutePolicy("PUT", "/rh/point/adjustment/approve-bulk");
     const managementRoutes = [
       ["POST", "/rh/point/recalculate"],
       ["POST", "/rh/point/adjustment/retroactive"],
       ["PUT", "/rh/timesheets/reopen"],
+      ["PUT", "/rh/timesheets/rebuild"],
       ["POST", "/rh/point/point-1/calculate"],
       ["POST", "/rh/timesheets"],
     ] as const;
@@ -356,6 +358,7 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ modules: { rh: 1 } }), selfServicePolicy)).toBe(true);
     expect(canAccessRoute(authContext({ modules: { rh: 1 } }), registerPolicy)).toBe(true);
     expect(canAccessRoute(authContext({ modules: { rh: 1 } }), signPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), pdfPolicy)).toBe(true);
     expect(canAccessRoute(authContext({ modules: { rh: 1 } }), managerPolicy)).toBe(false);
     expect(canAccessRoute(authContext({ modules: { rh: 2 } }), managerPolicy)).toBe(true);
 

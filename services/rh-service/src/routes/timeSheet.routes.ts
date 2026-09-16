@@ -17,6 +17,7 @@ import {
 import {
   createTimeSheetBodySchema,
   listTimeSheetsQuerySchema,
+  rebuildTimeSheetBodySchema,
   reopenTimeSheetBodySchema,
   signTimeSheetBodySchema,
   timeSheetIdParamsSchema,
@@ -58,6 +59,30 @@ router.post(
   },
 );
 
+router.put(
+  "/rebuild",
+  isAuthenticated,
+  requireRhPermission(RH_MANAGEMENT_PERMISSION),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = req.organization_id;
+      if (!organizationId) {
+        throw new ServiceError(400, "organization_id e obrigatorio.");
+      }
+
+      const body = parseWithZod(rebuildTimeSheetBodySchema, req.body);
+      const result = await timeSheetService.rebuild({
+        organization_id: organizationId,
+        timesheet_id: body.id,
+      });
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao reconstruir folha de ponto", { err });
+      next(err);
+    }
+  },
+);
+
 router.get(
   "/",
   isAuthenticated,
@@ -86,6 +111,47 @@ router.get(
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao listar folhas de ponto", { err });
+      next(err);
+    }
+  },
+);
+
+router.get(
+  "/:id/pdf",
+  isAuthenticated,
+  requireRhPermission(RH_SELF_SERVICE_PERMISSION),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = req.organization_id;
+      const requesterId = req.user_id;
+      if (!organizationId) {
+        throw new ServiceError(400, "organization_id e obrigatorio.");
+      }
+      if (!requesterId) {
+        throw new ServiceError(400, "user_id e obrigatorio.");
+      }
+
+      const { id } = parseWithZod(timeSheetIdParamsSchema, req.params);
+      const detail = await timeSheetService.getById({
+        organization_id: organizationId,
+        timesheet_id: id,
+      });
+      if (!canManageRh(req) && detail.user_id !== requesterId) {
+        throw new ServiceError(
+          403,
+          "Permissao insuficiente para acessar folha de ponto de terceiro.",
+        );
+      }
+
+      const result = await timeSheetService.getPdf({
+        organization_id: organizationId,
+        timesheet_id: id,
+      });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${result.fileName}"`);
+      res.status(200).send(result.buffer);
+    } catch (err) {
+      logError("Erro ao gerar PDF da folha de ponto", { err });
       next(err);
     }
   },

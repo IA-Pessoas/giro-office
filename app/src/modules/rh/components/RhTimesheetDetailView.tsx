@@ -1,6 +1,11 @@
+import { Download, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 
-import { useRhTimeSheetDetail } from "../hooks/useRhCalendar";
+import {
+  useDownloadRhTimeSheetPdfMutation,
+  useRhTimeSheetDetail,
+} from "../hooks/useRhCalendar";
 import { formatRhDate, formatRhDateTime, formatRhTime } from "../utils/rhDate";
 
 type TimesheetDayFilter = "all" | "records" | "absent" | "incomplete";
@@ -72,6 +77,7 @@ export function RhTimesheetDetailView({
 }: RhTimesheetDetailViewProps) {
   const isFullPage = mode === "page";
   const detailQuery = useRhTimeSheetDetail(timesheetId, enabled);
+  const downloadPdfMutation = useDownloadRhTimeSheetPdfMutation();
   const [dayFilter, setDayFilter] = useState<TimesheetDayFilter>(initialFilter);
 
   useEffect(() => {
@@ -119,6 +125,22 @@ export function RhTimesheetDetailView({
       ? "rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
       : "rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800";
 
+  async function handleDownloadPdf() {
+    if (!timesheetId) return;
+    try {
+      const result = await downloadPdfMutation.mutateAsync(timesheetId);
+      const objectUrl = URL.createObjectURL(result.blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = result.filename;
+      anchor.click();
+      URL.revokeObjectURL(objectUrl);
+      toast.success("PDF da folha pronto para download.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível baixar o PDF.");
+    }
+  }
+
   if (detailQuery.isLoading) {
     return (
       <div className="rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
@@ -141,7 +163,30 @@ export function RhTimesheetDetailView({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+            Snapshot autorizado
+          </p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+            O PDF contém os registros, totais, banco de horas e assinatura da folha.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleDownloadPdf()}
+          disabled={!timesheetId || downloadPdfMutation.isPending}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20"
+        >
+          {downloadPdfMutation.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+          {downloadPdfMutation.isPending ? "Preparando PDF..." : "Baixar PDF"}
+        </button>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
             Início
@@ -180,6 +225,14 @@ export function RhTimesheetDetailView({
           </p>
           <p className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
             {totals ? formatMinutes(totals.balance_minutes, { showPositiveSign: true }) : "-"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+            Banco de horas
+          </p>
+          <p className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+            {totals ? formatMinutes(totals.bank_balance_minutes, { showPositiveSign: true }) : "-"}
           </p>
         </div>
       </div>

@@ -87,12 +87,12 @@ export function RhTimesheetGenerateModal({
       return;
     }
 
-    if (!startTime || !endTime) {
-      toast.warn("Preencha o início e o fim da folha.");
+    if (Boolean(startTime) !== Boolean(endTime)) {
+      toast.warn("Preencha o início e o fim da folha ou deixe os dois vazios.");
       return;
     }
 
-    if (new Date(startTime).getTime() >= new Date(endTime).getTime()) {
+    if (startTime && endTime && new Date(startTime).getTime() >= new Date(endTime).getTime()) {
       toast.warn("O fim da folha deve ser posterior ao início.");
       return;
     }
@@ -100,8 +100,7 @@ export function RhTimesheetGenerateModal({
     try {
       await createMutation.mutateAsync({
         user_id: formState.userId,
-        start_time: startTime,
-        end_time: endTime,
+        ...(startTime && endTime ? { start_time: startTime, end_time: endTime } : {}),
       });
 
       toast.success("Folha gerada com sucesso.");
@@ -148,7 +147,8 @@ export function RhTimesheetGenerateModal({
       bodyClassName="space-y-4"
     >
       <p className="text-sm text-gray-600 dark:text-gray-400">
-        Selecione o colaborador e o período que será consolidado na folha.
+        Selecione o colaborador. Sem período informado, a folha usa automaticamente do dia 22 do
+        mês anterior ao dia 22 do mês atual.
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -172,7 +172,7 @@ export function RhTimesheetGenerateModal({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Início</span>
+          <span>Início (opcional)</span>
           <input
             type="datetime-local"
             value={formState.startTime}
@@ -182,7 +182,7 @@ export function RhTimesheetGenerateModal({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Fim</span>
+          <span>Fim (opcional)</span>
           <input
             type="datetime-local"
             value={formState.endTime}

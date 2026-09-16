@@ -13,6 +13,7 @@ import type {
   CreateRhHolidayPayload,
   CreateRhTimeBankReleasePayload,
   CreateRhTimeSheetPayload,
+  RebuildRhTimeSheetPayload,
   DeleteRhHolidayPayload,
   RhHoliday,
   RhMutationMessage,
@@ -228,6 +229,29 @@ export function useSignRhTimeSheetMutation(): UseMutationResult<
       await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
     },
   });
+}
+
+export function useRebuildRhTimeSheetMutation(): UseMutationResult<
+  RhTimeSheetDetail,
+  Error,
+  RebuildRhTimeSheetPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => rhCalendarService.rebuildTimeSheet(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+    },
+  });
+}
+
+export function useDownloadRhTimeSheetPdfMutation(): UseMutationResult<
+  { blob: Blob; filename: string },
+  Error,
+  string
+> {
+  return useMutation({ mutationFn: (id) => rhCalendarService.downloadTimeSheetPdf(id) });
 }
 
 export function useReopenRhTimeSheetMutation(): UseMutationResult<

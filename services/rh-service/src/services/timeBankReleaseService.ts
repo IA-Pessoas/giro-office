@@ -131,10 +131,13 @@ class TimeBankReleaseService {
       }
 
       const updated = await prismaClient.$transaction(async (tx) => {
-        await tx.timeBankReleases.update({
-          where: { id },
+        const claimed = await tx.timeBankReleases.updateMany({
+          where: { id, organization_id: organizationId, is_approved: false },
           data: { is_approved: true },
         });
+        if (claimed.count !== 1) {
+          throw new ServiceError(409, "Lancamento ja foi aprovado.");
+        }
 
         await tx.pointsConfig.update({
           where: { user_id: release.user_id },
