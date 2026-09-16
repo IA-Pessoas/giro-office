@@ -994,6 +994,30 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           },
         },
       },
+      "/internal/pessoal/group-assignments/audit-outbox/reconcile": {
+        post: {
+          tags: ["Pessoal Internal"],
+          security: internalSecurity,
+          summary: "Reconciliar eventos pendentes da outbox de atribuicao de grupos",
+          operationId: "reconcilePessoalGroupAssignmentAuditOutbox",
+          responses: {
+            "200": {
+              description: "OK",
+              ...successJsonWithData({
+                type: "object",
+                required: ["processed", "pending"],
+                properties: {
+                  processed: { type: "integer", minimum: 0 },
+                  pending: { type: "integer", minimum: 0 },
+                },
+              }),
+            },
+            "401": { description: "Unauthorized", ...errorJson },
+            "403": { description: "Forbidden", ...errorJson },
+            "500": { description: "Internal error", ...errorJson },
+          },
+        },
+      },
       "/internal/reporting/catalog": {
         get: {
           tags: ["Pessoal Internal"],

@@ -45,6 +45,9 @@ describe("pessoal-service OpenAPI", () => {
     expect(paths["/internal/pessoal/union-notifications/run"]?.post?.security).toEqual([
       { internalServiceToken: [] },
     ]);
+    expect(
+      paths["/internal/pessoal/group-assignments/audit-outbox/reconcile"]?.post?.security,
+    ).toEqual([{ internalServiceToken: [] }]);
   });
 
   it("documenta o contrato interno de reporting pessoal", () => {
@@ -155,6 +158,9 @@ describe("pessoal-service OpenAPI", () => {
     expect(paths["/pessoal/group-assignments/apply"]?.post?.parameters).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: "Idempotency-Key" })]),
     );
+    expect(
+      paths["/internal/pessoal/group-assignments/audit-outbox/reconcile"]?.post?.operationId,
+    ).toBe("reconcilePessoalGroupAssignmentAuditOutbox");
   });
 
   it("documenta politica explicita e contadores de geracao de obrigacoes", () => {

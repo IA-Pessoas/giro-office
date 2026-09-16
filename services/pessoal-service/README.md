@@ -50,6 +50,7 @@ histórico, mas precisa receber um grupo ativo antes de ser alterada.
 ## Rotinas internas
 
 - `POST /internal/pessoal/union-notifications/run`
+- `POST /internal/pessoal/group-assignments/audit-outbox/reconcile`
 - `GET /internal/reporting/catalog`
 - `POST /internal/reporting/extract`
 
@@ -59,8 +60,9 @@ ficam exclusivamente em `keys`; as chaves internas de situações e configuraç�
 ficam fora dos campos públicos. A extração só aceita campos publicados e usa a organização contida
 no grant HMAC de curta duração.
 
-O servico nao agenda cron no processo Node. A rotina de notificacoes de sindicatos deve ser
-acionada por um scheduler externo, como Supabase/Vercel, usando `x-internal-service-token`.
+O servico nao agenda cron no processo Node. As rotinas de notificacoes de sindicatos e de
+reconciliacao da outbox de auditoria devem ser acionadas por um scheduler externo, como
+Supabase/Vercel, usando `x-internal-service-token`.
 Em VPS, configure `INTERNAL_SERVICE_TOKEN` em `.env.vps.pessoal-service` e use o mesmo valor nesse header. O fallback para `AUDIT_SERVICE_TOKEN` fica restrito a dev/test.
 
 ## Desenvolvimento

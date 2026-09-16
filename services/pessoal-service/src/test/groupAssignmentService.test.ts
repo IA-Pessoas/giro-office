@@ -93,7 +93,12 @@ function createPrismaMock() {
       count: vi.fn(async () => 2),
       findMany: vi.fn(async () => []),
     },
-    pessoalAuditOutboxEvent: { update: vi.fn(async () => ({})) },
+    pessoalAuditOutboxEvent: {
+      count: vi.fn(async () => 0),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
+      update: vi.fn(async () => ({})),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
     $queryRaw: vi.fn(async (): Promise<unknown[]> => []),
     $transaction: vi.fn(async (callback) => callback(tx)),
   };
@@ -278,5 +283,63 @@ describe("GroupAssignmentService", () => {
 
     expect(prisma.tx.pessoalAuditOutboxEvent.create).toHaveBeenCalledTimes(1);
     expect(prisma.pessoalAuditOutboxEvent.update).not.toHaveBeenCalled();
+  });
+
+  it("reconcilia eventos pendentes sem repetir a alteracao de folha", async () => {
+    const prisma = createPrismaMock();
+    prisma.pessoalAuditOutboxEvent.findMany.mockResolvedValueOnce([
+      {
+        id: "outbox-pending",
+        payload: {
+          requestId: "audit-request-1",
+          organizationId,
+          userId,
+          permission: 2,
+          action: "Atualizacao",
+          referring: "pessoal.group-assignment",
+          referringId: previewId,
+        },
+      },
+    ]);
+    const audit = createAuditMock();
+    (audit.recordChange as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+    const service = new GroupAssignmentService(prisma as never, audit, () => fixedNow);
+
+    await expect(service.reconcilePendingAuditEvents()).resolves.toEqual({
+      processed: 1,
+      pending: 0,
+    });
+    expect(audit.recordChange).toHaveBeenCalledTimes(1);
+    expect(prisma.pessoalAuditOutboxEvent.updateMany).toHaveBeenCalledWith({
+      where: { id: "outbox-pending", status: "pending" },
+      data: { status: "processed", processed_at: fixedNow },
+    });
+    expect(prisma.tx.payroll.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("mantem o evento pendente quando a reconciliacao de auditoria falha", async () => {
+    const prisma = createPrismaMock();
+    prisma.pessoalAuditOutboxEvent.findMany.mockResolvedValueOnce([
+      {
+        id: "outbox-pending",
+        payload: {
+          organizationId,
+          userId,
+          action: "Atualizacao",
+          referring: "pessoal.group-assignment",
+          referringId: previewId,
+        },
+      },
+    ]);
+    const audit = createAuditMock();
+    (audit.recordChange as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+    prisma.pessoalAuditOutboxEvent.count.mockResolvedValueOnce(1);
+    const service = new GroupAssignmentService(prisma as never, audit, () => fixedNow);
+
+    await expect(service.reconcilePendingAuditEvents()).resolves.toEqual({
+      processed: 0,
+      pending: 1,
+    });
+    expect(prisma.pessoalAuditOutboxEvent.updateMany).not.toHaveBeenCalled();
   });
 });

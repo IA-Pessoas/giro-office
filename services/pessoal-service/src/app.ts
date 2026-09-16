@@ -18,6 +18,7 @@ import { prismaClient } from "./prisma/index.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
 import { createGroupRoutes } from "./routes/group.routes.js";
 import { createGroupAssignmentRoutes } from "./routes/groupAssignment.routes.js";
+import { createGroupAssignmentOutboxRoutes } from "./routes/groupAssignmentOutbox.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createLddRoutes } from "./routes/ldd.routes.js";
 import { createObligationRoutes } from "./routes/obligation.routes.js";
@@ -128,6 +129,13 @@ export function createPessoalApp({
   app.use("/pessoal/ldd", createLddRoutes(lddService));
   app.use("/pessoal/groups", createGroupRoutes(groupService));
   app.use("/pessoal/group-assignments", createGroupAssignmentRoutes(groupAssignmentService));
+  app.use(
+    "/internal/pessoal/group-assignments/audit-outbox",
+    createGroupAssignmentOutboxRoutes({
+      internalServiceToken: env.internalServiceToken,
+      service: groupAssignmentService,
+    }),
+  );
   app.use(
     "/internal",
     createInternalReportingRouter({
