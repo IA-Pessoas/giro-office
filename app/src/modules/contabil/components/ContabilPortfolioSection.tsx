@@ -84,6 +84,7 @@ export function ContabilPortfolioSection() {
               <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-800/70 dark:text-slate-400">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-semibold">Cliente</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Fechamento recebido</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Controle mensal</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Itens concluídos</th>
                 </tr>
@@ -94,6 +95,15 @@ export function ContabilPortfolioSection() {
                   return (
                     <tr key={item.client_id}>
                       <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{item.legal_name}</td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-slate-300">
+                        {{
+                          NOT_RECEIVED: "Não recebido",
+                          RECEIVED: "Recebido",
+                          UNDER_REVIEW: "Em conferência",
+                          CLOSED: "Fechado",
+                          REOPENED: "Reaberto",
+                        }[item.closing.status]}
+                      </td>
                       <td className="px-4 py-3 text-gray-700 dark:text-slate-300">
                         {item.control ? "Iniciado" : "—"}
                       </td>

@@ -102,6 +102,19 @@ await (async () => {
     assert.match(source, /—/);
   });
 
+  await runTest("carteira associa o fechamento e o controle às colunas corretas", () => {
+    const source = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
+    const closingStatus = source.indexOf('NOT_RECEIVED: "Não recebido"');
+    const monthlyControl = source.indexOf('item.control ? "Iniciado" : "—"');
+
+    assert.ok(closingStatus >= 0);
+    assert.ok(monthlyControl >= 0);
+    assert.ok(
+      closingStatus < monthlyControl,
+      "o status do fechamento deve ser renderizado antes do estado do controle mensal",
+    );
+  });
+
   await runTest("contabil page preserva o seletor de cliente da organização", () => {
     const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
 
@@ -129,6 +142,7 @@ await (async () => {
     );
     assert.equal(CONTABIL_ENDPOINTS.triageMonthly, "/triagem/monthly");
     assert.equal(CONTABIL_ENDPOINTS.triageStatements, "/triagem/statements");
+    assert.equal(CONTABIL_ENDPOINTS.triageClosing, "/triagem/closing");
   });
 
   await runTest("triagem apresenta os nove documentos, indicador e banco sem dados de conta", () => {
@@ -140,6 +154,9 @@ await (async () => {
     assert.match(source, /Identificador do banco/);
     assert.match(source, /dados de\s+conta não são solicitados/i);
     assert.match(source, /useTriageStatements/);
+    assert.match(source, /useTriageClosing/);
+    assert.match(source, /Fechamento recebido/);
+    assert.match(source, /NOT_RECEIVED/);
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {

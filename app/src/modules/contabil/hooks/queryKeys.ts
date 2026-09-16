@@ -23,3 +23,7 @@ export function triageMonthlyQueryKey(clientId: string, competence: string) {
 export function triageStatementsQueryKey(clientId: string, competence: string) {
   return [...CONTABIL_QUERY_KEY, "triage", "statements", clientId, competence] as const;
 }
+
+export function triageClosingQueryKey(clientId: string, competence: string) {
+  return [...CONTABIL_QUERY_KEY, "triage", "closing", clientId, competence] as const;
+}

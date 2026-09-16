@@ -8,9 +8,26 @@ import { triageDocumentsService } from "../services";
 import type {
   ContabilCompetence,
   TriageBankStatement,
+  TriageClosing,
+  TriageClosingStatus,
   TriageDocumentsMonthly,
 } from "../types";
-import { triageMonthlyQueryKey, triageStatementsQueryKey } from "./queryKeys";
+import {
+  triageClosingQueryKey,
+  triageMonthlyQueryKey,
+  triageStatementsQueryKey,
+} from "./queryKeys";
+
+export function useTriageClosing(
+  clientId: string,
+  competence: ContabilCompetence,
+): UseQueryResult<TriageClosing, Error> {
+  return useFetch(
+    triageClosingQueryKey(clientId, competence),
+    () => triageDocumentsService.getClosing({ clientId, competence }),
+    { enabled: Boolean(clientId) },
+  );
+}
 
 export function useTriageMonthly(
   clientId: string,
@@ -77,6 +94,18 @@ export function useTriageMutations(
         await refresh();
         await queryClient.invalidateQueries({
           queryKey: triageStatementsQueryKey(clientId, competence),
+        });
+      },
+    }),
+    closing: useMutation({
+      mutationFn: ({ status }: { status: TriageClosingStatus }) =>
+        triageDocumentsService.updateClosing({ clientId, competence, status }),
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: triageClosingQueryKey(clientId, competence),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: ["contabil", "controls", "list", competence],
         });
       },
     }),

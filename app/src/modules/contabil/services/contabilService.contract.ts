@@ -16,6 +16,7 @@ export const CONTABIL_ENDPOINTS = {
   triageMonthlyItem: (monthlyId: string) => `/triagem/monthly/${monthlyId}/item`,
   triageMonthlyItems: (monthlyId: string) => `/triagem/monthly/${monthlyId}/items`,
   triageStatements: "/triagem/statements",
+  triageClosing: "/triagem/closing",
 } as const;
 
 export function buildContabilControlParams(filters: ContabilControlFilters) {

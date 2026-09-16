@@ -80,16 +80,34 @@ describe("ControlService", () => {
           client_id: "b0000000-0000-4000-8000-000000000001",
           legal_name: "Alfa Contábil Ltda.",
           control: null,
+          closing: {
+            client_id: "b0000000-0000-4000-8000-000000000001",
+            competence: "2024-01",
+            status: "NOT_RECEIVED",
+            archived_at: null,
+          },
         },
         {
           client_id: "b0000000-0000-4000-8000-000000000002",
           legal_name: "Beta Contábil Ltda.",
           control: { ...baseRow, client_id: "b0000000-0000-4000-8000-000000000002" },
+          closing: {
+            client_id: "b0000000-0000-4000-8000-000000000002",
+            competence: "2024-01",
+            status: "NOT_RECEIVED",
+            archived_at: null,
+          },
         },
         {
           client_id: "b0000000-0000-4000-8000-000000000003",
           legal_name: "Cliente C",
           control: null,
+          closing: {
+            client_id: "b0000000-0000-4000-8000-000000000003",
+            competence: "2024-01",
+            status: "NOT_RECEIVED",
+            archived_at: null,
+          },
         },
       ],
     });
