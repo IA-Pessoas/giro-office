@@ -62,6 +62,11 @@ const client = {
   company_name: "Empresa Smoke",
   fantasy_name: "Smoke Ltda.",
 };
+const proposalConfig = {
+  id: "c0000000-0000-4000-8000-000000000001",
+  name: "Configuração Smoke",
+  contract_value: 1_500_000,
+};
 const prospecting = {
   id: "d0000000-0000-4000-8000-000000000001",
   client_id: client.id,
@@ -108,6 +113,21 @@ function respondJson(response, data, status = 200) {
   response.statusCode = status;
   response.setHeader("content-type", "application/json");
   response.end(JSON.stringify({ success: true, data }));
+}
+
+function readJsonBody(request) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      try {
+        resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {});
+      } catch (error) {
+        reject(error);
+      }
+    });
+    request.on("error", reject);
+  });
 }
 
 async function startServer(handler) {
@@ -159,14 +179,28 @@ function createUserUpstream() {
 
 function createCommercialUpstream() {
   const state = {
+    proposalConfigs: [proposalConfig],
     prospectingList: [],
     taskBillingList: [taskBilling],
   };
 
   const upstream = startServer((request, response) => {
     const pathname = new URL(request.url || "/", "http://commercial-smoke").pathname;
-    if (pathname === "/commercial/proposal-configs") {
-      respondJson(response, []);
+    if (pathname === "/commercial/proposal-configs" && request.method === "GET") {
+      respondJson(response, state.proposalConfigs);
+      return;
+    }
+    if (pathname.startsWith("/commercial/proposal-configs/") && request.method === "PATCH") {
+      readJsonBody(request).then((body) => {
+        const id = pathname.split("/").at(-1);
+        const updated = state.proposalConfigs.find((item) => item.id === id);
+        if (!updated) {
+          respondJson(response, {}, 404);
+          return;
+        }
+        Object.assign(updated, body);
+        respondJson(response, updated);
+      });
       return;
     }
     if (pathname === "/commercial/prospecting/clients") {
@@ -302,16 +336,37 @@ async function run() {
     }
     await page.screenshot({ path: `${evidenceDir}/01-commercial-desktop-light.png`, fullPage: true });
 
+    await page.getByRole("button", { name: "Editar", exact: true }).first().click();
+    const contractForm = page.getByRole("form", { name: "Editar configuração" });
+    const contractValueInput = contractForm.getByLabel("Valor base do contrato");
+    assert.equal(await contractValueInput.inputValue(), "R$ 1.500.000,00");
+    await contractValueInput.fill("abc");
+    assert.equal(await contractValueInput.inputValue(), "");
+    await contractValueInput.fill("123456");
+    assert.equal(await contractValueInput.inputValue(), "R$ 1.234,56");
+    await page.screenshot({ path: `${evidenceDir}/02-commercial-contract-value-mask.png`, fullPage: true });
+    const updateResponsePromise = page.waitForResponse(
+      (response) => response.request().method() === "PATCH" && response.url().includes("/commercial/proposal-configs/"),
+    );
+    await contractForm.getByRole("button", { name: "Salvar", exact: true }).click();
+    const updateResponse = await updateResponsePromise;
+    assert.deepEqual(JSON.parse(updateResponse.request().postData() || "{}"), {
+      name: "Configuração Smoke",
+      contract_value: 1234.56,
+    });
+    await page.getByText("Valor base do contrato: R$ 1.234,56", { exact: true }).waitFor();
+    await page.screenshot({ path: `${evidenceDir}/03-commercial-contract-value-saved.png`, fullPage: true });
+
     await page.getByRole("button", { name: "Nova prospecção" }).click();
     const clientSelect = page.locator('form[aria-label="Nova prospecção"] select').first();
     await clientSelect.focus();
     assert.equal(await page.evaluate(() => document.activeElement?.tagName), "SELECT");
-    await page.screenshot({ path: `${evidenceDir}/02-commercial-form-focus.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/04-commercial-form-focus.png`, fullPage: true });
     await clientSelect.selectOption(client.id);
     await page.getByLabel("Descrição").fill("Retorno na próxima semana");
     await page.getByRole("button", { name: "Salvar" }).click();
     await page.getByText("Análise Financeira").last().waitFor();
-    await page.screenshot({ path: `${evidenceDir}/03-commercial-saved-light.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/05-commercial-saved-light.png`, fullPage: true });
     await page.getByRole("button", { name: "Nova prospecção" }).click();
     await page.getByRole("form", { name: "Nova prospecção" }).waitFor();
     await page.getByRole("button", { name: "Cancelar" }).last().click();
@@ -324,7 +379,7 @@ async function run() {
     await page.getByText("Cobrança confirmada", { exact: true }).waitFor();
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({ path: `${evidenceDir}/04-commercial-mobile-light.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/06-commercial-mobile-light.png`, fullPage: true });
     await page.evaluate(() => window.localStorage.setItem("workspace-theme", "dark"));
     await page.reload({ waitUntil: "networkidle" });
     await page.getByRole("heading", { name: "Catálogo de propostas" }).waitFor();
@@ -353,7 +408,7 @@ async function run() {
     for (const evidence of [darkTextEvidence.heading, darkTextEvidence.intro, darkTextEvidence.taskBillingHeading]) {
       assert.ok(evidence.luminance >= 0.65, `Texto dark com contraste baixo: ${JSON.stringify(evidence)}`);
     }
-    await page.screenshot({ path: `${evidenceDir}/05-commercial-mobile-dark.png`, fullPage: true });
+    await page.screenshot({ path: `${evidenceDir}/07-commercial-mobile-dark.png`, fullPage: true });
     assert.deepEqual(pageErrors, []);
     assert.deepEqual(consoleErrors, []);
   } finally {
