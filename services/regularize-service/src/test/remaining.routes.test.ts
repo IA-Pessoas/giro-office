@@ -130,6 +130,8 @@ describe("regularize remaining routes", () => {
       },
     } as unknown as PrismaClient;
 
+    prisma.$transaction = vi.fn(async (callback) => callback(prisma));
+
     const app = createTestApp(prisma);
 
     const response = await request(app).post("/regularize/process").set(gatewayHeaders()).send({

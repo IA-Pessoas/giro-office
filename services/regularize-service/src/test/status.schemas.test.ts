@@ -45,7 +45,16 @@ describe("regularize status contracts", () => {
       post: {
         requestBody: {
           content: {
-            "application/json": { schema: { properties: { status: { enum: string[] } } } };
+            "application/json": {
+              schema: {
+                required: string[];
+                additionalProperties: boolean;
+                properties: {
+                  status: { enum: string[] };
+                  client_pj_id: { type: string; format: string };
+                };
+              };
+            };
           };
         };
       };
@@ -86,6 +95,15 @@ describe("regularize status contracts", () => {
     ).toEqual(
       expect.arrayContaining(["Pendente", "Andamento", "Protocolado", "Finalizado", "Paralisado"]),
     );
+    expect(
+      processWritePath.post.requestBody.content["application/json"].schema.additionalProperties,
+    ).toBe(false);
+    expect(processWritePath.post.requestBody.content["application/json"].schema.required).toEqual(
+      expect.arrayContaining(["cpf_cnpj", "process_type", "description", "status"]),
+    );
+    expect(
+      processWritePath.post.requestBody.content["application/json"].schema.properties.client_pj_id,
+    ).toEqual({ type: "string", format: "uuid" });
     expect(
       guidanceWritePath.post.requestBody.content["application/json"].schema.properties.status.enum,
     ).toEqual(expect.arrayContaining(["Em andamento", "Finalizado"]));

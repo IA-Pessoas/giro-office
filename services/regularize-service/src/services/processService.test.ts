@@ -23,7 +23,7 @@ function createBody(overrides: Partial<CreateProcessBody> = {}): CreateProcessBo
 }
 
 function createPrisma(overrides: Record<string, unknown> = {}) {
-  return {
+  const prisma = {
     client: {
       findFirst: vi.fn(async () => ({ id: clientPjId, cpf_cnpj: "12345678000199" })),
     },
@@ -47,6 +47,9 @@ function createPrisma(overrides: Record<string, unknown> = {}) {
     },
     ...overrides,
   } as unknown as PrismaClient;
+
+  prisma.$transaction = vi.fn(async (callback) => callback(prisma));
+  return prisma;
 }
 
 describe("ProcessService", () => {
@@ -132,6 +135,22 @@ describe("ProcessService", () => {
     expect(prisma.process.create).not.toHaveBeenCalled();
   });
 
+  it("rejects a task that is not part of the organization", async () => {
+    const prisma = createPrisma({
+      task: { findFirst: vi.fn(async () => null) },
+    });
+    const service = new ProcessService(prisma);
+
+    await expect(
+      service.create({
+        organizationId,
+        userId,
+        body: createBody({ task_id: "10000000-0000-4000-8000-000000000001" }),
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.process.create).not.toHaveBeenCalled();
+  });
+
   it("records explicit fiscal actions and returns them in the process timeline", async () => {
     const process = {
       id: processId,
@@ -210,6 +229,62 @@ describe("ProcessService", () => {
     });
 
     expect(prisma.logs.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps process writes and their audit log inside one transaction", async () => {
+    const prisma = createPrisma({
+      process: {
+        findFirst: vi.fn(async () => ({ id: processId })),
+        update: vi.fn(async () => ({ id: processId, status: "Andamento" })),
+      },
+    });
+    const service = new ProcessService(prisma);
+
+    await service.update({
+      organizationId,
+      userId,
+      body: { ...createBody(), id: processId },
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.process.update).toHaveBeenCalled();
+    expect(prisma.logs.create).toHaveBeenCalled();
+  });
+
+  it("hides responsible and history users from another organization", async () => {
+    const prisma = createPrisma({
+      process: {
+        findFirst: vi.fn(async () => ({
+          id: processId,
+          responsible1: {
+            id: responsibleId,
+            name: "Outro tenant",
+            organization_id: "a0000000-0000-4000-8000-000000000099",
+          },
+        })),
+      },
+      logs: {
+        create: vi.fn(async () => ({})),
+        findMany: vi.fn(async () => [
+          {
+            id: "log-foreign",
+            user: {
+              id: userId,
+              name: "Usuário de outro tenant",
+              organization_id: "a0000000-0000-4000-8000-000000000099",
+            },
+          },
+        ]),
+      },
+    });
+    const service = new ProcessService(prisma);
+
+    await expect(service.detail(organizationId, processId)).resolves.toMatchObject({
+      detail: {
+        responsible1: null,
+        history: [{ user: null }],
+      },
+    });
   });
 
   it("calculates calendar days without mutating any record", () => {

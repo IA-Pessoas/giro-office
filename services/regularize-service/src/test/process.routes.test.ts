@@ -9,7 +9,7 @@ import { createTestApp, gatewayHeaders } from "./regularizeTestUtils.js";
 const processId = "e0000000-0000-4000-8000-000000000001";
 
 function createPrisma() {
-  return {
+  const prisma = {
     process: {
       findFirst: vi.fn(async () => ({
         id: processId,
@@ -36,6 +36,9 @@ function createPrisma() {
       findMany: vi.fn(async () => []),
     },
   } as unknown as PrismaClient;
+
+  prisma.$transaction = vi.fn(async (callback) => callback(prisma));
+  return prisma;
 }
 
 describe("regularize process routes", () => {
