@@ -4327,6 +4327,37 @@ const handlers = {
     });
   },
 
+  async triageClosingGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
+  async triageClosingUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+        status: "UNDER_REVIEW",
+      },
+    });
+  },
+
+  async triageClosingArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
   async contabilResponsibleCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

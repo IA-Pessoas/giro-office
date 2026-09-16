@@ -25,11 +25,16 @@ import {
   createTriageDocumentsRoutes,
   type TriageDocumentsRouteDeps,
 } from "./routes/triageDocuments.routes.js";
+import {
+  createTriageClosingRoutes,
+  type TriageClosingRouteDeps,
+} from "./routes/triageClosing.routes.js";
 import { ControlService } from "./services/controlService.js";
 import { InternalReportingService } from "./services/internalReportingService.js";
 import { RelationshipService } from "./services/relationshipService.js";
 import { ResponsibleService } from "./services/responsibleService.js";
 import { TriageDocumentsService } from "./services/triageDocumentsService.js";
+import { TriageClosingService } from "./services/triageClosingService.js";
 
 function contabilServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -58,6 +63,7 @@ export function createContabilApp(options: {
   responsibleRouteDeps?: ResponsibleRouteDeps;
   relationshipRouteDeps?: RelationshipRouteDeps;
   triageDocumentsRouteDeps?: TriageDocumentsRouteDeps;
+  triageClosingRouteDeps?: TriageClosingRouteDeps;
   internalReportingService?: InternalReportingService;
 }): express.Express {
   const { env, logger } = options;
@@ -65,6 +71,7 @@ export function createContabilApp(options: {
   const responsibleRouteDeps = options.responsibleRouteDeps ?? new ResponsibleService();
   const relationshipRouteDeps = options.relationshipRouteDeps ?? new RelationshipService();
   const triageDocumentsRouteDeps = options.triageDocumentsRouteDeps ?? new TriageDocumentsService();
+  const triageClosingRouteDeps = options.triageClosingRouteDeps ?? new TriageClosingService();
   const internalReportingService =
     options.internalReportingService ?? new InternalReportingService(prismaClient);
 
@@ -94,6 +101,7 @@ export function createContabilApp(options: {
   app.use("/contabil", createResponsibleRoutes(responsibleRouteDeps));
   app.use("/contabil", createRelationshipRoutes(relationshipRouteDeps));
   app.use("/triagem", createTriageDocumentsRoutes(triageDocumentsRouteDeps));
+  app.use("/triagem", createTriageClosingRoutes(triageClosingRouteDeps));
   app.use(
     "/internal",
     createInternalReportingRouter({ env, reportingService: internalReportingService }),

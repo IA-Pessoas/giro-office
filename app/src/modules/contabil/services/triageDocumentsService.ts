@@ -5,6 +5,8 @@ import type {
   TriageBankStatement,
   TriageDocumentStatus,
   TriageDocumentsMonthly,
+  TriageClosing,
+  TriageClosingStatus,
 } from "../types";
 import {
   CONTABIL_ENDPOINTS,
@@ -71,6 +73,22 @@ export const triageDocumentsService = {
         status: params.status,
       },
     );
+    return unwrapContabilEnvelope(response.data);
+  },
+  async getClosing(params: MonthlyParams): Promise<TriageClosing> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageClosing, {
+      params: { client_id: params.clientId, competence: params.competence },
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async updateClosing(
+    params: MonthlyParams & { status: TriageClosingStatus },
+  ): Promise<TriageClosing> {
+    const response = await setupAPIClient().put(CONTABIL_ENDPOINTS.triageClosing, {
+      client_id: params.clientId,
+      competence: params.competence,
+      status: params.status,
+    });
     return unwrapContabilEnvelope(response.data);
   },
 };

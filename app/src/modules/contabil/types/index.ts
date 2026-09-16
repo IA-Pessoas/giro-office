@@ -79,6 +79,7 @@ export interface ContabilControlPortfolioItem {
   client_id: string;
   legal_name: string;
   control: ContabilControl | null;
+  closing: TriageClosing;
 }
 
 export interface ContabilControlPortfolio {
@@ -155,4 +156,19 @@ export interface TriageBankStatement {
   id: string;
   bank_id: string;
   status: TriageDocumentStatus;
+}
+
+export type TriageClosingStatus =
+  | "NOT_RECEIVED"
+  | "RECEIVED"
+  | "UNDER_REVIEW"
+  | "CLOSED"
+  | "REOPENED";
+
+export interface TriageClosing {
+  id?: string;
+  client_id: string;
+  competence: ContabilCompetence;
+  status: TriageClosingStatus;
+  archived_at: string | null;
 }

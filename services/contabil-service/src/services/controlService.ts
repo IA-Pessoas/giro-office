@@ -36,6 +36,7 @@ export interface ControlPortfolio {
     client_id: string;
     legal_name: string;
     control: ControlContabilEntity | null;
+    closing: Record<string, unknown>;
   }>;
 }
 
@@ -127,6 +128,11 @@ export class ControlService {
             orderBy: { id: "asc" },
             take: 1,
           },
+          triageClosings: {
+            where: { competence, organization_id: organizationId, archived_at: null },
+            orderBy: { id: "asc" },
+            take: 1,
+          },
         },
       });
 
@@ -135,6 +141,12 @@ export class ControlService {
           client_id: client.id,
           legal_name: client.company_name?.trim() || client.name,
           control: client.controlContabil[0] ?? null,
+          closing: client.triageClosings?.[0] ?? {
+            client_id: client.id,
+            competence,
+            status: "NOT_RECEIVED",
+            archived_at: null,
+          },
         }))
         .sort((a, b) => a.legal_name.localeCompare(b.legal_name, "pt-BR", { sensitivity: "base" }));
 

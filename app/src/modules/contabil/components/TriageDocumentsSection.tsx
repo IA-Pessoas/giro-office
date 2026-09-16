@@ -10,9 +10,14 @@ import {
   useTriageMonthly,
   useTriageMutations,
   useTriageStatements,
+  useTriageClosing,
 } from "../hooks";
 import { getContabilErrorMessage } from "../services";
-import type { ContabilCompetence, TriageDocumentStatus } from "../types";
+import type {
+  ContabilCompetence,
+  TriageClosingStatus,
+  TriageDocumentStatus,
+} from "../types";
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilStateBox } from "./ContabilStateBox";
 
@@ -34,6 +39,13 @@ const STATUSES: Array<[TriageDocumentStatus, string]> = [
   ["NOT_PRESENT", "Não recebido"],
   ["NOT_APPLICABLE", "Não aplicável"],
 ];
+const CLOSING_STATUSES: Array<[TriageClosingStatus, string]> = [
+  ["NOT_RECEIVED", "Não recebido"],
+  ["RECEIVED", "Recebido"],
+  ["UNDER_REVIEW", "Em conferência"],
+  ["CLOSED", "Fechado"],
+  ["REOPENED", "Reaberto"],
+];
 
 export function TriageDocumentsSection({
   clientId,
@@ -49,6 +61,7 @@ export function TriageDocumentsSection({
   const monthly = useTriageMonthly(clientId, competence);
   const mutations = useTriageMutations(clientId, competence);
   const statements = useTriageStatements(clientId, competence);
+  const closing = useTriageClosing(clientId, competence);
   const record = monthly.data;
 
   if (monthly.isLoading)
@@ -95,6 +108,38 @@ export function TriageDocumentsSection({
             className="ml-2 h-10 rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
           />
         </label>
+      </div>
+      <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
+        <h3 className="font-semibold text-gray-900 dark:text-white">
+          Fechamento recebido
+        </h3>
+        <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
+          Estado independente das pendências documentais e do checklist mensal.
+        </p>
+        {canEdit ? (
+          <select
+            aria-label="Estado do fechamento recebido"
+            value={closing.data?.status ?? "NOT_RECEIVED"}
+            disabled={closing.isLoading || mutations.closing.isPending}
+            onChange={(event) =>
+              mutations.closing.mutate({
+                status: event.target.value as TriageClosingStatus,
+              })
+            }
+            className="mt-3 rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
+          >
+            {CLOSING_STATUSES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="mt-3 text-sm text-gray-700 dark:text-slate-300">
+            {CLOSING_STATUSES.find(([value]) => value === closing.data?.status)?.[1] ??
+              "Não recebido"}
+          </p>
+        )}
       </div>
       {!record ? (
         <ContabilStateBox

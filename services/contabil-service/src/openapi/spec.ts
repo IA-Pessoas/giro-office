@@ -955,6 +955,106 @@ export function buildContabilServiceOpenApiSpec(
             },
           },
         },
+        "/triagem/closing": {
+          get: {
+            tags: ["Triage Closing"],
+            summary: "Consultar estado do fechamento recebido",
+            security: [{ bearerAuth: [] }],
+            parameters: [
+              {
+                name: "client_id",
+                in: "query",
+                required: true,
+                schema: { type: "string", format: "uuid" },
+              },
+              {
+                name: "competence",
+                in: "query",
+                required: true,
+                schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+              },
+            ],
+            responses: {
+              "200": {
+                description: "Estado do fechamento; ausência retorna NOT_RECEIVED sem criar registro",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  },
+                },
+              },
+            },
+          },
+          put: {
+            tags: ["Triage Closing"],
+            summary: "Atualizar estado do fechamento recebido",
+            security: [{ bearerAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["client_id", "competence", "status"],
+                    additionalProperties: false,
+                    properties: {
+                      client_id: { type: "string", format: "uuid" },
+                      competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+                      status: {
+                        type: "string",
+                        enum: ["NOT_RECEIVED", "RECEIVED", "UNDER_REVIEW", "CLOSED", "REOPENED"],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              "200": {
+                description: "Fechamento atualizado",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  },
+                },
+              },
+              "403": { description: "Sem permissão" },
+            },
+          },
+          delete: {
+            tags: ["Triage Closing"],
+            summary: "Arquivar logicamente o fechamento recebido",
+            security: [{ bearerAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["client_id", "competence"],
+                    additionalProperties: false,
+                    properties: {
+                      client_id: { type: "string", format: "uuid" },
+                      competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              "200": {
+                description: "Fechamento arquivado",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  },
+                },
+              },
+              "403": { description: "Sem permissão" },
+              "404": { description: "Fechamento não encontrado" },
+            },
+          },
+        },
     },
   };
 }

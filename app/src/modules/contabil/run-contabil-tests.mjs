@@ -129,6 +129,7 @@ await (async () => {
     );
     assert.equal(CONTABIL_ENDPOINTS.triageMonthly, "/triagem/monthly");
     assert.equal(CONTABIL_ENDPOINTS.triageStatements, "/triagem/statements");
+    assert.equal(CONTABIL_ENDPOINTS.triageClosing, "/triagem/closing");
   });
 
   await runTest("triagem apresenta os nove documentos, indicador e banco sem dados de conta", () => {
@@ -140,6 +141,9 @@ await (async () => {
     assert.match(source, /Identificador do banco/);
     assert.match(source, /dados de\s+conta não são solicitados/i);
     assert.match(source, /useTriageStatements/);
+    assert.match(source, /useTriageClosing/);
+    assert.match(source, /Fechamento recebido/);
+    assert.match(source, /NOT_RECEIVED/);
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {

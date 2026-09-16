@@ -223,6 +223,7 @@ model Organization {
   triageMonthlys                TriageMonthly[]
   triageResponsibles            TriageResponsible[]
   triageBankStatements          TriageBankStatement[]
+  triageClosings                TriageClosing[]
 
   @@index([name, id], map: "idx_organizations_name_id")
   @@map("organizations")
@@ -691,6 +692,7 @@ model Client {
   triageMonthlys                TriageMonthly[]
   responsiblesTriage            TriageResponsible[]
   triageBankStatements          TriageBankStatement[]
+  triageClosings                TriageClosing[]
   commercialProspectings        CommercialProspecting[]
 
   @@map("clients")
@@ -2452,6 +2454,23 @@ model TriageBankStatement {
   @@unique([organization_id, client_id, competence, bank_id])
   @@index([organization_id, client_id, competence])
   @@map("triagem.bank_statements")
+}
+
+model TriageClosing {
+  id              String       @id @default(uuid())
+  client_id       String
+  competence      String
+  status          String
+  archived_at     DateTime?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, client_id, competence])
+  @@index([organization_id, client_id, competence, archived_at])
+  @@map("triagem.closings")
 }
 
 model ClientClouds {

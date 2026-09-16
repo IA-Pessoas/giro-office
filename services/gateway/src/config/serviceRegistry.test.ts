@@ -44,13 +44,13 @@ describe("triagem gateway registry", () => {
       auditServiceToken: "gateway-triagem-token",
     } as GatewayEnv;
 
-    expect(resolveGatewayService(env, "/triagem/monthly")).toMatchObject({
+    expect(resolveGatewayService(env, "/triagem/closing", "PUT")).toMatchObject({
       key: "triagem-service",
       targetUrl: "http://contabil-service:3038",
       internalServiceToken: "gateway-triagem-token",
       routePrefixes: ["/triagem"],
     });
-    expect(resolveGatewayService(env, "/triagem/monthly")?.permissionModule).toBeUndefined();
+    expect(resolveGatewayService(env, "/triagem/closing", "PUT")?.permissionModule).toBeUndefined();
   });
 });
 
