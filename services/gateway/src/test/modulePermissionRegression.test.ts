@@ -41,12 +41,14 @@ describe("matriz de regressão das políticas modulares", () => {
       ["GET", "/triagem/statements"],
       ["GET", "/triagem/closing"],
     ] as const;
-    const writeRoutes = [
+    const contabilWriteRoutes = [
       ["POST", "/contabil/controls"],
       ["POST", "/contabil/controls/year"],
       ["PATCH", "/contabil/controls/control-1/items"],
       ["DELETE", "/contabil/controls"],
       ["POST", "/contabil/controls/restore"],
+    ] as const;
+    const triagemWriteRoutes = [
       ["POST", "/triagem/monthly"],
       ["PUT", "/triagem/statements"],
       ["PUT", "/triagem/closing"],
@@ -55,8 +57,12 @@ describe("matriz de regressão das políticas modulares", () => {
     for (const [method, path] of readRoutes) {
       expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(true);
     }
-    for (const [method, path] of writeRoutes) {
+    for (const [method, path] of contabilWriteRoutes) {
       expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(false);
+      expect(canAccessRoute(editor, requiredRoutePolicy(method, path))).toBe(true);
+    }
+    for (const [method, path] of triagemWriteRoutes) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(true);
       expect(canAccessRoute(editor, requiredRoutePolicy(method, path))).toBe(true);
     }
   });
@@ -73,6 +79,17 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 0 } }), policy)).toBe(
       false,
     );
+  });
+
+  it("deixa a atribuição de Triagem decidir a escrita no serviço", () => {
+    const policy = requiredRoutePolicy("PATCH", "/triagem/monthly/monthly-1/item");
+
+    expect(
+      canAccessRoute(authContext({ modules: { contabil: 0, triagem: 1 } }), policy),
+    ).toBe(true);
+    expect(
+      canAccessRoute(authContext({ modules: { contabil: 0, triagem: 0 } }), policy),
+    ).toBe(false);
   });
 
   it.each([
