@@ -28,6 +28,13 @@ This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-opti
 
 ## Learn More
 
+### Smoke da navegação autenticada
+
+`pnpm test:auth-sidebar` inicia o servidor de desenvolvimento. Para usar um build
+já preparado, execute `pnpm build` e depois `pnpm test:auth-sidebar --production`.
+A suíte `pnpm test` usa esse modo após o build realizado pelo teste de sessão,
+evitando compilar rotas durante as asserções de navegação.
+
 To learn more about Next.js, take a look at the following resources:
 
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
