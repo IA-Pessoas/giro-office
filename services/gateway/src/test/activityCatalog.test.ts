@@ -206,6 +206,26 @@ describe("activityCatalog", () => {
       "gerou",
       "obrigações da competência",
     ],
+    ["GET", "/pessoal/groups", "consultou", "a lista de grupos de departamento pessoal"],
+    ["POST", "/pessoal/groups", "cadastrou", "um novo grupo de departamento pessoal"],
+    ["GET", "/pessoal/groups/42", "consultou", "um grupo de departamento pessoal"],
+    ["PATCH", "/pessoal/groups/42", "atualizou", "um grupo de departamento pessoal"],
+    ["DELETE", "/pessoal/groups/42", "arquivou", "um grupo de departamento pessoal"],
+    ["POST", "/pessoal/groups/42/reactivate", "reativou", "um grupo de departamento pessoal"],
+    [
+      "GET",
+      "/pessoal/group-assignments/eligible?competence=2026-09",
+      "consultou",
+      "as folhas elegíveis para atribuição de grupos",
+    ],
+    ["POST", "/pessoal/group-assignments/previews", "gerou", "uma prévia de atribuição de grupos"],
+    [
+      "GET",
+      "/pessoal/group-assignments/previews/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+      "consultou",
+      "uma prévia de atribuição de grupos",
+    ],
+    ["POST", "/pessoal/group-assignments/apply", "aplicou", "uma atribuição de grupos em lote"],
     ["GET", "/platform/organizations", "consultou", "a lista global de organizações"],
     ["POST", "/platform/organizations", "criou", "uma organização"],
     ["POST", "/platform/organizations/org-1/users", "criou", "um usuário da organização"],
@@ -296,6 +316,10 @@ describe("activityCatalog", () => {
   it("não inventa descrição para rota desconhecida", () => {
     expect(classifyActivity("POST", "/unknown/action")).toEqual({ kind: "unknown" });
     expect(classifyActivity("POST", "/task/nova-acao")).toEqual({ kind: "unknown" });
+    expect(classifyActivity("POST", "/pessoal/groups/42/unknown")).toEqual({ kind: "unknown" });
+    expect(classifyActivity("GET", "/pessoal/group-assignments/unknown")).toEqual({
+      kind: "unknown",
+    });
     expect(describeActivity("POST", "/unknown/action")).toBeNull();
   });
 

@@ -447,6 +447,36 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "gerou", item: "obrigações da competência" },
   },
   {
+    methods: ["DELETE"],
+    pattern: /^\/pessoal\/groups\/[^/]+$/,
+    description: { action: "arquivou", item: "um grupo de departamento pessoal" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/groups\/[^/]+\/reactivate$/,
+    description: { action: "reativou", item: "um grupo de departamento pessoal" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/group-assignments\/eligible$/,
+    description: { action: "consultou", item: "as folhas elegíveis para atribuição de grupos" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/group-assignments\/previews$/,
+    description: { action: "gerou", item: "uma prévia de atribuição de grupos" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/group-assignments\/previews\/[^/]+$/,
+    description: { action: "consultou", item: "uma prévia de atribuição de grupos" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/group-assignments\/apply$/,
+    description: { action: "aplicou", item: "uma atribuição de grupos em lote" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/parcelamento\/installments\/[^/]+\/competencies$/,
     description: { action: "consultou", item: "as competências de um parcelamento" },
@@ -1004,6 +1034,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "uma notificação de certificado",
     newSingular: "uma nova notificação de certificado",
     plural: "notificações de certificados",
+  },
+  {
+    pattern: /^\/pessoal\/groups(?:\/|$)/,
+    singular: "um grupo de departamento pessoal",
+    newSingular: "um novo grupo de departamento pessoal",
+    plural: "grupos de departamento pessoal",
   },
   {
     pattern: /^\/pessoal\/ldd(?:\/|$)/,
