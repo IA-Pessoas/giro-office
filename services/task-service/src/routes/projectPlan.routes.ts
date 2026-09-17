@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  normalizeModulePermission,
   parseWithZod,
   requireAuthenticatedRequestContext,
 } from "@workspace/shared";
@@ -53,6 +54,8 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
       const result = await service.create({
         user_id,
         organization_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
         name: body.name,
         color: body.color,
       });
@@ -66,8 +69,13 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
 
   router.get("/project-plan/list", isAuthenticated, async (req: Request, res: Response, next) => {
     try {
-      const { organization_id } = requireAuthenticatedRequestContext(req);
-      const result = await service.list(organization_id);
+      const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+      const result = await service.list(organization_id, {
+        user_id,
+        organization_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
+      });
 
       res.json(createSuccessResponse(result));
     } catch (err) {
@@ -84,6 +92,8 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
       const result = await service.update({
         user_id,
         organization_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
         id: body.id,
         name: body.name,
         color: body.color,
@@ -102,9 +112,14 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
         plan_id: firstQueryValue(req.body?.plan_id ?? req.query.plan_id),
       };
       const query = parseWithZod(projectPlanDetailQuerySchema, rawObj);
-      const { organization_id } = requireAuthenticatedRequestContext(req);
+      const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
 
-      const result = await service.detail(query.plan_id, organization_id);
+      const result = await service.detail(query.plan_id, organization_id, {
+        user_id,
+        organization_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
+      });
       res.json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao detalhar plano de projeto", { err });
@@ -124,6 +139,8 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
         id: params.id,
         user_id,
         organization_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
       });
 
       res.json(createSuccessResponse(result));
@@ -143,6 +160,8 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
         task_id: body.task_id,
         user_id,
         organization_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
       });
 
       res.status(201).json(createSuccessResponse(result));
@@ -161,9 +180,14 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
           plan_id: firstQueryValue(req.body?.plan_id ?? req.query.plan_id),
         };
         const query = parseWithZod(projectPlanListTasksQuerySchema, rawObj);
-        const { organization_id } = requireAuthenticatedRequestContext(req);
+        const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
 
-        const result = await service.listTasks(query.plan_id, organization_id);
+        const result = await service.listTasks(query.plan_id, organization_id, {
+          user_id,
+          organization_id,
+          integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+          isOwner: req.user_type === "owner",
+        });
         res.json(createSuccessResponse(result));
       } catch (err) {
         logError("Erro ao listar tarefas do plano", { err });
@@ -183,6 +207,8 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
         direction: body.direction,
         user_id,
         organization_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
       });
 
       res.json(createSuccessResponse(result));
@@ -205,6 +231,8 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
           plan_task_id: body.plan_task_id,
           user_id,
           organization_id,
+          integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+          isOwner: req.user_type === "owner",
         });
 
         res.json(createSuccessResponse(result));
@@ -225,6 +253,8 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
         organization_id,
         project_id: body.project_id,
         plan_id: body.plan_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
       });
 
       res.json(createSuccessResponse(result));

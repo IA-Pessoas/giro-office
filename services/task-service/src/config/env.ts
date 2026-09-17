@@ -54,6 +54,9 @@ const envSchema = z
     auditServiceToken: z.string().default("audit-service-token"),
     commercialServiceToken: z.string().default("audit-service-token"),
     projectServiceUrl: z.string().url().default("http://localhost:3033"),
+    supabaseUrl: z.string().url().optional(),
+    supabaseServiceRoleKey: z.string().trim().min(1).optional(),
+    taskAttachmentStorageBucket: z.string().trim().min(1).optional(),
     aiExtractionMode: z.enum(AI_TASK_EXTRACTION_MODES).optional().default("fake"),
     openaiApiKey: z.string().trim().min(1).optional(),
     openaiBaseUrl: z.string().url().optional(),
@@ -95,6 +98,27 @@ const envSchema = z
         path: ["openaiApiKey"],
       });
     }
+    if (env.nodeEnv === "production" && !env.supabaseUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "SUPABASE_URL é obrigatória para anexos de tarefas em produção.",
+        path: ["supabaseUrl"],
+      });
+    }
+    if (env.nodeEnv === "production" && !env.supabaseServiceRoleKey) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "SUPABASE_SERVICE_ROLE_KEY é obrigatória para anexos de tarefas em produção.",
+        path: ["supabaseServiceRoleKey"],
+      });
+    }
+    if (env.nodeEnv === "production" && !env.taskAttachmentStorageBucket) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "TASK_ATTACHMENT_STORAGE_BUCKET é obrigatório para anexos de tarefas em produção.",
+        path: ["taskAttachmentStorageBucket"],
+      });
+    }
   })
   .transform((env) => {
     const { enableApiDocsEnv, ...rest } = env;
@@ -134,6 +158,9 @@ const envSchema = z
     });
     return {
       ...rest,
+      supabaseUrl: rest.supabaseUrl ?? "http://localhost:54321",
+      supabaseServiceRoleKey: rest.supabaseServiceRoleKey ?? "task-attachment-storage-test-key",
+      taskAttachmentStorageBucket: rest.taskAttachmentStorageBucket ?? "task-attachments-private",
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,
       enableApiDocs,
     };
@@ -152,6 +179,9 @@ export function getTaskServiceEnv(): TaskServiceEnv {
     auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     commercialServiceToken: process.env.COMMERCIAL_SERVICE_TOKEN,
     projectServiceUrl: process.env.PROJECT_SERVICE_URL,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    taskAttachmentStorageBucket: process.env.TASK_ATTACHMENT_STORAGE_BUCKET,
     aiExtractionMode: process.env.AI_EXTRACTION_MODE,
     openaiApiKey: process.env.OPENAI_API_KEY,
     openaiBaseUrl: process.env.OPENAI_BASE_URL,

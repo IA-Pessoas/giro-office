@@ -312,6 +312,86 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "concluiu", item: "uma tarefa" },
   },
   {
+    methods: ["DELETE"],
+    pattern: /^\/task\/complete-request$/,
+    description: { action: "cancelou", item: "uma solicitação de conclusão de tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/complete-request\/list$/,
+    description: { action: "consultou", item: "o histórico de conclusão de uma tarefa" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/reopen$/,
+    description: { action: "reabriu", item: "uma tarefa" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/postponement$/,
+    description: { action: "prorrogou", item: "uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/postponement\/list$/,
+    description: { action: "consultou", item: "o histórico de prorrogações de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/notifications$/,
+    description: { action: "consultou", item: "as notificações operacionais" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/notifications\/read$/,
+    description: { action: "marcou como lida", item: "uma notificação operacional" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/attachment$/,
+    description: { action: "anexou", item: "um comprovante a uma tarefa" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/task\/attachment$/,
+    description: { action: "removeu", item: "um anexo de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/attachment\/list$/,
+    description: { action: "consultou", item: "os anexos de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/attachment\/access$/,
+    description: { action: "abriu", item: "um anexo de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/financeiro\/queue$/,
+    description: { action: "consultou", item: "a fila de cobrança financeira" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/financeiro\/collectors$/,
+    description: { action: "consultou", item: "os cobradores de um departamento" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/financeiro\/collectors$/,
+    description: { action: "configurou", item: "os cobradores de um departamento" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/financeiro\/settle$/,
+    description: { action: "deu baixa financeira em", item: "tarefas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/financeiro\/express$/,
+    description: { action: "deu Baixa Express em", item: "tarefas de um cliente" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/regularize\/dashboard$/,
     description: { action: "consultou", item: "o painel de regularização" },

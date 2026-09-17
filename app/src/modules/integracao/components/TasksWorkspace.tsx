@@ -23,6 +23,7 @@ import { INTEGRACAO_TASK_STATUS_VALUES, type IntegracaoTaskListItem } from "../t
 import { useDeleteIntegracaoTaskMutation, useIntegracaoTasksList } from "../hooks";
 import { TASK_MODEL_CONFIG_ENTRY } from "../navigation/taskModelConfigNavigation";
 import { TaskFormModal } from "./TaskFormModal";
+import { TaskFinanceiroPanel } from "./TaskFinanceiroPanel";
 import {
   getProjectStatusTone,
   PROJECT_COMPACT_BUTTON_CLASSNAME,
@@ -335,6 +336,12 @@ export function TasksWorkspace() {
           </section>
         ))}
       </div>
+
+      <TaskFinanceiroPanel
+        canManage={integracaoAccess.isAdmin}
+        canView={integracaoAccess.canView}
+        clientId={routeClientId}
+      />
 
       <section className={`${PROJECT_SUBPANEL_CLASSNAME} p-4`}>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_240px]">

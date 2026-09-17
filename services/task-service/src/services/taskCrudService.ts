@@ -21,6 +21,10 @@ import {
   listEligibleTaskResponsibles,
 } from "./responsibleUserContext.js";
 import { ACTIVE_TASK_CONFLICT_MESSAGE, throwIfActiveTaskConflict } from "./taskActiveConflict.js";
+import {
+  publishTaskOperationalNotifications,
+  TASK_OPERATIONAL_NOTIFICATION_TYPE,
+} from "./taskOperationalNotificationService.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
 
 const TASK_DETAIL_SELECT = {
@@ -91,6 +95,7 @@ const TASK_UPDATE_SELECT = {
   responsible2_id: true,
   responsible3_id: true,
   prevision_date: true,
+  date_updated: true,
 } as const;
 
 const DEPENDENTS_FOR_CREATE_SELECT = {
@@ -154,7 +159,6 @@ export interface UpdateTaskCrudRequest {
   responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
-  prevision_date?: Date | string | null;
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
 }
@@ -747,15 +751,14 @@ export class TaskCrudService {
         ),
       });
 
-      const canSetCompletedStatus =
-        data.isOwner === true ||
-        (data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) >=
-          INTEGRACAO_PERMISSION_LEVEL.ADMIN;
-      if (data.status === "Concluída" && !canSetCompletedStatus) {
+      if (data.status === "Concluída") {
         throw new ServiceError(
           403,
-          "A conclusão deve ser solicitada pelo fluxo de conclusão da tarefa.",
+          "A conclusão deve ser aprovada pelo fluxo de conclusão da tarefa.",
         );
+      }
+      if (exists.status === "Concluída" && data.status !== undefined) {
+        throw new ServiceError(403, "A reabertura deve usar o fluxo de conclusão da tarefa.");
       }
 
       const name = data.name !== undefined ? data.name : exists.name;
@@ -834,18 +837,6 @@ export class TaskCrudService {
           : undefined,
       ]);
 
-      let prevision_date: Date | null;
-      if (data.prevision_date === undefined) {
-        prevision_date = exists.prevision_date;
-      } else if (data.prevision_date === null) {
-        prevision_date = null;
-      } else {
-        prevision_date =
-          typeof data.prevision_date === "string"
-            ? new Date(data.prevision_date)
-            : data.prevision_date;
-      }
-
       const updated = await prismaClient.task.update({
         where: { id: data.task_id },
         data: {
@@ -859,7 +850,7 @@ export class TaskCrudService {
           responsible_id,
           responsible2_id,
           responsible3_id,
-          prevision_date,
+          prevision_date: exists.prevision_date,
         },
         select: TASK_UPDATE_SELECT,
       });
@@ -873,6 +864,30 @@ export class TaskCrudService {
         oldData: exists as Record<string, unknown>,
         updatedData: updated as Record<string, unknown>,
       });
+
+      const relevantChange =
+        exists.status !== updated.status ||
+        exists.observations !== updated.observations ||
+        exists.responsible_id !== updated.responsible_id ||
+        exists.responsible2_id !== updated.responsible2_id ||
+        exists.responsible3_id !== updated.responsible3_id;
+      if (relevantChange) {
+        await publishTaskOperationalNotifications(prismaClient, {
+          organization_id: data.organization_id,
+          task_id: data.task_id,
+          event_key: `task-change:${updated.date_updated?.toISOString() ?? data.task_id}`,
+          type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
+          title: "Tarefa atualizada",
+          message: "Há uma alteração relevante em uma tarefa acompanhada por você.",
+          responsible_ids: [
+            updated.responsible_id,
+            updated.responsible2_id,
+            updated.responsible3_id,
+          ],
+          include_administrators: true,
+          exclude_user_id: data.user_id,
+        });
+      }
 
       await this.#workflow.afterTaskUpdated({
         taskId: data.task_id,

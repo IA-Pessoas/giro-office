@@ -54,6 +54,9 @@ import {
   getTaskUrgencyOptions,
   shouldBlockTaskEditForm,
 } from "./taskFormModalUi";
+import { TaskCompletionPanel } from "./TaskCompletionPanel";
+import { TaskAttachmentPanel } from "./TaskAttachmentPanel";
+import { TaskPostponementPanel } from "./TaskPostponementPanel";
 
 interface TaskFormModalProps {
   open: boolean;
@@ -430,6 +433,10 @@ export function TaskFormModal({
     }
 
     const status = editValues.status as IntegracaoTaskStatus;
+    if (status === "Concluída" && detail?.status !== "Concluída") {
+      toast.warning("Use o painel de conclusão para enviar a solicitação.");
+      return;
+    }
 
     try {
       const updatedTask = await updateMutation.mutateAsync(
@@ -453,7 +460,6 @@ export function TaskFormModal({
               ...(editValues.responsible_id !== (detail?.responsible_id ?? "")
                 ? { responsible_id: editValues.responsible_id }
                 : {}),
-              prevision_date: editValues.prevision_date || null,
             },
       );
 
@@ -707,17 +713,20 @@ export function TaskFormModal({
               <div className={TASK_FORM_GRID_CLASSNAME}>
                 <label className={TASK_FORM_LABEL_CLASSNAME}>
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
-                    Previsão
+                    Previsão atual
                   </span>
                   <div className="relative">
                     <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                       type="date"
                       value={editValues.prevision_date}
-                      onChange={(event) => updateEditValue("prevision_date", event.target.value)}
+                      readOnly
                       className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
                     />
                   </div>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Use Prorrogações para alterar a previsão.
+                  </span>
                 </label>
 
                 <label className={TASK_FORM_LABEL_CLASSNAME}>
@@ -754,6 +763,31 @@ export function TaskFormModal({
               </label>
             </>
           )}
+          {taskDetailQuery.data ? (
+            <TaskCompletionPanel
+              task={taskDetailQuery.data}
+              currentUserId={user?.id}
+              accessLevel={integracaoAccess.level}
+              isOwner={user?.type === "owner"}
+              canApproveCompletion={user?.task_completion === true}
+            />
+          ) : null}
+          {taskDetailQuery.data ? (
+            <TaskPostponementPanel
+              task={taskDetailQuery.data}
+              currentUserId={user?.id}
+              accessLevel={integracaoAccess.level}
+              isOwner={user?.type === "owner"}
+            />
+          ) : null}
+          {taskDetailQuery.data ? (
+            <TaskAttachmentPanel
+              task={taskDetailQuery.data}
+              currentUserId={user?.id}
+              accessLevel={integracaoAccess.level}
+              isOwner={user?.type === "owner"}
+            />
+          ) : null}
         </form>
       ) : (
         <form

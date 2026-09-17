@@ -148,6 +148,7 @@ model Organization {
   ipis                          Ipi[]
   ncms                          Ncm[]
   projectPlans                  ProjectPlan[]
+  projectPlanHirings            ProjectPlanHiring[]
   projectPlanTasks              ProjectPlanTasks[]
   projects                      Project[]
   projectWizardConfirmations    ProjectWizardConfirmation[]
@@ -155,12 +156,16 @@ model Organization {
   taskDependents                TaskDependent[]
   tasksIntegrationRegularize    TasksIntegrationRegularize[]
   taskModels                    TaskModel[]
+  completionRequests            TaskCompletionRequest[]
+  taskAttachments               TaskAttachment[]
+  taskPostponements             TaskPostponement[]
   logs                          Logs[]
   passwordsMkt                  PasswordMkt[]
   notes                         Note[]
   certificateNotifications      CertificateNotification[]
   pessoalNotifications          PessoalNotification[]
   regularizeNotifications       RegularizeNotification[]
+  taskOperationalNotifications  TaskOperationalNotification[]
   organizationInvites           OrganizationInvite[]
   usersWithOrg                  User[]              @relation("UserOrganization")
   installments                  Installment[]
@@ -261,6 +266,7 @@ model Department {
   categorysStock            CategoryStock[]
   locationsStock            LocationStock[]
   users                     User[]
+  financeiroCollectors      DepartmentCollector[]
 
   @@index([organization_id, name], map: "idx_departments_org_name")
   @@unique([organization_id, name], map: "uq_departments_org_name")
@@ -361,6 +367,8 @@ model User {
   authSessions                AuthSession[]
   triageMonthlys              TriageMonthly[]
   responsiblesTriage          TriageResponsible[]
+  financeiroCollectorAssignments DepartmentCollector[]
+  taskOperationalNotifications TaskOperationalNotification[]
   department                  Department             @relation(fields: [department_id], references: [id])
 
   @@unique([login], map: "users_login_key")
@@ -555,6 +563,27 @@ model RegularizeNotification {
   organization    Organization @relation(fields: [organization_id], references: [id])
 
   @@map("notification.regularize")
+}
+
+model TaskOperationalNotification {
+  id              String       @id @default(uuid())
+  organization_id String
+  recipient_id    String
+  task_id         String
+  event_key       String       @db.VarChar(191)
+  type            String
+  title           String
+  message         String
+  read_at         DateTime?
+  archived_at     DateTime?
+  created_at      DateTime     @default(now())
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  recipient       User         @relation(fields: [recipient_id], references: [id])
+
+  @@unique([organization_id, recipient_id, task_id, event_key], map: "uq_task_operational_notification_event")
+  @@index([organization_id, recipient_id, archived_at, read_at, created_at], map: "idx_task_operational_notification_inbox")
+  @@index([archived_at, created_at], map: "idx_task_operational_notification_retention")
+  @@map("notification.task_operational")
 }
 
 model Chat {
@@ -894,6 +923,7 @@ model ProjectPlan {
   color           String
   organization_id String
   organization    Organization       @relation(fields: [organization_id], references: [id])
+  hirings         ProjectPlanHiring[]
   tasks           ProjectPlanTasks[]
 
   @@map("integracao.projectPlan")
@@ -909,7 +939,25 @@ model ProjectPlanTasks {
   plans           ProjectPlan  @relation(fields: [plan_id], references: [id])
   tasks           TaskModel    @relation(fields: [task_id], references: [id])
 
+  @@unique([organization_id, plan_id, task_id], map: "uq_project_plan_task_model")
   @@map("integracao.projectPlanTasks")
+}
+
+model ProjectPlanHiring {
+  id                String      @id @default(uuid())
+  plan_id           String
+  project_id        String
+  organization_id   String
+  response_snapshot Json
+  created_at        DateTime    @default(now())
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  plan              ProjectPlan @relation(fields: [plan_id], references: [id])
+  project           Project     @relation(fields: [project_id], references: [id])
+
+  @@unique([organization_id, plan_id, project_id], map: "uq_project_plan_hiring_org_plan_project")
+  @@index([plan_id], map: "idx_project_plan_hiring_plan")
+  @@index([project_id], map: "idx_project_plan_hiring_project")
+  @@map("integracao.project_plan_hirings")
 }
 
 model Project {
@@ -928,6 +976,7 @@ model Project {
   sponsor         User?        @relation("sponsor", fields: [sponsor_id], references: [id])
   tasks           Task[]
   wizardConfirmations ProjectWizardConfirmation[]
+  planHirings         ProjectPlanHiring[]
 
   @@map("integracao.projects")
 }
@@ -990,8 +1039,95 @@ model Task {
   license             License[]
   process             Process[]
   commercialTaskBilling CommercialTaskBilling?
+  completionRequests    TaskCompletionRequest[]
+  attachments           TaskAttachment[]
+  postponements         TaskPostponement[]
 
   @@map("integracao.tasks")
+}
+
+model TaskFinanceiroCommand {
+  id                String   @id @default(uuid())
+  organization_id   String
+  requested_by_user_id String
+  idempotency_key   String   @db.VarChar(255)
+  command_hash      String   @db.Char(64)
+  response_snapshot Json
+  created_at        DateTime @default(now())
+  audited_at        DateTime?
+
+  @@unique([organization_id, idempotency_key], map: "uq_task_financeiro_command_org_key")
+  @@index([organization_id], map: "idx_task_financeiro_command_org")
+  @@map("integracao.task_financeiro_commands")
+}
+
+model DepartmentCollector {
+  id              String     @id @default(uuid())
+  organization_id String
+  department_id   String
+  user_id         String
+  created_at      DateTime   @default(now())
+  department      Department @relation(fields: [department_id], references: [id])
+  user            User       @relation(fields: [user_id], references: [id])
+
+  @@unique([organization_id, department_id, user_id], map: "uq_department_collector")
+  @@index([organization_id, user_id], map: "idx_department_collector_user")
+  @@map("integracao.department_collectors")
+}
+
+model TaskCompletionRequest {
+  id              String   @id @default(uuid())
+  task_id         String
+  organization_id String
+  requester_id    String
+  status          String   @default("pending")
+  reason          String?
+  decision_reason String?
+  decided_by      String?
+  created_at      DateTime @default(now())
+  resolved_at     DateTime?
+  task            Task     @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, created_at], map: "idx_task_completion_requests_org_task_created")
+  @@index([organization_id, requester_id, created_at], map: "idx_task_completion_requests_org_requester_created")
+  @@map("integracao.task_completion_requests")
+}
+
+model TaskAttachment {
+  id              String       @id @default(uuid())
+  task_id         String
+  organization_id String
+  uploaded_by     String
+  original_name   String
+  mime_type       String
+  size_bytes      Int
+  object_path     String       @unique
+  created_at      DateTime     @default(now())
+  deleted_at      DateTime?
+  deleted_by      String?
+  task            Task         @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, deleted_at, created_at], map: "idx_task_attachments_org_task_visible")
+  @@map("integracao.task_attachments")
+}
+
+model TaskPostponement {
+  id                      String       @id @default(uuid())
+  task_id                 String
+  organization_id         String
+  previous_prevision_date DateTime
+  new_prevision_date      DateTime
+  justification           String
+  author_id               String
+  created_at              DateTime     @default(now())
+  task                    Task         @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization            Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, created_at], map: "idx_task_postponements_org_task_created")
+  @@index([organization_id, author_id, created_at], map: "idx_task_postponements_org_author_created")
+  @@map("integracao.task_postponements")
 }
 
 model ProposalConfig {
@@ -1987,6 +2123,7 @@ model TasksIntegrationRegularize {
   organization    Organization @relation(fields: [organization_id], references: [id])
   task_model      TaskModel    @relation(fields: [task_model_id], references: [id])
 
+  @@unique([organization_id, task_model_id, referring_type, referring], map: "uq_task_regularize_link")
   @@map("integracao.tasksIntegrationRegularize")
 }
 

@@ -330,6 +330,34 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(false);
   });
 
+  it("libera as rotas de responsável da Integração para os níveis 0 e 1", () => {
+    for (const [method, path] of [
+      ["POST", "/task/complete-request"],
+      ["DELETE", "/task/complete-request"],
+      ["GET", "/task/complete-request/list"],
+      ["POST", "/task/postponement"],
+      ["GET", "/task/postponement/list"],
+      ["POST", "/task/attachment"],
+      ["GET", "/task/attachment/list"],
+      ["GET", "/task/attachment/access"],
+      ["PUT", "/task/conclusion"],
+      ["GET", "/task"],
+      ["GET", "/task/list"],
+    ] as const) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(
+        canAccessRoute(authContext({ modules: { integracao: 0 } }), policy),
+        `${method} ${path}`,
+      ).toBe(true);
+    }
+  });
+
+  it("mantém as demais mutações de tarefa restritas ao nível 2", () => {
+    const policy = requiredRoutePolicy("PUT", "/task");
+    expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), policy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { integracao: 2 } }), policy)).toBe(true);
+  });
+
   it("protege os endpoints de projeto pelo módulo Integração", () => {
     const policy = requiredRoutePolicy("GET", "/project/list");
     expect(canAccessRoute(authContext({ modules: { integracao: 0 } }), policy)).toBe(false);

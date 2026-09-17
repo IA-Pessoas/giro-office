@@ -19,6 +19,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "7.9.1",
     "@prisma/client": "7.9.1",
+    "@supabase/supabase-js": "^2.102.1",
     "@workspace/shared": "workspace:*",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
