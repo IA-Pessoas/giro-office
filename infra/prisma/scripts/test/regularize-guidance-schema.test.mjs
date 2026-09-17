@@ -74,7 +74,7 @@ test("migration cria checklist canônico, preserva histórico e protege orienta�
   );
   assert.match(
     migration,
-    /WHEN EXISTS \(\s*SELECT 1\s+FROM "clients" AS process_client_pj[\s\S]*?process_client_pj\."organization_id" = process\."organization_id"[\s\S]*?\)\s+AND EXISTS \(\s*SELECT 1\s+FROM "clients\.pf" AS process_client_pf[\s\S]*?process_client_pf\."organization_id" = process\."organization_id"[\s\S]*?\)\s+THEN 'SEM_CLIENTE'/,
+    /WHEN process\."client_pj_id" IS NOT NULL AND process\."client_pf_id" IS NOT NULL THEN 'SEM_CLIENTE'[\s\S]*?WHEN EXISTS \(\s*SELECT 1\s+FROM "clients" AS process_client_pj[\s\S]*?process_client_pj\."organization_id" = process\."organization_id"[\s\S]*?\) THEN 'PJ'/,
   );
   assert.match(
     migration,
