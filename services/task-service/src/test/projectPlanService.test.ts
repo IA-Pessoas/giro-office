@@ -410,15 +410,109 @@ describe("ProjectPlanService", () => {
     expect(taskCrud.calls).toHaveLength(2);
   });
 
+  it("hirePlan aplica o escopo da organização a plano, projeto e cliente", async () => {
+    const prisma = createBasePrisma();
+    const whereClauses: Record<string, unknown>[] = [];
+    prisma.projectPlan.findFirst = async (...args: unknown[]) => {
+      whereClauses.push((args[0] as { where: Record<string, unknown> }).where);
+      return { id: PLAN_ID };
+    };
+    prisma.project.findFirst = async (...args: unknown[]) => {
+      whereClauses.push((args[0] as { where: Record<string, unknown> }).where);
+      return { client_id: CLIENT_ID };
+    };
+    prisma.client.findFirst = async (...args: unknown[]) => {
+      whereClauses.push((args[0] as { where: Record<string, unknown> }).where);
+      return null;
+    };
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
+
+    await expect(
+      service.hirePlan({
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        ...ADMIN_AUTH,
+        project_id: PROJECT_ID,
+        plan_id: PLAN_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    expect(whereClauses).toEqual([
+      { id: PLAN_ID, organization_id: ORG_ID },
+      { id: PROJECT_ID, organization_id: ORG_ID },
+      { id: CLIENT_ID, organization_id: ORG_ID },
+    ]);
+  });
+
+  it("hirePlan serializa chamadas concorrentes no mesmo plano e projeto", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
+    prisma.project.findFirst = async () => ({ client_id: CLIENT_ID });
+    prisma.client.findFirst = async () => ({ prospecting_status: "Fechado" });
+    prisma.projectPlanTasks.findMany = async () => [{ task_id: "model-1" }];
+
+    let lockTail = Promise.resolve();
+    let lockCalls = 0;
+    prisma.$transaction = (async (input: unknown) => {
+      if (typeof input !== "function") {
+        return Promise.all(input as Promise<unknown>[]);
+      }
+
+      let releaseLock: (() => void) | undefined;
+      const tx = {
+        ...prisma,
+        async $executeRaw() {
+          lockCalls += 1;
+          const previous = lockTail;
+          lockTail = new Promise<void>((resolve) => {
+            releaseLock = resolve;
+          });
+          await previous;
+          return 0;
+        },
+      };
+
+      try {
+        return await input(tx as never);
+      } finally {
+        releaseLock?.();
+      }
+    }) as typeof prisma.$transaction;
+
+    const taskCrud = new TaskCrudServiceStub();
+    const service = new ProjectPlanService(taskCrud, prisma, createAudit());
+    const request = {
+      user_id: USER_ID,
+      organization_id: ORG_ID,
+      ...ADMIN_AUTH,
+      project_id: PROJECT_ID,
+      plan_id: PLAN_ID,
+    };
+
+    const [first, second] = await Promise.all([
+      service.hirePlan(request),
+      service.hirePlan(request),
+    ]);
+
+    expect([first.idempotent, second.idempotent].sort()).toEqual([false, true]);
+    expect(taskCrud.calls).toHaveLength(1);
+    expect(lockCalls).toBe(2);
+  });
+
   it("hirePlan não confirma sucesso quando a auditoria obrigatória falha", async () => {
     const prisma = createBasePrisma();
     prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
     prisma.project.findFirst = async () => ({ client_id: CLIENT_ID });
     prisma.client.findFirst = async () => ({ prospecting_status: "Fechado" });
     prisma.projectPlanTasks.findMany = async () => [{ task_id: "model-1" }];
+    let auditAvailable = false;
+    let auditAttempts = 0;
     const audit = {
       async createLog() {
-        throw new Error("audit indisponível");
+        auditAttempts += 1;
+        if (!auditAvailable) {
+          throw new Error("audit indisponível");
+        }
       },
       async logUpdateIfChanged() {},
     } satisfies ProjectPlanAudit;
@@ -433,6 +527,18 @@ describe("ProjectPlanService", () => {
         plan_id: PLAN_ID,
       }),
     ).rejects.toMatchObject({ statusCode: 500 });
+
+    auditAvailable = true;
+    const retry = await service.hirePlan({
+      user_id: USER_ID,
+      organization_id: ORG_ID,
+      ...ADMIN_AUTH,
+      project_id: PROJECT_ID,
+      plan_id: PLAN_ID,
+    });
+
+    expect(retry).toMatchObject({ idempotent: false });
+    expect(auditAttempts).toBe(2);
   });
 
   it("hirePlan rejeita plano sem modelos antes de criar tarefas", async () => {

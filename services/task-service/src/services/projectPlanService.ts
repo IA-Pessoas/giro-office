@@ -606,14 +606,11 @@ export class ProjectPlanService {
         });
         if (previous) {
           return {
-            response: {
-              ...(previous.response_snapshot as unknown as Omit<
-                ProjectPlanHireResponse,
-                "idempotent"
-              >),
-              idempotent: true,
-            },
-            taskIds: null,
+            ...(previous.response_snapshot as unknown as Omit<
+              ProjectPlanHireResponse,
+              "idempotent"
+            >),
+            idempotent: true,
           };
         }
 
@@ -672,19 +669,6 @@ export class ProjectPlanService {
         const response = JSON.parse(
           JSON.stringify({ created, idempotent: false }),
         ) as ProjectPlanHireResponse;
-        await tx.projectPlanHiring.create({
-          data: {
-            organization_id: data.organization_id,
-            plan_id: data.plan_id,
-            project_id: data.project_id,
-            response_snapshot: response as unknown as Prisma.InputJsonValue,
-          },
-        });
-
-        return { response, taskIds: created.map(({ id }) => id) };
-      });
-
-      if (result.taskIds) {
         await this.#audit.createLog({
           userId: data.user_id,
           organizationId: data.organization_id,
@@ -694,12 +678,21 @@ export class ProjectPlanService {
           changes: {
             source: "project-plan-hire",
             projectId: data.project_id,
-            taskIds: result.taskIds,
+            taskIds: created.map(({ id }) => id),
           },
         });
-      }
+        await tx.projectPlanHiring.create({
+          data: {
+            organization_id: data.organization_id,
+            plan_id: data.plan_id,
+            project_id: data.project_id,
+            response_snapshot: response as unknown as Prisma.InputJsonValue,
+          },
+        });
 
-      return result.response;
+        return response;
+      });
+      return result;
     } catch (err: unknown) {
       logError("Erro ao contratar plano de projeto", { err });
       if (err instanceof ServiceError) throw err;
