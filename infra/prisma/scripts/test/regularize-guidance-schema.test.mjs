@@ -68,6 +68,14 @@ test("migration cria checklist canônico, preserva histórico e protege orienta�
   assert.match(migration, /'Pendente'/);
   assert.match(migration, /ON CONFLICT DO NOTHING/);
   assert.match(migration, /jsonb_build_object\('version', 1,/);
+  assert.match(
+    migration,
+    /UPDATE "regularize\.proceduralGuidances" AS guidance\s+SET "target_type" = CASE\s+WHEN process\."client_pj_id" IS NOT NULL THEN 'PJ'\s+WHEN process\."client_pf_id" IS NOT NULL THEN 'PF'\s+ELSE 'SEM_CLIENTE'\s+END\s+FROM "regularize\.process" AS process\s+WHERE guidance\."process_id" = process\."id"\s+AND guidance\."organization_id" = process\."organization_id";/,
+  );
+  assert.match(
+    migration,
+    /LEFT JOIN "clients" AS client_pj[\s\S]*?client_pj\."organization_id" = process\."organization_id"[\s\S]*?LEFT JOIN "clients\.pf" AS client_pf[\s\S]*?client_pf\."organization_id" = process\."organization_id"[\s\S]*?WHERE guidance\."process_id" = process\."id"\s+AND guidance\."organization_id" = process\."organization_id";/,
+  );
   assert.match(migration, /RAISE EXCEPTION 'Cannot create procedural_guidance_active_process_unique/);
   assert.match(
     migration,

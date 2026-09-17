@@ -39,7 +39,8 @@ SET "target_type" = CASE
   ELSE 'SEM_CLIENTE'
 END
 FROM "regularize.process" AS process
-WHERE guidance."process_id" = process."id";
+WHERE guidance."process_id" = process."id"
+  AND guidance."organization_id" = process."organization_id";
 
 UPDATE "regularize.proceduralGuidances" AS guidance
 SET
