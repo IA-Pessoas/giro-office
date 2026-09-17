@@ -10,8 +10,9 @@ describe("task attachment storage", () => {
     const upload = vi.fn().mockResolvedValue({ error: null });
     const getPublicUrl = vi.fn();
     const from = vi.fn().mockReturnValue({ upload, getPublicUrl });
+    const getBucket = vi.fn().mockResolvedValue({ data: { public: false }, error: null });
     const storage = new SupabaseTaskAttachmentStorage(
-      { storage: { from } } as never,
+      { storage: { from, getBucket } } as never,
       "task-attachments-private",
       () => "attachment-1",
     );
@@ -42,6 +43,7 @@ describe("task attachment storage", () => {
       { contentType: "application/pdf", upsert: false },
     );
     expect(getPublicUrl).not.toHaveBeenCalled();
+    expect(getBucket).toHaveBeenCalledWith("task-attachments-private");
   });
 
   it("gera URL assinada de cinco minutos somente para objeto autorizado", async () => {
@@ -50,8 +52,9 @@ describe("task attachment storage", () => {
       error: null,
     });
     const from = vi.fn().mockReturnValue({ createSignedUrl });
+    const getBucket = vi.fn().mockResolvedValue({ data: { public: false }, error: null });
     const storage = new SupabaseTaskAttachmentStorage(
-      { storage: { from } } as never,
+      { storage: { from, getBucket } } as never,
       "task-attachments-private",
     );
 
@@ -62,5 +65,29 @@ describe("task attachment storage", () => {
       "integracao/organizations/org-1/tasks/task-1/attachment-1.pdf",
       300,
     );
+  });
+
+  it("recusa upload quando o bucket é público", async () => {
+    const upload = vi.fn();
+    const from = vi.fn().mockReturnValue({ upload });
+    const getBucket = vi.fn().mockResolvedValue({ data: { public: true }, error: null });
+    const storage = new SupabaseTaskAttachmentStorage(
+      { storage: { from, getBucket } } as never,
+      "task-attachments-private",
+    );
+
+    await expect(
+      storage.upload({
+        organizationId: "org-1",
+        taskId: "task-1",
+        file: {
+          buffer: Buffer.from("%PDF-1.7"),
+          mimetype: "application/pdf",
+          originalname: "comprovante.pdf",
+        },
+      }),
+    ).rejects.toMatchObject({ statusCode: 500 });
+
+    expect(upload).not.toHaveBeenCalled();
   });
 });

@@ -11,7 +11,13 @@ export const INTEGRACAO_PERMISSION_LEVEL = {
   ADMIN: 3,
 } as const satisfies Record<string, IntegracaoPermissionLevel>;
 
-export type IntegracaoResource = "client" | "project" | "projectPlan" | "task" | "taskModel";
+export type IntegracaoResource =
+  | "client"
+  | "project"
+  | "projectPlan"
+  | "task"
+  | "taskAttachment"
+  | "taskModel";
 export type IntegracaoAction =
   | "read"
   | "create"
@@ -511,7 +517,11 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     "taskAttachment",
     "create",
     [
-      writeRule([INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER], [], "responsible"),
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        [],
+        "responsible",
+      ),
       writeRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN], []),
     ],
     { audit: "required", test: "task.attachment.create" },

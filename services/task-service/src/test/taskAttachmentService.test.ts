@@ -92,4 +92,74 @@ describe("TaskAttachmentService", () => {
       select: { id: true, object_path: true },
     });
   });
+
+  it("não acessa tarefa de outra organização nem armazena o arquivo", async () => {
+    prismaMock.task.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      new TaskAttachmentService(storage).upload({
+        user_id: "user-1",
+        organization_id: "org-2",
+        task_id: "task-1",
+        file: {
+          buffer: Buffer.from("%PDF-"),
+          mimetype: "application/pdf",
+          originalname: "evidencia.pdf",
+        },
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    expect(storage.upload).not.toHaveBeenCalled();
+  });
+
+  it("não revela tarefa a usuário básico que não é responsável", async () => {
+    await expect(
+      new TaskAttachmentService(storage).upload({
+        user_id: "other-user",
+        organization_id: "org-1",
+        task_id: "task-1",
+        integracaoLevel: 0,
+        file: {
+          buffer: Buffer.from("%PDF-"),
+          mimetype: "application/pdf",
+          originalname: "evidencia.pdf",
+        },
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    expect(storage.upload).not.toHaveBeenCalled();
+  });
+
+  it("faz remoção lógica auditada sem limite artificial na listagem", async () => {
+    prismaMock.taskAttachment.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      new TaskAttachmentService(storage).remove({
+        user_id: "admin-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        attachment_id: "attachment-1",
+        integracaoLevel: 3,
+      }),
+    ).resolves.toEqual({ id: "attachment-1" });
+
+    expect(prismaMock.taskAttachment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ deleted_at: expect.any(Date), deleted_by: "admin-1" }),
+      }),
+    );
+    expect(auditMock.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "Remoção de Anexo de Tarefa", required: true }),
+    );
+
+    await new TaskAttachmentService(storage).list({
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      integracaoLevel: 0,
+    });
+    expect(prismaMock.taskAttachment.findMany).toHaveBeenCalledWith(
+      expect.not.objectContaining({ take: expect.anything() }),
+    );
+  });
 });

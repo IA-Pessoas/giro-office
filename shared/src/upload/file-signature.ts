@@ -6,10 +6,18 @@ export interface UploadFileForSignatureValidation {
   originalname?: string;
 }
 
-const ZIP_BASED_OFFICE_MIME_TYPES = new Set([
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-]);
+const OOXML_ENTRIES_BY_MIME_TYPE: Record<string, readonly string[]> = {
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+    "[Content_Types].xml",
+    "_rels/.rels",
+    "word/document.xml",
+  ],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+    "[Content_Types].xml",
+    "_rels/.rels",
+    "xl/workbook.xml",
+  ],
+};
 
 function startsWithBytes(buffer: Buffer, bytes: number[]): boolean {
   return bytes.every((byte, index) => buffer[index] === byte);
@@ -21,6 +29,51 @@ function startsWithAscii(buffer: Buffer, value: string, offset = 0): boolean {
 
 function hasValidTextContent(buffer: Buffer): boolean {
   return !buffer.includes(0);
+}
+
+function hasOoxmlEntries(buffer: Buffer, expectedEntries: readonly string[]): boolean {
+  const endOfCentralDirectory = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+  const centralDirectorySignature = 0x02014b50;
+  const localFileHeaderSignature = 0x04034b50;
+  const endOffset = buffer.lastIndexOf(endOfCentralDirectory);
+  if (endOffset < 0 || endOffset + 22 > buffer.length) return false;
+
+  const entriesCount = buffer.readUInt16LE(endOffset + 10);
+  let offset = buffer.readUInt32LE(endOffset + 16);
+  const entries = new Set<string>();
+
+  for (let index = 0; index < entriesCount; index += 1) {
+    if (offset + 46 > buffer.length || buffer.readUInt32LE(offset) !== centralDirectorySignature) {
+      return false;
+    }
+    const nameLength = buffer.readUInt16LE(offset + 28);
+    const extraLength = buffer.readUInt16LE(offset + 30);
+    const commentLength = buffer.readUInt16LE(offset + 32);
+    const localHeaderOffset = buffer.readUInt32LE(offset + 42);
+    const nameStart = offset + 46;
+    const nextOffset = nameStart + nameLength + extraLength + commentLength;
+    if (nextOffset > buffer.length) return false;
+    const name = buffer.subarray(nameStart, nameStart + nameLength);
+    if (
+      localHeaderOffset + 30 > buffer.length ||
+      buffer.readUInt32LE(localHeaderOffset) !== localFileHeaderSignature
+    ) {
+      return false;
+    }
+    const localNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
+    const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
+    const localNameStart = localHeaderOffset + 30;
+    if (
+      localNameStart + localNameLength + localExtraLength > buffer.length ||
+      !buffer.subarray(localNameStart, localNameStart + localNameLength).equals(name)
+    ) {
+      return false;
+    }
+    entries.add(name.toString("utf8"));
+    offset = nextOffset;
+  }
+
+  return expectedEntries.every((entry) => entries.has(entry));
 }
 
 function hasValidSignature(file: UploadFileForSignatureValidation): boolean {
@@ -56,8 +109,9 @@ function hasValidSignature(file: UploadFileForSignatureValidation): boolean {
     return startsWithBytes(buffer, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
   }
 
-  if (ZIP_BASED_OFFICE_MIME_TYPES.has(mimetype)) {
-    return startsWithAscii(buffer, "PK\x03\x04");
+  const ooxmlEntries = OOXML_ENTRIES_BY_MIME_TYPE[mimetype];
+  if (ooxmlEntries) {
+    return hasOoxmlEntries(buffer, ooxmlEntries);
   }
 
   if (mimetype === "text/plain" || mimetype === "text/csv") {

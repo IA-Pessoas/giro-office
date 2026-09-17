@@ -89,7 +89,6 @@ export class TaskAttachmentService {
     return prismaClient.taskAttachment.findMany({
       where: { task_id: task.id, organization_id: task.organization_id, deleted_at: null },
       orderBy: { created_at: "desc" },
-      take: 100,
       select: {
         id: true,
         original_name: true,

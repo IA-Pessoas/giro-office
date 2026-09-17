@@ -41,6 +41,8 @@ export function buildTaskAttachmentObjectPath(input: {
 }
 
 export class SupabaseTaskAttachmentStorage implements TaskAttachmentStorage {
+  private bucketVerification: Promise<void> | undefined;
+
   constructor(
     private readonly supabase: SupabaseClient,
     private readonly bucket: string,
@@ -52,6 +54,7 @@ export class SupabaseTaskAttachmentStorage implements TaskAttachmentStorage {
     taskId: string;
     file: { buffer: Buffer; mimetype: TaskAttachmentMimeType; originalname: string };
   }): Promise<string> {
+    await this.ensurePrivateBucket();
     const objectPath = buildTaskAttachmentObjectPath({
       organizationId: input.organizationId,
       taskId: input.taskId,
@@ -76,6 +79,7 @@ export class SupabaseTaskAttachmentStorage implements TaskAttachmentStorage {
 
   async createSignedAccessUrl(objectPath: string): Promise<string> {
     try {
+      await this.ensurePrivateBucket();
       const { data, error } = await this.supabase.storage
         .from(this.bucket)
         .createSignedUrl(objectPath, 300);
@@ -97,6 +101,29 @@ export class SupabaseTaskAttachmentStorage implements TaskAttachmentStorage {
     } catch (err: unknown) {
       logError("Erro ao remover objeto de anexo de tarefa", { err });
       throw new ServiceError(500, "Erro ao remover objeto do anexo da tarefa.", err);
+    }
+  }
+
+  private async ensurePrivateBucket(): Promise<void> {
+    this.bucketVerification ??= this.verifyPrivateBucket();
+    try {
+      await this.bucketVerification;
+    } catch (err: unknown) {
+      this.bucketVerification = undefined;
+      throw err;
+    }
+  }
+
+  private async verifyPrivateBucket(): Promise<void> {
+    try {
+      const { data, error } = await this.supabase.storage.getBucket(this.bucket);
+      if (error || !data || data.public) {
+        throw new ServiceError(500, "O bucket de anexos da tarefa deve ser privado.", error);
+      }
+    } catch (err: unknown) {
+      logError("Bucket de anexos de tarefa indisponível ou público", { err });
+      if (err instanceof ServiceError) throw err;
+      throw new ServiceError(500, "O bucket de anexos da tarefa deve ser privado.", err);
     }
   }
 }

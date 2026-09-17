@@ -20,6 +20,19 @@ describe("rotas de anexos de tarefa", () => {
     expect(taskAttachmentServiceMock.upload).not.toHaveBeenCalled();
   });
 
+  it("recusa arquivo acima de 10 MB antes de encaminhar o upload", async () => {
+    const response = await request(createTestApp())
+      .post("/task/attachment")
+      .field("task_id", "task-1")
+      .attach("file", Buffer.alloc(10 * 1024 * 1024 + 1), {
+        filename: "evidencia.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(response.status).toBe(400);
+    expect(taskAttachmentServiceMock.upload).not.toHaveBeenCalled();
+  });
+
   it("não expõe caminho interno ao listar anexos", async () => {
     taskAttachmentServiceMock.list.mockResolvedValue([
       {

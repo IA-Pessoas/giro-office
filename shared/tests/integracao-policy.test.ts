@@ -47,6 +47,10 @@ const expectedRoutes = [
   "PUT /task/complete-request",
   "DELETE /task/complete-request",
   "GET /task/complete-request/list",
+  "POST /task/attachment",
+  "GET /task/attachment/list",
+  "GET /task/attachment/access",
+  "DELETE /task/attachment",
   "PUT /task/reopen",
   "GET /task/model/list",
   "GET /task/deps/list",
@@ -248,6 +252,10 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
     },
     { method: "DELETE", path: "/task/complete-request", allowedLevels: [0, 1, 2, 3] },
     { method: "GET", path: "/task/complete-request/list", allowedLevels: [0, 1, 2, 3] },
+    { method: "POST", path: "/task/attachment", allowedLevels: [0, 1, 2, 3] },
+    { method: "GET", path: "/task/attachment/list", allowedLevels: [0, 1, 2, 3] },
+    { method: "GET", path: "/task/attachment/access", allowedLevels: [0, 1, 2, 3] },
+    { method: "DELETE", path: "/task/attachment", allowedLevels: [3] },
     { method: "PUT", path: "/task/reopen", allowedLevels: [3] },
     { method: "GET", path: "/task/model/list", allowedLevels: [1, 2, 3] },
     { method: "GET", path: "/task/deps/list", allowedLevels: [1, 2, 3] },
@@ -369,7 +377,7 @@ test("helper traduz a decisão de política em 403 ou 404", () => {
   );
 });
 
-test("owner possui bypass global e exclusões preservam conflito de dependência", () => {
+test("owner possui bypass global e exclusões preservam o contrato de dependência", () => {
   const deletePolicy = requirePolicy("DELETE", "/project");
 
   assert.equal(
@@ -383,10 +391,12 @@ test("owner possui bypass global e exclusões preservam conflito de dependência
     "allow",
   );
   assert.equal(deletePolicy?.responses.dependency, 409);
+  const attachmentDelete = requirePolicy("DELETE", "/task/attachment");
+  assert.equal(attachmentDelete.responses.dependency, null);
   assert.ok(
-    INTEGRACAO_ROUTE_POLICIES.filter((policy) => policy.action === "delete").every(
-      (policy) => policy.responses.dependency === 409,
-    ),
+    INTEGRACAO_ROUTE_POLICIES.filter(
+      (policy) => policy.action === "delete" && policy.resource !== "taskAttachment",
+    ).every((policy) => policy.responses.dependency === 409),
   );
 });
 
