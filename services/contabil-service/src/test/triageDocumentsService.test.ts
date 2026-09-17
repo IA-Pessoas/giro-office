@@ -37,7 +37,12 @@ function createMockPrisma(): TriageDocumentsServicePrisma {
     triageCompetence: { findFirst: vi.fn() },
     triageMonthly: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     triageResponsible: { findFirst: vi.fn() },
-    triageBankStatement: { findFirst: vi.fn(), findMany: vi.fn(), upsert: vi.fn() },
+    triageBankStatement: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      upsert: vi.fn(),
+      update: vi.fn(),
+    },
     $executeRaw: vi.fn(),
     $transaction: vi.fn(async (callback: (transaction: TriageDocumentsServicePrisma) => unknown) =>
       callback(prisma),
@@ -687,5 +692,84 @@ describe("TriageDocumentsService", () => {
     await expect(
       service.getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, OTHER_ORG_ID),
     ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("arquiva somente o marcador ativo da organização e audita a operação", async () => {
+    const prisma = createMockPrisma();
+    const active = {
+      id: STATEMENT_ID,
+      client_id: CLIENT_ID,
+      competence: COMPETENCE,
+      bank_id: "001",
+      status: "COMPLETED",
+      archived_at: null,
+      organization_id: ORG_ID,
+    };
+    const archived = { ...active, archived_at: new Date("2026-09-17T10:00:00.000Z") };
+    vi.mocked(prisma.triageBankStatement.findFirst).mockResolvedValue(active as never);
+    vi.mocked(prisma.triageBankStatement.update).mockResolvedValue(archived as never);
+    const audit = { logUpdateIfChanged: vi.fn() };
+
+    const result = await new TriageDocumentsService(prisma, audit).archiveStatement(
+      { client_id: CLIENT_ID, competence: COMPETENCE, bank_id: "001" },
+      contabilEditor(),
+    );
+
+    expect(result).toEqual(archived);
+    expect(prisma.triageBankStatement.findFirst).toHaveBeenCalledWith({
+      where: {
+        organization_id: ORG_ID,
+        client_id: CLIENT_ID,
+        competence: COMPETENCE,
+        bank_id: "001",
+        archived_at: null,
+      },
+    });
+    expect(prisma.triageBankStatement.update).toHaveBeenCalledWith({
+      where: { id: STATEMENT_ID },
+      data: { archived_at: expect.any(Date) },
+    });
+    expect(audit.logUpdateIfChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Arquivar marcador de extrato bancário",
+        referring: "triagem.bank_statements",
+        oldData: active,
+        updatedData: archived,
+      }),
+    );
+  });
+
+  it("não tenta arquivar marcador bancário sem identificador", async () => {
+    const prisma = createMockPrisma();
+    const service = new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() });
+
+    await expect(
+      service.archiveStatement(
+        { client_id: CLIENT_ID, competence: COMPETENCE, bank_id: "   " },
+        contabilEditor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(prisma.triageBankStatement.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("reabre um marcador arquivado quando uma nova pendência chega para a mesma competência", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageBankStatement.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.triageBankStatement.upsert).mockResolvedValue({
+      id: STATEMENT_ID,
+      archived_at: null,
+      status: "PENDING",
+    } as never);
+
+    await new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).upsertStatement(
+      { client_id: CLIENT_ID, competence: COMPETENCE, bank_id: "001", status: "PENDING" },
+      contabilEditor(),
+    );
+
+    expect(prisma.triageBankStatement.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: { status: "PENDING", archived_at: null },
+      }),
+    );
   });
 });

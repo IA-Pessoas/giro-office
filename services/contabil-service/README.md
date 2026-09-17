@@ -45,7 +45,7 @@ Exemplos de paths públicos (via gateway, com `Authorization: Bearer …`):
 - `PUT http://localhost:3010/contabil/relationships/<id>`
 - `DELETE http://localhost:3010/contabil/relationships/<id>`
 - `GET|POST http://localhost:3010/triagem/monthly`
-- `GET|PUT http://localhost:3010/triagem/statements`
+- `GET|PUT|DELETE http://localhost:3010/triagem/statements`
 - `GET|PUT|DELETE http://localhost:3010/triagem/closing`
 
 Infraestrutura direto no serviço: `GET http://localhost:3038/health` e `GET http://localhost:3038/ready`.

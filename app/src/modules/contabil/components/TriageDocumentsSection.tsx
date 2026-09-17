@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   AlertCircle,
+  Archive,
   FileText,
   Loader2,
   Plus,
@@ -120,7 +121,10 @@ export function TriageDocumentsSection({
     mutations.item.error ??
     mutations.all.error ??
     mutations.statement.error ??
+    mutations.archiveStatement.error ??
     mutations.closing.error;
+  const statementMutationPending =
+    mutations.statement.isPending || mutations.archiveStatement.isPending;
 
   useEffect(() => {
     if (record) {
@@ -138,6 +142,16 @@ export function TriageDocumentsSection({
       ...current,
       [field]: { ...current[field], [key]: value },
     }));
+  }
+
+  function archiveBankStatement(bankIdToArchive: string) {
+    if (window.confirm(`Arquivar o marcador do banco ${bankIdToArchive} nesta competência?`)) {
+      mutations.archiveStatement.mutate({
+        clientId,
+        competence,
+        bankId: bankIdToArchive,
+      });
+    }
   }
 
   if (monthly.isLoading)
@@ -466,7 +480,10 @@ export function TriageDocumentsSection({
                   />
                   <button
                     type="button"
-                    disabled={!bankId.trim() || mutations.statement.isPending}
+                    disabled={
+                      !bankId.trim() ||
+                      statementMutationPending
+                    }
                     onClick={() =>
                       mutations.statement.mutate(
                         {
@@ -484,14 +501,68 @@ export function TriageDocumentsSection({
                   </button>
                 </div>
               ) : null}
+              {statements.isLoading ? (
+                <p className="mt-3 text-sm text-gray-600 dark:text-slate-400" role="status">
+                  Carregando marcadores...
+                </p>
+              ) : null}
+              {statements.isError ? (
+                <p className="mt-3 text-sm text-red-700 dark:text-red-300" role="alert">
+                  Não foi possível carregar os marcadores. {getContabilErrorMessage(statements.error)}
+                </p>
+              ) : null}
               <ul className="mt-3 space-y-1 text-sm text-gray-700 dark:text-slate-300">
                 {(statements.data ?? []).map((statement) => (
-                  <li key={statement.id}>
-                    Banco {statement.bank_id}:{" "}
-                    {STATUSES.find(([value]) => value === statement.status)?.[1]}
+                  <li
+                    key={statement.id}
+                    className="flex flex-col gap-2 rounded-lg border border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800"
+                  >
+                    <span>Banco {statement.bank_id}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {canEdit ? (
+                        <select
+                          aria-label={`Status do banco ${statement.bank_id}`}
+                          value={statement.status}
+                          disabled={statementMutationPending}
+                          onChange={(event) =>
+                            mutations.statement.mutate({
+                              clientId,
+                              competence,
+                              bankId: statement.bank_id,
+                              status: event.target.value as TriageDocumentStatus,
+                            })
+                          }
+                          className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
+                        >
+                          {STATUSES.map(([value, statusLabel]) => (
+                            <option key={value} value={value}>
+                              {statusLabel}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span>
+                          {STATUSES.find(([value]) => value === statement.status)?.[1]}
+                        </span>
+                      )}
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          aria-label={`Arquivar marcador do banco ${statement.bank_id}`}
+                          disabled={statementMutationPending}
+                          onClick={() => archiveBankStatement(statement.bank_id)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200"
+                        >
+                          <Archive className="h-3.5 w-3.5" aria-hidden="true" />
+                          Arquivar
+                        </button>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
-                {!statements.isLoading && (statements.data ?? []).length === 0 ? (
+                {!statements.isLoading &&
+                !statements.isError &&
+                (statements.data ?? []).length === 0 ? (
                   <li>Nenhum marcador registrado.</li>
                 ) : null}
               </ul>

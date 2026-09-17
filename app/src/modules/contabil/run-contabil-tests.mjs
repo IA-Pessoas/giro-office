@@ -185,6 +185,11 @@ await (async () => {
     assert.match(source, /Identificador do banco/);
     assert.match(source, /dados de\s+conta não são solicitados/i);
     assert.match(source, /useTriageStatements/);
+    assert.match(source, /Status do banco/);
+    assert.match(source, /Arquivar marcador do banco/);
+    assert.match(source, /window\.confirm/);
+    assert.match(source, /Nenhum marcador registrado/);
+    assert.match(source, /Carregando marcadores/);
     assert.match(source, /useTriageClosing/);
     assert.match(source, /Fechamento recebido/);
     assert.match(source, /NOT_RECEIVED/);

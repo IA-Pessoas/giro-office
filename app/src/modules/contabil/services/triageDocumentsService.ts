@@ -103,6 +103,16 @@ export const triageDocumentsService = {
     );
     return unwrapContabilEnvelope(response.data);
   },
+  async archiveStatement(params: MonthlyParams & { bankId: string }): Promise<TriageBankStatement> {
+    const response = await setupAPIClient().delete(CONTABIL_ENDPOINTS.triageStatements, {
+      data: {
+        client_id: params.clientId,
+        competence: params.competence,
+        bank_id: params.bankId,
+      },
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
   async getClosing(params: MonthlyParams): Promise<TriageClosing> {
     const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageClosing, {
       params: { client_id: params.clientId, competence: params.competence },

@@ -49,6 +49,7 @@ function createMockDeps(): TriageDocumentsRouteDeps {
     updateAll: vi.fn(async () => ({ id: MONTHLY_ID })),
     listStatements: vi.fn(async () => []),
     upsertStatement: vi.fn(async () => ({ id: "statement" })),
+    archiveStatement: vi.fn(async () => ({ id: "statement", archived_at: "2026-09-17" })),
   } as unknown as TriageDocumentsRouteDeps;
 }
 
@@ -62,6 +63,7 @@ describe("triage document routes", () => {
     expect(spec.paths).toHaveProperty("/triagem/monthly/{id}/items.patch");
     expect(spec.paths).toHaveProperty("/triagem/statements.get");
     expect(spec.paths).toHaveProperty("/triagem/statements.put");
+    expect(spec.paths).toHaveProperty("/triagem/statements.delete");
   });
 
   it("POST /triagem/monthly usa a organização autenticada e os módulos encaminhados", async () => {
@@ -238,6 +240,37 @@ describe("triage document routes", () => {
       { client_id: CLIENT_ID, competence: "2026-09", bank_id: "341", status: "PENDING" },
       expect.objectContaining({ organizationId: ORG_ID }),
     );
+  });
+
+  it("DELETE /triagem/statements arquiva o marcador da competência", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .delete("/triagem/statements")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, competence: "2026-09", bank_id: "341" });
+
+    expect(res.status).toBe(200);
+    expect(deps.archiveStatement).toHaveBeenCalledWith(
+      { client_id: CLIENT_ID, competence: "2026-09", bank_id: "341" },
+      expect.objectContaining({ organizationId: ORG_ID }),
+    );
+  });
+
+  it("DELETE /triagem/statements rejeita corpo sem banco", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .delete("/triagem/statements")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, competence: "2026-09" });
+
+    expect(res.status).toBe(400);
+    expect(deps.archiveStatement).not.toHaveBeenCalled();
   });
 
   it("GET /triagem/monthly exige autenticação", async () => {

@@ -20,6 +20,7 @@
     "test:departments": "node --experimental-strip-types src/modules/departments/run-departments-tests.mjs",
     "test:contabil": "node --experimental-strip-types src/modules/contabil/run-contabil-tests.mjs",
     "test:triagem-fiscal-browser": "node src/modules/contabil/run-triagem-fiscal-browser-smoke.mjs",
+    "test:triagem-bank-statements-browser": "node src/modules/contabil/run-triagem-bank-statements-browser-smoke.mjs",
     "test:projects": "node --experimental-strip-types src/modules/integracao/run-project-tests.mjs",
     "test:project-wizard-browser": "node src/modules/integracao/run-project-wizard-browser-smoke.mjs",
     "qa:wizard-evidence": "node scripts/wizard-evidence.mjs",
