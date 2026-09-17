@@ -5,6 +5,7 @@ CREATE TABLE "integracao.task_financeiro_commands" (
   "command_hash" CHAR(64) NOT NULL,
   "response_snapshot" JSONB NOT NULL,
   "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "audited_at" TIMESTAMP(3),
 
   CONSTRAINT "task_financeiro_commands_pkey" PRIMARY KEY ("id")
 );

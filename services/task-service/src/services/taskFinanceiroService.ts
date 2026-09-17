@@ -80,7 +80,7 @@ export class TaskFinanceiroService {
       where: {
         organization_id: data.organization_id,
         department_id: data.department_id,
-        user: { status: "Ativo" },
+        user: { status: "active" },
       },
       select: { user_id: true },
     });
@@ -96,11 +96,14 @@ export class TaskFinanceiroService {
         where: {
           organization_id: data.organization_id,
           user_id: data.user_id,
-          user: { status: "Ativo" },
+          user: { status: "active", organization_id: data.organization_id },
         },
         select: { department_id: true },
       });
       departmentIds = assignments.map((assignment) => assignment.department_id);
+      if (departmentIds.length === 0) {
+        throw new ServiceError(403, "Você não é cobrador autorizado para nenhum departamento.");
+      }
       if (data.department_id && !departmentIds.includes(data.department_id)) {
         throw new ServiceError(403, "Você não é cobrador autorizado para este departamento.");
       }
@@ -163,9 +166,13 @@ export class TaskFinanceiroService {
           const collectors = await tx.user.findMany({
             where: {
               id: { in: collectorIds },
-              organization_id: data.organization_id,
               department_id: data.department_id,
-              status: "Ativo",
+              status: "active",
+              OR: [
+                { organization_id: data.organization_id },
+                { organization_id: null, department: { organization_id: data.organization_id } },
+              ],
+              permissions: { some: { organization_id: data.organization_id, integracao: { gt: 0 } } },
             },
             select: { id: true },
           });
@@ -231,7 +238,7 @@ export class TaskFinanceiroService {
           }
           return {
             response: previous.response_snapshot as unknown as SettleFinanceiroResponse,
-            created: false,
+            audit_pending: previous.audited_at === null,
           };
         }
         if (taskIds.length === 0) {
@@ -259,7 +266,14 @@ export class TaskFinanceiroService {
                   organization_id: data.organization_id,
                   department_id,
                   user_id: data.user_id,
-                  user: { status: "Ativo" },
+                  user: {
+                    status: "active",
+                    department_id,
+                    OR: [
+                      { organization_id: data.organization_id },
+                      { organization_id: null, department: { organization_id: data.organization_id } },
+                    ],
+                  },
                 },
                 select: { id: true },
               }),
@@ -290,9 +304,9 @@ export class TaskFinanceiroService {
             response_snapshot: response as unknown as Prisma.InputJsonValue,
           },
         });
-        return { response, created: true };
+        return { response, audit_pending: true };
       });
-      if (result.created) {
+      if (result.audit_pending) {
         await audit.createLog({
           userId: data.user_id,
           organizationId: data.organization_id,
@@ -302,6 +316,15 @@ export class TaskFinanceiroService {
           referringId: data.idempotency_key,
           changes: { task_ids: result.response.task_ids, settled: result.response.settled },
           required: true,
+        });
+        await prismaClient.taskFinanceiroCommand.update({
+          where: {
+            organization_id_idempotency_key: {
+              organization_id: data.organization_id,
+              idempotency_key: data.idempotency_key,
+            },
+          },
+          data: { audited_at: new Date() },
         });
       }
       return result.response;

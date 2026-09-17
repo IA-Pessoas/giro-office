@@ -1029,6 +1029,7 @@ model TaskFinanceiroCommand {
   command_hash      String   @db.Char(64)
   response_snapshot Json
   created_at        DateTime @default(now())
+  audited_at        DateTime?
 
   @@unique([organization_id, idempotency_key], map: "uq_task_financeiro_command_org_key")
   @@index([organization_id], map: "idx_task_financeiro_command_org")

@@ -15,6 +15,7 @@ const { prismaMock, auditMock } = vi.hoisted(() => ({
     taskFinanceiroCommand: {
       findUnique: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
     },
     departmentCollector: {
       findFirst: vi.fn(),
@@ -48,6 +49,7 @@ describe("TaskFinanceiroService", () => {
     prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue({
       command_hash: commandHash,
       response_snapshot: response,
+      audited_at: new Date(),
     });
     const service = new TaskFinanceiroService();
 
@@ -63,6 +65,33 @@ describe("TaskFinanceiroService", () => {
 
     expect(prismaMock.task.updateMany).not.toHaveBeenCalled();
     expect(auditMock.createLog).not.toHaveBeenCalled();
+  });
+
+  it("repete somente a auditoria quando a baixa anterior ficou sem evidência", async () => {
+    const response = { task_ids: ["task-1"], settled: 1 };
+    const commandHash = createHash("sha256").update(JSON.stringify({ task_ids: ["task-1"] })).digest("hex");
+    prismaMock.$transaction.mockImplementation(async (operation) => operation(prismaMock));
+    prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue({
+      command_hash: commandHash,
+      response_snapshot: response,
+      audited_at: null,
+    });
+    const service = new TaskFinanceiroService();
+
+    await expect(
+      service.settle({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_ids: ["task-1"],
+        idempotency_key: "audit-retry-key",
+        integracao_level: 3,
+      }),
+    ).resolves.toEqual(response);
+
+    expect(prismaMock.task.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.taskFinanceiroCommand.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { audited_at: expect.any(Date) } }),
+    );
   });
 
   it("baixa em lote todas as tarefas pendentes no mesmo comando", async () => {
@@ -252,6 +281,15 @@ describe("TaskFinanceiroService", () => {
         where: expect.objectContaining({ department_id: { in: ["department-1"] } }),
       }),
     );
+  });
+
+  it("rejeita fila para usuário sem departamento de cobrança", async () => {
+    prismaMock.departmentCollector.findMany.mockResolvedValue([]);
+    const service = new TaskFinanceiroService();
+
+    await expect(
+      service.listQueue({ user_id: "user-1", organization_id: "org-1", integracao_level: 1 }),
+    ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it("Baixa Express recompõe as tarefas pendentes do cliente no servidor", async () => {
