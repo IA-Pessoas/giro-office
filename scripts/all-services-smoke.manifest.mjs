@@ -50,6 +50,7 @@ const GOOD_STATUS_OVERRIDES = new Map([
   ["pessoalPasswordCreate", [201]],
   ["taskModelCreate", [201]],
   ["taskModelDependentCreate", [201]],
+  ["taskIntegrationProcessList", [200]],
   ["taskIntegrationCreate", [201]],
   ["taskCreate", [201]],
   ["taskAttachmentCreate", [201]],
@@ -2362,6 +2363,15 @@ const baseManifest = [
     action: "taskModelDependentList",
     target: "gateway",
     auth: "bearer",
+  }),
+  op({
+    service: "regularize-service",
+    method: "GET",
+    path: "/regularize/processes",
+    action: "taskIntegrationProcessList",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
   }),
   op({
     service: "task-service",

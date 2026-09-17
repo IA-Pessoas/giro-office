@@ -23,6 +23,7 @@ export type {
   CreateTaskDependentData,
   CreateTaskModelData,
   TaskDependent,
+  TaskIntegrationRegularize,
   TaskModel,
   TaskModelDetail,
   TaskModelListItem,

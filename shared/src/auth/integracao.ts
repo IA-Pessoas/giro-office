@@ -615,6 +615,17 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     dependency: 409,
     test: "taskModel.delete",
   }),
+  routePolicy("POST", "/task/integration", "taskModel", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "taskIntegration.create",
+  }),
+  routePolicy("DELETE", "/task/integration", "taskModel", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "taskIntegration.delete",
+  }),
+  routePolicy("GET", "/task/integration", "taskModel", "read", [readRule(taskModelRead)], {
+    test: "taskIntegration.list",
+  }),
   routePolicy(
     "GET",
     "/task/model/dependent",

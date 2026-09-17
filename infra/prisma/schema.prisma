@@ -2068,6 +2068,7 @@ model TasksIntegrationRegularize {
   organization    Organization @relation(fields: [organization_id], references: [id])
   task_model      TaskModel    @relation(fields: [task_model_id], references: [id])
 
+  @@unique([organization_id, task_model_id, referring_type, referring], map: "uq_task_regularize_link")
   @@map("integracao.tasksIntegrationRegularize")
 }
 
