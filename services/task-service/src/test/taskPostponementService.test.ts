@@ -136,6 +136,28 @@ describe("TaskPostponementService", () => {
     expect(prismaMock.taskPostponement.create).not.toHaveBeenCalled();
   });
 
+  it("não revela nem altera tarefa de outra organização", async () => {
+    const service = new TaskPostponementService();
+    prismaMock.task.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.create({
+        user_id: "user-1",
+        organization_id: "org-2",
+        task_id: "task-1",
+        new_prevision_date: "2026-09-20",
+        justification: "Aguardando documento do cliente.",
+        integracaoLevel: 0,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    expect(prismaMock.task.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "task-1", organization_id: "org-2" } }),
+    );
+    expect(prismaMock.taskPostponement.create).not.toHaveBeenCalled();
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+  });
+
   it("usa a previsão atual de cada prorrogação como histórico da próxima", async () => {
     const service = new TaskPostponementService(() => new Date("2026-10-01T12:00:00.000Z"));
     const secondCurrentDate = new Date("2026-09-20T00:00:00.000Z");
