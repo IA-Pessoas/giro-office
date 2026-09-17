@@ -20,6 +20,8 @@ export {
   unwrapIntegracaoTaskDetail,
   unwrapIntegracaoTaskList,
   unwrapTaskCompletionRequestHistory,
+  unwrapTaskAttachmentList,
+  unwrapTaskAttachmentAccessUrl,
   unwrapUpdatedIntegracaoTask,
 } from "./integracaoTasksService.contract";
 export {

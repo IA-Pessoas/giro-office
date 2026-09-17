@@ -28,6 +28,9 @@ Ver [`src/config/env.ts`](src/config/env.ts):
   provedor. Nunca versione a chave.
 - `AI_EXTRACTION_RATE_LIMIT_MAX` (default `10`) e `AI_EXTRACTION_RATE_LIMIT_WINDOW_MS`
   (default `60000`) limitam extracoes por usuario e organizacao
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `TASK_ATTACHMENT_STORAGE_BUCKET` configuram o
+  bucket privado de anexos de tarefa. Em produção, URL e chave de serviço são obrigatórias; nunca
+  versione a chave nem use bucket público.
 
 ## Gateway
 
@@ -46,6 +49,10 @@ Exemplos de paths publicos:
 - `POST /task/complete-request` abre solicitação de conclusão; `PUT` aprova ou recusa, `DELETE`
   cancela a própria solicitação e `GET /task/complete-request/list` retorna o histórico da tarefa.
 - `PUT /task/reopen` reabre uma tarefa concluída com motivo; a permissão é validada no serviço.
+- `POST /task/attachment` aceita um arquivo permitido de até 10 MB com assinatura validada e cria
+  apenas metadados privados. `GET /task/attachment/list` não expõe caminho interno, `GET
+  /task/attachment/access` gera URL assinada curta após validar organização e tarefa, e `DELETE
+  /task/attachment` faz remoção lógica auditada, restrita a administradores/owner.
 - `POST /task/project-wizard/preview` compõe tarefas principais e dependências diretas canônicas e
   retorna uma `revision` opaca. Exige Integração nível 2+ ou owner.
 - `POST /task/project-wizard` cria o projeto com a lista, inclusive vazia, de tarefas principais e

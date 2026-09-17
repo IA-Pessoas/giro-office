@@ -91,6 +91,15 @@ export interface IntegracaoTaskCompletionRequest {
   resolved_at: string | null;
 }
 
+export interface IntegracaoTaskAttachment {
+  id: string;
+  original_name: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_by: string;
+  created_at: string;
+}
+
 export interface IntegracaoTaskListParams {
   status?: string;
   ref?: string;

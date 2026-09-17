@@ -11,7 +11,13 @@ export const INTEGRACAO_PERMISSION_LEVEL = {
   ADMIN: 3,
 } as const satisfies Record<string, IntegracaoPermissionLevel>;
 
-export type IntegracaoResource = "client" | "project" | "projectPlan" | "task" | "taskModel";
+export type IntegracaoResource =
+  | "client"
+  | "project"
+  | "projectPlan"
+  | "task"
+  | "taskAttachment"
+  | "taskModel";
 export type IntegracaoAction =
   | "read"
   | "create"
@@ -505,6 +511,53 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     ],
     { test: "task.requestCompletion.list" },
   ),
+  routePolicy(
+    "POST",
+    "/task/attachment",
+    "taskAttachment",
+    "create",
+    [
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        [],
+        "responsible",
+      ),
+      writeRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN], []),
+    ],
+    { audit: "required", test: "task.attachment.create" },
+  ),
+  routePolicy(
+    "GET",
+    "/task/attachment/list",
+    "taskAttachment",
+    "read",
+    [
+      readRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        "responsible",
+      ),
+      readRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
+    ],
+    { test: "task.attachment.list" },
+  ),
+  routePolicy(
+    "GET",
+    "/task/attachment/access",
+    "taskAttachment",
+    "read",
+    [
+      readRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        "responsible",
+      ),
+      readRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
+    ],
+    { test: "task.attachment.access" },
+  ),
+  routePolicy("DELETE", "/task/attachment", "taskAttachment", "delete", [writeRule(admin, [])], {
+    audit: "required",
+    test: "task.attachment.delete",
+  }),
   routePolicy("PUT", "/task/reopen", "task", "reopen", [writeRule(admin, [])], {
     audit: "required",
     test: "task.reopen",

@@ -216,6 +216,7 @@ const state = {
   taskDependentId: "",
   taskIntegrationId: "",
   taskId: "",
+  taskAttachmentId: "",
   projectWizardRevision: "",
   planId: "",
   planTaskId: "",
@@ -5041,6 +5042,55 @@ const handlers = {
       expectedStatus: [200],
       path: "/task/complete-request/list",
       query: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskAttachmentCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      form: {
+        fields: { task_id: requireState("taskId") },
+        file: {
+          fieldName: "file",
+          path: path.join(rootDir, "scripts", "fixtures", "smoke-upload.png"),
+          filename: "smoke-upload.png",
+          contentType: "image/png",
+        },
+      },
+    });
+    if (isBadExpectation(op)) return;
+    state.taskAttachmentId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async taskAttachmentList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskAttachmentAccess(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        task_id: requireState("taskId"),
+        attachment_id: isBadExpectation(op)
+          ? "00000000-0000-0000-0000-000000000000"
+          : requireState("taskAttachmentId"),
+      },
+    });
+  },
+
+  async taskAttachmentDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        task_id: requireState("taskId"),
+        attachment_id: isBadExpectation(op)
+          ? "00000000-0000-0000-0000-000000000000"
+          : requireState("taskAttachmentId"),
+      },
     });
   },
 

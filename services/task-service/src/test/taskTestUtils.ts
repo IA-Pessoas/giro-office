@@ -39,6 +39,12 @@ interface TaskRouteMocks {
   taskFinanceiroServiceMock: {
     updateChargeFinanceiro: Mock;
   };
+  taskAttachmentServiceMock: {
+    upload: Mock;
+    list: Mock;
+    createAccessUrl: Mock;
+    remove: Mock;
+  };
 }
 
 const taskRouteMocks: TaskRouteMocks = vi.hoisted(
@@ -77,6 +83,12 @@ const taskRouteMocks: TaskRouteMocks = vi.hoisted(
     },
     taskFinanceiroServiceMock: {
       updateChargeFinanceiro: vi.fn(),
+    },
+    taskAttachmentServiceMock: {
+      upload: vi.fn(),
+      list: vi.fn(),
+      createAccessUrl: vi.fn(),
+      remove: vi.fn(),
     },
   }),
 );
@@ -117,6 +129,12 @@ vi.mock("../services/taskFinanceiroService.js", () => ({
   }),
 }));
 
+vi.mock("../services/taskAttachmentService.js", () => ({
+  TaskAttachmentService: vi.fn(function TaskAttachmentService() {
+    return taskRouteMocks.taskAttachmentServiceMock;
+  }),
+}));
+
 vi.mock("../middlewares/isAuthenticated.js", () => ({
   isAuthenticated: (req: Express.Request, _res: Express.Response, next: NextFunction) => {
     req.user_id = "user-1";
@@ -141,6 +159,9 @@ export function createTestApp() {
     auditServiceToken: "audit-service-token",
     commercialServiceToken: "audit-service-token",
     projectServiceUrl: "http://localhost:3033",
+    supabaseUrl: "http://localhost:54321",
+    supabaseServiceRoleKey: "task-attachment-storage-test-key",
+    taskAttachmentStorageBucket: "TaskAttachmentsPrivate",
     aiExtractionMode: "fake" as const,
     aiExtractionTimeoutMs: 30_000,
     aiExtractionRateLimitMax: 10,
@@ -166,6 +187,7 @@ export function resetTaskRouteMocks() {
   const taskIntegrationRegularizeServiceMock = taskRouteMocks.taskIntegrationRegularizeServiceMock;
   const taskLifecycleServiceMock = taskRouteMocks.taskLifecycleServiceMock;
   const taskFinanceiroServiceMock = taskRouteMocks.taskFinanceiroServiceMock;
+  const taskAttachmentServiceMock = taskRouteMocks.taskAttachmentServiceMock;
 
   taskCrudServiceMock.createTask.mockResolvedValue({ id: "task-1" });
   taskCrudServiceMock.listTasks.mockResolvedValue([{ id: "task-1" }]);
@@ -200,6 +222,12 @@ export function resetTaskRouteMocks() {
   taskLifecycleServiceMock.listTaskCompletionRequests.mockResolvedValue([]);
   taskLifecycleServiceMock.reopenTask.mockResolvedValue({ id: "task-1", status: "Em Andamento" });
   taskFinanceiroServiceMock.updateChargeFinanceiro.mockResolvedValue({ id: "task-1" });
+  taskAttachmentServiceMock.upload.mockResolvedValue({ id: "attachment-1" });
+  taskAttachmentServiceMock.list.mockResolvedValue([]);
+  taskAttachmentServiceMock.createAccessUrl.mockResolvedValue({
+    url: "https://signed.example/file",
+  });
+  taskAttachmentServiceMock.remove.mockResolvedValue({ id: "attachment-1" });
 }
 
 const taskCrudServiceMock: TaskRouteMocks["taskCrudServiceMock"] =
@@ -214,11 +242,14 @@ const taskLifecycleServiceMock: TaskRouteMocks["taskLifecycleServiceMock"] =
   taskRouteMocks.taskLifecycleServiceMock;
 const taskFinanceiroServiceMock: TaskRouteMocks["taskFinanceiroServiceMock"] =
   taskRouteMocks.taskFinanceiroServiceMock;
+const taskAttachmentServiceMock: TaskRouteMocks["taskAttachmentServiceMock"] =
+  taskRouteMocks.taskAttachmentServiceMock;
 
 export {
   taskCrudServiceMock,
   taskDependentServiceMock,
   taskFinanceiroServiceMock,
+  taskAttachmentServiceMock,
   taskIntegrationRegularizeServiceMock,
   taskLifecycleServiceMock,
   taskModelServiceMock,

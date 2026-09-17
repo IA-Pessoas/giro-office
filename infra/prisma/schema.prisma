@@ -157,6 +157,7 @@ model Organization {
   tasksIntegrationRegularize    TasksIntegrationRegularize[]
   taskModels                    TaskModel[]
   completionRequests            TaskCompletionRequest[]
+  taskAttachments               TaskAttachment[]
   logs                          Logs[]
   passwordsMkt                  PasswordMkt[]
   notes                         Note[]
@@ -1012,6 +1013,7 @@ model Task {
   process             Process[]
   commercialTaskBilling CommercialTaskBilling?
   completionRequests    TaskCompletionRequest[]
+  attachments           TaskAttachment[]
 
   @@map("integracao.tasks")
 }
@@ -1033,6 +1035,25 @@ model TaskCompletionRequest {
   @@index([organization_id, task_id, created_at], map: "idx_task_completion_requests_org_task_created")
   @@index([organization_id, requester_id, created_at], map: "idx_task_completion_requests_org_requester_created")
   @@map("integracao.task_completion_requests")
+}
+
+model TaskAttachment {
+  id              String       @id @default(uuid())
+  task_id         String
+  organization_id String
+  uploaded_by     String
+  original_name   String
+  mime_type       String
+  size_bytes      Int
+  object_path     String       @unique
+  created_at      DateTime     @default(now())
+  deleted_at      DateTime?
+  deleted_by      String?
+  task            Task         @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, deleted_at, created_at], map: "idx_task_attachments_org_task_visible")
+  @@map("integracao.task_attachments")
 }
 
 model ProposalConfig {
