@@ -129,7 +129,7 @@ function validateBranchData(
   context: z.RefinementCtx,
 ): void {
   if (!value.checklist) {
-    if (value.branch_data !== undefined) {
+    if (value.branch_data !== undefined && value.branch_data !== null) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["branch_data"],
@@ -149,7 +149,7 @@ function validateBranchData(
       message: "branch_data válido é obrigatório quando a filial estiver concluída.",
     });
   }
-  if (!branchCompleted && value.branch_data !== undefined) {
+  if (!branchCompleted && value.branch_data !== undefined && value.branch_data !== null) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["branch_data"],
@@ -166,7 +166,7 @@ export const createGuidanceBodySchema = z
     client_pf_id: z.string().uuid("client_pf_id invalido.").nullable().optional(),
     target_snapshot: guidanceTargetSnapshotSchema.optional(),
     checklist: guidanceChecklistSchema,
-    branch_data: guidanceBranchDataSchema.optional(),
+    branch_data: guidanceBranchDataSchema.nullable().optional(),
     type: z.string().optional(),
     request: z.string().optional(),
     framework_obs: z.string().optional(),
@@ -198,7 +198,7 @@ export const updateGuidanceBodySchema = z
     client_pf_id: z.string().uuid("client_pf_id invalido.").nullable().optional(),
     target_snapshot: guidanceTargetSnapshotSchema.optional(),
     checklist: guidanceChecklistSchema.optional(),
-    branch_data: guidanceBranchDataSchema.optional(),
+    branch_data: guidanceBranchDataSchema.nullable().optional(),
     type: z.string().optional(),
     request: z.string().optional(),
     framework_obs: z.string().optional(),

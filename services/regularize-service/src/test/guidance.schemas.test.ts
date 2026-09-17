@@ -118,6 +118,12 @@ describe("guidance schemas", () => {
   });
 
   it("rejeita branch_data sem filial concluída e o exige quando concluída", () => {
+    expect(createGuidanceBodySchema.safeParse(createBody({ branch_data: null })).success).toBe(
+      true,
+    );
+    expect(
+      updateGuidanceBodySchema.safeParse({ id: processId, checklist, branch_data: null }).success,
+    ).toBe(true);
     expect(
       createGuidanceBodySchema.safeParse(
         createBody({

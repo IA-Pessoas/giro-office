@@ -308,7 +308,7 @@ function guidanceRequestBody(required: string[], includeId: boolean, includeColl
               client_pf_id: { type: "string", format: "uuid", nullable: true },
               target_snapshot: guidanceInputTargetSnapshotOpenApiSchema,
               checklist: guidanceChecklistOpenApiSchema,
-              branch_data: guidanceBranchDataOpenApiSchema,
+              branch_data: { ...guidanceBranchDataOpenApiSchema, nullable: true },
               type: { type: "string" },
               request: { type: "string" },
               framework_obs: { type: "string" },

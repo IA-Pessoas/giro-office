@@ -227,7 +227,7 @@ describe("regularize status contracts", () => {
                     maxItems: number;
                     items: { properties: { status: { enum: string[] } } };
                   };
-                  branch_data: { additionalProperties: boolean };
+                  branch_data: { additionalProperties: boolean; nullable: boolean };
                 };
               };
             };
@@ -277,6 +277,7 @@ describe("regularize status contracts", () => {
       "Não se aplica",
     ]);
     expect(schema.properties.branch_data.additionalProperties).toBe(false);
+    expect(schema.properties.branch_data.nullable).toBe(true);
 
     const responseSchema = (
       guidancePath.post.responses["201"] as {

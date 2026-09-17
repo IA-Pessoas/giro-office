@@ -34,6 +34,7 @@ CREATE TABLE "regularize.proceduralGuidanceChecklistItems" (
 
 UPDATE "regularize.proceduralGuidances" AS guidance
 SET "target_type" = CASE
+  WHEN process."client_pj_id" IS NOT NULL AND process."client_pf_id" IS NOT NULL THEN 'SEM_CLIENTE'
   WHEN process."client_pj_id" IS NOT NULL THEN 'PJ'
   WHEN process."client_pf_id" IS NOT NULL THEN 'PF'
   ELSE 'SEM_CLIENTE'
@@ -44,8 +45,14 @@ WHERE guidance."process_id" = process."id"
 
 UPDATE "regularize.proceduralGuidances" AS guidance
 SET
-  "client_pj_id" = client_pj."id",
-  "client_pf_id" = client_pf."id"
+  "client_pj_id" = CASE
+    WHEN guidance."target_type" = 'PJ' THEN client_pj."id"
+    ELSE NULL
+  END,
+  "client_pf_id" = CASE
+    WHEN guidance."target_type" = 'PF' THEN client_pf."id"
+    ELSE NULL
+  END
 FROM "regularize.process" AS process
 LEFT JOIN "clients" AS client_pj
   ON client_pj."id" = process."client_pj_id"
@@ -62,6 +69,15 @@ SET "target_snapshot" = jsonb_strip_nulls(jsonb_build_object('version', 1,
     WHEN 'PJ' THEN 'client_pj'
     WHEN 'PF' THEN 'client_pf'
     ELSE 'manual'
+  END,
+  'name', CASE
+    WHEN guidance."target_type" = 'SEM_CLIENTE' THEN COALESCE(
+      guidance."company_name",
+      guidance."trade_name",
+      guidance."type",
+      'Registro legado'
+    )
+    ELSE NULL
   END,
   'type', guidance."type",
   'request', guidance."request",
