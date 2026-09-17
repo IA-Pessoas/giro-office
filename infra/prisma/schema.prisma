@@ -690,6 +690,7 @@ model Client {
   partners                      Partners[]
   passRegularize                PasswordRegularize[]
   process                       Process[]
+  proceduralGuidances           ProceduralGuidance[]       @relation("proceduralGuidanceClientPJ")
   triageConfigs                 TriageConfig[]
   triageMonthlys                TriageMonthly[]
   responsiblesTriage            TriageResponsible[]
@@ -846,6 +847,7 @@ model ClientPF {
   organization         Organization @relation(fields: [organization_id], references: [id])
   partners             Partners[]
   process              Process[]
+  proceduralGuidances  ProceduralGuidance[] @relation("proceduralGuidanceClientPF")
 
   @@map("clients.pf")
 }
@@ -1909,7 +1911,7 @@ model Process {
 
 model ProceduralGuidance {
   id                   String       @id @default(uuid())
-  process_id           String
+  process_id           String?
   type                 String?
   request              String?
   framework_obs        String?
@@ -1927,11 +1929,34 @@ model ProceduralGuidance {
   status               String
   economic_activities  Json?
   partners             Json?
+  target_type          String
+  client_pj_id         String?
+  client_pf_id         String?
+  target_snapshot      Json
+  branch_data          Json?
   organization_id      String
+  checklist_items      ProceduralGuidanceChecklistItem[]
+  clientPJ             Client?      @relation("proceduralGuidanceClientPJ", fields: [client_pj_id], references: [id])
+  clientPF             ClientPF?    @relation("proceduralGuidanceClientPF", fields: [client_pf_id], references: [id])
   organization         Organization @relation(fields: [organization_id], references: [id])
-  process              Process      @relation(fields: [process_id], references: [id])
+  process              Process?     @relation(fields: [process_id], references: [id])
 
   @@map("regularize.proceduralGuidances")
+}
+
+model ProceduralGuidanceChecklistItem {
+  id          String             @id @default(uuid())
+  guidance_id String
+  code        String
+  label       String
+  status      String
+  observation String?
+  created_at  DateTime           @default(now())
+  updated_at  DateTime           @updatedAt
+  guidance    ProceduralGuidance @relation(fields: [guidance_id], references: [id], onDelete: Cascade)
+
+  @@unique([guidance_id, code])
+  @@map("regularize.proceduralGuidanceChecklistItems")
 }
 
 model Partners {
