@@ -66,6 +66,43 @@ describe("PointService", () => {
     });
   });
 
+  it("calculateDailyHours soma os dois intervalos em minutos e calcula o saldo do dia", async () => {
+    prismaMock.point.findUnique.mockResolvedValue({
+      id: "point-1",
+      user_id: "user-1",
+      organization_id: "org-1",
+      clock_in: new Date("2026-05-04T06:00:00.000Z"),
+      lunch_out: new Date("2026-05-04T09:00:00.000Z"),
+      lunch_in: new Date("2026-05-04T10:00:00.000Z"),
+      clock_out: new Date("2026-05-04T15:00:00.000Z"),
+      time_bank_balance: null,
+    });
+    prismaMock.timeSheets.findFirst.mockResolvedValue(null);
+    prismaMock.pointsConfig.findUnique.mockResolvedValue({
+      organization_id: "org-1",
+      start_time: new Date("2026-05-04T06:00:00.000Z"),
+      lunch_break: new Date("2026-05-04T09:00:00.000Z"),
+      lunch_return: new Date("2026-05-04T10:00:00.000Z"),
+      end_time: new Date("2026-05-04T15:00:00.000Z"),
+      work_days: "1,2,3,4,5",
+    });
+    prismaMock.holidays.findFirst.mockResolvedValue(null);
+
+    const service = new PointService();
+    const result = await service.calculateDailyHours("point-1", "org-1");
+
+    expect(result).toEqual({
+      point_id: "point-1",
+      total_worked_minutes: 480,
+      expected_minutes: 480,
+      day_balance_minutes: 0,
+    });
+    expect(prismaMock.point.update).toHaveBeenCalledWith({
+      where: { id: "point-1" },
+      data: { workload_hours: 480, time_bank_balance: 0 },
+    });
+  });
+
   it("listPoints aplica filtro por periodo e usuario", async () => {
     prismaMock.point.findMany.mockResolvedValue([
       {

@@ -2,6 +2,7 @@ import { Eye, FileSignature } from "lucide-react";
 
 import type { RhTimeSheetListItem } from "../types";
 import { formatRhDateTime } from "../utils/rhDate";
+import { formatRhDuration } from "../utils/rhDuration";
 
 interface RhTimesheetsTableProps {
   timeSheets: RhTimeSheetListItem[];
@@ -19,23 +20,6 @@ interface RhTimesheetsTableProps {
 
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 min-w-[96px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
-
-function formatMinutes(value: number) {
-  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
-  const absoluteMinutes = Math.abs(value);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const remainingMinutes = absoluteMinutes % 60;
-
-  if (hours === 0) {
-    return `${sign}${remainingMinutes}min`;
-  }
-
-  if (remainingMinutes === 0) {
-    return `${sign}${hours}h`;
-  }
-
-  return `${sign}${hours}h ${remainingMinutes}min`;
-}
 
 export function RhTimesheetsTable({
   timeSheets,
@@ -108,10 +92,10 @@ export function RhTimesheetsTable({
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                  {formatMinutes(sheet.worked_minutes)}
+                  {formatRhDuration(sheet.worked_minutes)}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                  {formatMinutes(sheet.balance_minutes)}
+                  {formatRhDuration(sheet.balance_minutes, { showPositiveSign: true })}
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex flex-col items-end gap-2">
