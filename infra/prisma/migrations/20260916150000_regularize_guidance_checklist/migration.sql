@@ -34,9 +34,30 @@ CREATE TABLE "regularize.proceduralGuidanceChecklistItems" (
 
 UPDATE "regularize.proceduralGuidances" AS guidance
 SET "target_type" = CASE
-  WHEN process."client_pj_id" IS NOT NULL AND process."client_pf_id" IS NOT NULL THEN 'SEM_CLIENTE'
-  WHEN process."client_pj_id" IS NOT NULL THEN 'PJ'
-  WHEN process."client_pf_id" IS NOT NULL THEN 'PF'
+  WHEN EXISTS (
+    SELECT 1
+    FROM "clients" AS process_client_pj
+    WHERE process_client_pj."id" = process."client_pj_id"
+      AND process_client_pj."organization_id" = process."organization_id"
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM "clients.pf" AS process_client_pf
+    WHERE process_client_pf."id" = process."client_pf_id"
+      AND process_client_pf."organization_id" = process."organization_id"
+  ) THEN 'SEM_CLIENTE'
+  WHEN EXISTS (
+    SELECT 1
+    FROM "clients" AS process_client_pj
+    WHERE process_client_pj."id" = process."client_pj_id"
+      AND process_client_pj."organization_id" = process."organization_id"
+  ) THEN 'PJ'
+  WHEN EXISTS (
+    SELECT 1
+    FROM "clients.pf" AS process_client_pf
+    WHERE process_client_pf."id" = process."client_pf_id"
+      AND process_client_pf."organization_id" = process."organization_id"
+  ) THEN 'PF'
   ELSE 'SEM_CLIENTE'
 END
 FROM "regularize.process" AS process
