@@ -785,7 +785,9 @@ export function TaskModelModal({
                   regularizeLinks.map((link) => (
                     <li key={link.id} className="flex items-center justify-between gap-3">
                       <span>
-                        {link.referring_type === "process" ? "Processo" : "Licença"}: {link.referring}
+                        {link.referring_type === "process" ? "Processo" : "Licença"}:{" "}
+                        {regularizeOptions.find((option) => option.id === link.referring)?.label.replace(/^(Processo|Licença): /, "") ??
+                          link.referring}
                         {link.available ? "" : " (indisponível)"}
                       </span>
                       <button
