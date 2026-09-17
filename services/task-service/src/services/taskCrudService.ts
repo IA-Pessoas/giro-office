@@ -21,11 +21,11 @@ import {
   listEligibleTaskResponsibles,
 } from "./responsibleUserContext.js";
 import { ACTIVE_TASK_CONFLICT_MESSAGE, throwIfActiveTaskConflict } from "./taskActiveConflict.js";
-import { TaskWorkflowService } from "./taskWorkflowService.js";
 import {
   publishTaskOperationalNotifications,
   TASK_OPERATIONAL_NOTIFICATION_TYPE,
 } from "./taskOperationalNotificationService.js";
+import { TaskWorkflowService } from "./taskWorkflowService.js";
 
 const TASK_DETAIL_SELECT = {
   id: true,
@@ -878,7 +878,7 @@ export class TaskCrudService {
           event_key: `task-change:${updated.date_updated?.toISOString() ?? data.task_id}`,
           type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
           title: "Tarefa atualizada",
-          message: "Há uma alteração relevante em uma tarefa sob sua responsabilidade.",
+          message: "Há uma alteração relevante em uma tarefa acompanhada por você.",
           responsible_ids: [
             updated.responsible_id,
             updated.responsible2_id,

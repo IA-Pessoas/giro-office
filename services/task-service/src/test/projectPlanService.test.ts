@@ -268,6 +268,24 @@ describe("ProjectPlanService", () => {
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
+  it("addTask rejeita o mesmo modelo duas vezes no plano", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
+    prisma.taskModel.findFirst = async () => ({ id: "model-1" });
+    prisma.projectPlanTasks.findFirst = async () => ({ id: "plan-task-1" });
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
+
+    await expect(
+      service.addTask({
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        plan_id: PLAN_ID,
+        task_id: "model-1",
+        integracaoLevel: 3,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
   it("reorderTask lança 403 quando usuário não tem permissão", async () => {
     const prisma = createBasePrisma();
     prisma.projectPlanTasks.findFirst = async (args?: {

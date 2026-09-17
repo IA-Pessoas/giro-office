@@ -13,6 +13,20 @@ import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { type TaskCreateRow, TaskCrudService } from "./taskCrudService.js";
 
+const HIRE_TRANSACTION_MAX_WAIT_MS = 20_000;
+const HIRE_TRANSACTION_TIMEOUT_MS = 60_000;
+
+function isTransactionTimeoutError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const code = "code" in err ? err.code : undefined;
+  const message = "message" in err ? String(err.message) : "";
+  return code === "P2028" || message.includes("Unable to start a transaction");
+}
+
+function isUniqueConstraintError(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && err.code === "P2002";
+}
+
 const PROJECT_PLAN_SELECT = {
   id: true,
   name: true,
@@ -208,7 +222,7 @@ export class ProjectPlanService {
         action: "Cadastro",
         referring: "integracao.projectPlan",
         referringId: create.id,
-        changes: "{}",
+        changes: JSON.stringify({ name: create.name, color: create.color }),
       });
 
       return { create };
@@ -351,7 +365,7 @@ export class ProjectPlanService {
         action: "Exclusao",
         referring: "integracao.projectPlan",
         referringId: data.id,
-        changes: "{}",
+        changes: JSON.stringify({ planId: data.id }),
       });
 
       return { response: true };
@@ -391,6 +405,19 @@ export class ProjectPlanService {
         throw new ServiceError(404, "Modelo de tarefa nao encontrado.");
       }
 
+      const alreadyInPlan = await this.#prisma.projectPlanTasks.findFirst({
+        where: {
+          plan_id: data.plan_id,
+          task_id: data.task_id,
+          organization_id: data.organization_id,
+        },
+        select: { id: true },
+      });
+
+      if (alreadyInPlan) {
+        throw new ServiceError(409, "Modelo de tarefa ja esta neste plano.");
+      }
+
       const lastTaskInPlan = await this.#prisma.projectPlanTasks.findFirst({
         where: {
           plan_id: data.plan_id,
@@ -422,12 +449,19 @@ export class ProjectPlanService {
         action: "Cadastro",
         referring: "integracao.projectPlan",
         referringId: create.id,
-        changes: "{}",
+        changes: JSON.stringify({
+          planId: data.plan_id,
+          taskModelId: data.task_id,
+          order: create.order,
+        }),
       });
 
       return { create };
     } catch (err: unknown) {
       logError("Erro ao adicionar modelo de tarefa ao plano", { err });
+      if (isUniqueConstraintError(err)) {
+        throw new ServiceError(409, "Modelo de tarefa ja esta neste plano.", err);
+      }
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Nao foi possivel adicionar a tarefa ao plano.", err);
     }
@@ -591,112 +625,124 @@ export class ProjectPlanService {
     try {
       this.#requirePlanAccess("POST", "/task/project-plan/hire", data);
 
-      const result = await this.#prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        const lockKey = JSON.stringify([data.organization_id, data.plan_id, data.project_id]);
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+      const result = await this.#prisma.$transaction(
+        async (tx: Prisma.TransactionClient) => {
+          const lockKey = JSON.stringify([data.organization_id, data.plan_id, data.project_id]);
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
 
-        const previous = await tx.projectPlanHiring.findUnique({
-          where: {
-            organization_id_plan_id_project_id: {
+          const previous = await tx.projectPlanHiring.findUnique({
+            where: {
+              organization_id_plan_id_project_id: {
+                organization_id: data.organization_id,
+                plan_id: data.plan_id,
+                project_id: data.project_id,
+              },
+            },
+          });
+          if (previous) {
+            return {
+              ...(previous.response_snapshot as unknown as Omit<
+                ProjectPlanHireResponse,
+                "idempotent"
+              >),
+              idempotent: true,
+            };
+          }
+
+          const plan = await tx.projectPlan.findFirst({
+            where: { id: data.plan_id, organization_id: data.organization_id },
+          });
+          if (!plan) {
+            throw new ServiceError(404, "Plano nao encontrado.");
+          }
+
+          const project = await tx.project.findFirst({
+            where: { id: data.project_id, organization_id: data.organization_id },
+            select: { client_id: true },
+          });
+          if (!project) {
+            throw new ServiceError(404, "Projeto nao encontrado.");
+          }
+
+          const client = await tx.client.findFirst({
+            where: { id: project.client_id, organization_id: data.organization_id },
+            select: { prospecting_status: true },
+          });
+          if (!client) {
+            throw new ServiceError(404, "Cliente nao encontrado.");
+          }
+
+          const planTasks = await tx.projectPlanTasks.findMany({
+            where: { plan_id: data.plan_id, organization_id: data.organization_id },
+            select: { task_id: true },
+            orderBy: { order: "asc" },
+          });
+          if (planTasks.length === 0) {
+            throw new ServiceError(422, "Plano vazio não pode ser contratado.");
+          }
+
+          const created: TaskCreateRow[] = [];
+          for (const planTask of planTasks) {
+            const task = await this.#taskCrudService.createTaskInTransaction(
+              {
+                user_id: data.user_id,
+                organization_id: data.organization_id,
+                model_id: planTask.task_id,
+                project_id: data.project_id,
+                client_id: project.client_id,
+                prospecting_status: client.prospecting_status as ProspectingStatus,
+                observations: "",
+                urgency: "",
+                integracaoLevel: data.integracaoLevel,
+                isOwner: data.isOwner === true,
+              },
+              tx,
+            );
+            created.push(task.create);
+          }
+
+          const response = JSON.parse(
+            JSON.stringify({ created, idempotent: false }),
+          ) as ProjectPlanHireResponse;
+          await this.#audit.createLog({
+            userId: data.user_id,
+            organizationId: data.organization_id,
+            action: "Cadastro",
+            referring: "integracao.projectPlan",
+            referringId: data.plan_id,
+            required: true,
+            changes: {
+              source: "project-plan-hire",
+              projectId: data.project_id,
+              taskIds: created.map(({ id }) => id),
+            },
+          });
+          await tx.projectPlanHiring.create({
+            data: {
               organization_id: data.organization_id,
               plan_id: data.plan_id,
               project_id: data.project_id,
+              response_snapshot: response as unknown as Prisma.InputJsonValue,
             },
-          },
-        });
-        if (previous) {
-          return {
-            ...(previous.response_snapshot as unknown as Omit<
-              ProjectPlanHireResponse,
-              "idempotent"
-            >),
-            idempotent: true,
-          };
-        }
+          });
 
-        const plan = await tx.projectPlan.findFirst({
-          where: { id: data.plan_id, organization_id: data.organization_id },
-        });
-        if (!plan) {
-          throw new ServiceError(404, "Plano nao encontrado.");
-        }
-
-        const project = await tx.project.findFirst({
-          where: { id: data.project_id, organization_id: data.organization_id },
-          select: { client_id: true },
-        });
-        if (!project) {
-          throw new ServiceError(404, "Projeto nao encontrado.");
-        }
-
-        const client = await tx.client.findFirst({
-          where: { id: project.client_id, organization_id: data.organization_id },
-          select: { prospecting_status: true },
-        });
-        if (!client) {
-          throw new ServiceError(404, "Cliente nao encontrado.");
-        }
-
-        const planTasks = await tx.projectPlanTasks.findMany({
-          where: { plan_id: data.plan_id, organization_id: data.organization_id },
-          select: { task_id: true },
-          orderBy: { order: "asc" },
-        });
-        if (planTasks.length === 0) {
-          throw new ServiceError(422, "Plano vazio não pode ser contratado.");
-        }
-
-        const created: TaskCreateRow[] = [];
-        for (const planTask of planTasks) {
-          const task = await this.#taskCrudService.createTaskInTransaction(
-            {
-              user_id: data.user_id,
-              organization_id: data.organization_id,
-              model_id: planTask.task_id,
-              project_id: data.project_id,
-              client_id: project.client_id,
-              prospecting_status: client.prospecting_status as ProspectingStatus,
-              observations: "",
-              urgency: "",
-              integracaoLevel: data.integracaoLevel,
-              isOwner: data.isOwner === true,
-            },
-            tx,
-          );
-          created.push(task.create);
-        }
-
-        const response = JSON.parse(
-          JSON.stringify({ created, idempotent: false }),
-        ) as ProjectPlanHireResponse;
-        await this.#audit.createLog({
-          userId: data.user_id,
-          organizationId: data.organization_id,
-          action: "Cadastro",
-          referring: "integracao.projectPlan",
-          referringId: data.plan_id,
-          required: true,
-          changes: {
-            source: "project-plan-hire",
-            projectId: data.project_id,
-            taskIds: created.map(({ id }) => id),
-          },
-        });
-        await tx.projectPlanHiring.create({
-          data: {
-            organization_id: data.organization_id,
-            plan_id: data.plan_id,
-            project_id: data.project_id,
-            response_snapshot: response as unknown as Prisma.InputJsonValue,
-          },
-        });
-
-        return response;
-      });
+          return response;
+        },
+        // A contratação serializa pelo advisory lock e cria uma tarefa por modelo:
+        // as chamadas concorrentes precisam esperar a primeira terminar.
+        { maxWait: HIRE_TRANSACTION_MAX_WAIT_MS, timeout: HIRE_TRANSACTION_TIMEOUT_MS },
+      );
       return result;
     } catch (err: unknown) {
       logError("Erro ao contratar plano de projeto", { err });
       if (err instanceof ServiceError) throw err;
+      if (isTransactionTimeoutError(err)) {
+        throw new ServiceError(
+          409,
+          "A contratacao do plano esta em andamento. Tente novamente.",
+          err,
+        );
+      }
       throw new ServiceError(500, "Nao foi possivel contratar o plano.", err);
     }
   }

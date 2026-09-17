@@ -110,6 +110,11 @@ const integracaoProjectPolicy: AuthPolicy = {
   },
 };
 const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao", 0);
+/**
+ * Rotas cuja matriz do task-service admite o responsável em nível 0/1; o escopo de
+ * responsável continua sendo validado no serviço.
+ */
+const integracaoResponsibleTaskPolicy: AuthPolicy = createModulePolicy("integracao", 0);
 
 const integracaoClientPolicy: AuthPolicy = {
   modulePermission: {
@@ -204,6 +209,12 @@ const routePolicyMatchers: Array<{
     path: /^\/task\/notifications(?:\/read)?$/,
     policy: integracaoNotificationPolicy,
   },
+  {
+    method: "ANY",
+    path: /^\/task\/(?:complete-request(?:\/list)?|postponement(?:\/list)?|attachment(?:\/list|\/access)?|conclusion)$/,
+    policy: integracaoResponsibleTaskPolicy,
+  },
+  { method: "GET", path: /^\/task(?:\/list)?$/, policy: integracaoResponsibleTaskPolicy },
   { method: "GET", path: /^\/task(?:\/|$)/, policy: integracaoProjectPolicy },
   { method: "ANY", path: /^\/task(?:\/|$)/, policy: integracaoEditPolicy },
   { method: "GET", path: /^\/department(?:\/|$)/, policy: tiModulePolicy },

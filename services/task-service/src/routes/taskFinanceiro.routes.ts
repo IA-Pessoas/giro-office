@@ -72,7 +72,10 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const query = parseWithZod(financeiroCollectorsQuerySchema, req.query);
-      const result = await taskFinanceiroService.listCollectors({ ...requestContext(req), ...query });
+      const result = await taskFinanceiroService.listCollectors({
+        ...requestContext(req),
+        ...query,
+      });
       res.json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao listar cobradores financeiros", { err });

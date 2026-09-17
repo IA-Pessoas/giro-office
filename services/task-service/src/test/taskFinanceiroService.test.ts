@@ -16,6 +16,7 @@ const { prismaMock, auditMock } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     departmentCollector: {
       findFirst: vi.fn(),
@@ -41,17 +42,21 @@ describe("TaskFinanceiroService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.user.findFirst.mockResolvedValue({ department_id: "department-1" });
+    prismaMock.taskFinanceiroCommand.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it("repetir a baixa com a mesma chave devolve o resultado registrado", async () => {
     const response = { task_ids: ["task-1"], settled: 1 };
-    const commandHash = createHash("sha256").update(JSON.stringify({ task_ids: ["task-1"] })).digest("hex");
+    const commandHash = createHash("sha256")
+      .update(JSON.stringify({ task_ids: ["task-1"] }))
+      .digest("hex");
     prismaMock.$transaction.mockImplementation(async (operation) => operation(prismaMock));
     prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue({
       command_hash: commandHash,
       response_snapshot: response,
       audited_at: new Date(),
     });
+    prismaMock.taskFinanceiroCommand.updateMany.mockResolvedValue({ count: 0 });
     const service = new TaskFinanceiroService();
 
     await expect(
@@ -70,7 +75,9 @@ describe("TaskFinanceiroService", () => {
 
   it("repete somente a auditoria quando a baixa anterior ficou sem evidência", async () => {
     const response = { task_ids: ["task-1"], settled: 1 };
-    const commandHash = createHash("sha256").update(JSON.stringify({ task_ids: ["task-1"] })).digest("hex");
+    const commandHash = createHash("sha256")
+      .update(JSON.stringify({ task_ids: ["task-1"] }))
+      .digest("hex");
     prismaMock.$transaction.mockImplementation(async (operation) => operation(prismaMock));
     prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue({
       command_hash: commandHash,
@@ -90,14 +97,19 @@ describe("TaskFinanceiroService", () => {
     ).resolves.toEqual(response);
 
     expect(prismaMock.task.updateMany).not.toHaveBeenCalled();
-    expect(prismaMock.taskFinanceiroCommand.update).toHaveBeenCalledWith(
+    expect(auditMock.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "Baixa Financeira de Tarefas", required: true }),
+    );
+    expect(prismaMock.taskFinanceiroCommand.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: { audited_at: expect.any(Date) } }),
     );
   });
 
   it("não devolve replay ao cobrador transferido", async () => {
     const response = { task_ids: ["task-1"], settled: 1 };
-    const commandHash = createHash("sha256").update(JSON.stringify({ task_ids: ["task-1"] })).digest("hex");
+    const commandHash = createHash("sha256")
+      .update(JSON.stringify({ task_ids: ["task-1"] }))
+      .digest("hex");
     prismaMock.$transaction.mockImplementation(async (operation) => operation(prismaMock));
     prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue({
       command_hash: commandHash,
@@ -122,7 +134,9 @@ describe("TaskFinanceiroService", () => {
 
   it("não devolve replay ao cobrador removido da configuração", async () => {
     const response = { task_ids: ["task-1"], settled: 1 };
-    const commandHash = createHash("sha256").update(JSON.stringify({ task_ids: ["task-1"] })).digest("hex");
+    const commandHash = createHash("sha256")
+      .update(JSON.stringify({ task_ids: ["task-1"] }))
+      .digest("hex");
     prismaMock.$transaction.mockImplementation(async (operation) => operation(prismaMock));
     prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue({
       command_hash: commandHash,
@@ -166,7 +180,11 @@ describe("TaskFinanceiroService", () => {
     ).resolves.toEqual({ task_ids: ["task-1", "task-2"], settled: 2 });
 
     expect(prismaMock.task.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ["task-1", "task-2"] }, organization_id: "org-1", charge_financeiro: true },
+      where: {
+        id: { in: ["task-1", "task-2"] },
+        organization_id: "org-1",
+        charge_financeiro: true,
+      },
       data: { charge_financeiro: false },
     });
     expect(prismaMock.taskFinanceiroCommand.create).toHaveBeenCalled();
@@ -353,7 +371,9 @@ describe("TaskFinanceiroService", () => {
     ).rejects.toMatchObject({ statusCode: 403 });
 
     expect(prismaMock.departmentCollector.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ department_id: "department-new" }) }),
+      expect.objectContaining({
+        where: expect.objectContaining({ department_id: "department-new" }),
+      }),
     );
   });
 
@@ -400,10 +420,12 @@ describe("TaskFinanceiroService", () => {
       }),
     ).resolves.toEqual({ task_ids: ["task-1"], settled: 1 });
 
-    expect(prismaMock.task.findMany.mock.calls[0]).toEqual([{
-      where: { organization_id: "org-1", client_id: "client-1", charge_financeiro: true },
-      select: { id: true },
-    }]);
+    expect(prismaMock.task.findMany.mock.calls[0]).toEqual([
+      {
+        where: { organization_id: "org-1", client_id: "client-1", charge_financeiro: true },
+        select: { id: true },
+      },
+    ]);
   });
 
   it("repetir Baixa Express devolve o snapshot mesmo sem pendências restantes", async () => {
@@ -411,7 +433,9 @@ describe("TaskFinanceiroService", () => {
     prismaMock.$transaction.mockImplementation(async (operation) => operation(prismaMock));
     prismaMock.task.findMany.mockResolvedValue([]);
     prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue({
-      command_hash: createHash("sha256").update(JSON.stringify({ client_id: "client-1" })).digest("hex"),
+      command_hash: createHash("sha256")
+        .update(JSON.stringify({ client_id: "client-1" }))
+        .digest("hex"),
       response_snapshot: response,
     });
     const service = new TaskFinanceiroService();

@@ -16,8 +16,8 @@ vi.mock("../prisma/index.js", () => ({ default: prismaMock }));
 
 import {
   publishTaskOperationalNotifications,
-  TaskOperationalNotificationService,
   TASK_OPERATIONAL_NOTIFICATION_TYPE,
+  TaskOperationalNotificationService,
 } from "../services/taskOperationalNotificationService.js";
 
 describe("TaskOperationalNotificationService", () => {
@@ -56,6 +56,29 @@ describe("TaskOperationalNotificationService", () => {
         notification_id: "notification-2",
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("inclui o proprietário entre os administradores notificados", async () => {
+    prismaMock.user.findMany
+      .mockResolvedValueOnce([{ id: "user-1" }])
+      .mockResolvedValueOnce([{ id: "owner-1" }]);
+    prismaMock.permission.findMany.mockResolvedValue([]);
+
+    await publishTaskOperationalNotifications(prismaMock, {
+      organization_id: "org-1",
+      task_id: "task-1",
+      event_key: "task-reopen:task-1",
+      type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
+      title: "Tarefa reaberta",
+      message: "Motivo.",
+      responsible_ids: ["user-1"],
+      include_administrators: true,
+    });
+
+    expect(prismaMock.taskOperationalNotification.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([expect.objectContaining({ recipient_id: "owner-1" })]),
+      skipDuplicates: true,
+    });
   });
 
   it("deduplica o mesmo evento por destinatário e entidade", async () => {

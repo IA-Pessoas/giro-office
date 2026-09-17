@@ -134,6 +134,7 @@ export class TaskPostponementService {
             message: `A previsão da tarefa foi alterada para ${input.new_prevision_date}.`,
             responsible_ids: [task.responsible_id, task.responsible2_id, task.responsible3_id],
             include_administrators: true,
+            exclude_user_id: input.user_id,
           });
           await audit.createLog({
             userId: input.user_id,

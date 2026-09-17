@@ -5,6 +5,7 @@ const { prismaMock, auditMock, workflowMock, operationalNotificationMock } = vi.
     $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(prismaMock)),
     task: {
       findFirst: vi.fn(),
+      findFirstOrThrow: vi.fn(),
       update: vi.fn(),
     },
     taskCompletionRequest: {
@@ -332,7 +333,7 @@ describe("TaskLifecycleService", () => {
     );
     expect(prismaMock.task.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { status: "Concluída", pending_approval: false },
+        data: { status: "Concluída", pending_approval: false, end_date: expect.any(Date) },
       }),
     );
     expect(auditMock.createLog).toHaveBeenCalledWith(
@@ -403,6 +404,11 @@ describe("TaskLifecycleService", () => {
       requester_id: "user-2",
       status: "approved",
     });
+    prismaMock.task.findFirstOrThrow.mockResolvedValue({
+      id: "task-1",
+      status: "Concluída",
+      pending_approval: false,
+    });
 
     await expect(
       new TaskLifecycleService().approveTaskCompletion({
@@ -439,6 +445,11 @@ describe("TaskLifecycleService", () => {
       })
       .mockResolvedValueOnce({ id: "request-1", organization_id: "org-1", status: "approved" });
     prismaMock.taskCompletionRequest.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.task.findFirstOrThrow.mockResolvedValue({
+      id: "task-1",
+      status: "Concluída",
+      pending_approval: false,
+    });
 
     await expect(
       new TaskLifecycleService().approveTaskCompletion({
@@ -524,11 +535,20 @@ describe("TaskLifecycleService", () => {
 
     expect(prismaMock.task.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { status: "Em Andamento", pending_approval: false },
+        data: { status: "Em Andamento", pending_approval: false, end_date: null },
       }),
     );
     expect(auditMock.createLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: "Reabertura de Tarefa", required: true }),
+    );
+    expect(operationalNotificationMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        title: "Tarefa reaberta",
+        include_administrators: true,
+        exclude_user_id: "admin-1",
+        responsible_ids: ["user-2", null, null],
+      }),
     );
   });
 

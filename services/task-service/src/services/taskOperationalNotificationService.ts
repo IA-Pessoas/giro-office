@@ -71,9 +71,17 @@ export async function publishTaskOperationalNotifications(
         })
       : [],
   ]);
+  /** O proprietário administra a Integração por bypass, sem nível no módulo. */
+  const owners = input.include_administrators
+    ? await prisma.user.findMany({
+        where: { organization_id: input.organization_id, status: "active", type: "owner" },
+        select: { id: true },
+      })
+    : [];
   const recipientIds = new Set([
     ...responsibles.map(({ id }) => id),
     ...administrators.map(({ user_id }) => user_id),
+    ...owners.map(({ id }) => id),
   ]);
   if (input.exclude_user_id) recipientIds.delete(input.exclude_user_id);
   if (recipientIds.size === 0) return;

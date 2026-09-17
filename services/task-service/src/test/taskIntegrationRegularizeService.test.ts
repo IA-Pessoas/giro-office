@@ -201,6 +201,11 @@ describe("TaskIntegrationRegularizeService", () => {
   });
 
   it("exige auditoria ao remover vínculo", async () => {
+    prismaMock.tasksIntegrationRegularize.findFirst.mockResolvedValue({
+      task_model_id: "model-1",
+      referring: "process-1",
+      referring_type: "process",
+    });
     prismaMock.tasksIntegrationRegularize.deleteMany.mockResolvedValue({ count: 1 });
     const service = new TaskIntegrationRegularizeService();
 
@@ -213,6 +218,15 @@ describe("TaskIntegrationRegularizeService", () => {
       }),
     ).resolves.toEqual({ message: "Vínculo removido com sucesso." });
 
-    expect(auditMock.createLog).toHaveBeenCalledWith(expect.objectContaining({ required: true }));
+    expect(auditMock.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        required: true,
+        changes: {
+          task_model_id: "model-1",
+          referring: "process-1",
+          referring_type: "process",
+        },
+      }),
+    );
   });
 });

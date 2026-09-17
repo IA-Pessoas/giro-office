@@ -155,9 +155,15 @@ export class TaskIntegrationRegularizeService {
         resourceOrganizationId: data.organization_id,
         isOwner: data.isOwner === true,
       });
-      const deleted = await prismaClient.tasksIntegrationRegularize.deleteMany({
+      const existing = await prismaClient.tasksIntegrationRegularize.findFirst({
         where: { id: data.integration_id, organization_id: data.organization_id },
+        select: { task_model_id: true, referring: true, referring_type: true },
       });
+      const deleted = existing
+        ? await prismaClient.tasksIntegrationRegularize.deleteMany({
+            where: { id: data.integration_id, organization_id: data.organization_id },
+          })
+        : { count: 0 };
 
       if (deleted.count === 0) {
         throw new ServiceError(404, "Vínculo não encontrado.");
@@ -169,7 +175,11 @@ export class TaskIntegrationRegularizeService {
         action: "Desvincular Tarefa",
         referring: "integracao.tasks",
         referringId: data.integration_id,
-        changes: "{}",
+        changes: {
+          task_model_id: existing?.task_model_id,
+          referring: existing?.referring,
+          referring_type: existing?.referring_type,
+        },
         required: true,
       });
 

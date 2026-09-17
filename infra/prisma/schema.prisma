@@ -939,6 +939,7 @@ model ProjectPlanTasks {
   plans           ProjectPlan  @relation(fields: [plan_id], references: [id])
   tasks           TaskModel    @relation(fields: [task_id], references: [id])
 
+  @@unique([organization_id, plan_id, task_id], map: "uq_project_plan_task_model")
   @@map("integracao.projectPlanTasks")
 }
 

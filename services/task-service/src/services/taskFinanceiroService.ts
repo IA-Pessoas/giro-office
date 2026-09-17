@@ -66,7 +66,9 @@ function settlementCommandHash(taskIds: string[]): string {
 }
 
 function expressCommandHash(clientId: string): string {
-  return createHash("sha256").update(JSON.stringify({ client_id: clientId })).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify({ client_id: clientId }))
+    .digest("hex");
 }
 
 export class TaskFinanceiroService {
@@ -74,7 +76,10 @@ export class TaskFinanceiroService {
     const isPrivileged =
       data.is_owner === true || data.integracao_level === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
     if (!isPrivileged) {
-      throw new ServiceError(403, "Apenas administradores podem consultar a configuração de cobradores.");
+      throw new ServiceError(
+        403,
+        "Apenas administradores podem consultar a configuração de cobradores.",
+      );
     }
     const collectors = await prismaClient.departmentCollector.findMany({
       where: {
@@ -88,7 +93,11 @@ export class TaskFinanceiroService {
   }
 
   async listQueue(data: ListFinanceiroQueueRequest) {
-    if (data.is_owner !== true && (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) < INTEGRACAO_PERMISSION_LEVEL.VIEWER) {
+    if (
+      data.is_owner !== true &&
+      (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) <
+        INTEGRACAO_PERMISSION_LEVEL.VIEWER
+    ) {
       throw new ServiceError(403, "Você não possui acesso à Integração.");
     }
     const isPrivileged =
@@ -146,7 +155,11 @@ export class TaskFinanceiroService {
   }
 
   async settleExpress(data: SettleExpressRequest): Promise<SettleFinanceiroResponse> {
-    if (data.is_owner !== true && (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) < INTEGRACAO_PERMISSION_LEVEL.VIEWER) {
+    if (
+      data.is_owner !== true &&
+      (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) <
+        INTEGRACAO_PERMISSION_LEVEL.VIEWER
+    ) {
       throw new ServiceError(403, "Você não possui acesso à Integração.");
     }
     const tasks = await prismaClient.task.findMany({
@@ -192,12 +205,17 @@ export class TaskFinanceiroService {
                 { organization_id: data.organization_id },
                 { organization_id: null, department: { organization_id: data.organization_id } },
               ],
-              permissions: { some: { organization_id: data.organization_id, integracao: { gt: 0 } } },
+              permissions: {
+                some: { organization_id: data.organization_id, integracao: { gt: 0 } },
+              },
             },
             select: { id: true },
           });
           if (collectors.length !== collectorIds.length) {
-            throw new ServiceError(422, "Todo cobrador deve estar ativo no departamento informado.");
+            throw new ServiceError(
+              422,
+              "Todo cobrador deve estar ativo no departamento informado.",
+            );
           }
         }
 
@@ -236,7 +254,11 @@ export class TaskFinanceiroService {
 
   async settle(data: SettleFinanceiroRequest): Promise<SettleFinanceiroResponse> {
     try {
-      if (data.is_owner !== true && (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) < INTEGRACAO_PERMISSION_LEVEL.VIEWER) {
+      if (
+        data.is_owner !== true &&
+        (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) <
+          INTEGRACAO_PERMISSION_LEVEL.VIEWER
+      ) {
         throw new ServiceError(403, "Você não possui acesso à Integração.");
       }
       const taskIds = [...new Set(data.task_ids)].sort();
@@ -301,9 +323,15 @@ export class TaskFinanceiroService {
               throw new ServiceError(403, "Você não é cobrador autorizado para este departamento.");
             }
           }
+          // A reivindicação acontece sob o advisory lock: repetições simultâneas da
+          // mesma chave não geram auditorias duplicadas.
+          const claimed = await tx.taskFinanceiroCommand.updateMany({
+            where: { id: previous.id, audited_at: null },
+            data: { audited_at: new Date() },
+          });
           return {
             response: previous.response_snapshot as unknown as SettleFinanceiroResponse,
-            audit_pending: previous.audited_at === null,
+            audit_pending: claimed.count > 0,
           };
         }
         if (taskIds.length === 0) {
@@ -318,7 +346,10 @@ export class TaskFinanceiroService {
           throw new ServiceError(404, "Uma ou mais tarefas não existem.");
         }
         if (tasks.some((task) => task.charge_financeiro !== true)) {
-          throw new ServiceError(409, "Uma ou mais tarefas não estão pendentes de cobrança financeira.");
+          throw new ServiceError(
+            409,
+            "Uma ou mais tarefas não estão pendentes de cobrança financeira.",
+          );
         }
         if (!isPrivileged) {
           const actor = await tx.user.findFirst({
@@ -351,7 +382,10 @@ export class TaskFinanceiroService {
                     department_id: actor.department_id,
                     OR: [
                       { organization_id: data.organization_id },
-                      { organization_id: null, department: { organization_id: data.organization_id } },
+                      {
+                        organization_id: null,
+                        department: { organization_id: data.organization_id },
+                      },
                     ],
                   },
                 },
@@ -374,7 +408,10 @@ export class TaskFinanceiroService {
           data: { charge_financeiro: false },
         });
         if (updated.count !== taskIds.length) {
-          throw new ServiceError(409, "A fila financeira foi alterada; recarregue e tente novamente.");
+          throw new ServiceError(
+            409,
+            "A fila financeira foi alterada; recarregue e tente novamente.",
+          );
         }
         await tx.taskFinanceiroCommand.create({
           data: {
@@ -383,30 +420,36 @@ export class TaskFinanceiroService {
             idempotency_key: data.idempotency_key,
             command_hash: commandHash,
             response_snapshot: response as unknown as Prisma.InputJsonValue,
+            audited_at: new Date(),
           },
         });
         return { response, audit_pending: true };
       });
       if (result.audit_pending) {
-        await audit.createLog({
-          userId: data.user_id,
-          organizationId: data.organization_id,
-          permission: data.integracao_level,
-          action: "Baixa Financeira de Tarefas",
-          referring: "integracao.financeiro.settlement",
-          referringId: data.idempotency_key,
-          changes: { task_ids: result.response.task_ids, settled: result.response.settled },
-          required: true,
-        });
-        await prismaClient.taskFinanceiroCommand.update({
-          where: {
-            organization_id_idempotency_key: {
-              organization_id: data.organization_id,
-              idempotency_key: data.idempotency_key,
+        try {
+          await audit.createLog({
+            userId: data.user_id,
+            organizationId: data.organization_id,
+            permission: data.integracao_level,
+            action: "Baixa Financeira de Tarefas",
+            referring: "integracao.financeiro.settlement",
+            referringId: data.idempotency_key,
+            changes: { task_ids: result.response.task_ids, settled: result.response.settled },
+            required: true,
+          });
+        } catch (auditError: unknown) {
+          // Libera a reivindicação para que uma repetição posterior audite de novo.
+          await prismaClient.taskFinanceiroCommand.update({
+            where: {
+              organization_id_idempotency_key: {
+                organization_id: data.organization_id,
+                idempotency_key: data.idempotency_key,
+              },
             },
-          },
-          data: { audited_at: new Date() },
-        });
+            data: { audited_at: null },
+          });
+          throw auditError;
+        }
       }
       return result.response;
     } catch (err: unknown) {
@@ -415,5 +458,4 @@ export class TaskFinanceiroService {
       throw new ServiceError(500, "Não foi possível executar a baixa financeira.", err);
     }
   }
-
 }

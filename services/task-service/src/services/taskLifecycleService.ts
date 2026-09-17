@@ -384,8 +384,19 @@ export class TaskLifecycleService {
       const updated = await prismaClient.$transaction(async (tx) => {
         const reopened = await tx.task.update({
           where: { id: params.task_id },
-          data: { status: "Em Andamento", pending_approval: false },
+          data: { status: "Em Andamento", pending_approval: false, end_date: null },
           select: COMPLETE_UPDATE_SELECT,
+        });
+        await publishTaskOperationalNotifications(tx, {
+          organization_id: params.organization_id,
+          task_id: params.task_id,
+          event_key: `task-reopen:${params.task_id}:${Date.now()}`,
+          type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
+          title: "Tarefa reaberta",
+          message: `A tarefa foi reaberta. Motivo: ${params.reason.trim()}`,
+          responsible_ids: [task.responsible_id, task.responsible2_id, task.responsible3_id],
+          include_administrators: true,
+          exclude_user_id: params.user_id,
         });
         await audit.createLog({
           userId: params.user_id,
@@ -709,11 +720,10 @@ export class TaskLifecycleService {
           if (completionRequest.status !== decision) {
             throw new ServiceError(409, "A solicitação de conclusão já foi encerrada.");
           }
-          return {
-            id: exists.id,
-            status: exists.status,
-            pending_approval: exists.pending_approval,
-          };
+          return tx.task.findFirstOrThrow({
+            where: { id: task_id, organization_id },
+            select: COMPLETE_UPDATE_SELECT,
+          });
         }
 
         const resolved = await tx.taskCompletionRequest.updateMany({
@@ -731,21 +741,21 @@ export class TaskLifecycleService {
             where: { id: completionRequest.id, organization_id },
           });
           if (concurrentRequest?.status === decision) {
-            return {
-              id: exists.id,
-              status: exists.status,
-              pending_approval: exists.pending_approval,
-            };
+            return tx.task.findFirstOrThrow({
+              where: { id: task_id, organization_id },
+              select: COMPLETE_UPDATE_SELECT,
+            });
           }
           throw new ServiceError(409, "A solicitação de conclusão já foi encerrada.");
         }
 
+        const approved = decision === TASK_COMPLETION_REQUEST_STATUS.APPROVED;
         const task = await tx.task.update({
           where: { id: task_id },
           data: {
-            status:
-              decision === TASK_COMPLETION_REQUEST_STATUS.APPROVED ? "Concluída" : "Em Andamento",
+            status: approved ? "Concluída" : "Em Andamento",
             pending_approval: false,
+            end_date: approved ? new Date() : null,
           },
           select: COMPLETE_UPDATE_SELECT,
         });
