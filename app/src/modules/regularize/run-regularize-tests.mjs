@@ -50,6 +50,106 @@ async function collectSourceFiles(directory) {
   return files;
 }
 
+await runTest(
+  "guidance form supports optional process and coherent PJ PF manual targets",
+  async () => {
+    const source = await readModuleSource("components/RegularizeGuidanceForm.tsx");
+    assert.match(source, /defaultProcessId\?: string/);
+    assert.match(source, /processOptions\?: RegularizeFormOption\[\]/);
+    assert.match(source, /REGULARIZE_GUIDANCE_TARGET_TYPES\.map/);
+    assert.match(source, /ClientPickerModal/);
+    assert.match(source, /RegularizeClientPfSelect/);
+    assert.match(source, /legacyIntegrationStatusFilter: false/);
+    assert.match(source, /target_type === "PJ"/);
+    assert.match(source, /target_type === "PF"/);
+    assert.match(source, /target_type === "SEM_CLIENTE"/);
+    assert.match(source, /client_pj_id: "",\s*client_pf_id: ""/);
+    assert.match(source, /source: "manual"/);
+    assert.match(source, /!formState\.target_snapshot\.name\.trim\(\)/);
+    assert.match(source, /process_id: formState\.process_id \|\| null/);
+    assert.match(source, /Sem processo/);
+    assert.doesNotMatch(source, /process_id: guidance\.process_id,/);
+    assert.doesNotMatch(source, /if \(!formState\.process_id/);
+    assert.doesNotMatch(source, /disabled=\{isEditing\}/);
+    assert.doesNotMatch(source, /LegacyGuidanceDraft/);
+  },
+);
+
+await runTest(
+  "guidance form renders and submits the canonical checklist with conditional branch",
+  async () => {
+    const source = await readModuleSource("components/RegularizeGuidanceForm.tsx");
+    const shared = await readFile(join(appRoot, "../shared/src/regularize/guidance.ts"), "utf8");
+    assert.equal((shared.match(/code: "/g) ?? []).length, 17);
+    assert.match(shared, /"Pendente",\s*"Concluído",\s*"Não se aplica"/);
+    assert.match(source, /@workspace\/shared\/regularize/);
+    assert.match(source, /checklist: REGULARIZE_GUIDANCE_CHECKLIST_ITEMS\.map/);
+    assert.match(source, /REGULARIZE_GUIDANCE_CHECKLIST_ITEMS\.map\(\(\{ code, label \}\)/);
+    assert.match(source, /REGULARIZE_GUIDANCE_CHECKLIST_STATUSES\.map/);
+    assert.match(source, /<textarea\s+value=\{item\?\.observation \?\? ""\}/);
+    assert.match(source, /item\.code === "branch" && item\.status === "Concluído"/);
+    assert.match(source, /code === "branch" && status !== "Concluído"/);
+    assert.match(source, /branch_data: null/);
+    assert.match(source, /disabled=\{!isBranchCompleted\}/);
+    assert.match(source, /branch_data:\s*isBranchCompleted\s*\?[\s\S]*?: undefined/);
+    assert.match(source, /branch\.name\.trim\(\)/);
+    assert.match(source, /branch\.address\.trim\(\)/);
+    assert.match(source, /branch\.city\.trim\(\)/);
+    assert.match(source, /branch\.state\.trim\(\)/);
+    assert.match(source, /observation: item\?\.observation\?\.trim\(\) \?\? ""/);
+    for (const field of [
+      "type",
+      "request",
+      "framework_obs",
+      "legal_nature",
+      "company_name",
+      "trade_name",
+      "cpf_cnpj",
+      "share_capital",
+      "iptu",
+      "address",
+      "comporate_purpose",
+      "carryng",
+      "regime",
+      "legal_representative",
+      "status",
+    ]) {
+      assert.ok(source.includes(`formState.${field}`), `preserves legacy ${field}`);
+    }
+  },
+);
+
+await runTest(
+  "guidance independent list preserves process scope permissions and mutation feedback",
+  async () => {
+    const page = await readModuleSource("components/RegularizePage.tsx");
+    const form = await readModuleSource("components/RegularizeGuidanceForm.tsx");
+    assert.match(page, /useRegularizeGuidance\(undefined, \{ enabled: true \}\)/);
+    assert.match(page, /function IndependentGuidanceSection/);
+    const independentSection = page.slice(
+      page.indexOf("function IndependentGuidanceSection"),
+      page.indexOf("function ProcessDetailContent"),
+    );
+    assert.match(
+      independentSection,
+      /canManageRegularizeCore \? \([\s\S]*?label="Nova orientação"/,
+    );
+    assert.doesNotMatch(independentSection, /currentProcessId/);
+    assert.match(page, /regularizeAccess\.canView \? \(\s*<IndependentGuidanceSection/);
+    assert.match(page, /onSetActiveForm\(\{ type: "guidance", mode: "create" \}\)/);
+    assert.match(page, /<QueryStatePanel query=\{independentGuidanceQuery\}/);
+    assert.match(page, /readOnly=\{!canManageRegularizeCore\}/);
+    assert.match(page, /Somente leitura/);
+    assert.match(page, /Orientação atualizada com sucesso/);
+    assert.match(page, /Orientação criada com sucesso/);
+    assert.match(page, /toast\.error\(message\);\s*throw new Error\(message\)/);
+    assert.match(form, /disabled=\{readOnly \|\| isSubmitting\}/);
+    assert.match(form, /if \(readOnly \|\| isSubmitting\)/);
+    assert.match(form, /getRegularizeMutationErrorMessage/);
+    assert.doesNotMatch(page, /LegacyGuidanceDraft/);
+  },
+);
+
 await runTest("regularize endpoints stay centralized in the frontend contract", async () => {
   const contractSource = await readModuleSource("services/regularizeService.contract.ts");
 

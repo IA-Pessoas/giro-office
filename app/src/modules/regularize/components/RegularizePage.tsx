@@ -167,7 +167,7 @@ type RegularizeFormState =
   | { type: "municipal-tax"; mode: "edit"; id: RegularizeId; clientId?: RegularizeId }
   | { type: "process"; mode: "create" }
   | { type: "process"; mode: "edit"; id: RegularizeId }
-  | { type: "guidance"; mode: "create"; processId: RegularizeId }
+  | { type: "guidance"; mode: "create"; processId?: RegularizeId }
   | { type: "guidance"; mode: "edit"; guidance: RegularizeGuidance }
   | { type: "guidance-activity"; guidanceId: RegularizeId; processId: RegularizeId }
   | { type: "guidance-partner"; guidanceId: RegularizeId; processId: RegularizeId }
@@ -705,6 +705,78 @@ function getSiteCredentialDetailStatus(error: unknown): string {
   return "Credencial indisponivel para revelacao.";
 }
 
+function IndependentGuidanceSection({
+  canManageRegularizeCore,
+  onSetActiveForm,
+}: {
+  canManageRegularizeCore: boolean;
+  onSetActiveForm: (form: RegularizeFormState) => void;
+}) {
+  const independentGuidanceQuery = useRegularizeGuidance(undefined, { enabled: true });
+
+  return (
+    <section className="space-y-4" aria-label="Orientações da organização">
+      <TabActionHeader
+        title="Orientações"
+        description="Orientações da organização, com ou sem processo vinculado."
+        action={
+          canManageRegularizeCore ? (
+            <PrimaryActionButton
+              icon={Plus}
+              label="Nova orientação"
+              onClick={() => onSetActiveForm({ type: "guidance", mode: "create" })}
+            />
+          ) : (
+            <span className="text-sm text-gray-500">Somente leitura</span>
+          )
+        }
+      />
+      <PrimaryActionButton
+        icon={RefreshCw}
+        label="Atualizar orientações"
+        disabled={independentGuidanceQuery.isFetching}
+        onClick={() => void independentGuidanceQuery.refetch()}
+      />
+      <QueryStatePanel query={independentGuidanceQuery} emptyTitle="Sem orientações.">
+        {(rows) => (
+          <div className="grid gap-3 md:grid-cols-2">
+            {rows.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-lg border border-gray-200 p-3 dark:border-slate-700"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium">{getGuidanceTitle(item)}</p>
+                    <p className="text-sm text-gray-500">{getGuidanceDescription(item)}</p>
+                  </div>
+                  <TableActionButton
+                    icon={canManageRegularizeCore ? Pencil : Eye}
+                    title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
+                    onClick={() =>
+                      onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
+                    }
+                  />
+                </div>
+                <FieldLine
+                  label="Alvo"
+                  value={item.target_type === "SEM_CLIENTE" ? "Não cliente" : item.target_type}
+                />
+                <FieldLine label="Nome" value={formatText(item.target_snapshot?.name)} />
+                <FieldLine
+                  label="Processo"
+                  value={item.process_id ? "Vinculado" : "Sem processo"}
+                />
+                <FieldLine label="Status" value={formatText(item.status)} />
+              </div>
+            ))}
+          </div>
+        )}
+      </QueryStatePanel>
+    </section>
+  );
+}
+
 function ProcessDetailContent({
   canManageRegularizeCore,
   currentProcessId,
@@ -863,15 +935,13 @@ function ProcessDetailContent({
                         {getGuidanceDescription(item)}
                       </p>
                     </div>
-                    {canManageRegularizeCore ? (
-                      <TableActionButton
-                        icon={Pencil}
-                        title="Editar orientação"
-                        onClick={() =>
-                          onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
-                        }
-                      />
-                    ) : null}
+                    <TableActionButton
+                      icon={canManageRegularizeCore ? Pencil : Eye}
+                      title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
+                      onClick={() =>
+                        onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
+                      }
+                    />
                   </div>
 
                   {canManageRegularizeCore ? (
@@ -1503,6 +1573,9 @@ export function RegularizePage() {
   async function handleSubmitGuidance(
     payload: CreateRegularizeGuidancePayload | UpdateRegularizeGuidancePayload,
   ) {
+    if (!canManageRegularizeCore) {
+      throw new Error("Você tem acesso somente leitura às orientações.");
+    }
     try {
       if ("id" in payload) {
         await updateGuidanceMutation.mutateAsync(payload);
@@ -1960,6 +2033,13 @@ export function RegularizePage() {
               </DetailPanel>
             ) : null}
           </div>
+
+          {regularizeAccess.canView ? (
+            <IndependentGuidanceSection
+              canManageRegularizeCore={canManageRegularizeCore}
+              onSetActiveForm={setActiveForm}
+            />
+          ) : null}
 
           <Dialog
             open={isProcessDetailDialogOpen}
@@ -2789,6 +2869,16 @@ export function RegularizePage() {
             : currentProcessId ?? ""
         }
         processOptions={processOptions}
+        processOptionsLoading={processQuery.isLoading}
+        processOptionsError={
+          processQuery.error
+            ? getRegularizeErrorMessage(
+                processQuery.error,
+                "Não foi possível carregar processos. Atualize a página para tentar novamente.",
+              )
+            : null
+        }
+        readOnly={!canManageRegularizeCore}
         isSubmitting={createGuidanceMutation.isPending || updateGuidanceMutation.isPending}
         onClose={closeCoreForm}
         onSubmit={handleSubmitGuidance}
