@@ -4,6 +4,7 @@ import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildRegularizeClientPfListParams,
+  buildRegularizeGuidanceListParams,
   buildRegularizeLicenseListParams,
   buildRegularizeMunicipalTaxesListParams,
   buildRegularizeProcessListParams,
@@ -79,6 +80,35 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   ]) {
     assert.match(contractSource, new RegExp(endpoint.replaceAll("/", "\\/")));
   }
+});
+
+await runTest("regularize guidance supports independent filters and complete payloads", async () => {
+  const [typesSource, contractSource, serviceSource, queryKeysSource, operationsSource] =
+    await Promise.all([
+      readModuleSource("types.ts"),
+      readModuleSource("services/regularizeService.contract.ts"),
+      readModuleSource("services/regularizeService.ts"),
+      readModuleSource("hooks/queryKeys.ts"),
+      readModuleSource("hooks/useRegularizeOperations.ts"),
+    ]);
+
+  assert.match(typesSource, /@workspace\/shared\/regularize/);
+  assert.match(typesSource, /checklist_items/);
+  assert.match(typesSource, /process_id: RegularizeId \| null/);
+  assert.match(contractSource, /target_type/);
+  assert.match(
+    serviceSource,
+    /updateGuidance[\s\S]{0,300}api\.put\(REGULARIZE_ENDPOINTS\.guidance, payload\)/,
+  );
+  assert.match(queryKeysSource, /filters\.process_id \?\? ""/);
+  assert.match(queryKeysSource, /filters\.target_type \?\? ""/);
+  assert.match(operationsSource, /enabled: \(options\?\.enabled \?\? true\)/);
+
+  assert.deepEqual(buildRegularizeGuidanceListParams({}), {});
+  assert.deepEqual(
+    buildRegularizeGuidanceListParams({ process_id: "process-1", target_type: "PJ" }),
+    { process_id: "process-1", target_type: "PJ" },
+  );
 });
 
 await runTest("regularize licenses list uses paginated hook and keeps mutation invalidation", async () => {

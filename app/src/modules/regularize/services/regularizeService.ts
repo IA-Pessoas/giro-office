@@ -390,8 +390,7 @@ export const regularizeService = {
 
   async updateGuidance(payload: UpdateRegularizeGuidancePayload): Promise<RegularizeGuidance> {
     const api = setupAPIClient();
-    const { process_id: _processId, ...body } = payload;
-    const response = await api.put(REGULARIZE_ENDPOINTS.guidance, body);
+    const response = await api.put(REGULARIZE_ENDPOINTS.guidance, payload);
 
     return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
   },

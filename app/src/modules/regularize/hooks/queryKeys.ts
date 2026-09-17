@@ -96,7 +96,12 @@ export const regularizeQueryKeys = {
   processDetail: (id: RegularizeId | undefined | null, scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.operations(scope), "processes", "detail", id ?? ""] as const,
   guidance: (filters: RegularizeGuidanceListFilters, scope: RegularizeQueryScope) =>
-    [...regularizeQueryKeys.operations(scope), "guidance", filters.process_id] as const,
+    [
+      ...regularizeQueryKeys.operations(scope),
+      "guidance",
+      filters.process_id ?? "",
+      filters.target_type ?? "",
+    ] as const,
   guidanceDetail: (id: RegularizeId | undefined | null, scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.operations(scope), "guidance", "detail", id ?? ""] as const,
   licenses: (filters: RegularizeLicenseListFilters, scope: RegularizeQueryScope) =>

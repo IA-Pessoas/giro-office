@@ -213,14 +213,14 @@ export function useRegularizeGuidance(
   filters: RegularizeGuidanceListFilters | undefined,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeGuidance[], Error> {
-  const safeFilters = filters ?? { process_id: "" };
+  const safeFilters = filters ?? {};
   const scope = useRegularizeQueryScope();
 
   return useFetch(
     regularizeQueryKeys.guidance(safeFilters, scope),
     () => regularizeService.listGuidance(safeFilters),
     {
-      enabled: Boolean(filters?.process_id) && (options?.enabled ?? true),
+      enabled: (options?.enabled ?? true),
     },
   );
 }
