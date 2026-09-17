@@ -1,10 +1,12 @@
 import { error as logError, ServiceError } from "@workspace/shared";
+import type { Prisma } from "../generated/prisma/client.js";
 
 import { type LogUpdateParams, logUpdateIfChanged } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
 
 export const TRIAGE_DOCUMENT_FIELDS = [
   "financial_transactions",
+  "triaged_transactions",
   "inventory_control",
   "accounts_payable_report",
   "accounts_receivable_report",
@@ -22,6 +24,7 @@ export const TRIAGE_DOCUMENT_STATUSES = [
   "NOT_PRESENT",
   "NOT_APPLICABLE",
 ] as const;
+export const TRIAGE_DOCUMENT_NOTE_MAX_LENGTH = 2_000;
 
 export type TriageDocumentField = (typeof TRIAGE_DOCUMENT_FIELDS)[number];
 export type TriageDocumentStatus = (typeof TRIAGE_DOCUMENT_STATUSES)[number];
@@ -46,6 +49,8 @@ export interface TriageMonthlyRequest {
 export interface TriageDocumentItemUpdate {
   field: TriageDocumentField;
   status: TriageDocumentStatus;
+  note?: string | null;
+  justification?: string | null;
 }
 
 export interface TriageDocumentsBulkUpdate {
@@ -69,6 +74,11 @@ export interface TriageDocumentSummary {
   percentage: number;
 }
 
+export interface TriageDocumentItemNotes {
+  note: string | null;
+  justification: string | null;
+}
+
 function isTriageDocumentField(value: string): value is TriageDocumentField {
   return TRIAGE_DOCUMENT_FIELDS.includes(value as TriageDocumentField);
 }
@@ -89,6 +99,39 @@ function asChecklist(value: unknown): Record<TriageDocumentField, TriageDocument
   }
 
   return checklist;
+}
+
+function asItemNotes(value: unknown): Record<TriageDocumentField, TriageDocumentItemNotes> {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(
+    TRIAGE_DOCUMENT_FIELDS.map((field) => {
+      const raw = (source as Record<string, unknown>)[field];
+      const item = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+      const note = (item as Record<string, unknown>).note;
+      const justification = (item as Record<string, unknown>).justification;
+      return [
+        field,
+        {
+          note: typeof note === "string" && note.trim() ? note.trim() : null,
+          justification:
+            typeof justification === "string" && justification.trim() ? justification.trim() : null,
+        },
+      ];
+    }),
+  ) as Record<TriageDocumentField, TriageDocumentItemNotes>;
+}
+
+function normalizeOptionalNote(value: unknown, label: string): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "string" || value.trim().length > TRIAGE_DOCUMENT_NOTE_MAX_LENGTH) {
+    throw new ServiceError(400, `${label} inválida.`);
+  }
+  return value.trim() || null;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -200,6 +243,9 @@ export class TriageDocumentsService {
         activeItems.has(field) ? "PENDING" : "NOT_APPLICABLE",
       ]),
     );
+    const itemNotes = Object.fromEntries(
+      TRIAGE_DOCUMENT_FIELDS.map((field) => [field, { note: null, justification: null }]),
+    );
 
     try {
       const created = await this.prisma.triageMonthly.create({
@@ -210,6 +256,7 @@ export class TriageDocumentsService {
           type: "CONTABIL",
           archived_at: null,
           checklist,
+          item_notes: itemNotes,
         },
       });
 
@@ -244,13 +291,42 @@ export class TriageDocumentsService {
     if (!isTriageDocumentField(update.field) || !isTriageDocumentStatus(update.status)) {
       throw new ServiceError(400, "Item ou status documental inválido.");
     }
+    const note = normalizeOptionalNote(update.note, "Nota documental");
+    const justification = normalizeOptionalNote(update.justification, "Justificativa documental");
 
-    const monthly = await this.findMonthlyForUpdate(monthlyId, auth.organizationId);
-    await this.assertCanEdit(monthly.client_id, auth);
-    const checklist = asChecklist(monthly.checklist);
-    const updated = await this.prisma.triageMonthly.update({
-      where: { id: monthly.id },
-      data: { checklist: { ...checklist, [update.field]: update.status } },
+    const { monthly, updated } = await this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${monthlyId}, 0))
+      `;
+
+      const monthly = await this.findMonthlyForUpdate(transaction, monthlyId, auth.organizationId);
+      await this.assertCanEdit(monthly.client_id, auth);
+      const checklist = asChecklist(monthly.checklist);
+      const itemNotes = asItemNotes(monthly.item_notes);
+      const nextItemNotes =
+        note === undefined && justification === undefined
+          ? undefined
+          : {
+              ...itemNotes,
+              [update.field]: {
+                note: note === undefined ? itemNotes[update.field].note : note,
+                justification:
+                  justification === undefined
+                    ? itemNotes[update.field].justification
+                    : justification,
+              },
+            };
+      const updated = await transaction.triageMonthly.update({
+        where: { id: monthly.id },
+        data: {
+          checklist: { ...checklist, [update.field]: update.status },
+          ...(nextItemNotes
+            ? { item_notes: nextItemNotes as unknown as Prisma.InputJsonValue }
+            : {}),
+        },
+      });
+
+      return { monthly, updated };
     });
 
     await this.audit.logUpdateIfChanged({
@@ -275,18 +351,26 @@ export class TriageDocumentsService {
     if (!isTriageDocumentStatus(update.status)) {
       throw new ServiceError(400, "Status documental inválido.");
     }
-    const monthly = await this.findMonthlyForUpdate(monthlyId, auth.organizationId);
-    await this.assertCanEdit(monthly.client_id, auth);
-    const checklist = asChecklist(monthly.checklist);
-    const nextChecklist = Object.fromEntries(
-      Object.entries(checklist).map(([field, status]) => [
-        field,
-        status === "NOT_APPLICABLE" ? status : update.status,
-      ]),
-    );
-    const updated = await this.prisma.triageMonthly.update({
-      where: { id: monthly.id },
-      data: { checklist: nextChecklist },
+    const { monthly, updated } = await this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${monthlyId}, 0))
+      `;
+
+      const monthly = await this.findMonthlyForUpdate(transaction, monthlyId, auth.organizationId);
+      await this.assertCanEdit(monthly.client_id, auth);
+      const checklist = asChecklist(monthly.checklist);
+      const nextChecklist = Object.fromEntries(
+        Object.entries(checklist).map(([field, status]) => [
+          field,
+          status === "NOT_APPLICABLE" ? status : update.status,
+        ]),
+      );
+      const updated = await transaction.triageMonthly.update({
+        where: { id: monthly.id },
+        data: { checklist: nextChecklist },
+      });
+
+      return { monthly, updated };
     });
 
     await this.audit.logUpdateIfChanged({
@@ -353,12 +437,13 @@ export class TriageDocumentsService {
   }
 
   private async findMonthlyForUpdate(
+    prisma: Pick<TriageDocumentsServicePrisma, "triageMonthly">,
     monthlyId: string,
     organizationId: string,
   ): Promise<
     NonNullable<Awaited<ReturnType<TriageDocumentsServicePrisma["triageMonthly"]["findFirst"]>>>
   > {
-    const monthly = await this.prisma.triageMonthly.findFirst({
+    const monthly = await prisma.triageMonthly.findFirst({
       where: {
         id: monthlyId,
         organization_id: organizationId,
@@ -392,9 +477,15 @@ export class TriageDocumentsService {
 
   private toMonthlyResponse(monthly: {
     checklist: unknown;
+    item_notes?: unknown;
     [key: string]: unknown;
   }): Record<string, unknown> {
     const checklist = asChecklist(monthly.checklist);
-    return { ...monthly, checklist, summary: this.getSummary(checklist) };
+    return {
+      ...monthly,
+      checklist,
+      item_notes: asItemNotes(monthly.item_notes),
+      summary: this.getSummary(checklist),
+    };
   }
 }

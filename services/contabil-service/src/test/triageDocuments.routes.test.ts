@@ -112,6 +112,34 @@ describe("triage document routes", () => {
     expect(deps.updateItem).not.toHaveBeenCalled();
   });
 
+  it("PATCH /triagem/monthly/:id/item encaminha nota e justificativa", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({
+        field: "triaged_transactions",
+        status: "ATTENTION",
+        note: "Parcial",
+        justification: "Aguardando arquivo complementar",
+      });
+
+    expect(res.status).toBe(200);
+    expect(deps.updateItem).toHaveBeenCalledWith(
+      MONTHLY_ID,
+      {
+        field: "triaged_transactions",
+        status: "ATTENTION",
+        note: "Parcial",
+        justification: "Aguardando arquivo complementar",
+      },
+      expect.objectContaining({ organizationId: ORG_ID }),
+    );
+  });
+
   it("PUT /triagem/statements mantém bank_id no marcador operacional", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
