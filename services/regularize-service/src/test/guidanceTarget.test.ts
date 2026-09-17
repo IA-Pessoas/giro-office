@@ -59,6 +59,9 @@ describe("resolveGuidanceTarget", () => {
       clientPfId,
       snapshot: { version: 1, source: "client_pf", name: "Pessoa Física", document: "12345678901" },
     });
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: clientPfId, organization_id: organizationId } }),
+    );
   });
 
   it("mantém o snapshot manual para SEM_CLIENTE", async () => {
@@ -91,5 +94,19 @@ describe("resolveGuidanceTarget", () => {
         client_pf_id: clientPfId,
       }),
     ).rejects.toEqual(expect.any(ServiceError));
+  });
+
+  it("não revela cadastro PF ausente ou de outro tenant", async () => {
+    const findFirst = vi.fn(async () => null);
+
+    await expect(
+      resolveGuidanceTarget({ clientPF: { findFirst } }, organizationId, {
+        target_type: "PF",
+        client_pf_id: clientPfId,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404, message: "Cadastro nao encontrado." });
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: clientPfId, organization_id: organizationId } }),
+    );
   });
 });
