@@ -21,7 +21,7 @@ const accountingFields = [
   "bank_investments",
   "card_sales_report",
 ];
-const fiscalFields = [
+const fiscalChecklistFields = [
   "inbound_report",
   "outbound_report",
   "nfse_provided",
@@ -36,6 +36,7 @@ const fiscalFields = [
   "cte_as_issuer",
   "services_provided_as_mei",
 ];
+const fiscalFields = [...fiscalChecklistFields, "billing_amount"];
 
 function createFixture(id, type, fields) {
   return {
@@ -74,7 +75,11 @@ const accountingFixture = createFixture(
   "CONTABIL",
   accountingFields,
 );
-const fiscalFixture = createFixture(fiscalMonthlyId, "FISCAL", fiscalFields);
+const fiscalFixture = createFixture(
+  fiscalMonthlyId,
+  "FISCAL",
+  fiscalChecklistFields,
+);
 const user = {
   id: "c0000000-0000-4000-8000-000000000001",
   name: "Analista Fiscal",
@@ -239,15 +244,18 @@ await page.route("**/*", async (route) => {
 });
 
 try {
+  assert.equal(fiscalFields.length, 14);
+  assert.equal(fiscalChecklistFields.length, 13);
   await page.goto("/triagem", { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.getByRole("button", { name: "Selecionar cliente" }).click();
   await page.getByRole("option", { name: /Cliente Demonstração/ }).click();
-  await expect(page.getByText("Carregando pendências")).toBeVisible();
+  await expect(page.getByText("Carregando pendências").first()).toBeVisible();
   releaseFiscalMonthly();
 
   await expect(page.getByRole("heading", { name: "Pendências documentais" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pendências fiscais" })).toBeVisible();
   await expect(page.locator('select[aria-label$=" status"]')).toHaveCount(23);
+  await expect(page.getByLabel("Faturamento fiscal")).toHaveCount(1);
   await expect(page.getByLabel("Movimentações financeiras Método de entrega")).toHaveCount(0);
 
   await page.getByLabel("Faturamento fiscal").fill("13000,00");
