@@ -51,9 +51,22 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
     servers: [{ url: baseUrl }],
     tags: [
       { name: "Health", description: "Saúde e readiness do serviço" },
-      { name: "Controls", description: "Checklist operacional por cliente e competência" },
-      { name: "Responsibles", description: "Responsáveis contábeis por cliente" },
-      { name: "Relationships", description: "Relacionamento contábil do cliente" },
+      {
+        name: "Controls",
+        description: "Checklist operacional por cliente e competência",
+      },
+      {
+        name: "Responsibles",
+        description: "Responsáveis contábeis por cliente",
+      },
+      {
+        name: "Relationships",
+        description: "Relacionamento contábil do cliente",
+      },
+      {
+        name: "Triage Documents",
+        description: "Pendências documentais e marcadores de extrato",
+      },
     ],
     components: {
       securitySchemes: {
@@ -97,7 +110,10 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             fields: { type: "array", items: { type: "string" } },
             request_id: { type: "string" },
             issued_at: { type: "integer" },
-            expires_at: { type: "integer", description: "Máximo de 60 segundos após issued_at." },
+            expires_at: {
+              type: "integer",
+              description: "Máximo de 60 segundos após issued_at.",
+            },
             body_sha256: { type: "string" },
           },
         },
@@ -116,8 +132,18 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               required: true,
               schema: { type: "string" },
             },
-            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
-            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-request-id",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              name: "x-reports-grant",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
             {
               name: "x-reports-grant-signature",
               in: "header",
@@ -129,7 +155,9 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             "200": {
               description: "Catálogo",
               content: {
-                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
               },
             },
             "403": { description: "Grant inválido" },
@@ -148,8 +176,18 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               required: true,
               schema: { type: "string" },
             },
-            { name: "x-request-id", in: "header", required: true, schema: { type: "string" } },
-            { name: "x-reports-grant", in: "header", required: true, schema: { type: "string" } },
+            {
+              name: "x-request-id",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              name: "x-reports-grant",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
             {
               name: "x-reports-grant-signature",
               in: "header",
@@ -170,7 +208,11 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                       enum: ["contabil.control", "contabil.responsibles", "contabil.relationship"],
                     },
                     fields: { type: "array", items: { type: "string" } },
-                    limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
+                    limit: {
+                      type: "integer",
+                      minimum: 1,
+                      maximum: MAX_REPORTING_QUERY_LIMIT,
+                    },
                     query: reportingQueryOpenApiSchema,
                   },
                 },
@@ -178,11 +220,15 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             },
           },
           responses: {
-            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
+            "422": {
+              description: "Capacidade de consulta excedida; nenhum resultado parcial",
+            },
             "200": {
               description: "Linhas limitadas",
               content: {
-                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
               },
             },
             "403": { description: "Grant ou campo inválido" },
@@ -236,7 +282,10 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    competence: { type: "string", minLength: 1 },
+                    competence: {
+                      type: "string",
+                      pattern: "^\\d{4}-(0[1-9]|1[0-2])$",
+                    },
                   },
                   example: createControlExample,
                 },
@@ -277,7 +326,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               name: "competence",
               in: "query",
               required: true,
-              schema: { type: "string", minLength: 1 },
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
             },
           ],
           responses: {
@@ -289,6 +338,149 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                 },
               },
             },
+          },
+        },
+        delete: {
+          tags: ["Controls"],
+          summary: "Arquivar competência e rastreadores relacionados",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Competência arquivada",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "404": { description: "Competência ativa ausente" },
+          },
+        },
+      },
+      "/contabil/controls/list": {
+        get: {
+          tags: ["Controls"],
+          summary: "Carteira operacional por competência",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+              example: "2026-01",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Uma linha por cliente Contábil elegível; controle ausente é null",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "400": { description: "Competência inválida" },
+            "401": { description: "Não autenticado" },
+          },
+        },
+      },
+      "/contabil/controls/year": {
+        post: {
+          tags: ["Controls"],
+          summary: "Criar as doze competências de um cliente",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "year", "confirmed"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    year: { type: "integer", minimum: 2000, maximum: 2100 },
+                    confirmed: { type: "boolean", enum: [true] },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Lote criado ou já existente",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Confirmação ou payload inválido" },
+            "403": { description: "Sem permissão" },
+          },
+        },
+      },
+      "/contabil/controls/restore": {
+        post: {
+          tags: ["Controls"],
+          summary: "Restaurar competência arquivada",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Competência restaurada",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "404": { description: "Competência arquivada ausente" },
+          },
+        },
+      },
+      "/contabil/controls/{id}/items": {
+        patch: {
+          tags: ["Controls"],
+          summary: "Concluir os 17 itens do controle",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Itens concluídos",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "403": { description: "Sem permissão" },
           },
         },
       },
@@ -394,8 +586,16 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    person_responsible_id: { type: "string", format: "uuid", nullable: true },
-                    posted_by_id: { type: "string", format: "uuid", nullable: true },
+                    person_responsible_id: {
+                      type: "string",
+                      format: "uuid",
+                      nullable: true,
+                    },
+                    posted_by_id: {
+                      type: "string",
+                      format: "uuid",
+                      nullable: true,
+                    },
                     customer_with_movement: { type: "boolean" },
                   },
                   example: updateResponsibleExample,
@@ -591,6 +791,371 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                 },
               },
             },
+          },
+        },
+      },
+      "/triagem/editability": {
+        get: {
+          tags: ["Triage Documents"],
+          summary: "Verificar edição de Triagem por cliente",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Permissão contextual do usuário autenticado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/triagem/monthly": {
+        get: {
+          tags: ["Triage Documents"],
+          summary: "Consultar pendência documental mensal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Pendência",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        post: {
+          tags: ["Triage Documents"],
+          summary: "Criar ou obter pendência documental mensal",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: {
+                      type: "string",
+                      pattern: "^\\d{4}-(0[1-9]|1[0-2])$",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Pendência criada ou existente",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Sem permissão para criar" },
+          },
+        },
+      },
+      "/triagem/monthly/{id}/item": {
+        patch: {
+          tags: ["Triage Documents"],
+          summary: "Atualizar documento",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["field", "status"],
+                  additionalProperties: false,
+                  properties: {
+                    field: {
+                      type: "string",
+                      enum: [
+                        "financial_transactions",
+                        "inventory_control",
+                        "accounts_payable_report",
+                        "accounts_receivable_report",
+                        "card_statements",
+                        "loan_agreements",
+                        "bank_reconciliation",
+                        "bank_investments",
+                        "card_sales_report",
+                      ],
+                    },
+                    status: {
+                      type: "string",
+                      enum: ["PENDING", "COMPLETED", "ATTENTION", "NOT_PRESENT", "NOT_APPLICABLE"],
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Sem permissão" },
+          },
+        },
+      },
+      "/triagem/monthly/{id}/items": {
+        patch: {
+          tags: ["Triage Documents"],
+          summary: "Atualizar todos os documentos aplicáveis",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["status"],
+                  additionalProperties: false,
+                  properties: {
+                    status: {
+                      type: "string",
+                      enum: ["PENDING", "COMPLETED", "ATTENTION", "NOT_PRESENT", "NOT_APPLICABLE"],
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Sem permissão" },
+          },
+        },
+      },
+      "/triagem/statements": {
+        get: {
+          tags: ["Triage Documents"],
+          summary: "Listar marcadores de extrato por banco",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Marcadores",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        put: {
+          tags: ["Triage Documents"],
+          summary: "Criar ou atualizar marcador de extrato",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence", "bank_id", "status"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string" },
+                    bank_id: {
+                      type: "string",
+                      description:
+                        "Identificador operacional do banco; não armazena dados de conta.",
+                    },
+                    status: {
+                      type: "string",
+                      enum: ["PENDING", "COMPLETED", "ATTENTION", "NOT_PRESENT", "NOT_APPLICABLE"],
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Marcador atualizado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Sem permissão" },
+          },
+        },
+      },
+      "/triagem/closing": {
+        get: {
+          tags: ["Triage Closing"],
+          summary: "Consultar estado do fechamento recebido",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Estado do fechamento; ausência retorna NOT_RECEIVED sem criar registro",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+        put: {
+          tags: ["Triage Closing"],
+          summary: "Atualizar estado do fechamento recebido",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence", "status"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+                    status: {
+                      type: "string",
+                      enum: ["NOT_RECEIVED", "RECEIVED", "UNDER_REVIEW", "CLOSED", "REOPENED"],
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Fechamento atualizado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Sem permissão" },
+          },
+        },
+        delete: {
+          tags: ["Triage Closing"],
+          summary: "Arquivar logicamente o fechamento recebido",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Fechamento arquivado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Fechamento não encontrado" },
           },
         },
       },

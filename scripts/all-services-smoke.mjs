@@ -4200,8 +4200,7 @@ const handlers = {
   },
 
   async contabilControlCreate(op) {
-    const competence =
-      `${env.namespace}`.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || `comp-${uniqueDigits(8)}`;
+    const competence = "2026-09";
     state.contabilControlCompetence = competence;
     const response = await httpRequest(op, {
       expectedStatus: [200, 201],
@@ -4223,7 +4222,48 @@ const handlers = {
   async contabilControlCreateInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],
-      json: { client_id: "not-a-uuid", competence: "" },
+      json: { client_id: requireState("primaryClientId"), competence: "2026-13" },
+    });
+  },
+
+  async contabilControlYearCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { client_id: requireState("primaryClientId"), year: 2026, confirmed: true },
+    });
+  },
+
+  async contabilControlArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+      },
+    });
+  },
+
+  async contabilControlRestore(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+      },
+    });
+  },
+
+  async contabilControlPortfolio(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { competence: requireState("contabilControlCompetence") },
+    });
+  },
+
+  async contabilControlPortfolioInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      query: { competence: "2026-13" },
     });
   },
 
@@ -4245,11 +4285,110 @@ const handlers = {
     });
   },
 
+  async contabilControlCompleteAll(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/controls/${requireState("contabilControlId")}/items`,
+    });
+  },
+
   async contabilControlPatchNotFound(op) {
     await httpRequest(op, {
       expectedStatus: [404],
       path: "/contabil/controls/00000000-0000-0000-0000-000000000000",
       json: { field: "monthly_closing", value: false },
+    });
+  },
+
+  async triageMonthlyCreate(op) {
+    const competence = "2026-09";
+    state.triageMonthlyCompetence = competence;
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      json: { client_id: requireState("primaryClientId"), competence },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triageMonthlyId = id;
+  },
+
+  async triageMonthlyGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
+  async triageMonthlyItemUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/monthly/${requireState("triageMonthlyId")}/item`,
+      json: { field: "financial_transactions", status: "ATTENTION" },
+    });
+  },
+
+  async triageMonthlyBulkUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/monthly/${requireState("triageMonthlyId")}/items`,
+      json: { status: "COMPLETED" },
+    });
+  },
+
+  async triageStatementUpsert(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+        bank_id: "001",
+        status: "PENDING",
+      },
+    });
+  },
+
+  async triageStatementList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
+  async triageClosingGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
+  async triageClosingUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+        status: "UNDER_REVIEW",
+      },
+    });
+  },
+
+  async triageClosingArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
     });
   },
 

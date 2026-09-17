@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  buildContabilPortfolioParams,
   buildContabilControlParams,
   CONTABIL_ENDPOINTS,
   executeNullableContabilRequest,
@@ -86,7 +87,35 @@ const contabilServiceSources = {
 };
 
 await (async () => {
-  await runTest("contabil page lists every active client from the organization", () => {
+  await runTest("carteira operacional usa o contrato mensal de leitura", () => {
+    assert.equal(CONTABIL_ENDPOINTS.controlsList, "/contabil/controls/list");
+    assert.deepEqual(buildContabilPortfolioParams("2026-09"), { competence: "2026-09" });
+  });
+
+  await runTest("carteira operacional mostra competência, resumo, ausência e recuperação", () => {
+    const source = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
+
+    assert.match(source, /type="month"/);
+    assert.match(source, /Carteira operacional/);
+    assert.match(source, /sem controle mensal/i);
+    assert.match(source, /Tentar novamente/);
+    assert.match(source, /—/);
+  });
+
+  await runTest("carteira associa o fechamento e o controle às colunas corretas", () => {
+    const source = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
+    const closingStatus = source.indexOf('NOT_RECEIVED: "Não recebido"');
+    const monthlyControl = source.indexOf('item.control ? "Iniciado" : "—"');
+
+    assert.ok(closingStatus >= 0);
+    assert.ok(monthlyControl >= 0);
+    assert.ok(
+      closingStatus < monthlyControl,
+      "o status do fechamento deve ser renderizado antes do estado do controle mensal",
+    );
+  });
+
+  await runTest("contabil page preserva o seletor de cliente da organização", () => {
     const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
 
     assert.match(source, /ClientPickerModal/);
@@ -111,6 +140,33 @@ await (async () => {
       CONTABIL_ENDPOINTS.relationshipByClient("30"),
       "/contabil/relationships/client/30",
     );
+    assert.equal(CONTABIL_ENDPOINTS.triageMonthly, "/triagem/monthly");
+    assert.equal(CONTABIL_ENDPOINTS.triageEditability, "/triagem/editability");
+    assert.equal(CONTABIL_ENDPOINTS.triageStatements, "/triagem/statements");
+    assert.equal(CONTABIL_ENDPOINTS.triageClosing, "/triagem/closing");
+  });
+
+  await runTest("triagem só mostra mutações após verificar a atribuição do cliente", () => {
+    const pageSource = readFileSync(new URL("../../pages/triagem.tsx", import.meta.url), "utf8");
+
+    assert.match(pageSource, /useTriageEditability/);
+    assert.match(pageSource, /canEdit=\{editability\.data\?\.can_edit === true\}/);
+    assert.match(pageSource, /canEditClosing=\{contabilAccess\.canEdit\}/);
+    assert.doesNotMatch(pageSource, /canEdit\s*\/>/);
+  });
+
+  await runTest("triagem apresenta os nove documentos, indicador e banco sem dados de conta", () => {
+    const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+
+    assert.equal((source.match(/\["[a-z_]+", "/g) ?? []).length, 9);
+    assert.match(source, /não entram no\s+indicador/i);
+    assert.match(source, /Marcar todos os itens abertos/);
+    assert.match(source, /Identificador do banco/);
+    assert.match(source, /dados de\s+conta não são solicitados/i);
+    assert.match(source, /useTriageStatements/);
+    assert.match(source, /useTriageClosing/);
+    assert.match(source, /Fechamento recebido/);
+    assert.match(source, /NOT_RECEIVED/);
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {
@@ -119,7 +175,7 @@ await (async () => {
 
     assert.equal(
       contabilServiceSources.controlRoute.match(/requireContabilWritePermission/g)?.length,
-      3,
+      7,
     );
     assert.equal(
       contabilServiceSources.responsibleRoute.match(/requireContabilWritePermission/g)?.length,

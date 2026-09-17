@@ -203,7 +203,10 @@ describe("buildHookPlan", () => {
   it("keeps root tests and QA without rebuilding every service for known global changes", () => {
     const files = ["infra/prisma/schema.prisma"];
     assert.deepEqual(buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files }), [
-      ["pnpm", ["check"]],
+      [
+        "pnpm",
+        ["exec", "biome", "check", "--files-ignore-unknown=true", "infra/prisma/schema.prisma"],
+      ],
       ["pnpm", ["typecheck"]],
       ["pnpm", ["test:scripts"]],
       [

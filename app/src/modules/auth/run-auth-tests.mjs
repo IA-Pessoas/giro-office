@@ -552,7 +552,7 @@ await (async () => {
   );
 
   await runTest("disabled modules are blocked even for global admins", () => {
-    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["marketing", "triagem"]);
+    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["marketing"]);
 
     for (const moduleKey of DISABLED_MODULE_KEYS) {
       assert.equal(isModuleDisabled(moduleKey), true);
@@ -617,7 +617,7 @@ await (async () => {
   );
 
   await runTest("retired modules are not registered in navigation or quick actions", () => {
-    for (const blockedPath of ["/marketing", "/triagem"]) {
+    for (const blockedPath of ["/marketing"]) {
       assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
       assert.equal(quickActionsSource.includes(`href: "${blockedPath}"`), false);
     }
@@ -627,7 +627,7 @@ await (async () => {
   await runTest(
     "disabled module pages return not found without importing module implementations",
     () => {
-      for (const source of [marketingPageSource, triagemPageSource]) {
+    for (const source of [marketingPageSource]) {
         assert.match(source, /notFound:\s*true/);
       }
 
@@ -637,7 +637,7 @@ await (async () => {
       assert.equal(clientCommercialPageSource.includes("ClientCommercialForm"), false);
       assert.equal(clientCommercialPageSource.includes("useUpdateClientCommercialMutation"), false);
       assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);
-      assert.equal(triagemPageSource.includes("newLayout/Triagem"), false);
+      assert.equal(triagemPageSource.includes("TriageDocumentsSection"), true);
       assert.match(parcelamentoPageSource, /ParcelamentoShell/);
     },
   );

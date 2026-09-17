@@ -87,6 +87,36 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "o estado de entrega da outbox comercial" },
   },
   {
+    methods: ["DELETE"],
+    pattern: /^\/pessoal\/groups\/[^/]+$/,
+    description: { action: "arquivou", item: "um grupo de pessoal" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/groups\/[^/]+\/reactivate$/,
+    description: { action: "reativou", item: "um grupo de pessoal" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/group-assignments\/eligible$/,
+    description: { action: "consultou", item: "os clientes elegíveis para atribuição de grupo" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/group-assignments\/previews$/,
+    description: { action: "gerou", item: "uma prévia de atribuição de grupo" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/group-assignments\/previews\/[^/]+$/,
+    description: { action: "consultou", item: "uma prévia de atribuição de grupo" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/group-assignments\/apply$/,
+    description: { action: "aplicou", item: "uma atribuição de grupo" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "consultou", item: "a lista global de organizações" },
@@ -447,36 +477,6 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "gerou", item: "obrigações da competência" },
   },
   {
-    methods: ["DELETE"],
-    pattern: /^\/pessoal\/groups\/[^/]+$/,
-    description: { action: "arquivou", item: "um grupo de departamento pessoal" },
-  },
-  {
-    methods: ["POST"],
-    pattern: /^\/pessoal\/groups\/[^/]+\/reactivate$/,
-    description: { action: "reativou", item: "um grupo de departamento pessoal" },
-  },
-  {
-    methods: ["GET"],
-    pattern: /^\/pessoal\/group-assignments\/eligible$/,
-    description: { action: "consultou", item: "as folhas elegíveis para atribuição de grupos" },
-  },
-  {
-    methods: ["POST"],
-    pattern: /^\/pessoal\/group-assignments\/previews$/,
-    description: { action: "gerou", item: "uma prévia de atribuição de grupos" },
-  },
-  {
-    methods: ["GET"],
-    pattern: /^\/pessoal\/group-assignments\/previews\/[^/]+$/,
-    description: { action: "consultou", item: "uma prévia de atribuição de grupos" },
-  },
-  {
-    methods: ["POST"],
-    pattern: /^\/pessoal\/group-assignments\/apply$/,
-    description: { action: "aplicou", item: "uma atribuição de grupos em lote" },
-  },
-  {
     methods: ["GET"],
     pattern: /^\/parcelamento\/installments\/[^/]+\/competencies$/,
     description: { action: "consultou", item: "as competências de um parcelamento" },
@@ -663,6 +663,56 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/triagem\/(?:monthly|statements)\/?.*$/,
+    description: { action: "consultou", item: "as pendências documentais contábeis" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/controls\/year$/,
+    description: { action: "criou", item: "os controles contábeis anuais" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/controls\/restore$/,
+    description: { action: "restaurou", item: "uma competência contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/contabil\/controls\/[^/]+\/items$/,
+    description: { action: "atualizou", item: "os itens de um controle contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/monthly\/[^/]+\/item$/,
+    description: { action: "atualizou", item: "uma pendência documental contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/monthly\/[^/]+\/items$/,
+    description: { action: "atualizou", item: "as pendências documentais contábeis" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "consultou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "atualizou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "arquivou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/editability$/,
+    description: { action: "consultou", item: "a permissão de edição da triagem" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/ti\/stock\/items\/[^/]+\/movements\/list$/,
     description: { action: "consultou", item: "a lista de movimentações de um item de estoque" },
   },
@@ -687,6 +737,12 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 ];
 
 const RESOURCE_RULES: ResourceRule[] = [
+  {
+    pattern: /^\/pessoal\/groups(?:\/|$)/,
+    singular: "um grupo de pessoal",
+    newSingular: "um novo grupo de pessoal",
+    plural: "grupos de pessoal",
+  },
   {
     pattern: /^\/commercial\/proposal-configs(?:\/|$)/,
     singular: "uma configuração de proposta comercial",
@@ -854,6 +910,18 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um vínculo contábil",
     newSingular: "um novo vínculo contábil",
     plural: "vínculos contábeis",
+  },
+  {
+    pattern: /^\/triagem\/monthly(?:\/|$)/,
+    singular: "uma pendência documental contábil",
+    newSingular: "uma nova pendência documental contábil",
+    plural: "pendências documentais contábeis",
+  },
+  {
+    pattern: /^\/triagem\/statements(?:\/|$)/,
+    singular: "um marcador de extrato bancário",
+    newSingular: "um novo marcador de extrato bancário",
+    plural: "marcadores de extratos bancários",
   },
   {
     pattern: /^\/rh\/point-config(?:\/|$)/,
@@ -1034,12 +1102,6 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "uma notificação de certificado",
     newSingular: "uma nova notificação de certificado",
     plural: "notificações de certificados",
-  },
-  {
-    pattern: /^\/pessoal\/groups(?:\/|$)/,
-    singular: "um grupo de departamento pessoal",
-    newSingular: "um novo grupo de departamento pessoal",
-    plural: "grupos de departamento pessoal",
   },
   {
     pattern: /^\/pessoal\/ldd(?:\/|$)/,

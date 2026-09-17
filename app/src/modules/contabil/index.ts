@@ -1,15 +1,18 @@
 export {
   AccessDeniedPanel,
   ContabilControlSection,
+  ContabilPortfolioSection,
   CONTABIL_CONTROL_FIELDS,
   CONTABIL_RELATIONSHIP_FIELDS,
   ContabilRelationshipSection,
   ContabilResponsibleSection,
   ContabilShell,
   ContabilStateBox,
+  TriageDocumentsSection,
 } from "./components";
 export {
   contabilControlQueryKey,
+  contabilControlPortfolioQueryKey,
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
   CONTABIL_QUERY_KEY,
@@ -18,6 +21,7 @@ export {
   syncContabilRelationshipQueryCache,
   syncContabilResponsibleQueryCache,
   useContabilControlBootstrapMutation,
+  useContabilControlPortfolio,
   useContabilRelationship,
   useContabilResponsible,
   useCreateContabilRelationshipMutation,
@@ -28,13 +32,19 @@ export {
   useUpdateContabilRelationshipMutation,
   useUpdateContabilResponsibleMutation,
   useContabilPermissions,
+  useTriageEditability,
+  useTriageMonthly,
+  useTriageMutations,
+  useTriageStatements,
 } from "./hooks";
 export { resolveContabilPermissionAccess } from "./hooks/contabilPermissionAccess";
 export {
   buildContabilControlParams,
+  buildContabilPortfolioParams,
   contabilControlService,
   contabilRelationshipService,
   contabilResponsibleService,
+  triageDocumentsService,
   CONTABIL_ENDPOINTS,
   getContabilErrorMessage,
   isNotFoundError,
@@ -45,6 +55,8 @@ export type {
   ContabilCompetence,
   ContabilControl,
   ContabilControlFilters,
+  ContabilControlPortfolio,
+  ContabilControlPortfolioItem,
   ContabilRelationship,
   ContabilResponsible,
   CreateContabilRelationshipPayload,
@@ -55,4 +67,7 @@ export type {
   PatchContabilControlFieldPayload,
   UpdateContabilRelationshipPayload,
   UpdateContabilResponsiblePayload,
+  TriageBankStatement,
+  TriageDocumentStatus,
+  TriageDocumentsMonthly,
 } from "./types";

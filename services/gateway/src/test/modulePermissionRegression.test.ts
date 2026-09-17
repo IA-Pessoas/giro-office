@@ -31,6 +31,67 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 }
 
 describe("matriz de regressão das políticas modulares", () => {
+  it("classifica todos os fluxos Contábil do milestone com leitura e escrita corretas", () => {
+    const viewer = authContext({ modules: { contabil: 1 } });
+    const editor = authContext({ modules: { contabil: 2 } });
+    const readRoutes = [
+      ["GET", "/contabil/controls"],
+      ["GET", "/contabil/controls/list"],
+      ["GET", "/triagem/monthly"],
+      ["GET", "/triagem/statements"],
+      ["GET", "/triagem/closing"],
+    ] as const;
+    const contabilWriteRoutes = [
+      ["POST", "/contabil/controls"],
+      ["POST", "/contabil/controls/year"],
+      ["PATCH", "/contabil/controls/control-1/items"],
+      ["DELETE", "/contabil/controls"],
+      ["POST", "/contabil/controls/restore"],
+    ] as const;
+    const triagemWriteRoutes = [
+      ["POST", "/triagem/monthly"],
+      ["PUT", "/triagem/statements"],
+      ["PUT", "/triagem/closing"],
+    ] as const;
+
+    for (const [method, path] of readRoutes) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(true);
+    }
+    for (const [method, path] of contabilWriteRoutes) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(false);
+      expect(canAccessRoute(editor, requiredRoutePolicy(method, path))).toBe(true);
+    }
+    for (const [method, path] of triagemWriteRoutes) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(true);
+      expect(canAccessRoute(editor, requiredRoutePolicy(method, path))).toBe(true);
+    }
+  });
+
+  it("permite consulta de triagem para Contábil ou Triagem e não permite quem não tem ambos", () => {
+    const policy = requiredRoutePolicy("GET", "/triagem/monthly");
+
+    expect(canAccessRoute(authContext({ modules: { contabil: 1, triagem: 0 } }), policy)).toBe(
+      true,
+    );
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 1 } }), policy)).toBe(
+      true,
+    );
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 0 } }), policy)).toBe(
+      false,
+    );
+  });
+
+  it("deixa a atribuição de Triagem decidir a escrita no serviço", () => {
+    const policy = requiredRoutePolicy("PATCH", "/triagem/monthly/monthly-1/item");
+
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 1 } }), policy)).toBe(
+      true,
+    );
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 0 } }), policy)).toBe(
+      false,
+    );
+  });
+
   it.each([
     ["user", 0, false, false],
     ["user", 1, true, false],

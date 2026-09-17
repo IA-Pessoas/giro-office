@@ -94,6 +94,14 @@ function cloneCommands(commands) {
   return commands.map(([command, args]) => [command, [...args]]);
 }
 
+function buildBiomeCheckCommand(changedFiles) {
+  if (changedFiles.length === 0) {
+    return ["pnpm", ["check"]];
+  }
+
+  return ["pnpm", ["exec", "biome", "check", "--files-ignore-unknown=true", ...changedFiles]];
+}
+
 export function classifyChangedFiles(changedFiles) {
   const filePaths = [...new Set(changedFiles.map(normalizeGitPath).filter(Boolean))];
 
@@ -148,7 +156,11 @@ export function buildHookPlan(
   }
 
   if (global) {
-    commands.push(["pnpm", ["check"]], ["pnpm", ["typecheck"]], ["pnpm", ["test:scripts"]]);
+    commands.push(
+      buildBiomeCheckCommand(changedFiles),
+      ["pnpm", ["typecheck"]],
+      ["pnpm", ["test:scripts"]],
+    );
   } else {
     commands.push([
       "pnpm",
