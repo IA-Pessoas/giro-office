@@ -5,6 +5,7 @@ export type {
   IntegracaoTaskCompletionRequest,
   IntegracaoTaskCompletionRequestStatus,
   IntegracaoTaskAttachment,
+  IntegracaoTaskPostponement,
   IntegracaoTaskListItem,
   IntegracaoTaskListParams,
   IntegracaoTaskListResult,

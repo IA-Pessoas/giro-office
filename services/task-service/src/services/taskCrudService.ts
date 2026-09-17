@@ -154,7 +154,6 @@ export interface UpdateTaskCrudRequest {
   responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
-  prevision_date?: Date | string | null;
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
 }
@@ -833,18 +832,6 @@ export class TaskCrudService {
           : undefined,
       ]);
 
-      let prevision_date: Date | null;
-      if (data.prevision_date === undefined) {
-        prevision_date = exists.prevision_date;
-      } else if (data.prevision_date === null) {
-        prevision_date = null;
-      } else {
-        prevision_date =
-          typeof data.prevision_date === "string"
-            ? new Date(data.prevision_date)
-            : data.prevision_date;
-      }
-
       const updated = await prismaClient.task.update({
         where: { id: data.task_id },
         data: {
@@ -858,7 +845,7 @@ export class TaskCrudService {
           responsible_id,
           responsible2_id,
           responsible3_id,
-          prevision_date,
+          prevision_date: exists.prevision_date,
         },
         select: TASK_UPDATE_SELECT,
       });

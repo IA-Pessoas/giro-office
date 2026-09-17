@@ -53,6 +53,8 @@ Exemplos de paths publicos:
   apenas metadados privados. `GET /task/attachment/list` não expõe caminho interno, `GET
   /task/attachment/access` gera URL assinada curta após validar organização e tarefa, e `DELETE
   /task/attachment` faz remoção lógica auditada, restrita a administradores/owner.
+- `POST /task/postponement` prorroga somente tarefa vencida em andamento, com justificativa e
+  histórico imutável. `GET /task/postponement/list` retorna as prorrogações em ordem cronológica.
 - `POST /task/project-wizard/preview` compõe tarefas principais e dependências diretas canônicas e
   retorna uma `revision` opaca. Exige Integração nível 2+ ou owner.
 - `POST /task/project-wizard` cria o projeto com a lista, inclusive vazia, de tarefas principais e

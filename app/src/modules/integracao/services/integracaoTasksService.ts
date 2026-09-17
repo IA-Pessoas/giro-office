@@ -14,12 +14,14 @@ import {
   buildTaskCompletionDecisionPayload,
   buildTaskCompletionRequestPayload,
   buildTaskReopenPayload,
+  buildTaskPostponementPayload,
   buildUpdateIntegracaoTaskPayload,
   INTEGRACAO_TASKS_ENDPOINTS,
   unwrapCreatedIntegracaoTask,
   unwrapIntegracaoTaskDetail,
   unwrapIntegracaoTaskList,
   unwrapTaskCompletionRequestHistory,
+  unwrapTaskPostponementHistory,
   unwrapTaskAttachmentList,
   unwrapTaskAttachmentAccessUrl,
   unwrapUpdatedIntegracaoTask,
@@ -110,6 +112,22 @@ export const integracaoTasksService = {
   async reopen(taskId: string, reason: string): Promise<void> {
     const api = setupAPIClient();
     await api.put(INTEGRACAO_TASKS_ENDPOINTS.reopen, buildTaskReopenPayload(taskId, reason));
+  },
+
+  async postpone(taskId: string, newPrevisionDate: string, justification: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.post(
+      INTEGRACAO_TASKS_ENDPOINTS.postponement,
+      buildTaskPostponementPayload(taskId, newPrevisionDate, justification),
+    );
+  },
+
+  async listPostponements(taskId: string) {
+    const api = setupAPIClient();
+    const response = await api.get(INTEGRACAO_TASKS_ENDPOINTS.postponementList, {
+      params: { task_id: taskId },
+    });
+    return unwrapTaskPostponementHistory(response.data);
   },
 
   async uploadAttachment(taskId: string, file: File): Promise<void> {

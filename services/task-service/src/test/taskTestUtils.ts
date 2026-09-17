@@ -45,6 +45,10 @@ interface TaskRouteMocks {
     createAccessUrl: Mock;
     remove: Mock;
   };
+  taskPostponementServiceMock: {
+    create: Mock;
+    list: Mock;
+  };
 }
 
 const taskRouteMocks: TaskRouteMocks = vi.hoisted(
@@ -90,6 +94,10 @@ const taskRouteMocks: TaskRouteMocks = vi.hoisted(
       createAccessUrl: vi.fn(),
       remove: vi.fn(),
     },
+    taskPostponementServiceMock: {
+      create: vi.fn(),
+      list: vi.fn(),
+    },
   }),
 );
 
@@ -132,6 +140,12 @@ vi.mock("../services/taskFinanceiroService.js", () => ({
 vi.mock("../services/taskAttachmentService.js", () => ({
   TaskAttachmentService: vi.fn(function TaskAttachmentService() {
     return taskRouteMocks.taskAttachmentServiceMock;
+  }),
+}));
+
+vi.mock("../services/taskPostponementService.js", () => ({
+  TaskPostponementService: vi.fn(function TaskPostponementService() {
+    return taskRouteMocks.taskPostponementServiceMock;
   }),
 }));
 
@@ -188,6 +202,7 @@ export function resetTaskRouteMocks() {
   const taskLifecycleServiceMock = taskRouteMocks.taskLifecycleServiceMock;
   const taskFinanceiroServiceMock = taskRouteMocks.taskFinanceiroServiceMock;
   const taskAttachmentServiceMock = taskRouteMocks.taskAttachmentServiceMock;
+  const taskPostponementServiceMock = taskRouteMocks.taskPostponementServiceMock;
 
   taskCrudServiceMock.createTask.mockResolvedValue({ id: "task-1" });
   taskCrudServiceMock.listTasks.mockResolvedValue([{ id: "task-1" }]);
@@ -228,6 +243,8 @@ export function resetTaskRouteMocks() {
     url: "https://signed.example/file",
   });
   taskAttachmentServiceMock.remove.mockResolvedValue({ id: "attachment-1" });
+  taskPostponementServiceMock.create.mockResolvedValue({ id: "postponement-1" });
+  taskPostponementServiceMock.list.mockResolvedValue([]);
 }
 
 const taskCrudServiceMock: TaskRouteMocks["taskCrudServiceMock"] =
@@ -244,12 +261,15 @@ const taskFinanceiroServiceMock: TaskRouteMocks["taskFinanceiroServiceMock"] =
   taskRouteMocks.taskFinanceiroServiceMock;
 const taskAttachmentServiceMock: TaskRouteMocks["taskAttachmentServiceMock"] =
   taskRouteMocks.taskAttachmentServiceMock;
+const taskPostponementServiceMock: TaskRouteMocks["taskPostponementServiceMock"] =
+  taskRouteMocks.taskPostponementServiceMock;
 
 export {
   taskCrudServiceMock,
   taskDependentServiceMock,
   taskFinanceiroServiceMock,
   taskAttachmentServiceMock,
+  taskPostponementServiceMock,
   taskIntegrationRegularizeServiceMock,
   taskLifecycleServiceMock,
   taskModelServiceMock,

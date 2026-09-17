@@ -90,7 +90,6 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: "Realizar",
     urgency: "MEDIA",
     responsible_id: "user-uuid",
-    prevision_date: "2026-04-10T09:00:00.000Z",
   },
   required: ["task_id"],
   properties: {
@@ -103,7 +102,6 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: { type: "string" },
     urgency: { type: "string" },
     responsible_id: { type: ["string", "null"] },
-    prevision_date: { type: ["string", "null"], format: "date-time" },
   },
 });
 
@@ -211,7 +209,6 @@ const concludeTaskRequestBody = createObjectRequestBody({
   example: {
     task_id: "task-uuid",
     status: "Concluida",
-    prevision_date: "2026-04-10T09:00:00.000Z",
     end_date: "2026-04-12T18:00:00.000Z",
     responsible_id: "user-uuid",
     responsible2_id: "backup-user-uuid",
@@ -223,7 +220,6 @@ const concludeTaskRequestBody = createObjectRequestBody({
   properties: {
     task_id: { type: "string" },
     status: { type: "string" },
-    prevision_date: { type: ["string", "null"], format: "date-time" },
     end_date: { type: ["string", "null"], format: "date-time" },
     responsible_id: { type: ["string", "null"] },
     responsible2_id: { type: ["string", "null"] },
@@ -250,6 +246,20 @@ const createConclusionRequestBody = createObjectRequestBody({
   properties: {
     task_id: { type: "string" },
     reason: { type: "string" },
+  },
+});
+
+const createTaskPostponementRequestBody = createObjectRequestBody({
+  example: {
+    task_id: "task-uuid",
+    new_prevision_date: "2026-04-20",
+    justification: "Aguardando documento obrigatório do cliente.",
+  },
+  required: ["task_id", "new_prevision_date", "justification"],
+  properties: {
+    task_id: { type: "string" },
+    new_prevision_date: { type: "string", format: "date" },
+    justification: { type: "string", minLength: 1, maxLength: 2000 },
   },
 });
 
@@ -937,6 +947,30 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
         get: {
           tags: ["Lifecycle"],
           summary: "Listar histórico de solicitações de conclusão",
+          security: bearer,
+          parameters: [
+            { name: "task_id", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Histórico", ...successJson } },
+        },
+      },
+      "/task/postponement": {
+        post: {
+          tags: ["Lifecycle"],
+          summary: "Prorrogar tarefa vencida em andamento",
+          security: bearer,
+          ...createTaskPostponementRequestBody,
+          responses: {
+            "201": { description: "Prorrogação registrada", ...successJson },
+            "400": { description: "Dados inválidos" },
+            "409": { description: "Tarefa sem elegibilidade ou data inválida" },
+          },
+        },
+      },
+      "/task/postponement/list": {
+        get: {
+          tags: ["Lifecycle"],
+          summary: "Listar histórico de prorrogações da tarefa",
           security: bearer,
           parameters: [
             { name: "task_id", in: "query", required: true, schema: { type: "string" } },

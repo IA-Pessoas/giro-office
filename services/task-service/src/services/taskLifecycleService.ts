@@ -84,9 +84,6 @@ function assertTaskConclusionAccess(params: {
         params.body.responsible2_id === params.task.responsible2_id) &&
       (params.body.responsible3_id === undefined ||
         params.body.responsible3_id === params.task.responsible3_id) &&
-      (params.body.prevision_date === undefined ||
-        parseOptionalDate(params.body.prevision_date)?.getTime() ===
-          params.task.prevision_date?.getTime()) &&
       (params.body.end_date === undefined ||
         parseOptionalDate(params.body.end_date)?.getTime() === params.task.end_date?.getTime()));
   if (!isOwnPatchUnchanged) {
@@ -475,10 +472,6 @@ export class TaskLifecycleService {
             }
           }
 
-          const previsionDate =
-            body.prevision_date !== undefined
-              ? parseOptionalDate(body.prevision_date)
-              : currentTask.prevision_date;
           const endDate =
             body.end_date !== undefined ? parseOptionalDate(body.end_date) : currentTask.end_date;
           const responsible2Id =
@@ -501,7 +494,7 @@ export class TaskLifecycleService {
             where: { id: body.task_id },
             data: {
               status: newStatus,
-              prevision_date: previsionDate,
+              prevision_date: currentTask.prevision_date,
               end_date: endDate,
               responsible_id: body.responsible_id,
               responsible2_id: responsible2Id,

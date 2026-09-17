@@ -3,6 +3,7 @@ import type {
   IntegracaoTaskCompletionDecision,
   IntegracaoTaskCompletionRequest,
   IntegracaoTaskAttachment,
+  IntegracaoTaskPostponement,
   IntegracaoTaskDetail,
   IntegracaoTaskListParams,
   IntegracaoTaskListResult,
@@ -15,6 +16,8 @@ export const INTEGRACAO_TASKS_ENDPOINTS = {
   list: "/task/list",
   completionRequest: "/task/complete-request",
   completionRequestList: "/task/complete-request/list",
+  postponement: "/task/postponement",
+  postponementList: "/task/postponement/list",
   reopen: "/task/reopen",
   attachment: "/task/attachment",
   attachmentList: "/task/attachment/list",
@@ -41,6 +44,18 @@ export function buildTaskCompletionDecisionPayload(
 
 export function buildTaskReopenPayload(taskId: string, reason: string) {
   return { task_id: taskId, reason };
+}
+
+export function buildTaskPostponementPayload(
+  taskId: string,
+  newPrevisionDate: string,
+  justification: string,
+) {
+  return {
+    task_id: taskId,
+    new_prevision_date: newPrevisionDate,
+    justification,
+  };
 }
 
 export function buildIntegracaoTaskListParams(params: IntegracaoTaskListParams) {
@@ -87,6 +102,10 @@ export function unwrapIntegracaoTaskList(body: unknown): IntegracaoTaskListResul
 
 export function unwrapTaskCompletionRequestHistory(body: unknown): IntegracaoTaskCompletionRequest[] {
   return unwrapServiceEnvelope(body) as IntegracaoTaskCompletionRequest[];
+}
+
+export function unwrapTaskPostponementHistory(body: unknown): IntegracaoTaskPostponement[] {
+  return unwrapServiceEnvelope(body) as IntegracaoTaskPostponement[];
 }
 
 export function unwrapTaskAttachmentList(body: unknown): IntegracaoTaskAttachment[] {

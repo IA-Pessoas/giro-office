@@ -525,7 +525,6 @@ async function runBrowserProof() {
         observations: updateTaskRequests[2].observations,
         billing: updateTaskRequests[2].billing,
         urgency: updateTaskRequests[2].urgency,
-        prevision_date: updateTaskRequests[2].prevision_date,
       },
       {
         model_id: "model-default",
@@ -536,10 +535,10 @@ async function runBrowserProof() {
         observations: "Legado preservado",
         billing: task.billing,
         urgency: "Normal",
-        prevision_date: null,
       },
       "A troca válida deve resolver o responsável e preservar os demais campos editáveis.",
     );
+    assert.equal(Object.hasOwn(updateTaskRequests[2], "prevision_date"), false);
 
     await page.getByRole("button", { name: `Editar tarefa ${task.name}` }).click();
     const persistedSwapDialog = page.getByRole("dialog", { name: "Editar tarefa" });

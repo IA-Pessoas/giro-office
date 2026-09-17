@@ -56,6 +56,10 @@ export function integracaoTaskCompletionRequestsQueryKey(taskId: string) {
   return [...INTEGRACAO_TASKS_QUERY_KEY, "completion-requests", taskId] as const;
 }
 
+export function integracaoTaskPostponementsQueryKey(taskId: string) {
+  return [...INTEGRACAO_TASKS_QUERY_KEY, "postponements", taskId] as const;
+}
+
 export function integracaoTaskAttachmentsQueryKey(taskId: string) {
   return [...INTEGRACAO_TASKS_QUERY_KEY, "attachments", taskId] as const;
 }

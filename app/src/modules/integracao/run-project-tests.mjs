@@ -85,12 +85,38 @@ runTest("task attachment contract keeps private paths out of the UI", () => {
   assert.doesNotMatch(source, /object_path/);
 });
 
+runTest("task postponement contract and panel retain justification and chronological history", () => {
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.postponement, "/task/postponement");
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.postponementList, "/task/postponement/list");
+  assert.deepEqual(
+    buildTaskPostponementPayload("task-1", "2026-09-20", "Aguardando documento."),
+    {
+      task_id: "task-1",
+      new_prevision_date: "2026-09-20",
+      justification: "Aguardando documento.",
+    },
+  );
+  assert.deepEqual(
+    unwrapTaskPostponementHistory({ success: true, data: [{ id: "postponement-1" }] }),
+    [{ id: "postponement-1" }],
+  );
+  const panel = readFileSync(
+    new URL("./components/TaskPostponementPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(panel, /usePostponeTaskMutation/);
+  assert.match(panel, /useIntegracaoTaskPostponements/);
+  assert.match(panel, /Justificativa da prorrogação/);
+  assert.match(panel, /Histórico de prorrogações/);
+});
+
 import {
   buildCreateIntegracaoTaskPayload,
   buildDeleteIntegracaoTaskPayload,
   buildIntegracaoTaskListParams,
   buildTaskCompletionDecisionPayload,
   buildTaskCompletionRequestPayload,
+  buildTaskPostponementPayload,
   buildTaskReopenPayload,
   buildUpdateIntegracaoTaskPayload,
   INTEGRACAO_TASKS_ENDPOINTS,
@@ -100,6 +126,7 @@ import {
   unwrapTaskAttachmentAccessUrl,
   unwrapTaskAttachmentList,
   unwrapTaskCompletionRequestHistory,
+  unwrapTaskPostponementHistory,
   unwrapUpdatedIntegracaoTask,
 } from "./services/integracaoTasksService.contract.ts";
 import {
