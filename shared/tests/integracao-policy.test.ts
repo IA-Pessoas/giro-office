@@ -391,12 +391,19 @@ test("owner possui bypass global e exclusões preservam o contrato de dependênc
     "allow",
   );
   assert.equal(deletePolicy?.responses.dependency, 409);
-  const attachmentDelete = requirePolicy("DELETE", "/task/attachment");
-  assert.equal(attachmentDelete.responses.dependency, null);
+  const deletesWithoutDependency = INTEGRACAO_ROUTE_POLICIES.filter(
+    (policy) => policy.action === "delete" && policy.responses.dependency === null,
+  );
+  assert.deepEqual(
+    deletesWithoutDependency.map((policy) => `${policy.method} ${policy.path}`),
+    ["DELETE /task/project-plan/task", "DELETE /task/attachment"],
+  );
   assert.ok(
-    INTEGRACAO_ROUTE_POLICIES.filter(
-      (policy) => policy.action === "delete" && policy.resource !== "taskAttachment",
-    ).every((policy) => policy.responses.dependency === 409),
+    INTEGRACAO_ROUTE_POLICIES.filter((policy) => policy.action === "delete").every((policy) =>
+      deletesWithoutDependency.includes(policy)
+        ? policy.responses.dependency === null
+        : policy.responses.dependency === 409,
+    ),
   );
 });
 
