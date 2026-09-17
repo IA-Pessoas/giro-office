@@ -167,6 +167,19 @@ await runTest(
     assert.match(guidanceSource, /\.\.\.formState\.target_snapshot/);
     assert.match(
       guidanceSource,
+      /cpf_cnpj: formatCpfCnpjInput\(guidance\.cpf_cnpj \?\? targetSnapshot\.cpf_cnpj \?\? ""\)/,
+    );
+    assert.match(guidanceSource, /guidance\.share_capital \?\? targetSnapshot\.share_capital/);
+    assert.match(
+      guidanceSource,
+      /\.\.\.formState\.target_snapshot[\s\S]*?cpf_cnpj: normalizeDigits\(trimRegularizeOptionalText\(formState\.cpf_cnpj\) \?\? ""\)/,
+    );
+    assert.match(
+      guidanceSource,
+      /\.\.\.formState\.target_snapshot[\s\S]*?share_capital: toRegularizeOptionalNumber\(formState\.share_capital\)/,
+    );
+    assert.match(
+      guidanceSource,
       /targetSnapshotAddress = formState\.target_snapshot\.address \?\? ""/,
     );
     assert.match(guidanceSource, /targetSnapshotCity = formState\.target_snapshot\.city \?\? ""/);
@@ -178,6 +191,8 @@ await runTest(
     assert.match(pickerSource, /useRef/);
     assert.match(pickerSource, /useEffect/);
     assert.match(pickerSource, /searchInputRef\.current\?\.focus\(\)/);
+    assert.match(pickerSource, /window\.addEventListener\("keydown",[\s\S]*?true\)/);
+    assert.match(pickerSource, /window\.removeEventListener\("keydown",[\s\S]*?true\)/);
     assert.match(
       pickerSource,
       /function handleDialogKeyDown\(event: KeyboardEvent<HTMLDivElement>\)/,

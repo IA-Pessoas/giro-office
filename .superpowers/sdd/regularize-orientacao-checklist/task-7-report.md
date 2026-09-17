@@ -92,3 +92,19 @@ Commit solicitado: `feat: add independent regularize guidance form`.
 | `git diff --check` | GREEN. |
 
 Limitações mantidas: não houve navegador autenticado nem integração real com API/banco. Permanecem os avisos ambientais de Node 24 versus Node 22 e do pnpm já registrados acima.
+
+## Rodada 2 da revisão
+
+- O `ClientPickerModal` agora instala, enquanto aberto, um listener nativo `window` para `keydown` em `capture=true`. Escape faz `preventDefault`, `stopPropagation` e fecha somente o picker antes de alcançar o `Dialog` pai; o handler local permanece como defesa e o foco inicial no campo de busca foi preservado.
+- A edição agora inicializa `cpf_cnpj` com `guidance.cpf_cnpj ?? targetSnapshot.cpf_cnpj` e `share_capital` com `guidance.share_capital ?? targetSnapshot.share_capital`, convertendo ambos para os tipos do formulário. O payload continua espalhando o snapshot inteiro e normaliza os campos editáveis a partir desse estado inicializado.
+- O runner ganhou regressões para o listener de captura, cleanup, foco e o cenário de snapshot histórico com campos superiores nulos; a execução final ficou GREEN.
+
+### Evidências da rodada 2
+
+| Validação | Resultado |
+| --- | --- |
+| RED do runner ampliado | Falhou antes da implementação no fallback de `cpf_cnpj`, confirmando o P1; o mesmo grupo também exigiu o listener nativo de captura. |
+| `corepack pnpm --filter @workspace/app test:regularize` | GREEN; todos os checks passaram. |
+| `corepack pnpm --filter @workspace/app typecheck` | GREEN; `tsc --noEmit` e `typecheck:usefetch` passaram. |
+| Biome temporário equivalente nos três arquivos de código | Sem apontamentos nos trechos novos; permanecem 3 apontamentos legados documentados anteriormente. |
+| `git diff --check` | GREEN. |

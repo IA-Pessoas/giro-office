@@ -54,6 +54,20 @@ export function ClientPickerModal({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handleWindowKeyDown(event: WindowEventMap["keydown"]) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setIsOpen(false);
+    }
+
+    window.addEventListener("keydown", handleWindowKeyDown, true);
+    return () => window.removeEventListener("keydown", handleWindowKeyDown, true);
+  }, [isOpen]);
+
   function handleSearchChange(value: string) {
     setSearch(value);
     setPage(FIRST_CLIENT_PAGE);

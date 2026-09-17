@@ -118,6 +118,8 @@ function buildGuidanceFormState(
     };
   }
 
+  const initialShareCapital = guidance.share_capital ?? targetSnapshot.share_capital;
+
   return {
     ...targetState,
     process_id: guidance.process_id ?? "",
@@ -127,11 +129,11 @@ function buildGuidanceFormState(
     legal_nature: guidance.legal_nature ?? targetSnapshot.legal_nature ?? "",
     company_name: guidance.company_name ?? targetSnapshot.company_name ?? "",
     trade_name: guidance.trade_name ?? targetSnapshot.trade_name ?? "",
-    cpf_cnpj: formatCpfCnpjInput(guidance.cpf_cnpj ?? ""),
+    cpf_cnpj: formatCpfCnpjInput(guidance.cpf_cnpj ?? targetSnapshot.cpf_cnpj ?? ""),
     share_capital:
-      guidance.share_capital === null || guidance.share_capital === undefined
+      initialShareCapital === null || initialShareCapital === undefined
         ? ""
-        : String(guidance.share_capital),
+        : String(initialShareCapital),
     iptu: guidance.iptu ?? targetSnapshot.iptu ?? "",
     address: guidance.address ?? targetSnapshot.address ?? "",
     comporate_purpose: guidance.comporate_purpose ?? targetSnapshot.comporate_purpose ?? "",
