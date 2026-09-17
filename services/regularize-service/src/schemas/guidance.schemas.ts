@@ -49,13 +49,33 @@ const guidanceChecklistSchema = z
     }
   });
 
-const manualTargetSnapshotSchema = z
+const guidanceTargetSnapshotSchema = z
   .object({
     version: z.literal(1),
     source: z.literal("manual"),
     name: z.string().trim().min(1, "name obrigatorio."),
+    document: z.string().optional(),
+    address: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    type: z.string().optional(),
+    request: z.string().optional(),
+    framework_obs: z.string().optional(),
+    legal_nature: z.string().optional(),
+    company_name: z.string().optional(),
+    trade_name: z.string().optional(),
+    cpf_cnpj: z.string().optional(),
+    share_capital: z.union([z.number(), z.string()]).optional(),
+    iptu: z.string().optional(),
+    comporate_purpose: z.string().optional(),
+    carryng: z.string().optional(),
+    regime: z.string().optional(),
+    legal_representative: z.string().optional(),
+    economic_activities: z.array(guidanceEconomicActivitySchema).optional(),
+    partners: z.array(guidancePartnerSchema).optional(),
+    status: guidanceWriteStatusSchema.optional(),
   })
-  .passthrough();
+  .strict();
 
 const guidanceBranchDataSchema = z
   .object({
@@ -94,7 +114,7 @@ function validateGuidanceTarget(
     value.target_type === "SEM_CLIENTE" &&
     (value.client_pj_id ||
       value.client_pf_id ||
-      !manualTargetSnapshotSchema.safeParse(value.target_snapshot).success)
+      !guidanceTargetSnapshotSchema.safeParse(value.target_snapshot).success)
   ) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
@@ -144,7 +164,7 @@ export const createGuidanceBodySchema = z
     target_type: z.enum(REGULARIZE_GUIDANCE_TARGET_TYPES),
     client_pj_id: z.string().uuid("client_pj_id invalido.").nullable().optional(),
     client_pf_id: z.string().uuid("client_pf_id invalido.").nullable().optional(),
-    target_snapshot: manualTargetSnapshotSchema.optional(),
+    target_snapshot: guidanceTargetSnapshotSchema.optional(),
     checklist: guidanceChecklistSchema,
     branch_data: guidanceBranchDataSchema.optional(),
     type: z.string().optional(),
@@ -176,7 +196,7 @@ export const updateGuidanceBodySchema = z
     target_type: z.enum(REGULARIZE_GUIDANCE_TARGET_TYPES).optional(),
     client_pj_id: z.string().uuid("client_pj_id invalido.").nullable().optional(),
     client_pf_id: z.string().uuid("client_pf_id invalido.").nullable().optional(),
-    target_snapshot: manualTargetSnapshotSchema.optional(),
+    target_snapshot: guidanceTargetSnapshotSchema.optional(),
     checklist: guidanceChecklistSchema.optional(),
     branch_data: guidanceBranchDataSchema.optional(),
     type: z.string().optional(),

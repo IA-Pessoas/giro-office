@@ -218,7 +218,10 @@ describe("regularize status contracts", () => {
                   partners: { nullable: boolean; items: { additionalProperties: boolean } };
                   process_id: { nullable: boolean };
                   target_type: { enum: string[] };
-                  target_snapshot: { additionalProperties: boolean };
+                  target_snapshot: {
+                    additionalProperties: boolean;
+                    properties: Record<string, unknown>;
+                  };
                   checklist: {
                     minItems: number;
                     maxItems: number;
@@ -254,6 +257,18 @@ describe("regularize status contracts", () => {
     expect(schema.properties.process_id.nullable).toBe(true);
     expect(schema.properties.target_type.enum).toEqual(["PJ", "PF", "SEM_CLIENTE"]);
     expect(schema.properties.target_snapshot.additionalProperties).toBe(false);
+    expect(schema.properties.target_snapshot.properties).toEqual(
+      expect.objectContaining({
+        document: { type: "string" },
+        type: { type: "string" },
+        request: { type: "string" },
+        framework_obs: { type: "string" },
+        economic_activities: expect.objectContaining({ type: "array" }),
+        partners: expect.objectContaining({ type: "array" }),
+        status: { type: "string", enum: ["Em andamento", "Finalizado"] },
+      }),
+    );
+    expect(schema.properties.target_snapshot.properties).not.toHaveProperty("custom_note");
     expect(schema.properties.checklist.minItems).toBe(17);
     expect(schema.properties.checklist.maxItems).toBe(17);
     expect(schema.properties.checklist.items.properties.status.enum).toEqual([
@@ -284,6 +299,7 @@ describe("regularize status contracts", () => {
                     partners: { nullable: boolean; items: { additionalProperties: boolean } };
                     target_snapshot: {
                       additionalProperties: boolean;
+                      required: string[];
                       properties: Record<string, unknown>;
                     };
                     checklist_items: {
@@ -327,16 +343,62 @@ describe("regularize status contracts", () => {
     expect(responseData.properties.economic_activities.items.additionalProperties).toBe(false);
     expect(responseData.properties.partners.items.additionalProperties).toBe(false);
     expect(responseData.properties.target_snapshot.additionalProperties).toBe(false);
+    expect(responseData.properties.target_snapshot.required).toEqual(["version", "source"]);
     expect(responseData.properties.target_snapshot.properties).toEqual(
       expect.objectContaining({
+        type: { type: "string" },
+        request: { type: "string" },
+        framework_obs: { type: "string" },
         company_name: { type: "string" },
         trade_name: { type: "string" },
         cpf_cnpj: { type: "string" },
         legal_nature: { type: "string" },
         share_capital: { oneOf: [{ type: "number" }, { type: "string" }] },
+        iptu: { type: "string" },
+        address: { type: "string" },
+        comporate_purpose: { type: "string" },
+        carryng: { type: "string" },
         regime: { type: "string" },
+        legal_representative: { type: "string" },
+        status: { type: "string", enum: ["Em andamento", "Finalizado"] },
       }),
     );
+    expect(responseData.properties.target_snapshot.properties.economic_activities).toEqual({
+      type: "array",
+      items: expect.objectContaining({ additionalProperties: false }),
+    });
+    expect(responseData.properties.target_snapshot.properties.partners).toEqual({
+      type: "array",
+      items: expect.objectContaining({ additionalProperties: false }),
+    });
+    expect(responseData.properties.target_snapshot.properties).not.toHaveProperty("custom_note");
+
+    const migratedTargetSnapshot = {
+      version: 1,
+      source: "client_pj",
+      name: "Empresa Migrada",
+      document: "12345678000199",
+      type: "Abertura",
+      request: "Regularizar cadastro",
+      framework_obs: "Observação histórica",
+      legal_nature: "Sociedade empresária limitada",
+      company_name: "Empresa Migrada LTDA",
+      trade_name: "Empresa Migrada",
+      cpf_cnpj: "12345678000199",
+      share_capital: 100000,
+      iptu: "IPTU-001",
+      address: "Rua A, 100",
+      comporate_purpose: "Comércio varejista",
+      carryng: "Pequeno porte",
+      regime: "Simples Nacional",
+      legal_representative: "Pessoa Representante",
+      economic_activities: [{ code: "4711-3/01", description: "Comércio", type: "Principal" }],
+      partners: [{ name: "Sócio", cpf: "12345678901" }],
+      status: "Em andamento",
+    };
+    for (const field of Object.keys(migratedTargetSnapshot)) {
+      expect(responseData.properties.target_snapshot.properties).toHaveProperty(field);
+    }
     expect(responseData.properties.checklist_items.items.additionalProperties).toBe(false);
     expect(responseData.properties.checklist_items.items.required).toEqual(
       expect.arrayContaining([

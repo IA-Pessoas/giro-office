@@ -238,6 +238,23 @@ describe("regularize remaining routes", () => {
     expect(listByProcess).toHaveBeenCalledWith("a0000000-0000-4000-8000-000000000001", undefined);
   });
 
+  it("POST /regularize/guidance rejeita chaves extras no snapshot", async () => {
+    vi.spyOn(GuidanceService.prototype, "create").mockResolvedValue(completeGuidance);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .post("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send({
+        ...guidancePayload,
+        target_snapshot: { ...guidancePayload.target_snapshot, custom_note: "fora do contrato" },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("custom_note");
+    expect(GuidanceService.prototype.create).not.toHaveBeenCalled();
+  });
+
   it("POST /regularize/guidance rejeita dados de filial sem checklist concluído", async () => {
     const app = createTestApp();
 

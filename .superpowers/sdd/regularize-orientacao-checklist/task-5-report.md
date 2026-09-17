@@ -43,6 +43,45 @@ Após corrigir expectativas dos casos negativos para o envelope de erro existent
 | `node_modules/.bin/biome.cmd format --write ...` e `node_modules/.bin/biome.cmd check ...` | Equivalente local usado; arquivos formatados e checados. |
 | `git diff --check` | Aprovado. |
 
+## Fix round 2
+
+### Evidência e decisão de contrato
+
+Foram lidos a migration `infra/prisma/migrations/20260916150000_regularize_guidance_checklist/migration.sql`, `guidanceTarget.ts`, `guidance.schemas.ts` e `guidanceService.ts`. A migration grava no `target_snapshot`, sem transformação posterior no serviço, os campos históricos `type`, `request`, `framework_obs`, `legal_nature`, `company_name`, `trade_name`, `cpf_cnpj`, `share_capital`, `iptu`, `address`, `comporate_purpose`, `carryng`, `regime`, `legal_representative`, `economic_activities`, `partners` e `status`, além de `version`/`source`; `guidanceTarget` também produz `name`, `document`, `city` e `state` para snapshots cadastrais.
+
+As propriedades opcionais do snapshot foram documentadas como omitíveis e não nulas: a migration usa `jsonb_strip_nulls` e `guidanceTarget` usa `compactSnapshot`, portanto valores nulos não são persistidos pelos fluxos reais. Os campos legados que podem ser `null` no registro pai continuam documentados como anuláveis no schema da orientação completa.
+
+Foi autorizada e aplicada a extensão mínima de escopo em `services/regularize-service/src/schemas/guidance.schemas.ts`: `manualTargetSnapshotSchema` deixou de usar `.passthrough()` e passou a ser um schema estrito com todos os campos explícitos do snapshot. Assim, `document` continua aceito/documentado e chaves sem contrato, como `custom_note`, são rejeitadas antes do service; nenhum schema novo usa `additionalProperties: true`.
+
+### RED
+
+Foram adicionados primeiro:
+
+- assertions do OpenAPI para todos os campos históricos/cadastrais, coleções fechadas, `status`, `document`, `version`/`source` e ausência de `custom_note`;
+- contrato literal de resposta migrada com campos legados, atividades/sócios e metadados do checklist;
+- teste de rota que envia `target_snapshot.custom_note` e exige 400 sem chamar o service.
+
+O RED reproduziu os P2: 2 testes falharam em 3 arquivos/60 testes — a chave extra ainda retornava 201 por causa do passthrough, e o OpenAPI não continha os campos legados do snapshot.
+
+### GREEN e refatoração
+
+- O snapshot de entrada agora é estrito e compartilha o conjunto explícito de campos com o contrato OpenAPI fechado; `custom_note` retorna 400 e `document` continua válido.
+- O snapshot de resposta agora cobre os campos cadastrais PJ/PF, todos os campos copiados pela migration, coleções de atividades/sócios fechadas e `status`, mantendo `additionalProperties: false` em todos os objetos novos.
+- A cobertura de `process_id` ausente, presente e nulo foi preservada.
+
+### Validação do fix round 2
+
+| Comando | Resultado |
+| --- | --- |
+| `corepack pnpm --filter @workspace/regularize-service exec vitest run src/test/remaining.routes.test.ts src/test/status.schemas.test.ts src/test/internalReporting.openapi.test.ts` | Shim limitado: `'vitest' não é reconhecido`; `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "vitest" not found`. |
+| `services/regularize-service/node_modules/.bin/vitest.cmd run src/test/remaining.routes.test.ts src/test/status.schemas.test.ts src/test/internalReporting.openapi.test.ts` | GREEN final: 3 arquivos, 60 testes aprovados. |
+| `corepack pnpm --filter @workspace/regularize-service build` | Aprovado; apenas avisos de Node 22/Node 24 e configuração `pnpm` já existentes. |
+| `corepack pnpm --filter @workspace/regularize-service typecheck` | Aprovado; mesmos avisos de ambiente. |
+| `corepack pnpm smoke:coverage` | Aprovado: `463/465 operations mapped with paired expectations`. |
+| `node_modules/.bin/biome.cmd format --write ...` | Aprovado; nenhum ajuste pendente após a formatação final. |
+| `node_modules/.bin/biome.cmd check` nos cinco arquivos de código autorizados | Aprovado: 5 arquivos verificados, nenhum ajuste. |
+| `git diff --check` | Aprovado. |
+
 ## Limitações de ambiente
 
 - O worktree declara Node 22 em `services/src`, mas o ambiente local executa Node 24.13.1; build e typecheck concluíram com aviso de engine.
@@ -77,5 +116,5 @@ O RED reproduziu os dois defeitos:
 | `corepack pnpm --filter @workspace/regularize-service build` | Aprovado; apenas avisos de Node 22/Node 24 e configuração `pnpm` já existentes. |
 | `corepack pnpm --filter @workspace/regularize-service typecheck` | Aprovado; mesmos avisos de ambiente. |
 | `corepack pnpm smoke:coverage` | Aprovado: `463/465 operations mapped with paired expectations`. |
-| `services/regularize-service/node_modules/.bin/biome.cmd check` nos quatro arquivos de produto/teste | Aprovado: 4 arquivos verificados, nenhum ajuste. |
+| `node_modules/.bin/biome.cmd check` nos quatro arquivos de produto/teste | Aprovado: 4 arquivos verificados, nenhum ajuste. |
 | `git diff --check` | Aprovado. |

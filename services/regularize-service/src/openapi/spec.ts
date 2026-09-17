@@ -176,7 +176,23 @@ const guidanceSnapshotProperties = {
   cpf_cnpj: { type: "string" },
   legal_nature: { type: "string" },
   share_capital: { oneOf: [{ type: "number" }, { type: "string" }] },
+  type: { type: "string" },
+  request: { type: "string" },
+  framework_obs: { type: "string" },
+  iptu: { type: "string" },
+  comporate_purpose: { type: "string" },
+  carryng: { type: "string" },
   regime: { type: "string" },
+  legal_representative: { type: "string" },
+  economic_activities: {
+    type: "array",
+    items: guidanceEconomicActivityInputOpenApiSchema,
+  },
+  partners: {
+    type: "array",
+    items: guidancePartnerInputOpenApiSchema,
+  },
+  status: { type: "string", enum: [...CANONICAL_GUIDANCE_STATUSES] },
 };
 
 const guidanceTargetSnapshotOpenApiSchema = {
