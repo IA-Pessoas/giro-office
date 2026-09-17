@@ -68,6 +68,11 @@ export type {
   UpdateContabilRelationshipPayload,
   UpdateContabilResponsiblePayload,
   TriageBankStatement,
+  TriageDeliveryMethod,
   TriageDocumentStatus,
   TriageDocumentsMonthly,
+  TriageFiscalChecklistField,
+  TriageFiscalField,
+  TriageItemPriority,
+  TriageRoutineType,
 } from "./types";

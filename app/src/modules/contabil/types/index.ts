@@ -1,4 +1,5 @@
 export type ContabilCompetence = `${number}-${number}`;
+export type TriageRoutineType = "CONTABIL" | "FISCAL";
 
 export type ContabilControlChecklistField =
   | "regenerate_accounting_entries"
@@ -152,6 +153,7 @@ export type TriageDocumentStatus =
   | "PENDING"
   | "COMPLETED"
   | "ATTENTION"
+  | "UNDER_REVIEW"
   | "NOT_PRESENT"
   | "NOT_APPLICABLE";
 
@@ -167,17 +169,42 @@ export type TriageDocumentField =
   | "bank_investments"
   | "card_sales_report";
 
+export type TriageFiscalChecklistField =
+  | "inbound_report"
+  | "outbound_report"
+  | "nfse_provided"
+  | "nfse_received"
+  | "cte_documents"
+  | "mei_documents"
+  | "nfce_documents"
+  | "sped_fiscal"
+  | "sped_contributions"
+  | "nfce_received"
+  | "model_21_invoice"
+  | "cte_as_issuer"
+  | "services_provided_as_mei";
+
+export type TriageFiscalField = TriageFiscalChecklistField | "billing_amount";
+
+export type TriageDeliveryMethod = "EMAIL" | "PORTAL" | "WHATSAPP";
+export type TriageItemPriority = "LOW" | "MEDIUM" | "HIGH";
+
 export interface TriageDocumentItemNotes {
   note: string | null;
   justification: string | null;
+  priority?: TriageItemPriority | null;
+  delivery_method?: TriageDeliveryMethod | null;
+  required?: boolean;
 }
 
 export interface TriageDocumentsMonthly {
   id: string;
   client_id: string;
   competence: ContabilCompetence;
-  checklist: Record<TriageDocumentField, TriageDocumentStatus>;
-  item_notes: Record<TriageDocumentField, TriageDocumentItemNotes>;
+  type: TriageRoutineType;
+  billing_amount?: string | null;
+  checklist: Record<string, TriageDocumentStatus>;
+  item_notes: Record<string, TriageDocumentItemNotes>;
   summary: { applicable: number; completed: number; attention: number; pending: number; notApplicable: number; notPresent: number; percentage: number };
 }
 

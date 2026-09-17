@@ -16,7 +16,10 @@ import {
   triageMonthlyRequestSchema,
   triageStatementBodySchema,
 } from "../schemas/triageDocuments.schemas.js";
-import type { TriageDocumentsService } from "../services/triageDocumentsService.js";
+import type {
+  TriageDocumentItemUpdate,
+  TriageDocumentsService,
+} from "../services/triageDocumentsService.js";
 
 export type TriageDocumentsRouteDeps = Pick<
   TriageDocumentsService,
@@ -52,7 +55,7 @@ export function createTriageDocumentsRoutes(
         const query = parseWithZod(triageEditabilityRequestSchema, req.query);
         res.json(
           createSuccessResponse(
-            await service.getEditability(query.client_id, authenticatedContext(req)),
+            await service.getEditability(query.client_id, authenticatedContext(req), query.type),
           ),
         );
       } catch (err) {
@@ -101,7 +104,11 @@ export function createTriageDocumentsRoutes(
         const body = parseWithZod(triageDocumentItemBodySchema, req.body);
         res.json(
           createSuccessResponse(
-            await service.updateItem(params.id, body, authenticatedContext(req)),
+            await service.updateItem(
+              params.id,
+              body as TriageDocumentItemUpdate,
+              authenticatedContext(req),
+            ),
           ),
         );
       } catch (err) {

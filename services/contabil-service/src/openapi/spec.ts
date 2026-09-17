@@ -806,6 +806,12 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               required: true,
               schema: { type: "string", format: "uuid" },
             },
+            {
+              name: "type",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["CONTABIL", "FISCAL"], default: "CONTABIL" },
+            },
           ],
           responses: {
             "200": {
@@ -837,6 +843,12 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               required: true,
               schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
             },
+            {
+              name: "type",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["CONTABIL", "FISCAL"], default: "CONTABIL" },
+            },
           ],
           responses: {
             "200": {
@@ -867,6 +879,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                       type: "string",
                       pattern: "^\\d{4}-(0[1-9]|1[0-2])$",
                     },
+                    type: { type: "string", enum: ["CONTABIL", "FISCAL"] },
                   },
                 },
               },
@@ -904,7 +917,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               "application/json": {
                 schema: {
                   type: "object",
-                  required: ["field", "status"],
+                  required: ["field"],
                   additionalProperties: false,
                   properties: {
                     field: {
@@ -920,11 +933,32 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                         "bank_reconciliation",
                         "bank_investments",
                         "card_sales_report",
+                        "inbound_report",
+                        "outbound_report",
+                        "nfse_provided",
+                        "nfse_received",
+                        "cte_documents",
+                        "mei_documents",
+                        "nfce_documents",
+                        "sped_fiscal",
+                        "sped_contributions",
+                        "model_21_invoice",
+                        "cte_as_issuer",
+                        "services_provided_as_mei",
+                        "billing_amount",
                       ],
                     },
+                    type: { type: "string", enum: ["CONTABIL", "FISCAL"] },
                     status: {
                       type: "string",
-                      enum: ["PENDING", "COMPLETED", "ATTENTION", "NOT_PRESENT", "NOT_APPLICABLE"],
+                      enum: [
+                        "PENDING",
+                        "COMPLETED",
+                        "ATTENTION",
+                        "UNDER_REVIEW",
+                        "NOT_PRESENT",
+                        "NOT_APPLICABLE",
+                      ],
                     },
                     note: {
                       type: "string",
@@ -935,6 +969,12 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                       type: "string",
                       nullable: true,
                       maxLength: 2000,
+                    },
+                    value: { type: "string", nullable: true, maxLength: 2000 },
+                    delivery_method: {
+                      type: "string",
+                      enum: ["EMAIL", "PORTAL", "WHATSAPP"],
+                      nullable: true,
                     },
                   },
                 },
@@ -978,8 +1018,16 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   properties: {
                     status: {
                       type: "string",
-                      enum: ["PENDING", "COMPLETED", "ATTENTION", "NOT_PRESENT", "NOT_APPLICABLE"],
+                      enum: [
+                        "PENDING",
+                        "COMPLETED",
+                        "ATTENTION",
+                        "UNDER_REVIEW",
+                        "NOT_PRESENT",
+                        "NOT_APPLICABLE",
+                      ],
                     },
+                    type: { type: "string", enum: ["CONTABIL", "FISCAL"] },
                   },
                 },
               },
@@ -1050,7 +1098,14 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                     },
                     status: {
                       type: "string",
-                      enum: ["PENDING", "COMPLETED", "ATTENTION", "NOT_PRESENT", "NOT_APPLICABLE"],
+                      enum: [
+                        "PENDING",
+                        "COMPLETED",
+                        "ATTENTION",
+                        "UNDER_REVIEW",
+                        "NOT_PRESENT",
+                        "NOT_APPLICABLE",
+                      ],
                     },
                   },
                 },

@@ -9,8 +9,13 @@ import { TriageCompetenceSection } from "@modules/triagem";
 export default function TriagemPage() {
   const { access, isLoading } = useModuleAccess("triagem");
   const { access: contabilAccess } = useModuleAccess("contabil");
+  const { access: fiscalAccess } = useModuleAccess("fiscal");
   const [client, setClient] = useState<ClientPickerOption | null>(null);
   const editability = useTriageEditability(client?.id ?? "");
+  const fiscalEditability = useTriageEditability(
+    fiscalAccess.canView ? client?.id ?? "" : "",
+    "FISCAL",
+  );
 
   return (
     <>
@@ -53,6 +58,18 @@ export default function TriagemPage() {
                   canEditClosing={contabilAccess.canEdit}
                 />
               </div>
+              {fiscalAccess.canView ? (
+                <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                  <TriageDocumentsSection
+                    clientId={client.id}
+                    canEdit={
+                      fiscalAccess.canEdit && fiscalEditability.data?.can_edit === true
+                    }
+                    canEditClosing={false}
+                    documentType="FISCAL"
+                  />
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
