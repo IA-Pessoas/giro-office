@@ -7,6 +7,7 @@ import {
   useRhTimeSheetDetail,
 } from "../hooks/useRhCalendar";
 import { formatRhDate, formatRhDateTime, formatRhTime } from "../utils/rhDate";
+import { formatRhDuration } from "../utils/rhDuration";
 
 type TimesheetDayFilter = "all" | "records" | "absent" | "incomplete";
 
@@ -15,23 +16,6 @@ interface RhTimesheetDetailViewProps {
   enabled?: boolean;
   initialFilter?: TimesheetDayFilter;
   mode?: "dialog" | "page";
-}
-
-function formatMinutes(value: number, options?: { showPositiveSign?: boolean }) {
-  const sign = value < 0 ? "-" : value > 0 && options?.showPositiveSign ? "+" : "";
-  const absoluteMinutes = Math.abs(value);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const remainingMinutes = absoluteMinutes % 60;
-
-  if (hours === 0) {
-    return `${sign}${remainingMinutes}min`;
-  }
-
-  if (remainingMinutes === 0) {
-    return `${sign}${hours}h`;
-  }
-
-  return `${sign}${hours}h ${remainingMinutes}min`;
 }
 
 function hasRecordedTime(day: {
@@ -208,7 +192,7 @@ export function RhTimesheetDetailView({
             Trabalhado
           </p>
           <p className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-            {totals ? formatMinutes(totals.worked_minutes) : "-"}
+            {totals ? formatRhDuration(totals.worked_minutes) : "-"}
           </p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">
@@ -216,7 +200,7 @@ export function RhTimesheetDetailView({
             Esperado
           </p>
           <p className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-            {totals ? formatMinutes(totals.expected_minutes) : "-"}
+            {totals ? formatRhDuration(totals.expected_minutes) : "-"}
           </p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">
@@ -224,7 +208,9 @@ export function RhTimesheetDetailView({
             Saldo
           </p>
           <p className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-            {totals ? formatMinutes(totals.balance_minutes, { showPositiveSign: true }) : "-"}
+            {totals
+              ? formatRhDuration(totals.balance_minutes, { showPositiveSign: true })
+              : "-"}
           </p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">
@@ -232,7 +218,9 @@ export function RhTimesheetDetailView({
             Banco de horas
           </p>
           <p className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-            {totals ? formatMinutes(totals.bank_balance_minutes, { showPositiveSign: true }) : "-"}
+            {totals
+              ? formatRhDuration(totals.bank_balance_minutes, { showPositiveSign: true })
+              : "-"}
           </p>
         </div>
       </div>
@@ -367,13 +355,13 @@ export function RhTimesheetDetailView({
                       {formatRhTime(day.clock_out)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                      {formatMinutes(day.worked_minutes)}
+                      {formatRhDuration(day.worked_minutes)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                      {formatMinutes(day.expected_minutes)}
+                      {formatRhDuration(day.expected_minutes)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                      {formatMinutes(day.balance_minutes, { showPositiveSign: true })}
+                      {formatRhDuration(day.balance_minutes, { showPositiveSign: true })}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                       <span
