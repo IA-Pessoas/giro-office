@@ -41,11 +41,19 @@ describe("triagem gateway registry", () => {
   it("encaminha triagem ao contabil-service sem reduzir a autorização ao módulo Contábil", () => {
     const env = {
       contabilServiceUrl: "http://contabil-service:3038",
+      triagemServiceUrl: "http://triagem-service:3046",
       auditServiceToken: "gateway-triagem-token",
     } as GatewayEnv;
 
-    expect(resolveGatewayService(env, "/triagem/closing", "PUT")).toMatchObject({
+    expect(resolveGatewayService(env, "/triagem/competencies", "POST")).toMatchObject({
       key: "triagem-service",
+      targetUrl: "http://triagem-service:3046",
+      internalServiceToken: "gateway-triagem-token",
+      permissionModule: "triagem",
+      routePrefixes: ["/triagem/competencies"],
+    });
+    expect(resolveGatewayService(env, "/triagem/closing", "PUT")).toMatchObject({
+      key: "triagem-legacy-service",
       targetUrl: "http://contabil-service:3038",
       internalServiceToken: "gateway-triagem-token",
       routePrefixes: ["/triagem"],

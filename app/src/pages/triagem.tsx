@@ -4,6 +4,7 @@ import Head from "next/head";
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import { AccessDeniedPanel, TriageDocumentsSection, useTriageEditability } from "@modules/contabil";
+import { TriageCompetenceSection } from "@modules/triagem";
 
 export default function TriagemPage() {
   const { access, isLoading } = useModuleAccess("triagem");
@@ -43,13 +44,16 @@ export default function TriagemPage() {
             />
           </header>
           {client ? (
-            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-              <TriageDocumentsSection
-                clientId={client.id}
-                canEdit={editability.data?.can_edit === true}
-                canEditClosing={contabilAccess.canEdit}
-              />
-            </div>
+            <>
+              <TriageCompetenceSection clientId={client.id} canEdit={access.canEdit} />
+              <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                <TriageDocumentsSection
+                  clientId={client.id}
+                  canEdit={editability.data?.can_edit === true}
+                  canEditClosing={contabilAccess.canEdit}
+                />
+              </div>
+            </>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
               Selecione um cliente para consultar as pendências documentais.

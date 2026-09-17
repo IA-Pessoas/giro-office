@@ -4313,6 +4313,41 @@ const handlers = {
     if (id) state.triageMonthlyId = id;
   },
 
+  async triageEditability(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async triagemCompetenceList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async triagemCompetenceCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-09",
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemCompetenceId = id;
+  },
+
+  async triagemCompetenceArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/competencies/${requireState("triagemCompetenceId")}/archive`,
+    });
+  },
+
   async triageMonthlyGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],

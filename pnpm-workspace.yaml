@@ -21,6 +21,7 @@ packages:
   - "services/parcelamento-service"
   - "services/reports-service"
   - "services/commercial-service"
+  - "services/triagem-service"
   - "services/src"
 
 minimumReleaseAge: 1440

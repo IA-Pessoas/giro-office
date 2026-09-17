@@ -1,0 +1,1 @@
+export { TriageCompetenceSection } from "./TriageCompetenceSection";

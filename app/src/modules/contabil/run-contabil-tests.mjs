@@ -155,6 +155,19 @@ await (async () => {
     assert.doesNotMatch(pageSource, /canEdit\s*\/>/);
   });
 
+  await runTest("triagem apresenta competências com criação, listagem e arquivamento", () => {
+    const pageSource = readFileSync(new URL("../../pages/triagem.tsx", import.meta.url), "utf8");
+    const source = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");
+
+    assert.match(pageSource, /TriageCompetenceSection/);
+    assert.match(source, /type="month"/);
+    assert.match(source, /Criar competência/);
+    assert.match(source, /Arquivar/);
+    assert.match(source, /Nenhuma competência ativa/);
+    assert.match(source, /role="alert"/);
+    assert.match(source, /window\.confirm/);
+  });
+
   await runTest("triagem apresenta os nove documentos, indicador e banco sem dados de conta", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
 
