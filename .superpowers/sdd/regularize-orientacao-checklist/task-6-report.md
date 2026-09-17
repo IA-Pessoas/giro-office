@@ -121,3 +121,33 @@ listagem, rota e OpenAPI.
 Os comandos pnpm mantiveram os avisos ambientais já registrados: Node local
 `v24.13.1` enquanto `services/src` pede Node 22, além de avisos de configuração
 do pnpm fora da raiz.
+
+## Fix round 2 — filtros e payload de update
+
+- `useRegularizeGuidance` agora só habilita consulta escopada quando existe
+  `process_id` ou `target_type` não vazio, rejeitando `{}`, `process_id: ""`,
+  `target_type: ""` e combinações com qualquer filtro vazio. Consulta geral
+  permanece exclusiva de `filters === undefined` com `options.enabled === true`.
+- O runner estático ganhou assertions para a função de política, os dois
+  filtros vazios e a consulta geral explicitamente habilitada.
+- `economic_activities` e `partners` foram separados dos campos de update e
+  não fazem parte de `UpdateRegularizeGuidancePayload`. Antes do PUT, o serviço
+  também os remove em runtime para proteger chamadas JavaScript não tipadas;
+  as mutações específicas de atividade/sócio não foram alteradas.
+- O relatório e o commit desta rodada ficam separados do fix round 1.
+
+### Evidências do fix round 2
+
+| Comando | Resultado |
+| --- | --- |
+| Runner estático antes da implementação (RED) | Falhou nas novas assertions de collections e política de filtros. |
+| `corepack pnpm --filter @workspace/app test:regularize` | Passou. |
+| `corepack pnpm --filter @workspace/app typecheck` | Passou. |
+| `corepack pnpm --filter @workspace/regularize-service exec vitest run ...` | Shim falhou: `'vitest' não é reconhecido como um comando interno ou externo`. |
+| `services/regularize-service/node_modules/.bin/vitest.CMD run ...` | Fallback local passou: 4 arquivos, 92 testes. |
+| `corepack pnpm --filter @workspace/regularize-service typecheck` | Passou. |
+| `corepack pnpm --filter @workspace/regularize-service build` | Passou. |
+| Biome local nos 8 arquivos backend | Passou, sem ajustes. |
+| Biome app via shim | Shim falhou; fallback local encontrou os arquivos ignorados pela configuração raiz. |
+| `corepack pnpm --filter @workspace/app lint` | Passou registrando `Skipping app lint (Biome ignored for now)`. |
+| `git diff --check` | Passou. |

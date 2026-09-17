@@ -82,7 +82,9 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   }
 });
 
-await runTest("regularize guidance supports independent filters and complete payloads", async () => {
+await runTest(
+  "regularize guidance supports independent filters and guards empty scopes",
+  async () => {
   const [typesSource, contractSource, serviceSource, queryKeysSource, operationsSource] =
     await Promise.all([
       readModuleSource("types.ts"),
@@ -113,7 +115,12 @@ await runTest("regularize guidance supports independent filters and complete pay
   assert.match(updateTypeSource, /id: RegularizeId;/);
   assert.match(updateTypeSource, /checklist\?: RegularizeGuidanceChecklistInput\[\]/);
   assert.doesNotMatch(updateTypeSource, /checklist_items/);
+  assert.doesNotMatch(updateTypeSource, /economic_activities|partners/);
   assert.doesNotMatch(updateTypeSource, /status: string/);
+  assert.match(
+    typesSource,
+    /type RegularizeGuidanceCreatePayloadFields[\s\S]*economic_activities[\s\S]*partners/,
+  );
   assert.match(typesSource, /export type LegacyGuidanceDraft/);
   assert.match(typesSource, /process_id: RegularizeId \| null/);
   assert.match(contractSource, /target_type/);
@@ -123,14 +130,17 @@ await runTest("regularize guidance supports independent filters and complete pay
   );
   assert.match(
     serviceSource,
-    /updateGuidance[\s\S]{0,300}api\.put\(REGULARIZE_ENDPOINTS\.guidance, payload\)/,
+    /updateGuidance[\s\S]{0,500}economic_activities[\s\S]{0,200}partners[\s\S]{0,300}api\.put\(REGULARIZE_ENDPOINTS\.guidance, body\)/,
   );
   assert.match(queryKeysSource, /filters\.process_id \?\? ""/);
   assert.match(queryKeysSource, /filters\.target_type \?\? ""/);
-  assert.match(
-    operationsSource,
-    /enabled:\s*filters === undefined \? options\?\.enabled === true : \(options\?\.enabled \?\? true\)/,
-  );
+  assert.match(operationsSource, /function shouldEnableRegularizeGuidanceQuery/);
+  assert.match(operationsSource, /"process_id" in filters/);
+  assert.match(operationsSource, /"target_type" in filters/);
+  assert.match(operationsSource, /!hasEmptyProcessFilter/);
+  assert.match(operationsSource, /!hasEmptyTargetFilter/);
+  assert.match(operationsSource, /Boolean\(filters\.process_id \|\| filters\.target_type\)/);
+  assert.match(operationsSource, /filters === undefined.*options\?\.enabled === true/);
   assert.match(
     serviceSource,
     /api\.post\(REGULARIZE_ENDPOINTS\.guidance, payload\)/,
@@ -146,7 +156,8 @@ await runTest("regularize guidance supports independent filters and complete pay
     buildRegularizeGuidanceListParams({ process_id: "", target_type: "PF" }),
     { target_type: "PF" },
   );
-});
+  },
+);
 
 await runTest("regularize licenses list uses paginated hook and keeps mutation invalidation", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");

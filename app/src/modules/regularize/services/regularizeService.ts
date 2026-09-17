@@ -85,6 +85,11 @@ function isLegacyGuidanceDraft(
   return !("checklist" in payload);
 }
 
+type RegularizeGuidanceUpdateRequest = UpdateRegularizeGuidancePayload & {
+  economic_activities?: never;
+  partners?: never;
+};
+
 export const regularizeService = {
   async getDashboard(year: number): Promise<RegularizeDashboard> {
     const api = setupAPIClient();
@@ -403,7 +408,13 @@ export const regularizeService = {
 
   async updateGuidance(payload: UpdateRegularizeGuidancePayload): Promise<RegularizeGuidance> {
     const api = setupAPIClient();
-    const response = await api.put(REGULARIZE_ENDPOINTS.guidance, payload);
+    const requestPayload: RegularizeGuidanceUpdateRequest = payload;
+    const {
+      economic_activities: _economicActivities,
+      partners: _partners,
+      ...body
+    } = requestPayload;
+    const response = await api.put(REGULARIZE_ENDPOINTS.guidance, body);
 
     return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
   },

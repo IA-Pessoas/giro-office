@@ -495,11 +495,14 @@ type RegularizeGuidancePayloadFields = {
   regime?: string;
   legal_representative?: string;
   status?: string;
+};
+
+type RegularizeGuidanceCreatePayloadFields = RegularizeGuidancePayloadFields & {
   economic_activities?: RegularizeGuidanceEconomicActivityPayload[];
   partners?: RegularizeGuidancePartnerPayload[];
 };
 
-type RegularizeGuidanceCompletePayload = RegularizeGuidancePayloadFields & {
+type RegularizeGuidanceCompletePayload = RegularizeGuidanceCreatePayloadFields & {
   process_id?: RegularizeId | null;
   target_type: RegularizeGuidanceTargetType;
   client_pj_id?: RegularizeId | null;
@@ -510,7 +513,7 @@ type RegularizeGuidanceCompletePayload = RegularizeGuidancePayloadFields & {
   status: string;
 };
 
-export type LegacyGuidanceDraft = RegularizeGuidancePayloadFields & {
+export type LegacyGuidanceDraft = RegularizeGuidanceCreatePayloadFields & {
   process_id: RegularizeId;
   status: string;
 };
