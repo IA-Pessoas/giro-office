@@ -132,6 +132,7 @@ import {
 import {
   buildCreateTaskModelPayload,
   buildDeleteTaskModelPayload,
+  buildTaskIntegrationPayload,
   buildTaskModelOptionsParams,
   buildTaskModelListParams,
   buildUpdateTaskModelPayload,
@@ -142,6 +143,7 @@ import {
   unwrapTaskModelList,
   unwrapTaskModelOptions,
   unwrapTaskModelPage,
+  unwrapTaskIntegrationList,
 } from "./services/taskModelService.contract.ts";
 import {
   buildCreateProjectPayload,
@@ -733,6 +735,28 @@ runTest("task model endpoints match task-service contract", () => {
   assert.equal(TASK_MODEL_ENDPOINTS.list, "/task/model/list");
   assert.equal(TASK_MODEL_ENDPOINTS.dependent, "/task/model/dependent");
   assert.equal(TASK_MODEL_ENDPOINTS.options, "/task/deps/options");
+  assert.equal(TASK_MODEL_ENDPOINTS.integration, "/task/integration");
+  assert.deepEqual(buildTaskIntegrationPayload("model-1", "process-1", "process"), {
+    task_model_id: "model-1",
+    referring: "process-1",
+    referring_type: "process",
+  });
+  assert.deepEqual(
+    unwrapTaskIntegrationList({
+      success: true,
+      data: [{ id: "link-1", referring_type: "process", available: false }],
+    }),
+    [{ id: "link-1", referring_type: "process", available: false }],
+  );
+});
+
+runTest("task model modal loads Regularize destinations from their own contracts", () => {
+  const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /regularizeService\.listProcesses\(\{ status: "Todos" \}\)/);
+  assert.match(source, /regularizeService\.listLicenses\(\{ status: "Todos" \}\)/);
+  assert.match(source, /taskModelService\.listRegularizeLinks/);
+  assert.match(source, /\(indisponível\)/);
 });
 
 runTest("task model options scope eligible responsibles by department", () => {

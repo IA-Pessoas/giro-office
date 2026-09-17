@@ -178,14 +178,14 @@ const createTaskDependentRequestBody = createObjectRequestBody({
 const createTaskIntegrationRequestBody = createObjectRequestBody({
   example: {
     task_model_id: "task-model-uuid",
-    referring: "regularize-step-uuid",
+    referring: "regularize-process-uuid",
     referring_type: "process",
   },
   required: ["task_model_id", "referring", "referring_type"],
   properties: {
     task_model_id: { type: "string" },
     referring: { type: "string" },
-    referring_type: { type: "string" },
+    referring_type: { type: "string", enum: ["process", "license"] },
   },
 });
 
@@ -852,21 +852,37 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           summary: "Criar vinculo Regularize",
           security: bearer,
           ...createTaskIntegrationRequestBody,
-          responses: { "201": { description: "Criado", ...successJson } },
+          responses: {
+            "201": { description: "Criado", ...successJson },
+            "400": { description: "Tipo de destino inválido." },
+            "403": { description: "Acesso negado." },
+            "404": { description: "Modelo ou destino não encontrado." },
+            "409": { description: "Vínculo já existe." },
+          },
         },
         delete: {
           tags: ["TaskIntegration"],
           summary: "Remover vinculo",
           security: bearer,
           ...deleteTaskIntegrationRequestBody,
-          responses: { "200": { description: "Removido", ...successJson } },
+          responses: {
+            "200": { description: "Removido", ...successJson },
+            "403": { description: "Acesso negado." },
+            "404": { description: "Vínculo não encontrado." },
+          },
         },
         get: {
           tags: ["TaskIntegration"],
-          summary: "Listar vinculos",
+          summary: "Listar vínculos e disponibilidade dos destinos",
           security: bearer,
           parameters: [{ name: "task_model_id", in: "query", schema: { type: "string" } }],
-          responses: { "200": { description: "Lista", ...successJson } },
+          responses: {
+            "200": {
+              description: "Lista; vínculos de destinos removidos têm available=false.",
+              ...successJson,
+            },
+            "403": { description: "Acesso negado." },
+          },
         },
       },
       "/task/financeiro": {

@@ -81,6 +81,7 @@ async function installApiMocks(
   createTaskRequests,
   updateTaskRequests,
   responsibleOptionsRequests,
+  regularizeLinkRequests,
 ) {
   let currentLegacyTaskDetail = { ...legacyTaskDetail };
   await page.route("**/user/me", (route) =>
@@ -260,6 +261,84 @@ async function installApiMocks(
       },
     }),
   );
+  await page.route(/\/task\/model(?:\?.*)?$/, (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: {
+        success: true,
+        data: {
+          detail: {
+            id: "model-default",
+            name: "Modelo com padrão",
+            department_id: "department-one",
+            responsible_id: "responsible-default",
+            responsible2_id: null,
+            responsible3_id: null,
+            observations: "Modelo para smoke",
+            billing: "Não Realizar",
+            prevision: 1,
+          },
+        },
+      },
+    });
+  });
+  await page.route(/\/task\/model\/dependent(?:\?.*)?$/, (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: { success: true, data: [] },
+    });
+  });
+  await page.route(/\/task\/integration(?:\?.*)?$/, (route) => {
+    const request = route.request();
+    if (request.method() === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        json: {
+          success: true,
+          data: [
+            {
+              id: "link-missing",
+              task_model_id: "model-default",
+              referring: "process-missing",
+              referring_type: "process",
+              available: false,
+            },
+          ],
+        },
+      });
+    }
+    regularizeLinkRequests.push({ method: request.method(), body: request.postDataJSON() });
+    return route.fulfill({
+      status: request.method() === "POST" ? 201 : 200,
+      contentType: "application/json",
+      json: { success: true, data: {} },
+    });
+  });
+  await page.route("**/regularize/processes*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: {
+        success: true,
+        data: [{ id: "process-1", process_type: "Abertura" }],
+      },
+    }),
+  );
+  await page.route("**/regularize/licenses*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: {
+        success: true,
+        data: [{ id: "license-1", type_license: "Alvará" }],
+      },
+    }),
+  );
   await page.route("**/project/list*", (route) =>
     route.fulfill({
       status: 200,
@@ -362,6 +441,7 @@ async function runBrowserProof() {
   const createTaskRequests = [];
   const updateTaskRequests = [];
   const responsibleOptionsRequests = [];
+  const regularizeLinkRequests = [];
   await installApiMocks(
     page,
     taskListRequests,
@@ -369,6 +449,7 @@ async function runBrowserProof() {
     createTaskRequests,
     updateTaskRequests,
     responsibleOptionsRequests,
+    regularizeLinkRequests,
   );
 
   try {
@@ -635,6 +716,28 @@ async function runBrowserProof() {
       "clientId vazio deve chegar inválido ao backend, nunca virar uma listagem sem cliente.",
     );
     await expect(page.getByText("Tarefa sem responsável", { exact: true })).toHaveCount(0);
+
+    await page.goto("/configs/integracao/tasks", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Modelos de tarefas", level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "Editar modelo Modelo com padrão" }).click();
+    const modelDialog = page.getByRole("dialog", { name: "Editar modelo" });
+    await expect(modelDialog).toBeVisible();
+    await expect(modelDialog.getByText("Processo: process-missing (indisponível)")).toBeVisible();
+    await modelDialog.getByLabel("Tipo de destino Regularize").selectOption("process");
+    await modelDialog.getByLabel("Destino Regularize", { exact: true }).selectOption("process-1");
+    await modelDialog.getByRole("button", { name: "Adicionar vínculo Regularize" }).click();
+    await expect.poll(() => regularizeLinkRequests.length).toBe(1);
+    assert.deepEqual(regularizeLinkRequests[0], {
+      method: "POST",
+      body: {
+        task_model_id: "model-default",
+        referring: "process-1",
+        referring_type: "process",
+      },
+    });
+    await modelDialog.getByRole("button", { name: "Remover vínculo Regularize" }).first().click();
+    await expect.poll(() => regularizeLinkRequests.length).toBe(2);
+    assert.equal(regularizeLinkRequests[1].method, "DELETE");
   } finally {
     await context.close();
     await browser.close();

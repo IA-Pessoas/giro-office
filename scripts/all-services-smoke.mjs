@@ -214,6 +214,7 @@ const state = {
   taskModelPrimaryId: "",
   taskModelSecondaryId: "",
   taskDependentId: "",
+  taskIntegrationProcessId: "",
   taskIntegrationId: "",
   taskId: "",
   taskAttachmentId: "",
@@ -4887,12 +4888,26 @@ const handlers = {
     });
   },
 
+  async taskIntegrationProcessList(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      query: { status: "Todos" },
+    });
+    if (isBadExpectation(op)) {
+      return;
+    }
+    state.taskIntegrationProcessId =
+      pickFirst(response.body, "data.id") ??
+      pickFirst(response.body, "data.create.id") ??
+      findFirstId(response.body?.data);
+  },
+
   async taskIntegrationCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],
       json: {
         task_model_id: requireState("taskModelPrimaryId"),
-        referring: env.namespace,
+        referring: requireState("taskIntegrationProcessId"),
         referring_type: "process",
       },
     });

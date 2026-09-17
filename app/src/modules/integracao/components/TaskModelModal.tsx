@@ -3,6 +3,7 @@ import { FileText, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
+import { regularizeService } from "@modules/regularize";
 import { useAssignableUsers } from "@modules/rh";
 import { ConfirmationDialog } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
@@ -15,6 +16,7 @@ import type {
   TaskDependent,
   TaskModel,
   TaskModelListItem,
+  TaskIntegrationRegularize,
 } from "../types";
 import {
   PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME,
@@ -92,6 +94,12 @@ export function TaskModelModal({
   const [departments, setDepartments] = useState<DepItem[]>([]);
   const [allTasks, setAllTasks] = useState<TaskModelListItem[]>([]);
   const [dependents, setDependents] = useState<TaskDependent[]>([]);
+  const [regularizeLinks, setRegularizeLinks] = useState<TaskIntegrationRegularize[]>([]);
+  const [regularizeDestination, setRegularizeDestination] = useState("");
+  const [regularizeType, setRegularizeType] = useState<"process" | "license">("process");
+  const [regularizeOptions, setRegularizeOptions] = useState<
+    Array<{ id: string; label: string; type: "process" | "license" }>
+  >([]);
   const [newDependent, setNewDependent] = useState({
     dependent_id: "",
     wait: false,
@@ -124,6 +132,8 @@ export function TaskModelModal({
     if (!isOpen) {
       setFormData(EMPTY_FORM_DATA);
       setDependents([]);
+      setRegularizeLinks([]);
+      setRegularizeDestination("");
       setNewDependent({ dependent_id: "", wait: false, observation: "" });
       setPendingDependentDeletion(null);
       setDependentDeletionError(null);
@@ -239,6 +249,37 @@ export function TaskModelModal({
             setDependents([]);
             toast.warning("Não foi possível carregar dependências do modelo.");
           }
+        }
+        try {
+          const links = await taskModelService.listRegularizeLinks(initialData.id);
+          if (!cancelled) {
+            setRegularizeLinks(links);
+          }
+        } catch {
+          if (!cancelled) toast.warning("Não foi possível carregar vínculos do Regularize.");
+        }
+
+        try {
+          const [processes, licenses] = await Promise.all([
+            regularizeService.listProcesses({ status: "Todos" }),
+            regularizeService.listLicenses({ status: "Todos" }),
+          ]);
+          if (!cancelled) {
+            setRegularizeOptions([
+              ...processes.map((item) => ({
+                id: item.id,
+                label: `Processo: ${item.process_type}`,
+                type: "process" as const,
+              })),
+              ...licenses.map((item) => ({
+                id: item.id,
+                label: `Licença: ${item.type_license}`,
+                type: "license" as const,
+              })),
+            ]);
+          }
+        } catch {
+          if (!cancelled) toast.warning("Não foi possível carregar destinos do Regularize.");
         }
       } catch (error) {
         if (!cancelled) {
@@ -429,6 +470,26 @@ export function TaskModelModal({
       throw error;
     } finally {
       setLoadingDependents(false);
+    }
+  }
+
+  async function handleAddRegularizeLink() {
+    if (!initialData?.id || !regularizeDestination) return;
+    try {
+      await taskModelService.addRegularizeLink(initialData.id, regularizeDestination, regularizeType);
+      setRegularizeLinks(await taskModelService.listRegularizeLinks(initialData.id));
+      setRegularizeDestination("");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Não foi possível adicionar vínculo do Regularize."));
+    }
+  }
+
+  async function handleDeleteRegularizeLink(id: string) {
+    try {
+      await taskModelService.deleteRegularizeLink(id);
+      setRegularizeLinks((current) => current.filter((link) => link.id !== id));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Não foi possível remover vínculo do Regularize."));
     }
   }
 
@@ -675,6 +736,71 @@ export function TaskModelModal({
             </div>
           </label>
 
+          {isEditing ? (
+            <section className={`${PROJECT_SUBPANEL_CLASSNAME} p-3`}>
+              <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">
+                Regularize
+              </h3>
+              <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-end">
+                <ProjectSelect
+                  aria-label="Tipo de destino Regularize"
+                  value={regularizeType}
+                  onChange={(event) =>
+                    setRegularizeType(event.target.value as "process" | "license")
+                  }
+                >
+                  <option value="process">Processo</option>
+                  <option value="license">Licença</option>
+                </ProjectSelect>
+                <ProjectSelect
+                  aria-label="Destino Regularize"
+                  value={regularizeDestination}
+                  onChange={(event) => setRegularizeDestination(event.target.value)}
+                >
+                  <option value="">Selecione o destino</option>
+                  {regularizeOptions
+                    .filter((option) => option.type === regularizeType)
+                    .map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                </ProjectSelect>
+                <button
+                  type="button"
+                  onClick={() => void handleAddRegularizeLink()}
+                  className={PROJECT_COMPACT_PRIMARY_BUTTON_CLASSNAME}
+                  disabled={!regularizeDestination}
+                  aria-label="Adicionar vínculo Regularize"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Adicionar
+                </button>
+              </div>
+              <ul className="mt-3 space-y-2 text-sm">
+                {regularizeLinks.length === 0 ? (
+                  <li className="text-slate-500">Nenhum vínculo cadastrado.</li>
+                ) : (
+                  regularizeLinks.map((link) => (
+                    <li key={link.id} className="flex items-center justify-between gap-3">
+                      <span>
+                        {link.referring_type === "process" ? "Processo" : "Licença"}: {link.referring}
+                        {link.available ? "" : " (indisponível)"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteRegularizeLink(link.id)}
+                        className={PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME}
+                        aria-label="Remover vínculo Regularize"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </section>
+          ) : null}
           {isEditing ? (
             <section className={`${PROJECT_SUBPANEL_CLASSNAME} p-3`}>
               <div className="mb-3 flex items-center justify-between gap-3">
