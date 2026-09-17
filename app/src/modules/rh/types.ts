@@ -40,6 +40,12 @@ export interface RhRequestRequester {
   status: string | null;
 }
 
+export interface RhRequestAssignee {
+  id: string;
+  name: string;
+  status: string | null;
+}
+
 export interface RhRequest {
   id: string;
   title: string;
@@ -48,6 +54,7 @@ export interface RhRequest {
   requester?: RhRequestRequester | null;
   category_id: string;
   assigned_to_user_id: string;
+  assigned_to?: RhRequestAssignee | null;
   urgency: RhRequestUrgency;
   status: RhRequestStatus;
   created_at: string;
@@ -134,6 +141,7 @@ export interface RhMessage {
   is_read: boolean;
   created_at: string;
   organization_id: string;
+  sender?: RhRequestRequester | null;
 }
 
 export interface RhMessageListFilters {
@@ -145,6 +153,23 @@ export interface CreateRhMessagePayload {
   message: string;
   type: RhMessageType;
   attachment?: string;
+}
+
+export interface RhNotification {
+  id: string;
+  user_id: string;
+  request_id: string;
+  event_key: string;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+  organization_id: string;
+}
+
+export interface CreateRhMessageInput {
+  payload: CreateRhMessagePayload;
+  file?: File;
 }
 
 export interface RhPointConfig {

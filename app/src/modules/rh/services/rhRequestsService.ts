@@ -4,6 +4,7 @@ import type {
   CreateRhCategoryPayload,
   CreateRhMessagePayload,
   CreateRhRequestPayload,
+  CreateRhMessageInput,
   DeleteRhCategoryPayload,
   DeleteRhRequestPayload,
   RhCategory,
@@ -14,6 +15,7 @@ import type {
   RhRequest,
   RhRequestListFilters,
   RhRequestListPage,
+  RhNotification,
   UpdateRhCategoryPayload,
   UpdateRhRequestPayload,
 } from "../types";
@@ -106,5 +108,30 @@ export const rhRequestsService = {
     const response = await api.post(RH_ENDPOINTS.messages, payload);
 
     return unwrapRhEnvelope<RhMessage>(response.data);
+  },
+
+  async createMessageWithAttachment(input: CreateRhMessageInput): Promise<RhMessage> {
+    const api = setupAPIClient();
+    if (!input.file) return this.createMessage(input.payload);
+
+    const formData = new FormData();
+    formData.append("request_id", input.payload.request_id);
+    formData.append("message", input.payload.message);
+    formData.append("type", input.payload.type);
+    formData.append("file", input.file);
+    const response = await api.post(RH_ENDPOINTS.messages, formData);
+    return unwrapRhEnvelope<RhMessage>(response.data);
+  },
+
+  async listNotifications(): Promise<RhNotification[]> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.notifications);
+    return unwrapRhEnvelope<RhNotification[]>(response.data);
+  },
+
+  async markNotificationRead(payload: { id?: string; request_id?: string; all?: boolean }) {
+    const api = setupAPIClient();
+    const response = await api.put(RH_ENDPOINTS.markNotificationsRead, payload);
+    return unwrapRhEnvelope<{ count: number }>(response.data);
   },
 };

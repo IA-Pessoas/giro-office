@@ -166,7 +166,7 @@ export function RhRequestDetailModal({
                   Responsável
                 </p>
                 <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                  {getAssignedUserLabel(request.assigned_to_user_id)}
+                  {request.assigned_to?.name ?? getAssignedUserLabel(request.assigned_to_user_id)}
                 </p>
               </div>
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Paperclip } from "lucide-react";
 import { toast } from "react-toastify";
 
 import {
@@ -26,6 +26,7 @@ export function RhRequestMessagesTimeline({
   const createMessageMutation = useCreateRhMessageMutation();
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<RhMessageType>("Message");
+  const [attachment, setAttachment] = useState<File | null>(null);
 
   async function handleSubmit() {
     if (!message.trim()) {
@@ -35,12 +36,16 @@ export function RhRequestMessagesTimeline({
 
     try {
       await createMessageMutation.mutateAsync({
-        request_id: requestId,
-        message: message.trim(),
-        type: messageType,
+        payload: {
+          request_id: requestId,
+          message: message.trim(),
+          type: messageType,
+        },
+        file: attachment ?? undefined,
       });
       setMessage("");
       setMessageType("Message");
+      setAttachment(null);
       toast.success("Mensagem enviada com sucesso.");
     } catch (error) {
       const errorMessage =
@@ -100,6 +105,20 @@ export function RhRequestMessagesTimeline({
                 <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-200">
                   {item.message}
                 </p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <span>{item.sender?.name ?? "Usuário RH"}</span>
+                  {item.attachment ? (
+                    <a
+                      href={item.attachment}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-300"
+                    >
+                      <Paperclip className="h-3.5 w-3.5" />
+                      Abrir anexo
+                    </a>
+                  ) : null}
+                </div>
               </article>
             ))}
           </div>
@@ -148,6 +167,38 @@ export function RhRequestMessagesTimeline({
             />
           </label>
         </div>
+
+        <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <span>Anexo opcional (PDF, PNG ou JPEG até 10 MB)</span>
+          <input
+            type="file"
+            accept="application/pdf,image/png,image/jpeg"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              if (!file) {
+                setAttachment(null);
+                return;
+              }
+              if (file.size > 10 * 1024 * 1024) {
+                toast.error("O anexo deve ter no máximo 10 MB.");
+                event.target.value = "";
+                setAttachment(null);
+                return;
+              }
+              if (!["application/pdf", "image/png", "image/jpeg"].includes(file.type)) {
+                toast.error("Use um anexo PDF, PNG ou JPEG.");
+                event.target.value = "";
+                setAttachment(null);
+                return;
+              }
+              setAttachment(file);
+            }}
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+          />
+          {attachment ? (
+            <span className="text-xs text-gray-500 dark:text-gray-400">{attachment.name}</span>
+          ) : null}
+        </label>
 
         <div className="flex justify-end">
           <button
