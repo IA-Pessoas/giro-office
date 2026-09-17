@@ -1329,7 +1329,8 @@ export function RegularizePage() {
     if (activeTab === "licenses") refreshes.push(licensePageQuery.refetch());
     if (queryPolicy.partners) refreshes.push(partnerQuery.refetch());
     if (queryPolicy.passwords) refreshes.push(credentialQuery.refetch());
-    if (queryPolicy.guidance) refreshes.push(guidanceQuery.refetch());
+    if (queryPolicy.guidance && Boolean(currentProcessId))
+      refreshes.push(guidanceQuery.refetch());
 
     void Promise.all(refreshes);
   }

@@ -159,6 +159,10 @@ await runTest(
     /const guidanceQuery = useRegularizeGuidance\(\s*currentProcessId \? \{ process_id: currentProcessId \} : undefined,\s*\{ enabled: queryPolicy\.guidance && Boolean\(currentProcessId\) \},\s*\);/,
   );
   assert.match(
+    pageSource,
+    /function handleRefreshRegularize\(\) \{[\s\S]*?if \(queryPolicy\.guidance && Boolean\(currentProcessId\)\)\s*refreshes\.push\(guidanceQuery\.refetch\(\)\);/,
+  );
+  assert.match(
     serviceSource,
     /api\.post\(REGULARIZE_ENDPOINTS\.guidance, payload\)/,
   );

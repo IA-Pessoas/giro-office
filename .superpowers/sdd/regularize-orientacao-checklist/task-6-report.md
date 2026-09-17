@@ -171,6 +171,24 @@ do pnpm fora da raiz.
 | `corepack pnpm --filter @workspace/app typecheck` | Passou. |
 | `git diff --check` | Passou. |
 
+## Fix round 5 — refresh processual sem listagem implícita
+
+- O refresh manual de `RegularizePage.tsx` agora chama `guidanceQuery.refetch()`
+  somente quando `queryPolicy.guidance && Boolean(currentProcessId)`. Sem
+  processo selecionado, o refresh não dispara a consulta geral de guidance.
+- O runner estático protege o call site do refresh e mantém a mesma regra de
+  habilitação da consulta processual. A listagem independente explícita segue
+  reservada à Task 7.
+
+### Evidências do fix round 5
+
+| Comando | Resultado |
+| --- | --- |
+| Runner estático antes da implementação (RED) | Falhou na assertion do refresh sem a guarda de `currentProcessId`. |
+| `corepack pnpm --filter @workspace/app test:regularize` | Passou. |
+| `corepack pnpm --filter @workspace/app typecheck` | Passou. |
+| `git diff --check` | Passou. |
+
 ## Fix round 4 — caller processual sem listagem implícita
 
 - `RegularizePage.tsx` agora habilita a consulta processual somente com
