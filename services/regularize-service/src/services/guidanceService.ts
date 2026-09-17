@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import {
   error as logError,
   REGULARIZE_GUIDANCE_CHECKLIST_ITEMS,
@@ -58,6 +59,23 @@ function checklistUpdates(id: string, rows: ReturnType<typeof checklistRows>) {
       update: row,
     })),
   };
+}
+
+function sameChecklist(
+  existingItems: ExpandedGuidance["checklist_items"],
+  rows: ReturnType<typeof checklistRows>,
+): boolean {
+  if (existingItems.length !== rows.length) return false;
+
+  const existingByCode = new Map(existingItems.map((item) => [item.code, item]));
+  return rows.every((row) => {
+    const existing = existingByCode.get(row.code);
+    return (
+      existing !== undefined &&
+      existing.status === row.status &&
+      (existing.observation ?? null) === row.observation
+    );
+  });
 }
 
 export class GuidanceService {
@@ -148,12 +166,22 @@ export class GuidanceService {
       if (checklist !== undefined) {
         const rows = checklistRows(checklist);
         const branch = resolveBranchData(checklist, branch_data);
-        data.checklist_items = checklistUpdates(id, rows);
-        data.branch_data = branch === null ? Prisma.DbNull : (branch as Prisma.InputJsonObject);
+        if (
+          !sameChecklist(existing.checklist_items, rows) ||
+          !isDeepStrictEqual(existing.branch_data ?? null, branch)
+        ) {
+          data.checklist_items = checklistUpdates(id, rows);
+          data.branch_data = branch === null ? Prisma.DbNull : (branch as Prisma.InputJsonObject);
+        }
       } else if (branch_data !== undefined) {
         throw new ServiceError(422, "Dados da filial exigem checklist.");
       }
-      const updated = await tx.proceduralGuidance.update({ where: { id }, data, include });
+      if (Object.keys(data).length === 0) return expanded(existing);
+      const updated = await tx.proceduralGuidance.update({
+        where: { id, organization_id: input.organizationId },
+        data,
+        include,
+      });
       await new RegularizeLogService(tx).logUpdateIfChanged({
         userId: input.userId,
         organizationId: input.organizationId,
@@ -256,7 +284,7 @@ export class GuidanceService {
         status: items.length ? completed : pending,
       };
       const updated = await tx.proceduralGuidance.update({
-        where: { id: input.guidanceId },
+        where: { id: input.guidanceId, organization_id: input.organizationId },
         data: {
           [field]: items,
           checklist_items: {

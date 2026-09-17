@@ -484,6 +484,23 @@ describe("GuidanceService", () => {
     expect(cleared.checklist_items).toHaveLength(17);
   });
 
+  it("não grava nem audita quando o checklist reenviado é funcionalmente idêntico", async () => {
+    const f = setup();
+    const created = await f.create();
+    const logCount = f.state.logs.length;
+
+    const result = await f.service.update({
+      organizationId,
+      userId,
+      body: { id: created.id as string, checklist: checklist() },
+    });
+
+    expect(result).toEqual(created);
+    expect(f.lastTransactionClient?.proceduralGuidance.update).not.toHaveBeenCalled();
+    expect(f.lastTransactionClient?.logs.create).not.toHaveBeenCalled();
+    expect(f.state.logs).toHaveLength(logCount);
+  });
+
   it("rejeita filial concluída sem dados e checklist incompleto sem persistir", async () => {
     const f = setup();
     await expect(
@@ -566,16 +583,29 @@ describe("GuidanceService", () => {
         : f.service.removePartner({ ...input, itemId });
     const field = kind === "activity" ? "economic_activities" : "partners";
     const first = await add();
+    expect(f.lastTransactionClient?.proceduralGuidance.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id, organization_id: organizationId } }),
+    );
     const firstId = (first[field] as Row[])[0].id;
     expect(firstId).toEqual(expect.any(String));
     expect(first.checklist_items).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: field, status: "Concluído" })]),
     );
     const second = await add();
+    expect(f.lastTransactionClient?.proceduralGuidance.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id, organization_id: organizationId } }),
+    );
     expect((second[field] as Row[])[0].id).toBe(firstId);
     const removed = await remove(firstId);
+    expect(f.lastTransactionClient?.proceduralGuidance.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id, organization_id: organizationId } }),
+    );
     expect(removed[field]).toHaveLength(1);
-    expect((await remove((removed[field] as Row[])[0].id)).checklist_items).toEqual(
+    const emptied = await remove((removed[field] as Row[])[0].id);
+    expect(f.lastTransactionClient?.proceduralGuidance.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id, organization_id: organizationId } }),
+    );
+    expect(emptied.checklist_items).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: field, status: "Pendente" })]),
     );
     expect(f.lastTransactionClient?.logs.create).toHaveBeenCalledTimes(1);
