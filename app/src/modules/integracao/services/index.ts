@@ -11,11 +11,15 @@ export {
   buildCreateIntegracaoTaskPayload,
   buildDeleteIntegracaoTaskPayload,
   buildIntegracaoTaskListParams,
+  buildTaskCompletionDecisionPayload,
+  buildTaskCompletionRequestPayload,
+  buildTaskReopenPayload,
   buildUpdateIntegracaoTaskPayload,
   INTEGRACAO_TASKS_ENDPOINTS,
   unwrapCreatedIntegracaoTask,
   unwrapIntegracaoTaskDetail,
   unwrapIntegracaoTaskList,
+  unwrapTaskCompletionRequestHistory,
   unwrapUpdatedIntegracaoTask,
 } from "./integracaoTasksService.contract";
 export {

@@ -156,6 +156,7 @@ model Organization {
   taskDependents                TaskDependent[]
   tasksIntegrationRegularize    TasksIntegrationRegularize[]
   taskModels                    TaskModel[]
+  completionRequests            TaskCompletionRequest[]
   logs                          Logs[]
   passwordsMkt                  PasswordMkt[]
   notes                         Note[]
@@ -1010,8 +1011,28 @@ model Task {
   license             License[]
   process             Process[]
   commercialTaskBilling CommercialTaskBilling?
+  completionRequests    TaskCompletionRequest[]
 
   @@map("integracao.tasks")
+}
+
+model TaskCompletionRequest {
+  id              String   @id @default(uuid())
+  task_id         String
+  organization_id String
+  requester_id    String
+  status          String   @default("pending")
+  reason          String?
+  decision_reason String?
+  decided_by      String?
+  created_at      DateTime @default(now())
+  resolved_at     DateTime?
+  task            Task     @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, created_at], map: "idx_task_completion_requests_org_task_created")
+  @@index([organization_id, requester_id, created_at], map: "idx_task_completion_requests_org_requester_created")
+  @@map("integracao.task_completion_requests")
 }
 
 model ProposalConfig {

@@ -5,6 +5,7 @@ export {
   TASK_MODELS_QUERY_KEY,
   taskModelsListQueryKey,
   INTEGRACAO_TASKS_QUERY_KEY,
+  integracaoTaskCompletionRequestsQueryKey,
   integracaoTaskDetailQueryKey,
   integracaoTasksListQueryKey,
   PROJECTS_QUERY_KEY,
@@ -22,10 +23,15 @@ export {
 } from "./useProjects";
 export { useHireProjectPlanMutation, useProjectPlans, useProjectPlanTasks } from "./useProjectPlans";
 export {
+  useCancelTaskCompletionMutation,
   useCreateIntegracaoTaskMutation,
+  useDecideTaskCompletionMutation,
   useDeleteIntegracaoTaskMutation,
+  useIntegracaoTaskCompletionRequests,
   useIntegracaoTaskDetail,
   useIntegracaoTasksList,
+  useReopenTaskMutation,
+  useRequestTaskCompletionMutation,
   useUpdateIntegracaoTaskMutation,
 } from "./useIntegracaoTasks";
 export { useTaskModels } from "./useTaskModels";

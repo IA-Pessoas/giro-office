@@ -21,6 +21,8 @@ export type IntegracaoAction =
   | "delete"
   | "requestCompletion"
   | "approveCompletion"
+  | "cancelCompletion"
+  | "reopen"
   | "manage"
   | "manageDependencies";
 export type IntegracaoScope = "organization" | "responsible";
@@ -442,6 +444,25 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     { audit: "required", test: "task.requestCompletion" },
   ),
   routePolicy(
+    "POST",
+    "/task/complete-request",
+    "task",
+    "requestCompletion",
+    [
+      writeRule(
+        [
+          INTEGRACAO_PERMISSION_LEVEL.BASIC,
+          INTEGRACAO_PERMISSION_LEVEL.VIEWER,
+          INTEGRACAO_PERMISSION_LEVEL.USER,
+          INTEGRACAO_PERMISSION_LEVEL.ADMIN,
+        ],
+        [],
+        "responsible",
+      ),
+    ],
+    { audit: "required", test: "task.requestCompletion.create" },
+  ),
+  routePolicy(
     "PUT",
     "/task/complete-request",
     "task",
@@ -452,6 +473,42 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     ],
     { audit: "required", test: "task.approveCompletion" },
   ),
+  routePolicy(
+    "DELETE",
+    "/task/complete-request",
+    "task",
+    "cancelCompletion",
+    [
+      writeRule(
+        [
+          INTEGRACAO_PERMISSION_LEVEL.BASIC,
+          INTEGRACAO_PERMISSION_LEVEL.VIEWER,
+          INTEGRACAO_PERMISSION_LEVEL.USER,
+          INTEGRACAO_PERMISSION_LEVEL.ADMIN,
+        ],
+        [],
+      ),
+    ],
+    { audit: "required", test: "task.requestCompletion.cancel" },
+  ),
+  routePolicy(
+    "GET",
+    "/task/complete-request/list",
+    "task",
+    "read",
+    [
+      readRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        "responsible",
+      ),
+      readRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
+    ],
+    { test: "task.requestCompletion.list" },
+  ),
+  routePolicy("PUT", "/task/reopen", "task", "reopen", [writeRule(admin, [])], {
+    audit: "required",
+    test: "task.reopen",
+  }),
   routePolicy("GET", "/task/model/list", "taskModel", "read", [readRule(taskModelRead)], {
     test: "taskModel.list",
   }),

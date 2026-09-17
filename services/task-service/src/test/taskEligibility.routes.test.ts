@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, authContext, auditMock, workflowMock } = vi.hoisted(() => ({
   prismaMock: {
+    $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(prismaMock)),
     department: { findFirst: vi.fn() },
     project: { findFirst: vi.fn() },
     client: { findFirst: vi.fn() },
@@ -21,6 +22,7 @@ const { prismaMock, authContext, auditMock, workflowMock } = vi.hoisted(() => ({
     },
     taskModel: { findFirst: vi.fn() },
     taskDependent: { findMany: vi.fn() },
+    taskCompletionRequest: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
     user: { findFirst: vi.fn(), findMany: vi.fn() },
     permissionSpecific: { findFirst: vi.fn() },
   },

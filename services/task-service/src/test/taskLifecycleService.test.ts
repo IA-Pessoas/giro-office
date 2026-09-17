@@ -2,9 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
   prismaMock: {
+    $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(prismaMock)),
     task: {
       findFirst: vi.fn(),
       update: vi.fn(),
+    },
+    taskCompletionRequest: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+      findMany: vi.fn(),
     },
     user: {
       findMany: vi.fn(),
@@ -17,6 +24,7 @@ const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
     },
   },
   auditMock: {
+    createLog: vi.fn(),
     logUpdateIfChanged: vi.fn(),
   },
   workflowMock: {
@@ -35,6 +43,66 @@ vi.mock("../services/taskWorkflowService.js", () => ({
 import { TaskLifecycleService } from "../services/taskLifecycleService.js";
 
 describe("TaskLifecycleService", () => {
+  it("cria uma única solicitação pendente e marca a tarefa na mesma transação", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.taskCompletionRequest.findFirst.mockResolvedValue(null);
+    prismaMock.taskCompletionRequest.create.mockResolvedValue({
+      id: "request-1",
+      status: "pending",
+    });
+    prismaMock.task.update.mockResolvedValue({ id: "task-1", pending_approval: true });
+
+    await expect(
+      new TaskLifecycleService().requestTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        reason: "Pronta para validação.",
+        integracaoLevel: 0,
+      }),
+    ).resolves.toMatchObject({ id: "request-1", status: "pending" });
+
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.task.update).toHaveBeenCalledWith({
+      where: { id: "task-1" },
+      data: { pending_approval: true },
+    });
+    expect(auditMock.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "Solicitação de Conclusão", required: true }),
+    );
+  });
+
+  it("converte a colisão da solicitação concorrente em conflito", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      status: "Em Andamento",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.taskCompletionRequest.findFirst.mockResolvedValue(null);
+    prismaMock.taskCompletionRequest.create.mockRejectedValue({ code: "P2002" });
+
+    await expect(
+      new TaskLifecycleService().requestTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        reason: "Pronta.",
+        integracaoLevel: 0,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+  });
+
   it("conclusão preserva responsável nulo e vínculos secundários legados", async () => {
     prismaMock.task.findFirst.mockResolvedValue({
       id: "task-1",
@@ -67,6 +135,9 @@ describe("TaskLifecycleService", () => {
       status: "Concluída",
     });
     expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+    expect(auditMock.logUpdateIfChanged).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "Conclusão", required: true }),
+    );
   });
   beforeEach(() => {
     vi.clearAllMocks();
@@ -112,7 +183,249 @@ describe("TaskLifecycleService", () => {
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
-  it("níveis 0 e 1 apenas solicitam conclusão mesmo com task_completion", async () => {
+  it("aprova uma solicitação pendente sem criar novo histórico", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      project_id: "project-1",
+      status: "Em Andamento",
+      pending_approval: true,
+      billing: "Realizar",
+    });
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
+    prismaMock.taskCompletionRequest.findFirst.mockResolvedValue({
+      id: "request-1",
+      task_id: "task-1",
+      organization_id: "org-1",
+      requester_id: "user-2",
+      status: "pending",
+    });
+    prismaMock.taskCompletionRequest.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.task.update.mockResolvedValue({
+      id: "task-1",
+      status: "Concluída",
+      pending_approval: false,
+    });
+
+    await expect(
+      new TaskLifecycleService().approveTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        request_id: "request-1",
+        integracaoLevel: 2,
+      }),
+    ).resolves.toMatchObject({ status: "Concluída", pending_approval: false });
+
+    expect(prismaMock.taskCompletionRequest.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "request-1", status: "pending" },
+        data: expect.objectContaining({ status: "approved", decided_by: "user-1" }),
+      }),
+    );
+    expect(prismaMock.task.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "Concluída", pending_approval: false },
+      }),
+    );
+    expect(auditMock.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "Aprovação de Conclusão", required: true }),
+    );
+  });
+
+  it("recusa uma solicitação com motivo e mantém a tarefa em andamento", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      project_id: "project-1",
+      status: "Em Andamento",
+      pending_approval: true,
+      billing: "Realizar",
+    });
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
+    prismaMock.taskCompletionRequest.findFirst.mockResolvedValue({
+      id: "request-1",
+      task_id: "task-1",
+      organization_id: "org-1",
+      requester_id: "user-2",
+      status: "pending",
+    });
+    prismaMock.taskCompletionRequest.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.task.update.mockResolvedValue({
+      id: "task-1",
+      status: "Em Andamento",
+      pending_approval: false,
+    });
+
+    await expect(
+      new TaskLifecycleService().approveTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        request_id: "request-1",
+        decision: "refused",
+        reason: "Falta documento obrigatório.",
+        integracaoLevel: 2,
+      }),
+    ).resolves.toMatchObject({ status: "Em Andamento", pending_approval: false });
+
+    expect(prismaMock.taskCompletionRequest.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "refused",
+          decision_reason: "Falta documento obrigatório.",
+        }),
+      }),
+    );
+  });
+
+  it("trata a repetição da mesma decisão como idempotente", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      project_id: "project-1",
+      status: "Concluída",
+      pending_approval: false,
+      billing: "Realizar",
+    });
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
+    prismaMock.taskCompletionRequest.findFirst.mockResolvedValue({
+      id: "request-1",
+      task_id: "task-1",
+      organization_id: "org-1",
+      requester_id: "user-2",
+      status: "approved",
+    });
+
+    await expect(
+      new TaskLifecycleService().approveTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        request_id: "request-1",
+        integracaoLevel: 2,
+      }),
+    ).resolves.toMatchObject({ status: "Concluída", pending_approval: false });
+
+    expect(prismaMock.taskCompletionRequest.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+    expect(auditMock.createLog).not.toHaveBeenCalled();
+  });
+
+  it("não duplica decisão quando outra transação já a confirmou", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      project_id: "project-1",
+      status: "Concluída",
+      pending_approval: false,
+      billing: "Realizar",
+    });
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
+    prismaMock.taskCompletionRequest.findFirst
+      .mockResolvedValueOnce({
+        id: "request-1",
+        task_id: "task-1",
+        organization_id: "org-1",
+        requester_id: "user-2",
+        status: "pending",
+      })
+      .mockResolvedValueOnce({ id: "request-1", organization_id: "org-1", status: "approved" });
+    prismaMock.taskCompletionRequest.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      new TaskLifecycleService().approveTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        request_id: "request-1",
+        integracaoLevel: 2,
+      }),
+    ).resolves.toMatchObject({ status: "Concluída", pending_approval: false });
+
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+    expect(auditMock.createLog).not.toHaveBeenCalled();
+  });
+
+  it("permite ao solicitante cancelar uma pendência e reenviar depois", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.taskCompletionRequest.findFirst.mockResolvedValue({
+      id: "request-1",
+      task_id: "task-1",
+      organization_id: "org-1",
+      requester_id: "user-1",
+      status: "pending",
+    });
+    prismaMock.taskCompletionRequest.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.task.update.mockResolvedValue({ id: "task-1", pending_approval: false });
+
+    await expect(
+      new TaskLifecycleService().cancelTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        request_id: "request-1",
+        integracaoLevel: 0,
+      }),
+    ).resolves.toMatchObject({ id: "request-1", status: "canceled" });
+
+    expect(prismaMock.taskCompletionRequest.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "request-1", status: "pending" },
+        data: expect.objectContaining({ status: "canceled", decided_by: "user-1" }),
+      }),
+    );
+    expect(prismaMock.task.update).toHaveBeenCalledWith({
+      where: { id: "task-1" },
+      data: { pending_approval: false },
+    });
+  });
+
+  it("reabre tarefa concluída somente pelo fluxo administrativo e audita a ação", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      project_id: "project-1",
+      status: "Concluída",
+      pending_approval: false,
+      billing: "Realizar",
+      responsible_id: "user-2",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.task.update.mockResolvedValue({
+      id: "task-1",
+      status: "Em Andamento",
+      pending_approval: false,
+    });
+
+    await expect(
+      new TaskLifecycleService().reopenTask({
+        user_id: "admin-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        reason: "Documentos complementares pendentes.",
+        integracaoLevel: 3,
+      }),
+    ).resolves.toMatchObject({ status: "Em Andamento", pending_approval: false });
+
+    expect(prismaMock.task.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "Em Andamento", pending_approval: false },
+      }),
+    );
+    expect(auditMock.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "Reabertura de Tarefa", required: true }),
+    );
+  });
+
+  it("níveis 0 e 1 registram uma solicitação ao pedir conclusão", async () => {
     prismaMock.task.findFirst.mockResolvedValue({
       id: "task-1",
       organization_id: "org-1",
@@ -139,6 +452,11 @@ describe("TaskLifecycleService", () => {
       observations: "observacao",
       justification: "justificativa",
     });
+    prismaMock.taskCompletionRequest.findFirst.mockResolvedValue(null);
+    prismaMock.taskCompletionRequest.create.mockResolvedValue({
+      id: "request-1",
+      status: "pending",
+    });
     const service = new TaskLifecycleService();
 
     await service.concludeTask({
@@ -157,6 +475,15 @@ describe("TaskLifecycleService", () => {
     expect(prismaMock.task.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "Em Andamento", pending_approval: true }),
+      }),
+    );
+    expect(prismaMock.taskCompletionRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          task_id: "task-1",
+          organization_id: "org-1",
+          requester_id: "user-1",
+        }),
       }),
     );
   });

@@ -747,15 +747,14 @@ export class TaskCrudService {
         ),
       });
 
-      const canSetCompletedStatus =
-        data.isOwner === true ||
-        (data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) >=
-          INTEGRACAO_PERMISSION_LEVEL.ADMIN;
-      if (data.status === "Concluída" && !canSetCompletedStatus) {
+      if (data.status === "Concluída") {
         throw new ServiceError(
           403,
-          "A conclusão deve ser solicitada pelo fluxo de conclusão da tarefa.",
+          "A conclusão deve ser aprovada pelo fluxo de conclusão da tarefa.",
         );
+      }
+      if (exists.status === "Concluída" && data.status !== undefined) {
+        throw new ServiceError(403, "A reabertura deve usar o fluxo de conclusão da tarefa.");
       }
 
       const name = data.name !== undefined ? data.name : exists.name;

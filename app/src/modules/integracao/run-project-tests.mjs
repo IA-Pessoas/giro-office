@@ -22,15 +22,63 @@ runTest("task creation preserves explicit null responsible and omits secondary a
   assert.equal(Object.hasOwn(buildCreateIntegracaoTaskPayload(base), "responsible_id"), false);
 });
 
+runTest("task completion contract preserves request, decision, reopen and history payloads", () => {
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.completionRequest, "/task/complete-request");
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.completionRequestList, "/task/complete-request/list");
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.reopen, "/task/reopen");
+  assert.deepEqual(buildTaskCompletionRequestPayload("task-1", "Pronta para validação."), {
+    task_id: "task-1",
+    reason: "Pronta para validação.",
+  });
+  assert.deepEqual(buildTaskCompletionDecisionPayload("task-1", "request-1", "refused", "Falta anexo."), {
+    task_id: "task-1",
+    request_id: "request-1",
+    decision: "refused",
+    reason: "Falta anexo.",
+  });
+  assert.deepEqual(buildTaskReopenPayload("task-1", "Documento pendente."), {
+    task_id: "task-1",
+    reason: "Documento pendente.",
+  });
+  assert.deepEqual(
+    unwrapTaskCompletionRequestHistory({ success: true, data: [{ id: "request-1", status: "pending" }] }),
+    [{ id: "request-1", status: "pending" }],
+  );
+});
+
+runTest("task completion panel exposes request, decision, cancel, history and reopen actions", () => {
+  const source = readFileSync(
+    new URL("./components/TaskCompletionPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  for (const hook of [
+    "useRequestTaskCompletionMutation",
+    "useDecideTaskCompletionMutation",
+    "useCancelTaskCompletionMutation",
+    "useReopenTaskMutation",
+    "useIntegracaoTaskCompletionRequests",
+  ]) {
+    assert.match(source, new RegExp(hook));
+  }
+  assert.match(source, /Solicitar conclusão/);
+  assert.match(source, /Recusar/);
+  assert.match(source, /Cancelar solicitação/);
+  assert.match(source, /Reabrir tarefa/);
+});
+
 import {
   buildCreateIntegracaoTaskPayload,
   buildDeleteIntegracaoTaskPayload,
   buildIntegracaoTaskListParams,
+  buildTaskCompletionDecisionPayload,
+  buildTaskCompletionRequestPayload,
+  buildTaskReopenPayload,
   buildUpdateIntegracaoTaskPayload,
   INTEGRACAO_TASKS_ENDPOINTS,
   unwrapCreatedIntegracaoTask,
   unwrapIntegracaoTaskDetail,
   unwrapIntegracaoTaskList,
+  unwrapTaskCompletionRequestHistory,
   unwrapUpdatedIntegracaoTask,
 } from "./services/integracaoTasksService.contract.ts";
 import {

@@ -11,11 +11,15 @@ import {
   buildCreateIntegracaoTaskPayload,
   buildDeleteIntegracaoTaskPayload,
   buildIntegracaoTaskListParams,
+  buildTaskCompletionDecisionPayload,
+  buildTaskCompletionRequestPayload,
+  buildTaskReopenPayload,
   buildUpdateIntegracaoTaskPayload,
   INTEGRACAO_TASKS_ENDPOINTS,
   unwrapCreatedIntegracaoTask,
   unwrapIntegracaoTaskDetail,
   unwrapIntegracaoTaskList,
+  unwrapTaskCompletionRequestHistory,
   unwrapUpdatedIntegracaoTask,
 } from "./integracaoTasksService.contract";
 
@@ -63,5 +67,46 @@ export const integracaoTasksService = {
     await api.delete(INTEGRACAO_TASKS_ENDPOINTS.crud, {
       data: buildDeleteIntegracaoTaskPayload(taskId),
     });
+  },
+
+  async requestCompletion(taskId: string, reason: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.post(
+      INTEGRACAO_TASKS_ENDPOINTS.completionRequest,
+      buildTaskCompletionRequestPayload(taskId, reason),
+    );
+  },
+
+  async decideCompletion(
+    taskId: string,
+    requestId: string,
+    decision: "approved" | "refused",
+    reason?: string,
+  ): Promise<void> {
+    const api = setupAPIClient();
+    await api.put(
+      INTEGRACAO_TASKS_ENDPOINTS.completionRequest,
+      buildTaskCompletionDecisionPayload(taskId, requestId, decision, reason),
+    );
+  },
+
+  async cancelCompletion(taskId: string, requestId: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(INTEGRACAO_TASKS_ENDPOINTS.completionRequest, {
+      data: { task_id: taskId, request_id: requestId },
+    });
+  },
+
+  async listCompletionRequests(taskId: string) {
+    const api = setupAPIClient();
+    const response = await api.get(INTEGRACAO_TASKS_ENDPOINTS.completionRequestList, {
+      params: { task_id: taskId },
+    });
+    return unwrapTaskCompletionRequestHistory(response.data);
+  },
+
+  async reopen(taskId: string, reason: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.put(INTEGRACAO_TASKS_ENDPOINTS.reopen, buildTaskReopenPayload(taskId, reason));
   },
 };

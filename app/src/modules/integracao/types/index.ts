@@ -1,6 +1,9 @@
 export type {
   CreateIntegracaoTaskBody,
   IntegracaoTaskDetail,
+  IntegracaoTaskCompletionDecision,
+  IntegracaoTaskCompletionRequest,
+  IntegracaoTaskCompletionRequestStatus,
   IntegracaoTaskListItem,
   IntegracaoTaskListParams,
   IntegracaoTaskListResult,

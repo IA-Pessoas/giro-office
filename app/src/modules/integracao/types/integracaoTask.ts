@@ -70,6 +70,25 @@ export interface IntegracaoTaskDetail {
   end_date: string | null;
   date_created: string;
   date_updated: string;
+  pending_approval?: boolean | null;
+}
+
+export type IntegracaoTaskCompletionDecision = "approved" | "refused";
+export type IntegracaoTaskCompletionRequestStatus =
+  | "pending"
+  | "approved"
+  | "refused"
+  | "canceled";
+
+export interface IntegracaoTaskCompletionRequest {
+  id: string;
+  requester_id: string;
+  status: IntegracaoTaskCompletionRequestStatus;
+  reason: string | null;
+  decision_reason: string | null;
+  decided_by: string | null;
+  created_at: string;
+  resolved_at: string | null;
 }
 
 export interface IntegracaoTaskListParams {

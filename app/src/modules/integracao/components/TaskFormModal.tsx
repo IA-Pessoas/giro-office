@@ -54,6 +54,7 @@ import {
   getTaskUrgencyOptions,
   shouldBlockTaskEditForm,
 } from "./taskFormModalUi";
+import { TaskCompletionPanel } from "./TaskCompletionPanel";
 
 interface TaskFormModalProps {
   open: boolean;
@@ -430,6 +431,10 @@ export function TaskFormModal({
     }
 
     const status = editValues.status as IntegracaoTaskStatus;
+    if (status === "Concluída" && detail?.status !== "Concluída") {
+      toast.warning("Use o painel de conclusão para enviar a solicitação.");
+      return;
+    }
 
     try {
       const updatedTask = await updateMutation.mutateAsync(
@@ -754,6 +759,14 @@ export function TaskFormModal({
               </label>
             </>
           )}
+          {taskDetailQuery.data ? (
+            <TaskCompletionPanel
+              task={taskDetailQuery.data}
+              currentUserId={user?.id}
+              accessLevel={integracaoAccess.level}
+              isOwner={user?.type === "owner"}
+            />
+          ) : null}
         </form>
       ) : (
         <form

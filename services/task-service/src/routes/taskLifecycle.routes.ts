@@ -10,6 +10,11 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { integracaoTaskCompleteRequestBodySchema } from "../schemas/integracaoTaskCompleteRequestBody.schema.js";
+import {
+  integracaoTaskCompletionRequestBodySchema,
+  integracaoTaskCompletionRequestListQuerySchema,
+  integracaoTaskReopenBodySchema,
+} from "../schemas/integracaoTaskCompletionRequest.schema.js";
 import { integracaoTaskConclusionBodySchema } from "../schemas/integracaoTaskConclusionBody.schema.js";
 import { TaskLifecycleService } from "../services/taskLifecycleService.js";
 
@@ -44,6 +49,29 @@ router.put(
   },
 );
 
+router.post(
+  "/complete-request",
+  isAuthenticated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+      const body = parseWithZod(integracaoTaskCompletionRequestBodySchema, req.body);
+      const result = await taskLifecycleService.requestTaskCompletion({
+        user_id,
+        organization_id,
+        task_id: body.task_id,
+        reason: body.reason,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
+      });
+      res.json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro na rota de solicitação de conclusão de tarefa", { err });
+      next(err);
+    }
+  },
+);
+
 router.put(
   "/complete-request",
   isAuthenticated,
@@ -56,6 +84,9 @@ router.put(
         user_id,
         organization_id,
         task_id: parsed.task_id,
+        ...(parsed.request_id ? { request_id: parsed.request_id } : {}),
+        ...(parsed.decision ? { decision: parsed.decision } : {}),
+        ...(parsed.reason ? { reason: parsed.reason } : {}),
         integracaoLevel: normalizeModulePermission(req.modules?.integracao),
         isOwner: req.user_type === "owner",
       });
@@ -67,5 +98,69 @@ router.put(
     }
   },
 );
+
+router.delete(
+  "/complete-request",
+  isAuthenticated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+      const parsed = parseWithZod(integracaoTaskCompleteRequestBodySchema, req.body);
+      const result = await taskLifecycleService.cancelTaskCompletion({
+        user_id,
+        organization_id,
+        task_id: parsed.task_id,
+        ...(parsed.request_id ? { request_id: parsed.request_id } : {}),
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
+      });
+      res.json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro na rota de cancelamento de conclusão de tarefa", { err });
+      next(err);
+    }
+  },
+);
+
+router.get(
+  "/complete-request/list",
+  isAuthenticated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+      const query = parseWithZod(integracaoTaskCompletionRequestListQuerySchema, req.query);
+      const result = await taskLifecycleService.listTaskCompletionRequests({
+        user_id,
+        organization_id,
+        task_id: query.task_id,
+        integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+        isOwner: req.user_type === "owner",
+      });
+      res.json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro na rota de histórico de conclusão de tarefa", { err });
+      next(err);
+    }
+  },
+);
+
+router.put("/reopen", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { user_id, organization_id } = requireAuthenticatedRequestContext(req);
+    const body = parseWithZod(integracaoTaskReopenBodySchema, req.body);
+    const result = await taskLifecycleService.reopenTask({
+      user_id,
+      organization_id,
+      task_id: body.task_id,
+      reason: body.reason,
+      integracaoLevel: normalizeModulePermission(req.modules?.integracao),
+      isOwner: req.user_type === "owner",
+    });
+    res.json(createSuccessResponse(result));
+  } catch (err) {
+    logError("Erro na rota de reabertura de tarefa", { err });
+    next(err);
+  }
+});
 
 export { router as taskLifecycleRoutes };

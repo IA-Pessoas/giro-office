@@ -234,10 +234,31 @@ const concludeTaskRequestBody = createObjectRequestBody({
 });
 
 const approveConclusionRequestBody = createObjectRequestBody({
-  example: { task_id: "task-uuid" },
+  example: { task_id: "task-uuid", request_id: "completion-request-uuid", decision: "approved" },
   required: ["task_id"],
   properties: {
     task_id: { type: "string" },
+    request_id: { type: "string" },
+    decision: { type: "string", enum: ["approved", "refused"] },
+    reason: { type: "string" },
+  },
+});
+
+const createConclusionRequestBody = createObjectRequestBody({
+  example: { task_id: "task-uuid", reason: "Documentação revisada." },
+  required: ["task_id"],
+  properties: {
+    task_id: { type: "string" },
+    reason: { type: "string" },
+  },
+});
+
+const reopenTaskRequestBody = createObjectRequestBody({
+  example: { task_id: "task-uuid", reason: "Documento complementar pendente." },
+  required: ["task_id", "reason"],
+  properties: {
+    task_id: { type: "string" },
+    reason: { type: "string" },
   },
 });
 
@@ -887,12 +908,49 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
         },
       },
       "/task/complete-request": {
+        post: {
+          tags: ["Lifecycle"],
+          summary: "Solicitar conclusão de tarefa",
+          security: bearer,
+          ...createConclusionRequestBody,
+          responses: {
+            "200": { description: "Solicitação criada", ...successJson },
+            "409": { description: "Já existe uma solicitação pendente" },
+          },
+        },
         put: {
           tags: ["Lifecycle"],
-          summary: "Aprovar pedido de conclusao",
+          summary: "Aprovar ou recusar pedido de conclusao",
           security: bearer,
           ...approveConclusionRequestBody,
-          responses: { "200": { description: "Aprovado", ...successJson } },
+          responses: { "200": { description: "Decidido", ...successJson } },
+        },
+        delete: {
+          tags: ["Lifecycle"],
+          summary: "Cancelar solicitação de conclusão",
+          security: bearer,
+          ...approveConclusionRequestBody,
+          responses: { "200": { description: "Cancelado", ...successJson } },
+        },
+      },
+      "/task/complete-request/list": {
+        get: {
+          tags: ["Lifecycle"],
+          summary: "Listar histórico de solicitações de conclusão",
+          security: bearer,
+          parameters: [
+            { name: "task_id", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Histórico", ...successJson } },
+        },
+      },
+      "/task/reopen": {
+        put: {
+          tags: ["Lifecycle"],
+          summary: "Reabrir tarefa concluída",
+          security: bearer,
+          ...reopenTaskRequestBody,
+          responses: { "200": { description: "Reaberta", ...successJson } },
         },
       },
       "/task/project-plan": {
