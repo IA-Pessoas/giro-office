@@ -43,8 +43,55 @@ const TASK_COMPLETION_REQUEST_STATUS = {
 export type TaskConclusionRow = TaskGetPayload<{ select: typeof CONCLUSION_UPDATE_SELECT }>;
 export type TaskCompleteApprovalRow = TaskGetPayload<{ select: typeof COMPLETE_UPDATE_SELECT }>;
 
+type TaskConclusionAccessTask = {
+  organization_id: string;
+  responsible_id: string | null;
+  responsible2_id: string | null;
+  responsible3_id: string | null;
+  prevision_date: Date | null;
+  end_date: Date | null;
+};
+
 function hasPrismaCode(err: unknown, code: string): boolean {
   return typeof err === "object" && err !== null && "code" in err && err.code === code;
+}
+
+function assertTaskConclusionAccess(params: {
+  userId: string;
+  organizationId: string;
+  body: IntegracaoTaskConclusionBody;
+  level: IntegracaoPermissionLevel;
+  isOwner: boolean;
+  task: TaskConclusionAccessTask;
+}): void {
+  requireIntegracaoRouteAccess("PUT", "/task/conclusion", {
+    userId: params.userId,
+    level: params.level,
+    organizationId: params.organizationId,
+    resourceOrganizationId: params.task.organization_id,
+    responsibleId: params.task.responsible_id,
+    responsible2Id: params.task.responsible2_id,
+    responsible3Id: params.task.responsible3_id,
+    isOwner: params.isOwner,
+    requestedFields: ["status", "observations"],
+  });
+
+  const isOwnPatchUnchanged =
+    params.isOwner ||
+    params.level >= INTEGRACAO_PERMISSION_LEVEL.USER ||
+    (params.body.responsible_id === params.task.responsible_id &&
+      (params.body.responsible2_id === undefined ||
+        params.body.responsible2_id === params.task.responsible2_id) &&
+      (params.body.responsible3_id === undefined ||
+        params.body.responsible3_id === params.task.responsible3_id) &&
+      (params.body.prevision_date === undefined ||
+        parseOptionalDate(params.body.prevision_date)?.getTime() ===
+          params.task.prevision_date?.getTime()) &&
+      (params.body.end_date === undefined ||
+        parseOptionalDate(params.body.end_date)?.getTime() === params.task.end_date?.getTime()));
+  if (!isOwnPatchUnchanged) {
+    throw new ServiceError(403, "Tarefa própria só permite alterar status e observações.");
+  }
 }
 
 function parseOptionalDate(v: string | Date | null): Date | null {
@@ -378,88 +425,41 @@ export class TaskLifecycleService {
         throw new ServiceError(404, "Tarefa não existe.");
       }
 
-      requireIntegracaoRouteAccess("PUT", "/task/conclusion", {
-        userId: user_id,
-        level: params.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
-        organizationId: organization_id,
-        resourceOrganizationId: exists.organization_id,
-        responsibleId: exists.responsible_id,
-        responsible2Id: exists.responsible2_id,
-        responsible3Id: exists.responsible3_id,
-        isOwner: params.isOwner === true,
-        requestedFields: ["status", "observations"],
-      });
-
-      const isOwnPatchUnchanged =
-        params.isOwner === true ||
-        (params.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) >=
-          INTEGRACAO_PERMISSION_LEVEL.USER ||
-        (body.responsible_id === exists.responsible_id &&
-          (body.responsible2_id === undefined || body.responsible2_id === exists.responsible2_id) &&
-          (body.responsible3_id === undefined || body.responsible3_id === exists.responsible3_id) &&
-          (body.prevision_date === undefined ||
-            parseOptionalDate(body.prevision_date)?.getTime() ===
-              exists.prevision_date?.getTime()) &&
-          (body.end_date === undefined ||
-            parseOptionalDate(body.end_date)?.getTime() === exists.end_date?.getTime()));
-      if (!isOwnPatchUnchanged) {
-        throw new ServiceError(403, "Tarefa própria só permite alterar status e observações.");
-      }
-
       const permSpecific = await prismaClient.permissionSpecific.findFirst({
         where: { user_id, organization_id },
       });
 
       let newStatus = body.status;
-      let newPendingApproval = exists.pending_approval ?? false;
       const level = params.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC;
+      const isOwner = params.isOwner === true;
       let requiresCompletionRequest = false;
 
       if (body.status === "Concluída") {
         const canCompleteDirectly =
-          (params.isOwner === true || level >= INTEGRACAO_PERMISSION_LEVEL.USER) &&
+          (isOwner || level >= INTEGRACAO_PERMISSION_LEVEL.USER) &&
           permSpecific?.task_completion === true;
         if (!canCompleteDirectly) {
           newStatus = "Em Andamento";
-          newPendingApproval = true;
           requiresCompletionRequest = true;
         }
       }
 
-      const prevision_date =
-        body.prevision_date !== undefined
-          ? parseOptionalDate(body.prevision_date)
-          : exists.prevision_date;
-      const end_date =
-        body.end_date !== undefined ? parseOptionalDate(body.end_date) : exists.end_date;
-
-      const responsible2_id =
-        body.responsible2_id !== undefined ? body.responsible2_id : exists.responsible2_id;
-      const responsible3_id =
-        body.responsible3_id !== undefined ? body.responsible3_id : exists.responsible3_id;
-
-      await assertResponsibleUsersInDepartment(
-        prismaClient,
-        organization_id,
-        exists.department_id,
-        [
-          body.responsible_id !== exists.responsible_id ? body.responsible_id : undefined,
-          body.responsible2_id !== undefined && body.responsible2_id !== exists.responsible2_id
-            ? body.responsible2_id
-            : undefined,
-          body.responsible3_id !== undefined && body.responsible3_id !== exists.responsible3_id
-            ? body.responsible3_id
-            : undefined,
-        ],
-      );
-
-      const updated = await prismaClient.$transaction(
+      const { task: updated, previousTask } = await prismaClient.$transaction(
         async (tx) => {
+          const currentTask = await tx.task.findFirst({
+            where: { id: body.task_id, organization_id },
+          });
+          if (!currentTask) throw new ServiceError(404, "Tarefa não existe.");
+          assertTaskConclusionAccess({
+            userId: user_id,
+            organizationId: organization_id,
+            body,
+            level,
+            isOwner,
+            task: currentTask,
+          });
+
           if (requiresCompletionRequest) {
-            const currentTask = await tx.task.findFirst({
-              where: { id: body.task_id, organization_id },
-            });
-            if (!currentTask) throw new ServiceError(404, "Tarefa não existe.");
             if (currentTask.status === "Concluída") {
               throw new ServiceError(409, "Tarefa já está concluída.");
             }
@@ -475,18 +475,41 @@ export class TaskLifecycleService {
             }
           }
 
+          const previsionDate =
+            body.prevision_date !== undefined
+              ? parseOptionalDate(body.prevision_date)
+              : currentTask.prevision_date;
+          const endDate =
+            body.end_date !== undefined ? parseOptionalDate(body.end_date) : currentTask.end_date;
+          const responsible2Id =
+            body.responsible2_id !== undefined ? body.responsible2_id : currentTask.responsible2_id;
+          const responsible3Id =
+            body.responsible3_id !== undefined ? body.responsible3_id : currentTask.responsible3_id;
+          await assertResponsibleUsersInDepartment(tx, organization_id, currentTask.department_id, [
+            body.responsible_id !== currentTask.responsible_id ? body.responsible_id : undefined,
+            body.responsible2_id !== undefined &&
+            body.responsible2_id !== currentTask.responsible2_id
+              ? body.responsible2_id
+              : undefined,
+            body.responsible3_id !== undefined &&
+            body.responsible3_id !== currentTask.responsible3_id
+              ? body.responsible3_id
+              : undefined,
+          ]);
+
           const task = await tx.task.update({
             where: { id: body.task_id },
             data: {
               status: newStatus,
-              prevision_date,
-              end_date,
+              prevision_date: previsionDate,
+              end_date: endDate,
               responsible_id: body.responsible_id,
-              responsible2_id,
-              responsible3_id,
+              responsible2_id: responsible2Id,
+              responsible3_id: responsible3Id,
               observations: body.observations,
               justification: body.justification,
-              pending_approval: newPendingApproval,
+              pending_approval:
+                requiresCompletionRequest || (currentTask.pending_approval ?? false),
             },
             select: CONCLUSION_UPDATE_SELECT,
           });
@@ -516,11 +539,9 @@ export class TaskLifecycleService {
             });
           }
 
-          return task;
+          return { task, previousTask: currentTask };
         },
-        requiresCompletionRequest
-          ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
-          : undefined,
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
 
       await audit.logUpdateIfChanged({
@@ -529,20 +550,20 @@ export class TaskLifecycleService {
         action: "Conclusão",
         referring: "integracao.tasks",
         referringId: body.task_id,
-        oldData: exists as Record<string, unknown>,
+        oldData: previousTask as Record<string, unknown>,
         updatedData: updated as Record<string, unknown>,
         required: true,
       });
 
-      if (exists.status !== updated.status) {
+      if (previousTask.status !== updated.status) {
         await this.#workflow.afterTaskUpdated({
           taskId: body.task_id,
-          projectId: exists.project_id,
+          projectId: previousTask.project_id,
           userId: user_id,
           organizationId: organization_id,
-          previousStatus: exists.status ?? "",
+          previousStatus: previousTask.status ?? "",
           newStatus: updated.status ?? "",
-          previousBilling: exists.billing ?? "",
+          previousBilling: previousTask.billing ?? "",
         });
       }
 
