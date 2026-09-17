@@ -151,3 +151,22 @@ do pnpm fora da raiz.
 | Biome app via shim | Shim falhou; fallback local encontrou os arquivos ignorados pela configuração raiz. |
 | `corepack pnpm --filter @workspace/app lint` | Passou registrando `Skipping app lint (Biome ignored for now)`. |
 | `git diff --check` | Passou. |
+
+## Fix round 3 — habilitação explícita da consulta
+
+- `useRegularizeGuidance` preserva `options.enabled === false` para qualquer
+  filtro escopado válido.
+- O guard combina `hasExplicitAllFilters` ou
+  `hasEffectiveGuidanceFilter` com `(options?.enabled ?? true)`, mantendo
+  `{}`, `process_id` vazio e `target_type` vazio desabilitados.
+- O runner estático exige esses nomes e a combinação de habilitação, evitando
+  regressão para o comportamento que ignorava `enabled: false`.
+
+### Evidências do fix round 3
+
+| Comando | Resultado |
+| --- | --- |
+| Runner estático antes da implementação (RED) | Falhou na ausência da combinação explícita de `enabled`. |
+| `corepack pnpm --filter @workspace/app test:regularize` | Passou. |
+| `corepack pnpm --filter @workspace/app typecheck` | Passou. |
+| `git diff --check` | Passou. |

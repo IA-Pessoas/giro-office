@@ -47,16 +47,18 @@ function shouldEnableRegularizeGuidanceQuery(
   filters: RegularizeGuidanceListFilters | undefined,
   options?: RegularizeReadQueryOptions,
 ): boolean {
-  if (filters === undefined) return options?.enabled === true;
-
-  const hasEmptyProcessFilter = "process_id" in filters && !filters.process_id;
-  const hasEmptyTargetFilter = "target_type" in filters && !filters.target_type;
-
-  return (
+  const hasEmptyProcessFilter =
+    filters !== undefined && "process_id" in filters && !filters.process_id;
+  const hasEmptyTargetFilter =
+    filters !== undefined && "target_type" in filters && !filters.target_type;
+  const hasExplicitAllFilters = filters === undefined && options?.enabled === true;
+  const hasEffectiveGuidanceFilter =
+    filters !== undefined &&
     !hasEmptyProcessFilter &&
     !hasEmptyTargetFilter &&
-    Boolean(filters.process_id || filters.target_type)
-  );
+    Boolean(filters.process_id || filters.target_type);
+
+  return (hasExplicitAllFilters || hasEffectiveGuidanceFilter) && (options?.enabled ?? true);
 }
 
 async function invalidateRegularizeOperations(

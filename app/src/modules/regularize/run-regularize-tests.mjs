@@ -140,7 +140,12 @@ await runTest(
   assert.match(operationsSource, /!hasEmptyProcessFilter/);
   assert.match(operationsSource, /!hasEmptyTargetFilter/);
   assert.match(operationsSource, /Boolean\(filters\.process_id \|\| filters\.target_type\)/);
-  assert.match(operationsSource, /filters === undefined.*options\?\.enabled === true/);
+  assert.match(operationsSource, /const hasExplicitAllFilters/);
+  assert.match(operationsSource, /const hasEffectiveGuidanceFilter/);
+  assert.match(
+    operationsSource,
+    /return \(hasExplicitAllFilters \|\| hasEffectiveGuidanceFilter\) && \(options\?\.enabled \?\? true\)/,
+  );
   assert.match(
     serviceSource,
     /api\.post\(REGULARIZE_ENDPOINTS\.guidance, payload\)/,
