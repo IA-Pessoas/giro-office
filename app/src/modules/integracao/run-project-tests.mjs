@@ -65,6 +65,11 @@ import {
   unwrapUpdatedProject,
   unwrapProjectTaskProposals,
 } from "./services/projectService.contract.ts";
+import {
+  buildHireProjectPlanPayload,
+  PROJECT_PLAN_ENDPOINTS,
+  unwrapProjectPlanHire,
+} from "./services/projectPlanService.contract.ts";
 import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
   applyWizardTaskChange,
@@ -296,6 +301,30 @@ runTest("project endpoints use only the v1 project contract", () => {
   assert.equal(PROJECT_ENDPOINTS.progress, "/project/progress");
   assert.equal(PROJECT_ENDPOINTS.metrics, "/project/metrics");
   assert.equal(PROJECT_ENDPOINTS.wizardPreview, "/task/project-wizard/preview");
+});
+
+runTest("project plan contratação preserva o contrato idempotente", () => {
+  assert.equal(PROJECT_PLAN_ENDPOINTS.hire, "/task/project-plan/hire");
+  assert.deepEqual(buildHireProjectPlanPayload({ plan_id: "plan-1", project_id: "project-1" }), {
+    plan_id: "plan-1",
+    project_id: "project-1",
+  });
+  assert.deepEqual(
+    unwrapProjectPlanHire({ success: true, data: { created: [], idempotent: true } }),
+    { created: [], idempotent: true },
+  );
+});
+
+runTest("contratação de plano só é exposta para administrador da Integração", () => {
+  const projectDetail = readFileSync(
+    new URL("./components/ProjectDetailView.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    projectDetail,
+    /integracaoAccess\.isAdmin \? \(\s*<button[\s\S]*?Contratar plano/,
+  );
 });
 
 runTest("project wizard preview keeps the server revision and hierarchy", () => {

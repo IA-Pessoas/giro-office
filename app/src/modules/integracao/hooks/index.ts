@@ -20,6 +20,7 @@ export {
   useRecalculateProjectProgressMutation,
   useUpdateProjectMutation,
 } from "./useProjects";
+export { useHireProjectPlanMutation, useProjectPlans, useProjectPlanTasks } from "./useProjectPlans";
 export {
   useCreateIntegracaoTaskMutation,
   useDeleteIntegracaoTaskMutation,

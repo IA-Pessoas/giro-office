@@ -9,6 +9,7 @@ const USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const PLAN_ID = "11111111-1111-1111-1111-111111111111";
 const PROJECT_ID = "22222222-2222-2222-2222-222222222222";
 const CLIENT_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+const ADMIN_AUTH = { integracaoLevel: 3 as const };
 
 class TaskCrudServiceStub extends TaskCrudService {
   readonly calls: CreateTaskCrudRequest[] = [];
@@ -37,6 +38,11 @@ class TaskCrudServiceStub extends TaskCrudService {
       },
     };
   }
+
+  override async createTaskInTransaction(data: CreateTaskCrudRequest) {
+    const result = await this.createTask(data);
+    return { ...result, dependentCreates: [] };
+  }
 }
 
 function createAudit(): ProjectPlanAudit {
@@ -47,7 +53,8 @@ function createAudit(): ProjectPlanAudit {
 }
 
 function createBasePrisma(): ProjectPlanPrisma {
-  return {
+  const hirings = new Map<string, { response_snapshot: unknown }>();
+  const prisma = {
     projectPlan: {
       async findFirst() {
         return null;
@@ -114,6 +121,33 @@ function createBasePrisma(): ProjectPlanPrisma {
         return { count: 0 };
       },
     },
+    projectPlanHiring: {
+      async findUnique(args: {
+        where: {
+          organization_id_plan_id_project_id: {
+            organization_id: string;
+            plan_id: string;
+            project_id: string;
+          };
+        };
+      }) {
+        const { organization_id, plan_id, project_id } =
+          args.where.organization_id_plan_id_project_id;
+        return hirings.get(`${organization_id}:${plan_id}:${project_id}`) ?? null;
+      },
+      async create(args: {
+        data: {
+          organization_id: string;
+          plan_id: string;
+          project_id: string;
+          response_snapshot: unknown;
+        };
+      }) {
+        const { organization_id, plan_id, project_id, response_snapshot } = args.data;
+        hirings.set(`${organization_id}:${plan_id}:${project_id}`, { response_snapshot });
+        return { id: "plan-hiring-1" };
+      },
+    },
     taskModel: {
       async findFirst() {
         return null;
@@ -141,7 +175,12 @@ function createBasePrisma(): ProjectPlanPrisma {
 
       return Promise.all(input as Promise<unknown>[]);
     },
+    async $executeRaw() {
+      return 0;
+    },
   };
+
+  return prisma as unknown as ProjectPlanPrisma;
 }
 
 describe("ProjectPlanService", () => {
@@ -161,6 +200,7 @@ describe("ProjectPlanService", () => {
       service.create({
         user_id: USER_ID,
         organization_id: ORG_ID,
+        ...ADMIN_AUTH,
         name: "Plano",
         color: "#ffffff",
       }),
@@ -174,7 +214,9 @@ describe("ProjectPlanService", () => {
     prisma.projectPlan.findFirst = async () => null;
     const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
 
-    await expect(service.detail(PLAN_ID, ORG_ID)).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      service.detail(PLAN_ID, ORG_ID, { user_id: USER_ID, organization_id: ORG_ID, ...ADMIN_AUTH }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it("create lança 403 quando usuário não tem permissão", async () => {
@@ -315,6 +357,24 @@ describe("ProjectPlanService", () => {
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
+  it("delete retorna 409 quando o plano já foi contratado", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
+    prisma.projectPlan.delete = async () => {
+      throw { code: "P2003" };
+    };
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, createAudit());
+
+    await expect(
+      service.delete({
+        id: PLAN_ID,
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        ...ADMIN_AUTH,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
   it("hirePlan instancia as tarefas na ordem do plano", async () => {
     const prisma = createBasePrisma();
     prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
@@ -328,6 +388,7 @@ describe("ProjectPlanService", () => {
     const result = await service.hirePlan({
       user_id: USER_ID,
       organization_id: ORG_ID,
+      ...ADMIN_AUTH,
       project_id: PROJECT_ID,
       plan_id: PLAN_ID,
     });
@@ -335,5 +396,64 @@ describe("ProjectPlanService", () => {
     expect(taskCrud.calls).toHaveLength(2);
     expect(taskCrud.calls.map((call) => call.model_id)).toEqual(["model-2", "model-1"]);
     expect(result.created).toHaveLength(2);
+    expect(result).toMatchObject({ idempotent: false });
+
+    const repeated = await service.hirePlan({
+      user_id: USER_ID,
+      organization_id: ORG_ID,
+      ...ADMIN_AUTH,
+      project_id: PROJECT_ID,
+      plan_id: PLAN_ID,
+    });
+
+    expect(repeated).toMatchObject({ idempotent: true, created: result.created });
+    expect(taskCrud.calls).toHaveLength(2);
+  });
+
+  it("hirePlan não confirma sucesso quando a auditoria obrigatória falha", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
+    prisma.project.findFirst = async () => ({ client_id: CLIENT_ID });
+    prisma.client.findFirst = async () => ({ prospecting_status: "Fechado" });
+    prisma.projectPlanTasks.findMany = async () => [{ task_id: "model-1" }];
+    const audit = {
+      async createLog() {
+        throw new Error("audit indisponível");
+      },
+      async logUpdateIfChanged() {},
+    } satisfies ProjectPlanAudit;
+    const service = new ProjectPlanService(new TaskCrudServiceStub(), prisma, audit);
+
+    await expect(
+      service.hirePlan({
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        ...ADMIN_AUTH,
+        project_id: PROJECT_ID,
+        plan_id: PLAN_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 500 });
+  });
+
+  it("hirePlan rejeita plano sem modelos antes de criar tarefas", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
+    prisma.project.findFirst = async () => ({ client_id: CLIENT_ID });
+    prisma.client.findFirst = async () => ({ prospecting_status: "Fechado" });
+    prisma.user.findFirst = async () => ({ id: USER_ID, permission: 2 });
+    const taskCrud = new TaskCrudServiceStub();
+    const service = new ProjectPlanService(taskCrud, prisma, createAudit());
+
+    await expect(
+      service.hirePlan({
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        ...ADMIN_AUTH,
+        project_id: PROJECT_ID,
+        plan_id: PLAN_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 422 });
+
+    expect(taskCrud.calls).toEqual([]);
   });
 });

@@ -32,3 +32,4 @@ export {
   unwrapUpdatedProject,
 } from "./projectService.contract";
 export { projectService } from "./projectService";
+export { projectPlanService } from "./projectPlanService";
