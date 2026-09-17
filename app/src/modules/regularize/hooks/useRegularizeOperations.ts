@@ -220,7 +220,8 @@ export function useRegularizeGuidance(
     regularizeQueryKeys.guidance(safeFilters, scope),
     () => regularizeService.listGuidance(safeFilters),
     {
-      enabled: (options?.enabled ?? true),
+      enabled:
+        filters === undefined ? options?.enabled === true : (options?.enabled ?? true),
     },
   );
 }

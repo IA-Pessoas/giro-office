@@ -13,6 +13,7 @@ import type {
   CreateRegularizeSitePasswordPayload,
   RemoveRegularizeGuidanceActivityPayload,
   RemoveRegularizeGuidancePartnerPayload,
+  LegacyGuidanceDraft,
   RegularizeClientPfDetail,
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
@@ -76,6 +77,12 @@ function stripSitePasswordSecret(
   const { password: _password, ...safeItem } = item;
 
   return safeItem;
+}
+
+function isLegacyGuidanceDraft(
+  payload: CreateRegularizeGuidancePayload,
+): payload is LegacyGuidanceDraft {
+  return !("checklist" in payload);
 }
 
 export const regularizeService = {
@@ -382,6 +389,12 @@ export const regularizeService = {
   },
 
   async createGuidance(payload: CreateRegularizeGuidancePayload): Promise<RegularizeGuidance> {
+    if (isLegacyGuidanceDraft(payload)) {
+      throw new Error(
+        "Rascunho legado de orientação não pode ser enviado; a Task 7 deve migrar este caller para checklist.",
+      );
+    }
+
     const api = setupAPIClient();
     const response = await api.post(REGULARIZE_ENDPOINTS.guidance, payload);
 

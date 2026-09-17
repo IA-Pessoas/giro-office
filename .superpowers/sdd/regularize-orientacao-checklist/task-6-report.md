@@ -63,3 +63,61 @@ inexistente), então a descoberta foi manual e limitada ao brief, plano, contrat
 Os comandos pnpm também emitiram avisos preexistentes: Node local `v24.13.1`
 enquanto `services/src` pede Node 22, e `resolutions` fora da raiz do workspace.
 Não foram alterados porque estão fora do escopo.
+
+## Fix round 1 — contrato ponta a ponta
+
+Esta rodada ampliou explicitamente o escopo de produto para o cliente frontend e
+para o contrato backend de guidance. Além dos seis arquivos originais, foram
+alterados os schemas, serviço, rota, OpenAPI e testes focados de
+`services/regularize-service`, sem tocar Prisma ou `shared`.
+
+### Ajustes implementados
+
+- A entrada e a resposta agora têm tipos distintos: create/update usam
+  `checklist` com os 17 itens `{ code, status, observation? }`, enquanto a
+  resposta mantém `checklist_items` com id, label, metadados e observação
+  nullable.
+- A entrada usa `RegularizeGuidanceManualSnapshot` com `source: "manual"`;
+  `RegularizeGuidanceSnapshot` continua reservado à resposta e snapshots
+  originados de cadastro não são aceitos como snapshot manual de entrada.
+- `UpdateRegularizeGuidancePayload` exige somente `id`; os demais campos,
+  incluindo `type`, `status`, campos legados, `process_id` nullable, checklist,
+  snapshot manual e branch_data não-null, são parciais.
+- O GET de guidance/list aceita `target_type` (`PJ`, `PF`, `SEM_CLIENTE`) e o
+  serviço aplica o filtro junto com `organization_id`, preservando isolamento.
+  O OpenAPI documenta o parâmetro.
+- O POST envia o payload completo com `checklist`; o caller legado nomeado
+  `LegacyGuidanceDraft` é rejeitado antes do HTTP com erro explícito que aponta
+  a migração da Task 7. O hook permanece temporariamente compatível com a união
+  apenas para manter a tela antiga compilando.
+- A consulta independente só é habilitada quando `useRegularizeGuidance()` é
+  chamada com `{ enabled: true }`; as chaves e os parâmetros distinguem
+  processo e alvo e omitem `process_id` vazio.
+
+### RED adicional
+
+O runner estático foi ampliado antes dos ajustes para exigir a separação entre
+`checklist` e `checklist_items`, o snapshot manual, update parcial, filtro por
+`target_type`, rejeição do draft legado e ausência de consulta independente
+implícita. Os testes backend também foram ampliados para schema, isolamento da
+listagem, rota e OpenAPI.
+
+### Evidências do fix
+
+| Comando | Resultado |
+| --- | --- |
+| `corepack pnpm --filter @workspace/app test:regularize` | Passou; runner completo verde. |
+| `corepack pnpm --filter @workspace/regularize-service exec vitest run ...` | Shim falhou: `'vitest' não é reconhecido como um comando interno ou externo`. |
+| `services/regularize-service/node_modules/.bin/vitest.CMD run ...` | Fallback local passou: 4 arquivos, 92 testes. |
+| `corepack pnpm --filter @workspace/app typecheck` | Passou. |
+| `corepack pnpm --filter @workspace/regularize-service typecheck` | Passou. |
+| `corepack pnpm --filter @workspace/regularize-service build` | Passou. |
+| `corepack pnpm --filter @workspace/app exec biome check ...` | Shim falhou: `'biome' não é reconhecido como um comando interno ou externo`. |
+| `node_modules/.bin/biome.CMD check` nos arquivos backend | Passou: 8 arquivos, sem ajustes. |
+| `node_modules/.bin/biome.CMD check` nos arquivos app | Configuração raiz ignora `app/`: `No files were processed`. |
+| `corepack pnpm --filter @workspace/app lint` | Fallback do pacote passou, registrando `Skipping app lint (Biome ignored for now)`. |
+| `git diff --check` | Passou, sem whitespace errors. |
+
+Os comandos pnpm mantiveram os avisos ambientais já registrados: Node local
+`v24.13.1` enquanto `services/src` pede Node 22, além de avisos de configuração
+do pnpm fora da raiz.

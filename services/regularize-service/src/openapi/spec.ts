@@ -1015,7 +1015,7 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/guidance/list": {
         get: {
           tags: ["Guidance"],
-          summary: "Listar orientações, opcionalmente filtradas por processo",
+          summary: "Listar orientações, opcionalmente filtradas por processo ou alvo",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
@@ -1023,6 +1023,12 @@ export function buildRegularizeServiceOpenApiSpec(
               in: "query",
               required: false,
               schema: { type: "string", format: "uuid", nullable: true },
+            },
+            {
+              name: "target_type",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: [...REGULARIZE_GUIDANCE_TARGET_TYPES] },
             },
           ],
           responses: {

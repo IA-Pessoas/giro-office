@@ -93,21 +93,58 @@ await runTest("regularize guidance supports independent filters and complete pay
     ]);
 
   assert.match(typesSource, /@workspace\/shared\/regularize/);
-  assert.match(typesSource, /checklist_items/);
+  assert.match(typesSource, /export type RegularizeGuidanceChecklistInput/);
+  assert.match(typesSource, /export type RegularizeGuidanceManualSnapshot/);
+  assert.match(
+    typesSource,
+    /export type RegularizeGuidanceManualSnapshot[\s\S]*?source: "manual";/,
+  );
+  const createTypeSource = typesSource.match(
+    /type RegularizeGuidanceCompletePayload[\s\S]*?export type LegacyGuidanceDraft/,
+  )?.[0];
+  assert.ok(createTypeSource);
+  assert.match(createTypeSource, /checklist: RegularizeGuidanceChecklistInput\[\]/);
+  assert.doesNotMatch(createTypeSource, /checklist_items/);
+  assert.match(createTypeSource, /target_snapshot\?: RegularizeGuidanceManualSnapshot/);
+  const updateTypeSource = typesSource.match(
+    /export type UpdateRegularizeGuidancePayload[\s\S]*?export type AddRegularizeGuidanceActivityPayload/,
+  )?.[0];
+  assert.ok(updateTypeSource);
+  assert.match(updateTypeSource, /id: RegularizeId;/);
+  assert.match(updateTypeSource, /checklist\?: RegularizeGuidanceChecklistInput\[\]/);
+  assert.doesNotMatch(updateTypeSource, /checklist_items/);
+  assert.doesNotMatch(updateTypeSource, /status: string/);
+  assert.match(typesSource, /export type LegacyGuidanceDraft/);
   assert.match(typesSource, /process_id: RegularizeId \| null/);
   assert.match(contractSource, /target_type/);
+  assert.match(
+    serviceSource,
+    /createGuidance[\s\S]{0,500}isLegacyGuidanceDraft[\s\S]{0,300}throw new Error/,
+  );
   assert.match(
     serviceSource,
     /updateGuidance[\s\S]{0,300}api\.put\(REGULARIZE_ENDPOINTS\.guidance, payload\)/,
   );
   assert.match(queryKeysSource, /filters\.process_id \?\? ""/);
   assert.match(queryKeysSource, /filters\.target_type \?\? ""/);
-  assert.match(operationsSource, /enabled: \(options\?\.enabled \?\? true\)/);
+  assert.match(
+    operationsSource,
+    /enabled:\s*filters === undefined \? options\?\.enabled === true : \(options\?\.enabled \?\? true\)/,
+  );
+  assert.match(
+    serviceSource,
+    /api\.post\(REGULARIZE_ENDPOINTS\.guidance, payload\)/,
+  );
+  assert.doesNotMatch(serviceSource, /checklist_items/);
 
   assert.deepEqual(buildRegularizeGuidanceListParams({}), {});
   assert.deepEqual(
     buildRegularizeGuidanceListParams({ process_id: "process-1", target_type: "PJ" }),
     { process_id: "process-1", target_type: "PJ" },
+  );
+  assert.deepEqual(
+    buildRegularizeGuidanceListParams({ process_id: "", target_type: "PF" }),
+    { target_type: "PF" },
   );
 });
 

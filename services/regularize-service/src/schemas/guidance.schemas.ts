@@ -224,7 +224,8 @@ export const guidanceDetailQuerySchema = z.object({ id: z.string().uuid("id inva
 
 export const listGuidanceByProcessQuerySchema = z
   .object({
-    process_id: z.string().uuid("process_id invalido."),
+    process_id: z.string().uuid("process_id invalido.").nullable().optional(),
+    target_type: z.enum(REGULARIZE_GUIDANCE_TARGET_TYPES).optional(),
   })
   .strict();
 

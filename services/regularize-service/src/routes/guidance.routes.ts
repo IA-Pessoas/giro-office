@@ -14,12 +14,6 @@ import {
 import { GuidanceService } from "../services/guidanceService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 
-const guidanceListQuerySchema = listGuidanceByProcessQuerySchema
-  .extend({
-    process_id: listGuidanceByProcessQuerySchema.shape.process_id.nullable().optional(),
-  })
-  .strict();
-
 export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();
   const guidanceService = new GuidanceService(deps.prisma);
@@ -73,10 +67,11 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
       const rawQuery = request.query as Record<string, unknown>;
       const normalizedQuery =
         rawQuery.process_id === "" ? { ...rawQuery, process_id: null } : rawQuery;
-      const query = parseWithZod(guidanceListQuerySchema, normalizedQuery);
+      const query = parseWithZod(listGuidanceByProcessQuerySchema, normalizedQuery);
       const list = await guidanceService.listByProcess(
         request.organization_id,
         query.process_id ?? undefined,
+        query.target_type,
       );
       response.json(createSuccessResponse(list));
     } catch (err) {

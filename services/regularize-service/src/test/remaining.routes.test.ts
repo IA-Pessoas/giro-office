@@ -204,7 +204,11 @@ describe("regularize remaining routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual([completeGuidance]);
-    expect(listByProcess).toHaveBeenCalledWith("a0000000-0000-4000-8000-000000000001", undefined);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      undefined,
+      undefined,
+    );
   });
 
   it("GET /regularize/guidance/list preserva o filtro process_id", async () => {
@@ -220,7 +224,11 @@ describe("regularize remaining routes", () => {
       .set(gatewayHeaders());
 
     expect(response.status).toBe(200);
-    expect(listByProcess).toHaveBeenCalledWith("a0000000-0000-4000-8000-000000000001", processId);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      processId,
+      undefined,
+    );
   });
 
   it("GET /regularize/guidance/list trata process_id nulo como ausência de filtro", async () => {
@@ -235,7 +243,30 @@ describe("regularize remaining routes", () => {
       .set(gatewayHeaders());
 
     expect(response.status).toBe(200);
-    expect(listByProcess).toHaveBeenCalledWith("a0000000-0000-4000-8000-000000000001", undefined);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      undefined,
+      undefined,
+    );
+  });
+
+  it("GET /regularize/guidance/list encaminha target_type sem perder o isolamento", async () => {
+    const listByProcess = vi
+      .spyOn(GuidanceService.prototype, "listByProcess")
+      .mockResolvedValue([completeGuidance]);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .get("/regularize/guidance/list")
+      .query({ target_type: "PF" })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      undefined,
+      "PF",
+    );
   });
 
   it("POST /regularize/guidance rejeita chaves extras no snapshot", async () => {

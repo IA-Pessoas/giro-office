@@ -1,6 +1,10 @@
 import { REGULARIZE_GUIDANCE_CHECKLIST_ITEMS } from "@workspace/shared";
 import { describe, expect, it } from "vitest";
-import { createGuidanceBodySchema, updateGuidanceBodySchema } from "../schemas/guidance.schemas.js";
+import {
+  createGuidanceBodySchema,
+  listGuidanceByProcessQuerySchema,
+  updateGuidanceBodySchema,
+} from "../schemas/guidance.schemas.js";
 
 const processId = "10000000-0000-4000-8000-000000000001";
 const clientPjId = "10000000-0000-4000-8000-000000000002";
@@ -57,6 +61,15 @@ describe("guidance schemas", () => {
     ).toBe(true);
     expect(
       createGuidanceBodySchema.safeParse(
+        createBody({
+          target_type: "SEM_CLIENTE",
+          client_pj_id: undefined,
+          target_snapshot: { version: 1, source: "client_pj", name: "Interessado" },
+        }),
+      ).success,
+    ).toBe(false);
+    expect(
+      createGuidanceBodySchema.safeParse(
         createBody({ target_type: "PJ", client_pf_id: clientPfId }),
       ).success,
     ).toBe(false);
@@ -91,6 +104,17 @@ describe("guidance schemas", () => {
       updateGuidanceBodySchema.safeParse({ id: processId, checklist: checklist.slice(0, 16) })
         .success,
     ).toBe(false);
+  });
+
+  it("aceita filtro opcional por processo e target_type no endpoint de listagem", () => {
+    expect(listGuidanceByProcessQuerySchema.safeParse({}).success).toBe(true);
+    expect(
+      listGuidanceByProcessQuerySchema.safeParse({ process_id: processId, target_type: "PF" })
+        .success,
+    ).toBe(true);
+    expect(listGuidanceByProcessQuerySchema.safeParse({ target_type: "OUTRO" }).success).toBe(
+      false,
+    );
   });
 
   it("rejeita branch_data sem filial concluída e o exige quando concluída", () => {

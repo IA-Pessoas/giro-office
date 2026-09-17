@@ -429,6 +429,12 @@ describe("regularize status contracts", () => {
       required: false,
       schema: { type: "string", format: "uuid", nullable: true },
     });
+    expect(listPath.get.parameters).toContainEqual({
+      name: "target_type",
+      in: "query",
+      required: false,
+      schema: { type: "string", enum: ["PJ", "PF", "SEM_CLIENTE"] },
+    });
     expect(Object.keys(listPath.get.responses)).toEqual(expect.arrayContaining(["200", "404"]));
   });
 });

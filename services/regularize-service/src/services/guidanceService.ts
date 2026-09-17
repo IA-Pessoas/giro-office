@@ -202,11 +202,13 @@ export class GuidanceService {
   async listByProcess(
     organizationId: string,
     processId?: string,
+    targetType?: RegularizeGuidanceTargetType,
   ): Promise<Record<string, unknown>[]> {
     const list = await this.prisma.proceduralGuidance.findMany({
       where: {
         organization_id: organizationId,
         ...(processId === undefined ? {} : { process_id: processId }),
+        ...(targetType === undefined ? {} : { target_type: targetType }),
       },
       include,
     });

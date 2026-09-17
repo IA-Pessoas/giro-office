@@ -546,8 +546,14 @@ describe("GuidanceService", () => {
     const f = setup();
     const created = await f.create();
     await f.create({ process_id: "process-a" });
-    expect(await f.service.listByProcess(organizationId)).toHaveLength(2);
+    await f.create({
+      target_type: "SEM_CLIENTE",
+      client_pf_id: null,
+      target_snapshot: { version: 1, source: "manual", name: "Interessado" },
+    });
+    expect(await f.service.listByProcess(organizationId)).toHaveLength(3);
     expect(await f.service.listByProcess(organizationId, "process-a")).toHaveLength(1);
+    expect(await f.service.listByProcess(organizationId, undefined, "SEM_CLIENTE")).toHaveLength(1);
     expect(await f.service.listByProcess("org-b")).toEqual([]);
     await expect(f.service.detail("org-b", created.id as string)).rejects.toMatchObject({
       statusCode: 404,
