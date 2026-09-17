@@ -194,6 +194,15 @@ export class TaskIntegrationRegularizeService {
         resourceOrganizationId: organizationId,
         isOwner: access.isOwner === true,
       });
+      if (taskModelId) {
+        const taskModel = await prismaClient.taskModel.findFirst({
+          where: { id: taskModelId, organization_id: organizationId },
+          select: { id: true },
+        });
+        if (!taskModel) {
+          throw new ServiceError(404, "Modelo de Tarefa não encontrado.");
+        }
+      }
       const list = await prismaClient.tasksIntegrationRegularize.findMany({
         where: {
           organization_id: organizationId,

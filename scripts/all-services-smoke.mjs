@@ -4893,9 +4893,6 @@ const handlers = {
       expectedStatus: [200],
       query: { status: "Todos" },
     });
-    if (isBadExpectation(op)) {
-      return;
-    }
     state.taskIntegrationProcessId =
       pickFirst(response.body, "data.id") ??
       pickFirst(response.body, "data.create.id") ??

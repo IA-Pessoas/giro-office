@@ -882,6 +882,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
               ...successJson,
             },
             "403": { description: "Acesso negado." },
+            "404": { description: "Modelo não encontrado no escopo da organização." },
           },
         },
       },

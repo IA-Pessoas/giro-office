@@ -214,6 +214,10 @@ export function TaskModelModal({
 
       setLoadingDetail(true);
       setLoadingDependents(true);
+      const regularizeOptionsPromise = Promise.allSettled([
+        regularizeService.listProcesses({ status: "Todos" }),
+        regularizeService.listLicenses({ status: "Todos" }),
+      ]);
 
       try {
         const detail = await taskModelService.detail(initialData.id);
@@ -238,48 +242,44 @@ export function TaskModelModal({
           type: "Projeto",
         });
 
-        try {
-          const dependentsData = await taskModelService.listDependents(initialData.id);
-
-          if (!cancelled) {
-            setDependents(dependentsData);
-          }
-        } catch {
-          if (!cancelled) {
+        const [dependentsResult, linksResult, regularizeOptionsResult] = await Promise.allSettled([
+          taskModelService.listDependents(initialData.id),
+          taskModelService.listRegularizeLinks(initialData.id),
+          regularizeOptionsPromise,
+        ]);
+        if (!cancelled) {
+          if (dependentsResult.status === "fulfilled") {
+            setDependents(dependentsResult.value);
+          } else {
             setDependents([]);
             toast.warning("Não foi possível carregar dependências do modelo.");
           }
-        }
-        try {
-          const links = await taskModelService.listRegularizeLinks(initialData.id);
-          if (!cancelled) {
-            setRegularizeLinks(links);
+          if (linksResult.status === "fulfilled") {
+            setRegularizeLinks(linksResult.value);
+          } else {
+            toast.warning("Não foi possível carregar vínculos do Regularize.");
           }
-        } catch {
-          if (!cancelled) toast.warning("Não foi possível carregar vínculos do Regularize.");
-        }
-
-        try {
-          const [processes, licenses] = await Promise.all([
-            regularizeService.listProcesses({ status: "Todos" }),
-            regularizeService.listLicenses({ status: "Todos" }),
+          if (regularizeOptionsResult.status === "rejected") {
+            toast.warning("Não foi possível carregar destinos do Regularize.");
+            return;
+          }
+          const [processesResult, licensesResult] = regularizeOptionsResult.value;
+          if (processesResult.status === "rejected" || licensesResult.status === "rejected") {
+            toast.warning("Não foi possível carregar destinos do Regularize.");
+            return;
+          }
+          setRegularizeOptions([
+            ...processesResult.value.map((item) => ({
+              id: item.id,
+              label: `Processo: ${item.process_type}`,
+              type: "process" as const,
+            })),
+            ...licensesResult.value.map((item) => ({
+              id: item.id,
+              label: `Licença: ${item.type_license}`,
+              type: "license" as const,
+            })),
           ]);
-          if (!cancelled) {
-            setRegularizeOptions([
-              ...processes.map((item) => ({
-                id: item.id,
-                label: `Processo: ${item.process_type}`,
-                type: "process" as const,
-              })),
-              ...licenses.map((item) => ({
-                id: item.id,
-                label: `Licença: ${item.type_license}`,
-                type: "license" as const,
-              })),
-            ]);
-          }
-        } catch {
-          if (!cancelled) toast.warning("Não foi possível carregar destinos do Regularize.");
         }
       } catch (error) {
         if (!cancelled) {
@@ -745,9 +745,10 @@ export function TaskModelModal({
                 <ProjectSelect
                   aria-label="Tipo de destino Regularize"
                   value={regularizeType}
-                  onChange={(event) =>
-                    setRegularizeType(event.target.value as "process" | "license")
-                  }
+                  onChange={(event) => {
+                    setRegularizeType(event.target.value as "process" | "license");
+                    setRegularizeDestination("");
+                  }}
                 >
                   <option value="process">Processo</option>
                   <option value="license">Licença</option>

@@ -27,6 +27,7 @@ import { TaskIntegrationRegularizeService } from "../services/taskIntegrationReg
 describe("TaskIntegrationRegularizeService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.taskModel.findFirst.mockResolvedValue({ id: "model-1", name: "Modelo" });
   });
 
   it("createLink lança 404 quando modelo não existe", async () => {
@@ -81,9 +82,23 @@ describe("TaskIntegrationRegularizeService", () => {
       where: { id: "process-1", organization_id: "org-1" },
       select: { id: true },
     });
-    expect(auditMock.createLog).toHaveBeenCalledWith(
-      expect.objectContaining({ required: true }),
-    );
+    expect(auditMock.createLog).toHaveBeenCalledWith(expect.objectContaining({ required: true }));
+
+    prismaMock.license.findFirst.mockResolvedValue({ id: "license-1" });
+    await expect(
+      service.createLink({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_model_id: "model-1",
+        referring: "license-1",
+        referring_type: "license",
+        integracaoLevel: 3,
+      }),
+    ).resolves.toMatchObject({ integration: { id: "link-1" } });
+    expect(prismaMock.license.findFirst).toHaveBeenCalledWith({
+      where: { id: "license-1", organization_id: "org-1" },
+      select: { id: true },
+    });
 
     await expect(
       service.createLink({
@@ -114,6 +129,43 @@ describe("TaskIntegrationRegularizeService", () => {
     ).rejects.toMatchObject({ statusCode: 404 });
 
     expect(prismaMock.tasksIntegrationRegularize.create).not.toHaveBeenCalled();
+  });
+
+  it("converte colisão do índice único em conflito", async () => {
+    prismaMock.process.findFirst.mockResolvedValue({ id: "process-1" });
+    prismaMock.tasksIntegrationRegularize.findFirst.mockResolvedValue(null);
+    prismaMock.tasksIntegrationRegularize.create.mockRejectedValue({ code: "P2002" });
+    const service = new TaskIntegrationRegularizeService();
+
+    await expect(
+      service.createLink({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_model_id: "model-1",
+        referring: "process-1",
+        referring_type: "process",
+        integracaoLevel: 3,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("rejeita listagem de modelo de outra organização", async () => {
+    prismaMock.taskModel.findFirst.mockResolvedValue(null);
+    const service = new TaskIntegrationRegularizeService();
+
+    await expect(
+      service.list("org-1", "model-org-2", { userId: "user-1", integracaoLevel: 1 }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    expect(prismaMock.tasksIntegrationRegularize.findMany).not.toHaveBeenCalled();
+  });
+
+  it("rejeita listagem sem permissão de Integração", async () => {
+    const service = new TaskIntegrationRegularizeService();
+
+    await expect(
+      service.list("org-1", "model-1", { userId: "user-1", integracaoLevel: 0 }),
+    ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it("mantém vínculo quando destino Regularize não está mais disponível", async () => {
@@ -161,8 +213,6 @@ describe("TaskIntegrationRegularizeService", () => {
       }),
     ).resolves.toEqual({ message: "Vínculo removido com sucesso." });
 
-    expect(auditMock.createLog).toHaveBeenCalledWith(
-      expect.objectContaining({ required: true }),
-    );
+    expect(auditMock.createLog).toHaveBeenCalledWith(expect.objectContaining({ required: true }));
   });
 });
