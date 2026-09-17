@@ -43,6 +43,9 @@ Exemplos de paths publicos:
 - `/task/project-plan`
 - `/task/project-plan/list`
 - `/task/deps/list`
+- `POST /task/complete-request` abre solicitação de conclusão; `PUT` aprova ou recusa, `DELETE`
+  cancela a própria solicitação e `GET /task/complete-request/list` retorna o histórico da tarefa.
+- `PUT /task/reopen` reabre uma tarefa concluída com motivo; a permissão é validada no serviço.
 - `POST /task/project-wizard/preview` compõe tarefas principais e dependências diretas canônicas e
   retorna uma `revision` opaca. Exige Integração nível 2+ ou owner.
 - `POST /task/project-wizard` cria o projeto com a lista, inclusive vazia, de tarefas principais e

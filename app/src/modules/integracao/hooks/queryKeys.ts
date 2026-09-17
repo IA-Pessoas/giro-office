@@ -51,3 +51,7 @@ export function integracaoTasksListQueryKey(params: IntegracaoTaskListParams) {
 export function integracaoTaskDetailQueryKey(taskId: string) {
   return [...INTEGRACAO_TASKS_QUERY_KEY, "detail", taskId] as const;
 }
+
+export function integracaoTaskCompletionRequestsQueryKey(taskId: string) {
+  return [...INTEGRACAO_TASKS_QUERY_KEY, "completion-requests", taskId] as const;
+}

@@ -9,6 +9,8 @@ import { useFetch } from "@shared/hooks";
 
 import type {
   CreateIntegracaoTaskBody,
+  IntegracaoTaskCompletionDecision,
+  IntegracaoTaskCompletionRequest,
   IntegracaoTaskDetail,
   IntegracaoTaskListParams,
   IntegracaoTaskListResult,
@@ -17,6 +19,7 @@ import type {
 import { integracaoTasksService } from "../services";
 import {
   INTEGRACAO_TASKS_QUERY_KEY,
+  integracaoTaskCompletionRequestsQueryKey,
   integracaoTaskDetailQueryKey,
   integracaoTasksListQueryKey,
 } from "./queryKeys";
@@ -42,6 +45,73 @@ export function useIntegracaoTaskDetail(taskId: string | undefined): UseQueryRes
       enabled: Boolean(taskId),
     },
   );
+}
+
+export function useIntegracaoTaskCompletionRequests(
+  taskId: string | undefined,
+): UseQueryResult<IntegracaoTaskCompletionRequest[], Error> {
+  return useFetch(
+    integracaoTaskCompletionRequestsQueryKey(taskId ?? "missing"),
+    () => integracaoTasksService.listCompletionRequests(taskId ?? ""),
+    { enabled: Boolean(taskId) },
+  );
+}
+
+async function invalidateTaskLifecycle(queryClient: ReturnType<typeof useQueryClient>, taskId: string) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: integracaoTaskDetailQueryKey(taskId) }),
+    queryClient.invalidateQueries({ queryKey: integracaoTaskCompletionRequestsQueryKey(taskId) }),
+    queryClient.invalidateQueries({ queryKey: INTEGRACAO_TASKS_QUERY_KEY }),
+  ]);
+}
+
+export function useRequestTaskCompletionMutation(): UseMutationResult<
+  void,
+  Error,
+  { taskId: string; reason: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, reason }) => integracaoTasksService.requestCompletion(taskId, reason),
+    onSuccess: async (_result, { taskId }) => invalidateTaskLifecycle(queryClient, taskId),
+  });
+}
+
+export function useDecideTaskCompletionMutation(): UseMutationResult<
+  void,
+  Error,
+  { taskId: string; requestId: string; decision: IntegracaoTaskCompletionDecision; reason?: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, requestId, decision, reason }) =>
+      integracaoTasksService.decideCompletion(taskId, requestId, decision, reason),
+    onSuccess: async (_result, { taskId }) => invalidateTaskLifecycle(queryClient, taskId),
+  });
+}
+
+export function useCancelTaskCompletionMutation(): UseMutationResult<
+  void,
+  Error,
+  { taskId: string; requestId: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, requestId }) => integracaoTasksService.cancelCompletion(taskId, requestId),
+    onSuccess: async (_result, { taskId }) => invalidateTaskLifecycle(queryClient, taskId),
+  });
+}
+
+export function useReopenTaskMutation(): UseMutationResult<
+  void,
+  Error,
+  { taskId: string; reason: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, reason }) => integracaoTasksService.reopen(taskId, reason),
+    onSuccess: async (_result, { taskId }) => invalidateTaskLifecycle(queryClient, taskId),
+  });
 }
 
 export function useCreateIntegracaoTaskMutation(): UseMutationResult<

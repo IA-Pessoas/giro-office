@@ -5017,8 +5017,46 @@ const handlers = {
   async taskCompleteRequestPut(op) {
     await httpRequest(op, {
       expectedStatus: [200],
+      method: "POST",
+      path: "/task/complete-request",
+      json: { task_id: requireState("taskId"), reason: "Solicitação criada pelo smoke." },
+    });
+    await httpRequest(op, {
+      expectedStatus: [200],
       path: "/task/complete-request",
       json: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskCompleteRequestPost(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/task/complete-request",
+      json: { task_id: requireState("taskId"), reason: "Solicitação criada pelo smoke." },
+    });
+  },
+
+  async taskCompleteRequestListGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/task/complete-request/list",
+      query: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskCompleteRequestDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/task/complete-request",
+      json: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskReopenPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/task/reopen",
+      json: { task_id: requireState("taskId"), reason: "Reabertura validada pelo smoke." },
     });
   },
 

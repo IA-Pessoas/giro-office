@@ -29,8 +29,12 @@ interface TaskRouteMocks {
     list: Mock;
   };
   taskLifecycleServiceMock: {
+    requestTaskCompletion: Mock;
     concludeTask: Mock;
     approveTaskCompletion: Mock;
+    cancelTaskCompletion: Mock;
+    listTaskCompletionRequests: Mock;
+    reopenTask: Mock;
   };
   taskFinanceiroServiceMock: {
     updateChargeFinanceiro: Mock;
@@ -64,8 +68,12 @@ const taskRouteMocks: TaskRouteMocks = vi.hoisted(
       list: vi.fn(),
     },
     taskLifecycleServiceMock: {
+      requestTaskCompletion: vi.fn(),
       concludeTask: vi.fn(),
       approveTaskCompletion: vi.fn(),
+      cancelTaskCompletion: vi.fn(),
+      listTaskCompletionRequests: vi.fn(),
+      reopenTask: vi.fn(),
     },
     taskFinanceiroServiceMock: {
       updateChargeFinanceiro: vi.fn(),
@@ -180,7 +188,17 @@ export function resetTaskRouteMocks() {
   taskIntegrationRegularizeServiceMock.list.mockResolvedValue([{ id: "integration-1" }]);
 
   taskLifecycleServiceMock.concludeTask.mockResolvedValue({ id: "task-1" });
+  taskLifecycleServiceMock.requestTaskCompletion.mockResolvedValue({
+    id: "request-1",
+    status: "pending",
+  });
   taskLifecycleServiceMock.approveTaskCompletion.mockResolvedValue({ id: "task-1" });
+  taskLifecycleServiceMock.cancelTaskCompletion.mockResolvedValue({
+    id: "request-1",
+    status: "canceled",
+  });
+  taskLifecycleServiceMock.listTaskCompletionRequests.mockResolvedValue([]);
+  taskLifecycleServiceMock.reopenTask.mockResolvedValue({ id: "task-1", status: "Em Andamento" });
   taskFinanceiroServiceMock.updateChargeFinanceiro.mockResolvedValue({ id: "task-1" });
 }
 

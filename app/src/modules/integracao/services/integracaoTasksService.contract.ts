@@ -1,5 +1,7 @@
 import type {
   CreateIntegracaoTaskBody,
+  IntegracaoTaskCompletionDecision,
+  IntegracaoTaskCompletionRequest,
   IntegracaoTaskDetail,
   IntegracaoTaskListParams,
   IntegracaoTaskListResult,
@@ -10,7 +12,32 @@ import { unwrapServiceEnvelope } from "./envelope.contract.js";
 export const INTEGRACAO_TASKS_ENDPOINTS = {
   crud: "/task",
   list: "/task/list",
+  completionRequest: "/task/complete-request",
+  completionRequestList: "/task/complete-request/list",
+  reopen: "/task/reopen",
 } as const;
+
+export function buildTaskCompletionRequestPayload(taskId: string, reason: string) {
+  return { task_id: taskId, reason };
+}
+
+export function buildTaskCompletionDecisionPayload(
+  taskId: string,
+  requestId: string,
+  decision: IntegracaoTaskCompletionDecision,
+  reason?: string,
+) {
+  return {
+    task_id: taskId,
+    request_id: requestId,
+    decision,
+    ...(reason ? { reason } : {}),
+  };
+}
+
+export function buildTaskReopenPayload(taskId: string, reason: string) {
+  return { task_id: taskId, reason };
+}
 
 export function buildIntegracaoTaskListParams(params: IntegracaoTaskListParams) {
   return {
@@ -52,6 +79,10 @@ export function buildDeleteIntegracaoTaskPayload(taskId: string) {
 
 export function unwrapIntegracaoTaskList(body: unknown): IntegracaoTaskListResult {
   return unwrapServiceEnvelope(body) as IntegracaoTaskListResult;
+}
+
+export function unwrapTaskCompletionRequestHistory(body: unknown): IntegracaoTaskCompletionRequest[] {
+  return unwrapServiceEnvelope(body) as IntegracaoTaskCompletionRequest[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

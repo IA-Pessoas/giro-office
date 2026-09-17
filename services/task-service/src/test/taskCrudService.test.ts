@@ -1478,7 +1478,7 @@ describe("TaskCrudService", () => {
     expect(result.data[0]).toMatchObject({ id: "task-1", isOwn: false });
   });
 
-  it("não permite concluir diretamente uma tarefa sem o fluxo de aprovação", async () => {
+  it("não permite concluir diretamente uma tarefa, inclusive para proprietário", async () => {
     prismaMock.task.findFirst.mockResolvedValue({
       organization_id: "org-1",
       name: "Tarefa",
@@ -1495,9 +1495,34 @@ describe("TaskCrudService", () => {
         organization_id: "org-1",
         task_id: "task-1",
         status: "Concluída",
-        integracaoLevel: 2,
+        integracaoLevel: 3,
+        isOwner: true,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+  });
+
+  it("não permite reabrir diretamente uma tarefa concluída", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      organization_id: "org-1",
+      name: "Tarefa",
+      status: "Concluída",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+
+    await expect(
+      new TaskCrudService().updateTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        status: "Em Andamento",
+        integracaoLevel: 3,
+        isOwner: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
     expect(prismaMock.task.update).not.toHaveBeenCalled();
   });
 
