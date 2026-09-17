@@ -109,6 +109,7 @@ const integracaoProjectPolicy: AuthPolicy = {
     minPermission: moduleAccessPermission,
   },
 };
+const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao", 0);
 
 const integracaoClientPolicy: AuthPolicy = {
   modulePermission: {
@@ -197,6 +198,11 @@ const routePolicyMatchers: Array<{
     method: "POST",
     path: /^\/task\/financeiro\/(?:settle|express)$/,
     policy: integracaoProjectPolicy,
+  },
+  {
+    method: "ANY",
+    path: /^\/task\/notifications(?:\/read)?$/,
+    policy: integracaoNotificationPolicy,
   },
   { method: "GET", path: /^\/task(?:\/|$)/, policy: integracaoProjectPolicy },
   { method: "ANY", path: /^\/task(?:\/|$)/, policy: integracaoEditPolicy },

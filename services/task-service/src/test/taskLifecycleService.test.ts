@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
+const { prismaMock, auditMock, workflowMock, operationalNotificationMock } = vi.hoisted(() => ({
   prismaMock: {
     $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(prismaMock)),
     task: {
@@ -30,6 +30,7 @@ const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
   workflowMock: {
     afterTaskUpdated: vi.fn(),
   },
+  operationalNotificationMock: vi.fn(),
 }));
 
 vi.mock("../prisma/index.js", () => ({ default: prismaMock }));
@@ -38,6 +39,14 @@ vi.mock("../services/taskWorkflowService.js", () => ({
   TaskWorkflowService: vi.fn(function TaskWorkflowService() {
     return workflowMock;
   }),
+}));
+vi.mock("../services/taskOperationalNotificationService.js", () => ({
+  publishTaskOperationalNotifications: operationalNotificationMock,
+  TASK_OPERATIONAL_NOTIFICATION_TYPE: {
+    COMPLETION_REQUEST: "completion_request",
+    COMPLETION_DECISION: "completion_decision",
+    TASK_CHANGED: "task_changed",
+  },
 }));
 
 import { TaskLifecycleService } from "../services/taskLifecycleService.js";
@@ -75,6 +84,42 @@ describe("TaskLifecycleService", () => {
     });
     expect(auditMock.createLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: "Solicitação de Conclusão", required: true }),
+    );
+  });
+
+  it("notifica os responsáveis atuais sem avisar quem solicitou a conclusão", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      status: "Em Andamento",
+      responsible_id: "user-1",
+      responsible2_id: "user-2",
+      responsible3_id: null,
+    });
+    prismaMock.taskCompletionRequest.findFirst.mockResolvedValue(null);
+    prismaMock.taskCompletionRequest.create.mockResolvedValue({
+      id: "request-1",
+      status: "pending",
+    });
+    prismaMock.task.update.mockResolvedValue({ id: "task-1", pending_approval: true });
+
+    await new TaskLifecycleService().requestTaskCompletion({
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      reason: "Pronta para validação.",
+      integracaoLevel: 0,
+    });
+
+    expect(operationalNotificationMock).toHaveBeenCalledWith(
+      prismaMock,
+      expect.objectContaining({
+        organization_id: "org-1",
+        task_id: "task-1",
+        event_key: "completion-request:request-1",
+        responsible_ids: ["user-1", "user-2", null],
+        exclude_user_id: "user-1",
+      }),
     );
   });
 

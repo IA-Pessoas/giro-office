@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, auditMock } = vi.hoisted(() => ({
+const { prismaMock, auditMock, operationalNotificationMock } = vi.hoisted(() => ({
   prismaMock: {
     $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(prismaMock)),
     task: { findFirst: vi.fn(), update: vi.fn() },
@@ -9,10 +9,15 @@ const { prismaMock, auditMock } = vi.hoisted(() => ({
     pessoalNotification: { createMany: vi.fn() },
   },
   auditMock: { createLog: vi.fn() },
+  operationalNotificationMock: vi.fn(),
 }));
 
 vi.mock("../prisma/index.js", () => ({ default: prismaMock }));
 vi.mock("../integrations/audit.js", () => auditMock);
+vi.mock("../services/taskOperationalNotificationService.js", () => ({
+  publishTaskOperationalNotifications: operationalNotificationMock,
+  TASK_OPERATIONAL_NOTIFICATION_TYPE: { TASK_CHANGED: "task_changed" },
+}));
 
 import { TaskPostponementService } from "../services/taskPostponementService.js";
 
@@ -38,8 +43,6 @@ describe("TaskPostponementService", () => {
       author_id: "user-1",
       created_at: new Date("2026-09-17T12:00:00.000Z"),
     });
-    prismaMock.permission.findMany.mockResolvedValue([{ user_id: "admin-1" }]);
-    prismaMock.pessoalNotification.createMany.mockResolvedValue({ count: 3 });
   });
 
   it("prorroga em uma transação, preserva o histórico e notifica responsáveis e admin", async () => {
@@ -72,14 +75,12 @@ describe("TaskPostponementService", () => {
         required: true,
       }),
     );
-    expect(prismaMock.pessoalNotification.createMany).toHaveBeenCalledWith(
+    expect(operationalNotificationMock).toHaveBeenCalledWith(
+      prismaMock,
       expect.objectContaining({
-        data: expect.arrayContaining([
-          expect.objectContaining({ user_id: "user-1", regarding: "task_postponement" }),
-          expect.objectContaining({ user_id: "user-2", regarding: "task_postponement" }),
-          expect.objectContaining({ user_id: "admin-1", regarding: "task_postponement" }),
-        ]),
-        skipDuplicates: true,
+        event_key: "postponement:postponement-1",
+        responsible_ids: ["user-1", "user-2", null],
+        include_administrators: true,
       }),
     );
   });

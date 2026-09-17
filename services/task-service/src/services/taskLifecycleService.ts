@@ -12,6 +12,10 @@ import prismaClient from "../prisma/index.js";
 import type { IntegracaoTaskConclusionBody } from "../schemas/integracaoTaskConclusionBody.schema.js";
 import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
 import { throwIfActiveTaskConflict } from "./taskActiveConflict.js";
+import {
+  publishTaskOperationalNotifications,
+  TASK_OPERATIONAL_NOTIFICATION_TYPE,
+} from "./taskOperationalNotificationService.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
 
 const CONCLUSION_UPDATE_SELECT = {
@@ -25,6 +29,7 @@ const CONCLUSION_UPDATE_SELECT = {
   observations: true,
   justification: true,
   pending_approval: true,
+  date_updated: true,
 } as const;
 
 const COMPLETE_UPDATE_SELECT = {
@@ -176,6 +181,20 @@ export class TaskLifecycleService {
           await tx.task.update({
             where: { id: params.task_id },
             data: { pending_approval: true },
+          });
+          await publishTaskOperationalNotifications(tx, {
+            organization_id: params.organization_id,
+            task_id: currentTask.id,
+            event_key: `completion-request:${request.id}`,
+            type: TASK_OPERATIONAL_NOTIFICATION_TYPE.COMPLETION_REQUEST,
+            title: "Solicitação de conclusão",
+            message: "Uma tarefa foi enviada para sua validação.",
+            responsible_ids: [
+              currentTask.responsible_id,
+              currentTask.responsible2_id,
+              currentTask.responsible3_id,
+            ],
+            exclude_user_id: params.user_id,
           });
           await audit.createLog({
             userId: params.user_id,
@@ -530,6 +549,37 @@ export class TaskLifecycleService {
               },
               required: true,
             });
+            await publishTaskOperationalNotifications(tx, {
+              organization_id,
+              task_id: task.id,
+              event_key: `completion-request:${request.id}`,
+              type: TASK_OPERATIONAL_NOTIFICATION_TYPE.COMPLETION_REQUEST,
+              title: "Solicitação de conclusão",
+              message: "Uma tarefa foi enviada para sua validação.",
+              responsible_ids: [task.responsible_id, task.responsible2_id, task.responsible3_id],
+              exclude_user_id: user_id,
+            });
+          }
+
+          const relevantChange =
+            currentTask.status !== task.status ||
+            currentTask.observations !== task.observations ||
+            currentTask.end_date?.getTime() !== task.end_date?.getTime() ||
+            currentTask.responsible_id !== task.responsible_id ||
+            currentTask.responsible2_id !== task.responsible2_id ||
+            currentTask.responsible3_id !== task.responsible3_id;
+          if (relevantChange && !requiresCompletionRequest) {
+            await publishTaskOperationalNotifications(tx, {
+              organization_id,
+              task_id: task.id,
+              event_key: `task-change:${task.date_updated?.toISOString() ?? task.id}`,
+              type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
+              title: "Tarefa atualizada",
+              message: "Há uma alteração relevante em uma tarefa sob sua responsabilidade.",
+              responsible_ids: [task.responsible_id, task.responsible2_id, task.responsible3_id],
+              include_administrators: true,
+              exclude_user_id: user_id,
+            });
           }
 
           return { task, previousTask: currentTask };
@@ -636,6 +686,20 @@ export class TaskLifecycleService {
               changes: { status: "Concluída", legacy_pending_approval: true },
               required: true,
             });
+            await publishTaskOperationalNotifications(tx, {
+              organization_id,
+              task_id,
+              event_key: `completion-decision:legacy:${task_id}:${decision}`,
+              type: TASK_OPERATIONAL_NOTIFICATION_TYPE.COMPLETION_DECISION,
+              title: "Conclusão aprovada",
+              message: "A conclusão da tarefa foi aprovada.",
+              responsible_ids: [
+                exists.responsible_id,
+                exists.responsible2_id,
+                exists.responsible3_id,
+              ],
+              exclude_user_id: user_id,
+            });
             return legacyUpdated;
           }
           throw new ServiceError(409, "Não há solicitação de conclusão pendente.");
@@ -700,6 +764,27 @@ export class TaskLifecycleService {
             ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
           },
           required: true,
+        });
+        await publishTaskOperationalNotifications(tx, {
+          organization_id,
+          task_id,
+          event_key: `completion-decision:${completionRequest.id}:${decision}`,
+          type: TASK_OPERATIONAL_NOTIFICATION_TYPE.COMPLETION_DECISION,
+          title:
+            decision === TASK_COMPLETION_REQUEST_STATUS.APPROVED
+              ? "Conclusão aprovada"
+              : "Conclusão recusada",
+          message:
+            decision === TASK_COMPLETION_REQUEST_STATUS.APPROVED
+              ? "A conclusão da tarefa foi aprovada."
+              : "A conclusão da tarefa foi recusada.",
+          responsible_ids: [
+            completionRequest.requester_id,
+            exists.responsible_id,
+            exists.responsible2_id,
+            exists.responsible3_id,
+          ],
+          exclude_user_id: user_id,
         });
         return task;
       });

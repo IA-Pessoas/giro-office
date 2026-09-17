@@ -165,6 +165,7 @@ model Organization {
   certificateNotifications      CertificateNotification[]
   pessoalNotifications          PessoalNotification[]
   regularizeNotifications       RegularizeNotification[]
+  taskOperationalNotifications  TaskOperationalNotification[]
   organizationInvites           OrganizationInvite[]
   usersWithOrg                  User[]              @relation("UserOrganization")
   installments                  Installment[]
@@ -367,6 +368,7 @@ model User {
   triageMonthlys              TriageMonthly[]
   responsiblesTriage          TriageResponsible[]
   financeiroCollectorAssignments DepartmentCollector[]
+  taskOperationalNotifications TaskOperationalNotification[]
   department                  Department             @relation(fields: [department_id], references: [id])
 
   @@unique([login], map: "users_login_key")
@@ -561,6 +563,27 @@ model RegularizeNotification {
   organization    Organization @relation(fields: [organization_id], references: [id])
 
   @@map("notification.regularize")
+}
+
+model TaskOperationalNotification {
+  id              String       @id @default(uuid())
+  organization_id String
+  recipient_id    String
+  task_id         String
+  event_key       String       @db.VarChar(191)
+  type            String
+  title           String
+  message         String
+  read_at         DateTime?
+  archived_at     DateTime?
+  created_at      DateTime     @default(now())
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  recipient       User         @relation(fields: [recipient_id], references: [id])
+
+  @@unique([organization_id, recipient_id, task_id, event_key], map: "uq_task_operational_notification_event")
+  @@index([organization_id, recipient_id, archived_at, read_at, created_at], map: "idx_task_operational_notification_inbox")
+  @@index([archived_at, created_at], map: "idx_task_operational_notification_retention")
+  @@map("notification.task_operational")
 }
 
 model Chat {

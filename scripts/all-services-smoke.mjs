@@ -5136,6 +5136,18 @@ const handlers = {
     });
   },
 
+  async taskOperationalNotificationList(op) {
+    const response = await httpRequest(op, { expectedStatus: [200] });
+    state.taskOperationalNotificationId = pickFirst(response.body, "data.items.0.id");
+  },
+
+  async taskOperationalNotificationRead(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { notification_id: requireState("taskOperationalNotificationId") },
+    });
+  },
+
   async taskAttachmentCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

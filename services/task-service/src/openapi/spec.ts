@@ -516,6 +516,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       { name: "TaskIntegration", description: "Vinculos integracao Regularize" },
       { name: "Financeiro", description: "Cobranca financeira" },
       { name: "Lifecycle", description: "Conclusao e aprovacao" },
+      { name: "Notifications", description: "Notificações operacionais por destinatário" },
       { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     components: {
@@ -919,7 +920,10 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             { name: "department_id", in: "query", schema: { type: "string" } },
             { name: "client_id", in: "query", schema: { type: "string" } },
           ],
-          responses: { "200": { description: "Fila pendente", ...successJson }, "403": { description: "Fora do escopo" } },
+          responses: {
+            "200": { description: "Fila pendente", ...successJson },
+            "403": { description: "Fora do escopo" },
+          },
         },
       },
       "/task/financeiro/collectors": {
@@ -927,22 +931,31 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["Financeiro"],
           summary: "Listar cobradores ativos do departamento",
           security: bearer,
-          parameters: [{ name: "department_id", in: "query", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Cobradores", ...successJson }, "403": { description: "Somente administradores" } },
+          parameters: [
+            { name: "department_id", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: {
+            "200": { description: "Cobradores", ...successJson },
+            "403": { description: "Somente administradores" },
+          },
         },
         put: {
           tags: ["Financeiro"],
           summary: "Configurar cobradores ativos do departamento",
           security: bearer,
           ...collectorsFinanceiroRequestBody,
-          responses: { "200": { description: "Configurado", ...successJson }, "403": { description: "Somente administradores" } },
+          responses: {
+            "200": { description: "Configurado", ...successJson },
+            "403": { description: "Somente administradores" },
+          },
         },
       },
       "/task/financeiro/settle": {
         post: {
           tags: ["Financeiro"],
           summary: "Baixar tarefas financeiras atomicamente",
-          description: "O mesmo Idempotency-Key e o mesmo lote retornam o resultado original; outra carga retorna conflito.",
+          description:
+            "O mesmo Idempotency-Key e o mesmo lote retornam o resultado original; outra carga retorna conflito.",
           security: bearer,
           parameters: [financeiroIdempotencyHeader],
           ...settleFinanceiroRequestBody,
@@ -960,7 +973,11 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           security: bearer,
           parameters: [financeiroIdempotencyHeader],
           ...expressFinanceiroRequestBody,
-          responses: { "200": { description: "Baixa realizada", ...successJson }, "403": { description: "Fora do escopo" }, "409": { description: "Fila alterada" } },
+          responses: {
+            "200": { description: "Baixa realizada", ...successJson },
+            "403": { description: "Fora do escopo" },
+            "409": { description: "Fila alterada" },
+          },
         },
       },
       "/internal/commercial/task-billing": {
@@ -1061,6 +1078,27 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             { name: "task_id", in: "query", required: true, schema: { type: "string" } },
           ],
           responses: { "200": { description: "Histórico", ...successJson } },
+        },
+      },
+      "/task/notifications": {
+        get: {
+          tags: ["Notifications"],
+          summary: "Listar notificações operacionais do destinatário autenticado",
+          security: bearer,
+          responses: { "200": { description: "Caixa de entrada", ...successJson } },
+        },
+      },
+      "/task/notifications/read": {
+        put: {
+          tags: ["Notifications"],
+          summary: "Marcar notificação operacional como lida",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: { notification_id: "notification-uuid" },
+            required: ["notification_id"],
+            properties: { notification_id: { type: "string" } },
+          }),
+          responses: { "200": { description: "Notificação lida", ...successJson } },
         },
       },
       "/task/attachment": {

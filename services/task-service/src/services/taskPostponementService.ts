@@ -10,6 +10,10 @@ import { INTEGRACAO_TASK_STATUS_IN_PROGRESS } from "../constants/integracaoTask.
 import { Prisma } from "../generated/prisma/client.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
+import {
+  publishTaskOperationalNotifications,
+  TASK_OPERATIONAL_NOTIFICATION_TYPE,
+} from "./taskOperationalNotificationService.js";
 
 export type TaskPostponement = {
   id: string;
@@ -121,36 +125,16 @@ export class TaskPostponementService {
             data: { prevision_date: newPrevisionDate },
           });
 
-          const administrators = await tx.permission.findMany({
-            where: {
-              organization_id: task.organization_id,
-              integracao: { gte: INTEGRACAO_PERMISSION_LEVEL.ADMIN },
-              user: { status: "Ativo" },
-            },
-            select: { user_id: true },
+          await publishTaskOperationalNotifications(tx, {
+            organization_id: task.organization_id,
+            task_id: task.id,
+            event_key: `postponement:${postponement.id}`,
+            type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
+            title: "Tarefa prorrogada",
+            message: `A previsão da tarefa foi alterada para ${input.new_prevision_date}.`,
+            responsible_ids: [task.responsible_id, task.responsible2_id, task.responsible3_id],
+            include_administrators: true,
           });
-          const recipients = new Set(
-            [
-              task.responsible_id,
-              task.responsible2_id,
-              task.responsible3_id,
-              ...administrators.map(({ user_id }) => user_id),
-            ].filter((userId): userId is string => Boolean(userId)),
-          );
-          if (recipients.size > 0) {
-            await tx.pessoalNotification.createMany({
-              data: [...recipients].map((user_id) => ({
-                user_id,
-                organization_id: task.organization_id,
-                regarding: "task_postponement",
-                regarding_id: postponement.id,
-                title: "Tarefa prorrogada",
-                message: `A previsão da tarefa foi alterada para ${input.new_prevision_date}.`,
-                reference_date: postponement.created_at,
-              })),
-              skipDuplicates: true,
-            });
-          }
           await audit.createLog({
             userId: input.user_id,
             organizationId: task.organization_id,
