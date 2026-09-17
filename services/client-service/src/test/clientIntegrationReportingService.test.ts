@@ -50,7 +50,7 @@ describe("ClientIntegrationReportingService", () => {
       name: `Cliente ${String(index).padStart(3, "0")}`,
     }));
     const service = new ClientIntegrationReportingService({
-      $transaction: async function (read: (prisma: unknown) => unknown) {
+      $transaction: async function (read: (transaction: unknown) => Promise<unknown>) {
         return read(this);
       },
       client: {

@@ -222,6 +222,7 @@ test("the policy test remains in the local and CI gates", async () => {
     "utf8",
   );
 
-  assert.match(packageJson.scripts.test, /codeowners-policy\.test\.mjs/u);
+  assert.match(packageJson.scripts.test, /^pnpm test:scripts && /u);
+  assert.match(packageJson.scripts["test:scripts"], /codeowners-policy\.test\.mjs/u);
   assert.match(workflow, /codeowners-policy\.test\.mjs/u);
 });
