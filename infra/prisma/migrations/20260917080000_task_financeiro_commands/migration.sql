@@ -1,6 +1,7 @@
 CREATE TABLE "integracao.task_financeiro_commands" (
   "id" TEXT NOT NULL,
   "organization_id" TEXT NOT NULL,
+  "requested_by_user_id" TEXT NOT NULL,
   "idempotency_key" VARCHAR(255) NOT NULL,
   "command_hash" CHAR(64) NOT NULL,
   "response_snapshot" JSONB NOT NULL,

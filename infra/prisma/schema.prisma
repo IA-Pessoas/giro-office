@@ -1025,6 +1025,7 @@ model Task {
 model TaskFinanceiroCommand {
   id                String   @id @default(uuid())
   organization_id   String
+  requested_by_user_id String
   idempotency_key   String   @db.VarChar(255)
   command_hash      String   @db.Char(64)
   response_snapshot Json

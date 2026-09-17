@@ -247,6 +247,8 @@ export class TaskFinanceiroService {
       const result = await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
         const lockKey = JSON.stringify([data.organization_id, data.idempotency_key]);
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+        const isPrivileged =
+          data.is_owner === true || data.integracao_level === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
         const previous = await tx.taskFinanceiroCommand.findUnique({
           where: {
             organization_id_idempotency_key: {
@@ -258,6 +260,34 @@ export class TaskFinanceiroService {
         if (previous) {
           if (previous.command_hash !== commandHash) {
             throw new ServiceError(409, "Idempotency-Key já utilizada com outro comando.");
+          }
+          if (!isPrivileged) {
+            const replay = previous.response_snapshot as unknown as SettleFinanceiroResponse;
+            if (previous.requested_by_user_id !== data.user_id) {
+              throw new ServiceError(403, "Você não pode repetir uma baixa de outro cobrador.");
+            }
+            const actor = await tx.user.findFirst({
+              where: {
+                id: data.user_id,
+                status: "active",
+                OR: [
+                  { organization_id: data.organization_id },
+                  { organization_id: null, department: { organization_id: data.organization_id } },
+                ],
+              },
+              select: { department_id: true },
+            });
+            const replayTasks = await tx.task.findMany({
+              where: { id: { in: replay.task_ids }, organization_id: data.organization_id },
+              select: { id: true, department_id: true },
+            });
+            if (
+              !actor ||
+              replayTasks.length !== replay.task_ids.length ||
+              replayTasks.some((task) => task.department_id !== actor.department_id)
+            ) {
+              throw new ServiceError(403, "Você não é cobrador autorizado para este departamento.");
+            }
           }
           return {
             response: previous.response_snapshot as unknown as SettleFinanceiroResponse,
@@ -278,8 +308,6 @@ export class TaskFinanceiroService {
         if (tasks.some((task) => task.charge_financeiro !== true)) {
           throw new ServiceError(409, "Uma ou mais tarefas não estão pendentes de cobrança financeira.");
         }
-        const isPrivileged =
-          data.is_owner === true || data.integracao_level === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
         if (!isPrivileged) {
           const actor = await tx.user.findFirst({
             where: {
@@ -339,6 +367,7 @@ export class TaskFinanceiroService {
         await tx.taskFinanceiroCommand.create({
           data: {
             organization_id: data.organization_id,
+            requested_by_user_id: data.user_id,
             idempotency_key: data.idempotency_key,
             command_hash: commandHash,
             response_snapshot: response as unknown as Prisma.InputJsonValue,

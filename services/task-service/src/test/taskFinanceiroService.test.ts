@@ -95,6 +95,31 @@ describe("TaskFinanceiroService", () => {
     );
   });
 
+  it("não devolve replay ao cobrador transferido", async () => {
+    const response = { task_ids: ["task-1"], settled: 1 };
+    const commandHash = createHash("sha256").update(JSON.stringify({ task_ids: ["task-1"] })).digest("hex");
+    prismaMock.$transaction.mockImplementation(async (operation) => operation(prismaMock));
+    prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue({
+      command_hash: commandHash,
+      response_snapshot: response,
+      requested_by_user_id: "user-1",
+      audited_at: new Date(),
+    });
+    prismaMock.user.findFirst.mockResolvedValue({ department_id: "department-new" });
+    prismaMock.task.findMany.mockResolvedValue([{ id: "task-1", department_id: "department-old" }]);
+    const service = new TaskFinanceiroService();
+
+    await expect(
+      service.settle({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_ids: ["task-1"],
+        idempotency_key: "replay-transfer-key",
+        integracao_level: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
   it("baixa em lote todas as tarefas pendentes no mesmo comando", async () => {
     prismaMock.$transaction.mockImplementation(async (operation) => operation(prismaMock));
     prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue(null);
