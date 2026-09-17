@@ -64,7 +64,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
 
   router.get("/guidance/list", async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const query = parseWithZod(listGuidanceByProcessQuerySchema, request.query);
+      const query = parseWithZod(listGuidanceByProcessQuerySchema.partial(), request.query);
       const list = await guidanceService.listByProcess(request.organization_id, query.process_id);
       response.json(createSuccessResponse(list));
     } catch (err) {

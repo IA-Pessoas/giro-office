@@ -1,4 +1,9 @@
-import { reportingQueryOpenApiSchema } from "@workspace/shared";
+import {
+  REGULARIZE_GUIDANCE_CHECKLIST_CODES,
+  REGULARIZE_GUIDANCE_CHECKLIST_STATUSES,
+  REGULARIZE_GUIDANCE_TARGET_TYPES,
+  reportingQueryOpenApiSchema,
+} from "@workspace/shared";
 
 import {
   CANONICAL_GUIDANCE_STATUSES,
@@ -68,6 +73,128 @@ function protectedErrorResponses() {
     "400": { description: "Dados de entrada invalidos" },
     "401": { description: "Autenticacao ausente ou invalida" },
     "403": { description: "Permissao insuficiente para o modulo Regularize" },
+  };
+}
+
+const guidanceChecklistItemOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code", "status"],
+  properties: {
+    code: { type: "string", enum: [...REGULARIZE_GUIDANCE_CHECKLIST_CODES] },
+    status: { type: "string", enum: [...REGULARIZE_GUIDANCE_CHECKLIST_STATUSES] },
+    observation: { type: "string" },
+  },
+};
+
+const guidanceChecklistOpenApiSchema = {
+  type: "array",
+  minItems: 17,
+  maxItems: 17,
+  description: "Os 17 códigos canônicos, cada um exatamente uma vez.",
+  items: guidanceChecklistItemOpenApiSchema,
+};
+
+const guidanceTargetSnapshotOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["version", "source", "name"],
+  properties: {
+    version: { type: "integer", enum: [1] },
+    source: { type: "string", enum: ["manual", "client_pj", "client_pf"] },
+    name: { type: "string", minLength: 1 },
+  },
+};
+
+const guidanceBranchDataOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "address", "city", "state"],
+  properties: {
+    name: { type: "string", minLength: 1 },
+    document: { type: "string", minLength: 1 },
+    address: { type: "string", minLength: 1 },
+    city: { type: "string", minLength: 1 },
+    state: { type: "string", minLength: 1 },
+  },
+};
+
+const guidanceOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "process_id",
+    "target_type",
+    "target_snapshot",
+    "checklist_items",
+    "branch_data",
+  ],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    process_id: { type: "string", format: "uuid", nullable: true },
+    target_type: { type: "string", enum: [...REGULARIZE_GUIDANCE_TARGET_TYPES] },
+    client_pj_id: { type: "string", format: "uuid", nullable: true },
+    client_pf_id: { type: "string", format: "uuid", nullable: true },
+    target_snapshot: guidanceTargetSnapshotOpenApiSchema,
+    checklist_items: guidanceChecklistOpenApiSchema,
+    branch_data: { ...guidanceBranchDataOpenApiSchema, nullable: true },
+    status: { type: "string", enum: [...CANONICAL_GUIDANCE_STATUSES] },
+  },
+};
+
+function guidanceRequestBody(required: string[]) {
+  return {
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required,
+            properties: {
+              id: { type: "string", format: "uuid" },
+              process_id: { type: "string", format: "uuid", nullable: true },
+              target_type: { type: "string", enum: [...REGULARIZE_GUIDANCE_TARGET_TYPES] },
+              client_pj_id: { type: "string", format: "uuid", nullable: true },
+              client_pf_id: { type: "string", format: "uuid", nullable: true },
+              target_snapshot: guidanceTargetSnapshotOpenApiSchema,
+              checklist: guidanceChecklistOpenApiSchema,
+              branch_data: guidanceBranchDataOpenApiSchema,
+              status: { type: "string", enum: [...CANONICAL_GUIDANCE_STATUSES] },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function guidanceSuccessEnvelopeContent(list = false) {
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean", enum: [true] },
+            data: list ? { type: "array", items: guidanceOpenApiSchema } : guidanceOpenApiSchema,
+          },
+        },
+      },
+    },
+  };
+}
+
+function guidanceErrorResponses() {
+  return {
+    ...protectedErrorResponses(),
+    "404": { description: "Orientação, processo ou cadastro não encontrado" },
+    "409": { description: "Já existe orientação em andamento para este processo" },
+    "422": { description: "Alvo, checklist ou dados de filial inconsistentes" },
   };
 }
 
@@ -676,22 +803,28 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/guidance": {
         post: {
           tags: ["Guidance"],
-          summary: "Criar orientacao procedural",
+          summary: "Criar orientação procedural independente ou vinculada a processo",
           security: [{ bearerAuth: [] }],
-          ...statusRequestBody(CANONICAL_GUIDANCE_STATUSES, ["status"]),
+          ...guidanceRequestBody(["target_type", "checklist", "status"]),
           responses: {
-            "201": { description: "Orientacao criada", ...successEnvelopeContent() },
-            ...protectedErrorResponses(),
+            "201": {
+              description: "Orientação completa criada",
+              ...guidanceSuccessEnvelopeContent(),
+            },
+            ...guidanceErrorResponses(),
           },
         },
         put: {
           tags: ["Guidance"],
-          summary: "Atualizar orientacao procedural",
+          summary: "Atualizar orientação procedural completa",
           security: [{ bearerAuth: [] }],
-          ...statusRequestBody(CANONICAL_GUIDANCE_STATUSES, ["id"]),
+          ...guidanceRequestBody(["id"]),
           responses: {
-            "200": { description: "Orientacao atualizada", ...successEnvelopeContent() },
-            ...protectedErrorResponses(),
+            "200": {
+              description: "Orientação completa atualizada",
+              ...guidanceSuccessEnvelopeContent(),
+            },
+            ...guidanceErrorResponses(),
           },
         },
       },
@@ -704,32 +837,34 @@ export function buildRegularizeServiceOpenApiSpec(
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
           responses: {
-            "200": { description: "Detalhe da orientacao", ...successEnvelopeContent() },
+            "200": { description: "Detalhe da orientação", ...guidanceSuccessEnvelopeContent() },
+            ...guidanceErrorResponses(),
           },
         },
       },
       "/regularize/guidance/list": {
         get: {
           tags: ["Guidance"],
-          summary: "Listar orientacoes por processo",
+          summary: "Listar orientações, opcionalmente filtradas por processo",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
               name: "process_id",
               in: "query",
-              required: true,
-              schema: { type: "string", format: "uuid" },
+              required: false,
+              schema: { type: "string", format: "uuid", nullable: true },
             },
           ],
           responses: {
-            "200": { description: "Lista de orientacoes", ...successEnvelopeContent() },
+            "200": { description: "Lista de orientações", ...guidanceSuccessEnvelopeContent(true) },
+            ...guidanceErrorResponses(),
           },
         },
       },
       "/regularize/guidance/activity/add": {
         post: {
           tags: ["Guidance"],
-          summary: "Adicionar atividade economica",
+          summary: "Adicionar atividade econômica (compatibilidade legada)",
           security: [{ bearerAuth: [] }],
           responses: {
             "200": { description: "Atividade adicionada", ...successEnvelopeContent() },
@@ -739,7 +874,7 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/guidance/activity/remove": {
         post: {
           tags: ["Guidance"],
-          summary: "Remover atividade economica",
+          summary: "Remover atividade econômica (compatibilidade legada)",
           security: [{ bearerAuth: [] }],
           responses: { "200": { description: "Atividade removida", ...successEnvelopeContent() } },
         },
@@ -747,7 +882,7 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/guidance/partner/add": {
         post: {
           tags: ["Guidance"],
-          summary: "Adicionar socio na orientacao",
+          summary: "Adicionar sócio na orientação (compatibilidade legada)",
           security: [{ bearerAuth: [] }],
           responses: { "200": { description: "Socio adicionado", ...successEnvelopeContent() } },
         },
@@ -755,7 +890,7 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/guidance/partner/remove": {
         post: {
           tags: ["Guidance"],
-          summary: "Remover socio da orientacao",
+          summary: "Remover sócio da orientação (compatibilidade legada)",
           security: [{ bearerAuth: [] }],
           responses: { "200": { description: "Socio removido", ...successEnvelopeContent() } },
         },

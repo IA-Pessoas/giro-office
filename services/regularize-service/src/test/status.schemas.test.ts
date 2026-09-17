@@ -195,4 +195,73 @@ describe("regularize status contracts", () => {
     ).toBe("uuid");
     expect(returnFromFiscalPath.post.summary).toContain("retorno");
   });
+
+  it("documents the independent guidance contract with the complete checklist", () => {
+    const spec = buildRegularizeServiceOpenApiSpec({ port: 3039 });
+    const guidancePath = spec.paths["/regularize/guidance"] as {
+      post: {
+        security: Array<Record<string, string[]>>;
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                additionalProperties: boolean;
+                required: string[];
+                properties: {
+                  process_id: { nullable: boolean };
+                  target_type: { enum: string[] };
+                  target_snapshot: { additionalProperties: boolean };
+                  checklist: {
+                    minItems: number;
+                    maxItems: number;
+                    items: { properties: { status: { enum: string[] } } };
+                  };
+                  branch_data: { additionalProperties: boolean };
+                };
+              };
+            };
+          };
+        };
+        responses: Record<string, unknown>;
+      };
+      put: { responses: Record<string, unknown> };
+    };
+    const listPath = spec.paths["/regularize/guidance/list"] as {
+      get: {
+        security: Array<Record<string, string[]>>;
+        parameters: Array<{ name: string; required: boolean; schema: { nullable: boolean } }>;
+        responses: Record<string, unknown>;
+      };
+    };
+
+    const schema = guidancePath.post.requestBody.content["application/json"].schema;
+    expect(guidancePath.post.security).toEqual([{ bearerAuth: [] }]);
+    expect(schema.additionalProperties).toBe(false);
+    expect(schema.required).toEqual(expect.arrayContaining(["target_type", "checklist", "status"]));
+    expect(schema.properties.process_id.nullable).toBe(true);
+    expect(schema.properties.target_type.enum).toEqual(["PJ", "PF", "SEM_CLIENTE"]);
+    expect(schema.properties.target_snapshot.additionalProperties).toBe(false);
+    expect(schema.properties.checklist.minItems).toBe(17);
+    expect(schema.properties.checklist.maxItems).toBe(17);
+    expect(schema.properties.checklist.items.properties.status.enum).toEqual([
+      "Pendente",
+      "Concluído",
+      "Não se aplica",
+    ]);
+    expect(schema.properties.branch_data.additionalProperties).toBe(false);
+    expect(Object.keys(guidancePath.post.responses)).toEqual(
+      expect.arrayContaining(["201", "404", "409", "422"]),
+    );
+    expect(Object.keys(guidancePath.put.responses)).toEqual(
+      expect.arrayContaining(["200", "404", "409", "422"]),
+    );
+    expect(listPath.get.security).toEqual([{ bearerAuth: [] }]);
+    expect(listPath.get.parameters).toContainEqual({
+      name: "process_id",
+      in: "query",
+      required: false,
+      schema: { type: "string", format: "uuid", nullable: true },
+    });
+    expect(Object.keys(listPath.get.responses)).toEqual(expect.arrayContaining(["200", "404"]));
+  });
 });
