@@ -84,12 +84,12 @@ describe("matriz de regressão das políticas modulares", () => {
   it("deixa a atribuição de Triagem decidir a escrita no serviço", () => {
     const policy = requiredRoutePolicy("PATCH", "/triagem/monthly/monthly-1/item");
 
-    expect(
-      canAccessRoute(authContext({ modules: { contabil: 0, triagem: 1 } }), policy),
-    ).toBe(true);
-    expect(
-      canAccessRoute(authContext({ modules: { contabil: 0, triagem: 0 } }), policy),
-    ).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 1 } }), policy)).toBe(
+      true,
+    );
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 0 } }), policy)).toBe(
+      false,
+    );
   });
 
   it.each([

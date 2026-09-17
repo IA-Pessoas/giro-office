@@ -223,7 +223,10 @@ export class ControlService {
             },
           });
           if (!restored) {
-            throw new ServiceError(409, "Não foi possível restaurar o controle contábil arquivado.");
+            throw new ServiceError(
+              409,
+              "Não foi possível restaurar o controle contábil arquivado.",
+            );
           }
           return { control: restored, created: false };
         }

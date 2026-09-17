@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   buildHookPlan,
+  buildPrePushTurboConfig,
   classifyChangedFiles,
   parsePrePushInput,
   resolvePrePushChangedFiles,
@@ -63,10 +69,91 @@ describe("classifyChangedFiles", () => {
   });
 });
 
+describe("pre-push Turbo task graph", () => {
+  it("runs source tests without a service build and preserves library and browser prerequisites", (t) => {
+    const repoRoot = fileURLToPath(new URL("../", import.meta.url));
+    const directory = mkdtempSync(path.join(tmpdir(), "git-hook-turbo-"));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const configPath = path.join(directory, "turbo.json");
+    const rootConfig = JSON.parse(readFileSync(path.join(repoRoot, "turbo.json"), "utf8"));
+    writeFileSync(configPath, JSON.stringify(buildPrePushTurboConfig(rootConfig)));
+
+    const plan = (config) => {
+      const result = spawnSync(
+        process.execPath,
+        [
+          path.join(repoRoot, "node_modules/turbo/bin/turbo"),
+          "run",
+          "test",
+          "--filter=@workspace/client-service",
+          "--filter=@workspace/app",
+          `--root-turbo-json=${config}`,
+          "--dry-run=json",
+        ],
+        { cwd: repoRoot, encoding: "utf8", timeout: 30_000 },
+      );
+      assert.equal(result.status, 0, result.stderr);
+      return JSON.parse(result.stdout).tasks;
+    };
+
+    const original = plan(path.join(repoRoot, "turbo.json"));
+    assert.ok(original.some((task) => task.taskId === "@workspace/client-service#build"));
+
+    const optimized = plan(configPath);
+    assert.deepEqual(
+      optimized
+        .filter((task) => task.task === "build")
+        .map((task) => task.taskId)
+        .sort(),
+      ["@workspace/api#build", "@workspace/app#build", "@workspace/shared#build"],
+    );
+    assert.deepEqual(
+      optimized
+        .filter((task) => task.task === "test")
+        .map((task) => task.taskId)
+        .sort(),
+      ["@workspace/app#test", "@workspace/client-service#test"],
+    );
+    assert.ok(
+      optimized
+        .find((task) => task.taskId === "@workspace/client-service#test")
+        .dependencies.includes("@workspace/shared#build"),
+    );
+    assert.ok(
+      optimized
+        .find((task) => task.taskId === "@workspace/app#test")
+        .dependencies.includes("@workspace/app#build"),
+    );
+  });
+});
+
 describe("buildHookPlan", () => {
   it("filters by the affected graph from the pushed base", () => {
     assert.deepEqual(buildHookPlan(classifyChangedFiles(["app/src/x.tsx"]), ["abc123"]), [
-      ["pnpm", ["exec", "turbo", "run", "check", "typecheck", "test", "--filter=...[abc123]"]],
+      [
+        "pnpm",
+        [
+          "exec",
+          "turbo",
+          "run",
+          "check",
+          "typecheck",
+          "--filter=...[abc123]",
+          "--output-logs=new-only",
+        ],
+      ],
+      [
+        "pnpm",
+        [
+          "exec",
+          "turbo",
+          "run",
+          "test",
+          "--root-turbo-json=.turbo/git-hooks/turbo.pre-push.json",
+          "--filter=...[abc123]",
+          "--output-logs=new-only",
+        ],
+      ],
     ]);
   });
 
@@ -82,9 +169,22 @@ describe("buildHookPlan", () => {
             "run",
             "check",
             "typecheck",
-            "test",
             "--filter=...[abc123]",
             "--filter=...[def456]",
+            "--output-logs=new-only",
+          ],
+        ],
+        [
+          "pnpm",
+          [
+            "exec",
+            "turbo",
+            "run",
+            "test",
+            "--root-turbo-json=.turbo/git-hooks/turbo.pre-push.json",
+            "--filter=...[abc123]",
+            "--filter=...[def456]",
+            "--output-logs=new-only",
           ],
         ],
       ],
@@ -100,23 +200,53 @@ describe("buildHookPlan", () => {
     ]);
   });
 
-  it("checks somente os arquivos alterados antes da sequência global", () => {
-    assert.deepEqual(
-      buildHookPlan(
-        classifyChangedFiles(["infra/prisma/schema.prisma"]),
-        ["abc"],
-        ["infra/prisma/schema.prisma"],
-      ),
+  it("keeps root tests and QA without rebuilding every service for known global changes", () => {
+    const files = ["infra/prisma/schema.prisma"];
+    assert.deepEqual(buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files }), [
       [
-        ["pnpm", ["audit:ci"]],
-        [
-          "pnpm",
-          ["exec", "biome", "check", "--files-ignore-unknown=true", "infra/prisma/schema.prisma"],
-        ],
-        ["pnpm", ["typecheck"]],
-        ["pnpm", ["test"]],
+        "pnpm",
+        ["exec", "biome", "check", "--files-ignore-unknown=true", "infra/prisma/schema.prisma"],
       ],
+      ["pnpm", ["typecheck"]],
+      ["pnpm", ["test:scripts"]],
+      [
+        "pnpm",
+        [
+          "exec",
+          "turbo",
+          "run",
+          "test",
+          "--root-turbo-json=.turbo/git-hooks/turbo.pre-push.json",
+          "--output-logs=new-only",
+        ],
+      ],
+      ["pnpm", ["qa:integracao"]],
+    ]);
+  });
+
+  it("audits dependency changes even inside an affected package", () => {
+    const files = ["services/user-service/package.json"];
+    const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
+    assert.deepEqual(commands[0], ["pnpm", ["audit:ci"]]);
+  });
+
+  it("does not contact the dependency registry for code-only pushes", () => {
+    const files = ["services/user-service/src/server.ts"];
+    const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
+    assert.equal(
+      commands.some(([, args]) => args.includes("audit:ci")),
+      false,
     );
+    assert.equal(commands.filter(([, args]) => args.includes("test")).length, 1);
+  });
+
+  it("allows explicitly running all original gates even without changed files", () => {
+    assert.deepEqual(buildHookPlan(classifyChangedFiles([]), [], { full: true }), [
+      ["pnpm", ["audit:ci"]],
+      ["pnpm", ["check"]],
+      ["pnpm", ["typecheck"]],
+      ["pnpm", ["test"]],
+    ]);
   });
 
   it("skips every command for docs-only changes", () => {
