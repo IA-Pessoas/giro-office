@@ -769,6 +769,7 @@ export function TaskFormModal({
               currentUserId={user?.id}
               accessLevel={integracaoAccess.level}
               isOwner={user?.type === "owner"}
+              canApproveCompletion={user?.task_completion === true}
             />
           ) : null}
           {taskDetailQuery.data ? (

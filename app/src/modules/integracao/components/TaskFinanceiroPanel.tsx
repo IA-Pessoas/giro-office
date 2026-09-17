@@ -100,6 +100,13 @@ export function TaskFinanceiroPanel({ canManage, canView, clientId }: TaskFinanc
 
   if (!canView) return null;
 
+  const queueErrorStatus =
+    typeof queueQuery.error === "object" && queueQuery.error !== null && "response" in queueQuery.error
+      ? (queueQuery.error as { response?: { status?: number } }).response?.status
+      : undefined;
+  /** 403 aqui significa apenas que o usuário não cobra nenhum departamento. */
+  const isOutOfScope = queueErrorStatus === 403;
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -133,7 +140,13 @@ export function TaskFinanceiroPanel({ canManage, canView, clientId }: TaskFinanc
 
       <div className="mt-4 space-y-2">
         {queueQuery.isLoading ? <p className="text-sm text-slate-500">Carregando fila...</p> : null}
-        {queueQuery.isError ? <p className="text-sm text-rose-600">Não foi possível carregar a fila.</p> : null}
+        {queueQuery.isError ? (
+          <p className={isOutOfScope ? "text-sm text-slate-500" : "text-sm text-rose-600"}>
+            {isOutOfScope
+              ? "Você não é cobrador de nenhum departamento, então não há fila para exibir."
+              : "Não foi possível carregar a fila."}
+          </p>
+        ) : null}
         {!queueQuery.isLoading && !queueQuery.isError && queue.length === 0 ? (
           <p className="text-sm text-slate-500">Nenhuma tarefa financeira pendente.</p>
         ) : null}

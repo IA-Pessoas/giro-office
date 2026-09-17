@@ -21,6 +21,7 @@ export type TaskPostponement = {
   new_prevision_date: Date;
   justification: string;
   author_id: string;
+  author_name: string | null;
   created_at: Date;
 };
 
@@ -149,7 +150,7 @@ export class TaskPostponementService {
             },
             required: true,
           });
-          return postponement;
+          return { ...postponement, author_name: null };
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
@@ -185,7 +186,7 @@ export class TaskPostponementService {
       responsible3Id: task.responsible3_id,
       isOwner: input.isOwner === true,
     });
-    return prismaClient.taskPostponement.findMany({
+    const postponements = await prismaClient.taskPostponement.findMany({
       where: { task_id: task.id, organization_id: task.organization_id },
       orderBy: { created_at: "asc" },
       select: {
@@ -197,5 +198,14 @@ export class TaskPostponementService {
         created_at: true,
       },
     });
+    const authors = await prismaClient.user.findMany({
+      where: { id: { in: [...new Set(postponements.map(({ author_id }) => author_id))] } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(authors.map(({ id, name }) => [id, name]));
+    return postponements.map((postponement) => ({
+      ...postponement,
+      author_name: nameById.get(postponement.author_id) ?? null,
+    }));
   }
 }

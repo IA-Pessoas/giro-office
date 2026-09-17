@@ -20,6 +20,16 @@ import { ConfirmationDialog } from "@shared/components";
 
 const EMPTY_PLAN = { name: "", color: "#2563eb" };
 
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const data = (error as { response?: { data?: { error?: string; message?: string } } }).response
+      ?.data;
+    return data?.error ?? data?.message ?? fallback;
+  }
+  return fallback;
+}
+
 export default function ProjectPlansConfig() {
   const { access: integracaoAccess } = useModuleAccess("integracao");
   const canManage = integracaoAccess.isAdmin;
@@ -62,8 +72,8 @@ export default function ProjectPlansConfig() {
         toast.success("Plano criado.");
       }
       await plansQuery.refetch();
-    } catch {
-      toast.error("Não foi possível salvar o plano.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Não foi possível salvar o plano."));
     } finally {
       setIsSaving(false);
     }
@@ -79,8 +89,8 @@ export default function ProjectPlansConfig() {
       await projectPlanService.addTask({ plan_id: selectedPlan.id, task_id: modelId });
       setModelId("");
       await tasksQuery.refetch();
-    } catch {
-      toast.error("Não foi possível adicionar o modelo ao plano.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Não foi possível adicionar o modelo ao plano."));
     } finally {
       setIsSaving(false);
     }
@@ -99,8 +109,8 @@ export default function ProjectPlansConfig() {
         direction,
       });
       await tasksQuery.refetch();
-    } catch {
-      toast.error("Não foi possível reordenar o plano.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Não foi possível reordenar o plano."));
     } finally {
       setIsSaving(false);
     }
@@ -115,8 +125,8 @@ export default function ProjectPlansConfig() {
     try {
       await projectPlanService.deleteTask({ plan_id: selectedPlan.id, plan_task_id: planTaskId });
       await tasksQuery.refetch();
-    } catch {
-      toast.error("Não foi possível remover o modelo do plano.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Não foi possível remover o modelo do plano."));
     } finally {
       setIsSaving(false);
     }
@@ -134,8 +144,8 @@ export default function ProjectPlansConfig() {
       setPlanToDelete(null);
       await plansQuery.refetch();
       toast.success("Plano removido.");
-    } catch {
-      toast.error("Não foi possível remover o plano.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Não foi possível remover o plano."));
     } finally {
       setIsSaving(false);
     }

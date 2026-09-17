@@ -142,7 +142,8 @@ export function TaskPostponementPanel({
                 </p>
                 <p>{postponement.justification}</p>
                 <p>
-                  Autor: {postponement.author_id} em {formatDate(postponement.created_at)}
+                  Autor: {postponement.author_name ?? postponement.author_id} em{" "}
+                  {formatDate(postponement.created_at)}
                 </p>
               </li>
             ))}

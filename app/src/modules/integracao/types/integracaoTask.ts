@@ -106,6 +106,7 @@ export interface IntegracaoTaskPostponement {
   new_prevision_date: string;
   justification: string;
   author_id: string;
+  author_name: string | null;
   created_at: string;
 }
 

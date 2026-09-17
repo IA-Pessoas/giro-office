@@ -5,6 +5,7 @@ const { prismaMock, auditMock, operationalNotificationMock } = vi.hoisted(() => 
     $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(prismaMock)),
     task: { findFirst: vi.fn(), update: vi.fn() },
     taskPostponement: { create: vi.fn(), findMany: vi.fn() },
+    user: { findMany: vi.fn() },
     permission: { findMany: vi.fn() },
     pessoalNotification: { createMany: vi.fn() },
   },
@@ -196,8 +197,12 @@ describe("TaskPostponementService", () => {
 
   it("lista as prorrogações em ordem cronológica", async () => {
     const service = new TaskPostponementService();
-    const history = [{ id: "first" }, { id: "second" }];
+    const history = [
+      { id: "first", author_id: "user-9" },
+      { id: "second", author_id: "user-9" },
+    ];
     prismaMock.taskPostponement.findMany.mockResolvedValue(history);
+    prismaMock.user.findMany.mockResolvedValue([{ id: "user-9", name: "Autor QA" }]);
 
     await expect(
       service.list({
@@ -206,7 +211,10 @@ describe("TaskPostponementService", () => {
         task_id: "task-1",
         integracaoLevel: 0,
       }),
-    ).resolves.toEqual(history);
+    ).resolves.toEqual([
+      { id: "first", author_id: "user-9", author_name: "Autor QA" },
+      { id: "second", author_id: "user-9", author_name: "Autor QA" },
+    ]);
 
     expect(prismaMock.taskPostponement.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { created_at: "asc" } }),

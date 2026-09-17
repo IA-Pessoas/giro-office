@@ -86,7 +86,10 @@ describe("task attachment storage", () => {
           originalname: "comprovante.pdf",
         },
       }),
-    ).rejects.toMatchObject({ statusCode: 500 });
+    ).rejects.toMatchObject({
+      statusCode: 503,
+      message: "Anexos indisponíveis no momento. Tente novamente mais tarde.",
+    });
 
     expect(upload).not.toHaveBeenCalled();
   });

@@ -118,12 +118,20 @@ export class SupabaseTaskAttachmentStorage implements TaskAttachmentStorage {
     try {
       const { data, error } = await this.supabase.storage.getBucket(this.bucket);
       if (error || !data || data.public) {
-        throw new ServiceError(500, "O bucket de anexos da tarefa deve ser privado.", error);
+        throw new ServiceError(
+          503,
+          "Anexos indisponíveis no momento. Tente novamente mais tarde.",
+          error,
+        );
       }
     } catch (err: unknown) {
       logError("Bucket de anexos de tarefa indisponível ou público", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "O bucket de anexos da tarefa deve ser privado.", err);
+      throw new ServiceError(
+        503,
+        "Anexos indisponíveis no momento. Tente novamente mais tarde.",
+        err,
+      );
     }
   }
 }

@@ -15,6 +15,8 @@ import type { IntegracaoTaskDetail } from "../types";
 import { PROJECT_COMPACT_BUTTON_CLASSNAME, PROJECT_INPUT_CLASSNAME } from "./projectUi";
 
 interface TaskCompletionPanelProps {
+  /** Permissão específica de conclusão; o nível 2 só decide quando a possui. */
+  canApproveCompletion: boolean;
   task: Pick<
     IntegracaoTaskDetail,
     "id" | "status" | "responsible_id" | "responsible2_id" | "responsible3_id"
@@ -49,6 +51,7 @@ export function TaskCompletionPanel({
   currentUserId,
   accessLevel,
   isOwner,
+  canApproveCompletion,
 }: TaskCompletionPanelProps) {
   const [requestReason, setRequestReason] = useState("");
   const [decisionReason, setDecisionReason] = useState("");
@@ -63,7 +66,10 @@ export function TaskCompletionPanel({
   const isResponsible = [task.responsible_id, task.responsible2_id, task.responsible3_id].includes(
     currentUserId ?? null,
   );
-  const canDecide = accessLevel === "edit" || accessLevel === "admin" || isOwner;
+  const canDecide =
+    accessLevel === "admin" ||
+    isOwner ||
+    (accessLevel === "edit" && canApproveCompletion);
   const canReopen = accessLevel === "admin" || isOwner;
   const isMutating =
     requestMutation.isPending ||
