@@ -57,6 +57,12 @@
       "development": "./src/routes/services.ts",
       "default": "./dist/routes/services.js"
     },
+    "./regularize": {
+      "types": "./dist/regularize/guidance.d.ts",
+      "development": "./src/regularize/guidance.ts",
+      "import": "./dist/regularize/guidance.js",
+      "default": "./dist/regularize/guidance.js"
+    },
     "./schemas": {
       "types": "./dist/schemas/index.d.ts",
       "import": "./dist/schemas/index.js",
