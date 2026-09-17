@@ -265,6 +265,7 @@ model Department {
   categorysStock            CategoryStock[]
   locationsStock            LocationStock[]
   users                     User[]
+  financeiroCollectors      DepartmentCollector[]
 
   @@index([organization_id, name], map: "idx_departments_org_name")
   @@unique([organization_id, name], map: "uq_departments_org_name")
@@ -365,6 +366,7 @@ model User {
   authSessions                AuthSession[]
   triageMonthlys              TriageMonthly[]
   responsiblesTriage          TriageResponsible[]
+  financeiroCollectorAssignments DepartmentCollector[]
   department                  Department             @relation(fields: [department_id], references: [id])
 
   @@unique([login], map: "users_login_key")
@@ -1018,6 +1020,35 @@ model Task {
   postponements         TaskPostponement[]
 
   @@map("integracao.tasks")
+}
+
+model TaskFinanceiroCommand {
+  id                String   @id @default(uuid())
+  organization_id   String
+  requested_by_user_id String
+  idempotency_key   String   @db.VarChar(255)
+  command_hash      String   @db.Char(64)
+  response_snapshot Json
+  created_at        DateTime @default(now())
+  audited_at        DateTime?
+
+  @@unique([organization_id, idempotency_key], map: "uq_task_financeiro_command_org_key")
+  @@index([organization_id], map: "idx_task_financeiro_command_org")
+  @@map("integracao.task_financeiro_commands")
+}
+
+model DepartmentCollector {
+  id              String     @id @default(uuid())
+  organization_id String
+  department_id   String
+  user_id         String
+  created_at      DateTime   @default(now())
+  department      Department @relation(fields: [department_id], references: [id])
+  user            User       @relation(fields: [user_id], references: [id])
+
+  @@unique([organization_id, department_id, user_id], map: "uq_department_collector")
+  @@index([organization_id, user_id], map: "idx_department_collector_user")
+  @@map("integracao.department_collectors")
 }
 
 model TaskCompletionRequest {

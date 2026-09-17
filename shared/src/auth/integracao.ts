@@ -332,6 +332,36 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     [readRule([INTEGRACAO_PERMISSION_LEVEL.BASIC], "responsible"), readRule(readOrganization)],
     { test: "task.detail" },
   ),
+  routePolicy("GET", "/task/financeiro/queue", "task", "read", [readRule(readOrganization)], {
+    test: "task.financeiro.queue",
+  }),
+  routePolicy("GET", "/task/financeiro/collectors", "task", "manage", [readRule(admin)], {
+    test: "task.financeiro.collectors.list",
+  }),
+  routePolicy(
+    "PUT",
+    "/task/financeiro/collectors",
+    "task",
+    "manage",
+    [writeRule(admin, [])],
+    { audit: "required", test: "task.financeiro.collectors" },
+  ),
+  routePolicy(
+    "POST",
+    "/task/financeiro/settle",
+    "task",
+    "update",
+    [writeRule(readOrganization, [])],
+    { audit: "required", test: "task.financeiro.settle" },
+  ),
+  routePolicy(
+    "POST",
+    "/task/financeiro/express",
+    "task",
+    "update",
+    [writeRule(readOrganization, [])],
+    { audit: "required", test: "task.financeiro.express" },
+  ),
   routePolicy("POST", "/task", "task", "create", [writeRule(writeUser, TASK_CREATE_FIELDS)], {
     audit: "required",
     test: "task.create",
