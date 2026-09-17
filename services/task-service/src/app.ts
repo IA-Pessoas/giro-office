@@ -49,6 +49,7 @@ import { taskFinanceiroRoutes } from "./routes/taskFinanceiro.routes.js";
 import { taskIntegrationRegularizeRoutes } from "./routes/taskIntegrationRegularize.routes.js";
 import { taskLifecycleRoutes } from "./routes/taskLifecycle.routes.js";
 import { taskModelRoutes } from "./routes/taskModel.routes.js";
+import { taskOperationalNotificationRoutes } from "./routes/taskOperationalNotification.routes.js";
 import { taskPostponementRoutes } from "./routes/taskPostponement.routes.js";
 import { MEETING_MINUTES_MAX_SOURCE_BYTES } from "./schemas/projectWizardExtraction.schemas.js";
 import { CommercialProspectingCloseService } from "./services/commercialProspectingCloseService.js";
@@ -174,6 +175,7 @@ export function createTaskApp(
   app.use("/task", taskIntegrationRegularizeRoutes);
   app.use("/task", taskLifecycleRoutes);
   app.use("/task", taskPostponementRoutes);
+  app.use("/task", taskOperationalNotificationRoutes);
   app.use("/task", taskAttachmentRoutes);
   app.use("/task", taskFinanceiroRoutes);
   app.use("/task", taskCrudRoutes);

@@ -38,6 +38,13 @@ vi.mock("../services/taskWorkflowService.js", () => ({
     return workflowMock;
   }),
 }));
+vi.mock("../services/taskOperationalNotificationService.js", () => ({
+  publishTaskOperationalNotifications: vi.fn(),
+  TASK_OPERATIONAL_NOTIFICATION_TYPE: { TASK_CHANGED: "task_changed" },
+  TaskOperationalNotificationService: vi.fn(function TaskOperationalNotificationService() {
+    return { list: vi.fn(), markRead: vi.fn() };
+  }),
+}));
 vi.mock("../middlewares/isAuthenticated.js", () => ({
   isAuthenticated: (req: Request, _res: Response, next: NextFunction) => {
     req.user_id = "user-1";

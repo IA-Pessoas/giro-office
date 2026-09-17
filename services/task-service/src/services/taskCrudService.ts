@@ -22,6 +22,10 @@ import {
 } from "./responsibleUserContext.js";
 import { ACTIVE_TASK_CONFLICT_MESSAGE, throwIfActiveTaskConflict } from "./taskActiveConflict.js";
 import { TaskWorkflowService } from "./taskWorkflowService.js";
+import {
+  publishTaskOperationalNotifications,
+  TASK_OPERATIONAL_NOTIFICATION_TYPE,
+} from "./taskOperationalNotificationService.js";
 
 const TASK_DETAIL_SELECT = {
   id: true,
@@ -91,6 +95,7 @@ const TASK_UPDATE_SELECT = {
   responsible2_id: true,
   responsible3_id: true,
   prevision_date: true,
+  date_updated: true,
 } as const;
 
 const DEPENDENTS_FOR_CREATE_SELECT = {
@@ -859,6 +864,30 @@ export class TaskCrudService {
         oldData: exists as Record<string, unknown>,
         updatedData: updated as Record<string, unknown>,
       });
+
+      const relevantChange =
+        exists.status !== updated.status ||
+        exists.observations !== updated.observations ||
+        exists.responsible_id !== updated.responsible_id ||
+        exists.responsible2_id !== updated.responsible2_id ||
+        exists.responsible3_id !== updated.responsible3_id;
+      if (relevantChange) {
+        await publishTaskOperationalNotifications(prismaClient, {
+          organization_id: data.organization_id,
+          task_id: data.task_id,
+          event_key: `task-change:${updated.date_updated?.toISOString() ?? data.task_id}`,
+          type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
+          title: "Tarefa atualizada",
+          message: "Há uma alteração relevante em uma tarefa sob sua responsabilidade.",
+          responsible_ids: [
+            updated.responsible_id,
+            updated.responsible2_id,
+            updated.responsible3_id,
+          ],
+          include_administrators: true,
+          exclude_user_id: data.user_id,
+        });
+      }
 
       await this.#workflow.afterTaskUpdated({
         taskId: data.task_id,

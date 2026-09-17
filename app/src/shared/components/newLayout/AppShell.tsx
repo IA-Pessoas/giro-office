@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeDollarSign,
   Bot,
@@ -45,7 +46,8 @@ import {
   type ModuleKey,
   type ModulePermissionSubject,
 } from "@modules/auth";
-import { useMe } from "@shared/hooks";
+import { useFetch, useMe } from "@shared/hooks";
+import { taskOperationalNotificationService } from "@shared/services/taskOperationalNotificationService";
 import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
@@ -306,6 +308,12 @@ type AppShellNotification = {
   unread: boolean;
 };
 
+function formatNotificationTime(value: string): string {
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(
+    new Date(value),
+  );
+}
+
 export function AppShell({
   children,
   isIframeView = false,
@@ -318,6 +326,16 @@ export function AppShell({
   const isPlatformSuperAdmin =
     user?.auth_kind === "platform" && user.platform_role === "super_admin";
   const meQuery = useMe({ enabled: !isPlatformSuperAdmin });
+  const notificationQuery = useFetch(
+    ["task", "notifications"],
+    () => taskOperationalNotificationService.list(),
+    { enabled: !isPlatformSuperAdmin && Boolean(user) },
+  );
+  const queryClient = useQueryClient();
+  const markNotificationRead = useMutation({
+    mutationFn: taskOperationalNotificationService.markRead,
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["task", "notifications"] }),
+  });
   const {
     accessMap: moduleAccessMap,
     isLoading: isModuleAccessLoading,
@@ -334,8 +352,14 @@ export function AppShell({
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [hasUserPhotoLoadError, setHasUserPhotoLoadError] = useState(false);
-  const notifications: AppShellNotification[] = [];
-  const hasUnreadNotifications = notifications.some((item) => item.unread);
+  const notifications: AppShellNotification[] = (notificationQuery.data?.items ?? []).map((item) => ({
+    id: item.id,
+    title: item.title,
+    description: item.message,
+    time: formatNotificationTime(item.created_at),
+    unread: item.read_at === null,
+  }));
+  const hasUnreadNotifications = (notificationQuery.data?.unread_count ?? 0) > 0;
   const shouldExpandSidebar = isSidebarOpen || isSidebarPreviewOpen;
   const sidebarToggleLabel = isSidebarOpen
     ? "Recolher sidebar"
@@ -820,6 +844,9 @@ export function AppShell({
                           <button
                             key={item.id}
                             type="button"
+                            onClick={() => {
+                              if (item.unread) markNotificationRead.mutate(item.id);
+                            }}
                             className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
                           >
                             <div className="flex items-start gap-3">

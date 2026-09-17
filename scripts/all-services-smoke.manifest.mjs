@@ -2430,6 +2430,22 @@ const baseManifest = [
     auth: "admin-bearer",
   }),
   op({
+    service: "task-service",
+    method: "GET",
+    path: "/task/notifications",
+    action: "taskOperationalNotificationList",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
+    service: "task-service",
+    method: "PUT",
+    path: "/task/notifications/read",
+    action: "taskOperationalNotificationRead",
+    target: "gateway",
+    auth: "admin-bearer",
+  }),
+  op({
     service: "commercial-service",
     method: "PUT",
     path: "/commercial/task-billing/{taskId}",

@@ -48,6 +48,8 @@ const expectedRoutes = [
   "PUT /task",
   "POST /task/postponement",
   "GET /task/postponement/list",
+  "GET /task/notifications",
+  "PUT /task/notifications/read",
   "DELETE /task",
   "PUT /task/conclusion",
   "POST /task/complete-request",

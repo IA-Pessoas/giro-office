@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
+const { prismaMock, auditMock, workflowMock, operationalNotificationMock } = vi.hoisted(() => ({
   prismaMock: {
     $transaction: vi.fn(),
     department: {
@@ -39,6 +39,7 @@ const { prismaMock, auditMock, workflowMock } = vi.hoisted(() => ({
     afterTaskCreated: vi.fn(),
     afterTaskUpdated: vi.fn(),
   },
+  operationalNotificationMock: vi.fn(),
 }));
 
 vi.mock("../prisma/index.js", () => ({
@@ -51,6 +52,10 @@ vi.mock("../services/taskWorkflowService.js", () => ({
   TaskWorkflowService: vi.fn(function TaskWorkflowService() {
     return workflowMock;
   }),
+}));
+vi.mock("../services/taskOperationalNotificationService.js", () => ({
+  publishTaskOperationalNotifications: operationalNotificationMock,
+  TASK_OPERATIONAL_NOTIFICATION_TYPE: { TASK_CHANGED: "task_changed" },
 }));
 
 import type { Prisma } from "../generated/prisma/client.js";

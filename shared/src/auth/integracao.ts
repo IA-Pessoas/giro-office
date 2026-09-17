@@ -338,14 +338,10 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
   routePolicy("GET", "/task/financeiro/collectors", "task", "manage", [readRule(admin)], {
     test: "task.financeiro.collectors.list",
   }),
-  routePolicy(
-    "PUT",
-    "/task/financeiro/collectors",
-    "task",
-    "manage",
-    [writeRule(admin, [])],
-    { audit: "required", test: "task.financeiro.collectors" },
-  ),
+  routePolicy("PUT", "/task/financeiro/collectors", "task", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "task.financeiro.collectors",
+  }),
   routePolicy(
     "POST",
     "/task/financeiro/settle",
@@ -487,6 +483,22 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
       readRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
     ],
     { test: "task.postponement.list" },
+  ),
+  routePolicy(
+    "GET",
+    "/task/notifications",
+    "task",
+    "read",
+    [readRule([INTEGRACAO_PERMISSION_LEVEL.BASIC, ...readOrganization])],
+    { test: "task.notifications.list" },
+  ),
+  routePolicy(
+    "PUT",
+    "/task/notifications/read",
+    "task",
+    "update",
+    [writeRule([INTEGRACAO_PERMISSION_LEVEL.BASIC, ...readOrganization], [])],
+    { test: "task.notifications.read" },
   ),
   routePolicy("DELETE", "/task", "task", "delete", [writeRule(admin, [])], {
     audit: "required",

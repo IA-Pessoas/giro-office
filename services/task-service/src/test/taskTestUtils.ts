@@ -53,6 +53,10 @@ interface TaskRouteMocks {
     create: Mock;
     list: Mock;
   };
+  taskOperationalNotificationServiceMock: {
+    list: Mock;
+    markRead: Mock;
+  };
 }
 
 const taskRouteMocks: TaskRouteMocks = vi.hoisted(
@@ -106,6 +110,10 @@ const taskRouteMocks: TaskRouteMocks = vi.hoisted(
       create: vi.fn(),
       list: vi.fn(),
     },
+    taskOperationalNotificationServiceMock: {
+      list: vi.fn(),
+      markRead: vi.fn(),
+    },
   }),
 );
 
@@ -154,6 +162,12 @@ vi.mock("../services/taskAttachmentService.js", () => ({
 vi.mock("../services/taskPostponementService.js", () => ({
   TaskPostponementService: vi.fn(function TaskPostponementService() {
     return taskRouteMocks.taskPostponementServiceMock;
+  }),
+}));
+
+vi.mock("../services/taskOperationalNotificationService.js", () => ({
+  TaskOperationalNotificationService: vi.fn(function TaskOperationalNotificationService() {
+    return taskRouteMocks.taskOperationalNotificationServiceMock;
   }),
 }));
 
@@ -211,6 +225,8 @@ export function resetTaskRouteMocks() {
   const taskFinanceiroServiceMock = taskRouteMocks.taskFinanceiroServiceMock;
   const taskAttachmentServiceMock = taskRouteMocks.taskAttachmentServiceMock;
   const taskPostponementServiceMock = taskRouteMocks.taskPostponementServiceMock;
+  const taskOperationalNotificationServiceMock =
+    taskRouteMocks.taskOperationalNotificationServiceMock;
 
   taskCrudServiceMock.createTask.mockResolvedValue({ id: "task-1" });
   taskCrudServiceMock.listTasks.mockResolvedValue([{ id: "task-1" }]);
@@ -246,7 +262,10 @@ export function resetTaskRouteMocks() {
   taskLifecycleServiceMock.reopenTask.mockResolvedValue({ id: "task-1", status: "Em Andamento" });
   taskFinanceiroServiceMock.listQueue.mockResolvedValue([]);
   taskFinanceiroServiceMock.listCollectors.mockResolvedValue([]);
-  taskFinanceiroServiceMock.setCollectors.mockResolvedValue({ department_id: "department-1", collector_ids: [] });
+  taskFinanceiroServiceMock.setCollectors.mockResolvedValue({
+    department_id: "department-1",
+    collector_ids: [],
+  });
   taskFinanceiroServiceMock.settle.mockResolvedValue({ task_ids: ["task-1"], settled: 1 });
   taskFinanceiroServiceMock.settleExpress.mockResolvedValue({ task_ids: ["task-1"], settled: 1 });
   taskAttachmentServiceMock.upload.mockResolvedValue({ id: "attachment-1" });
@@ -257,6 +276,11 @@ export function resetTaskRouteMocks() {
   taskAttachmentServiceMock.remove.mockResolvedValue({ id: "attachment-1" });
   taskPostponementServiceMock.create.mockResolvedValue({ id: "postponement-1" });
   taskPostponementServiceMock.list.mockResolvedValue([]);
+  taskOperationalNotificationServiceMock.list.mockResolvedValue({ items: [], unread_count: 0 });
+  taskOperationalNotificationServiceMock.markRead.mockResolvedValue({
+    id: "notification-1",
+    read_at: new Date("2026-09-17T00:00:00.000Z"),
+  });
 }
 
 const taskCrudServiceMock: TaskRouteMocks["taskCrudServiceMock"] =
@@ -275,6 +299,8 @@ const taskAttachmentServiceMock: TaskRouteMocks["taskAttachmentServiceMock"] =
   taskRouteMocks.taskAttachmentServiceMock;
 const taskPostponementServiceMock: TaskRouteMocks["taskPostponementServiceMock"] =
   taskRouteMocks.taskPostponementServiceMock;
+const taskOperationalNotificationServiceMock: TaskRouteMocks["taskOperationalNotificationServiceMock"] =
+  taskRouteMocks.taskOperationalNotificationServiceMock;
 
 export {
   taskCrudServiceMock,
@@ -282,6 +308,7 @@ export {
   taskFinanceiroServiceMock,
   taskAttachmentServiceMock,
   taskPostponementServiceMock,
+  taskOperationalNotificationServiceMock,
   taskIntegrationRegularizeServiceMock,
   taskLifecycleServiceMock,
   taskModelServiceMock,
