@@ -1,7 +1,7 @@
-import { useDeferredValue, useId, useState } from "react";
-import { Check, Loader2, Search, X } from "lucide-react";
-
 import { PaginationControls } from "@shared/components";
+import { Check, Loader2, Search, X } from "lucide-react";
+import { type KeyboardEvent, useDeferredValue, useEffect, useId, useRef, useState } from "react";
+
 import { useClients } from "../hooks/useClients";
 import type { ClientListFilters } from "../types";
 
@@ -31,6 +31,7 @@ export function ClientPickerModal({
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(FIRST_CLIENT_PAGE);
   const searchInputId = useId();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const deferredSearch = useDeferredValue(search.trim());
   const clientsQuery = useClients({
     ...filters,
@@ -47,6 +48,12 @@ export function ClientPickerModal({
   const pageSize = clientsQuery.data?.pageSize ?? CLIENT_PICKER_LIMIT;
   const totalPages = Math.max(FIRST_CLIENT_PAGE, Math.ceil(total / pageSize));
 
+  useEffect(() => {
+    if (isOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [isOpen]);
+
   function handleSearchChange(value: string) {
     setSearch(value);
     setPage(FIRST_CLIENT_PAGE);
@@ -55,6 +62,14 @@ export function ClientPickerModal({
   function handleSelect(client: ClientPickerOption | null) {
     onSelectClient(client);
     setIsOpen(false);
+  }
+
+  function handleDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsOpen(false);
+    }
   }
 
   return (
@@ -84,6 +99,7 @@ export function ClientPickerModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="client-picker-title"
+            onKeyDown={handleDialogKeyDown}
             className="w-full max-w-2xl rounded-xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
           >
             <div className="flex items-start justify-between gap-3">
@@ -112,6 +128,7 @@ export function ClientPickerModal({
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
+                  ref={searchInputRef}
                   id={searchInputId}
                   type="search"
                   value={search}

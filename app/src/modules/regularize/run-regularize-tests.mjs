@@ -150,6 +150,44 @@ await runTest(
   },
 );
 
+await runTest(
+  "guidance hardening preserves manual snapshots, API statuses and picker focus",
+  async () => {
+    const [guidanceSource, pickerSource] = await Promise.all([
+      readModuleSource("components/RegularizeGuidanceForm.tsx"),
+      readFile(join(appRoot, "src/modules/clients/components/ClientPickerModal.tsx"), "utf8"),
+    ]);
+
+    assert.match(
+      guidanceSource,
+      /const regularizeGuidanceStatusOptions = \["Em andamento", "Finalizado"\] as const;/,
+    );
+    assert.doesNotMatch(guidanceSource, /regularizeGuidanceStatusOptions,\s*/);
+    assert.match(guidanceSource, /\.\.\.\(guidance\?\.target_snapshot \?\? \{\}\)/);
+    assert.match(guidanceSource, /\.\.\.formState\.target_snapshot/);
+    assert.match(
+      guidanceSource,
+      /targetSnapshotAddress = formState\.target_snapshot\.address \?\? ""/,
+    );
+    assert.match(guidanceSource, /targetSnapshotCity = formState\.target_snapshot\.city \?\? ""/);
+    assert.match(guidanceSource, /targetSnapshotState = formState\.target_snapshot\.state \?\? ""/);
+    assert.match(guidanceSource, /targetSnapshotAddress\)/);
+    assert.match(guidanceSource, /targetSnapshotCity\)/);
+    assert.match(guidanceSource, /targetSnapshotState\)/);
+
+    assert.match(pickerSource, /useRef/);
+    assert.match(pickerSource, /useEffect/);
+    assert.match(pickerSource, /searchInputRef\.current\?\.focus\(\)/);
+    assert.match(
+      pickerSource,
+      /function handleDialogKeyDown\(event: KeyboardEvent<HTMLDivElement>\)/,
+    );
+    assert.match(pickerSource, /onKeyDown=\{handleDialogKeyDown\}/);
+    assert.match(pickerSource, /event\.preventDefault\(\)/);
+    assert.match(pickerSource, /event\.stopPropagation\(\)/);
+  },
+);
+
 await runTest("regularize endpoints stay centralized in the frontend contract", async () => {
   const contractSource = await readModuleSource("services/regularizeService.contract.ts");
 
@@ -1091,7 +1129,6 @@ await runTest("regularize finite status and urgency fields use native selects", 
   for (const optionExport of [
     "regularizeClientStatusOptions",
     "regularizeProcessStatusOptions",
-    "regularizeGuidanceStatusOptions",
     "regularizeLicenseStatusOptions",
     "regularizeUrgencyOptions",
     "getRegularizePresetOptions",
@@ -1105,7 +1142,7 @@ await runTest("regularize finite status and urgency fields use native selects", 
   assert.match(processSource, /regularizeUrgencyOptions/);
   assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
   assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.urgency\}/);
-  assert.match(guidanceSource, /regularizeGuidanceStatusOptions/);
+  assert.match(guidanceSource, /const regularizeGuidanceStatusOptions = \["Em andamento", "Finalizado"\] as const;/);
   assert.match(guidanceSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
   assert.match(licenseSource, /regularizeLicenseStatusOptions/);
   assert.match(licenseSource, /regularizeUrgencyOptions/);

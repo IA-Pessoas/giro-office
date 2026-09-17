@@ -28,23 +28,26 @@ import {
 import { RegularizeClientPfSelect } from "./RegularizeClientPfSelect";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import {
-  getRegularizePresetOptions,
   RegularizeFormActions,
   RegularizeFormError,
   RegularizeFormField,
   type RegularizeFormOption,
-  regularizeGuidanceStatusOptions,
   regularizeSecondaryButtonClassName,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
+
+const regularizeGuidanceStatusOptions = ["Em andamento", "Finalizado"] as const;
+
+type RegularizeGuidanceStatus = (typeof regularizeGuidanceStatusOptions)[number];
+type RegularizeGuidanceSnapshotState = RegularizeGuidanceManualSnapshot & Record<string, unknown>;
 
 type RegularizeGuidanceFormState = {
   process_id: string;
   target_type: RegularizeGuidanceTargetType;
   client_pj_id: string;
   client_pf_id: string;
-  target_snapshot: RegularizeGuidanceManualSnapshot;
+  target_snapshot: RegularizeGuidanceSnapshotState;
   checklist: RegularizeGuidanceChecklistInput[];
   branch_data: RegularizeGuidanceBranchData | null;
   type: string;
@@ -64,23 +67,25 @@ type RegularizeGuidanceFormState = {
   status: string;
 };
 
+function normalizeGuidanceStatus(value: string | null | undefined): RegularizeGuidanceStatus {
+  return value === "Finalizado" ? "Finalizado" : "Em andamento";
+}
+
 function buildGuidanceFormState(
   guidance: RegularizeGuidance | null,
   defaultProcessId = "",
 ): RegularizeGuidanceFormState {
+  const targetSnapshot: RegularizeGuidanceSnapshotState = {
+    ...(guidance?.target_snapshot ?? {}),
+    version: 1,
+    source: "manual",
+    name: guidance?.target_snapshot?.name ?? guidance?.company_name ?? "",
+  };
   const targetState = {
     target_type: guidance?.target_type ?? "SEM_CLIENTE",
     client_pj_id: guidance?.target_type === "PJ" ? (guidance.client_pj_id ?? "") : "",
     client_pf_id: guidance?.target_type === "PF" ? (guidance.client_pf_id ?? "") : "",
-    target_snapshot: {
-      version: 1,
-      source: "manual",
-      name: guidance?.target_snapshot?.name ?? guidance?.company_name ?? "",
-      document: guidance?.target_snapshot?.document ?? "",
-      address: guidance?.target_snapshot?.address ?? "",
-      city: guidance?.target_snapshot?.city ?? "",
-      state: guidance?.target_snapshot?.state ?? "",
-    } satisfies RegularizeGuidanceManualSnapshot,
+    target_snapshot: targetSnapshot,
     checklist: REGULARIZE_GUIDANCE_CHECKLIST_ITEMS.map(({ code }) => {
       const item = guidance?.checklist_items?.find((entry) => entry.code === code);
       return { code, status: item?.status ?? "Pendente", observation: item?.observation ?? "" };
@@ -109,31 +114,32 @@ function buildGuidanceFormState(
       carryng: "",
       regime: "",
       legal_representative: "",
-      status: "Em andamento",
+      status: "Em andamento" as RegularizeGuidanceStatus,
     };
   }
 
   return {
     ...targetState,
     process_id: guidance.process_id ?? "",
-    type: guidance.type ?? "",
-    request: guidance.request ?? "",
-    framework_obs: guidance.framework_obs ?? "",
-    legal_nature: guidance.legal_nature ?? "",
-    company_name: guidance.company_name ?? "",
-    trade_name: guidance.trade_name ?? "",
+    type: guidance.type ?? targetSnapshot.type ?? "",
+    request: guidance.request ?? targetSnapshot.request ?? "",
+    framework_obs: guidance.framework_obs ?? targetSnapshot.framework_obs ?? "",
+    legal_nature: guidance.legal_nature ?? targetSnapshot.legal_nature ?? "",
+    company_name: guidance.company_name ?? targetSnapshot.company_name ?? "",
+    trade_name: guidance.trade_name ?? targetSnapshot.trade_name ?? "",
     cpf_cnpj: formatCpfCnpjInput(guidance.cpf_cnpj ?? ""),
     share_capital:
       guidance.share_capital === null || guidance.share_capital === undefined
         ? ""
         : String(guidance.share_capital),
-    iptu: guidance.iptu ?? "",
-    address: guidance.address ?? "",
-    comporate_purpose: guidance.comporate_purpose ?? "",
-    carryng: guidance.carryng ?? "",
-    regime: guidance.regime ?? "",
-    legal_representative: guidance.legal_representative ?? "",
-    status: guidance.status ?? "Em andamento",
+    iptu: guidance.iptu ?? targetSnapshot.iptu ?? "",
+    address: guidance.address ?? targetSnapshot.address ?? "",
+    comporate_purpose: guidance.comporate_purpose ?? targetSnapshot.comporate_purpose ?? "",
+    carryng: guidance.carryng ?? targetSnapshot.carryng ?? "",
+    regime: guidance.regime ?? targetSnapshot.regime ?? "",
+    legal_representative:
+      guidance.legal_representative ?? targetSnapshot.legal_representative ?? "",
+    status: normalizeGuidanceStatus(guidance.status ?? targetSnapshot.status),
   };
 }
 
@@ -144,23 +150,39 @@ function buildGuidancePayload(
     (item) => item.code === "branch" && item.status === "Concluído",
   );
   const branch = formState.branch_data;
+  const targetSnapshotAddress = formState.target_snapshot.address ?? "";
+  const targetSnapshotCity = formState.target_snapshot.city ?? "";
+  const targetSnapshotState = formState.target_snapshot.state ?? "";
+  const manualTargetSnapshot = {
+    ...formState.target_snapshot,
+    version: 1,
+    source: "manual",
+    name: formState.target_snapshot.name.trim(),
+    document: normalizeDigits(formState.target_snapshot.document ?? ""),
+    address: trimRegularizeOptionalText(targetSnapshotAddress),
+    city: trimRegularizeOptionalText(targetSnapshotCity),
+    state: trimRegularizeOptionalText(targetSnapshotState),
+    type: trimRegularizeOptionalText(formState.type),
+    request: trimRegularizeOptionalText(formState.request),
+    framework_obs: trimRegularizeOptionalText(formState.framework_obs),
+    legal_nature: trimRegularizeOptionalText(formState.legal_nature),
+    company_name: trimRegularizeOptionalText(formState.company_name),
+    trade_name: trimRegularizeOptionalText(formState.trade_name),
+    cpf_cnpj: normalizeDigits(trimRegularizeOptionalText(formState.cpf_cnpj) ?? ""),
+    share_capital: toRegularizeOptionalNumber(formState.share_capital),
+    iptu: trimRegularizeOptionalText(formState.iptu),
+    comporate_purpose: trimRegularizeOptionalText(formState.comporate_purpose),
+    carryng: trimRegularizeOptionalText(formState.carryng),
+    regime: trimRegularizeOptionalText(formState.regime),
+    legal_representative: trimRegularizeOptionalText(formState.legal_representative),
+    status: formState.status,
+  } satisfies RegularizeGuidanceManualSnapshot;
   return {
     process_id: formState.process_id || null,
     target_type: formState.target_type,
     client_pj_id: formState.target_type === "PJ" ? formState.client_pj_id : null,
     client_pf_id: formState.target_type === "PF" ? formState.client_pf_id : null,
-    target_snapshot:
-      formState.target_type === "SEM_CLIENTE"
-        ? {
-            version: 1,
-            source: "manual",
-            name: formState.target_snapshot.name.trim(),
-            document: normalizeDigits(formState.target_snapshot.document ?? ""),
-            address: trimRegularizeOptionalText(formState.target_snapshot.address),
-            city: trimRegularizeOptionalText(formState.target_snapshot.city),
-            state: trimRegularizeOptionalText(formState.target_snapshot.state),
-          }
-        : undefined,
+    target_snapshot: formState.target_type === "SEM_CLIENTE" ? manualTargetSnapshot : undefined,
     checklist: REGULARIZE_GUIDANCE_CHECKLIST_ITEMS.map(({ code }) => {
       const item = formState.checklist.find((entry) => entry.code === code);
       return {
@@ -479,13 +501,11 @@ export function RegularizeGuidanceForm({
                 value={formState.status}
                 onChange={(event) => handleChange("status", event.target.value)}
               >
-                {getRegularizePresetOptions(regularizeGuidanceStatusOptions, formState.status).map(
-                  (status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ),
-                )}
+                {regularizeGuidanceStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
               </RegularizeNativeSelect>
             </RegularizeFormField>
 

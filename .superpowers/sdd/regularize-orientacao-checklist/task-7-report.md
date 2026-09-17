@@ -7,6 +7,7 @@
 - Referências: `task-7-brief.md`, plano `docs/superpowers/plans/2026-09-16-regularize-orientacao-checklist.md` (Task 7) e spec correspondente.
 - Execução sem subagentes: descoberta frontend, ampliação do runner, RED, implementação, GREEN/refatoração, validação e commit.
 - Arquivos de produto/teste alterados: `RegularizeGuidanceForm.tsx`, `RegularizePage.tsx` e `run-regularize-tests.mjs`, todos em `app/src/modules/regularize/`. Este relatório é o quarto arquivo, documental SDD.
+- Rodada de correção: também foi alterado `app/src/modules/clients/components/ClientPickerModal.tsx`, extensão autorizada para corrigir o Escape/foco do seletor.
 - Nenhuma alteração em backend, Prisma, shared, contratos ou cache da Task 6.
 
 ## Contexto e decisões
@@ -72,3 +73,22 @@ O fallback do Biome usa `%TEMP%/regularize-task7-biome-9c0529969e3540ffb77de7675
 - Não houve sincronização com develop, deploy, push, mudança de ambiente ou execução de migrations; a base solicitada da Task 7 foi preservada.
 
 Commit solicitado: `feat: add independent regularize guidance form`.
+
+## Rodada de correção da revisão
+
+- Corrigido o fluxo `SEM_CLIENTE`: os campos opcionais do snapshot (`address`, `city` e `state`) recebem strings seguras antes de `trimRegularizeOptionalText`, evitando `TypeError` ao converter PJ/PF para não cliente.
+- `buildGuidanceFormState` e `buildGuidancePayload` agora espalham o snapshot existente antes de normalizar os campos editáveis. Assim, `company_name`, `regime`, `economic_activities`, `partners` e outros metadados válidos sobrevivem à edição.
+- O status da orientação usa lista local compatível com a API: somente `Em andamento` e `Finalizado`; o carregamento de status legado é normalizado para um desses valores.
+- `ClientPickerModal` captura Escape no diálogo interno, impede a propagação para o Dialog pai e foca o campo de busca ao abrir.
+
+### Evidências da correção
+
+| Validação | Resultado |
+| --- | --- |
+| RED do runner ampliado | Falhou inicialmente no novo check de hardening antes da implementação; após o ajuste do matcher, o runner completo ficou GREEN. |
+| `corepack pnpm --filter @workspace/app test:regularize` | GREEN; todos os checks passaram, incluindo snapshot, status e seletor. |
+| `corepack pnpm --filter @workspace/app typecheck` | GREEN após explicitar o tipo extensível do snapshot; `tsc --noEmit` e `typecheck:usefetch` passaram. |
+| Biome temporário equivalente nos três arquivos de código da rodada | Sem erros nos trechos novos; restaram 3 diagnósticos preexistentes: formatação do `h2` do seletor e dois diagnósticos no runner legado. |
+| `git diff --check` | GREEN. |
+
+Limitações mantidas: não houve navegador autenticado nem integração real com API/banco. Permanecem os avisos ambientais de Node 24 versus Node 22 e do pnpm já registrados acima.
