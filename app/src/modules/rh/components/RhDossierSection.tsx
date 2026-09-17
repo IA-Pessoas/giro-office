@@ -17,6 +17,14 @@ import {
   useUpdateRhContactMutation,
   useUpdateRhDossierMutation,
 } from "../hooks/useRhProfile";
+import {
+  RH_DOSSIER_GENDER_OPTIONS,
+  RH_DOSSIER_STATUS_OPTIONS,
+  getRhDossierGenderLabel,
+  getRhDossierGenderValue,
+  getRhDossierStatusLabel,
+  getRhDossierStatusValue,
+} from "../utils/rhDossierUi";
 import type {
   RhAllergy,
   RhDossier,
@@ -130,6 +138,12 @@ function inputValue(value: string | null | undefined, field: DossierField): stri
 
 function displayValue(value: string | null | undefined): string {
   return value || "Não informado";
+}
+
+function getDossierFieldDisplayValue(dossier: RhDossier, field: DossierField): unknown {
+  if (field === "gender") return getRhDossierGenderLabel(dossier.gender);
+  if (field === "status") return getRhDossierStatusLabel(dossier.status);
+  return dossier[field];
 }
 
 export function RhDossierSection() {
@@ -253,7 +267,9 @@ function DossierListRow({ item, selected, onSelect }: DossierListRowProps) {
           {item.job_title || "Cargo não informado"} · {item.department?.name || "Sem departamento"}
         </span>
       </span>
-      <span className="text-xs text-gray-500 dark:text-gray-400">{item.status}</span>
+      <span className="text-xs text-gray-500 dark:text-gray-400">
+        {getRhDossierStatusLabel(item.status)}
+      </span>
     </>
   );
 
@@ -301,7 +317,13 @@ function DossierDetail({
 
   useEffect(() => {
     if (dossier) {
-      const values = Object.fromEntries(ADMIN_FIELDS.map((field) => [field, dossier[field]]));
+      const values = Object.fromEntries(
+        ADMIN_FIELDS.map((field) => {
+          if (field === "gender") return [field, getRhDossierGenderValue(dossier.gender)];
+          if (field === "status") return [field, getRhDossierStatusValue(dossier.status)];
+          return [field, dossier[field]];
+        }),
+      );
       setDraft(values as Partial<UpdateRhDossierPayload>);
     }
   }, [dossier]);
@@ -401,7 +423,7 @@ function DossierDetail({
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{dossier.full_name}</p>
             </div>
             <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-              {dossier.status}
+              {getRhDossierStatusLabel(dossier.status)}
             </span>
           </div>
 
@@ -428,6 +450,43 @@ function DossierDetail({
                       {departmentsQuery.data?.map((department) => (
                         <option key={department.id} value={department.id}>
                           {department.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field === "gender" ? (
+                    <select
+                      value={inputValue(draft[field], field)}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          gender: event.target.value || null,
+                        }))
+                      }
+                      className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      disabled={updateDossierMutation.isPending}
+                    >
+                      <option value="">Não informado</option>
+                      {RH_DOSSIER_GENDER_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field === "status" ? (
+                    <select
+                      value={inputValue(draft[field], field)}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          status: event.target.value,
+                        }))
+                      }
+                      className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      disabled={updateDossierMutation.isPending}
+                    >
+                      {RH_DOSSIER_STATUS_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
@@ -531,7 +590,11 @@ function ReadOnlyDossier({ dossier }: { dossier: RhDossier }) {
   return (
     <div className="grid gap-4 p-5 sm:grid-cols-2">
       {ADMIN_FIELDS.map((field) => (
-        <InfoRow key={field} label={FIELD_LABELS[field]} value={dossier[field]} />
+        <InfoRow
+          key={field}
+          label={FIELD_LABELS[field]}
+          value={getDossierFieldDisplayValue(dossier, field)}
+        />
       ))}
     </div>
   );
