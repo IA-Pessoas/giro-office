@@ -155,11 +155,29 @@ export type TriageDocumentStatus =
   | "NOT_PRESENT"
   | "NOT_APPLICABLE";
 
+export type TriageDocumentField =
+  | "financial_transactions"
+  | "triaged_transactions"
+  | "inventory_control"
+  | "accounts_payable_report"
+  | "accounts_receivable_report"
+  | "card_statements"
+  | "loan_agreements"
+  | "bank_reconciliation"
+  | "bank_investments"
+  | "card_sales_report";
+
+export interface TriageDocumentItemNotes {
+  note: string | null;
+  justification: string | null;
+}
+
 export interface TriageDocumentsMonthly {
   id: string;
   client_id: string;
   competence: ContabilCompetence;
-  checklist: Record<string, TriageDocumentStatus>;
+  checklist: Record<TriageDocumentField, TriageDocumentStatus>;
+  item_notes: Record<TriageDocumentField, TriageDocumentItemNotes>;
   summary: { applicable: number; completed: number; attention: number; pending: number; notApplicable: number; notPresent: number; percentage: number };
 }
 

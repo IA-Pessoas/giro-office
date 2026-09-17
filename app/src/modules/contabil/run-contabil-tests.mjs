@@ -168,10 +168,14 @@ await (async () => {
     assert.match(source, /window\.confirm/);
   });
 
-  await runTest("triagem apresenta os nove documentos, indicador e banco sem dados de conta", () => {
+  await runTest("triagem apresenta dez documentos com nota, justificativa e banco sem dados de conta", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
 
-    assert.equal((source.match(/\["[a-z_]+", "/g) ?? []).length, 9);
+    assert.equal((source.match(/\["[a-z_]+", "/g) ?? []).length, 10);
+    assert.match(source, /triaged_transactions/);
+    assert.match(source, /Nota/);
+    assert.match(source, /Justificativa/);
+    assert.match(source, /Salvar observações de \$\{label\}/);
     assert.match(source, /não entram no\s+indicador/i);
     assert.match(source, /Marcar todos os itens abertos/);
     assert.match(source, /Identificador do banco/);

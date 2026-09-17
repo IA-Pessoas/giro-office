@@ -4,6 +4,7 @@ import type {
   ContabilCompetence,
   TriageBankStatement,
   TriageDocumentStatus,
+  TriageDocumentItemNotes,
   TriageDocumentsMonthly,
   TriageClosing,
   TriageClosingStatus,
@@ -44,10 +45,11 @@ export const triageDocumentsService = {
     monthlyId: string,
     field: string,
     status: TriageDocumentStatus,
+    itemNotes?: TriageDocumentItemNotes,
   ): Promise<TriageDocumentsMonthly> {
     const response = await setupAPIClient().patch(
       CONTABIL_ENDPOINTS.triageMonthlyItem(monthlyId),
-      { field, status },
+      { field, status, ...itemNotes },
     );
     return unwrapContabilEnvelope(response.data);
   },
