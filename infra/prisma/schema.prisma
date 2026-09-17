@@ -2427,6 +2427,7 @@ model TriageMonthly {
   competence      String
   type            String
   checklist       Json
+  item_notes      Json              @default("{}")
   download_date   DateTime?
   settlement_date DateTime?
   billing_amount  String?

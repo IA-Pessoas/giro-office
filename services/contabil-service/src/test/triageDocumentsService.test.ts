@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   TRIAGE_DOCUMENT_FIELDS,
+  TRIAGE_DOCUMENT_NOTE_MAX_LENGTH,
   TriageDocumentsService,
   type TriageDocumentsServicePrisma,
 } from "../services/triageDocumentsService.js";
@@ -28,12 +29,18 @@ const monthly = {
 };
 
 function createMockPrisma(): TriageDocumentsServicePrisma {
-  return {
+  const prisma = {
     triageConfig: { findFirst: vi.fn() },
     triageMonthly: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     triageResponsible: { findFirst: vi.fn() },
     triageBankStatement: { findFirst: vi.fn(), findMany: vi.fn(), upsert: vi.fn() },
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(async (callback: (transaction: TriageDocumentsServicePrisma) => unknown) =>
+      callback(prisma),
+    ),
   } as unknown as TriageDocumentsServicePrisma;
+
+  return prisma;
 }
 
 function contabilEditor() {
@@ -45,6 +52,171 @@ function contabilEditor() {
 }
 
 describe("TriageDocumentsService", () => {
+  it("mantém os dez itens operacionais e normaliza notas por item", async () => {
+    expect(TRIAGE_DOCUMENT_FIELDS).toHaveLength(10);
+    expect(TRIAGE_DOCUMENT_FIELDS).toContain("triaged_transactions");
+
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue({
+      ...monthly,
+      checklist: { financial_transactions: "COMPLETED" },
+      item_notes: {
+        financial_transactions: { note: "Recebido", justification: null },
+      },
+    } as never);
+    const service = new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() });
+
+    await expect(
+      service.getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, ORG_ID),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        item_notes: expect.objectContaining({
+          financial_transactions: { note: "Recebido", justification: null },
+          triaged_transactions: { note: null, justification: null },
+        }),
+      }),
+    );
+  });
+
+  it("atualiza estado, nota e justificativa do mesmo item", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    vi.mocked(prisma.triageMonthly.update).mockResolvedValue({
+      ...monthly,
+      checklist: { ...checklist, triaged_transactions: "ATTENTION" },
+      item_notes: {
+        triaged_transactions: {
+          note: "Documento parcial",
+          justification: "Aguardando complemento do cliente",
+        },
+      },
+    } as never);
+    const service = new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() });
+
+    await service.updateItem(
+      MONTHLY_ID,
+      {
+        field: "triaged_transactions",
+        status: "ATTENTION",
+        note: "Documento parcial",
+        justification: "Aguardando complemento do cliente",
+      },
+      contabilEditor(),
+    );
+
+    expect(prisma.triageMonthly.update).toHaveBeenCalledWith({
+      where: { id: MONTHLY_ID },
+      data: {
+        checklist: expect.objectContaining({ triaged_transactions: "ATTENTION" }),
+        item_notes: expect.objectContaining({
+          triaged_transactions: {
+            note: "Documento parcial",
+            justification: "Aguardando complemento do cliente",
+          },
+        }),
+      },
+    });
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+    expect(prisma.$executeRaw).toHaveBeenCalledOnce();
+  });
+
+  it("rejeita observações acima do limite antes de tocar no banco", async () => {
+    const prisma = createMockPrisma();
+    const service = new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() });
+
+    await expect(
+      service.updateItem(
+        MONTHLY_ID,
+        {
+          field: "triaged_transactions",
+          status: "ATTENTION",
+          note: "x".repeat(TRIAGE_DOCUMENT_NOTE_MAX_LENGTH + 1),
+        },
+        contabilEditor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("preserva atualizações distintas quando itens são alterados em paralelo", async () => {
+    const prisma = createMockPrisma();
+    const stored = {
+      ...monthly,
+      checklist: { ...checklist },
+      item_notes: {},
+    };
+    let transactionTail = Promise.resolve();
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const previous = transactionTail;
+      let release!: () => void;
+      transactionTail = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await previous;
+      try {
+        return await callback(prisma);
+      } finally {
+        release();
+      }
+    });
+    vi.mocked(prisma.triageMonthly.findFirst).mockImplementation((async () => ({
+      ...stored,
+      checklist: { ...stored.checklist },
+      item_notes: structuredClone(stored.item_notes),
+    })) as never);
+    vi.mocked(prisma.triageMonthly.update).mockImplementation((async ({
+      data,
+    }: {
+      data: { checklist?: unknown; item_notes?: unknown };
+    }) => {
+      stored.checklist = data.checklist as typeof stored.checklist;
+      stored.item_notes = (data.item_notes ?? stored.item_notes) as typeof stored.item_notes;
+      return {
+        ...stored,
+        checklist: { ...stored.checklist },
+        item_notes: structuredClone(stored.item_notes),
+      };
+    }) as never);
+    const service = new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() });
+
+    await Promise.all([
+      service.updateItem(
+        MONTHLY_ID,
+        {
+          field: "financial_transactions",
+          status: "COMPLETED",
+          note: "Movimentações conferidas",
+        },
+        contabilEditor(),
+      ),
+      service.updateItem(
+        MONTHLY_ID,
+        {
+          field: "triaged_transactions",
+          status: "ATTENTION",
+          justification: "Aguardando validação complementar",
+        },
+        contabilEditor(),
+      ),
+    ]);
+
+    expect(stored.checklist).toEqual(
+      expect.objectContaining({
+        financial_transactions: "COMPLETED",
+        triaged_transactions: "ATTENTION",
+      }),
+    );
+    expect(stored.item_notes).toEqual(
+      expect.objectContaining({
+        financial_transactions: expect.objectContaining({ note: "Movimentações conferidas" }),
+        triaged_transactions: expect.objectContaining({
+          justification: "Aguardando validação complementar",
+        }),
+      }),
+    );
+  });
+
   it("cria mensal idempotente usando PENDING para item ativo e NOT_APPLICABLE para ausente", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(null);

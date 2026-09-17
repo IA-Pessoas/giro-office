@@ -10,6 +10,8 @@ import type {
   TriageBankStatement,
   TriageClosing,
   TriageClosingStatus,
+  TriageDocumentItemNotes,
+  TriageDocumentField,
   TriageDocumentsMonthly,
 } from "../types";
 import {
@@ -79,11 +81,24 @@ export function useTriageMutations(
         id,
         field,
         status,
+        note,
+        justification,
       }: {
         id: string;
-        field: string;
+        field: TriageDocumentField;
         status: Parameters<typeof triageDocumentsService.updateItem>[2];
-      }) => triageDocumentsService.updateItem(id, field, status),
+        note?: string | null;
+        justification?: string | null;
+      }) => {
+        const itemNotes =
+          note === undefined && justification === undefined
+            ? undefined
+            : ({
+                note: note ?? null,
+                justification: justification ?? null,
+              } satisfies TriageDocumentItemNotes);
+        return triageDocumentsService.updateItem(id, field, status, itemNotes);
+      },
       onSuccess: refresh,
     }),
     all: useMutation({

@@ -911,6 +911,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                       type: "string",
                       enum: [
                         "financial_transactions",
+                        "triaged_transactions",
                         "inventory_control",
                         "accounts_payable_report",
                         "accounts_receivable_report",
@@ -924,6 +925,16 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                     status: {
                       type: "string",
                       enum: ["PENDING", "COMPLETED", "ATTENTION", "NOT_PRESENT", "NOT_APPLICABLE"],
+                    },
+                    note: {
+                      type: "string",
+                      nullable: true,
+                      maxLength: 2000,
+                    },
+                    justification: {
+                      type: "string",
+                      nullable: true,
+                      maxLength: 2000,
                     },
                   },
                 },
