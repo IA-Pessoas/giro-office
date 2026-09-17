@@ -88,15 +88,32 @@ export class TaskFinanceiroService {
   }
 
   async listQueue(data: ListFinanceiroQueueRequest) {
+    if (data.is_owner !== true && (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) < INTEGRACAO_PERMISSION_LEVEL.VIEWER) {
+      throw new ServiceError(403, "Você não possui acesso à Integração.");
+    }
     const isPrivileged =
       data.is_owner === true || data.integracao_level === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
     let departmentIds: string[] | undefined;
     if (!isPrivileged) {
+      const actor = await prismaClient.user.findFirst({
+        where: {
+          id: data.user_id,
+          status: "active",
+          OR: [
+            { organization_id: data.organization_id },
+            { organization_id: null, department: { organization_id: data.organization_id } },
+          ],
+        },
+        select: { department_id: true },
+      });
+      if (!actor) {
+        throw new ServiceError(403, "Você não é cobrador ativo.");
+      }
       const assignments = await prismaClient.departmentCollector.findMany({
         where: {
           organization_id: data.organization_id,
           user_id: data.user_id,
-          user: { status: "active", organization_id: data.organization_id },
+          department_id: actor.department_id,
         },
         select: { department_id: true },
       });
@@ -129,6 +146,9 @@ export class TaskFinanceiroService {
   }
 
   async settleExpress(data: SettleExpressRequest): Promise<SettleFinanceiroResponse> {
+    if (data.is_owner !== true && (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) < INTEGRACAO_PERMISSION_LEVEL.VIEWER) {
+      throw new ServiceError(403, "Você não possui acesso à Integração.");
+    }
     const tasks = await prismaClient.task.findMany({
       where: {
         organization_id: data.organization_id,
@@ -216,6 +236,9 @@ export class TaskFinanceiroService {
 
   async settle(data: SettleFinanceiroRequest): Promise<SettleFinanceiroResponse> {
     try {
+      if (data.is_owner !== true && (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) < INTEGRACAO_PERMISSION_LEVEL.VIEWER) {
+        throw new ServiceError(403, "Você não possui acesso à Integração.");
+      }
       const taskIds = [...new Set(data.task_ids)].sort();
       if (taskIds.length === 0 && !data.command_hash) {
         throw new ServiceError(400, "Informe ao menos uma tarefa para baixa.");
@@ -258,7 +281,24 @@ export class TaskFinanceiroService {
         const isPrivileged =
           data.is_owner === true || data.integracao_level === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
         if (!isPrivileged) {
+          const actor = await tx.user.findFirst({
+            where: {
+              id: data.user_id,
+              status: "active",
+              OR: [
+                { organization_id: data.organization_id },
+                { organization_id: null, department: { organization_id: data.organization_id } },
+              ],
+            },
+            select: { department_id: true },
+          });
+          if (!actor) {
+            throw new ServiceError(403, "Você não é cobrador ativo.");
+          }
           const departmentIds = [...new Set(tasks.map((task) => task.department_id))];
+          if (departmentIds.some((department_id) => department_id !== actor.department_id)) {
+            throw new ServiceError(403, "Você não é cobrador autorizado para este departamento.");
+          }
           const assignments = await Promise.all(
             departmentIds.map((department_id) =>
               tx.departmentCollector.findFirst({
@@ -268,7 +308,7 @@ export class TaskFinanceiroService {
                   user_id: data.user_id,
                   user: {
                     status: "active",
-                    department_id,
+                    department_id: actor.department_id,
                     OR: [
                       { organization_id: data.organization_id },
                       { organization_id: null, department: { organization_id: data.organization_id } },

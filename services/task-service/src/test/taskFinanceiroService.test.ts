@@ -24,7 +24,7 @@ const { prismaMock, auditMock } = vi.hoisted(() => ({
       createMany: vi.fn(),
     },
     department: { findFirst: vi.fn() },
-    user: { findMany: vi.fn() },
+    user: { findFirst: vi.fn(), findMany: vi.fn() },
   },
   auditMock: {
     createLog: vi.fn(),
@@ -40,6 +40,7 @@ import { TaskFinanceiroService } from "../services/taskFinanceiroService.js";
 describe("TaskFinanceiroService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.user.findFirst.mockResolvedValue({ department_id: "department-1" });
   });
 
   it("repetir a baixa com a mesma chave devolve o resultado registrado", async () => {
@@ -290,6 +291,42 @@ describe("TaskFinanceiroService", () => {
     await expect(
       service.listQueue({ user_id: "user-1", organization_id: "org-1", integracao_level: 1 }),
     ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("ignora vínculos do departamento anterior após transferência do cobrador", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({ department_id: "department-new" });
+    prismaMock.departmentCollector.findMany.mockResolvedValue([]);
+    const service = new TaskFinanceiroService();
+
+    await expect(
+      service.listQueue({ user_id: "user-1", organization_id: "org-1", integracao_level: 1 }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(prismaMock.departmentCollector.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ department_id: "department-new" }) }),
+    );
+  });
+
+  it("rejeita baixa quando o cobrador foi transferido de departamento", async () => {
+    prismaMock.$transaction.mockImplementation(async (operation) => operation(prismaMock));
+    prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue(null);
+    prismaMock.task.findMany.mockResolvedValue([
+      { id: "task-1", department_id: "department-old", charge_financeiro: true },
+    ]);
+    prismaMock.user.findFirst.mockResolvedValue({ department_id: "department-new" });
+    const service = new TaskFinanceiroService();
+
+    await expect(
+      service.settle({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_ids: ["task-1"],
+        idempotency_key: "transferred-collector-key",
+        integracao_level: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(prismaMock.task.updateMany).not.toHaveBeenCalled();
   });
 
   it("Baixa Express recompõe as tarefas pendentes do cliente no servidor", async () => {

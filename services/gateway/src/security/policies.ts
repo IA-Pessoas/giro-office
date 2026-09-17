@@ -193,6 +193,11 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  {
+    method: "POST",
+    path: /^\/task\/financeiro\/(?:settle|express)$/,
+    policy: integracaoProjectPolicy,
+  },
   { method: "GET", path: /^\/task(?:\/|$)/, policy: integracaoProjectPolicy },
   { method: "ANY", path: /^\/task(?:\/|$)/, policy: integracaoEditPolicy },
   { method: "GET", path: /^\/department(?:\/|$)/, policy: tiModulePolicy },
