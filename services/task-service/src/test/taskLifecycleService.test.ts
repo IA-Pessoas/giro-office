@@ -103,6 +103,68 @@ describe("TaskLifecycleService", () => {
     expect(prismaMock.task.update).not.toHaveBeenCalled();
   });
 
+  it("revalida a tarefa dentro da transação antes de criar a solicitação", async () => {
+    prismaMock.task.findFirst
+      .mockResolvedValueOnce({
+        id: "task-1",
+        organization_id: "org-1",
+        status: "Em Andamento",
+        responsible_id: "user-1",
+        responsible2_id: null,
+        responsible3_id: null,
+      })
+      .mockResolvedValueOnce({
+        id: "task-1",
+        organization_id: "org-1",
+        status: "Concluída",
+        responsible_id: "user-1",
+        responsible2_id: null,
+        responsible3_id: null,
+      });
+
+    await expect(
+      new TaskLifecycleService().requestTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        reason: "Pronta.",
+        integracaoLevel: 0,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(prismaMock.taskCompletionRequest.create).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    });
+  });
+
+  it("lista o histórico apenas da tarefa e organização solicitadas", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.taskCompletionRequest.findMany.mockResolvedValue([]);
+
+    await expect(
+      new TaskLifecycleService().listTaskCompletionRequests({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        integracaoLevel: 0,
+      }),
+    ).resolves.toEqual([]);
+
+    expect(prismaMock.taskCompletionRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { task_id: "task-1", organization_id: "org-1" },
+        orderBy: { created_at: "desc" },
+      }),
+    );
+  });
+
   it("conclusão preserva responsável nulo e vínculos secundários legados", async () => {
     prismaMock.task.findFirst.mockResolvedValue({
       id: "task-1",

@@ -5,6 +5,7 @@ import {
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
+import { Prisma } from "../generated/prisma/client.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
@@ -41,6 +42,10 @@ const TASK_COMPLETION_REQUEST_STATUS = {
 
 export type TaskConclusionRow = TaskGetPayload<{ select: typeof CONCLUSION_UPDATE_SELECT }>;
 export type TaskCompleteApprovalRow = TaskGetPayload<{ select: typeof COMPLETE_UPDATE_SELECT }>;
+
+function hasPrismaCode(err: unknown, code: string): boolean {
+  return typeof err === "object" && err !== null && "code" in err && err.code === code;
+}
 
 function parseOptionalDate(v: string | Date | null): Date | null {
   if (v === null) {
@@ -86,50 +91,73 @@ export class TaskLifecycleService {
         isOwner: params.isOwner === true,
       });
 
-      return await prismaClient.$transaction(async (tx) => {
-        const pending = await tx.taskCompletionRequest.findFirst({
-          where: {
-            task_id: params.task_id,
-            organization_id: params.organization_id,
-            status: TASK_COMPLETION_REQUEST_STATUS.PENDING,
-          },
-        });
-        if (pending)
-          throw new ServiceError(409, "Já existe uma solicitação de conclusão pendente.");
+      return await prismaClient.$transaction(
+        async (tx) => {
+          const currentTask = await tx.task.findFirst({
+            where: { id: params.task_id, organization_id: params.organization_id },
+          });
+          if (!currentTask) throw new ServiceError(404, "Tarefa não existe.");
+          if (currentTask.status === "Concluída") {
+            throw new ServiceError(409, "Tarefa já está concluída.");
+          }
+          requireIntegracaoRouteAccess("POST", "/task/complete-request", {
+            userId: params.user_id,
+            level: params.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+            organizationId: params.organization_id,
+            resourceOrganizationId: currentTask.organization_id,
+            responsibleId: currentTask.responsible_id,
+            responsible2Id: currentTask.responsible2_id,
+            responsible3Id: currentTask.responsible3_id,
+            isOwner: params.isOwner === true,
+          });
+          const pending = await tx.taskCompletionRequest.findFirst({
+            where: {
+              task_id: params.task_id,
+              organization_id: params.organization_id,
+              status: TASK_COMPLETION_REQUEST_STATUS.PENDING,
+            },
+          });
+          if (pending)
+            throw new ServiceError(409, "Já existe uma solicitação de conclusão pendente.");
 
-        const request = await tx.taskCompletionRequest.create({
-          data: {
-            task_id: params.task_id,
-            organization_id: params.organization_id,
-            requester_id: params.user_id,
-            reason: params.reason,
-          },
-          select: { id: true, status: true },
-        });
-        await tx.task.update({
-          where: { id: params.task_id },
-          data: { pending_approval: true },
-        });
-        await audit.createLog({
-          userId: params.user_id,
-          organizationId: params.organization_id,
-          action: "Solicitação de Conclusão",
-          referring: "integracao.task_completion_requests",
-          referringId: request.id,
-          changes: {
-            task_id: params.task_id,
-            status: request.status,
-            reason: params.reason,
-          },
-          required: true,
-        });
-        return request;
-      });
+          const request = await tx.taskCompletionRequest.create({
+            data: {
+              task_id: params.task_id,
+              organization_id: params.organization_id,
+              requester_id: params.user_id,
+              reason: params.reason,
+            },
+            select: { id: true, status: true },
+          });
+          await tx.task.update({
+            where: { id: params.task_id },
+            data: { pending_approval: true },
+          });
+          await audit.createLog({
+            userId: params.user_id,
+            organizationId: params.organization_id,
+            action: "Solicitação de Conclusão",
+            referring: "integracao.task_completion_requests",
+            referringId: request.id,
+            changes: {
+              task_id: params.task_id,
+              status: request.status,
+              reason: params.reason,
+            },
+            required: true,
+          });
+          return request;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
     } catch (err: unknown) {
       logError("Erro ao solicitar conclusão da tarefa", { err });
       if (err instanceof ServiceError) throw err;
-      if (typeof err === "object" && err !== null && "code" in err && err.code === "P2002") {
+      if (hasPrismaCode(err, "P2002")) {
         throw new ServiceError(409, "Já existe uma solicitação de conclusão pendente.", err);
+      }
+      if (hasPrismaCode(err, "P2034")) {
+        throw new ServiceError(409, "A tarefa foi alterada simultaneamente. Tente novamente.", err);
       }
       throw new ServiceError(500, "Não foi possível solicitar a conclusão da tarefa.", err);
     }
@@ -425,63 +453,75 @@ export class TaskLifecycleService {
         ],
       );
 
-      const updated = await prismaClient.$transaction(async (tx) => {
-        if (requiresCompletionRequest) {
-          const pending = await tx.taskCompletionRequest.findFirst({
-            where: {
-              task_id: body.task_id,
-              organization_id,
-              status: TASK_COMPLETION_REQUEST_STATUS.PENDING,
-            },
-          });
-          if (pending) {
-            throw new ServiceError(409, "Já existe uma solicitação de conclusão pendente.");
+      const updated = await prismaClient.$transaction(
+        async (tx) => {
+          if (requiresCompletionRequest) {
+            const currentTask = await tx.task.findFirst({
+              where: { id: body.task_id, organization_id },
+            });
+            if (!currentTask) throw new ServiceError(404, "Tarefa não existe.");
+            if (currentTask.status === "Concluída") {
+              throw new ServiceError(409, "Tarefa já está concluída.");
+            }
+            const pending = await tx.taskCompletionRequest.findFirst({
+              where: {
+                task_id: body.task_id,
+                organization_id,
+                status: TASK_COMPLETION_REQUEST_STATUS.PENDING,
+              },
+            });
+            if (pending) {
+              throw new ServiceError(409, "Já existe uma solicitação de conclusão pendente.");
+            }
           }
-        }
 
-        const task = await tx.task.update({
-          where: { id: body.task_id },
-          data: {
-            status: newStatus,
-            prevision_date,
-            end_date,
-            responsible_id: body.responsible_id,
-            responsible2_id,
-            responsible3_id,
-            observations: body.observations,
-            justification: body.justification,
-            pending_approval: newPendingApproval,
-          },
-          select: CONCLUSION_UPDATE_SELECT,
-        });
-
-        if (requiresCompletionRequest) {
-          const request = await tx.taskCompletionRequest.create({
+          const task = await tx.task.update({
+            where: { id: body.task_id },
             data: {
-              task_id: body.task_id,
-              organization_id,
-              requester_id: user_id,
-              reason: body.justification ?? "",
+              status: newStatus,
+              prevision_date,
+              end_date,
+              responsible_id: body.responsible_id,
+              responsible2_id,
+              responsible3_id,
+              observations: body.observations,
+              justification: body.justification,
+              pending_approval: newPendingApproval,
             },
-            select: { id: true, status: true },
+            select: CONCLUSION_UPDATE_SELECT,
           });
-          await audit.createLog({
-            userId: user_id,
-            organizationId: organization_id,
-            action: "Solicitação de Conclusão",
-            referring: "integracao.task_completion_requests",
-            referringId: request.id,
-            changes: {
-              task_id: body.task_id,
-              status: request.status,
-              reason: body.justification ?? "",
-            },
-            required: true,
-          });
-        }
 
-        return task;
-      });
+          if (requiresCompletionRequest) {
+            const request = await tx.taskCompletionRequest.create({
+              data: {
+                task_id: body.task_id,
+                organization_id,
+                requester_id: user_id,
+                reason: body.justification ?? "",
+              },
+              select: { id: true, status: true },
+            });
+            await audit.createLog({
+              userId: user_id,
+              organizationId: organization_id,
+              action: "Solicitação de Conclusão",
+              referring: "integracao.task_completion_requests",
+              referringId: request.id,
+              changes: {
+                task_id: body.task_id,
+                status: request.status,
+                reason: body.justification ?? "",
+              },
+              required: true,
+            });
+          }
+
+          return task;
+        },
+        requiresCompletionRequest
+          ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+          : undefined,
+      );
 
       await audit.logUpdateIfChanged({
         userId: user_id,
@@ -511,6 +551,9 @@ export class TaskLifecycleService {
       logError("Erro na conclusão da tarefa", { err });
       throwIfActiveTaskConflict(err);
       if (err instanceof ServiceError) throw err;
+      if (hasPrismaCode(err, "P2034")) {
+        throw new ServiceError(409, "A tarefa foi alterada simultaneamente. Tente novamente.", err);
+      }
       throw new ServiceError(500, "Não foi possível concluir a tarefa.", err);
     }
   }
