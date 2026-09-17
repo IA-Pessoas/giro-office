@@ -944,6 +944,66 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Histórico", ...successJson } },
         },
       },
+      "/task/attachment": {
+        post: {
+          tags: ["TaskAttachment"],
+          summary: "Anexar arquivo privado à tarefa",
+          security: bearer,
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["task_id", "file"],
+                  properties: {
+                    task_id: { type: "string" },
+                    file: { type: "string", format: "binary" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Anexo criado", ...successJson },
+            "400": { description: "Arquivo inválido ou acima de 10 MB" },
+          },
+        },
+        delete: {
+          tags: ["TaskAttachment"],
+          summary: "Remover logicamente anexo da tarefa",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: { task_id: "task-uuid", attachment_id: "attachment-uuid" },
+            required: ["task_id", "attachment_id"],
+            properties: { task_id: { type: "string" }, attachment_id: { type: "string" } },
+          }),
+          responses: { "200": { description: "Anexo removido", ...successJson } },
+        },
+      },
+      "/task/attachment/list": {
+        get: {
+          tags: ["TaskAttachment"],
+          summary: "Listar metadados de anexos privados da tarefa",
+          security: bearer,
+          parameters: [
+            { name: "task_id", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Anexos", ...successJson } },
+        },
+      },
+      "/task/attachment/access": {
+        get: {
+          tags: ["TaskAttachment"],
+          summary: "Gerar URL assinada temporária para anexo privado",
+          security: bearer,
+          parameters: [
+            { name: "task_id", in: "query", required: true, schema: { type: "string" } },
+            { name: "attachment_id", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "URL assinada", ...successJson } },
+        },
+      },
       "/task/reopen": {
         put: {
           tags: ["Lifecycle"],

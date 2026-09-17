@@ -20,6 +20,8 @@ import {
   unwrapIntegracaoTaskDetail,
   unwrapIntegracaoTaskList,
   unwrapTaskCompletionRequestHistory,
+  unwrapTaskAttachmentList,
+  unwrapTaskAttachmentAccessUrl,
   unwrapUpdatedIntegracaoTask,
 } from "./integracaoTasksService.contract";
 
@@ -108,5 +110,36 @@ export const integracaoTasksService = {
   async reopen(taskId: string, reason: string): Promise<void> {
     const api = setupAPIClient();
     await api.put(INTEGRACAO_TASKS_ENDPOINTS.reopen, buildTaskReopenPayload(taskId, reason));
+  },
+
+  async uploadAttachment(taskId: string, file: File): Promise<void> {
+    const api = setupAPIClient();
+    const payload = new FormData();
+    payload.append("task_id", taskId);
+    payload.append("file", file);
+    await api.post(INTEGRACAO_TASKS_ENDPOINTS.attachment, payload);
+  },
+
+  async listAttachments(taskId: string) {
+    const api = setupAPIClient();
+    const response = await api.get(INTEGRACAO_TASKS_ENDPOINTS.attachmentList, {
+      params: { task_id: taskId },
+    });
+    return unwrapTaskAttachmentList(response.data);
+  },
+
+  async getAttachmentAccessUrl(taskId: string, attachmentId: string): Promise<string> {
+    const api = setupAPIClient();
+    const response = await api.get(INTEGRACAO_TASKS_ENDPOINTS.attachmentAccess, {
+      params: { task_id: taskId, attachment_id: attachmentId },
+    });
+    return unwrapTaskAttachmentAccessUrl(response.data);
+  },
+
+  async deleteAttachment(taskId: string, attachmentId: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(INTEGRACAO_TASKS_ENDPOINTS.attachment, {
+      data: { task_id: taskId, attachment_id: attachmentId },
+    });
   },
 };

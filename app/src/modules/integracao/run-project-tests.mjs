@@ -66,6 +66,25 @@ runTest("task completion panel exposes request, decision, cancel, history and re
   assert.match(source, /Reabrir tarefa/);
 });
 
+runTest("task attachment contract keeps private paths out of the UI", () => {
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.attachment, "/task/attachment");
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.attachmentAccess, "/task/attachment/access");
+  assert.deepEqual(
+    unwrapTaskAttachmentList({ success: true, data: [{ id: "attachment-1" }] }),
+    [{ id: "attachment-1" }],
+  );
+  assert.equal(
+    unwrapTaskAttachmentAccessUrl({ success: true, data: { url: "https://signed.example/file" } }),
+    "https://signed.example/file",
+  );
+  const source = readFileSync(new URL("./components/TaskAttachmentPanel.tsx", import.meta.url), "utf8");
+  assert.match(source, /useUploadTaskAttachmentMutation/);
+  assert.match(source, /useIntegracaoTaskAttachments/);
+  assert.match(source, /window\.open\(url, "_blank", "noopener,noreferrer"\)/);
+  assert.match(source, /key=\{fileInputKey\}/);
+  assert.doesNotMatch(source, /object_path/);
+});
+
 import {
   buildCreateIntegracaoTaskPayload,
   buildDeleteIntegracaoTaskPayload,
@@ -78,6 +97,8 @@ import {
   unwrapCreatedIntegracaoTask,
   unwrapIntegracaoTaskDetail,
   unwrapIntegracaoTaskList,
+  unwrapTaskAttachmentAccessUrl,
+  unwrapTaskAttachmentList,
   unwrapTaskCompletionRequestHistory,
   unwrapUpdatedIntegracaoTask,
 } from "./services/integracaoTasksService.contract.ts";

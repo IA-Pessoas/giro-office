@@ -11,6 +11,7 @@ import type {
   CreateIntegracaoTaskBody,
   IntegracaoTaskCompletionDecision,
   IntegracaoTaskCompletionRequest,
+  IntegracaoTaskAttachment,
   IntegracaoTaskDetail,
   IntegracaoTaskListParams,
   IntegracaoTaskListResult,
@@ -20,6 +21,7 @@ import { integracaoTasksService } from "../services";
 import {
   INTEGRACAO_TASKS_QUERY_KEY,
   integracaoTaskCompletionRequestsQueryKey,
+  integracaoTaskAttachmentsQueryKey,
   integracaoTaskDetailQueryKey,
   integracaoTasksListQueryKey,
 } from "./queryKeys";
@@ -55,6 +57,48 @@ export function useIntegracaoTaskCompletionRequests(
     () => integracaoTasksService.listCompletionRequests(taskId ?? ""),
     { enabled: Boolean(taskId) },
   );
+}
+
+export function useIntegracaoTaskAttachments(
+  taskId: string | undefined,
+): UseQueryResult<IntegracaoTaskAttachment[], Error> {
+  return useFetch(
+    integracaoTaskAttachmentsQueryKey(taskId ?? "missing"),
+    () => integracaoTasksService.listAttachments(taskId ?? ""),
+    { enabled: Boolean(taskId) },
+  );
+}
+
+async function invalidateTaskAttachments(
+  queryClient: ReturnType<typeof useQueryClient>,
+  taskId: string,
+) {
+  await queryClient.invalidateQueries({ queryKey: integracaoTaskAttachmentsQueryKey(taskId) });
+}
+
+export function useUploadTaskAttachmentMutation(): UseMutationResult<
+  void,
+  Error,
+  { taskId: string; file: File }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, file }) => integracaoTasksService.uploadAttachment(taskId, file),
+    onSuccess: async (_result, { taskId }) => invalidateTaskAttachments(queryClient, taskId),
+  });
+}
+
+export function useDeleteTaskAttachmentMutation(): UseMutationResult<
+  void,
+  Error,
+  { taskId: string; attachmentId: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, attachmentId }) =>
+      integracaoTasksService.deleteAttachment(taskId, attachmentId),
+    onSuccess: async (_result, { taskId }) => invalidateTaskAttachments(queryClient, taskId),
+  });
 }
 
 async function invalidateTaskLifecycle(queryClient: ReturnType<typeof useQueryClient>, taskId: string) {

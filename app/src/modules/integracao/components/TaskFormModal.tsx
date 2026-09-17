@@ -55,6 +55,7 @@ import {
   shouldBlockTaskEditForm,
 } from "./taskFormModalUi";
 import { TaskCompletionPanel } from "./TaskCompletionPanel";
+import { TaskAttachmentPanel } from "./TaskAttachmentPanel";
 
 interface TaskFormModalProps {
   open: boolean;
@@ -761,6 +762,14 @@ export function TaskFormModal({
           )}
           {taskDetailQuery.data ? (
             <TaskCompletionPanel
+              task={taskDetailQuery.data}
+              currentUserId={user?.id}
+              accessLevel={integracaoAccess.level}
+              isOwner={user?.type === "owner"}
+            />
+          ) : null}
+          {taskDetailQuery.data ? (
+            <TaskAttachmentPanel
               task={taskDetailQuery.data}
               currentUserId={user?.id}
               accessLevel={integracaoAccess.level}

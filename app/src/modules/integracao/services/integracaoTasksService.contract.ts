@@ -2,6 +2,7 @@ import type {
   CreateIntegracaoTaskBody,
   IntegracaoTaskCompletionDecision,
   IntegracaoTaskCompletionRequest,
+  IntegracaoTaskAttachment,
   IntegracaoTaskDetail,
   IntegracaoTaskListParams,
   IntegracaoTaskListResult,
@@ -15,6 +16,9 @@ export const INTEGRACAO_TASKS_ENDPOINTS = {
   completionRequest: "/task/complete-request",
   completionRequestList: "/task/complete-request/list",
   reopen: "/task/reopen",
+  attachment: "/task/attachment",
+  attachmentList: "/task/attachment/list",
+  attachmentAccess: "/task/attachment/access",
 } as const;
 
 export function buildTaskCompletionRequestPayload(taskId: string, reason: string) {
@@ -83,6 +87,16 @@ export function unwrapIntegracaoTaskList(body: unknown): IntegracaoTaskListResul
 
 export function unwrapTaskCompletionRequestHistory(body: unknown): IntegracaoTaskCompletionRequest[] {
   return unwrapServiceEnvelope(body) as IntegracaoTaskCompletionRequest[];
+}
+
+export function unwrapTaskAttachmentList(body: unknown): IntegracaoTaskAttachment[] {
+  return unwrapServiceEnvelope(body) as IntegracaoTaskAttachment[];
+}
+
+export function unwrapTaskAttachmentAccessUrl(body: unknown): string {
+  const value = unwrapServiceEnvelope(body) as { url?: unknown };
+  if (typeof value?.url !== "string") throw new Error("Resposta de acesso ao anexo inválida.");
+  return value.url;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

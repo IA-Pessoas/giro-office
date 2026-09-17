@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import {
   createExpressErrorHandler,
   createRateLimitMiddleware,
@@ -41,6 +42,7 @@ import {
   type ProjectWizardExtractionRouteDeps,
   type ProjectWizardRouteDeps,
 } from "./routes/projectWizard.routes.js";
+import { createTaskAttachmentRoutes } from "./routes/taskAttachment.routes.js";
 import { taskCrudRoutes } from "./routes/taskCrud.routes.js";
 import { taskDependentRoutes } from "./routes/taskDependent.routes.js";
 import { taskFinanceiroRoutes } from "./routes/taskFinanceiro.routes.js";
@@ -52,6 +54,8 @@ import { CommercialProspectingCloseService } from "./services/commercialProspect
 import { CommercialTaskBillingProjectionService } from "./services/commercialTaskBillingProjectionService.js";
 import { ProjectWizardExtractionService } from "./services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "./services/projectWizardService.js";
+import { TaskAttachmentService } from "./services/taskAttachmentService.js";
+import { SupabaseTaskAttachmentStorage } from "./services/taskAttachmentStorage.js";
 import { TaskReportingService } from "./services/taskReportingService.js";
 
 const PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES =
@@ -81,6 +85,7 @@ export function createTaskApp(
     internalReportingService?: TaskReportingService;
     commercialTaskBillingProjectionService?: InternalCommercialTaskBillingRouteDeps;
     commercialProspectingCloseService?: InternalCommercialProspectingRouteDeps;
+    taskAttachmentService?: TaskAttachmentService;
   },
 ): Express {
   const app = express();
@@ -118,6 +123,26 @@ export function createTaskApp(
   const commercialProspectingCloseService =
     options?.commercialProspectingCloseService ??
     new CommercialProspectingCloseService(prismaClient);
+  const taskAttachmentRoutes = createTaskAttachmentRoutes({
+    service:
+      options?.taskAttachmentService ??
+      new TaskAttachmentService(
+        new SupabaseTaskAttachmentStorage(
+          createClient(
+            env.supabaseUrl || "http://localhost:54321",
+            env.supabaseServiceRoleKey || "task-attachment-storage-test-key",
+          ),
+          env.taskAttachmentStorageBucket || "TaskAttachmentsPrivate",
+        ),
+      ),
+    uploadRateLimit: createRateLimitMiddleware({
+      key: "task-service:task-attachment-upload",
+      max: 10,
+      windowMs: 60_000,
+      methods: ["POST"],
+      message: "Muitos anexos seguidos. Aguarde antes de tentar novamente.",
+    }),
+  });
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "task-service")));
@@ -147,6 +172,7 @@ export function createTaskApp(
   app.use("/task", taskDependentRoutes);
   app.use("/task", taskIntegrationRegularizeRoutes);
   app.use("/task", taskLifecycleRoutes);
+  app.use("/task", taskAttachmentRoutes);
   app.use("/task", taskFinanceiroRoutes);
   app.use("/task", taskCrudRoutes);
   app.use("/task", resolvedProjectWizardRoutes);
