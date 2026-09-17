@@ -14,6 +14,12 @@ import {
 import { GuidanceService } from "../services/guidanceService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
 
+const guidanceListQuerySchema = listGuidanceByProcessQuerySchema
+  .extend({
+    process_id: listGuidanceByProcessQuerySchema.shape.process_id.nullable().optional(),
+  })
+  .strict();
+
 export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
   const router = Router();
   const guidanceService = new GuidanceService(deps.prisma);
@@ -64,8 +70,14 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
 
   router.get("/guidance/list", async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const query = parseWithZod(listGuidanceByProcessQuerySchema.partial(), request.query);
-      const list = await guidanceService.listByProcess(request.organization_id, query.process_id);
+      const rawQuery = request.query as Record<string, unknown>;
+      const normalizedQuery =
+        rawQuery.process_id === "" ? { ...rawQuery, process_id: null } : rawQuery;
+      const query = parseWithZod(guidanceListQuerySchema, normalizedQuery);
+      const list = await guidanceService.listByProcess(
+        request.organization_id,
+        query.process_id ?? undefined,
+      );
       response.json(createSuccessResponse(list));
     } catch (err) {
       logError("Erro ao listar orientacoes do regularize", { err });

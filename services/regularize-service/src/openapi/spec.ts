@@ -95,13 +95,103 @@ const guidanceChecklistOpenApiSchema = {
   items: guidanceChecklistItemOpenApiSchema,
 };
 
+const guidanceChecklistResponseItemOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "guidance_id",
+    "code",
+    "label",
+    "status",
+    "observation",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    guidance_id: { type: "string", format: "uuid" },
+    code: { type: "string", enum: [...REGULARIZE_GUIDANCE_CHECKLIST_CODES] },
+    label: { type: "string" },
+    status: { type: "string", enum: [...REGULARIZE_GUIDANCE_CHECKLIST_STATUSES] },
+    observation: { type: "string", nullable: true },
+    created_at: { type: "string", format: "date-time" },
+    updated_at: { type: "string", format: "date-time" },
+  },
+};
+
+const guidanceChecklistItemsResponseOpenApiSchema = {
+  type: "array",
+  minItems: 17,
+  maxItems: 17,
+  description: "Os 17 itens canônicos persistidos, na ordem de apresentação.",
+  items: guidanceChecklistResponseItemOpenApiSchema,
+};
+
+const guidanceEconomicActivityInputOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code", "description", "type"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    code: { type: "string", minLength: 1 },
+    description: { type: "string", minLength: 1 },
+    type: { type: "string", enum: ["Principal", "Secundária", "Secundaria"] },
+  },
+};
+
+const guidanceEconomicActivityResponseOpenApiSchema = {
+  ...guidanceEconomicActivityInputOpenApiSchema,
+  required: ["id", "code", "description", "type"],
+};
+
+const guidancePartnerInputOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "cpf"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    name: { type: "string", minLength: 1 },
+    cpf: { type: "string", minLength: 1 },
+    role: { type: "string" },
+    share: { type: "number" },
+  },
+};
+
+const guidancePartnerResponseOpenApiSchema = {
+  ...guidancePartnerInputOpenApiSchema,
+  required: ["id", "name", "cpf"],
+};
+
+const guidanceSnapshotProperties = {
+  version: { type: "integer", enum: [1] },
+  source: { type: "string", enum: ["manual", "client_pj", "client_pf"] },
+  name: { type: "string" },
+  document: { type: "string" },
+  address: { type: "string" },
+  city: { type: "string" },
+  state: { type: "string" },
+  company_name: { type: "string" },
+  trade_name: { type: "string" },
+  cpf_cnpj: { type: "string" },
+  legal_nature: { type: "string" },
+  share_capital: { oneOf: [{ type: "number" }, { type: "string" }] },
+  regime: { type: "string" },
+};
+
 const guidanceTargetSnapshotOpenApiSchema = {
   type: "object",
   additionalProperties: false,
+  required: ["version", "source"],
+  properties: guidanceSnapshotProperties,
+};
+
+const guidanceInputTargetSnapshotOpenApiSchema = {
+  ...guidanceTargetSnapshotOpenApiSchema,
   required: ["version", "source", "name"],
   properties: {
-    version: { type: "integer", enum: [1] },
-    source: { type: "string", enum: ["manual", "client_pj", "client_pf"] },
+    ...guidanceSnapshotProperties,
+    source: { type: "string", enum: ["manual"] },
     name: { type: "string", minLength: 1 },
   },
 };
@@ -124,26 +214,67 @@ const guidanceOpenApiSchema = {
   additionalProperties: false,
   required: [
     "id",
+    "organization_id",
     "process_id",
+    "type",
+    "request",
+    "framework_obs",
+    "legal_nature",
+    "company_name",
+    "trade_name",
+    "cpf_cnpj",
+    "share_capital",
+    "iptu",
+    "address",
+    "comporate_purpose",
+    "carryng",
+    "regime",
+    "legal_representative",
+    "status",
+    "economic_activities",
+    "partners",
     "target_type",
+    "client_pj_id",
+    "client_pf_id",
     "target_snapshot",
     "checklist_items",
     "branch_data",
   ],
   properties: {
     id: { type: "string", format: "uuid" },
+    organization_id: { type: "string", format: "uuid" },
     process_id: { type: "string", format: "uuid", nullable: true },
+    type: { type: "string", nullable: true },
+    request: { type: "string", nullable: true },
+    framework_obs: { type: "string", nullable: true },
+    legal_nature: { type: "string", nullable: true },
+    company_name: { type: "string", nullable: true },
+    trade_name: { type: "string", nullable: true },
+    cpf_cnpj: { type: "string", nullable: true },
+    share_capital: { type: "number", nullable: true },
+    iptu: { type: "string", nullable: true },
+    address: { type: "string", nullable: true },
+    comporate_purpose: { type: "string", nullable: true },
+    carryng: { type: "string", nullable: true },
+    regime: { type: "string", nullable: true },
+    legal_representative: { type: "string", nullable: true },
+    status: { type: "string", enum: [...CANONICAL_GUIDANCE_STATUSES] },
+    economic_activities: {
+      type: "array",
+      nullable: true,
+      items: guidanceEconomicActivityResponseOpenApiSchema,
+    },
+    partners: { type: "array", nullable: true, items: guidancePartnerResponseOpenApiSchema },
     target_type: { type: "string", enum: [...REGULARIZE_GUIDANCE_TARGET_TYPES] },
     client_pj_id: { type: "string", format: "uuid", nullable: true },
     client_pf_id: { type: "string", format: "uuid", nullable: true },
     target_snapshot: guidanceTargetSnapshotOpenApiSchema,
-    checklist_items: guidanceChecklistOpenApiSchema,
+    checklist_items: guidanceChecklistItemsResponseOpenApiSchema,
     branch_data: { ...guidanceBranchDataOpenApiSchema, nullable: true },
-    status: { type: "string", enum: [...CANONICAL_GUIDANCE_STATUSES] },
   },
 };
 
-function guidanceRequestBody(required: string[]) {
+function guidanceRequestBody(required: string[], includeId: boolean, includeCollections: boolean) {
   return {
     requestBody: {
       required: true,
@@ -154,15 +285,38 @@ function guidanceRequestBody(required: string[]) {
             additionalProperties: false,
             required,
             properties: {
-              id: { type: "string", format: "uuid" },
+              ...(includeId ? { id: { type: "string", format: "uuid" } } : {}),
               process_id: { type: "string", format: "uuid", nullable: true },
               target_type: { type: "string", enum: [...REGULARIZE_GUIDANCE_TARGET_TYPES] },
               client_pj_id: { type: "string", format: "uuid", nullable: true },
               client_pf_id: { type: "string", format: "uuid", nullable: true },
-              target_snapshot: guidanceTargetSnapshotOpenApiSchema,
+              target_snapshot: guidanceInputTargetSnapshotOpenApiSchema,
               checklist: guidanceChecklistOpenApiSchema,
               branch_data: guidanceBranchDataOpenApiSchema,
+              type: { type: "string" },
+              request: { type: "string" },
+              framework_obs: { type: "string" },
+              legal_nature: { type: "string" },
+              company_name: { type: "string" },
+              trade_name: { type: "string" },
+              cpf_cnpj: { type: "string" },
+              share_capital: { type: "number" },
+              iptu: { type: "string" },
+              address: { type: "string" },
+              comporate_purpose: { type: "string" },
+              carryng: { type: "string" },
+              regime: { type: "string" },
+              legal_representative: { type: "string" },
               status: { type: "string", enum: [...CANONICAL_GUIDANCE_STATUSES] },
+              ...(includeCollections
+                ? {
+                    economic_activities: {
+                      type: "array",
+                      items: guidanceEconomicActivityInputOpenApiSchema,
+                    },
+                    partners: { type: "array", items: guidancePartnerInputOpenApiSchema },
+                  }
+                : {}),
             },
           },
         },
@@ -805,7 +959,7 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Guidance"],
           summary: "Criar orientação procedural independente ou vinculada a processo",
           security: [{ bearerAuth: [] }],
-          ...guidanceRequestBody(["target_type", "checklist", "status"]),
+          ...guidanceRequestBody(["target_type", "checklist", "status"], false, true),
           responses: {
             "201": {
               description: "Orientação completa criada",
@@ -818,7 +972,7 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Guidance"],
           summary: "Atualizar orientação procedural completa",
           security: [{ bearerAuth: [] }],
-          ...guidanceRequestBody(["id"]),
+          ...guidanceRequestBody(["id"], true, false),
           responses: {
             "200": {
               description: "Orientação completa atualizada",

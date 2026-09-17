@@ -208,6 +208,14 @@ describe("regularize status contracts", () => {
                 additionalProperties: boolean;
                 required: string[];
                 properties: {
+                  request: { type: string; nullable: boolean };
+                  company_name: { type: string; nullable: boolean };
+                  address: { type: string; nullable: boolean };
+                  economic_activities: {
+                    nullable: boolean;
+                    items: { additionalProperties: boolean };
+                  };
+                  partners: { nullable: boolean; items: { additionalProperties: boolean } };
                   process_id: { nullable: boolean };
                   target_type: { enum: string[] };
                   target_snapshot: { additionalProperties: boolean };
@@ -238,6 +246,11 @@ describe("regularize status contracts", () => {
     expect(guidancePath.post.security).toEqual([{ bearerAuth: [] }]);
     expect(schema.additionalProperties).toBe(false);
     expect(schema.required).toEqual(expect.arrayContaining(["target_type", "checklist", "status"]));
+    expect(schema.properties.request).toEqual({ type: "string" });
+    expect(schema.properties.company_name).toEqual({ type: "string" });
+    expect(schema.properties.address).toEqual({ type: "string" });
+    expect(schema.properties.economic_activities.items.additionalProperties).toBe(false);
+    expect(schema.properties.partners.items.additionalProperties).toBe(false);
     expect(schema.properties.process_id.nullable).toBe(true);
     expect(schema.properties.target_type.enum).toEqual(["PJ", "PF", "SEM_CLIENTE"]);
     expect(schema.properties.target_snapshot.additionalProperties).toBe(false);
@@ -249,6 +262,98 @@ describe("regularize status contracts", () => {
       "Não se aplica",
     ]);
     expect(schema.properties.branch_data.additionalProperties).toBe(false);
+
+    const responseSchema = (
+      guidancePath.post.responses["201"] as {
+        content: {
+          "application/json": {
+            schema: {
+              additionalProperties: boolean;
+              properties: {
+                data: {
+                  required: string[];
+                  properties: {
+                    organization_id: { type: string };
+                    request: { type: string; nullable: boolean };
+                    company_name: { type: string; nullable: boolean };
+                    address: { type: string; nullable: boolean };
+                    economic_activities: {
+                      nullable: boolean;
+                      items: { additionalProperties: boolean };
+                    };
+                    partners: { nullable: boolean; items: { additionalProperties: boolean } };
+                    target_snapshot: {
+                      additionalProperties: boolean;
+                      properties: Record<string, unknown>;
+                    };
+                    checklist_items: {
+                      items: {
+                        additionalProperties: boolean;
+                        required: string[];
+                        properties: {
+                          guidance_id: { type: string };
+                          label: { type: string };
+                          observation: { type: string; nullable: boolean };
+                          created_at: { type: string; format: string };
+                          updated_at: { type: string; format: string };
+                        };
+                      };
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
+      }
+    ).content["application/json"].schema;
+    const responseData = responseSchema.properties.data;
+    expect(responseSchema.additionalProperties).toBe(false);
+    expect(responseData.required).toEqual(
+      expect.arrayContaining([
+        "id",
+        "organization_id",
+        "process_id",
+        "target_type",
+        "target_snapshot",
+        "checklist_items",
+        "branch_data",
+      ]),
+    );
+    expect(responseData.properties.organization_id).toEqual({ type: "string", format: "uuid" });
+    expect(responseData.properties.request).toEqual({ type: "string", nullable: true });
+    expect(responseData.properties.company_name).toEqual({ type: "string", nullable: true });
+    expect(responseData.properties.address).toEqual({ type: "string", nullable: true });
+    expect(responseData.properties.economic_activities.items.additionalProperties).toBe(false);
+    expect(responseData.properties.partners.items.additionalProperties).toBe(false);
+    expect(responseData.properties.target_snapshot.additionalProperties).toBe(false);
+    expect(responseData.properties.target_snapshot.properties).toEqual(
+      expect.objectContaining({
+        company_name: { type: "string" },
+        trade_name: { type: "string" },
+        cpf_cnpj: { type: "string" },
+        legal_nature: { type: "string" },
+        share_capital: { oneOf: [{ type: "number" }, { type: "string" }] },
+        regime: { type: "string" },
+      }),
+    );
+    expect(responseData.properties.checklist_items.items.additionalProperties).toBe(false);
+    expect(responseData.properties.checklist_items.items.required).toEqual(
+      expect.arrayContaining([
+        "id",
+        "guidance_id",
+        "code",
+        "label",
+        "status",
+        "observation",
+        "created_at",
+        "updated_at",
+      ]),
+    );
+    expect(responseData.properties.checklist_items.items.properties.observation).toEqual({
+      type: "string",
+      nullable: true,
+    });
     expect(Object.keys(guidancePath.post.responses)).toEqual(
       expect.arrayContaining(["201", "404", "409", "422"]),
     );

@@ -223,6 +223,21 @@ describe("regularize remaining routes", () => {
     expect(listByProcess).toHaveBeenCalledWith("a0000000-0000-4000-8000-000000000001", processId);
   });
 
+  it("GET /regularize/guidance/list trata process_id nulo como ausência de filtro", async () => {
+    const listByProcess = vi
+      .spyOn(GuidanceService.prototype, "listByProcess")
+      .mockResolvedValue([completeGuidance]);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .get("/regularize/guidance/list")
+      .query({ process_id: null })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(listByProcess).toHaveBeenCalledWith("a0000000-0000-4000-8000-000000000001", undefined);
+  });
+
   it("POST /regularize/guidance rejeita dados de filial sem checklist concluído", async () => {
     const app = createTestApp();
 
