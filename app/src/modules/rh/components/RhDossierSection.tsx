@@ -711,27 +711,36 @@ function ContactPanel({
         )}
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <input
-            aria-label="Nome do contato"
-            placeholder="Nome"
-            value={draft.name}
-            onChange={(event) => onChange({ ...draft, name: event.target.value })}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-          />
-          <input
-            aria-label="Telefone do contato"
-            placeholder="Telefone"
-            value={draft.phone}
-            onChange={(event) => onChange({ ...draft, phone: event.target.value })}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-          />
-          <input
-            aria-label="Referência do contato"
-            placeholder="Referência (opcional)"
-            value={draft.reference}
-            onChange={(event) => onChange({ ...draft, reference: event.target.value })}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-          />
+          <label htmlFor="rh-contact-name" className="space-y-1">
+            <span className="block text-xs font-medium text-gray-600 dark:text-gray-300">Nome</span>
+            <input
+              id="rh-contact-name"
+              placeholder="Nome"
+              value={draft.name}
+              onChange={(event) => onChange({ ...draft, name: event.target.value })}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+          </label>
+          <label htmlFor="rh-contact-phone" className="space-y-1">
+            <span className="block text-xs font-medium text-gray-600 dark:text-gray-300">Telefone</span>
+            <input
+              id="rh-contact-phone"
+              placeholder="Telefone"
+              value={draft.phone}
+              onChange={(event) => onChange({ ...draft, phone: event.target.value })}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+          </label>
+          <label htmlFor="rh-contact-reference" className="space-y-1">
+            <span className="block text-xs font-medium text-gray-600 dark:text-gray-300">Referência</span>
+            <input
+              id="rh-contact-reference"
+              placeholder="Referência (opcional)"
+              value={draft.reference}
+              onChange={(event) => onChange({ ...draft, reference: event.target.value })}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+          </label>
         </div>
 
         <div className="flex justify-end gap-2">
