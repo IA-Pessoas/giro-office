@@ -5,6 +5,7 @@ const { getRhQuarterOptions } = await import("./utils/rhScoreUi.ts");
 const { formatRhDate } = await import("./utils/rhDate.ts");
 const { resolveRhPermissionCapabilities } = await import("./utils/rhPermissions.ts");
 const { getRhMessageTypeClassName } = await import("./utils/rhRequestUi.ts");
+const { getRhErrorMessage } = await import("./utils/rhErrorMessage.ts");
 
 const rhSources = {
   messageTimeline: readFileSync("src/modules/rh/components/RhRequestMessagesTimeline.tsx", "utf8"),
@@ -221,6 +222,31 @@ runTest("RH point adjustments expose guarded approve and reject decisions", () =
   );
   assert.match(rhSources.pointAdjustmentPanel, /adjustment\.status === "Rejeitado"/);
   assert.match(rhSources.pointAdjustmentPanel, /obs_approver: rejectionReason\.trim\(\) \|\| null/);
+});
+
+runTest("RH point adjustments preserve API conflict messages", () => {
+  const conflictMessage =
+    "O dia esta bloqueado por uma folha assinada; reabra a folha antes de altera-lo.";
+
+  assert.equal(
+    getRhErrorMessage({ response: { data: { error: conflictMessage } } }, "fallback"),
+    conflictMessage,
+  );
+  assert.equal(
+    getRhErrorMessage(new Error("Request failed with status code 409"), "fallback"),
+    "fallback",
+  );
+  assert.equal(
+    getRhErrorMessage(
+      { response: { status: 500, data: { error: "detalhe interno do banco" } } },
+      "fallback",
+    ),
+    "fallback",
+  );
+  assert.match(
+    rhSources.pointAdjustmentPanel,
+    /resetDecision\(\);\s*toast\.error\(getRhErrorMessage\(error/,
+  );
 });
 
 runTest("RH Usuario mantem autosservico e nao recebe gestao", () => {

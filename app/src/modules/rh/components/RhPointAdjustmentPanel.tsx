@@ -10,6 +10,7 @@ import {
 } from "../hooks/useRhPoint";
 import type { RhPointAdjustmentRequest } from "../types";
 import { formatRhDate, formatRhDateTime } from "../utils/rhDate";
+import { getRhErrorMessage } from "../utils/rhErrorMessage";
 
 interface RhPointAdjustmentPanelProps {
   adjustments: RhPointAdjustmentRequest[];
@@ -64,6 +65,10 @@ export function RhPointAdjustmentPanel({
       return;
     }
 
+    resetDecision();
+  }
+
+  function resetDecision() {
     setDecision(null);
     setRejectionReason("");
   }
@@ -86,9 +91,8 @@ export function RhPointAdjustmentPanel({
       }
       closeDecision();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Não foi possível decidir o ajuste.";
-      toast.error(message);
+      resetDecision();
+      toast.error(getRhErrorMessage(error, "Não foi possível decidir o ajuste."));
     }
   }
 
@@ -100,9 +104,9 @@ export function RhPointAdjustmentPanel({
       toast.success(`${selectedRequestIds.length} ajustes aceitos com sucesso.`);
       setSelectedRequestIds([]);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Não foi possível aceitar os ajustes selecionados.";
-      toast.error(message);
+      toast.error(
+        getRhErrorMessage(error, "Não foi possível aceitar os ajustes selecionados."),
+      );
     }
   }
 
