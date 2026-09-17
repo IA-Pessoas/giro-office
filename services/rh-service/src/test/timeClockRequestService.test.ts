@@ -279,6 +279,71 @@ describe("TimeClockRequestService", () => {
     );
   });
 
+  it("approveBulk aprova solicitacoes pendentes e recalcula cada ponto", async () => {
+    const firstRequest = requestSnapshot({ id: "req-1", point_id: null });
+    const secondRequest = requestSnapshot({ id: "req-2", point_id: null });
+    const firstApproved = requestSnapshot({
+      id: "req-1",
+      point_id: "point-1",
+      status: "Aprovado",
+    });
+    const secondApproved = requestSnapshot({
+      id: "req-2",
+      point_id: "point-2",
+      status: "Aprovado",
+    });
+    prismaMock.timeClockRequest.findUnique
+      .mockResolvedValueOnce(firstRequest)
+      .mockResolvedValueOnce(firstApproved)
+      .mockResolvedValueOnce(secondRequest)
+      .mockResolvedValueOnce(secondApproved);
+    prismaMock.point.create
+      .mockResolvedValueOnce({
+        id: "point-1",
+        user_id: "user-2",
+        organization_id: "org-1",
+        time_bank_balance: null,
+      })
+      .mockResolvedValueOnce({
+        id: "point-2",
+        user_id: "user-2",
+        organization_id: "org-1",
+        time_bank_balance: null,
+      });
+    prismaMock.timeClockRequest.updateMany.mockResolvedValue({ count: 1 });
+    pointServiceMock.calculateDailyHours.mockResolvedValue({
+      point_id: "point-1",
+      total_worked_minutes: 480,
+      expected_minutes: 480,
+      day_balance_minutes: 0,
+    });
+    const service = new TimeClockRequestService();
+
+    await expect(
+      service.approveBulk({
+        request_ids: ["req-1", "req-2"],
+        approver_user_id: "user-3",
+        organization_id: "org-1",
+        rh_permission: 3,
+      }),
+    ).resolves.toEqual([firstApproved, secondApproved]);
+
+    expect(prismaMock.timeClockRequest.updateMany).toHaveBeenCalledTimes(2);
+    expect(prismaMock.timeClockRequest.updateMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "Aprovado", point_id: "point-1" }),
+      }),
+    );
+    expect(prismaMock.timeClockRequest.updateMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "Aprovado", point_id: "point-2" }),
+      }),
+    );
+    expect(pointServiceMock.calculateDailyHours).toHaveBeenCalledTimes(2);
+  });
+
   it("approve bloqueia ponto de folha assinada", async () => {
     prismaMock.timeClockRequest.findUnique.mockResolvedValue(requestSnapshot());
     prismaMock.timeSheets.findFirst.mockResolvedValue({ id: "sheet-1" });
