@@ -148,6 +148,7 @@ model Organization {
   ipis                          Ipi[]
   ncms                          Ncm[]
   projectPlans                  ProjectPlan[]
+  projectPlanHirings            ProjectPlanHiring[]
   projectPlanTasks              ProjectPlanTasks[]
   projects                      Project[]
   projectWizardConfirmations    ProjectWizardConfirmation[]
@@ -894,6 +895,7 @@ model ProjectPlan {
   color           String
   organization_id String
   organization    Organization       @relation(fields: [organization_id], references: [id])
+  hirings         ProjectPlanHiring[]
   tasks           ProjectPlanTasks[]
 
   @@map("integracao.projectPlan")
@@ -912,6 +914,23 @@ model ProjectPlanTasks {
   @@map("integracao.projectPlanTasks")
 }
 
+model ProjectPlanHiring {
+  id                String      @id @default(uuid())
+  plan_id           String
+  project_id        String
+  organization_id   String
+  response_snapshot Json
+  created_at        DateTime    @default(now())
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  plan              ProjectPlan @relation(fields: [plan_id], references: [id])
+  project           Project     @relation(fields: [project_id], references: [id])
+
+  @@unique([organization_id, plan_id, project_id], map: "uq_project_plan_hiring_org_plan_project")
+  @@index([plan_id], map: "idx_project_plan_hiring_plan")
+  @@index([project_id], map: "idx_project_plan_hiring_project")
+  @@map("integracao.project_plan_hirings")
+}
+
 model Project {
   id              String       @id @default(uuid())
   name            String
@@ -928,6 +947,7 @@ model Project {
   sponsor         User?        @relation("sponsor", fields: [sponsor_id], references: [id])
   tasks           Task[]
   wizardConfirmations ProjectWizardConfirmation[]
+  planHirings         ProjectPlanHiring[]
 
   @@map("integracao.projects")
 }

@@ -11,7 +11,7 @@ export const INTEGRACAO_PERMISSION_LEVEL = {
   ADMIN: 3,
 } as const satisfies Record<string, IntegracaoPermissionLevel>;
 
-export type IntegracaoResource = "client" | "project" | "task" | "taskModel";
+export type IntegracaoResource = "client" | "project" | "projectPlan" | "task" | "taskModel";
 export type IntegracaoAction =
   | "read"
   | "create"
@@ -349,6 +349,60 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     [writeRule(writeUser, [])],
     { test: "task.projectWizard.preview" },
   ),
+  routePolicy("GET", "/task/project-plan", "projectPlan", "read", [readRule(readOrganization)], {
+    test: "projectPlan.detail",
+  }),
+  routePolicy(
+    "GET",
+    "/task/project-plan/list",
+    "projectPlan",
+    "read",
+    [readRule(readOrganization)],
+    {
+      test: "projectPlan.list",
+    },
+  ),
+  routePolicy(
+    "GET",
+    "/task/project-plan/task/list",
+    "projectPlan",
+    "read",
+    [readRule(readOrganization)],
+    { test: "projectPlan.task.list" },
+  ),
+  routePolicy("POST", "/task/project-plan", "projectPlan", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "projectPlan.create",
+  }),
+  routePolicy("PUT", "/task/project-plan", "projectPlan", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "projectPlan.update",
+  }),
+  routePolicy("DELETE", "/task/project-plan", "projectPlan", "delete", [writeRule(admin, [])], {
+    audit: "required",
+    dependency: 409,
+    test: "projectPlan.delete",
+  }),
+  routePolicy("POST", "/task/project-plan/task", "projectPlan", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "projectPlan.task.create",
+  }),
+  routePolicy("PUT", "/task/project-plan/task", "projectPlan", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "projectPlan.task.reorder",
+  }),
+  routePolicy(
+    "DELETE",
+    "/task/project-plan/task",
+    "projectPlan",
+    "delete",
+    [writeRule(admin, [])],
+    { audit: "required", test: "projectPlan.task.delete" },
+  ),
+  routePolicy("POST", "/task/project-plan/hire", "projectPlan", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "projectPlan.hire",
+  }),
   routePolicy(
     "PUT",
     "/task",

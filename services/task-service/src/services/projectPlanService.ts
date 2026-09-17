@@ -1,4 +1,10 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import {
+  INTEGRACAO_PERMISSION_LEVEL,
+  type IntegracaoPermissionLevel,
+  error as logError,
+  requireIntegracaoRouteAccess,
+  ServiceError,
+} from "@workspace/shared";
 import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import type * as Prisma from "../generated/prisma/internal/prismaNamespace.js";
 import type { ProjectPlanGetPayload } from "../generated/prisma/models/ProjectPlan.js";
@@ -55,6 +61,8 @@ export type ProjectPlanTaskRow = ProjectPlanTasksGetPayload<{
 export interface CreateProjectPlanRequest {
   user_id: string;
   organization_id: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
   name: string;
   color: string;
 }
@@ -67,6 +75,8 @@ export interface DeleteProjectPlanRequest {
   id: string;
   user_id: string;
   organization_id: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
 }
 
 export interface AddProjectPlanTaskRequest {
@@ -74,6 +84,8 @@ export interface AddProjectPlanTaskRequest {
   task_id: string;
   user_id: string;
   organization_id: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
 }
 
 export interface ReorderProjectPlanTaskRequest {
@@ -82,6 +94,8 @@ export interface ReorderProjectPlanTaskRequest {
   direction: "up" | "down";
   user_id: string;
   organization_id: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
 }
 
 export interface DeleteProjectPlanTaskRequest {
@@ -89,6 +103,8 @@ export interface DeleteProjectPlanTaskRequest {
   plan_task_id: string;
   user_id: string;
   organization_id: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
 }
 
 export interface HireProjectPlanRequest {
@@ -96,6 +112,20 @@ export interface HireProjectPlanRequest {
   organization_id: string;
   project_id: string;
   plan_id: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
+}
+
+export interface ProjectPlanAuthorization {
+  user_id: string;
+  organization_id: string;
+  integracaoLevel?: IntegracaoPermissionLevel;
+  isOwner?: boolean;
+}
+
+export interface ProjectPlanHireResponse {
+  created: TaskCreateRow[];
+  idempotent: boolean;
 }
 
 export interface ProjectPlanPrisma {
@@ -107,10 +137,10 @@ export interface ProjectPlanPrisma {
     typeof prismaClient.projectPlanTasks,
     "findFirst" | "findMany" | "create" | "update" | "updateMany" | "delete" | "deleteMany"
   >;
+  projectPlanHiring: Pick<typeof prismaClient.projectPlanHiring, "findUnique" | "create">;
   taskModel: Pick<typeof prismaClient.taskModel, "findFirst">;
   project: Pick<typeof prismaClient.project, "findFirst">;
   client: Pick<typeof prismaClient.client, "findFirst">;
-  user: Pick<typeof prismaClient.user, "findFirst">;
   $transaction: typeof prismaClient.$transaction;
 }
 
@@ -134,22 +164,24 @@ export class ProjectPlanService {
     this.#audit = auditIntegration;
   }
 
-  async #requireManagerPermission(userId: string): Promise<void> {
-    const user = await this.#prisma.user.findFirst({
-      where: { id: userId },
+  #requirePlanAccess(
+    method: "GET" | "POST" | "PUT" | "DELETE",
+    path: string,
+    data: ProjectPlanAuthorization,
+  ): void {
+    requireIntegracaoRouteAccess(method, path, {
+      userId: data.user_id,
+      level: data.integracaoLevel ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+      organizationId: data.organization_id,
+      resourceOrganizationId: data.organization_id,
+      isOwner: data.isOwner === true,
     });
-
-    if (!user) {
-      throw new ServiceError(404, "Usuario nao encontrado.");
-    }
-
-    if (user.permission < 2) {
-      throw new ServiceError(403, "Usuario nao tem permissao.");
-    }
   }
 
   async create(data: CreateProjectPlanRequest): Promise<{ create: ProjectPlanRow }> {
     try {
+      this.#requirePlanAccess("POST", "/task/project-plan", data);
+
       const exists = await this.#prisma.projectPlan.findFirst({
         where: {
           name: data.name,
@@ -160,8 +192,6 @@ export class ProjectPlanService {
       if (exists) {
         throw new ServiceError(409, "Plano com esse nome ja foi cadastrado.");
       }
-
-      await this.#requireManagerPermission(data.user_id);
 
       const create = await this.#prisma.projectPlan.create({
         data: {
@@ -191,6 +221,8 @@ export class ProjectPlanService {
 
   async update(data: UpdateProjectPlanRequest): Promise<ProjectPlanRow> {
     try {
+      this.#requirePlanAccess("PUT", "/task/project-plan", data);
+
       const exists = await this.#prisma.projectPlan.findFirst({
         where: {
           id: data.id,
@@ -202,8 +234,6 @@ export class ProjectPlanService {
       if (!exists) {
         throw new ServiceError(404, "Plano nao encontrado.");
       }
-
-      await this.#requireManagerPermission(data.user_id);
 
       const updated = await this.#prisma.projectPlan.update({
         where: {
@@ -234,8 +264,14 @@ export class ProjectPlanService {
     }
   }
 
-  async detail(planId: string, organizationId: string): Promise<{ detail: ProjectPlanDetailRow }> {
+  async detail(
+    planId: string,
+    organizationId: string,
+    authorization: ProjectPlanAuthorization,
+  ): Promise<{ detail: ProjectPlanDetailRow }> {
     try {
+      this.#requirePlanAccess("GET", "/task/project-plan", authorization);
+
       const detail = await this.#prisma.projectPlan.findFirst({
         where: {
           id: planId,
@@ -256,8 +292,13 @@ export class ProjectPlanService {
     }
   }
 
-  async list(organizationId: string): Promise<ProjectPlanRow[]> {
+  async list(
+    organizationId: string,
+    authorization: ProjectPlanAuthorization,
+  ): Promise<ProjectPlanRow[]> {
     try {
+      this.#requirePlanAccess("GET", "/task/project-plan/list", authorization);
+
       return await this.#prisma.projectPlan.findMany({
         where: {
           organization_id: organizationId,
@@ -276,6 +317,8 @@ export class ProjectPlanService {
 
   async delete(data: DeleteProjectPlanRequest): Promise<{ response: true }> {
     try {
+      this.#requirePlanAccess("DELETE", "/task/project-plan", data);
+
       const exists = await this.#prisma.projectPlan.findFirst({
         where: {
           id: data.id,
@@ -286,8 +329,6 @@ export class ProjectPlanService {
       if (!exists) {
         throw new ServiceError(404, "Plano nao encontrado.");
       }
-
-      await this.#requireManagerPermission(data.user_id);
 
       await this.#prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         await tx.projectPlanTasks.deleteMany({
@@ -304,16 +345,30 @@ export class ProjectPlanService {
         });
       });
 
+      await this.#audit.createLog({
+        userId: data.user_id,
+        organizationId: data.organization_id,
+        action: "Exclusao",
+        referring: "integracao.projectPlan",
+        referringId: data.id,
+        changes: "{}",
+      });
+
       return { response: true };
     } catch (err: unknown) {
       logError("Erro ao excluir plano de projeto", { err });
       if (err instanceof ServiceError) throw err;
+      if (typeof err === "object" && err !== null && "code" in err && err.code === "P2003") {
+        throw new ServiceError(409, "Não é possível excluir um plano já contratado.");
+      }
       throw new ServiceError(500, "Nao foi possivel excluir o plano.", err);
     }
   }
 
   async addTask(data: AddProjectPlanTaskRequest): Promise<{ create: ProjectPlanTaskRow }> {
     try {
+      this.#requirePlanAccess("POST", "/task/project-plan/task", data);
+
       const plan = await this.#prisma.projectPlan.findFirst({
         where: {
           id: data.plan_id,
@@ -335,8 +390,6 @@ export class ProjectPlanService {
       if (!taskModel) {
         throw new ServiceError(404, "Modelo de tarefa nao encontrado.");
       }
-
-      await this.#requireManagerPermission(data.user_id);
 
       const lastTaskInPlan = await this.#prisma.projectPlanTasks.findFirst({
         where: {
@@ -380,8 +433,14 @@ export class ProjectPlanService {
     }
   }
 
-  async listTasks(planId: string, organizationId: string): Promise<ProjectPlanTaskRow[]> {
+  async listTasks(
+    planId: string,
+    organizationId: string,
+    authorization: ProjectPlanAuthorization,
+  ): Promise<ProjectPlanTaskRow[]> {
     try {
+      this.#requirePlanAccess("GET", "/task/project-plan/task/list", authorization);
+
       return await this.#prisma.projectPlanTasks.findMany({
         where: {
           plan_id: planId,
@@ -405,6 +464,8 @@ export class ProjectPlanService {
     { message: string } | { updatedTaskA: ProjectPlanTaskRow; updatedTaskB: ProjectPlanTaskRow }
   > {
     try {
+      this.#requirePlanAccess("PUT", "/task/project-plan/task", data);
+
       const taskA = await this.#prisma.projectPlanTasks.findFirst({
         where: {
           id: data.plan_task_id,
@@ -416,8 +477,6 @@ export class ProjectPlanService {
       if (!taskA) {
         throw new ServiceError(404, "Tarefa nao encontrada neste plano.");
       }
-
-      await this.#requireManagerPermission(data.user_id);
 
       if (data.direction === "up" && taskA.order === 1) {
         return { message: "A tarefa ja esta no topo." };
@@ -449,6 +508,18 @@ export class ProjectPlanService {
         }),
       ]);
 
+      await this.#audit.createLog({
+        userId: data.user_id,
+        organizationId: data.organization_id,
+        action: "Atualizacao",
+        referring: "integracao.projectPlan",
+        referringId: data.plan_id,
+        changes: JSON.stringify({
+          planTaskId: data.plan_task_id,
+          direction: data.direction,
+        }),
+      });
+
       return { updatedTaskA, updatedTaskB };
     } catch (err: unknown) {
       logError("Erro ao reordenar tarefa do plano", { err });
@@ -459,6 +530,8 @@ export class ProjectPlanService {
 
   async deleteTask(data: DeleteProjectPlanTaskRequest): Promise<{ deleted: ProjectPlanTaskRow }> {
     try {
+      this.#requirePlanAccess("DELETE", "/task/project-plan/task", data);
+
       const deleted = await this.#prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const taskToDelete = await tx.projectPlanTasks.findFirst({
           where: {
@@ -472,8 +545,6 @@ export class ProjectPlanService {
         if (!taskToDelete) {
           throw new ServiceError(404, "Tarefa nao encontrada neste plano.");
         }
-
-        await this.#requireManagerPermission(data.user_id);
 
         await tx.projectPlanTasks.delete({
           where: {
@@ -499,6 +570,15 @@ export class ProjectPlanService {
         return taskToDelete;
       });
 
+      await this.#audit.createLog({
+        userId: data.user_id,
+        organizationId: data.organization_id,
+        action: "Exclusao",
+        referring: "integracao.projectPlan",
+        referringId: data.plan_id,
+        changes: JSON.stringify({ planTaskId: data.plan_task_id }),
+      });
+
       return { deleted };
     } catch (err: unknown) {
       logError("Erro ao excluir tarefa do plano", { err });
@@ -507,79 +587,113 @@ export class ProjectPlanService {
     }
   }
 
-  async hirePlan(data: HireProjectPlanRequest): Promise<{ created: TaskCreateRow[] }> {
+  async hirePlan(data: HireProjectPlanRequest): Promise<ProjectPlanHireResponse> {
     try {
-      const plan = await this.#prisma.projectPlan.findFirst({
-        where: {
-          id: data.plan_id,
-          organization_id: data.organization_id,
-        },
-      });
+      this.#requirePlanAccess("POST", "/task/project-plan/hire", data);
 
-      if (!plan) {
-        throw new ServiceError(404, "Plano nao encontrado.");
-      }
+      const result = await this.#prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const lockKey = JSON.stringify([data.organization_id, data.plan_id, data.project_id]);
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
 
-      const project = await this.#prisma.project.findFirst({
-        where: {
-          id: data.project_id,
-          organization_id: data.organization_id,
-        },
-        select: {
-          client_id: true,
-        },
-      });
+        const previous = await tx.projectPlanHiring.findUnique({
+          where: {
+            organization_id_plan_id_project_id: {
+              organization_id: data.organization_id,
+              plan_id: data.plan_id,
+              project_id: data.project_id,
+            },
+          },
+        });
+        if (previous) {
+          return {
+            ...(previous.response_snapshot as unknown as Omit<
+              ProjectPlanHireResponse,
+              "idempotent"
+            >),
+            idempotent: true,
+          };
+        }
 
-      if (!project) {
-        throw new ServiceError(404, "Projeto nao encontrado.");
-      }
+        const plan = await tx.projectPlan.findFirst({
+          where: { id: data.plan_id, organization_id: data.organization_id },
+        });
+        if (!plan) {
+          throw new ServiceError(404, "Plano nao encontrado.");
+        }
 
-      const client = await this.#prisma.client.findFirst({
-        where: {
-          id: project.client_id,
-          organization_id: data.organization_id,
-        },
-        select: {
-          prospecting_status: true,
-        },
-      });
+        const project = await tx.project.findFirst({
+          where: { id: data.project_id, organization_id: data.organization_id },
+          select: { client_id: true },
+        });
+        if (!project) {
+          throw new ServiceError(404, "Projeto nao encontrado.");
+        }
 
-      if (!client) {
-        throw new ServiceError(404, "Cliente nao encontrado.");
-      }
+        const client = await tx.client.findFirst({
+          where: { id: project.client_id, organization_id: data.organization_id },
+          select: { prospecting_status: true },
+        });
+        if (!client) {
+          throw new ServiceError(404, "Cliente nao encontrado.");
+        }
 
-      await this.#requireManagerPermission(data.user_id);
+        const planTasks = await tx.projectPlanTasks.findMany({
+          where: { plan_id: data.plan_id, organization_id: data.organization_id },
+          select: { task_id: true },
+          orderBy: { order: "asc" },
+        });
+        if (planTasks.length === 0) {
+          throw new ServiceError(422, "Plano vazio não pode ser contratado.");
+        }
 
-      const planTasks = await this.#prisma.projectPlanTasks.findMany({
-        where: {
-          plan_id: data.plan_id,
-          organization_id: data.organization_id,
-        },
-        select: {
-          task_id: true,
-        },
-        orderBy: {
-          order: "asc",
-        },
-      });
+        const created: TaskCreateRow[] = [];
+        for (const planTask of planTasks) {
+          const task = await this.#taskCrudService.createTaskInTransaction(
+            {
+              user_id: data.user_id,
+              organization_id: data.organization_id,
+              model_id: planTask.task_id,
+              project_id: data.project_id,
+              client_id: project.client_id,
+              prospecting_status: client.prospecting_status as ProspectingStatus,
+              observations: "",
+              urgency: "",
+              integracaoLevel: data.integracaoLevel,
+              isOwner: data.isOwner === true,
+            },
+            tx,
+          );
+          created.push(task.create);
+        }
 
-      const created: TaskCreateRow[] = [];
-      for (const planTask of planTasks) {
-        const result = await this.#taskCrudService.createTask({
-          user_id: data.user_id,
-          organization_id: data.organization_id,
-          model_id: planTask.task_id,
-          project_id: data.project_id,
-          client_id: project.client_id,
-          prospecting_status: client.prospecting_status as ProspectingStatus,
-          observations: "",
-          urgency: "",
+        const response = JSON.parse(
+          JSON.stringify({ created, idempotent: false }),
+        ) as ProjectPlanHireResponse;
+        await this.#audit.createLog({
+          userId: data.user_id,
+          organizationId: data.organization_id,
+          action: "Cadastro",
+          referring: "integracao.projectPlan",
+          referringId: data.plan_id,
+          required: true,
+          changes: {
+            source: "project-plan-hire",
+            projectId: data.project_id,
+            taskIds: created.map(({ id }) => id),
+          },
+        });
+        await tx.projectPlanHiring.create({
+          data: {
+            organization_id: data.organization_id,
+            plan_id: data.plan_id,
+            project_id: data.project_id,
+            response_snapshot: response as unknown as Prisma.InputJsonValue,
+          },
         });
 
-        created.push(result.create);
-      }
-
-      return { created };
+        return response;
+      });
+      return result;
     } catch (err: unknown) {
       logError("Erro ao contratar plano de projeto", { err });
       if (err instanceof ServiceError) throw err;
