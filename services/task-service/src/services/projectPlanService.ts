@@ -675,6 +675,7 @@ export class ProjectPlanService {
           action: "Cadastro",
           referring: "integracao.projectPlan",
           referringId: data.plan_id,
+          required: true,
           changes: {
             source: "project-plan-hire",
             projectId: data.project_id,

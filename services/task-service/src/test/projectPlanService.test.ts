@@ -507,9 +507,11 @@ describe("ProjectPlanService", () => {
     prisma.projectPlanTasks.findMany = async () => [{ task_id: "model-1" }];
     let auditAvailable = false;
     let auditAttempts = 0;
+    let auditRequired = false;
     const audit = {
-      async createLog() {
+      async createLog(params) {
         auditAttempts += 1;
+        auditRequired = params.required === true;
         if (!auditAvailable) {
           throw new Error("audit indisponível");
         }
@@ -539,6 +541,7 @@ describe("ProjectPlanService", () => {
 
     expect(retry).toMatchObject({ idempotent: false });
     expect(auditAttempts).toBe(2);
+    expect(auditRequired).toBe(true);
   });
 
   it("hirePlan rejeita plano sem modelos antes de criar tarefas", async () => {
