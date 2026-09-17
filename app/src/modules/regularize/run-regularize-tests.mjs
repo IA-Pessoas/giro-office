@@ -85,13 +85,21 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
 await runTest(
   "regularize guidance supports independent filters and guards empty scopes",
   async () => {
-  const [typesSource, contractSource, serviceSource, queryKeysSource, operationsSource] =
+  const [
+    typesSource,
+    contractSource,
+    serviceSource,
+    queryKeysSource,
+    operationsSource,
+    pageSource,
+  ] =
     await Promise.all([
       readModuleSource("types.ts"),
       readModuleSource("services/regularizeService.contract.ts"),
       readModuleSource("services/regularizeService.ts"),
       readModuleSource("hooks/queryKeys.ts"),
       readModuleSource("hooks/useRegularizeOperations.ts"),
+      readModuleSource("components/RegularizePage.tsx"),
     ]);
 
   assert.match(typesSource, /@workspace\/shared\/regularize/);
@@ -145,6 +153,10 @@ await runTest(
   assert.match(
     operationsSource,
     /return \(hasExplicitAllFilters \|\| hasEffectiveGuidanceFilter\) && \(options\?\.enabled \?\? true\)/,
+  );
+  assert.match(
+    pageSource,
+    /const guidanceQuery = useRegularizeGuidance\(\s*currentProcessId \? \{ process_id: currentProcessId \} : undefined,\s*\{ enabled: queryPolicy\.guidance && Boolean\(currentProcessId\) \},\s*\);/,
   );
   assert.match(
     serviceSource,

@@ -1137,7 +1137,7 @@ export function RegularizePage() {
   );
   const guidanceQuery = useRegularizeGuidance(
     currentProcessId ? { process_id: currentProcessId } : undefined,
-    { enabled: queryPolicy.guidance },
+    { enabled: queryPolicy.guidance && Boolean(currentProcessId) },
   );
   const clientPfDetailQuery = useRegularizeClientPfDetail(currentClientPfId, {
     enabled: activeTab === "pf",

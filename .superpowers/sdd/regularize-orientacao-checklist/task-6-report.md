@@ -170,3 +170,22 @@ do pnpm fora da raiz.
 | `corepack pnpm --filter @workspace/app test:regularize` | Passou. |
 | `corepack pnpm --filter @workspace/app typecheck` | Passou. |
 | `git diff --check` | Passou. |
+
+## Fix round 4 — caller processual sem listagem implícita
+
+- `RegularizePage.tsx` agora habilita a consulta processual somente com
+  `queryPolicy.guidance && Boolean(currentProcessId)`. Sem processo selecionado,
+  o caller não transforma `filters === undefined` em uma listagem geral
+  implícita.
+- O runner estático protege o call site e a expressão completa de habilitação.
+- A Task 7 será responsável por habilitar explicitamente a listagem independente
+  quando esse fluxo estiver pronto.
+
+### Evidências do fix round 4
+
+| Comando | Resultado |
+| --- | --- |
+| Runner estático antes da implementação (RED) | Falhou na assertion do call site sem a guarda de `currentProcessId`. |
+| `corepack pnpm --filter @workspace/app test:regularize` | Passou. |
+| `corepack pnpm --filter @workspace/app typecheck` | Passou. |
+| `git diff --check` | Passou. |
