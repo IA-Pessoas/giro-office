@@ -162,6 +162,9 @@ model Organization {
   certificateNotifications      CertificateNotification[]
   pessoalNotifications          PessoalNotification[]
   regularizeNotifications       RegularizeNotification[]
+  rhNotifications               RhNotification[]
+  rhRequestReads                RhRequestRead[]
+  rhMessageReads                RhMessageRead[]
   organizationInvites           OrganizationInvite[]
   usersWithOrg                  User[]              @relation("UserOrganization")
   installments                  Installment[]
@@ -333,6 +336,9 @@ model User {
   senderMsgRH                 RhMessage[]
   assignerRH                  RhRequest[]            @relation("RequestAssignee")
   requesterRH                 RhRequest[]            @relation("RequestOwner")
+  rhNotifications             RhNotification[]
+  rhRequestReads              RhRequestRead[]
+  rhMessageReads              RhMessageRead[]
   scores                      ScoreQuarter[]
   scoresEvaluaion             ScoreEvaluation[]
   timeBankRealeasesAdded      TimeBankReleases[]     @relation("add")
@@ -2053,6 +2059,8 @@ model RhRequest {
   updated_at          DateTime         @updatedAt
   organization_id     String
   messages            RhMessage[]
+  reads               RhRequestRead[]
+  notifications       RhNotification[]
   assigned_to         User?            @relation("RequestAssignee", fields: [assigned_to_user_id], references: [id])
   category            RhCategory       @relation(fields: [category_id], references: [id])
   organization        Organization     @relation(fields: [organization_id], references: [id])
@@ -2085,8 +2093,58 @@ model RhMessage {
   organization    Organization   @relation(fields: [organization_id], references: [id])
   request         RhRequest      @relation(fields: [request_id], references: [id], onDelete: Cascade)
   sender          User           @relation(fields: [sender_user_id], references: [id])
+  reads           RhMessageRead[]
 
   @@map("rh.request_messages")
+}
+
+model RhMessageRead {
+  id              String      @id @default(uuid())
+  message_id      String
+  user_id         String
+  organization_id String
+  read_at         DateTime    @default(now())
+  message         RhMessage   @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  user            User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, message_id, user_id], map: "uq_rh_message_reads_scope")
+  @@index([organization_id, user_id, read_at], map: "idx_rh_message_reads_user")
+  @@map("rh.message_reads")
+}
+
+model RhRequestRead {
+  id              String      @id @default(uuid())
+  request_id      String
+  user_id         String
+  organization_id String
+  read_at         DateTime    @default(now())
+  request         RhRequest   @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  user            User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, request_id, user_id], map: "uq_rh_request_reads_scope")
+  @@index([organization_id, user_id, read_at], map: "idx_rh_request_reads_user")
+  @@map("rh.request_reads")
+}
+
+model RhNotification {
+  id              String      @id @default(uuid())
+  user_id         String
+  request_id      String
+  event_key       String
+  title           String
+  message         String
+  read            Boolean     @default(false)
+  created_at      DateTime    @default(now())
+  organization_id String
+  user            User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  request         RhRequest   @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, user_id, request_id, event_key], map: "uq_rh_notifications_event")
+  @@index([organization_id, user_id, read, created_at], map: "idx_rh_notifications_user_state")
+  @@map("rh.notifications")
 }
 
 model PasswordTecnologia {

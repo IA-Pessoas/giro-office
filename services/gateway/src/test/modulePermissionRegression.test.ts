@@ -33,13 +33,26 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 describe("matriz de regressão das políticas modulares", () => {
   it("permite RH nível 1 no próprio perfil, sem liberar as demais mutações RH", () => {
     const profilePolicy = requiredRoutePolicy("PUT", "/rh/profile/colaborator");
+    const createRequestPolicy = requiredRoutePolicy("POST", "/rh/requests");
+    const createMessagePolicy = requiredRoutePolicy("POST", "/rh/messages");
     const requestsPolicy = requiredRoutePolicy("PUT", "/rh/requests");
 
     expect(profilePolicy).toEqual({ modulePermission: { module: "rh", minPermission: 1 } });
     expect(canAccessRoute(authContext({ modules: { rh: 1 } }), profilePolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), createRequestPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), createMessagePolicy)).toBe(true);
     expect(canAccessRoute(authContext({ modules: { rh: 1 } }), requestsPolicy)).toBe(false);
     expect(canAccessRoute(authContext({ modules: { rh: 2 } }), requestsPolicy)).toBe(true);
     expect(canAccessRoute(authContext({ modules: { rh: 0 } }), profilePolicy)).toBe(false);
+  });
+
+  it("mantém notificações de RH no mesmo nível de acesso do módulo", () => {
+    const listPolicy = requiredRoutePolicy("GET", "/rh/notifications");
+    const readPolicy = requiredRoutePolicy("PUT", "/rh/notifications/read");
+
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), listPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), readPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 0 } }), listPolicy)).toBe(false);
   });
 
   it("protege Comercial: Viewer lê e Editor altera, sem bypass global", () => {

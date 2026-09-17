@@ -3312,6 +3312,22 @@ const baseManifest = [
   }),
   op({
     service: "rh-service",
+    method: "GET",
+    path: "/rh/notifications",
+    action: "rhNotificationList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
+    method: "PUT",
+    path: "/rh/notifications/read",
+    action: "rhNotificationMarkRead",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "rh-service",
     method: "POST",
     path: "/rh/timesheets",
     action: "rhTimeSheetCreate",

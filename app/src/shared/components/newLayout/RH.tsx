@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Award, BarChart3, Calendar, Clock, FileText, UserRound, Users } from "lucide-react";
+import { useRouter } from "next/router";
 
 import {
   RhDashboardSection,
@@ -16,6 +17,7 @@ import { Dialog } from "@shared/components";
 type RhMainTab = "dashboard" | "dossier" | "requests" | "evaluations" | "point";
 
 export function RH() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<RhMainTab>("dashboard");
   const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
   const { canAccessRhPortal, canManageRh, canManageRhRequests, canViewRhDashboard, permissionQuery } =
@@ -44,6 +46,12 @@ export function RH() {
       setActiveTab("requests");
     }
   }, [activeTab, canViewRhDashboard, permissionQuery.isLoading]);
+
+  useEffect(() => {
+    if (router.isReady && typeof router.query.requestId === "string") {
+      setActiveTab("requests");
+    }
+  }, [router.isReady, router.query.requestId]);
 
   if (!permissionQuery.isLoading && permissionQuery.error) {
     return (
@@ -157,7 +165,13 @@ export function RH() {
       ) : null}
 
       {activeTab === "dossier" ? <RhDossierSection /> : null}
-      {activeTab === "requests" ? <RhRequestsSection /> : null}
+      {activeTab === "requests" ? (
+        <RhRequestsSection
+          initialRequestId={
+            typeof router.query.requestId === "string" ? router.query.requestId : undefined
+          }
+        />
+      ) : null}
       {activeTab === "evaluations" ? <RhScoreSection /> : null}
       {activeTab === "point" ? <RhPointSection /> : null}
 

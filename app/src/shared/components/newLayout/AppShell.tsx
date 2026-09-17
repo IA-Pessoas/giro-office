@@ -44,6 +44,10 @@ import {
   type ModuleKey,
   type ModulePermissionSubject,
 } from "@modules/auth";
+import {
+  useMarkRhNotificationReadMutation,
+  useRhNotifications,
+} from "@modules/rh/hooks/useRhRequests";
 import { useMe } from "@shared/hooks";
 import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 import { resolvePhotoUrl } from "@shared/utils";
@@ -168,6 +172,15 @@ const MODULE_NAV_LOADING_MESSAGE = "Carregando módulos";
 const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
 const USER_MENU_PANEL_ID = "app-shell-user-menu";
 const AI_CHAT_DIALOG_DESCRIPTION_ID = "app-shell-ai-chat-description";
+
+function formatAppShellNotificationTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
 
 function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
   const normalizedPath = normalizeRoutePath(routePath);
@@ -298,6 +311,7 @@ type ChatMessage = {
 
 type AppShellNotification = {
   id: string;
+  requestId: string;
   title: string;
   description: string;
   time: string;
@@ -321,6 +335,10 @@ export function AppShell({
     isLoading: isModuleAccessLoading,
     user: moduleAccessUser,
   } = useModuleAccessMap(MODULE_KEYS);
+  const rhNotificationsQuery = useRhNotifications({
+    enabled: !isPlatformSuperAdmin && moduleAccessMap.rh?.canView === true,
+  });
+  const markRhNotificationReadMutation = useMarkRhNotificationReadMutation();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -332,7 +350,14 @@ export function AppShell({
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [hasUserPhotoLoadError, setHasUserPhotoLoadError] = useState(false);
-  const notifications: AppShellNotification[] = [];
+  const notifications: AppShellNotification[] = (rhNotificationsQuery.data ?? []).map((item) => ({
+    id: item.id,
+    requestId: item.request_id,
+    title: item.title,
+    description: item.message,
+    time: formatAppShellNotificationTime(item.created_at),
+    unread: !item.read,
+  }));
   const hasUnreadNotifications = notifications.some((item) => item.unread);
   const shouldExpandSidebar = isSidebarOpen || isSidebarPreviewOpen;
   const sidebarToggleLabel = isSidebarOpen
@@ -818,6 +843,16 @@ export function AppShell({
                           <button
                             key={item.id}
                             type="button"
+                            onClick={() => {
+                              if (item.unread) {
+                                markRhNotificationReadMutation.mutate({ id: item.id });
+                              }
+                              setShowNotifications(false);
+                              void router.push({
+                                pathname: "/rh",
+                                query: { requestId: item.requestId },
+                              });
+                            }}
                             className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
                           >
                             <div className="flex items-start gap-3">

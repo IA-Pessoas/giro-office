@@ -14,6 +14,8 @@ export const RH_ENDPOINTS = {
   requests: "/rh/requests",
   requestDetail: (id: string) => `/rh/requests/${id}`,
   messages: "/rh/messages",
+  notifications: "/rh/notifications",
+  markNotificationsRead: "/rh/notifications/read",
   operationalUsers: "/rh/operational-users",
   dossier: "/rh/profile/colaborator",
   dossierList: "/rh/profile/colaborator/list",
