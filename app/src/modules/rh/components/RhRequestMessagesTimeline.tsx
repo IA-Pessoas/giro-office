@@ -16,11 +16,13 @@ import { formatRhDateTime } from "../utils/rhDate";
 interface RhRequestMessagesTimelineProps {
   requestId: string;
   canUseRhWorkflowMessages: boolean;
+  canRespondToRhSolution: boolean;
 }
 
 export function RhRequestMessagesTimeline({
   requestId,
   canUseRhWorkflowMessages,
+  canRespondToRhSolution,
 }: RhRequestMessagesTimelineProps) {
   const messagesQuery = useRhMessages({ requestId });
   const createMessageMutation = useCreateRhMessageMutation();
@@ -57,6 +59,12 @@ export function RhRequestMessagesTimeline({
   }
 
   const messages = messagesQuery.data ?? [];
+  const messageTypes: RhMessageType[] = canUseRhWorkflowMessages
+    ? ["Message", "Solution", "Rejection", "Acceptance"]
+    : canRespondToRhSolution
+      ? ["Message", "Rejection", "Acceptance"]
+      : ["Message"];
+  const canChooseMessageType = messageTypes.length > 1;
 
   return (
     <div className="space-y-4">
@@ -132,10 +140,10 @@ export function RhRequestMessagesTimeline({
 
         <div
           className={
-            canUseRhWorkflowMessages ? "grid gap-3 md:grid-cols-[180px,1fr]" : "block"
+            canChooseMessageType ? "grid gap-3 md:grid-cols-[180px,1fr]" : "block"
           }
         >
-          {canUseRhWorkflowMessages ? (
+          {canChooseMessageType ? (
             <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
               <span>Tipo</span>
               <div className="relative">
@@ -147,9 +155,9 @@ export function RhRequestMessagesTimeline({
                   className="w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 >
                   <option value="Message">Mensagem</option>
-                  <option value="Solution">Solução</option>
-                  <option value="Rejection">Rejeição</option>
-                  <option value="Acceptance">Aceite</option>
+                  {messageTypes.includes("Solution") ? <option value="Solution">Solução</option> : null}
+                  {messageTypes.includes("Rejection") ? <option value="Rejection">Rejeição</option> : null}
+                  {messageTypes.includes("Acceptance") ? <option value="Acceptance">Aceite</option> : null}
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               </div>

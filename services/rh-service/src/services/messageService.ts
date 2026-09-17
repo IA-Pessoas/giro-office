@@ -38,6 +38,7 @@ export interface MessageCreateInput {
   type: RhMessageTypeInput;
   attachment?: string;
   can_manage_rh?: boolean;
+  can_use_rh_workflow_messages?: boolean;
 }
 
 export interface MessageListByRequestInput {
@@ -58,7 +59,86 @@ function assertUserCanAccessRequest(
   }
 }
 
+type MessageAuthorizationRequest = {
+  requester_user_id: string;
+  assigned_to_user_id: string;
+  status: string;
+};
+
+function assertMessageCanBeCreated(
+  request: MessageAuthorizationRequest,
+  senderUserId: string,
+  type: RhMessageTypeInput,
+  canManageRh = false,
+  canUseRhWorkflowMessages = false,
+): void {
+  assertUserCanAccessRequest(request, senderUserId, canManageRh);
+
+  if (request.status === "Closed") {
+    throw new ServiceError(409, "Não é possível enviar mensagens em uma solicitação fechada.");
+  }
+
+  if (!canManageRh) {
+    if (type === "Solution") {
+      if (!canUseRhWorkflowMessages) {
+        throw new ServiceError(403, "RH Visualizador pode enviar somente mensagens.");
+      }
+      if (request.assigned_to_user_id !== senderUserId) {
+        throw new ServiceError(403, "Somente o responsável pode enviar a solução.");
+      }
+    }
+    if (
+      (type === "Rejection" || type === "Acceptance") &&
+      request.requester_user_id !== senderUserId
+    ) {
+      throw new ServiceError(403, "Somente o solicitante pode responder à solução.");
+    }
+  }
+
+  const expectedStatusByType: Record<RhMessageTypeInput, string | null> = {
+    Message: null,
+    Solution: "In_Progress",
+    Rejection: "Resolved",
+    Acceptance: "Resolved",
+  };
+  const expectedStatus = expectedStatusByType[type];
+  if (expectedStatus !== null && request.status !== expectedStatus) {
+    throw new ServiceError(409, "A mensagem de workflow não corresponde ao status atual.");
+  }
+}
+
 class MessageService {
+  async assertCanCreate(input: {
+    organization_id: string;
+    sender_user_id: string;
+    request_id: string;
+    type: RhMessageTypeInput;
+    can_manage_rh?: boolean;
+    can_use_rh_workflow_messages?: boolean;
+  }): Promise<void> {
+    const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
+    const senderUserId = assertNonEmptyString(input.sender_user_id, "sender_user_id");
+    const requestId = assertNonEmptyString(input.request_id, "request_id");
+    const request = await prismaClient.rhRequest.findFirst({
+      where: { id: requestId, organization_id: organizationId },
+      select: {
+        requester_user_id: true,
+        assigned_to_user_id: true,
+        status: true,
+      },
+    });
+    if (!request) {
+      throw new ServiceError(404, "Chamado não encontrado.");
+    }
+    assertMessageCanBeCreated(
+      request,
+      senderUserId,
+      input.type,
+      input.can_manage_rh,
+      input.can_use_rh_workflow_messages,
+    );
+  }
+
   async create(input: MessageCreateInput): Promise<RhMessageSnapshot> {
     try {
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
@@ -85,40 +165,16 @@ class MessageService {
             throw new ServiceError(404, "Chamado não encontrado.");
           }
 
-          assertUserCanAccessRequest(request, senderUserId, input.can_manage_rh);
+          assertMessageCanBeCreated(
+            request,
+            senderUserId,
+            type,
+            input.can_manage_rh,
+            input.can_use_rh_workflow_messages,
+          );
 
           if (attachment && !isRhRequestMessageObjectPath(attachment, organizationId, requestId)) {
             throw new ServiceError(400, "O anexo informado não pertence a esta mensagem de RH.");
-          }
-
-          if (request.status === "Closed") {
-            throw new ServiceError(
-              409,
-              "Não é possível enviar mensagens em uma solicitação fechada.",
-            );
-          }
-
-          if (!input.can_manage_rh) {
-            if (type === "Solution" && request.assigned_to_user_id !== senderUserId) {
-              throw new ServiceError(403, "Somente o responsável pode enviar a solução.");
-            }
-            if (
-              (type === "Rejection" || type === "Acceptance") &&
-              request.requester_user_id !== senderUserId
-            ) {
-              throw new ServiceError(403, "Somente o solicitante pode responder à solução.");
-            }
-          }
-
-          const expectedStatusByType: Record<RhMessageTypeInput, string | null> = {
-            Message: null,
-            Solution: "In_Progress",
-            Rejection: "Resolved",
-            Acceptance: "Resolved",
-          };
-          const expectedStatus = expectedStatusByType[type];
-          if (expectedStatus !== null && request.status !== expectedStatus) {
-            throw new ServiceError(409, "A mensagem de workflow não corresponde ao status atual.");
           }
 
           const created = await tx.rhMessage.create({
@@ -144,10 +200,17 @@ class MessageService {
                     ? "In_Progress"
                     : null;
           if (nextStatus !== null) {
-            await tx.rhRequest.update({
-              where: { id: requestId },
+            const statusUpdate = await tx.rhRequest.updateMany({
+              where: {
+                id: requestId,
+                organization_id: organizationId,
+                status: request.status,
+              },
               data: { status: nextStatus },
             });
+            if (statusUpdate.count !== 1) {
+              throw new ServiceError(409, "A solicitação foi atualizada por outro usuário.");
+            }
           }
 
           const recipients = [request.requester_user_id, request.assigned_to_user_id].filter(

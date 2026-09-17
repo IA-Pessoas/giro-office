@@ -4,7 +4,7 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     rhRequest: {
       findFirst: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
     rhMessage: {
       create: vi.fn(),
@@ -29,6 +29,7 @@ describe("MessageService", () => {
     vi.clearAllMocks();
     prismaMock.rhMessageRead.createMany.mockResolvedValue({ count: 0 });
     prismaMock.rhNotification.upsert.mockResolvedValue({});
+    prismaMock.rhRequest.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.$transaction.mockImplementation(
       async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock),
     );
@@ -93,7 +94,6 @@ describe("MessageService", () => {
       assigned_to_user_id: "user-3",
     });
     prismaMock.rhMessage.create.mockResolvedValue(created);
-    prismaMock.rhRequest.update.mockResolvedValue({ id: "req-1" });
 
     const service = new MessageService();
     const result = await service.create({
@@ -127,6 +127,7 @@ describe("MessageService", () => {
         request_id: "req-1",
         message: "Solução",
         type: "Solution",
+        can_use_rh_workflow_messages: true,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
 
@@ -136,10 +137,11 @@ describe("MessageService", () => {
       request_id: "req-1",
       message: "Solução",
       type: "Solution",
+      can_use_rh_workflow_messages: true,
     });
 
-    expect(prismaMock.rhRequest.update).toHaveBeenCalledWith({
-      where: { id: "req-1" },
+    expect(prismaMock.rhRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: "req-1", organization_id: "org-1", status: "In_Progress" },
       data: { status: "Resolved" },
     });
     expect(prismaMock.rhNotification.upsert).toHaveBeenCalledTimes(1);
@@ -164,10 +166,34 @@ describe("MessageService", () => {
       type: "Acceptance",
     });
 
-    expect(prismaMock.rhRequest.update).toHaveBeenCalledWith({
-      where: { id: "req-1" },
+    expect(prismaMock.rhRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: "req-1", organization_id: "org-1", status: "Resolved" },
       data: { status: "Closed" },
     });
     expect(prismaMock.rhNotification.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("create rejeita workflow quando a atualização condicional perde a corrida", async () => {
+    prismaMock.rhRequest.findFirst.mockResolvedValue({
+      id: "req-1",
+      title: "Pedido",
+      requester_user_id: "user-2",
+      assigned_to_user_id: "user-3",
+      status: "Resolved",
+    });
+    prismaMock.rhMessage.create.mockResolvedValue({ id: "msg-rejection" });
+    prismaMock.rhRequest.updateMany.mockResolvedValue({ count: 0 });
+
+    const service = new MessageService();
+    await expect(
+      service.create({
+        organization_id: "org-1",
+        sender_user_id: "user-2",
+        request_id: "req-1",
+        message: "Não aceito",
+        type: "Rejection",
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prismaMock.rhNotification.upsert).not.toHaveBeenCalled();
   });
 });

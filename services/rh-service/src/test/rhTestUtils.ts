@@ -92,6 +92,7 @@ const rhMocks: {
   },
   messageServiceMock: {
     create: vi.fn(),
+    assertCanCreate: vi.fn(),
     listByRequest: vi.fn(),
   },
   timeSheetServiceMock: {
@@ -383,6 +384,7 @@ export function resetRhRouteMocks() {
     users_with_negative_balance: 4,
   });
   messageServiceMock.create.mockResolvedValue({ ok: true });
+  messageServiceMock.assertCanCreate.mockResolvedValue(undefined);
   messageServiceMock.listByRequest.mockResolvedValue([
     { id: "00000000-0000-4000-8000-000000000010" },
   ]);

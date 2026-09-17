@@ -11,6 +11,7 @@ interface SupabaseStorageClient {
         data: Buffer,
         options: { contentType: string; upsert: boolean },
       ): Promise<{ error: unknown | null }>;
+      remove(objectPaths: string[]): Promise<{ error: unknown | null }>;
       createSignedUrl(
         objectPath: string,
         expiresIn: number,
@@ -42,6 +43,7 @@ export interface RhRequestMessageAttachmentStorage {
     requestId: string;
     file: { buffer: Buffer; mimetype: RhRequestMessageMimeType };
   }): Promise<string>;
+  remove(objectPath: string): Promise<void>;
   createSignedAccessUrl(objectPath: string): Promise<string>;
 }
 
@@ -115,6 +117,15 @@ export class SupabaseRhRequestMessageStorage implements RhRequestMessageAttachme
       throw new ServiceError(500, "Erro ao gerar link do anexo da mensagem.", err);
     }
   }
+
+  async remove(objectPath: string): Promise<void> {
+    try {
+      const { error } = await this.supabase.storage.from(this.bucket).remove([objectPath]);
+      if (error) throw error;
+    } catch (err: unknown) {
+      logError("Erro ao remover anexo de mensagem RH", { err, objectPath });
+    }
+  }
 }
 
 export function createSupabaseRhRequestMessageStorage(
@@ -138,4 +149,6 @@ export class UnavailableRhRequestMessageStorage implements RhRequestMessageAttac
   async createSignedAccessUrl(): Promise<string> {
     throw new ServiceError(503, "Armazenamento de anexos de mensagens não configurado.");
   }
+
+  async remove(): Promise<void> {}
 }

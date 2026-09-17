@@ -311,6 +311,7 @@ export function RhRequestsSection({ initialRequestId }: { initialRequestId?: str
         getCategoryLabel={getCategoryLabel}
         getAssignedUserLabel={getAssignedUserLabel}
         getRequesterLabel={getRequesterLabel}
+        currentUserId={user?.id}
         canManageRequest={canManageRhRequests}
         canUseRhWorkflowMessages={canUseRhWorkflowMessages}
         isDeleting={deleteRequestMutation.isPending}

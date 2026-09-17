@@ -90,6 +90,40 @@ describe("RequestService", () => {
     expect(result).toMatchObject({ assigned_to_user_id: "rh-user-1" });
   });
 
+  it("create valida responsável informado no mesmo escopo RH da organização", async () => {
+    prismaMock.rhCategory.findFirst.mockResolvedValue({ id: "cat-1" });
+    prismaMock.user.findFirst.mockResolvedValue({ id: "rh-user-2" });
+    prismaMock.rhRequest.create.mockResolvedValue({
+      id: "req-2",
+      assigned_to_user_id: "rh-user-2",
+    });
+    const service = new RequestService();
+
+    await service.create({
+      organization_id: "org-1",
+      requester_user_id: "user-1",
+      title: "Solicitacao",
+      description: "Descricao",
+      category_id: "cat-1",
+      assigned_to_user_id: "rh-user-2",
+      urgency: "Medium",
+    });
+
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+      where: {
+        status: "active",
+        id: { equals: "rh-user-2", not: "user-1" },
+        OR: [
+          { organization_id: "org-1" },
+          { organization_id: null, department: { organization_id: "org-1" } },
+        ],
+        permissions: { some: { organization_id: "org-1", rh: { gte: 1 } } },
+      },
+      orderBy: { name: "asc" },
+      select: { id: true },
+    });
+  });
+
   it("getById lança 404 quando solicitação não existe", async () => {
     prismaMock.rhRequest.findFirst.mockResolvedValue(null);
     const service = new RequestService();

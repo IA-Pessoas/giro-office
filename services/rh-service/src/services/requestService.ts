@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { assertNonEmptyString, error as logError, ServiceError } from "@workspace/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
@@ -148,13 +150,17 @@ class RequestService {
       const title = assertNonEmptyString(input.title, "title");
       const description = assertNonEmptyString(input.description, "description");
       const categoryId = assertNonEmptyString(input.category_id, "category_id");
-      let assignedToUserId =
+      const requestedAssigneeId =
         input.assigned_to_user_id !== undefined
           ? assertNonEmptyString(input.assigned_to_user_id, "assigned_to_user_id")
           : undefined;
 
       await this.requireCategoryInOrg(organizationId, categoryId);
-      assignedToUserId ??= await this.findEligibleRhAssignee(organizationId, requesterUserId);
+      const assignedToUserId = await this.findEligibleRhAssignee(
+        organizationId,
+        requesterUserId,
+        requestedAssigneeId,
+      );
       this.ensureAssigneeIsNotRequester(requesterUserId, assignedToUserId);
 
       const created = await prismaClient.rhRequest.create({
@@ -284,7 +290,7 @@ class RequestService {
           organization_id: organizationId,
           user_id: recipientId,
           request_id: updated.id,
-          event_key: `request-updated:${updated.updated_at.toISOString()}`,
+          event_key: `request-updated:${randomUUID()}`,
           title: "Solicitação de RH atualizada",
           message: `A solicitação “${updated.title}” foi atualizada.`,
         });

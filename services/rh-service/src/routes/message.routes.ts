@@ -43,6 +43,7 @@ function withSignedAttachment(
     typeof objectPath !== "string" ||
     !isRhRequestMessageObjectPath(objectPath, organizationId, requestId)
   ) {
+    // Anexos legados ou URLs públicas ficam em quarentena: nunca devolvemos o valor bruto.
     return Promise.resolve({ ...record, attachment: null });
   }
 
@@ -68,6 +69,7 @@ export function createMessageRoutes(options: {
     requireRhPermission(RH_SELF_SERVICE_PERMISSION),
     upload.single("file"),
     async (req: Request, res: Response, next: NextFunction) => {
+      let uploadedObjectPath: string | undefined;
       try {
         const organizationId = req.organization_id;
         const userId = req.user_id;
@@ -75,9 +77,19 @@ export function createMessageRoutes(options: {
         if (!userId) throw new ServiceError(400, "user_id é obrigatório.");
 
         const body = parseWithZod(createMessageBodySchema, req.body);
-        if (!canUseRhWorkflowMessages(req) && body.type !== "Message") {
+        const canManage = canManageRh(req);
+        const canUseWorkflowMessages = canUseRhWorkflowMessages(req);
+        if (!canUseWorkflowMessages && body.type === "Solution") {
           throw new ServiceError(403, "RH Visualizador pode enviar somente mensagens.");
         }
+        await messageService.assertCanCreate({
+          organization_id: organizationId,
+          sender_user_id: userId,
+          request_id: body.request_id,
+          type: body.type,
+          can_manage_rh: canManage,
+          can_use_rh_workflow_messages: canUseWorkflowMessages,
+        });
 
         let attachment = body.attachment;
         if (req.file) {
@@ -93,6 +105,7 @@ export function createMessageRoutes(options: {
           if (!isRhRequestMessageObjectPath(objectPath, organizationId, body.request_id)) {
             throw new ServiceError(500, "Armazenamento retornou uma chave de anexo inválida.");
           }
+          uploadedObjectPath = objectPath;
           attachment = objectPath;
         }
 
@@ -103,7 +116,8 @@ export function createMessageRoutes(options: {
           message: body.message,
           type: body.type,
           ...(attachment !== undefined ? { attachment } : {}),
-          can_manage_rh: canManageRh(req),
+          can_manage_rh: canManage,
+          can_use_rh_workflow_messages: canUseWorkflowMessages,
         });
 
         const responseMessage = await withSignedAttachment(
@@ -114,6 +128,14 @@ export function createMessageRoutes(options: {
         );
         res.status(200).json(createSuccessResponse(responseMessage));
       } catch (err) {
+        if (uploadedObjectPath && options.attachmentStorage.remove) {
+          await options.attachmentStorage.remove(uploadedObjectPath).catch((cleanupError) => {
+            logError("Erro ao remover anexo órfão de mensagem RH", {
+              err: cleanupError,
+              objectPath: uploadedObjectPath,
+            });
+          });
+        }
         logError("Erro ao criar mensagem do chamado RH", { err });
         next(err);
       }
