@@ -549,6 +549,48 @@ describe("TaskLifecycleService", () => {
       }),
     );
   });
+
+  it("não cria solicitação legada quando a tarefa foi concluída simultaneamente", async () => {
+    const activeTask = {
+      id: "task-1",
+      organization_id: "org-1",
+      department_id: "dep-1",
+      project_id: "project-1",
+      status: "Em Andamento",
+      pending_approval: false,
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+      prevision_date: null,
+      end_date: null,
+      billing: "Realizar",
+    };
+    prismaMock.task.findFirst
+      .mockResolvedValueOnce(activeTask)
+      .mockResolvedValueOnce({ ...activeTask, status: "Concluída" });
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: false });
+
+    await expect(
+      new TaskLifecycleService().concludeTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        integracaoLevel: 1,
+        body: {
+          task_id: "task-1",
+          status: "Concluída",
+          observations: "Pronta.",
+          justification: "Pronta.",
+          responsible_id: "user-1",
+        },
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+    expect(prismaMock.taskCompletionRequest.create).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    });
+  });
   it("rejeita novo responsavel fora do departamento da tarefa", async () => {
     prismaMock.task.findFirst.mockResolvedValue({
       id: "task-1",
