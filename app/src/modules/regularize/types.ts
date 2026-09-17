@@ -1,3 +1,11 @@
+import type {
+  RegularizeGuidanceBranchData,
+  RegularizeGuidanceChecklistCode,
+  RegularizeGuidanceChecklistStatus,
+  RegularizeGuidanceSnapshot,
+  RegularizeGuidanceTargetType,
+} from "@workspace/shared/regularize";
+
 export type RegularizeId = string;
 
 export type RegularizeStatus = string | boolean;
@@ -52,7 +60,8 @@ export type RegularizeProcessListFilters = {
 };
 
 export type RegularizeGuidanceListFilters = {
-  process_id: RegularizeId;
+  process_id?: RegularizeId;
+  target_type?: RegularizeGuidanceTargetType;
 };
 
 export type RegularizeLicenseListFilters = {
@@ -384,9 +393,32 @@ export type RegularizeGuidancePartner = {
   [key: string]: unknown;
 };
 
+export type RegularizeGuidanceChecklistInput = {
+  code: RegularizeGuidanceChecklistCode;
+  status: RegularizeGuidanceChecklistStatus;
+  observation?: string;
+};
+
+export type RegularizeGuidanceChecklistItem = {
+  id: RegularizeId;
+  guidance_id: RegularizeId;
+  code: RegularizeGuidanceChecklistCode;
+  label: string;
+  status: RegularizeGuidanceChecklistStatus;
+  observation: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type RegularizeGuidance = {
   id: RegularizeId;
-  process_id: RegularizeId;
+  process_id: RegularizeId | null;
+  target_type: RegularizeGuidanceTargetType;
+  client_pj_id?: RegularizeId | null;
+  client_pf_id?: RegularizeId | null;
+  target_snapshot: RegularizeGuidanceSnapshot;
+  branch_data: RegularizeGuidanceBranchData | null;
+  checklist_items: RegularizeGuidanceChecklistItem[];
   description?: string | null;
   type?: string | null;
   request?: string | null;
@@ -421,8 +453,33 @@ export type RegularizeGuidancePartnerPayload = {
   share?: number;
 };
 
-export type CreateRegularizeGuidancePayload = {
-  process_id: RegularizeId;
+export type RegularizeGuidanceManualSnapshot = {
+  version: 1;
+  source: "manual";
+  name: string;
+  document?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  type?: string;
+  request?: string;
+  framework_obs?: string;
+  legal_nature?: string;
+  company_name?: string;
+  trade_name?: string;
+  cpf_cnpj?: string;
+  share_capital?: number | string;
+  iptu?: string;
+  comporate_purpose?: string;
+  carryng?: string;
+  regime?: string;
+  legal_representative?: string;
+  economic_activities?: RegularizeGuidanceEconomicActivityPayload[];
+  partners?: RegularizeGuidancePartnerPayload[];
+  status?: string;
+};
+
+type RegularizeGuidancePayloadFields = {
   type?: string;
   request?: string;
   framework_obs?: string;
@@ -437,16 +494,43 @@ export type CreateRegularizeGuidancePayload = {
   carryng?: string;
   regime?: string;
   legal_representative?: string;
-  status: string;
+  status?: string;
+};
+
+type RegularizeGuidanceCreatePayloadFields = RegularizeGuidancePayloadFields & {
   economic_activities?: RegularizeGuidanceEconomicActivityPayload[];
   partners?: RegularizeGuidancePartnerPayload[];
 };
 
-export type UpdateRegularizeGuidancePayload = Partial<
-  Omit<CreateRegularizeGuidancePayload, "process_id" | "economic_activities" | "partners">
-> & {
+type RegularizeGuidanceCompletePayload = RegularizeGuidanceCreatePayloadFields & {
+  process_id?: RegularizeId | null;
+  target_type: RegularizeGuidanceTargetType;
+  client_pj_id?: RegularizeId | null;
+  client_pf_id?: RegularizeId | null;
+  target_snapshot?: RegularizeGuidanceManualSnapshot;
+  branch_data?: RegularizeGuidanceBranchData;
+  checklist: RegularizeGuidanceChecklistInput[];
+  status: string;
+};
+
+export type LegacyGuidanceDraft = RegularizeGuidanceCreatePayloadFields & {
+  process_id: RegularizeId;
+  status: string;
+};
+
+export type CreateRegularizeGuidancePayload =
+  | RegularizeGuidanceCompletePayload
+  | LegacyGuidanceDraft;
+
+export type UpdateRegularizeGuidancePayload = RegularizeGuidancePayloadFields & {
   id: RegularizeId;
-  process_id?: RegularizeId;
+  process_id?: RegularizeId | null;
+  target_type?: RegularizeGuidanceTargetType;
+  client_pj_id?: RegularizeId | null;
+  client_pf_id?: RegularizeId | null;
+  target_snapshot?: RegularizeGuidanceManualSnapshot;
+  checklist?: RegularizeGuidanceChecklistInput[];
+  branch_data?: RegularizeGuidanceBranchData;
 };
 
 export type AddRegularizeGuidanceActivityPayload = {

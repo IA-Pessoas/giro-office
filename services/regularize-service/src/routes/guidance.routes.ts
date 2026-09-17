@@ -64,8 +64,15 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
 
   router.get("/guidance/list", async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const query = parseWithZod(listGuidanceByProcessQuerySchema, request.query);
-      const list = await guidanceService.listByProcess(request.organization_id, query.process_id);
+      const rawQuery = request.query as Record<string, unknown>;
+      const normalizedQuery =
+        rawQuery.process_id === "" ? { ...rawQuery, process_id: null } : rawQuery;
+      const query = parseWithZod(listGuidanceByProcessQuerySchema, normalizedQuery);
+      const list = await guidanceService.listByProcess(
+        request.organization_id,
+        query.process_id ?? undefined,
+        query.target_type,
+      );
       response.json(createSuccessResponse(list));
     } catch (err) {
       logError("Erro ao listar orientacoes do regularize", { err });

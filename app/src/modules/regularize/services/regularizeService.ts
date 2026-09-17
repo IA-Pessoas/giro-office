@@ -13,6 +13,7 @@ import type {
   CreateRegularizeSitePasswordPayload,
   RemoveRegularizeGuidanceActivityPayload,
   RemoveRegularizeGuidancePartnerPayload,
+  LegacyGuidanceDraft,
   RegularizeClientPfDetail,
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
@@ -77,6 +78,17 @@ function stripSitePasswordSecret(
 
   return safeItem;
 }
+
+function isLegacyGuidanceDraft(
+  payload: CreateRegularizeGuidancePayload,
+): payload is LegacyGuidanceDraft {
+  return !("checklist" in payload);
+}
+
+type RegularizeGuidanceUpdateRequest = UpdateRegularizeGuidancePayload & {
+  economic_activities?: never;
+  partners?: never;
+};
 
 export const regularizeService = {
   async getDashboard(year: number): Promise<RegularizeDashboard> {
@@ -382,6 +394,12 @@ export const regularizeService = {
   },
 
   async createGuidance(payload: CreateRegularizeGuidancePayload): Promise<RegularizeGuidance> {
+    if (isLegacyGuidanceDraft(payload)) {
+      throw new Error(
+        "Rascunho legado de orientação não pode ser enviado; a Task 7 deve migrar este caller para checklist.",
+      );
+    }
+
     const api = setupAPIClient();
     const response = await api.post(REGULARIZE_ENDPOINTS.guidance, payload);
 
@@ -390,7 +408,12 @@ export const regularizeService = {
 
   async updateGuidance(payload: UpdateRegularizeGuidancePayload): Promise<RegularizeGuidance> {
     const api = setupAPIClient();
-    const { process_id: _processId, ...body } = payload;
+    const requestPayload: RegularizeGuidanceUpdateRequest = payload;
+    const {
+      economic_activities: _economicActivities,
+      partners: _partners,
+      ...body
+    } = requestPayload;
     const response = await api.put(REGULARIZE_ENDPOINTS.guidance, body);
 
     return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);

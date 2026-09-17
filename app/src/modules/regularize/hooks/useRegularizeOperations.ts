@@ -43,6 +43,24 @@ type RegularizeReadQueryOptions = {
   enabled?: boolean;
 };
 
+function shouldEnableRegularizeGuidanceQuery(
+  filters: RegularizeGuidanceListFilters | undefined,
+  options?: RegularizeReadQueryOptions,
+): boolean {
+  const hasEmptyProcessFilter =
+    filters !== undefined && "process_id" in filters && !filters.process_id;
+  const hasEmptyTargetFilter =
+    filters !== undefined && "target_type" in filters && !filters.target_type;
+  const hasExplicitAllFilters = filters === undefined && options?.enabled === true;
+  const hasEffectiveGuidanceFilter =
+    filters !== undefined &&
+    !hasEmptyProcessFilter &&
+    !hasEmptyTargetFilter &&
+    Boolean(filters.process_id || filters.target_type);
+
+  return (hasExplicitAllFilters || hasEffectiveGuidanceFilter) && (options?.enabled ?? true);
+}
+
 async function invalidateRegularizeOperations(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<void> {
@@ -213,14 +231,14 @@ export function useRegularizeGuidance(
   filters: RegularizeGuidanceListFilters | undefined,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeGuidance[], Error> {
-  const safeFilters = filters ?? { process_id: "" };
+  const safeFilters = filters ?? {};
   const scope = useRegularizeQueryScope();
 
   return useFetch(
     regularizeQueryKeys.guidance(safeFilters, scope),
     () => regularizeService.listGuidance(safeFilters),
     {
-      enabled: Boolean(filters?.process_id) && (options?.enabled ?? true),
+      enabled: shouldEnableRegularizeGuidanceQuery(filters, options),
     },
   );
 }

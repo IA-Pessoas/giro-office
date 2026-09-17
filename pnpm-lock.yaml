@@ -88,6 +88,9 @@ importers:
       '@workspace/api':
         specifier: workspace:*
         version: link:../packages/api
+      '@workspace/shared':
+        specifier: workspace:*
+        version: link:../shared
       axios:
         specifier: ^1.18.1
         version: 1.18.1

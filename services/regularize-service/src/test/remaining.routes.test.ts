@@ -1,11 +1,31 @@
 import "./envBootstrap.js";
 
+import { REGULARIZE_GUIDANCE_CHECKLIST_ITEMS, ServiceError } from "@workspace/shared";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { GuidanceService } from "../services/guidanceService.js";
 import { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
 import { createTestApp, gatewayHeaders } from "./regularizeTestUtils.js";
+
+const guidancePayload = {
+  target_type: "SEM_CLIENTE" as const,
+  target_snapshot: { version: 1 as const, source: "manual" as const, name: "Interessado" },
+  checklist: REGULARIZE_GUIDANCE_CHECKLIST_ITEMS.map(({ code }) => ({
+    code,
+    status: "Pendente" as const,
+  })),
+  status: "Em andamento" as const,
+};
+
+const completeGuidance = {
+  id: "d0000000-0000-4000-8000-000000000001",
+  process_id: null,
+  ...guidancePayload,
+  checklist_items: guidancePayload.checklist,
+  branch_data: null,
+};
 
 describe("regularize remaining routes", () => {
   afterEach(() => {
@@ -146,32 +166,154 @@ describe("regularize remaining routes", () => {
     expect(response.body.success).toBe(true);
   });
 
-  it("POST /regularize/guidance creates a procedural guidance", async () => {
-    const prisma = {
-      process: {
-        findFirst: vi.fn(async () => ({ id: "process-1" })),
-      },
-      proceduralGuidance: {
-        create: vi.fn(async () => ({
-          id: "guidance-1",
-          process_id: "d0000000-0000-4000-8000-000000000001",
-          status: "Em andamento",
-        })),
-      },
-      logs: {
-        create: vi.fn(async () => ({})),
-      },
-    } as unknown as PrismaClient;
+  it("POST /regularize/guidance cria orientação independente e retorna os 17 itens", async () => {
+    vi.spyOn(GuidanceService.prototype, "create").mockResolvedValue(completeGuidance);
+    const app = createTestApp();
 
-    const app = createTestApp(prisma);
-
-    const response = await request(app).post("/regularize/guidance").set(gatewayHeaders()).send({
-      process_id: "d0000000-0000-4000-8000-000000000001",
-      status: "Em andamento",
-    });
+    const response = await request(app)
+      .post("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send(guidancePayload);
 
     expect(response.status).toBe(201);
-    expect(response.body.success).toBe(true);
+    expect(response.body).toMatchObject({ success: true, data: completeGuidance });
+    expect(response.body.data.checklist_items).toHaveLength(17);
+  });
+
+  it("PUT /regularize/guidance mantém 200 e retorna orientação completa", async () => {
+    vi.spyOn(GuidanceService.prototype, "update").mockResolvedValue(completeGuidance);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .put("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send({ id: completeGuidance.id, ...guidancePayload });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, data: completeGuidance });
+    expect(response.body.data.checklist_items).toHaveLength(17);
+  });
+
+  it("GET /regularize/guidance/list encaminha undefined quando process_id está ausente", async () => {
+    const listByProcess = vi
+      .spyOn(GuidanceService.prototype, "listByProcess")
+      .mockResolvedValue([completeGuidance]);
+    const app = createTestApp();
+
+    const response = await request(app).get("/regularize/guidance/list").set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual([completeGuidance]);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      undefined,
+      undefined,
+    );
+  });
+
+  it("GET /regularize/guidance/list preserva o filtro process_id", async () => {
+    const processId = "d0000000-0000-4000-8000-000000000002";
+    const listByProcess = vi
+      .spyOn(GuidanceService.prototype, "listByProcess")
+      .mockResolvedValue([completeGuidance]);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .get("/regularize/guidance/list")
+      .query({ process_id: processId })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      processId,
+      undefined,
+    );
+  });
+
+  it("GET /regularize/guidance/list trata process_id nulo como ausência de filtro", async () => {
+    const listByProcess = vi
+      .spyOn(GuidanceService.prototype, "listByProcess")
+      .mockResolvedValue([completeGuidance]);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .get("/regularize/guidance/list")
+      .query({ process_id: null })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      undefined,
+      undefined,
+    );
+  });
+
+  it("GET /regularize/guidance/list encaminha target_type sem perder o isolamento", async () => {
+    const listByProcess = vi
+      .spyOn(GuidanceService.prototype, "listByProcess")
+      .mockResolvedValue([completeGuidance]);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .get("/regularize/guidance/list")
+      .query({ target_type: "PF" })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      undefined,
+      "PF",
+    );
+  });
+
+  it("POST /regularize/guidance rejeita chaves extras no snapshot", async () => {
+    vi.spyOn(GuidanceService.prototype, "create").mockResolvedValue(completeGuidance);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .post("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send({
+        ...guidancePayload,
+        target_snapshot: { ...guidancePayload.target_snapshot, custom_note: "fora do contrato" },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("custom_note");
+    expect(GuidanceService.prototype.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /regularize/guidance rejeita dados de filial sem checklist concluído", async () => {
+    const app = createTestApp();
+
+    const response = await request(app)
+      .post("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send({
+        ...guidancePayload,
+        branch_data: { name: "Filial", address: "Rua A", city: "Salvador", state: "BA" },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("branch_data");
+  });
+
+  it("POST /regularize/guidance preserva o conflito de domínio", async () => {
+    vi.spyOn(GuidanceService.prototype, "create").mockRejectedValue(
+      new ServiceError(409, "Ja existe orientacao em andamento para este processo."),
+    );
+    const app = createTestApp();
+
+    const response = await request(app)
+      .post("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send(guidancePayload);
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toBe("Ja existe orientacao em andamento para este processo.");
   });
 
   it("POST /regularize/license creates a license", async () => {

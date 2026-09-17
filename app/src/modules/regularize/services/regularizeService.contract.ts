@@ -110,7 +110,8 @@ export function buildRegularizeProcessListParams(filters: RegularizeProcessListF
 
 export function buildRegularizeGuidanceListParams(filters: RegularizeGuidanceListFilters) {
   return {
-    process_id: filters.process_id,
+    ...(filters.process_id ? { process_id: filters.process_id } : {}),
+    ...(filters.target_type ? { target_type: filters.target_type } : {}),
   };
 }
 

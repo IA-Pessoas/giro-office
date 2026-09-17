@@ -4,6 +4,7 @@ import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildRegularizeClientPfListParams,
+  buildRegularizeGuidanceListParams,
   buildRegularizeLicenseListParams,
   buildRegularizeMunicipalTaxesListParams,
   buildRegularizeProcessListParams,
@@ -49,6 +50,159 @@ async function collectSourceFiles(directory) {
   return files;
 }
 
+await runTest(
+  "guidance form supports optional process and coherent PJ PF manual targets",
+  async () => {
+    const source = await readModuleSource("components/RegularizeGuidanceForm.tsx");
+    assert.match(source, /defaultProcessId\?: string/);
+    assert.match(source, /processOptions\?: RegularizeFormOption\[\]/);
+    assert.match(source, /REGULARIZE_GUIDANCE_TARGET_TYPES\.map/);
+    assert.match(source, /ClientPickerModal/);
+    assert.match(source, /RegularizeClientPfSelect/);
+    assert.match(source, /legacyIntegrationStatusFilter: false/);
+    assert.match(source, /target_type === "PJ"/);
+    assert.match(source, /target_type === "PF"/);
+    assert.match(source, /target_type === "SEM_CLIENTE"/);
+    assert.match(source, /client_pj_id: "",\s*client_pf_id: ""/);
+    assert.match(source, /source: "manual"/);
+    assert.match(source, /!formState\.target_snapshot\.name\.trim\(\)/);
+    assert.match(source, /process_id: formState\.process_id \|\| null/);
+    assert.match(source, /Sem processo/);
+    assert.doesNotMatch(source, /process_id: guidance\.process_id,/);
+    assert.doesNotMatch(source, /if \(!formState\.process_id/);
+    assert.doesNotMatch(source, /disabled=\{isEditing\}/);
+    assert.doesNotMatch(source, /LegacyGuidanceDraft/);
+  },
+);
+
+await runTest(
+  "guidance form renders and submits the canonical checklist with conditional branch",
+  async () => {
+    const source = await readModuleSource("components/RegularizeGuidanceForm.tsx");
+    const shared = await readFile(join(appRoot, "../shared/src/regularize/guidance.ts"), "utf8");
+    assert.equal((shared.match(/code: "/g) ?? []).length, 17);
+    assert.match(shared, /"Pendente",\s*"Concluído",\s*"Não se aplica"/);
+    assert.match(source, /@workspace\/shared\/regularize/);
+    assert.match(source, /checklist: REGULARIZE_GUIDANCE_CHECKLIST_ITEMS\.map/);
+    assert.match(source, /REGULARIZE_GUIDANCE_CHECKLIST_ITEMS\.map\(\(\{ code, label \}\)/);
+    assert.match(source, /REGULARIZE_GUIDANCE_CHECKLIST_STATUSES\.map/);
+    assert.match(source, /<textarea\s+value=\{item\?\.observation \?\? ""\}/);
+    assert.match(source, /item\.code === "branch" && item\.status === "Concluído"/);
+    assert.match(source, /code === "branch" && status !== "Concluído"/);
+    assert.match(source, /branch_data: null/);
+    assert.match(source, /disabled=\{!isBranchCompleted\}/);
+    assert.match(source, /branch_data:\s*isBranchCompleted\s*\?[\s\S]*?: undefined/);
+    assert.match(source, /branch\.name\.trim\(\)/);
+    assert.match(source, /branch\.address\.trim\(\)/);
+    assert.match(source, /branch\.city\.trim\(\)/);
+    assert.match(source, /branch\.state\.trim\(\)/);
+    assert.match(source, /observation: item\?\.observation\?\.trim\(\) \?\? ""/);
+    for (const field of [
+      "type",
+      "request",
+      "framework_obs",
+      "legal_nature",
+      "company_name",
+      "trade_name",
+      "cpf_cnpj",
+      "share_capital",
+      "iptu",
+      "address",
+      "comporate_purpose",
+      "carryng",
+      "regime",
+      "legal_representative",
+      "status",
+    ]) {
+      assert.ok(source.includes(`formState.${field}`), `preserves legacy ${field}`);
+    }
+  },
+);
+
+await runTest(
+  "guidance independent list preserves process scope permissions and mutation feedback",
+  async () => {
+    const page = await readModuleSource("components/RegularizePage.tsx");
+    const form = await readModuleSource("components/RegularizeGuidanceForm.tsx");
+    assert.match(page, /useRegularizeGuidance\(undefined, \{ enabled: true \}\)/);
+    assert.match(page, /function IndependentGuidanceSection/);
+    const independentSection = page.slice(
+      page.indexOf("function IndependentGuidanceSection"),
+      page.indexOf("function ProcessDetailContent"),
+    );
+    assert.match(
+      independentSection,
+      /canManageRegularizeCore \? \([\s\S]*?label="Nova orientação"/,
+    );
+    assert.doesNotMatch(independentSection, /currentProcessId/);
+    assert.match(page, /regularizeAccess\.canView \? \(\s*<IndependentGuidanceSection/);
+    assert.match(page, /onSetActiveForm\(\{ type: "guidance", mode: "create" \}\)/);
+    assert.match(page, /<QueryStatePanel query=\{independentGuidanceQuery\}/);
+    assert.match(page, /readOnly=\{!canManageRegularizeCore\}/);
+    assert.match(page, /Somente leitura/);
+    assert.match(page, /Orientação atualizada com sucesso/);
+    assert.match(page, /Orientação criada com sucesso/);
+    assert.match(page, /toast\.error\(message\);\s*throw new Error\(message\)/);
+    assert.match(form, /disabled=\{readOnly \|\| isSubmitting\}/);
+    assert.match(form, /if \(readOnly \|\| isSubmitting\)/);
+    assert.match(form, /getRegularizeMutationErrorMessage/);
+    assert.doesNotMatch(page, /LegacyGuidanceDraft/);
+  },
+);
+
+await runTest(
+  "guidance hardening preserves manual snapshots, API statuses and picker focus",
+  async () => {
+    const [guidanceSource, pickerSource] = await Promise.all([
+      readModuleSource("components/RegularizeGuidanceForm.tsx"),
+      readFile(join(appRoot, "src/modules/clients/components/ClientPickerModal.tsx"), "utf8"),
+    ]);
+
+    assert.match(
+      guidanceSource,
+      /const regularizeGuidanceStatusOptions = \["Em andamento", "Finalizado"\] as const;/,
+    );
+    assert.doesNotMatch(guidanceSource, /regularizeGuidanceStatusOptions,\s*/);
+    assert.match(guidanceSource, /\.\.\.\(guidance\?\.target_snapshot \?\? \{\}\)/);
+    assert.match(guidanceSource, /\.\.\.formState\.target_snapshot/);
+    assert.match(
+      guidanceSource,
+      /cpf_cnpj: formatCpfCnpjInput\(guidance\.cpf_cnpj \?\? targetSnapshot\.cpf_cnpj \?\? ""\)/,
+    );
+    assert.match(guidanceSource, /guidance\.share_capital \?\? targetSnapshot\.share_capital/);
+    assert.match(
+      guidanceSource,
+      /\.\.\.formState\.target_snapshot[\s\S]*?cpf_cnpj: normalizeDigits\(trimRegularizeOptionalText\(formState\.cpf_cnpj\) \?\? ""\)/,
+    );
+    assert.match(
+      guidanceSource,
+      /\.\.\.formState\.target_snapshot[\s\S]*?share_capital: toRegularizeOptionalNumber\(formState\.share_capital\)/,
+    );
+    assert.match(
+      guidanceSource,
+      /targetSnapshotAddress = formState\.target_snapshot\.address \?\? ""/,
+    );
+    assert.match(guidanceSource, /targetSnapshotCity = formState\.target_snapshot\.city \?\? ""/);
+    assert.match(guidanceSource, /targetSnapshotState = formState\.target_snapshot\.state \?\? ""/);
+    assert.match(guidanceSource, /targetSnapshotAddress\)/);
+    assert.match(guidanceSource, /targetSnapshotCity\)/);
+    assert.match(guidanceSource, /targetSnapshotState\)/);
+
+    assert.match(pickerSource, /useRef/);
+    assert.match(pickerSource, /useEffect/);
+    assert.match(pickerSource, /searchInputRef\.current\?\.focus\(\)/);
+    assert.match(pickerSource, /window\.addEventListener\("keydown",[\s\S]*?true\)/);
+    assert.match(pickerSource, /window\.removeEventListener\("keydown",[\s\S]*?true\)/);
+    assert.match(
+      pickerSource,
+      /function handleDialogKeyDown\(event: KeyboardEvent<HTMLDivElement>\)/,
+    );
+    assert.match(pickerSource, /onKeyDown=\{handleDialogKeyDown\}/);
+    assert.match(pickerSource, /event\.preventDefault\(\)/);
+    assert.match(pickerSource, /event\.stopPropagation\(\)/);
+  },
+);
+
 await runTest("regularize endpoints stay centralized in the frontend contract", async () => {
   const contractSource = await readModuleSource("services/regularizeService.contract.ts");
 
@@ -80,6 +234,104 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
     assert.match(contractSource, new RegExp(endpoint.replaceAll("/", "\\/")));
   }
 });
+
+await runTest(
+  "regularize guidance supports independent filters and guards empty scopes",
+  async () => {
+  const [
+    typesSource,
+    contractSource,
+    serviceSource,
+    queryKeysSource,
+    operationsSource,
+    pageSource,
+  ] =
+    await Promise.all([
+      readModuleSource("types.ts"),
+      readModuleSource("services/regularizeService.contract.ts"),
+      readModuleSource("services/regularizeService.ts"),
+      readModuleSource("hooks/queryKeys.ts"),
+      readModuleSource("hooks/useRegularizeOperations.ts"),
+      readModuleSource("components/RegularizePage.tsx"),
+    ]);
+
+  assert.match(typesSource, /@workspace\/shared\/regularize/);
+  assert.match(typesSource, /export type RegularizeGuidanceChecklistInput/);
+  assert.match(typesSource, /export type RegularizeGuidanceManualSnapshot/);
+  assert.match(
+    typesSource,
+    /export type RegularizeGuidanceManualSnapshot[\s\S]*?source: "manual";/,
+  );
+  const createTypeSource = typesSource.match(
+    /type RegularizeGuidanceCompletePayload[\s\S]*?export type LegacyGuidanceDraft/,
+  )?.[0];
+  assert.ok(createTypeSource);
+  assert.match(createTypeSource, /checklist: RegularizeGuidanceChecklistInput\[\]/);
+  assert.doesNotMatch(createTypeSource, /checklist_items/);
+  assert.match(createTypeSource, /target_snapshot\?: RegularizeGuidanceManualSnapshot/);
+  const updateTypeSource = typesSource.match(
+    /export type UpdateRegularizeGuidancePayload[\s\S]*?export type AddRegularizeGuidanceActivityPayload/,
+  )?.[0];
+  assert.ok(updateTypeSource);
+  assert.match(updateTypeSource, /id: RegularizeId;/);
+  assert.match(updateTypeSource, /checklist\?: RegularizeGuidanceChecklistInput\[\]/);
+  assert.doesNotMatch(updateTypeSource, /checklist_items/);
+  assert.doesNotMatch(updateTypeSource, /economic_activities|partners/);
+  assert.doesNotMatch(updateTypeSource, /status: string/);
+  assert.match(
+    typesSource,
+    /type RegularizeGuidanceCreatePayloadFields[\s\S]*economic_activities[\s\S]*partners/,
+  );
+  assert.match(typesSource, /export type LegacyGuidanceDraft/);
+  assert.match(typesSource, /process_id: RegularizeId \| null/);
+  assert.match(contractSource, /target_type/);
+  assert.match(
+    serviceSource,
+    /createGuidance[\s\S]{0,500}isLegacyGuidanceDraft[\s\S]{0,300}throw new Error/,
+  );
+  assert.match(
+    serviceSource,
+    /updateGuidance[\s\S]{0,500}economic_activities[\s\S]{0,200}partners[\s\S]{0,300}api\.put\(REGULARIZE_ENDPOINTS\.guidance, body\)/,
+  );
+  assert.match(queryKeysSource, /filters\.process_id \?\? ""/);
+  assert.match(queryKeysSource, /filters\.target_type \?\? ""/);
+  assert.match(operationsSource, /function shouldEnableRegularizeGuidanceQuery/);
+  assert.match(operationsSource, /"process_id" in filters/);
+  assert.match(operationsSource, /"target_type" in filters/);
+  assert.match(operationsSource, /!hasEmptyProcessFilter/);
+  assert.match(operationsSource, /!hasEmptyTargetFilter/);
+  assert.match(operationsSource, /Boolean\(filters\.process_id \|\| filters\.target_type\)/);
+  assert.match(operationsSource, /const hasExplicitAllFilters/);
+  assert.match(operationsSource, /const hasEffectiveGuidanceFilter/);
+  assert.match(
+    operationsSource,
+    /return \(hasExplicitAllFilters \|\| hasEffectiveGuidanceFilter\) && \(options\?\.enabled \?\? true\)/,
+  );
+  assert.match(
+    pageSource,
+    /const guidanceQuery = useRegularizeGuidance\(\s*currentProcessId \? \{ process_id: currentProcessId \} : undefined,\s*\{ enabled: queryPolicy\.guidance && Boolean\(currentProcessId\) \},\s*\);/,
+  );
+  assert.match(
+    pageSource,
+    /function handleRefreshRegularize\(\) \{[\s\S]*?if \(queryPolicy\.guidance && Boolean\(currentProcessId\)\)\s*refreshes\.push\(guidanceQuery\.refetch\(\)\);/,
+  );
+  assert.match(
+    serviceSource,
+    /api\.post\(REGULARIZE_ENDPOINTS\.guidance, payload\)/,
+  );
+  assert.doesNotMatch(serviceSource, /checklist_items/);
+
+  assert.deepEqual(buildRegularizeGuidanceListParams({}), {});
+  assert.deepEqual(
+    buildRegularizeGuidanceListParams({ process_id: "process-1", target_type: "PJ" }),
+    { process_id: "process-1", target_type: "PJ" },
+  );
+  assert.deepEqual(
+    buildRegularizeGuidanceListParams({ process_id: "", target_type: "PF" }),
+    { target_type: "PF" },
+  );
+  },
+);
 
 await runTest("regularize licenses list uses paginated hook and keeps mutation invalidation", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
@@ -892,7 +1144,6 @@ await runTest("regularize finite status and urgency fields use native selects", 
   for (const optionExport of [
     "regularizeClientStatusOptions",
     "regularizeProcessStatusOptions",
-    "regularizeGuidanceStatusOptions",
     "regularizeLicenseStatusOptions",
     "regularizeUrgencyOptions",
     "getRegularizePresetOptions",
@@ -906,7 +1157,7 @@ await runTest("regularize finite status and urgency fields use native selects", 
   assert.match(processSource, /regularizeUrgencyOptions/);
   assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
   assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.urgency\}/);
-  assert.match(guidanceSource, /regularizeGuidanceStatusOptions/);
+  assert.match(guidanceSource, /const regularizeGuidanceStatusOptions = \["Em andamento", "Finalizado"\] as const;/);
   assert.match(guidanceSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
   assert.match(licenseSource, /regularizeLicenseStatusOptions/);
   assert.match(licenseSource, /regularizeUrgencyOptions/);
