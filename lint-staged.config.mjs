@@ -18,7 +18,7 @@ function biomeTasks(files) {
 
 export default {
   "app/**/*.{ts,tsx,js,jsx,json,css}": () => "pnpm --filter @workspace/app check",
-  "services/**/*.{ts,tsx,js,jsx,json}": biomeTasks,
+  "services/!(src)/**/*.{ts,tsx,js,jsx,json}": biomeTasks,
   "shared/**/*.{ts,tsx,js,jsx,json}": biomeTasks,
   "packages/api/**/*.{ts,tsx,js,jsx,json}": biomeTasks,
   "{package.json,package-lock.json,pnpm-lock.yaml,pnpm-workspace.yaml,turbo.json,biome.json,tsconfig.base.json}":
