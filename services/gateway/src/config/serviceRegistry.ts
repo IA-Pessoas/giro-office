@@ -178,6 +178,24 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
     },
     {
       key: "triagem-service",
+      targetUrl: env.triagemServiceUrl,
+      auditTarget: "triagem-service",
+      routePrefixes: ["/triagem/competencies"],
+      internalServiceToken: env.auditServiceToken,
+      permissionModule: "triagem",
+      routeMatchers: [
+        {
+          methods: ["GET", "POST"],
+          path: /^\/triagem\/competencies\/?$/,
+        },
+        {
+          methods: ["PATCH"],
+          path: /^\/triagem\/competencies\/[^/]+\/archive\/?$/,
+        },
+      ],
+    },
+    {
+      key: "triagem-legacy-service",
       targetUrl: env.contabilServiceUrl,
       auditTarget: "contabil-service",
       routePrefixes: [...TRIAGEM_SERVICE_PREFIXES],
