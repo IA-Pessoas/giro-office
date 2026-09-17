@@ -37,7 +37,11 @@ interface TaskRouteMocks {
     reopenTask: Mock;
   };
   taskFinanceiroServiceMock: {
-    updateChargeFinanceiro: Mock;
+    listCollectors: Mock;
+    listQueue: Mock;
+    setCollectors: Mock;
+    settle: Mock;
+    settleExpress: Mock;
   };
   taskAttachmentServiceMock: {
     upload: Mock;
@@ -86,7 +90,11 @@ const taskRouteMocks: TaskRouteMocks = vi.hoisted(
       reopenTask: vi.fn(),
     },
     taskFinanceiroServiceMock: {
-      updateChargeFinanceiro: vi.fn(),
+      listCollectors: vi.fn(),
+      listQueue: vi.fn(),
+      setCollectors: vi.fn(),
+      settle: vi.fn(),
+      settleExpress: vi.fn(),
     },
     taskAttachmentServiceMock: {
       upload: vi.fn(),
@@ -236,7 +244,11 @@ export function resetTaskRouteMocks() {
   });
   taskLifecycleServiceMock.listTaskCompletionRequests.mockResolvedValue([]);
   taskLifecycleServiceMock.reopenTask.mockResolvedValue({ id: "task-1", status: "Em Andamento" });
-  taskFinanceiroServiceMock.updateChargeFinanceiro.mockResolvedValue({ id: "task-1" });
+  taskFinanceiroServiceMock.listQueue.mockResolvedValue([]);
+  taskFinanceiroServiceMock.listCollectors.mockResolvedValue([]);
+  taskFinanceiroServiceMock.setCollectors.mockResolvedValue({ department_id: "department-1", collector_ids: [] });
+  taskFinanceiroServiceMock.settle.mockResolvedValue({ task_ids: ["task-1"], settled: 1 });
+  taskFinanceiroServiceMock.settleExpress.mockResolvedValue({ task_ids: ["task-1"], settled: 1 });
   taskAttachmentServiceMock.upload.mockResolvedValue({ id: "attachment-1" });
   taskAttachmentServiceMock.list.mockResolvedValue([]);
   taskAttachmentServiceMock.createAccessUrl.mockResolvedValue({

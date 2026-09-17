@@ -26,8 +26,63 @@ import {
   unwrapTaskAttachmentAccessUrl,
   unwrapUpdatedIntegracaoTask,
 } from "./integracaoTasksService.contract";
+import type {
+  IntegracaoFinanceiroQueueItem,
+  IntegracaoFinanceiroSettlementResult,
+} from "./integracaoTasksService.contract";
+import { unwrapServiceEnvelope } from "./envelope.contract";
 
 export const integracaoTasksService = {
+  async listFinanceiroQueue(params: { departmentId?: string; clientId?: string } = {}) {
+    const api = setupAPIClient();
+    const response = await api.get(INTEGRACAO_TASKS_ENDPOINTS.financeiroQueue, {
+      params: {
+        ...(params.departmentId ? { department_id: params.departmentId } : {}),
+        ...(params.clientId ? { client_id: params.clientId } : {}),
+      },
+    });
+    return unwrapServiceEnvelope(response.data) as IntegracaoFinanceiroQueueItem[];
+  },
+
+  async listFinanceiroCollectors(departmentId: string): Promise<string[]> {
+    const api = setupAPIClient();
+    const response = await api.get(INTEGRACAO_TASKS_ENDPOINTS.financeiroCollectors, {
+      params: { department_id: departmentId },
+    });
+    return unwrapServiceEnvelope(response.data) as string[];
+  },
+
+  async setFinanceiroCollectors(departmentId: string, collectorIds: string[]): Promise<void> {
+    const api = setupAPIClient();
+    await api.put(INTEGRACAO_TASKS_ENDPOINTS.financeiroCollectors, {
+      department_id: departmentId,
+      collector_ids: collectorIds,
+    });
+  },
+
+  async settleFinanceiro(taskIds: string[], idempotencyKey: string): Promise<IntegracaoFinanceiroSettlementResult> {
+    const api = setupAPIClient();
+    const response = await api.post(
+      INTEGRACAO_TASKS_ENDPOINTS.financeiroSettle,
+      { task_ids: taskIds },
+      { headers: { "Idempotency-Key": idempotencyKey } },
+    );
+    return unwrapServiceEnvelope(response.data) as IntegracaoFinanceiroSettlementResult;
+  },
+
+  async settleFinanceiroExpress(
+    clientId: string,
+    idempotencyKey: string,
+  ): Promise<IntegracaoFinanceiroSettlementResult> {
+    const api = setupAPIClient();
+    const response = await api.post(
+      INTEGRACAO_TASKS_ENDPOINTS.financeiroExpress,
+      { client_id: clientId },
+      { headers: { "Idempotency-Key": idempotencyKey } },
+    );
+    return unwrapServiceEnvelope(response.data) as IntegracaoFinanceiroSettlementResult;
+  },
+
   async list(params: IntegracaoTaskListParams = {}): Promise<IntegracaoTaskListResult> {
     const api = setupAPIClient();
     const response = await api.get(INTEGRACAO_TASKS_ENDPOINTS.list, {

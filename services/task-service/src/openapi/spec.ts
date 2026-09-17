@@ -197,13 +197,37 @@ const deleteTaskIntegrationRequestBody = createObjectRequestBody({
   },
 });
 
-const updateFinanceiroRequestBody = createObjectRequestBody({
-  example: { task_id: "task-uuid" },
-  required: ["task_id"],
+const settleFinanceiroRequestBody = createObjectRequestBody({
+  example: { task_ids: ["task-uuid"] },
+  required: ["task_ids"],
   properties: {
-    task_id: { type: "string" },
+    task_ids: { type: "array", items: { type: "string" }, minItems: 1 },
   },
 });
+
+const expressFinanceiroRequestBody = createObjectRequestBody({
+  example: { client_id: "client-uuid" },
+  required: ["client_id"],
+  properties: {
+    client_id: { type: "string" },
+  },
+});
+
+const collectorsFinanceiroRequestBody = createObjectRequestBody({
+  example: { department_id: "department-uuid", collector_ids: ["user-uuid"] },
+  required: ["department_id", "collector_ids"],
+  properties: {
+    department_id: { type: "string" },
+    collector_ids: { type: "array", items: { type: "string" } },
+  },
+});
+
+const financeiroIdempotencyHeader = {
+  name: "Idempotency-Key",
+  in: "header",
+  required: true,
+  schema: { type: "string", minLength: 1, maxLength: 255 },
+} as const;
 
 const concludeTaskRequestBody = createObjectRequestBody({
   example: {
@@ -886,13 +910,57 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           },
         },
       },
-      "/task/financeiro": {
+      "/task/financeiro/queue": {
+        get: {
+          tags: ["Financeiro"],
+          summary: "Listar fila financeira no escopo do cobrador",
+          security: bearer,
+          parameters: [
+            { name: "department_id", in: "query", schema: { type: "string" } },
+            { name: "client_id", in: "query", schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Fila pendente", ...successJson }, "403": { description: "Fora do escopo" } },
+        },
+      },
+      "/task/financeiro/collectors": {
+        get: {
+          tags: ["Financeiro"],
+          summary: "Listar cobradores ativos do departamento",
+          security: bearer,
+          parameters: [{ name: "department_id", in: "query", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Cobradores", ...successJson }, "403": { description: "Somente administradores" } },
+        },
         put: {
           tags: ["Financeiro"],
-          summary: "Atualizar cobranca financeira",
+          summary: "Configurar cobradores ativos do departamento",
           security: bearer,
-          ...updateFinanceiroRequestBody,
-          responses: { "200": { description: "Atualizado", ...successJson } },
+          ...collectorsFinanceiroRequestBody,
+          responses: { "200": { description: "Configurado", ...successJson }, "403": { description: "Somente administradores" } },
+        },
+      },
+      "/task/financeiro/settle": {
+        post: {
+          tags: ["Financeiro"],
+          summary: "Baixar tarefas financeiras atomicamente",
+          description: "O mesmo Idempotency-Key e o mesmo lote retornam o resultado original; outra carga retorna conflito.",
+          security: bearer,
+          parameters: [financeiroIdempotencyHeader],
+          ...settleFinanceiroRequestBody,
+          responses: {
+            "200": { description: "Baixa realizada ou repetida", ...successJson },
+            "403": { description: "Cobrador fora do departamento" },
+            "409": { description: "Conflito de chave ou lote não pendente" },
+          },
+        },
+      },
+      "/task/financeiro/express": {
+        post: {
+          tags: ["Financeiro"],
+          summary: "Baixar toda a fila atual de um cliente",
+          security: bearer,
+          parameters: [financeiroIdempotencyHeader],
+          ...expressFinanceiroRequestBody,
+          responses: { "200": { description: "Baixa realizada", ...successJson }, "403": { description: "Fora do escopo" }, "409": { description: "Fila alterada" } },
         },
       },
       "/internal/commercial/task-billing": {

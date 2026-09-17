@@ -22,7 +22,24 @@ export const INTEGRACAO_TASKS_ENDPOINTS = {
   attachment: "/task/attachment",
   attachmentList: "/task/attachment/list",
   attachmentAccess: "/task/attachment/access",
+  financeiroQueue: "/task/financeiro/queue",
+  financeiroCollectors: "/task/financeiro/collectors",
+  financeiroSettle: "/task/financeiro/settle",
+  financeiroExpress: "/task/financeiro/express",
 } as const;
+
+export interface IntegracaoFinanceiroQueueItem {
+  id: string;
+  name: string;
+  client_id: string;
+  department_id: string;
+  status: string;
+}
+
+export interface IntegracaoFinanceiroSettlementResult {
+  task_ids: string[];
+  settled: number;
+}
 
 export function buildTaskCompletionRequestPayload(taskId: string, reason: string) {
   return { task_id: taskId, reason };

@@ -5008,11 +5008,59 @@ const handlers = {
     });
   },
 
-  async taskFinanceiroPut(op) {
+  async taskFinanceiroQueue(op) {
+    const response = await httpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) return;
+    state.taskFinanceiroDepartmentId = pickFirst(response.body, "data.0.department_id");
+  },
+
+  async taskFinanceiroCollectorsGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],
-      path: "/task/financeiro",
-      json: { task_id: requireState("taskId") },
+      query: { department_id: requireState("taskFinanceiroDepartmentId") },
+    });
+  },
+
+  async taskFinanceiroCollectorsPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        department_id: requireState("taskFinanceiroDepartmentId"),
+        collector_ids: [requireState("session").id],
+      },
+    });
+  },
+
+  async taskFinanceiroExpress(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      headers: { "Idempotency-Key": uniqueText("smoke-financeiro-express") },
+      json: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async taskFinanceiroSettle(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      method: "POST",
+      path: "/task",
+      json: {
+        model_id: requireState("taskModelPrimaryId"),
+        project_id: requireState("projectId"),
+        client_id: requireState("primaryClientId"),
+        prospecting_status: "Fechado",
+        status: "Em Andamento",
+        observations: "Smoke financial settlement",
+        urgency: "Alta",
+        prevision_date: "2020-01-01",
+      },
+    });
+    if (isBadExpectation(op)) return;
+    const taskId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
+    await httpRequest(op, {
+      expectedStatus: [200],
+      headers: { "Idempotency-Key": uniqueText("smoke-financeiro-settle") },
+      json: { task_ids: [taskId] },
     });
   },
 
