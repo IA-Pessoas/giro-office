@@ -152,7 +152,6 @@ const TASK_UPDATE_FIELDS = [
   "department_id",
   "billing",
   "responsible_id",
-  "prevision_date",
 ] as const;
 const TASK_OWN_FIELDS = ["status", "observations"] as const;
 const TASK_MODEL_FIELDS = [
@@ -429,6 +428,35 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
       ),
     ],
     { audit: "required", test: "task.update" },
+  ),
+  routePolicy(
+    "POST",
+    "/task/postponement",
+    "task",
+    "update",
+    [
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        [],
+        "responsible",
+      ),
+      writeRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN], []),
+    ],
+    { audit: "required", test: "task.postponement.create" },
+  ),
+  routePolicy(
+    "GET",
+    "/task/postponement/list",
+    "task",
+    "read",
+    [
+      readRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        "responsible",
+      ),
+      readRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
+    ],
+    { test: "task.postponement.list" },
   ),
   routePolicy("DELETE", "/task", "task", "delete", [writeRule(admin, [])], {
     audit: "required",

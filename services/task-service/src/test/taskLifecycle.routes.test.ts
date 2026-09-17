@@ -12,6 +12,17 @@ it("conclusão aceita responsável principal nulo", () => {
   ).toBe(true);
 });
 
+it("conclusão rejeita alteração direta de previsão", () => {
+  expect(
+    integracaoTaskConclusionBodySchema.safeParse({
+      task_id: "task-1",
+      status: "Em Andamento",
+      responsible_id: null,
+      prevision_date: "2026-09-20",
+    }).success,
+  ).toBe(false);
+});
+
 import { createTestApp, resetTaskRouteMocks, taskLifecycleServiceMock } from "./taskTestUtils.js";
 
 describe("task lifecycle routes", () => {

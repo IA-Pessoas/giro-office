@@ -41,6 +41,8 @@ const expectedRoutes = [
   "DELETE /task/project-plan/task",
   "POST /task/project-plan/hire",
   "PUT /task",
+  "POST /task/postponement",
+  "GET /task/postponement/list",
   "DELETE /task",
   "PUT /task/conclusion",
   "POST /task/complete-request",
@@ -241,6 +243,8 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
       allowedLevels: [0, 1, 2, 3],
       requestedFields: ["status", "observations"],
     },
+    { method: "POST", path: "/task/postponement", allowedLevels: [0, 1, 2, 3] },
+    { method: "GET", path: "/task/postponement/list", allowedLevels: [0, 1, 2, 3] },
     { method: "DELETE", path: "/task", allowedLevels: [3] },
     { method: "PUT", path: "/task/conclusion", allowedLevels: [0, 1] },
     { method: "POST", path: "/task/complete-request", allowedLevels: [0, 1, 2, 3] },
@@ -303,6 +307,27 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
       `${routeCase.method} ${routeCase.path} owner`,
     );
   }
+});
+
+test("prorrogação conserva escopo de responsável para os níveis básicos", () => {
+  const policy = requirePolicy("POST", "/task/postponement");
+  const input = {
+    userId: "user-1",
+    level: 0 as const,
+    organizationId: "org-1",
+    resourceOrganizationId: "org-1",
+    isOwner: false,
+  };
+
+  assert.equal(evaluateIntegracaoAction(policy, { ...input, responsibleId: "user-1" }), "allow");
+  assert.equal(
+    evaluateIntegracaoAction(policy, { ...input, responsibleId: "user-2" }),
+    "not_found",
+  );
+  assert.equal(
+    evaluateIntegracaoAction(policy, { ...input, level: 2, responsibleId: "user-2" }),
+    "allow",
+  );
 });
 
 test("nível 2 exige task_completion para aprovar conclusão", () => {

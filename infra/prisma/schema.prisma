@@ -158,6 +158,7 @@ model Organization {
   taskModels                    TaskModel[]
   completionRequests            TaskCompletionRequest[]
   taskAttachments               TaskAttachment[]
+  taskPostponements             TaskPostponement[]
   logs                          Logs[]
   passwordsMkt                  PasswordMkt[]
   notes                         Note[]
@@ -1014,6 +1015,7 @@ model Task {
   commercialTaskBilling CommercialTaskBilling?
   completionRequests    TaskCompletionRequest[]
   attachments           TaskAttachment[]
+  postponements         TaskPostponement[]
 
   @@map("integracao.tasks")
 }
@@ -1054,6 +1056,23 @@ model TaskAttachment {
 
   @@index([organization_id, task_id, deleted_at, created_at], map: "idx_task_attachments_org_task_visible")
   @@map("integracao.task_attachments")
+}
+
+model TaskPostponement {
+  id                      String       @id @default(uuid())
+  task_id                 String
+  organization_id         String
+  previous_prevision_date DateTime
+  new_prevision_date      DateTime
+  justification           String
+  author_id               String
+  created_at              DateTime     @default(now())
+  task                    Task         @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization            Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, created_at], map: "idx_task_postponements_org_task_created")
+  @@index([organization_id, author_id, created_at], map: "idx_task_postponements_org_author_created")
+  @@map("integracao.task_postponements")
 }
 
 model ProposalConfig {

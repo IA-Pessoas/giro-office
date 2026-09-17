@@ -12,6 +12,7 @@ import type {
   IntegracaoTaskCompletionDecision,
   IntegracaoTaskCompletionRequest,
   IntegracaoTaskAttachment,
+  IntegracaoTaskPostponement,
   IntegracaoTaskDetail,
   IntegracaoTaskListParams,
   IntegracaoTaskListResult,
@@ -21,6 +22,7 @@ import { integracaoTasksService } from "../services";
 import {
   INTEGRACAO_TASKS_QUERY_KEY,
   integracaoTaskCompletionRequestsQueryKey,
+  integracaoTaskPostponementsQueryKey,
   integracaoTaskAttachmentsQueryKey,
   integracaoTaskDetailQueryKey,
   integracaoTasksListQueryKey,
@@ -69,6 +71,16 @@ export function useIntegracaoTaskAttachments(
   );
 }
 
+export function useIntegracaoTaskPostponements(
+  taskId: string | undefined,
+): UseQueryResult<IntegracaoTaskPostponement[], Error> {
+  return useFetch(
+    integracaoTaskPostponementsQueryKey(taskId ?? "missing"),
+    () => integracaoTasksService.listPostponements(taskId ?? ""),
+    { enabled: Boolean(taskId) },
+  );
+}
+
 async function invalidateTaskAttachments(
   queryClient: ReturnType<typeof useQueryClient>,
   taskId: string,
@@ -107,6 +119,30 @@ async function invalidateTaskLifecycle(queryClient: ReturnType<typeof useQueryCl
     queryClient.invalidateQueries({ queryKey: integracaoTaskCompletionRequestsQueryKey(taskId) }),
     queryClient.invalidateQueries({ queryKey: INTEGRACAO_TASKS_QUERY_KEY }),
   ]);
+}
+
+async function invalidateTaskPostponements(
+  queryClient: ReturnType<typeof useQueryClient>,
+  taskId: string,
+) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: integracaoTaskDetailQueryKey(taskId) }),
+    queryClient.invalidateQueries({ queryKey: integracaoTaskPostponementsQueryKey(taskId) }),
+    queryClient.invalidateQueries({ queryKey: INTEGRACAO_TASKS_QUERY_KEY }),
+  ]);
+}
+
+export function usePostponeTaskMutation(): UseMutationResult<
+  void,
+  Error,
+  { taskId: string; newPrevisionDate: string; justification: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, newPrevisionDate, justification }) =>
+      integracaoTasksService.postpone(taskId, newPrevisionDate, justification),
+    onSuccess: async (_result, { taskId }) => invalidateTaskPostponements(queryClient, taskId),
+  });
 }
 
 export function useRequestTaskCompletionMutation(): UseMutationResult<

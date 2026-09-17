@@ -4920,8 +4920,10 @@ const handlers = {
         project_id: requireState("projectId"),
         client_id: requireState("primaryClientId"),
         prospecting_status: "Fechado",
+        status: "Em Andamento",
         observations: "Smoke task creation",
         urgency: "Alta",
+        prevision_date: "2020-01-01",
       },
     });
     if (isBadExpectation(op)) {
@@ -5041,6 +5043,35 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: "/task/complete-request/list",
+      query: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskPostponementCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        task_id: requireState("taskId"),
+        new_prevision_date: "2030-01-01",
+        justification: "Prorrogação validada pelo smoke.",
+      },
+    });
+  },
+
+  async taskPostponementCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        task_id: requireState("taskId"),
+        new_prevision_date: "2030-02-30",
+        justification: "Data inválida.",
+      },
+    });
+  },
+
+  async taskPostponementListGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
       query: { task_id: requireState("taskId") },
     });
   },

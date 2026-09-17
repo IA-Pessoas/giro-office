@@ -100,6 +100,15 @@ export interface IntegracaoTaskAttachment {
   created_at: string;
 }
 
+export interface IntegracaoTaskPostponement {
+  id: string;
+  previous_prevision_date: string;
+  new_prevision_date: string;
+  justification: string;
+  author_id: string;
+  created_at: string;
+}
+
 export interface IntegracaoTaskListParams {
   status?: string;
   ref?: string;
@@ -136,5 +145,4 @@ export interface UpdateIntegracaoTaskBody {
   billing?: TaskBilling;
   urgency?: string;
   responsible_id?: string | null;
-  prevision_date?: string | null;
 }
