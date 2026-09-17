@@ -21,6 +21,7 @@ const rhMocks: {
   timeSheetServiceMock: MockGroup;
   scoreNitroServiceMock: MockGroup;
   employeeDossierServiceMock: MockGroup;
+  rhNotificationServiceMock: MockGroup;
 } = vi.hoisted(() => ({
   pointConfigServiceMock: {
     upsert: vi.fn(),
@@ -55,6 +56,7 @@ const rhMocks: {
     getById: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+    markOpened: vi.fn(),
   },
   operationalUserServiceMock: {
     list: vi.fn(),
@@ -90,6 +92,7 @@ const rhMocks: {
   },
   messageServiceMock: {
     create: vi.fn(),
+    assertCanCreate: vi.fn(),
     listByRequest: vi.fn(),
   },
   timeSheetServiceMock: {
@@ -115,6 +118,11 @@ const rhMocks: {
     listAllergies: vi.fn(),
     replaceAllergies: vi.fn(),
   },
+  rhNotificationServiceMock: {
+    list: vi.fn(),
+    markRead: vi.fn(),
+    notify: vi.fn(),
+  },
 }));
 
 const {
@@ -133,6 +141,7 @@ const {
   timeSheetServiceMock,
   scoreNitroServiceMock,
   employeeDossierServiceMock,
+  rhNotificationServiceMock,
 } = rhMocks;
 
 vi.mock("../services/pointConfigService.js", () => ({
@@ -226,6 +235,10 @@ vi.mock("../services/employeeDossierService.js", () => ({
   EmployeeDossierService: vi.fn(function EmployeeDossierService() {
     return rhMocks.employeeDossierServiceMock;
   }),
+}));
+
+vi.mock("../services/rhNotificationService.js", () => ({
+  rhNotificationService: rhMocks.rhNotificationServiceMock,
 }));
 
 const testAuthContext = vi.hoisted(() => ({
@@ -323,6 +336,7 @@ export function resetRhRouteMocks() {
   });
   requestServiceMock.update.mockResolvedValue({ ok: true });
   requestServiceMock.delete.mockResolvedValue({ ok: true });
+  requestServiceMock.markOpened.mockResolvedValue(undefined);
   operationalUserServiceMock.list.mockResolvedValue([
     {
       id: "00000000-0000-4000-8000-000000000001",
@@ -370,6 +384,7 @@ export function resetRhRouteMocks() {
     users_with_negative_balance: 4,
   });
   messageServiceMock.create.mockResolvedValue({ ok: true });
+  messageServiceMock.assertCanCreate.mockResolvedValue(undefined);
   messageServiceMock.listByRequest.mockResolvedValue([
     { id: "00000000-0000-4000-8000-000000000010" },
   ]);
@@ -419,6 +434,9 @@ export function resetRhRouteMocks() {
   });
   employeeDossierServiceMock.listAllergies.mockResolvedValue([]);
   employeeDossierServiceMock.replaceAllergies.mockResolvedValue([]);
+  rhNotificationServiceMock.list.mockResolvedValue([]);
+  rhNotificationServiceMock.markRead.mockResolvedValue({ count: 0 });
+  rhNotificationServiceMock.notify.mockResolvedValue(undefined);
 }
 
 export function setRhRoutePermission(permission: number) {
@@ -441,4 +459,5 @@ export {
   timeClockRequestServiceMock,
   timeSheetServiceMock,
   employeeDossierServiceMock,
+  rhNotificationServiceMock,
 };

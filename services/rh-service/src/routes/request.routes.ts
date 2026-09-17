@@ -102,7 +102,8 @@ router.get(
         listOptions.assigned_to_user_id = parsed.assigned_to_user_id;
       }
       if (!canManageRh(req)) {
-        listOptions.requester_user_id = user_id;
+        listOptions.participant_user_id = user_id;
+        delete listOptions.requester_user_id;
         delete listOptions.assigned_to_user_id;
       }
 
@@ -128,9 +129,18 @@ router.get(
       const params = parseWithZod(requestIdParamsSchema, req.params);
 
       const result = await requestService.getById(params.id, organization_id);
-      if (!canManageRh(req) && result.requester_user_id !== user_id) {
+      if (
+        !canManageRh(req) &&
+        result.requester_user_id !== user_id &&
+        result.assigned_to_user_id !== user_id
+      ) {
         throw new ServiceError(403, "Permissao insuficiente para acessar solicitacao de terceiro.");
       }
+      await requestService.markOpened({
+        organization_id,
+        request_id: result.id,
+        user_id,
+      });
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao buscar solicitacao RH", { err });
@@ -145,12 +155,15 @@ router.put(
   requireRhPermission(RH_MANAGEMENT_PERMISSION),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
+      const { organization_id, user_id } = requireAuthenticatedRequestContext(req, {
+        statusCode: 400,
+      });
       const body = parseWithZod(updateRequestBodySchema, req.body);
 
       const updateInput: RequestUpdateInput = {
         id: body.id,
         organization_id,
+        actor_user_id: user_id,
       };
       if (body.title !== undefined) {
         updateInput.title = body.title;

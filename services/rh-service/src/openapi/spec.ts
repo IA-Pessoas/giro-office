@@ -432,19 +432,49 @@ const timeBankReleaseApproveRequestBody = createObjectRequestBody({
   },
 });
 
-const messageCreateRequestBody = createObjectRequestBody({
-  example: {
-    request_id: "request-uuid",
-    message: "Seu pedido foi encaminhado para aprovação.",
-    type: "Message",
-    attachment: "https://cdn.castelo.com/rh/attachment.pdf",
+const messageCreateRequestBody = {
+  requestBody: {
+    required: true,
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["request_id", "message", "type"],
+          additionalProperties: false,
+          properties: {
+            request_id: { type: "string", format: "uuid" },
+            message: { type: "string" },
+            type: { type: "string", enum: ["Message", "Solution", "Rejection", "Acceptance"] },
+            attachment: { type: "string" },
+          },
+        },
+      },
+      "multipart/form-data": {
+        schema: {
+          type: "object",
+          required: ["request_id", "message", "type"],
+          properties: {
+            request_id: { type: "string", format: "uuid" },
+            message: { type: "string" },
+            type: { type: "string", enum: ["Message", "Solution", "Rejection", "Acceptance"] },
+            file: {
+              type: "string",
+              format: "binary",
+              description: "PDF, PNG ou JPEG de no máximo 10 MB.",
+            },
+          },
+        },
+      },
+    },
   },
-  required: ["request_id", "message", "type"],
+} as const;
+
+const rhNotificationReadRequestBody = createObjectRequestBody({
+  example: { request_id: "request-uuid" },
   properties: {
-    request_id: { type: "string" },
-    message: { type: "string" },
-    type: { type: "string", enum: ["Message", "Solution", "Rejection", "Acceptance"] },
-    attachment: { type: "string" },
+    id: { type: "string", format: "uuid" },
+    request_id: { type: "string", format: "uuid" },
+    all: { type: "boolean" },
   },
 });
 
@@ -1384,6 +1414,27 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           ],
           responses: {
             "200": { description: "Lista", ...successJson },
+          },
+        },
+      },
+      "/rh/notifications": {
+        get: {
+          tags: ["Notificacoes"],
+          summary: "Listar notificações de solicitações RH do usuário autenticado",
+          security: bearer,
+          responses: {
+            "200": { description: "Notificações RH", ...successJson },
+          },
+        },
+      },
+      "/rh/notifications/read": {
+        put: {
+          tags: ["Notificacoes"],
+          summary: "Marcar notificações RH como lidas",
+          security: bearer,
+          ...rhNotificationReadRequestBody,
+          responses: {
+            "200": { description: "Notificações atualizadas", ...successJson },
           },
         },
       },

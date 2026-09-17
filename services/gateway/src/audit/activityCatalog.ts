@@ -702,6 +702,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "assinou", item: "uma folha de ponto" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/rh\/messages$/,
+    description: { action: "enviou", item: "uma mensagem em uma solicitação de RH" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/notifications$/,
+    description: { action: "consultou", item: "as notificações de solicitações de RH" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/notifications\/read$/,
+    description: { action: "marcou", item: "notificações de solicitações de RH como lidas" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/contabil\/responsibles\/client\/[^/]+$/,
     description: { action: "consultou", item: "o responsável contábil de um cliente" },

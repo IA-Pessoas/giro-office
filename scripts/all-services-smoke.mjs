@@ -6030,6 +6030,21 @@ const handlers = {
     });
   },
 
+  async rhNotificationList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/notifications",
+    });
+  },
+
+  async rhNotificationMarkRead(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/notifications/read",
+      json: { all: true },
+    });
+  },
+
   async rhTimeSheetCreate(op) {
     const start = new Date(Date.now() - 8 * 60 * 60 * 1000);
     const end = new Date();
