@@ -288,6 +288,18 @@ export class TaskFinanceiroService {
             ) {
               throw new ServiceError(403, "Você não é cobrador autorizado para este departamento.");
             }
+            const assignment = await tx.departmentCollector.findFirst({
+              where: {
+                organization_id: data.organization_id,
+                department_id: actor.department_id,
+                user_id: data.user_id,
+                user: { status: "active", department_id: actor.department_id },
+              },
+              select: { id: true },
+            });
+            if (!assignment) {
+              throw new ServiceError(403, "Você não é cobrador autorizado para este departamento.");
+            }
           }
           return {
             response: previous.response_snapshot as unknown as SettleFinanceiroResponse,
