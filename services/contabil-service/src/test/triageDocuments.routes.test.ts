@@ -29,7 +29,9 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-function gatewayHeaders(modules = { contabil: 2, triagem: 0 }): Record<string, string> {
+function gatewayHeaders(
+  modules: Record<string, number> = { contabil: 2, triagem: 0 },
+): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
@@ -98,6 +100,23 @@ describe("triage document routes", () => {
     );
   });
 
+  it("POST /triagem/monthly aceita a rotina fiscal explicitamente", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/triagem/monthly")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders({ fiscal: 2, triagem: 1 }))
+      .send({ client_id: CLIENT_ID, competence: "2026-09", type: "FISCAL" });
+
+    expect(res.status).toBe(200);
+    expect(deps.getOrCreateMonthly).toHaveBeenCalledWith(
+      { client_id: CLIENT_ID, competence: "2026-09", type: "FISCAL" },
+      expect.objectContaining({ modules: expect.objectContaining({ fiscal: 2 }) }),
+    );
+  });
+
   it("PATCH /triagem/monthly/:id/item rejeita status inválido", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
@@ -138,6 +157,70 @@ describe("triage document routes", () => {
       },
       expect.objectContaining({ organizationId: ORG_ID }),
     );
+  });
+
+  it("PATCH /triagem/monthly/:id/item encaminha entrega fiscal controlada", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders({ fiscal: 2, triagem: 1 }))
+      .send({
+        type: "FISCAL",
+        field: "nfce_documents",
+        status: "ATTENTION",
+        delivery_method: "EMAIL",
+      });
+
+    expect(res.status).toBe(200);
+    expect(deps.updateItem).toHaveBeenCalledWith(
+      MONTHLY_ID,
+      expect.objectContaining({
+        type: "FISCAL",
+        field: "nfce_documents",
+        delivery_method: "EMAIL",
+      }),
+      expect.objectContaining({ modules: expect.objectContaining({ fiscal: 2 }) }),
+    );
+  });
+
+  it("PATCH /triagem/monthly/:id/item aceita faturamento fiscal sem status", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders({ fiscal: 2, triagem: 1 }))
+      .send({ type: "FISCAL", field: "billing_amount", value: "12500,00" });
+
+    expect(res.status).toBe(200);
+    expect(deps.updateItem).toHaveBeenCalledWith(
+      MONTHLY_ID,
+      { type: "FISCAL", field: "billing_amount", value: "12500,00" },
+      expect.objectContaining({ modules: expect.objectContaining({ fiscal: 2 }) }),
+    );
+  });
+
+  it("PATCH /triagem/monthly/:id/item rejeita entrega fiscal desconhecida", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders({ fiscal: 2, triagem: 1 }))
+      .send({
+        type: "FISCAL",
+        field: "nfce_documents",
+        status: "ATTENTION",
+        delivery_method: "SMS",
+      });
+
+    expect(res.status).toBe(400);
+    expect(deps.updateItem).not.toHaveBeenCalled();
   });
 
   it("PUT /triagem/statements mantém bank_id no marcador operacional", async () => {

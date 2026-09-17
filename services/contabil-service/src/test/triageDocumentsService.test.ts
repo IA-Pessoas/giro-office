@@ -3,8 +3,11 @@ import "./envBootstrap.js";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  TRIAGE_DELIVERY_METHODS,
   TRIAGE_DOCUMENT_FIELDS,
   TRIAGE_DOCUMENT_NOTE_MAX_LENGTH,
+  TRIAGE_FISCAL_CHECKLIST_FIELDS,
+  TRIAGE_FISCAL_FIELDS,
   TriageDocumentsService,
   type TriageDocumentsServicePrisma,
 } from "../services/triageDocumentsService.js";
@@ -31,6 +34,7 @@ const monthly = {
 function createMockPrisma(): TriageDocumentsServicePrisma {
   const prisma = {
     triageConfig: { findFirst: vi.fn() },
+    triageCompetence: { findFirst: vi.fn() },
     triageMonthly: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     triageResponsible: { findFirst: vi.fn() },
     triageBankStatement: { findFirst: vi.fn(), findMany: vi.fn(), upsert: vi.fn() },
@@ -51,7 +55,268 @@ function contabilEditor() {
   };
 }
 
+function fiscalEditor() {
+  return {
+    userId: USER_ID,
+    organizationId: ORG_ID,
+    modules: { fiscal: 2, triagem: 0 },
+  };
+}
+
 describe("TriageDocumentsService", () => {
+  it("expõe os 14 campos fiscais legados e métodos de entrega controlados", () => {
+    expect(TRIAGE_FISCAL_FIELDS).toHaveLength(14);
+    expect(TRIAGE_FISCAL_CHECKLIST_FIELDS).toHaveLength(13);
+    expect(TRIAGE_FISCAL_FIELDS).toContain("billing_amount");
+    expect(TRIAGE_DELIVERY_METHODS).toEqual(["EMAIL", "PORTAL", "WHATSAPP"]);
+  });
+
+  it("cria o mensal fiscal usando obrigatoriedade, prioridade e entrega do snapshot", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({
+      configuration_snapshot: {
+        configs: [
+          {
+            type: "FISCAL",
+            active_items: [
+              {
+                field: "nfce_documents",
+                required: true,
+                priority: "HIGH",
+                delivery_method: "EMAIL",
+              },
+              {
+                field: "sped_fiscal",
+                required: false,
+                priority: "LOW",
+                delivery_method: "PORTAL",
+              },
+            ],
+          },
+        ],
+      },
+    } as never);
+    vi.mocked(prisma.triageMonthly.create).mockResolvedValue({
+      ...monthly,
+      type: "FISCAL",
+      billing_amount: null,
+    } as never);
+
+    const result = await new TriageDocumentsService(prisma, {
+      logUpdateIfChanged: vi.fn(),
+    }).getOrCreateMonthly(
+      { client_id: CLIENT_ID, competence: COMPETENCE, type: "FISCAL" },
+      fiscalEditor(),
+    );
+
+    expect(prisma.triageMonthly.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: "FISCAL",
+        checklist: expect.objectContaining({
+          nfce_documents: "PENDING",
+          sped_fiscal: "NOT_APPLICABLE",
+        }),
+        item_notes: expect.objectContaining({
+          nfce_documents: expect.objectContaining({
+            priority: "HIGH",
+            delivery_method: "EMAIL",
+          }),
+          sped_fiscal: expect.objectContaining({
+            priority: "LOW",
+            delivery_method: "PORTAL",
+          }),
+        }),
+      }),
+    });
+    expect(result).toEqual(expect.objectContaining({ type: "FISCAL" }));
+  });
+
+  it("rejeita método de entrega fiscal não controlado antes da mutação", async () => {
+    const prisma = createMockPrisma();
+    const service = new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() });
+
+    await expect(
+      service.updateItem(
+        MONTHLY_ID,
+        {
+          type: "FISCAL",
+          field: "nfce_documents",
+          status: "ATTENTION",
+          delivery_method: "SMS",
+        },
+        fiscalEditor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("atualiza estado fiscal, nota, revisão e entrega sem sair da organização", async () => {
+    const prisma = createMockPrisma();
+    const fiscalMonthly = {
+      ...monthly,
+      type: "FISCAL",
+      checklist: { nfce_documents: "PENDING" },
+      item_notes: { nfce_documents: { note: null, justification: null } },
+    };
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(fiscalMonthly as never);
+    vi.mocked(prisma.triageMonthly.update).mockResolvedValue({
+      ...fiscalMonthly,
+      checklist: { nfce_documents: "UNDER_REVIEW" },
+      item_notes: {
+        nfce_documents: {
+          note: "Arquivo parcial",
+          justification: "Aguardando validação",
+          delivery_method: "WHATSAPP",
+        },
+      },
+    } as never);
+    const audit = { logUpdateIfChanged: vi.fn() };
+
+    const result = await new TriageDocumentsService(prisma, audit).updateItem(
+      MONTHLY_ID,
+      {
+        type: "FISCAL",
+        field: "nfce_documents",
+        status: "UNDER_REVIEW",
+        note: "Arquivo parcial",
+        justification: "Aguardando validação",
+        delivery_method: "WHATSAPP",
+      },
+      fiscalEditor(),
+    );
+
+    expect(result).toEqual(expect.objectContaining({ type: "FISCAL" }));
+    expect(prisma.triageMonthly.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: MONTHLY_ID,
+        organization_id: ORG_ID,
+        type: "FISCAL",
+      }),
+    });
+    expect(prisma.triageMonthly.update).toHaveBeenCalledWith({
+      where: { id: MONTHLY_ID },
+      data: expect.objectContaining({
+        checklist: expect.objectContaining({ nfce_documents: "UNDER_REVIEW" }),
+        item_notes: expect.objectContaining({
+          nfce_documents: expect.objectContaining({ delivery_method: "WHATSAPP" }),
+        }),
+      }),
+    });
+  });
+
+  it("salva o campo fiscal de faturamento sem convertê-lo em status", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue({
+      ...monthly,
+      type: "FISCAL",
+      billing_amount: null,
+    } as never);
+    vi.mocked(prisma.triageMonthly.update).mockResolvedValue({
+      ...monthly,
+      type: "FISCAL",
+      billing_amount: "12500,00",
+    } as never);
+
+    await new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).updateItem(
+      MONTHLY_ID,
+      { type: "FISCAL", field: "billing_amount", value: "12500,00" },
+      fiscalEditor(),
+    );
+
+    expect(prisma.triageMonthly.update).toHaveBeenCalledWith({
+      where: { id: MONTHLY_ID },
+      data: { billing_amount: "12500,00" },
+    });
+  });
+
+  it("preserva observações ao alterar somente o método de entrega", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue({
+      ...monthly,
+      type: "FISCAL",
+      checklist: { nfce_documents: "PENDING" },
+      item_notes: {
+        nfce_documents: {
+          note: "Arquivo recebido",
+          justification: "Conferir no portal",
+        },
+      },
+    } as never);
+    vi.mocked(prisma.triageMonthly.update).mockResolvedValue({
+      ...monthly,
+      type: "FISCAL",
+    } as never);
+
+    await new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).updateItem(
+      MONTHLY_ID,
+      {
+        type: "FISCAL",
+        field: "nfce_documents",
+        status: "PENDING",
+        delivery_method: "PORTAL",
+      },
+      fiscalEditor(),
+    );
+
+    expect(prisma.triageMonthly.update).toHaveBeenCalledWith({
+      where: { id: MONTHLY_ID },
+      data: expect.objectContaining({
+        item_notes: expect.objectContaining({
+          nfce_documents: {
+            note: "Arquivo recebido",
+            justification: "Conferir no portal",
+            delivery_method: "PORTAL",
+          },
+        }),
+      }),
+    });
+  });
+
+  it("remove o método de entrega quando recebe null explicitamente", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue({
+      ...monthly,
+      type: "FISCAL",
+      checklist: { nfce_documents: "PENDING" },
+      item_notes: {
+        nfce_documents: {
+          note: "Arquivo recebido",
+          justification: null,
+          delivery_method: "EMAIL",
+        },
+      },
+    } as never);
+    vi.mocked(prisma.triageMonthly.update).mockResolvedValue({
+      ...monthly,
+      type: "FISCAL",
+    } as never);
+
+    await new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).updateItem(
+      MONTHLY_ID,
+      {
+        type: "FISCAL",
+        field: "nfce_documents",
+        status: "PENDING",
+        delivery_method: null,
+      },
+      fiscalEditor(),
+    );
+
+    expect(prisma.triageMonthly.update).toHaveBeenCalledWith({
+      where: { id: MONTHLY_ID },
+      data: expect.objectContaining({
+        item_notes: expect.objectContaining({
+          nfce_documents: {
+            note: "Arquivo recebido",
+            justification: null,
+            delivery_method: null,
+          },
+        }),
+      }),
+    });
+  });
+
   it("mantém os dez itens operacionais e normaliza notas por item", async () => {
     expect(TRIAGE_DOCUMENT_FIELDS).toHaveLength(10);
     expect(TRIAGE_DOCUMENT_FIELDS).toContain("triaged_transactions");
@@ -243,6 +508,36 @@ describe("TriageDocumentsService", () => {
           inventory_control: "NOT_APPLICABLE",
         }),
       }),
+    });
+  });
+
+  it("não retorna mensal arquivado no fallback de uma corrida de criação", async () => {
+    const prisma = createMockPrisma();
+    const archived = {
+      ...monthly,
+      archived_at: new Date("2026-09-01T00:00:00.000Z"),
+    };
+    vi.mocked(prisma.triageMonthly.findFirst).mockImplementation((async (args: unknown) => {
+      const where = args && typeof args === "object" && "where" in args ? args.where : undefined;
+      const archivedAt =
+        where && typeof where === "object" && "archived_at" in where
+          ? where.archived_at
+          : undefined;
+      return (archivedAt === null ? null : archived) as never;
+    }) as never);
+    vi.mocked(prisma.triageConfig.findFirst).mockResolvedValue({
+      active_items: [],
+    } as never);
+    vi.mocked(prisma.triageMonthly.create).mockRejectedValue({ code: "P2002" });
+
+    await expect(
+      new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).getOrCreateMonthly(
+        { client_id: CLIENT_ID, competence: COMPETENCE },
+        contabilEditor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prisma.triageMonthly.findFirst).toHaveBeenNthCalledWith(2, {
+      where: expect.objectContaining({ archived_at: null }),
     });
   });
 

@@ -171,7 +171,11 @@ await (async () => {
   await runTest("triagem apresenta dez documentos com nota, justificativa e banco sem dados de conta", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
 
-    assert.equal((source.match(/\["[a-z_]+", "/g) ?? []).length, 10);
+    const contabilDocuments = source.slice(
+      source.indexOf("const CONTABIL_DOCUMENTS"),
+      source.indexOf("const FISCAL_DOCUMENTS"),
+    );
+    assert.equal((contabilDocuments.match(/\["[a-z0-9_]+", "/g) ?? []).length, 10);
     assert.match(source, /triaged_transactions/);
     assert.match(source, /Nota/);
     assert.match(source, /Justificativa/);
@@ -184,6 +188,28 @@ await (async () => {
     assert.match(source, /useTriageClosing/);
     assert.match(source, /Fechamento recebido/);
     assert.match(source, /NOT_RECEIVED/);
+  });
+
+  await runTest("triagem fiscal apresenta os 14 campos e controla revisão e entrega", () => {
+    const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    const pageSource = readWorkspaceSource("../../pages/triagem.tsx");
+    const fiscalDocuments = source.slice(
+      source.indexOf("const FISCAL_DOCUMENTS"),
+      source.indexOf("const STATUSES"),
+    );
+
+    assert.equal((fiscalDocuments.match(/\["[a-z0-9_]+", "/g) ?? []).length, 13);
+    assert.match(source, /billing_amount/);
+    assert.match(pageSource, /documentType="FISCAL"/);
+    assert.match(source, /UNDER_REVIEW/);
+    assert.match(source, /Método de entrega/);
+    assert.match(source, /EMAIL/);
+    assert.match(source, /PORTAL/);
+    assert.match(source, /WHATSAPP/);
+    assert.match(source, /Obrigatório/);
+    assert.match(source, /prioridade/);
+    assert.match(source, /const mutationError/);
+    assert.match(source, /role="alert"/);
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {

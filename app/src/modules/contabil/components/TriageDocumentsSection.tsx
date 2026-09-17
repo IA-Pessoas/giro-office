@@ -19,11 +19,14 @@ import type {
   TriageDocumentField,
   TriageDocumentItemNotes,
   TriageDocumentStatus,
+  TriageFiscalChecklistField,
+  TriageDeliveryMethod,
+  TriageRoutineType,
 } from "../types";
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilStateBox } from "./ContabilStateBox";
 
-const DOCUMENTS = [
+const CONTABIL_DOCUMENTS = [
   ["financial_transactions", "Movimentações financeiras"],
   ["triaged_transactions", "Movimentações triadas"],
   ["inventory_control", "Controle de estoque"],
@@ -35,10 +38,26 @@ const DOCUMENTS = [
   ["bank_investments", "Investimentos bancários"],
   ["card_sales_report", "Relatório de vendas de cartão"],
 ] as const;
+const FISCAL_DOCUMENTS = [
+  ["inbound_report", "Relatório de entradas"],
+  ["outbound_report", "Relatório de saídas"],
+  ["nfse_provided", "NFSe prestados"],
+  ["nfse_received", "NFSe recebidos"],
+  ["cte_documents", "Documentos CTe"],
+  ["mei_documents", "Documentos MEI"],
+  ["nfce_documents", "Documentos NFCe"],
+  ["sped_fiscal", "SPED Fiscal"],
+  ["sped_contributions", "SPED Contribuições"],
+  ["nfce_received", "NFCe recebidos"],
+  ["model_21_invoice", "Nota fiscal modelo 21"],
+  ["cte_as_issuer", "CTe como emitente"],
+  ["services_provided_as_mei", "Serviços prestados como MEI"],
+] as const;
 const STATUSES: Array<[TriageDocumentStatus, string]> = [
   ["PENDING", "Pendente"],
   ["COMPLETED", "Concluído"],
   ["ATTENTION", "Atenção"],
+  ["UNDER_REVIEW", "Em revisão"],
   ["NOT_PRESENT", "Não recebido"],
   ["NOT_APPLICABLE", "Não aplicável"],
 ];
@@ -50,13 +69,15 @@ const CLOSING_STATUSES: Array<[TriageClosingStatus, string]> = [
   ["REOPENED", "Reaberto"],
 ];
 
-type TriageDocumentDraft = Record<TriageDocumentField, { note: string; justification: string }>;
+type TriageDocumentFieldValue = TriageDocumentField | TriageFiscalChecklistField;
+type TriageDocumentDraft = Record<string, { note: string; justification: string }>;
 
 function buildDocumentDrafts(
-  notes: Partial<Record<TriageDocumentField, TriageDocumentItemNotes>> | undefined,
+  notes: Record<string, TriageDocumentItemNotes> | undefined,
+  documents: readonly (readonly [string, string])[],
 ): TriageDocumentDraft {
   return Object.fromEntries(
-    DOCUMENTS.map(([field]) => [
+    documents.map(([field]) => [
       field,
       {
         note: notes?.[field]?.note ?? "",
@@ -70,32 +91,46 @@ export function TriageDocumentsSection({
   clientId,
   canEdit,
   canEditClosing,
+  documentType = "CONTABIL",
 }: {
   clientId: string;
   canEdit: boolean;
   canEditClosing: boolean;
+  documentType?: TriageRoutineType;
 }) {
+  const documents = documentType === "FISCAL" ? FISCAL_DOCUMENTS : CONTABIL_DOCUMENTS;
+  const titleId = documentType === "FISCAL"
+    ? "triage-fiscal-documents-title"
+    : "triage-contabil-documents-title";
   const [competence, setCompetence] = useState<ContabilCompetence>(
     getCurrentContabilCompetence(),
   );
   const [bankId, setBankId] = useState("");
+  const [billingAmount, setBillingAmount] = useState("");
   const [documentDrafts, setDocumentDrafts] = useState<TriageDocumentDraft>(() =>
-    buildDocumentDrafts(undefined),
+    buildDocumentDrafts(undefined, documents),
   );
-  const monthly = useTriageMonthly(clientId, competence);
-  const mutations = useTriageMutations(clientId, competence);
-  const statements = useTriageStatements(clientId, competence);
-  const closing = useTriageClosing(clientId, competence);
+  const monthly = useTriageMonthly(clientId, competence, documentType);
+  const mutations = useTriageMutations(clientId, competence, documentType);
+  const statements = useTriageStatements(clientId, competence, documentType);
+  const closing = useTriageClosing(clientId, competence, documentType);
   const record = monthly.data;
+  const mutationError =
+    mutations.create.error ??
+    mutations.item.error ??
+    mutations.all.error ??
+    mutations.statement.error ??
+    mutations.closing.error;
 
   useEffect(() => {
     if (record) {
-      setDocumentDrafts(buildDocumentDrafts(record.item_notes));
+      setDocumentDrafts(buildDocumentDrafts(record.item_notes, documents));
+      setBillingAmount(record.billing_amount ?? "");
     }
   }, [record]);
 
   function updateDocumentDraft(
-    field: TriageDocumentField,
+    field: TriageDocumentFieldValue,
     key: "note" | "justification",
     value: string,
   ) {
@@ -123,24 +158,29 @@ export function TriageDocumentsSection({
     );
 
   return (
-    <section className="space-y-5" aria-labelledby="triage-documents-title">
+    <section className="space-y-5" aria-labelledby={titleId}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2
-            id="triage-documents-title"
+            id={titleId}
             className="text-lg font-semibold text-gray-900 dark:text-white"
           >
-            Pendências documentais
+            {documentType === "FISCAL" ? "Pendências fiscais" : "Pendências documentais"}
           </h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
-            Dez documentos por competência. Itens não aplicáveis não entram no
-            indicador.
+            {documentType === "FISCAL"
+              ? "Quatorze campos fiscais legados por competência; a obrigatoriedade vem do snapshot."
+              : "Dez documentos por competência. Itens não aplicáveis não entram no indicador."}
           </p>
         </div>
         <label className="text-sm font-medium text-gray-700 dark:text-slate-300">
           Competência
           <input
-            aria-label="Competência documental"
+            aria-label={
+              documentType === "FISCAL"
+                ? "Competência fiscal"
+                : "Competência documental"
+            }
             type="month"
             value={competence}
             onChange={(event) =>
@@ -150,38 +190,49 @@ export function TriageDocumentsSection({
           />
         </label>
       </div>
-      <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
-        <h3 className="font-semibold text-gray-900 dark:text-white">
-          Fechamento recebido
-        </h3>
-        <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
-          Estado independente das pendências documentais e do checklist mensal.
+      {mutationError ? (
+        <p
+          role="alert"
+          aria-live="assertive"
+          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200"
+        >
+          {getContabilErrorMessage(mutationError)}
         </p>
-        {canEditClosing ? (
-          <select
-            aria-label="Estado do fechamento recebido"
-            value={closing.data?.status ?? "NOT_RECEIVED"}
-            disabled={closing.isLoading || mutations.closing.isPending}
-            onChange={(event) =>
-              mutations.closing.mutate({
-                status: event.target.value as TriageClosingStatus,
-              })
-            }
-            className="mt-3 rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
-          >
-            {CLOSING_STATUSES.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <p className="mt-3 text-sm text-gray-700 dark:text-slate-300">
-            {CLOSING_STATUSES.find(([value]) => value === closing.data?.status)?.[1] ??
-              "Não recebido"}
+      ) : null}
+      {documentType === "CONTABIL" ? (
+        <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
+          <h3 className="font-semibold text-gray-900 dark:text-white">
+            Fechamento recebido
+          </h3>
+          <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
+            Estado independente das pendências documentais e do checklist mensal.
           </p>
-        )}
-      </div>
+          {canEditClosing ? (
+            <select
+              aria-label="Estado do fechamento recebido"
+              value={closing.data?.status ?? "NOT_RECEIVED"}
+              disabled={closing.isLoading || mutations.closing.isPending}
+              onChange={(event) =>
+                mutations.closing.mutate({
+                  status: event.target.value as TriageClosingStatus,
+                })
+              }
+              className="mt-3 rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
+            >
+              {CLOSING_STATUSES.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="mt-3 text-sm text-gray-700 dark:text-slate-300">
+              {CLOSING_STATUSES.find(([value]) => value === closing.data?.status)?.[1] ??
+                "Não recebido"}
+            </p>
+          )}
+        </div>
+      ) : null}
       {!record ? (
         <ContabilStateBox
           icon={FileText}
@@ -198,7 +249,7 @@ export function TriageDocumentsSection({
               Iniciar pendências
             </button>
           ) : (
-            "Um editor contábil ou responsável de triagem pode iniciar a competência."
+            "Um editor da rotina ou responsável de triagem pode iniciar a competência."
           )}
         </ContabilStateBox>
       ) : (
@@ -208,6 +259,39 @@ export function TriageDocumentsSection({
             {record.summary.completed}/{record.summary.applicable} aplicáveis ·{" "}
             {record.summary.attention} em atenção
           </div>
+          {documentType === "FISCAL" ? (
+            <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+                Faturamento
+                <div className="mt-2 flex gap-2">
+                  <input
+                    aria-label="Faturamento fiscal"
+                    value={billingAmount}
+                    onChange={(event) => setBillingAmount(event.target.value)}
+                    maxLength={2000}
+                    disabled={!canEdit}
+                    className="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
+                  />
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        mutations.item.mutate({
+                          id: record.id,
+                          field: "billing_amount",
+                          value: billingAmount || null,
+                        })
+                      }
+                      disabled={mutations.item.isPending}
+                      className="rounded-lg border border-blue-200 px-3 text-sm font-semibold text-blue-700 disabled:opacity-60 dark:border-blue-800 dark:text-blue-200"
+                    >
+                      Salvar faturamento
+                    </button>
+                  ) : null}
+                </div>
+              </label>
+            </div>
+          ) : null}
           {canEdit ? (
             <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300">
               Marcar todos os itens abertos como
@@ -231,13 +315,21 @@ export function TriageDocumentsSection({
             </label>
           ) : null}
           <div className="divide-y overflow-hidden rounded-xl border border-gray-200 dark:divide-slate-800 dark:border-slate-700">
-            {DOCUMENTS.map(([field, label]) => (
+            {documents.map(([field, label]) => (
               <div
                 key={field}
                 className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <span className="font-medium text-gray-900 dark:text-white">
                   {label}
+                  {documentType === "FISCAL" ? (
+                    <span className="ml-2 text-xs font-normal text-gray-500 dark:text-slate-400">
+                      {record.item_notes[field]?.required ? "Obrigatório" : "Opcional"}
+                      {record.item_notes[field]?.priority
+                        ? ` · prioridade ${record.item_notes[field].priority.toLowerCase()}`
+                        : ""}
+                    </span>
+                  ) : null}
                 </span>
                 <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
                   {canEdit ? (
@@ -251,6 +343,7 @@ export function TriageDocumentsSection({
                           status: event.target.value as TriageDocumentStatus,
                           note: documentDrafts[field].note || null,
                           justification: documentDrafts[field].justification || null,
+                          delivery_method: record.item_notes[field]?.delivery_method ?? null,
                         })
                       }
                       className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
@@ -294,6 +387,29 @@ export function TriageDocumentsSection({
                           className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
                         />
                       </label>
+                      {documentType === "FISCAL" ? (
+                        <label className="text-xs text-gray-600 dark:text-slate-300 sm:col-span-2">
+                          Método de entrega
+                          <select
+                            aria-label={`${label} Método de entrega`}
+                            value={record.item_notes[field]?.delivery_method ?? ""}
+                            onChange={(event) =>
+                              mutations.item.mutate({
+                                id: record.id,
+                                field,
+                                status: record.checklist[field],
+                                delivery_method: (event.target.value || null) as TriageDeliveryMethod | null,
+                              })
+                            }
+                            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
+                          >
+                            <option value="">Não definido</option>
+                            <option value="EMAIL">E-mail</option>
+                            <option value="PORTAL">Portal</option>
+                            <option value="WHATSAPP">WhatsApp</option>
+                          </select>
+                        </label>
+                      ) : null}
                       <button
                         type="button"
                         aria-label={`Salvar observações de ${label}`}
@@ -304,6 +420,7 @@ export function TriageDocumentsSection({
                             status: record.checklist[field],
                             note: documentDrafts[field].note || null,
                             justification: documentDrafts[field].justification || null,
+                            delivery_method: record.item_notes[field]?.delivery_method ?? null,
                           })
                         }
                         disabled={mutations.item.isPending}
@@ -320,61 +437,66 @@ export function TriageDocumentsSection({
                       {record.item_notes[field]?.justification ? (
                         <p>Justificativa: {record.item_notes[field].justification}</p>
                       ) : null}
+                      {record.item_notes[field]?.delivery_method ? (
+                        <p>Método: {record.item_notes[field].delivery_method}</p>
+                      ) : null}
                     </div>
                   )}
                 </div>
               </div>
             ))}
           </div>
-          <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
-            <h3 className="font-semibold text-gray-900 dark:text-white">
-              Extratos por banco
-            </h3>
-            <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
-              Registre somente um identificador operacional do banco; dados de
-              conta não são solicitados.
-            </p>
-            {canEdit ? (
-              <div className="mt-3 flex gap-2">
-                <input
-                  aria-label="Identificador do banco"
-                  value={bankId}
-                  onChange={(event) => setBankId(event.target.value)}
-                  placeholder="Ex.: 341"
-                  className="h-10 min-w-0 rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
-                />
-                <button
-                  type="button"
-                  disabled={!bankId.trim() || mutations.statement.isPending}
-                  onClick={() =>
-                    mutations.statement.mutate(
-                      {
-                        clientId,
-                        competence,
-                        bankId: bankId.trim(),
-                        status: "PENDING",
-                      },
-                      { onSuccess: () => setBankId("") },
-                    )
-                  }
-                  className="rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  Adicionar
-                </button>
-              </div>
-            ) : null}
-            <ul className="mt-3 space-y-1 text-sm text-gray-700 dark:text-slate-300">
-              {(statements.data ?? []).map((statement) => (
-                <li key={statement.id}>
-                  Banco {statement.bank_id}:{" "}
-                  {STATUSES.find(([value]) => value === statement.status)?.[1]}
-                </li>
-              ))}
-              {!statements.isLoading && (statements.data ?? []).length === 0 ? (
-                <li>Nenhum marcador registrado.</li>
+          {documentType === "CONTABIL" ? (
+            <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
+              <h3 className="font-semibold text-gray-900 dark:text-white">
+                Extratos por banco
+              </h3>
+              <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
+                Registre somente um identificador operacional do banco; dados de
+                conta não são solicitados.
+              </p>
+              {canEdit ? (
+                <div className="mt-3 flex gap-2">
+                  <input
+                    aria-label="Identificador do banco"
+                    value={bankId}
+                    onChange={(event) => setBankId(event.target.value)}
+                    placeholder="Ex.: 341"
+                    className="h-10 min-w-0 rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
+                  />
+                  <button
+                    type="button"
+                    disabled={!bankId.trim() || mutations.statement.isPending}
+                    onClick={() =>
+                      mutations.statement.mutate(
+                        {
+                          clientId,
+                          competence,
+                          bankId: bankId.trim(),
+                          status: "PENDING",
+                        },
+                        { onSuccess: () => setBankId("") },
+                      )
+                    }
+                    className="rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    Adicionar
+                  </button>
+                </div>
               ) : null}
-            </ul>
-          </div>
+              <ul className="mt-3 space-y-1 text-sm text-gray-700 dark:text-slate-300">
+                {(statements.data ?? []).map((statement) => (
+                  <li key={statement.id}>
+                    Banco {statement.bank_id}:{" "}
+                    {STATUSES.find(([value]) => value === statement.status)?.[1]}
+                  </li>
+                ))}
+                {!statements.isLoading && (statements.data ?? []).length === 0 ? (
+                  <li>Nenhum marcador registrado.</li>
+                ) : null}
+              </ul>
+              </div>
+          ) : null}
         </>
       )}
     </section>
