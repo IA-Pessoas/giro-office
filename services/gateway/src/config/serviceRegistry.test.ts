@@ -50,7 +50,14 @@ describe("triagem gateway registry", () => {
       targetUrl: "http://triagem-service:3046",
       internalServiceToken: "gateway-triagem-token",
       permissionModule: "triagem",
-      routePrefixes: ["/triagem/competencies"],
+      routePrefixes: ["/triagem/competencies", "/triagem/external-links"],
+    });
+    expect(resolveGatewayService(env, "/triagem/external-links", "POST")).toMatchObject({
+      key: "triagem-service",
+      targetUrl: "http://triagem-service:3046",
+      internalServiceToken: "gateway-triagem-token",
+      permissionModule: "triagem",
+      routePrefixes: ["/triagem/competencies", "/triagem/external-links"],
     });
     expect(resolveGatewayService(env, "/triagem/closing", "PUT")).toMatchObject({
       key: "triagem-legacy-service",

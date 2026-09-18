@@ -235,6 +235,8 @@ const state = {
   auditRequestId: "",
   contabilControlId: "",
   contabilControlCompetence: "",
+  triagemExternalLinkId: "",
+  triagemExternalLinkCompetence: "",
   contabilResponsibleId: "",
   contabilRelationshipId: "",
   pessoalLddId: "",
@@ -4345,6 +4347,54 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/triagem/competencies/${requireState("triagemCompetenceId")}/archive`,
+    });
+  },
+
+  async triagemExternalLinkList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: state.triagemExternalLinkCompetence ?? "2026-09",
+      },
+    });
+  },
+
+  async triagemExternalLinkCreate(op) {
+    const competence = "2026-09";
+    state.triagemExternalLinkCompetence = competence;
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence,
+        type: "DRIVE",
+        url: "https://drive.example.test/triagem-smoke",
+        description: "Link externo criado pelo smoke",
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemExternalLinkId = id;
+  },
+
+  async triagemExternalLinkUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/external-links/${requireState("triagemExternalLinkId")}`,
+      json: {
+        type: "CLOUD",
+        url: "https://cloud.example.test/triagem-smoke",
+        description: "Link externo atualizado pelo smoke",
+      },
+    });
+  },
+
+  async triagemExternalLinkArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/external-links/${requireState("triagemExternalLinkId")}/archive`,
     });
   },
 

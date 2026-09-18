@@ -68,4 +68,52 @@ describe("proxy público do triagem-service", () => {
       await stopServer(upstream);
     }
   });
+
+  it("encaminha links externos ao serviço novo", async () => {
+    const upstreamRequests: Array<{ url: string }> = [];
+    const upstream = createServer((request, response) => {
+      upstreamRequests.push({ url: request.url ?? "" });
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ success: true, data: [] }));
+    });
+    const triagemServiceUrl = await startServer(upstream);
+    const app = createApp(
+      createTestEnv({ triagemServiceUrl, bearerAuthCompatibility: true }),
+      createTestLogger(),
+    );
+    const gateway = createServer(app);
+    const gatewayUrl = await startServer(gateway);
+    const session = jwt.sign(
+      {
+        user_id: "triagem-user",
+        organization_id: "triagem-org",
+        permission: 2,
+        type: "admin",
+        modules: { triagem: 2 },
+      },
+      "test-secret",
+    );
+
+    try {
+      const response = await fetch(`${gatewayUrl}/triagem/external-links`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${session}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          client_id: "11111111-1111-4111-8111-111111111111",
+          competence: "2026-09",
+          type: "DRIVE",
+          url: "https://drive.example.test/triagem",
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(upstreamRequests).toEqual([{ url: "/triagem/external-links" }]);
+    } finally {
+      await stopServer(gateway);
+      await stopServer(upstream);
+    }
+  });
 });

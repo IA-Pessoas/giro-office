@@ -40,6 +40,7 @@ describe("matriz de regressão das políticas modulares", () => {
       ["GET", "/triagem/monthly"],
       ["GET", "/triagem/statements"],
       ["GET", "/triagem/closing"],
+      ["GET", "/triagem/external-links"],
     ] as const;
     const contabilWriteRoutes = [
       ["POST", "/contabil/controls"],
@@ -53,6 +54,9 @@ describe("matriz de regressão das políticas modulares", () => {
       ["PUT", "/triagem/statements"],
       ["DELETE", "/triagem/statements"],
       ["PUT", "/triagem/closing"],
+      ["POST", "/triagem/external-links"],
+      ["PUT", "/triagem/external-links/link-1"],
+      ["PATCH", "/triagem/external-links/link-1/archive"],
     ] as const;
 
     for (const [method, path] of readRoutes) {

@@ -43,6 +43,38 @@ export const operations = [
     target: "gateway",
     auth: "bearer",
   },
+  {
+    service: "triagem-service",
+    method: "GET",
+    path: "/triagem/external-links",
+    action: "triagemExternalLinkList",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "triagem-service",
+    method: "POST",
+    path: "/triagem/external-links",
+    action: "triagemExternalLinkCreate",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "triagem-service",
+    method: "PUT",
+    path: "/triagem/external-links/{id}",
+    action: "triagemExternalLinkUpdate",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "triagem-service",
+    method: "PATCH",
+    path: "/triagem/external-links/{id}/archive",
+    action: "triagemExternalLinkArchive",
+    target: "gateway",
+    auth: "bearer",
+  },
 ];
 
 export const routePlaceholders = [];

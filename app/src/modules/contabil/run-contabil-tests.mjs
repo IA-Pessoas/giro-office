@@ -168,6 +168,19 @@ await (async () => {
     assert.match(source, /window\.confirm/);
   });
 
+  await runTest("triagem apresenta links externos por competência", () => {
+    const source = readWorkspaceSource("../triagem/components/TriageExternalLinksSection.tsx");
+    const competenceSource = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");
+
+    assert.match(competenceSource, /TriageExternalLinksSection/);
+    assert.match(source, /https:\/\//);
+    assert.match(source, /DRIVE/);
+    assert.match(source, /CLOUD/);
+    assert.match(source, /responsible_id/);
+    assert.match(source, /Arquivar/);
+    assert.match(source, /window\.confirm/);
+  });
+
   await runTest("triagem apresenta dez documentos com nota, justificativa e banco sem dados de conta", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
 
@@ -220,6 +233,11 @@ await (async () => {
   await runTest("triagem bancária integra o smoke de navegador à suíte do app", () => {
     const packageJson = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
     assert.match(packageJson.scripts.test, /test:triagem-bank-statements-browser/);
+  });
+
+  await runTest("triagem de links externos integra o smoke de navegador à suíte do app", () => {
+    const packageJson = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
+    assert.match(packageJson.scripts.test, /test:triagem-external-links-browser/);
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {
