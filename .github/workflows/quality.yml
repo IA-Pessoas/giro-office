@@ -1,0 +1,63 @@
+name: Quality
+
+# Substitui os seis workflows *-cicd.yml removidos em 2026-09-18, que estavam
+# 100% comentados desde 2026-06-01 e falhavam na validacao a cada push.
+# Este gate cobre so qualidade de codigo; o deploy continua manual
+# (`pnpm deploy:production`, ver docs/production-deploy.md).
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: quality/gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # Placeholder: `prisma generate` roda no typecheck e exige a variavel,
+      # mas nenhum gate abre conexao com o banco.
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/giro_ci
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          test "$(corepack pnpm --version)" = "10.26.0"
+
+      - name: Install frozen dependencies without lifecycle scripts
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Lint and format
+        run: corepack pnpm check
+
+      - name: Typecheck
+        run: corepack pnpm typecheck
+
+      - name: Test
+        run: corepack pnpm test
+
+      - name: Harness and compose gates
+        run: |
+          corepack pnpm harness:test
+          corepack pnpm security:compose
