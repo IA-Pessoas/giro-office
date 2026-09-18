@@ -22,6 +22,14 @@ export const operations = [
   {
     service: "triagem-service",
     method: "GET",
+    path: "/triagem/overview",
+    action: "triagemOverviewList",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "triagem-service",
+    method: "GET",
     path: "/triagem/competencies",
     action: "triagemCompetenceList",
     target: "gateway",

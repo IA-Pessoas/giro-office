@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "../generated/prisma/client.js";
 import { TriageCatalogService } from "../services/triageCatalogService.js";
 import { TriageCompetenceService } from "../services/triageCompetenceService.js";
+import { TriageOverviewService } from "../services/triageOverviewService.js";
 
 const runIntegration = process.env.TRIAGEM_POSTGRES_INTEGRATION === "1";
 const integrationDescribe = runIntegration ? describe : describe.skip;
@@ -34,6 +35,7 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
   let fixtureB: OrganizationFixture;
   let service: TriageCompetenceService;
   let catalogService: TriageCatalogService;
+  let overviewService: TriageOverviewService;
 
   async function createFixture(label: string): Promise<OrganizationFixture> {
     const stamp = `${Date.now()}-${randomUUID().slice(0, 8)}`;
@@ -135,6 +137,7 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
     fixtureB = await createFixture("Beta");
     service = new TriageCompetenceService(runtimePrisma);
     catalogService = new TriageCatalogService(runtimePrisma);
+    overviewService = new TriageOverviewService(runtimePrisma);
   });
 
   afterAll(async () => {
@@ -147,6 +150,15 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
         continue;
       }
       await adminPrisma.triageOutboxEvent.deleteMany({
+        where: { organization_id: fixture.organizationId },
+      });
+      await adminPrisma.triageUrgentRequest.deleteMany({
+        where: { organization_id: fixture.organizationId },
+      });
+      await adminPrisma.triageMonthly.deleteMany({
+        where: { organization_id: fixture.organizationId },
+      });
+      await adminPrisma.triageBankStatement.deleteMany({
         where: { organization_id: fixture.organizationId },
       });
       await adminPrisma.triageCompetenceCatalogSnapshot.deleteMany({
@@ -241,6 +253,77 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
         `,
       ),
     ).rejects.toThrow(/row-level security|permission denied/u);
+  });
+
+  it("deriva precedência, paginação e reabertura nas tabelas PostgreSQL", async () => {
+    const monthly = await adminPrisma.triageMonthly.create({
+      data: {
+        client_id: fixtureA.clientId,
+        competence: "2026-09",
+        type: "CONTABIL",
+        checklist: { item: "PENDING" },
+        organization_id: fixtureA.organizationId,
+      },
+    });
+    const bank = await adminPrisma.triageBankStatement.create({
+      data: {
+        client_id: fixtureA.clientId,
+        competence: "2026-09",
+        bank_id: `bank-${randomUUID()}`,
+        status: "PENDING",
+        organization_id: fixtureA.organizationId,
+      },
+    });
+    const urgent = await adminPrisma.triageUrgentRequest.create({
+      data: {
+        organization_id: fixtureA.organizationId,
+        client_id: fixtureA.clientId,
+        competence: "2026-09",
+        requester_id: fixtureA.userId,
+        responsible_id: fixtureA.userId,
+        urgency_code: "HIGH",
+        description: "Integração PostgreSQL",
+        dedupe_key: `overview-${randomUUID()}`,
+      },
+    });
+
+    const authA = auth(fixtureA);
+    await expect(overviewService.list({ page: 1, pageSize: 1 }, authA)).resolves.toMatchObject({
+      total: 1,
+      items: [expect.objectContaining({ status: "URGENT_OPEN" })],
+      indicators: { urgent_open: 1, routine_pending: 0, bank_pending: 0, complete: 0 },
+    });
+
+    await adminPrisma.triageUrgentRequest.update({
+      where: { id: urgent.id },
+      data: { status: "CLOSED" },
+    });
+    await expect(overviewService.list({ page: 1, pageSize: 1 }, authA)).resolves.toMatchObject({
+      items: [expect.objectContaining({ status: "ROUTINE_PENDING" })],
+    });
+
+    await adminPrisma.triageMonthly.update({
+      where: { id: monthly.id },
+      data: { checklist: { item: "COMPLETED" } },
+    });
+    await expect(overviewService.list({ page: 1, pageSize: 1 }, authA)).resolves.toMatchObject({
+      items: [expect.objectContaining({ status: "BANK_PENDING" })],
+    });
+
+    await adminPrisma.triageBankStatement.update({
+      where: { id: bank.id },
+      data: { status: "COMPLETED" },
+    });
+    await expect(overviewService.list({ page: 1, pageSize: 1 }, authA)).resolves.toMatchObject({
+      items: [expect.objectContaining({ status: "COMPLETE" })],
+    });
+
+    await service.create({ client_id: fixtureA.clientId, competence: "2026-08" }, authA);
+    await expect(overviewService.list({ page: 1, pageSize: 1 }, authA)).resolves.toMatchObject({
+      total: 2,
+      page_size: 1,
+      items: [expect.objectContaining({ competence: "2026-09" })],
+    });
   });
 
   it("isola catálogos por organização e congela os valores da competência", async () => {

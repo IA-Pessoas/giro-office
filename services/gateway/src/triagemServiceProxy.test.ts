@@ -116,4 +116,42 @@ describe("proxy público do triagem-service", () => {
       await stopServer(upstream);
     }
   });
+
+  it("encaminha o painel operacional ao triagem-service", async () => {
+    const upstreamRequests: Array<{ url: string }> = [];
+    const upstream = createServer((request, response) => {
+      upstreamRequests.push({ url: request.url ?? "" });
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ success: true, data: { items: [] } }));
+    });
+    const triagemServiceUrl = await startServer(upstream);
+    const app = createApp(
+      createTestEnv({ triagemServiceUrl, bearerAuthCompatibility: true }),
+      createTestLogger(),
+    );
+    const gateway = createServer(app);
+    const gatewayUrl = await startServer(gateway);
+    const session = jwt.sign(
+      {
+        user_id: "triagem-user",
+        organization_id: "triagem-org",
+        permission: 2,
+        type: "admin",
+        modules: { triagem: 2 },
+      },
+      "test-secret",
+    );
+
+    try {
+      const response = await fetch(`${gatewayUrl}/triagem/overview?page=1&page_size=20`, {
+        headers: { authorization: `Bearer ${session}` },
+      });
+
+      expect(response.status).toBe(200);
+      expect(upstreamRequests).toEqual([{ url: "/triagem/overview?page=1&page_size=20" }]);
+    } finally {
+      await stopServer(gateway);
+      await stopServer(upstream);
+    }
+  });
 });

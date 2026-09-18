@@ -145,6 +145,31 @@ const urgentRequest = {
   },
 } as const;
 
+const overviewItem = {
+  type: "object",
+  required: ["client_id", "legal_name", "competence", "status"],
+  properties: {
+    client_id: { type: "string", format: "uuid" },
+    legal_name: { type: "string" },
+    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+    status: {
+      type: "string",
+      enum: ["URGENT_OPEN", "ROUTINE_PENDING", "BANK_PENDING", "COMPLETE"],
+    },
+  },
+} as const;
+
+const overviewIndicators = {
+  type: "object",
+  required: ["urgent_open", "routine_pending", "bank_pending", "complete"],
+  properties: {
+    urgent_open: { type: "integer", minimum: 0 },
+    routine_pending: { type: "integer", minimum: 0 },
+    bank_pending: { type: "integer", minimum: 0 },
+    complete: { type: "integer", minimum: 0 },
+  },
+} as const;
+
 export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiDocument {
   return {
     openapi: "3.0.3",
@@ -160,6 +185,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
       { name: "Catalogs", description: "Catálogos operacionais da Triagem" },
       { name: "ExternalLinks", description: "Links externos por competência" },
       { name: "UrgentRequests", description: "Solicitações urgentes por competência" },
+      { name: "Overview", description: "Painel operacional consolidado" },
     ],
     paths: {
       "/health": {
@@ -183,6 +209,57 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
               description: "Ready",
               ...successEnvelope({ type: "object", additionalProperties: true }),
             },
+          },
+        },
+      },
+      "/triagem/overview": {
+        get: {
+          tags: ["Overview"],
+          summary: "Listar o painel operacional consolidado",
+          security: bearer,
+          parameters: [
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "page_size",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+            { name: "client_id", in: "query", schema: { type: "string", format: "uuid" } },
+            {
+              name: "competence",
+              in: "query",
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+            {
+              name: "status",
+              in: "query",
+              schema: {
+                type: "string",
+                enum: ["URGENT_OPEN", "ROUTINE_PENDING", "BANK_PENDING", "COMPLETE"],
+              },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Painel consolidado",
+              ...successEnvelope({
+                type: "object",
+                required: ["items", "total", "page", "page_size", "indicators"],
+                properties: {
+                  items: {
+                    type: "array",
+                    items: { $ref: "#/components/schemas/TriageOverviewItem" },
+                  },
+                  total: { type: "integer", minimum: 0 },
+                  page: { type: "integer", minimum: 1 },
+                  page_size: { type: "integer", minimum: 1, maximum: 100 },
+                  indicators: { $ref: "#/components/schemas/TriageOverviewIndicators" },
+                },
+              }),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "400": { description: "Entrada inválida" },
           },
         },
       },
@@ -708,6 +785,8 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
         TriageCatalogItem: catalogItem,
         TriageExternalLink: externalLink,
         TriageUrgentRequest: urgentRequest,
+        TriageOverviewItem: overviewItem,
+        TriageOverviewIndicators: overviewIndicators,
       },
     },
   };

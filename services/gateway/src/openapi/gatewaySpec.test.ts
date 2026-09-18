@@ -55,6 +55,7 @@ it("agrega o catálogo público do reports-service", () => {
   );
   expect(spec.paths["/triagem/catalogs"]?.get?.["x-origin-service"]).toBe("triagem-service");
   expect(spec.paths["/triagem/external-links"]?.post?.["x-origin-service"]).toBe("triagem-service");
+  expect(spec.paths["/triagem/overview"]?.get?.["x-origin-service"]).toBe("triagem-service");
   expect(spec.paths["/internal/reporting/access-context"]).toBeUndefined();
   expect(
     spec.paths["/platform/organizations/{organizationId}/users/{userId}/permissions"]?.get

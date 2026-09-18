@@ -19,3 +19,11 @@ export type {
   TriageCatalogItem,
   TriageCatalogKind,
 } from "./triagemCatalogService";
+export { triagemOverviewService } from "./triagemOverviewService";
+export type {
+  TriageOverview,
+  TriageOverviewFilters,
+  TriageOverviewIndicators,
+  TriageOverviewItem,
+  TriageOverviewStatus,
+} from "./triagemOverviewService";
