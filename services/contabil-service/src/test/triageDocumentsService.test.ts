@@ -459,7 +459,7 @@ describe("TriageDocumentsService", () => {
       },
     });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(3);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(4);
   });
 
   it("rejeita observações acima do limite antes de tocar no banco", async () => {

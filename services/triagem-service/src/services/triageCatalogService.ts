@@ -144,6 +144,10 @@ function assertCatalogValues(input: {
   }
 }
 
+function catalogItemLockKey(organizationId: string, kind: string, code: string): string {
+  return `triage.catalog.item:${organizationId}:${kind}:${code}`;
+}
+
 export class TriageCatalogService {
   constructor(private readonly prisma: TriageCatalogPrisma) {}
 
@@ -255,8 +259,21 @@ export class TriageCatalogService {
       if (!existing) {
         throw new ServiceError(404, "Item de catálogo não encontrado.");
       }
-      if (existing.archived_at) {
-        return existing;
+
+      await transaction.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(${catalogItemLockKey(auth.organizationId, existing.kind, existing.code)}, 0)
+        )
+      `;
+      const locked = await transaction.triageCatalogItem.findFirst({
+        where: { id, organization_id: auth.organizationId },
+        select: catalogItemSelect,
+      });
+      if (!locked) {
+        throw new ServiceError(404, "Item de catálogo não encontrado.");
+      }
+      if (locked.archived_at) {
+        return locked;
       }
 
       return transaction.triageCatalogItem.update({

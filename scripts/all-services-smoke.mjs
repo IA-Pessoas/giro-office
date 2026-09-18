@@ -4546,11 +4546,12 @@ const handlers = {
   },
 
   async triagemCatalogCreate(op) {
+    const code = `SMOKE_LINK_TYPE_${crypto.randomUUID().slice(0, 8)}`;
     const response = await httpRequest(op, {
       expectedStatus: [201],
       json: {
         kind: "LINK_TYPE",
-        code: "SMOKE_LINK_TYPE",
+        code,
         label: "Tipo de link (smoke)",
       },
     });
@@ -4558,7 +4559,7 @@ const handlers = {
 
     const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
     if (id) state.triagemCatalogId = id;
-    state.triagemLinkTypeCode = "SMOKE_LINK_TYPE";
+    state.triagemLinkTypeCode = code;
   },
 
   async triagemCatalogUpdate(op) {

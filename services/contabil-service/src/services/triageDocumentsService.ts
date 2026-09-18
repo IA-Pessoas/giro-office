@@ -784,6 +784,13 @@ export class TriageDocumentsService {
 
     await transaction.$executeRaw`SET LOCAL ROLE "giro_user_runtime"`;
     await transaction.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
+    for (const code of uniqueCodes.sort()) {
+      await transaction.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(${`triage.catalog.item:${organizationId}:${kind}:${code}`}, 0)
+        )
+      `;
+    }
     const activeItems = await transaction.triageCatalogItem.findMany({
       where: {
         organization_id: organizationId,
