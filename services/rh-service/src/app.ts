@@ -6,7 +6,7 @@ import {
   createServiceCorsOptions,
   createSuccessResponse,
 } from "@workspace/shared";
-import { mountOpenApiDocs } from "@workspace/shared/http";
+import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
 import express, { type Request, type Response } from "express";
 import "express-async-errors";
