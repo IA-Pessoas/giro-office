@@ -115,7 +115,9 @@ function toSnapshotDto(record: SnapshotRecord): TriageCatalogSnapshotDto {
   return dto;
 }
 
-function snapshotAsCatalogItem(record: SnapshotRecord): TriageCatalogItemDto {
+type SnapshotLike = Pick<SnapshotRecord, "id" | "kind" | "code" | "label" | "url" | "created_at">;
+
+function snapshotAsCatalogItem(record: SnapshotLike): TriageCatalogItemDto {
   return {
     id: record.id,
     kind: record.kind,
@@ -189,8 +191,17 @@ export class TriageCatalogService {
             orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
             select: snapshotSelect,
           });
-          if (snapshots.length > 0) {
-            return snapshots.map(snapshotAsCatalogItem);
+          let snapshotItems = snapshots.map(snapshotAsCatalogItem);
+          if (snapshotItems.length === 0) {
+            const capturedSnapshots = await this.snapshotForCompetenceInTransaction(
+              transaction,
+              auth.organizationId,
+              competence.id,
+            );
+            snapshotItems = capturedSnapshots.map(snapshotAsCatalogItem);
+          }
+          if (snapshotItems.length > 0) {
+            return snapshotItems;
           }
         }
       }
