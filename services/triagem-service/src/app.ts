@@ -27,12 +27,17 @@ import {
   type TriageExternalLinkRouteDeps,
 } from "./routes/triageExternalLinks.routes.js";
 import {
+  createTriageOverviewRoutes,
+  type TriageOverviewRouteDeps,
+} from "./routes/triageOverview.routes.js";
+import {
   createTriageUrgentRequestRoutes,
   type TriageUrgentRequestRouteDeps,
 } from "./routes/triageUrgentRequest.routes.js";
 import { TriageCatalogService } from "./services/triageCatalogService.js";
 import { TriageCompetenceService } from "./services/triageCompetenceService.js";
 import { TriageExternalLinkService } from "./services/triageExternalLinkService.js";
+import { TriageOverviewService } from "./services/triageOverviewService.js";
 import { TriageUrgentRequestService } from "./services/triageUrgentRequestService.js";
 
 function triagemServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -56,6 +61,7 @@ export interface CreateTriagemAppOptions {
   triageExternalLinkRouteDeps?: TriageExternalLinkRouteDeps;
   triageCatalogRouteDeps?: TriageCatalogRouteDeps;
   triageUrgentRequestRouteDeps?: TriageUrgentRequestRouteDeps;
+  triageOverviewRouteDeps?: TriageOverviewRouteDeps;
 }
 
 export function createTriagemApp({
@@ -66,6 +72,7 @@ export function createTriagemApp({
   triageExternalLinkRouteDeps,
   triageCatalogRouteDeps,
   triageUrgentRequestRouteDeps,
+  triageOverviewRouteDeps,
 }: CreateTriagemAppOptions): express.Express {
   const app = express();
   const catalogService = new TriageCatalogService(prisma);
@@ -77,6 +84,7 @@ export function createTriagemApp({
   );
   const externalLinkService = new TriageExternalLinkService(prisma);
   const urgentRequestService = new TriageUrgentRequestService(prisma);
+  const overviewService = new TriageOverviewService(prisma);
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -114,6 +122,7 @@ export function createTriagemApp({
     "/triagem",
     createTriageUrgentRequestRoutes(triageUrgentRequestRouteDeps ?? urgentRequestService),
   );
+  app.use("/triagem", createTriageOverviewRoutes(triageOverviewRouteDeps ?? overviewService));
   app.use(
     createExpressErrorHandler({
       logger,
