@@ -48,6 +48,9 @@ Exemplos de paths públicos (via gateway, com `Authorization: Bearer …`):
 - `GET|PUT|DELETE http://localhost:3010/triagem/statements`
 - `GET|PUT|DELETE http://localhost:3010/triagem/closing`
 
+As atualizações fiscais de itens também aceitam `justification`, `delivery_method` e `state_site`;
+esses valores são validados no catálogo da organização ou no snapshot da competência.
+
 Infraestrutura direto no serviço: `GET http://localhost:3038/health` e `GET http://localhost:3038/ready`.
 `/internal/reporting/*` é contrato interno direto; não passa pelo gateway.
 

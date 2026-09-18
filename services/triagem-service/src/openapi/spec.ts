@@ -1,6 +1,7 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { TriagemServiceEnv } from "../config/env.js";
+import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "../services/triageCatalog.constants.js";
 
 function successEnvelope(data: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -45,6 +46,21 @@ const competence = {
   },
 } as const;
 
+const catalogItem = {
+  type: "object",
+  required: ["id", "kind", "code", "label", "url", "archived_at", "created_at", "updated_at"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    kind: { type: "string", enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"] },
+    code: { type: "string", minLength: 1, maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH },
+    label: { type: "string", minLength: 1, maxLength: 255 },
+    url: { type: ["string", "null"], format: "uri", pattern: "^https://" },
+    archived_at: { type: ["string", "null"], format: "date-time" },
+    created_at: { type: "string", format: "date-time" },
+    updated_at: { type: "string", format: "date-time" },
+  },
+} as const;
+
 const externalLink = {
   type: "object",
   required: [
@@ -63,7 +79,7 @@ const externalLink = {
     id: { type: "string", format: "uuid" },
     client_id: { type: "string", format: "uuid" },
     competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
-    type: { type: "string", enum: ["CLOUD", "DRIVE"] },
+    type: { type: "string", minLength: 1, maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH },
     url: { type: "string", format: "uri", pattern: "^https://" },
     description: { type: ["string", "null"] },
     responsible_id: { type: "string", format: "uuid" },
@@ -141,6 +157,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
     tags: [
       { name: "Health", description: "Saúde do serviço" },
       { name: "Competencies", description: "Competências mensais da Triagem" },
+      { name: "Catalogs", description: "Catálogos operacionais da Triagem" },
       { name: "ExternalLinks", description: "Links externos por competência" },
       { name: "UrgentRequests", description: "Solicitações urgentes por competência" },
     ],
@@ -242,6 +259,146 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
           },
         },
       },
+      "/triagem/catalogs": {
+        get: {
+          tags: ["Catalogs"],
+          summary: "Listar itens de catálogo",
+          security: bearer,
+          parameters: [
+            {
+              name: "kind",
+              in: "query",
+              schema: {
+                type: "string",
+                enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
+              },
+            },
+            { name: "include_archived", in: "query", schema: { type: "boolean" } },
+            { name: "client_id", in: "query", schema: { type: "string", format: "uuid" } },
+            {
+              name: "competence",
+              in: "query",
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Itens de catálogo",
+              ...successEnvelope({
+                type: "array",
+                items: { $ref: "#/components/schemas/TriageCatalogItem" },
+              }),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+          },
+        },
+        post: {
+          tags: ["Catalogs"],
+          summary: "Criar item de catálogo",
+          security: bearer,
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["kind", "code", "label"],
+                  properties: {
+                    kind: {
+                      type: "string",
+                      enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
+                    },
+                    code: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                    },
+                    label: { type: "string", minLength: 1, maxLength: 255 },
+                    url: { type: "string", format: "uri", pattern: "^https://" },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Criado",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageCatalogItem" }),
+            },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "409": { description: "Código já cadastrado" },
+          },
+        },
+      },
+      "/triagem/catalogs/{id}": {
+        patch: {
+          tags: ["Catalogs"],
+          summary: "Atualizar item de catálogo",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  minProperties: 1,
+                  properties: {
+                    kind: {
+                      type: "string",
+                      enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
+                    },
+                    code: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                    },
+                    label: { type: "string", minLength: 1, maxLength: 255 },
+                    url: { type: ["string", "null"], format: "uri", pattern: "^https://" },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizado",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageCatalogItem" }),
+            },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Item não encontrado" },
+            "409": { description: "Código já cadastrado" },
+          },
+        },
+      },
+      "/triagem/catalogs/{id}/archive": {
+        patch: {
+          tags: ["Catalogs"],
+          summary: "Arquivar item de catálogo",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Arquivado",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageCatalogItem" }),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Item não encontrado" },
+          },
+        },
+      },
       "/triagem/external-links": {
         get: {
           tags: ["ExternalLinks"],
@@ -288,7 +445,11 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                   properties: {
                     client_id: { type: "string", format: "uuid" },
                     competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
-                    type: { type: "string", enum: ["CLOUD", "DRIVE"] },
+                    type: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                    },
                     url: { type: "string", format: "uri", pattern: "^https://" },
                     description: { type: ["string", "null"] },
                     responsible_id: { type: ["string", "null"], format: "uuid" },
@@ -326,7 +487,11 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                   type: "object",
                   required: ["type", "url"],
                   properties: {
-                    type: { type: "string", enum: ["CLOUD", "DRIVE"] },
+                    type: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                    },
                     url: { type: "string", format: "uri", pattern: "^https://" },
                     description: { type: ["string", "null"] },
                     responsible_id: { type: ["string", "null"], format: "uuid" },
@@ -540,6 +705,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
       },
       schemas: {
         TriageCompetence: competence,
+        TriageCatalogItem: catalogItem,
         TriageExternalLink: externalLink,
         TriageUrgentRequest: urgentRequest,
       },

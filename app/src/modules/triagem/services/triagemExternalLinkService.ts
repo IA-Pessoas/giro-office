@@ -1,6 +1,6 @@
 import { setupAPIClient } from "@shared/services/api";
 
-export type TriageExternalLinkType = "CLOUD" | "DRIVE";
+export type TriageExternalLinkType = string;
 
 export type TriageExternalLink = {
   id: string;

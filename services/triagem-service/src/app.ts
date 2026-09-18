@@ -15,6 +15,10 @@ import { createTriagemPrismaClient, type TriagemPrismaClient } from "./integrati
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTriagemServiceOpenApiSpec } from "./openapi/spec.js";
 import {
+  createTriageCatalogRoutes,
+  type TriageCatalogRouteDeps,
+} from "./routes/triageCatalog.routes.js";
+import {
   createTriageCompetenceRoutes,
   type TriageCompetenceRouteDeps,
 } from "./routes/triageCompetence.routes.js";
@@ -26,6 +30,7 @@ import {
   createTriageUrgentRequestRoutes,
   type TriageUrgentRequestRouteDeps,
 } from "./routes/triageUrgentRequest.routes.js";
+import { TriageCatalogService } from "./services/triageCatalogService.js";
 import { TriageCompetenceService } from "./services/triageCompetenceService.js";
 import { TriageExternalLinkService } from "./services/triageExternalLinkService.js";
 import { TriageUrgentRequestService } from "./services/triageUrgentRequestService.js";
@@ -49,6 +54,7 @@ export interface CreateTriagemAppOptions {
   prisma?: TriagemPrismaClient;
   triageCompetenceRouteDeps?: TriageCompetenceRouteDeps;
   triageExternalLinkRouteDeps?: TriageExternalLinkRouteDeps;
+  triageCatalogRouteDeps?: TriageCatalogRouteDeps;
   triageUrgentRequestRouteDeps?: TriageUrgentRequestRouteDeps;
 }
 
@@ -58,10 +64,17 @@ export function createTriagemApp({
   prisma = createTriagemPrismaClient(env.databaseUrl),
   triageCompetenceRouteDeps,
   triageExternalLinkRouteDeps,
+  triageCatalogRouteDeps,
   triageUrgentRequestRouteDeps,
 }: CreateTriagemAppOptions): express.Express {
   const app = express();
-  const competenceService = new TriageCompetenceService(prisma);
+  const catalogService = new TriageCatalogService(prisma);
+  const competenceService = new TriageCompetenceService(
+    prisma,
+    undefined,
+    (transaction, organizationId, competenceId) =>
+      catalogService.snapshotForCompetence(organizationId, competenceId, transaction),
+  );
   const externalLinkService = new TriageExternalLinkService(prisma);
   const urgentRequestService = new TriageUrgentRequestService(prisma);
 
@@ -96,6 +109,7 @@ export function createTriagemApp({
     "/triagem",
     createTriageExternalLinkRoutes(triageExternalLinkRouteDeps ?? externalLinkService),
   );
+  app.use("/triagem", createTriageCatalogRoutes(triageCatalogRouteDeps ?? catalogService));
   app.use(
     "/triagem",
     createTriageUrgentRequestRoutes(triageUrgentRequestRouteDeps ?? urgentRequestService),

@@ -13,7 +13,19 @@ O principal de `DATABASE_URL` deve ser membro de `giro_user_runtime`; cada trans
 
 ## Gateway
 
-O prefixo público será `/triagem`. A ativação do upstream fica controlada pela registry do gateway.
+O prefixo público será `/triagem`. A ativação do upstream fica controlada pela registry do gateway;
+quando habilitado, `TRIAGEM_SERVICE_URL` aponta para o upstream (por exemplo,
+`http://localhost:3046`).
+
+Endpoints públicos principais via gateway:
+
+- `GET|POST /triagem/catalogs`
+- `PATCH /triagem/catalogs/<id>` e `PATCH /triagem/catalogs/<id>/archive`
+- `GET|POST /triagem/external-links`
+
+Os catálogos aceitam `JUSTIFICATION`, `LINK_TYPE`, `DELIVERY_METHOD` e `STATE_SITE`, sempre
+escopados à organização. Competências preservam os valores catalogados em snapshots imutáveis;
+arquivar uma opção impede novos usos fora do snapshot, sem apagar o histórico.
 
 ## Desenvolvimento
 

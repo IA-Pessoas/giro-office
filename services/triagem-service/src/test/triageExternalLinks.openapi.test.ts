@@ -21,8 +21,14 @@ describe("contrato OpenAPI de links externos da Triagem", () => {
     expect(paths["/triagem/external-links/{id}"]?.put).toBeDefined();
     expect(paths["/triagem/external-links/{id}/archive"]?.patch).toBeDefined();
     expect(spec.components?.schemas).toHaveProperty("TriageExternalLink");
-    expect(JSON.stringify(spec)).toContain("https://");
-    expect(JSON.stringify(spec)).toContain("DRIVE");
-    expect(JSON.stringify(spec)).toContain("CLOUD");
+    const externalLinkSchema = spec.components?.schemas?.TriageExternalLink as {
+      properties?: { type?: Record<string, unknown> };
+    };
+    expect(externalLinkSchema.properties?.type).toMatchObject({
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+    });
+    expect(externalLinkSchema.properties?.type).not.toHaveProperty("enum");
   });
 });

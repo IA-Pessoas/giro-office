@@ -1,6 +1,8 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "./triageCatalog.constants.js";
+import { snapshotTriageCatalogForCompetence } from "./triageCatalogService.js";
 
 const externalLinkSelect = {
   id: true,
@@ -23,10 +25,17 @@ type ExternalLinkRecord = Prisma.TriageExternalLinkGetPayload<{
 
 export type TriageExternalLinkPrisma = Pick<
   PrismaClient,
-  "$executeRaw" | "$transaction" | "client" | "user" | "triageExternalLink"
+  | "$executeRaw"
+  | "$transaction"
+  | "client"
+  | "user"
+  | "triageCatalogItem"
+  | "triageCompetence"
+  | "triageCompetenceCatalogSnapshot"
+  | "triageExternalLink"
 >;
 
-export type ExternalLinkType = "CLOUD" | "DRIVE";
+export type ExternalLinkType = string;
 
 export interface TriageExternalLinkAuthContext {
   userId: string;
@@ -92,7 +101,7 @@ function assertCompetence(value: string): void {
 }
 
 function assertLinkValues(input: Pick<UpdateTriageExternalLinkInput, "type" | "url">): void {
-  if (input.type !== "CLOUD" && input.type !== "DRIVE") {
+  if (!input.type.trim() || input.type.length > TRIAGE_CATALOG_CODE_MAX_LENGTH) {
     throw new ServiceError(400, "Tipo de link inválido.");
   }
 
@@ -124,6 +133,14 @@ export class TriageExternalLinkService {
     assertLinkValues(input);
 
     const created = await this.withOrganization(auth, async (transaction) => {
+      await this.assertCatalogItemForCompetence(
+        transaction,
+        "LINK_TYPE",
+        input.type,
+        auth.organizationId,
+        input.client_id,
+        input.competence,
+      );
       await this.assertClient(transaction, input.client_id, auth.organizationId);
       await this.assertResponsible(transaction, input.responsible_id, auth.organizationId);
 
@@ -186,6 +203,14 @@ export class TriageExternalLinkService {
         throw new ServiceError(404, "Link externo não encontrado.");
       }
 
+      await this.assertCatalogItemForCompetence(
+        transaction,
+        "LINK_TYPE",
+        input.type,
+        auth.organizationId,
+        existing.client_id,
+        existing.competence,
+      );
       await this.assertResponsible(transaction, input.responsible_id, auth.organizationId);
 
       return transaction.triageExternalLink.update({
@@ -258,6 +283,50 @@ export class TriageExternalLinkService {
     });
     if (!responsible) {
       throw new ServiceError(404, "Responsável não encontrado na organização ativa.");
+    }
+  }
+
+  private async assertCatalogItemForCompetence(
+    transaction: TriageExternalLinkPrisma,
+    kind: "LINK_TYPE",
+    code: string,
+    organizationId: string,
+    clientId: string,
+    competence: string,
+  ): Promise<void> {
+    const competenceRecord = await transaction.triageCompetence.findFirst({
+      where: {
+        organization_id: organizationId,
+        client_id: clientId,
+        competence,
+      },
+      select: { id: true, catalog_snapshot_initialized_at: true },
+    });
+    if (competenceRecord) {
+      if (competenceRecord.catalog_snapshot_initialized_at === null) {
+        await snapshotTriageCatalogForCompetence(transaction, organizationId, competenceRecord.id);
+      }
+      const snapshot = await transaction.triageCompetenceCatalogSnapshot.findFirst({
+        where: {
+          organization_id: organizationId,
+          competence_id: competenceRecord.id,
+          kind,
+          code,
+        },
+        select: { id: true },
+      });
+      if (!snapshot) {
+        throw new ServiceError(400, "Tipo de link não está disponível no snapshot da competência.");
+      }
+      return;
+    }
+
+    const catalogItem = await transaction.triageCatalogItem.findFirst({
+      where: { organization_id: organizationId, kind, code, archived_at: null },
+      select: { id: true },
+    });
+    if (!catalogItem) {
+      throw new ServiceError(400, "Tipo de link não cadastrado ou arquivado no catálogo ativo.");
     }
   }
 

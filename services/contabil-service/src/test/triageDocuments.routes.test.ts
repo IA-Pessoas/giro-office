@@ -206,7 +206,7 @@ describe("triage document routes", () => {
     );
   });
 
-  it("PATCH /triagem/monthly/:id/item rejeita entrega fiscal desconhecida", async () => {
+  it("PATCH /triagem/monthly/:id/item rejeita método de entrega vazio", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
 
@@ -218,7 +218,7 @@ describe("triage document routes", () => {
         type: "FISCAL",
         field: "nfce_documents",
         status: "ATTENTION",
-        delivery_method: "SMS",
+        delivery_method: "",
       });
 
     expect(res.status).toBe(400);

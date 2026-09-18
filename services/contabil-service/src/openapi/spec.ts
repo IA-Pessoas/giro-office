@@ -2,6 +2,7 @@ import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspa
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ContabilServiceEnv } from "../config/env.js";
+import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "../services/triageDocumentsService.js";
 
 export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
@@ -968,12 +969,19 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                     justification: {
                       type: "string",
                       nullable: true,
-                      maxLength: 2000,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
                     },
                     value: { type: "string", nullable: true, maxLength: 2000 },
                     delivery_method: {
                       type: "string",
-                      enum: ["EMAIL", "PORTAL", "WHATSAPP"],
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                      nullable: true,
+                    },
+                    state_site: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
                       nullable: true,
                     },
                   },

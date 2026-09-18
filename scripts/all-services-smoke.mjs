@@ -248,6 +248,8 @@ const state = {
   contabilControlCompetence: "",
   triagemExternalLinkId: "",
   triagemExternalLinkCompetence: "",
+  triagemCatalogId: "",
+  triagemLinkTypeCode: "",
   triagemUrgentRequestId: "",
   triagemUrgentRequestCompetence: "",
   contabilResponsibleId: "",
@@ -291,6 +293,16 @@ const actionExecutionRank = {
   rhPointAdjustmentApproveBulk: 2924,
   rhPointAdjustmentRetroactive: 2925,
   rhPointRecalculate: 2926,
+  triagemCatalogCreate: 4470,
+  triagemCompetenceList: 4480,
+  triagemCompetenceCreate: 4481,
+  triagemCatalogList: 4482,
+  triagemCatalogUpdate: 4483,
+  triagemExternalLinkList: 4484,
+  triagemExternalLinkCreate: 4485,
+  triagemExternalLinkUpdate: 4486,
+  triagemExternalLinkArchive: 4487,
+  triagemCatalogArchive: 4488,
   projectDelete: 8000,
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
@@ -4528,6 +4540,45 @@ const handlers = {
     });
   },
 
+  async triagemCatalogList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { kind: "LINK_TYPE" },
+    });
+  },
+
+  async triagemCatalogCreate(op) {
+    const code = `SMOKE_LINK_TYPE_${crypto.randomUUID().slice(0, 8)}`;
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        kind: "LINK_TYPE",
+        code,
+        label: "Tipo de link (smoke)",
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemCatalogId = id;
+    state.triagemLinkTypeCode = code;
+  },
+
+  async triagemCatalogUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/catalogs/${requireState("triagemCatalogId")}`,
+      json: { label: "Sem movimento (smoke revisado)" },
+    });
+  },
+
+  async triagemCatalogArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/catalogs/${requireState("triagemCatalogId")}/archive`,
+    });
+  },
+
   async triagemExternalLinkList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -4546,8 +4597,8 @@ const handlers = {
       json: {
         client_id: requireState("primaryClientId"),
         competence,
-        type: "DRIVE",
-        url: "https://drive.example.test/triagem-smoke",
+        type: requireState("triagemLinkTypeCode"),
+        url: "https://links.example.test/triagem-smoke",
         description: "Link externo criado pelo smoke",
       },
     });
@@ -4562,8 +4613,8 @@ const handlers = {
       expectedStatus: [200],
       path: `/triagem/external-links/${requireState("triagemExternalLinkId")}`,
       json: {
-        type: "CLOUD",
-        url: "https://cloud.example.test/triagem-smoke",
+        type: requireState("triagemLinkTypeCode"),
+        url: "https://links.example.test/triagem-smoke-revisado",
         description: "Link externo atualizado pelo smoke",
       },
     });

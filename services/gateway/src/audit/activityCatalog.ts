@@ -847,6 +847,26 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "os links externos da Triagem" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/triagem\/catalogs\/?$/,
+    description: { action: "consultou", item: "os catálogos operacionais da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/triagem\/catalogs\/?$/,
+    description: { action: "cadastrou", item: "um item de catálogo da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/catalogs\/[^/]+\/archive\/?$/,
+    description: { action: "arquivou", item: "um item de catálogo da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/catalogs\/[^/]+\/?$/,
+    description: { action: "atualizou", item: "um item de catálogo da Triagem" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/triagem\/external-links\/?$/,
     description: { action: "cadastrou", item: "um link externo da Triagem" },
@@ -1148,6 +1168,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um link externo da Triagem",
     newSingular: "um novo link externo da Triagem",
     plural: "links externos da Triagem",
+  },
+  {
+    pattern: /^\/triagem\/catalogs(?:\/|$)/,
+    singular: "um item de catálogo da Triagem",
+    newSingular: "um novo item de catálogo da Triagem",
+    plural: "itens de catálogo da Triagem",
   },
   {
     pattern: /^\/triagem\/urgent-requests(?:\/|$)/,

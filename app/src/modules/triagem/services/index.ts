@@ -7,9 +7,15 @@ export type {
   TriageExternalLinkType,
 } from "./triagemExternalLinkService";
 export { triagemUrgentRequestService } from "./triagemUrgentRequestService";
+export { triagemCatalogService } from "./triagemCatalogService";
 export type {
   TriageUrgentRequest,
   TriageUrgentRequestInput,
   TriageUrgentRequestStatus,
   TriageUrgencyCode,
 } from "./triagemUrgentRequestService";
+export type {
+  TriageCatalogInput,
+  TriageCatalogItem,
+  TriageCatalogKind,
+} from "./triagemCatalogService";

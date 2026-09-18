@@ -52,6 +52,7 @@ describe("triagem gateway registry", () => {
       permissionModule: "triagem",
       routePrefixes: [
         "/triagem/competencies",
+        "/triagem/catalogs",
         "/triagem/external-links",
         "/triagem/urgent-requests",
       ],
@@ -63,6 +64,7 @@ describe("triagem gateway registry", () => {
       permissionModule: "triagem",
       routePrefixes: [
         "/triagem/competencies",
+        "/triagem/catalogs",
         "/triagem/external-links",
         "/triagem/urgent-requests",
       ],

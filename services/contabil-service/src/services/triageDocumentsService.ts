@@ -1,5 +1,5 @@
 import { error as logError, ServiceError } from "@workspace/shared";
-import type { Prisma } from "../generated/prisma/client.js";
+import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 
 import { type LogUpdateParams, logUpdateIfChanged } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
@@ -35,8 +35,6 @@ export const TRIAGE_FISCAL_CHECKLIST_FIELDS = [
 
 export const TRIAGE_FISCAL_FIELDS = [...TRIAGE_FISCAL_CHECKLIST_FIELDS, "billing_amount"] as const;
 
-export const TRIAGE_DELIVERY_METHODS = ["EMAIL", "PORTAL", "WHATSAPP"] as const;
-
 export const TRIAGE_ITEM_PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
 
 export const TRIAGE_DOCUMENT_STATUSES = [
@@ -48,15 +46,20 @@ export const TRIAGE_DOCUMENT_STATUSES = [
   "NOT_APPLICABLE",
 ] as const;
 export const TRIAGE_DOCUMENT_NOTE_MAX_LENGTH = 2_000;
+export const TRIAGE_CATALOG_CODE_MAX_LENGTH = 100;
 
 export type TriageDocumentField = (typeof TRIAGE_DOCUMENT_FIELDS)[number];
 export type TriageFiscalChecklistField = (typeof TRIAGE_FISCAL_CHECKLIST_FIELDS)[number];
 export type TriageFiscalField = (typeof TRIAGE_FISCAL_FIELDS)[number];
 export type TriageRoutineType = "CONTABIL" | "FISCAL";
-export type TriageDeliveryMethod = (typeof TRIAGE_DELIVERY_METHODS)[number];
+export type TriageDeliveryMethod = string;
 export type TriageItemPriority = (typeof TRIAGE_ITEM_PRIORITIES)[number];
 export type TriageDocumentStatus = (typeof TRIAGE_DOCUMENT_STATUSES)[number];
 export type TriageDocumentsServicePrisma = typeof prismaClient;
+type TriageCatalogLookupClient = Pick<
+  PrismaClient,
+  "$executeRaw" | "triageCatalogItem" | "triageCompetence" | "triageCompetenceCatalogSnapshot"
+>;
 
 type TriageDocumentsAudit = {
   logUpdateIfChanged: (params: LogUpdateParams) => Promise<void>;
@@ -83,6 +86,7 @@ export interface TriageDocumentItemUpdate {
   note?: string | null;
   justification?: string | null;
   delivery_method?: string | null;
+  state_site?: string | null;
 }
 
 export interface TriageDocumentsBulkUpdate {
@@ -118,6 +122,7 @@ export interface TriageDocumentItemNotes {
   justification: string | null;
   priority?: TriageItemPriority | null;
   delivery_method?: TriageDeliveryMethod | null;
+  state_site?: string | null;
   required?: boolean;
 }
 
@@ -138,9 +143,7 @@ function checklistFields(type: TriageRoutineType): readonly string[] {
 }
 
 function isDeliveryMethod(value: unknown): value is TriageDeliveryMethod {
-  return (
-    typeof value === "string" && TRIAGE_DELIVERY_METHODS.includes(value as TriageDeliveryMethod)
-  );
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function isItemPriority(value: unknown): value is TriageItemPriority {
@@ -181,6 +184,7 @@ function asItemNotes(
       const justification = (item as Record<string, unknown>).justification;
       const priority = (item as Record<string, unknown>).priority;
       const deliveryMethod = (item as Record<string, unknown>).delivery_method;
+      const stateSite = (item as Record<string, unknown>).state_site;
       const required = (item as Record<string, unknown>).required;
       return [
         field,
@@ -190,6 +194,7 @@ function asItemNotes(
             typeof justification === "string" && justification.trim() ? justification.trim() : null,
           ...(isItemPriority(priority) ? { priority } : {}),
           ...(isDeliveryMethod(deliveryMethod) ? { delivery_method: deliveryMethod } : {}),
+          ...(isDeliveryMethod(stateSite) ? { state_site: stateSite } : {}),
           ...(typeof required === "boolean" ? { required } : {}),
         },
       ];
@@ -208,6 +213,79 @@ function normalizeOptionalNote(value: unknown, label: string): string | null | u
     throw new ServiceError(400, `${label} inválida.`);
   }
   return value.trim() || null;
+}
+
+function normalizeOptionalCatalogCode(value: unknown, label: string): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (
+    typeof value !== "string" ||
+    value.trim().length === 0 ||
+    value.trim().length > TRIAGE_CATALOG_CODE_MAX_LENGTH
+  ) {
+    throw new ServiceError(400, `${label} inválido.`);
+  }
+  return value.trim();
+}
+
+async function ensureCatalogSnapshotForCompetence(
+  transaction: TriageCatalogLookupClient,
+  organizationId: string,
+  competenceId: string,
+): Promise<void> {
+  await transaction.$executeRaw`
+    SELECT pg_advisory_xact_lock(hashtextextended(${`triage.catalog.snapshot:${competenceId}`}, 0))
+  `;
+  const competence = await transaction.triageCompetence.findFirst({
+    where: { id: competenceId, organization_id: organizationId },
+    select: { id: true, catalog_snapshot_initialized_at: true },
+  });
+  if (!competence) {
+    return;
+  }
+
+  const existingSnapshot = await transaction.triageCompetenceCatalogSnapshot.findFirst({
+    where: { organization_id: organizationId, competence_id: competenceId },
+    select: { id: true },
+  });
+  if (existingSnapshot || competence.catalog_snapshot_initialized_at !== null) {
+    if (existingSnapshot && competence.catalog_snapshot_initialized_at === null) {
+      await transaction.triageCompetence.update({
+        where: { id: competenceId },
+        data: { catalog_snapshot_initialized_at: new Date() },
+        select: { id: true },
+      });
+    }
+    return;
+  }
+
+  const items = await transaction.triageCatalogItem.findMany({
+    where: { organization_id: organizationId, archived_at: null },
+    select: { id: true, kind: true, code: true, label: true, url: true },
+  });
+  if (items.length > 0) {
+    await transaction.triageCompetenceCatalogSnapshot.createMany({
+      data: items.map((item) => ({
+        organization_id: organizationId,
+        competence_id: competenceId,
+        catalog_item_id: item.id,
+        kind: item.kind,
+        code: item.code,
+        label: item.label,
+        url: item.url,
+      })),
+      skipDuplicates: true,
+    });
+  }
+  await transaction.triageCompetence.update({
+    where: { id: competenceId },
+    data: { catalog_snapshot_initialized_at: new Date() },
+    select: { id: true },
+  });
 }
 
 function normalizeOptionalValue(value: unknown, label: string): string | null | undefined {
@@ -378,11 +456,24 @@ export class TriageDocumentsService {
       throw new ServiceError(400, "Item ou status documental inválido.");
     }
     const note = normalizeOptionalNote(update.note, "Nota documental");
-    const justification = normalizeOptionalNote(update.justification, "Justificativa documental");
+    const justification = normalizeOptionalCatalogCode(
+      update.justification,
+      "Justificativa documental",
+    );
     const value = isBillingAmount
       ? normalizeOptionalValue(update.value, "Valor de faturamento")
       : undefined;
-    const deliveryMethod = update.delivery_method;
+    const deliveryMethod = normalizeOptionalCatalogCode(
+      update.delivery_method,
+      "Método de entrega fiscal",
+    );
+    const stateSite = normalizeOptionalCatalogCode(update.state_site, "Site estadual");
+    if (type !== "FISCAL" && deliveryMethod !== undefined) {
+      throw new ServiceError(400, "método de entrega só é aceito na rotina fiscal.");
+    }
+    if (type !== "FISCAL" && stateSite !== undefined) {
+      throw new ServiceError(400, "site estadual só é aceito na rotina fiscal.");
+    }
     if (
       deliveryMethod !== undefined &&
       deliveryMethod !== null &&
@@ -390,55 +481,85 @@ export class TriageDocumentsService {
     ) {
       throw new ServiceError(400, "Método de entrega fiscal inválido.");
     }
-
-    const { monthly, updated } = await this.prisma.$transaction(async (transaction) => {
-      await transaction.$executeRaw`
+    const { monthly, updated } = await this.prisma.$transaction(
+      async (transaction) => {
+        await transaction.$executeRaw`
         SELECT pg_advisory_xact_lock(hashtextextended(${monthlyId}, 0))
       `;
 
-      const monthly = await this.findMonthlyForUpdate(
-        transaction,
-        monthlyId,
-        auth.organizationId,
-        type,
-      );
-      await this.assertCanEdit(monthly.client_id, auth, type);
-      const fields = checklistFields(type);
-      const checklist = asChecklist(monthly.checklist, fields);
-      const itemNotes = asItemNotes(
-        monthly.item_notes,
-        type === "FISCAL" ? TRIAGE_FISCAL_FIELDS : fields,
-      );
-      const currentNotes = itemNotes[update.field] ?? { note: null, justification: null };
-      const nextItemNotes =
-        isBillingAmount ||
-        (note === undefined && justification === undefined && deliveryMethod === undefined)
-          ? undefined
-          : {
-              ...itemNotes,
-              [update.field]: {
-                ...currentNotes,
-                note: note === undefined ? currentNotes.note : note,
-                justification:
-                  justification === undefined ? currentNotes.justification : justification,
-                ...(deliveryMethod !== undefined ? { delivery_method: deliveryMethod } : {}),
-              },
-            };
-      const updated = await transaction.triageMonthly.update({
-        where: { id: monthly.id },
-        data: {
-          ...(isBillingAmount
-            ? {}
-            : { checklist: { ...checklist, [update.field]: update.status } }),
-          ...(isBillingAmount ? { billing_amount: value } : {}),
-          ...(nextItemNotes
-            ? { item_notes: nextItemNotes as unknown as Prisma.InputJsonValue }
-            : {}),
-        },
-      });
+        const monthly = await this.findMonthlyForUpdate(
+          transaction,
+          monthlyId,
+          auth.organizationId,
+          type,
+        );
+        await this.assertCanEdit(monthly.client_id, auth, type);
+        await this.assertActiveCatalogItems(
+          transaction,
+          "JUSTIFICATION",
+          justification ? [justification] : [],
+          auth.organizationId,
+          monthly.client_id,
+          monthly.competence,
+        );
+        await this.assertActiveCatalogItems(
+          transaction,
+          "DELIVERY_METHOD",
+          deliveryMethod ? [deliveryMethod] : [],
+          auth.organizationId,
+          monthly.client_id,
+          monthly.competence,
+        );
+        await this.assertActiveCatalogItems(
+          transaction,
+          "STATE_SITE",
+          stateSite ? [stateSite] : [],
+          auth.organizationId,
+          monthly.client_id,
+          monthly.competence,
+        );
+        const fields = checklistFields(type);
+        const checklist = asChecklist(monthly.checklist, fields);
+        const itemNotes = asItemNotes(
+          monthly.item_notes,
+          type === "FISCAL" ? TRIAGE_FISCAL_FIELDS : fields,
+        );
+        const currentNotes = itemNotes[update.field] ?? { note: null, justification: null };
+        const nextItemNotes =
+          isBillingAmount ||
+          (note === undefined &&
+            justification === undefined &&
+            deliveryMethod === undefined &&
+            stateSite === undefined)
+            ? undefined
+            : {
+                ...itemNotes,
+                [update.field]: {
+                  ...currentNotes,
+                  note: note === undefined ? currentNotes.note : note,
+                  justification:
+                    justification === undefined ? currentNotes.justification : justification,
+                  ...(deliveryMethod !== undefined ? { delivery_method: deliveryMethod } : {}),
+                  ...(stateSite !== undefined ? { state_site: stateSite } : {}),
+                },
+              };
+        const updated = await transaction.triageMonthly.update({
+          where: { id: monthly.id },
+          data: {
+            ...(isBillingAmount
+              ? {}
+              : { checklist: { ...checklist, [update.field]: update.status } }),
+            ...(isBillingAmount ? { billing_amount: value } : {}),
+            ...(nextItemNotes
+              ? { item_notes: nextItemNotes as unknown as Prisma.InputJsonValue }
+              : {}),
+          },
+        });
 
-      return { monthly, updated };
-    });
+        return { monthly, updated };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     await this.audit.logUpdateIfChanged({
       userId: auth.userId,
@@ -738,7 +859,100 @@ export class TriageDocumentsService {
       ]),
     ) as Record<string, TriageDocumentItemNotes>;
 
+    await this.prisma.$transaction(async (transaction) => {
+      await this.assertActiveCatalogItems(
+        transaction,
+        "JUSTIFICATION",
+        Object.values(itemNotes)
+          .map((item) => item.justification)
+          .filter((value): value is string => typeof value === "string"),
+        organizationId,
+        clientId,
+        competence,
+      );
+      await this.assertActiveCatalogItems(
+        transaction,
+        "DELIVERY_METHOD",
+        Object.values(itemNotes)
+          .map((item) => item.delivery_method)
+          .filter((value): value is string => typeof value === "string"),
+        organizationId,
+        clientId,
+        competence,
+      );
+      await this.assertActiveCatalogItems(
+        transaction,
+        "STATE_SITE",
+        Object.values(itemNotes)
+          .map((item) => item.state_site)
+          .filter((value): value is string => typeof value === "string"),
+        organizationId,
+        clientId,
+        competence,
+      );
+    });
+
     return { checklist, itemNotes };
+  }
+
+  private async assertActiveCatalogItems(
+    transaction: TriageCatalogLookupClient,
+    kind: "JUSTIFICATION" | "DELIVERY_METHOD" | "STATE_SITE",
+    codes: readonly string[],
+    organizationId: string,
+    clientId: string,
+    competence: string,
+  ): Promise<void> {
+    const uniqueCodes = [...new Set(codes.map((code) => code.trim()).filter(Boolean))];
+    if (uniqueCodes.length === 0) {
+      return;
+    }
+
+    await transaction.$executeRaw`SET LOCAL ROLE "giro_user_runtime"`;
+    await transaction.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
+    for (const code of uniqueCodes.sort()) {
+      await transaction.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(${`triage.catalog.item:${organizationId}:${kind}:${code}`}, 0)
+        )
+      `;
+    }
+    const competenceRecord = await transaction.triageCompetence.findFirst({
+      where: { organization_id: organizationId, client_id: clientId, competence },
+      select: { id: true, catalog_snapshot_initialized_at: true },
+    });
+
+    if (competenceRecord?.id && competenceRecord.catalog_snapshot_initialized_at === null) {
+      await ensureCatalogSnapshotForCompetence(transaction, organizationId, competenceRecord.id);
+    }
+
+    const catalogCodes = competenceRecord?.id
+      ? await transaction.triageCompetenceCatalogSnapshot.findMany({
+          where: {
+            organization_id: organizationId,
+            competence_id: competenceRecord.id,
+            kind,
+            code: { in: uniqueCodes },
+          },
+          select: { code: true },
+        })
+      : await transaction.triageCatalogItem.findMany({
+          where: {
+            organization_id: organizationId,
+            kind,
+            code: { in: uniqueCodes },
+            archived_at: null,
+          },
+          select: { code: true },
+        });
+    const availableCodes = new Set(catalogCodes.map((item) => item.code));
+    const missing = uniqueCodes.find((code) => !availableCodes.has(code));
+    if (missing) {
+      throw new ServiceError(
+        400,
+        `Valor ${missing} não está disponível no catálogo da competência.`,
+      );
+    }
   }
 }
 
@@ -789,6 +1003,7 @@ function fiscalSnapshotItems(value: unknown): Record<string, TriageDocumentItemN
             ...(isDeliveryMethod(record.delivery_method)
               ? { delivery_method: record.delivery_method }
               : {}),
+            ...(isDeliveryMethod(record.state_site) ? { state_site: record.state_site } : {}),
           },
         ],
       ];
