@@ -1,5 +1,6 @@
 import {
   createSuccessResponse,
+  error as logError,
   parseWithZod,
   requireAuthenticatedRequestContext,
 } from "@workspace/shared";
@@ -49,6 +50,7 @@ router.get(
       });
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao buscar dossiê do colaborador", { err });
       next(err);
     }
   },
@@ -67,6 +69,7 @@ router.get(
       });
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao listar dossiês de colaboradores", { err });
       next(err);
     }
   },
@@ -88,6 +91,7 @@ router.put(
       });
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao atualizar dossiê do colaborador", { err });
       next(err);
     }
   },
@@ -107,6 +111,7 @@ router.get(
       });
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao listar contatos de emergência", { err });
       next(err);
     }
   },
@@ -128,6 +133,7 @@ router.post(
       });
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao criar contato de emergência", { err });
       next(err);
     }
   },
@@ -149,6 +155,7 @@ router.put(
       });
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao atualizar contato de emergência", { err });
       next(err);
     }
   },
@@ -170,6 +177,7 @@ router.delete(
       });
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao excluir contato de emergência", { err });
       next(err);
     }
   },
@@ -189,6 +197,7 @@ router.get(
       });
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao listar alergias do colaborador", { err });
       next(err);
     }
   },
@@ -209,6 +218,7 @@ router.put(
       });
       response.status(200).json(createSuccessResponse(data));
     } catch (err) {
+      logError("Erro ao atualizar alergias do colaborador", { err });
       next(err);
     }
   },
