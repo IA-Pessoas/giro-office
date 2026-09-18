@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   buildHookPlan,
@@ -352,5 +355,51 @@ describe("runCommands", () => {
     runCommands([["pnpm", ["test:scripts"]]], fakeSpawn, { TURBO_CONCURRENCY: "2" }, "linux");
 
     assert.equal(ambientes[0].TURBO_CONCURRENCY, "2");
+  });
+});
+
+describe("hook executado de ponta a ponta", () => {
+  const hookPath = fileURLToPath(new URL("./git-hook-scope.mjs", import.meta.url));
+  const repoRoot = path.dirname(path.dirname(hookPath));
+
+  const rodar = (linha, env = {}) =>
+    spawnSync(process.execPath, [hookPath, "pre-push"], {
+      cwd: repoRoot,
+      input: `${linha}\n`,
+      encoding: "utf8",
+      env: { ...process.env, ...env },
+    });
+
+  // Cobre o caminho real: o hook so enxerga o que esta sendo empurrado se conseguir
+  // ler a entrada padrao. Uma falha ali deixa o gate cego sem ninguem perceber.
+  it("recusa um push que descartaria commit publicado", () => {
+    const head = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+    const anterior = spawnSync("git", ["rev-parse", "HEAD~1"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+
+    const resultado = rodar(
+      `refs/heads/feature/teste ${anterior} refs/heads/feature/teste ${head}`,
+    );
+
+    assert.equal(resultado.status, 1);
+    assert.match(resultado.stderr, /reescrita de historico detectada/);
+  });
+
+  it("enxerga as refs empurradas em vez de tratar como push sem mudancas", () => {
+    const head = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+
+    const resultado = rodar(`refs/heads/feature/teste ${head} refs/heads/feature/teste ${head}`, {
+      GIT_HOOK_SCOPE_DRY_RUN: "1",
+    });
+
+    assert.doesNotMatch(resultado.stderr, /nao foi possivel ler a entrada do hook/);
   });
 });

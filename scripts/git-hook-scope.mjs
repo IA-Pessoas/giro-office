@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -416,7 +416,9 @@ function readHookInput() {
 
   try {
     return readFileSync(0, "utf8");
-  } catch {
+  } catch (error) {
+    // Sem stdin legivel nao da para saber o que esta sendo empurrado: avise, nao engula.
+    console.error(`git-hook-scope: nao foi possivel ler a entrada do hook: ${error.message}`);
     return "";
   }
 }
