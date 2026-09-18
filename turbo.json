@@ -45,6 +45,11 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "!**/*.md"],
       "outputs": []
+    },
+    "@workspace/shared#test": {
+      "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.md"],
+      "outputs": []
     }
   }
 }
