@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -95,7 +95,9 @@ function cloneCommands(commands) {
 }
 
 function buildBiomeCheckCommand(changedFiles) {
-  if (changedFiles.length === 0) {
+  const existingFiles = changedFiles.filter((filePath) => existsSync(filePath));
+
+  if (existingFiles.length === 0) {
     return ["pnpm", ["check"]];
   }
 
@@ -112,7 +114,7 @@ function buildBiomeCheckCommand(changedFiles) {
       "check",
       "--files-ignore-unknown=true",
       "--no-errors-on-unmatched",
-      ...changedFiles,
+      ...existingFiles,
     ],
   ];
 }

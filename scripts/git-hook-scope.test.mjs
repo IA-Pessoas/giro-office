@@ -149,6 +149,13 @@ describe("buildHookPlan", () => {
     assert.ok(biome[1].includes("--no-errors-on-unmatched"));
   });
 
+  it("nao passa ao biome arquivos deletados do diff", () => {
+    const files = [".github/workflows/removed-from-worktree.yml"];
+    const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
+
+    assert.deepEqual(commands[0], ["pnpm", ["check"]]);
+  });
+
   it("audits dependency changes even inside an affected package", () => {
     const files = ["services/user-service/package.json"];
     const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
