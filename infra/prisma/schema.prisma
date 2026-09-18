@@ -1888,7 +1888,9 @@ model Process {
   entry_date      DateTime?
   completion_date DateTime?
   expected_date   DateTime?
+  client_notice_date DateTime?
   status          String
+  financial_status String            @default("Pendente")
   observation     String?
   responsible1_id String?
   responsible2_id String?

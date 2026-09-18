@@ -18,11 +18,19 @@ function createBody(overrides: Partial<CreateProcessBody> = {}): CreateProcessBo
     process_type: "Abertura",
     description: "Descrição do processo",
     status: "Pendente",
+    financial_status: "Pendente",
     ...overrides,
   };
 }
 
 function createPrisma(overrides: Record<string, unknown> = {}) {
+  const defaultProcess = {
+    findFirst: vi.fn(async () => null),
+    create: vi.fn(async () => ({ id: processId, status: "Pendente" })),
+    update: vi.fn(async () => ({ id: processId, status: "Pendente" })),
+    updateMany: vi.fn(async () => ({ count: 1 })),
+  };
+  const { process: processOverrides, ...otherOverrides } = overrides;
   const prisma = {
     client: {
       findFirst: vi.fn(async () => ({ id: clientPjId, cpf_cnpj: "12345678000199" })),
@@ -30,11 +38,7 @@ function createPrisma(overrides: Record<string, unknown> = {}) {
     clientPF: {
       findFirst: vi.fn(async () => null),
     },
-    process: {
-      findFirst: vi.fn(async () => null),
-      create: vi.fn(async () => ({ id: processId, status: "Pendente" })),
-      update: vi.fn(async () => ({ id: processId, status: "Pendente" })),
-    },
+    process: { ...defaultProcess, ...(processOverrides as Record<string, unknown>) },
     logs: {
       create: vi.fn(async () => ({})),
       findMany: vi.fn(async () => []),
@@ -45,7 +49,7 @@ function createPrisma(overrides: Record<string, unknown> = {}) {
     task: {
       findFirst: vi.fn(async () => ({ id: "10000000-0000-4000-8000-000000000001" })),
     },
-    ...overrides,
+    ...otherOverrides,
   } as unknown as PrismaClient;
 
   prisma.$transaction = vi.fn(async (callback) => callback(prisma));
@@ -80,6 +84,61 @@ describe("ProcessService", () => {
       service.create({ organizationId, userId, body: createBody() }),
     ).rejects.toMatchObject({ statusCode: 404 });
     expect(prisma.process.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a duplicate process for the same client and status", async () => {
+    const prisma = createPrisma({
+      process: {
+        findFirst: vi.fn(async () => ({ id: processId })),
+        create: vi.fn(async () => ({ id: processId, status: "Pendente" })),
+      },
+    });
+    const service = new ProcessService(prisma);
+
+    await expect(
+      service.create({ organizationId, userId, body: createBody() }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prisma.process.create).not.toHaveBeenCalled();
+  });
+
+  it("maps a database uniqueness race to a conflict", async () => {
+    const prisma = createPrisma({
+      process: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => {
+          throw { code: "P2002" };
+        }),
+      },
+    });
+    const service = new ProcessService(prisma);
+
+    await expect(
+      service.create({ organizationId, userId, body: createBody() }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("rejects an update when the financial snapshot changed concurrently", async () => {
+    const current = {
+      id: processId,
+      status: "Andamento",
+      financial_status: "Regular",
+      locking_type: null,
+    };
+    const prisma = createPrisma({
+      process: {
+        findFirst: vi.fn(async () => current),
+        updateMany: vi.fn(async () => ({ count: 0 })),
+      },
+    });
+    const service = new ProcessService(prisma);
+
+    await expect(
+      service.update({
+        organizationId,
+        userId,
+        body: { ...createBody(), id: processId },
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
   });
 
   it("rejects when the process document does not match the selected client", async () => {
@@ -162,7 +221,9 @@ describe("ProcessService", () => {
       entry_date: new Date("2026-01-01T00:00:00.000Z"),
       completion_date: new Date("2026-01-04T00:00:00.000Z"),
       expected_date: null,
+      client_notice_date: null,
       status: "Andamento",
+      financial_status: "Regular",
       observation: null,
       responsible1_id: null,
       responsible2_id: null,
@@ -234,8 +295,21 @@ describe("ProcessService", () => {
   it("keeps process writes and their audit log inside one transaction", async () => {
     const prisma = createPrisma({
       process: {
-        findFirst: vi.fn(async () => ({ id: processId })),
-        update: vi.fn(async () => ({ id: processId, status: "Andamento" })),
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce({ id: processId })
+          .mockResolvedValueOnce({
+            id: processId,
+            status: "Pendente",
+            financial_status: "Pendente",
+            locking_type: null,
+          })
+          .mockResolvedValueOnce({
+            id: processId,
+            status: "Andamento",
+            financial_status: "Pendente",
+            locking_type: null,
+          }),
       },
     });
     const service = new ProcessService(prisma);
@@ -247,8 +321,152 @@ describe("ProcessService", () => {
     });
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.process.update).toHaveBeenCalled();
+    expect(prisma.process.updateMany).toHaveBeenCalled();
     expect(prisma.logs.create).toHaveBeenCalled();
+  });
+
+  it("persists financial status, notice date, and financial pause on create", async () => {
+    const created = {
+      id: processId,
+      status: "Paralisado",
+      financial_status: "Não Contratado",
+      locking_type: "Financeiro",
+      client_notice_date: new Date("2026-04-10T00:00:00.000Z"),
+    };
+    const prisma = createPrisma({
+      process: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => created),
+      },
+    });
+    const service = new ProcessService(prisma);
+
+    await service.create({
+      organizationId,
+      userId,
+      body: createBody({
+        financial_status: "Não Contratado",
+        client_notice_date: new Date("2026-04-10T00:00:00.000Z"),
+        status: "Andamento",
+      }),
+    });
+
+    expect(prisma.process.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          financial_status: "Não Contratado",
+          status: "Paralisado",
+          locking_type: "Financeiro",
+          client_notice_date: new Date("2026-04-10T00:00:00.000Z"),
+        }),
+      }),
+    );
+    expect(prisma.logs.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          user_id: userId,
+          organization_id: organizationId,
+          changes: expect.objectContaining({
+            status: "Paralisado",
+            financial_status: "Não Contratado",
+            locking_type: "Financeiro",
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("resumes only a financial pause and audits the transition", async () => {
+    const existing = {
+      id: processId,
+      client_pj_id: clientPjId,
+      client_pf_id: null,
+      cpf_cnpj: "12345678000199",
+      process_type: "Abertura",
+      description: "Descrição do processo",
+      entry_date: null,
+      completion_date: null,
+      expected_date: null,
+      client_notice_date: new Date("2026-04-10T00:00:00.000Z"),
+      status: "Paralisado",
+      financial_status: "Não Contratado",
+      observation: null,
+      responsible1_id: null,
+      responsible2_id: null,
+      responsible3_id: null,
+      locking_type: "Financeiro",
+      urgency: null,
+      task_id: null,
+      responsible1: null,
+      responsible2: null,
+      responsible3: null,
+    };
+    const updated = {
+      ...existing,
+      status: "Andamento",
+      financial_status: "Regular",
+      locking_type: null,
+    };
+    const prisma = createPrisma({
+      process: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce(existing)
+          .mockResolvedValueOnce(existing)
+          .mockResolvedValueOnce(updated)
+          .mockResolvedValueOnce(updated)
+          .mockResolvedValueOnce(updated)
+          .mockResolvedValueOnce(updated),
+      },
+    });
+    const service = new ProcessService(prisma);
+
+    await service.update({
+      organizationId,
+      userId,
+      body: {
+        ...createBody({
+          status: "Paralisado",
+          locking_type: "Financeiro",
+          financial_status: "Regular",
+        }),
+        id: processId,
+      },
+    });
+    await service.update({
+      organizationId,
+      userId,
+      body: {
+        ...createBody({
+          status: "Paralisado",
+          locking_type: "Financeiro",
+          financial_status: "Regular",
+        }),
+        id: processId,
+      },
+    });
+
+    expect(prisma.process.updateMany).toHaveBeenCalledTimes(2);
+    expect(prisma.process.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "Andamento",
+          financial_status: "Regular",
+          locking_type: null,
+        }),
+      }),
+    );
+    expect(prisma.logs.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          changes: expect.objectContaining({
+            status: { from: "Paralisado", to: "Andamento" },
+            financial_status: { from: "Não Contratado", to: "Regular" },
+            locking_type: { from: "Financeiro", to: null },
+          }),
+        }),
+      }),
+    );
   });
 
   it("hides responsible and history users from another organization", async () => {
