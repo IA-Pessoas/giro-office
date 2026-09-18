@@ -98,6 +98,18 @@ async function runBrowserProof() {
     if (request.method() === "GET" && apiPath === "/triagem/external-links") {
       return json(route, externalLinks.filter((link) => link.archived_at === null));
     }
+    if (request.method() === "GET" && apiPath === "/triagem/catalogs") {
+      return json(route, [
+        {
+          id: "catalog-link-type-drive",
+          kind: "LINK_TYPE",
+          code: "DRIVE",
+          label: "Drive",
+          url: null,
+          archived_at: null,
+        },
+      ]);
+    }
     if (request.method() === "POST" && apiPath === "/triagem/external-links") {
       const created = newLink({ ...body, url: body.url, type: body.type, description: body.description ?? null });
       externalLinks.push(created);
@@ -137,6 +149,7 @@ async function runBrowserProof() {
     await page.getByRole("option", { name: /Cliente Demonstração/ }).click();
     await expect(page.getByRole("heading", { name: "Links externos" })).toBeVisible();
 
+    await page.getByLabel("Tipo do link externo").selectOption("DRIVE");
     await page.getByLabel("Link HTTPS").fill("https://drive.example.test/competencia");
     await page.getByLabel("Descrição do link externo").fill("Pasta da competência");
     await page.getByRole("button", { name: "Adicionar link" }).click();

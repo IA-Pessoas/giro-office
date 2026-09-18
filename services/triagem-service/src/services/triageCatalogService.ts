@@ -38,7 +38,7 @@ export type TriageCatalogTransaction = Pick<
 
 export type TriageCatalogPrisma = TriageCatalogTransaction & Pick<PrismaClient, "$transaction">;
 
-export type TriageCatalogKind = "JUSTIFICATION" | "LINK_TYPE" | "STATE_SITE";
+export type TriageCatalogKind = "JUSTIFICATION" | "LINK_TYPE" | "DELIVERY_METHOD" | "STATE_SITE";
 
 export interface TriageCatalogAuthContext {
   userId: string;
@@ -120,7 +120,10 @@ function assertCatalogValues(input: {
   label?: string;
   url?: string | null;
 }): void {
-  if (input.kind && !["JUSTIFICATION", "LINK_TYPE", "STATE_SITE"].includes(input.kind)) {
+  if (
+    input.kind &&
+    !["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"].includes(input.kind)
+  ) {
     throw new ServiceError(400, "Tipo de catálogo inválido.");
   }
   if (input.code !== undefined && (!input.code.trim() || input.code.length > 100)) {
@@ -289,12 +292,28 @@ export class TriageCatalogService {
     organizationId: string,
     competenceId: string,
   ): Promise<TriageCatalogSnapshotDto[]> {
+    await transaction.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtextextended(${`triage.catalog.snapshot:${competenceId}`}, 0))
+    `;
     const competence = await transaction.triageCompetence.findFirst({
       where: { id: competenceId, organization_id: organizationId },
       select: { id: true },
     });
     if (!competence) {
       throw new ServiceError(404, "Competência da Triagem não encontrada.");
+    }
+
+    const existingSnapshot = await transaction.triageCompetenceCatalogSnapshot.findFirst({
+      where: { organization_id: organizationId, competence_id: competenceId },
+      select: { id: true },
+    });
+    if (existingSnapshot) {
+      const snapshots = await transaction.triageCompetenceCatalogSnapshot.findMany({
+        where: { organization_id: organizationId, competence_id: competenceId },
+        orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
+        select: snapshotSelect,
+      });
+      return snapshots.map(toSnapshotDto);
     }
 
     const items = await transaction.triageCatalogItem.findMany({

@@ -9,6 +9,7 @@ import type { TriageCatalogInput, TriageCatalogItem, TriageCatalogKind } from ".
 const CATALOG_KINDS: Array<{ value: TriageCatalogKind; label: string }> = [
   { value: "JUSTIFICATION", label: "Justificativas" },
   { value: "LINK_TYPE", label: "Tipos de link" },
+  { value: "DELIVERY_METHOD", label: "Métodos de entrega" },
   { value: "STATE_SITE", label: "Sites estaduais" },
 ];
 

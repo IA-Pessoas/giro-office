@@ -3,7 +3,6 @@ import "./envBootstrap.js";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  TRIAGE_DELIVERY_METHODS,
   TRIAGE_DOCUMENT_FIELDS,
   TRIAGE_DOCUMENT_NOTE_MAX_LENGTH,
   TRIAGE_FISCAL_CHECKLIST_FIELDS,
@@ -36,6 +35,11 @@ function createMockPrisma(): TriageDocumentsServicePrisma {
     client: { findFirst: vi.fn().mockResolvedValue({ id: CLIENT_ID }) },
     triageConfig: { findFirst: vi.fn() },
     triageCompetence: { findFirst: vi.fn() },
+    triageCatalogItem: {
+      findMany: vi.fn(async (args: { where?: { code?: { in?: string[] } } }) =>
+        (args.where?.code?.in ?? []).map((code) => ({ code })),
+      ),
+    },
     triageMonthly: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     triageResponsible: { findFirst: vi.fn() },
     triageBankStatement: {
@@ -70,11 +74,10 @@ function fiscalEditor() {
 }
 
 describe("TriageDocumentsService", () => {
-  it("expõe os 14 campos fiscais legados e métodos de entrega controlados", () => {
+  it("expõe os 14 campos fiscais legados e lê métodos de entrega do catálogo", () => {
     expect(TRIAGE_FISCAL_FIELDS).toHaveLength(14);
     expect(TRIAGE_FISCAL_CHECKLIST_FIELDS).toHaveLength(13);
     expect(TRIAGE_FISCAL_FIELDS).toContain("billing_amount");
-    expect(TRIAGE_DELIVERY_METHODS).toEqual(["EMAIL", "PORTAL", "WHATSAPP"]);
   });
 
   it("cria o mensal fiscal usando obrigatoriedade, prioridade e entrega do snapshot", async () => {
@@ -138,8 +141,42 @@ describe("TriageDocumentsService", () => {
     expect(result).toEqual(expect.objectContaining({ type: "FISCAL" }));
   });
 
+  it("rejeita justificativa ou método não cadastrado/arquivado", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageCatalogItem.findMany).mockResolvedValue([] as never);
+
+    await expect(
+      new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).updateItem(
+        MONTHLY_ID,
+        {
+          field: "nfce_documents",
+          type: "FISCAL",
+          status: "ATTENTION",
+          justification: "OLD_JUSTIFICATION",
+        },
+        fiscalEditor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    await expect(
+      new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).updateItem(
+        MONTHLY_ID,
+        {
+          field: "nfce_documents",
+          type: "FISCAL",
+          status: "ATTENTION",
+          delivery_method: "OLD_METHOD",
+        },
+        fiscalEditor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(prisma.triageMonthly.update).not.toHaveBeenCalled();
+  });
+
   it("rejeita método de entrega fiscal não controlado antes da mutação", async () => {
     const prisma = createMockPrisma();
+    vi.mocked(prisma.triageCatalogItem.findMany).mockResolvedValue([] as never);
     const service = new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() });
 
     await expect(
@@ -154,7 +191,7 @@ describe("TriageDocumentsService", () => {
         fiscalEditor(),
       ),
     ).rejects.toMatchObject({ statusCode: 400 });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.triageMonthly.update).not.toHaveBeenCalled();
   });
 
   it("atualiza estado fiscal, nota, revisão e entrega sem sair da organização", async () => {
@@ -387,8 +424,8 @@ describe("TriageDocumentsService", () => {
         }),
       },
     });
-    expect(prisma.$transaction).toHaveBeenCalledOnce();
-    expect(prisma.$executeRaw).toHaveBeenCalledOnce();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(3);
   });
 
   it("rejeita observações acima do limite antes de tocar no banco", async () => {

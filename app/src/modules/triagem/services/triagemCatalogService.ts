@@ -1,6 +1,6 @@
 import { setupAPIClient } from "@shared/services/api";
 
-export type TriageCatalogKind = "JUSTIFICATION" | "LINK_TYPE" | "STATE_SITE";
+export type TriageCatalogKind = "JUSTIFICATION" | "LINK_TYPE" | "DELIVERY_METHOD" | "STATE_SITE";
 
 export type TriageCatalogItem = {
   id: string;

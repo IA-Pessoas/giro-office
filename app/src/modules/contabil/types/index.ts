@@ -186,7 +186,7 @@ export type TriageFiscalChecklistField =
 
 export type TriageFiscalField = TriageFiscalChecklistField | "billing_amount";
 
-export type TriageDeliveryMethod = "EMAIL" | "PORTAL" | "WHATSAPP";
+export type TriageDeliveryMethod = string;
 export type TriageItemPriority = "LOW" | "MEDIUM" | "HIGH";
 
 export interface TriageDocumentItemNotes {

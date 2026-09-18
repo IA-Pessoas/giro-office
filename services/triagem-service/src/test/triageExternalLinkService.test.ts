@@ -34,6 +34,7 @@ function createMockPrisma(): TriageExternalLinkPrisma {
     ),
     client: { findFirst: vi.fn() },
     user: { findFirst: vi.fn() },
+    triageCatalogItem: { findFirst: vi.fn().mockResolvedValue({ id: "catalog-link-type" }) },
     triageExternalLink: {
       findFirst: vi.fn(),
       findMany: vi.fn(),
@@ -186,6 +187,34 @@ describe("TriageExternalLinkService", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejeita tipo de link ausente ou arquivado no catálogo da organização", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageCatalogItem.findFirst).mockResolvedValue(null);
+
+    await expect(
+      new TriageExternalLinkService(prisma).create(
+        {
+          client_id: CLIENT_ID,
+          competence: "2026-09",
+          type: "ONEDRIVE",
+          url: "https://cloud.example.test/triagem",
+        },
+        editor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(prisma.triageExternalLink.create).not.toHaveBeenCalled();
+    expect(prisma.triageCatalogItem.findFirst).toHaveBeenCalledWith({
+      where: {
+        organization_id: ORGANIZATION_ID,
+        kind: "LINK_TYPE",
+        code: "ONEDRIVE",
+        archived_at: null,
+      },
+      select: { id: true },
+    });
   });
 
   it("não aceita responsável de outra organização", async () => {

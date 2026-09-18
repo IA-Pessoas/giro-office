@@ -13,6 +13,7 @@ import {
   useTriageStatements,
   useTriageClosing,
 } from "../hooks";
+import { useTriageCatalogs } from "@modules/triagem";
 import { getContabilErrorMessage } from "../services";
 import type {
   ContabilCompetence,
@@ -112,6 +113,8 @@ export function TriageDocumentsSection({
     buildDocumentDrafts(undefined, documents),
   );
   const monthly = useTriageMonthly(clientId, competence, documentType);
+  const justifications = useTriageCatalogs("JUSTIFICATION");
+  const deliveryMethods = useTriageCatalogs("DELIVERY_METHOD");
   const mutations = useTriageMutations(clientId, competence, documentType);
   const statements = useTriageStatements(clientId, competence, documentType);
   const closing = useTriageClosing(clientId, competence, documentType);
@@ -122,7 +125,9 @@ export function TriageDocumentsSection({
     mutations.all.error ??
     mutations.statement.error ??
     mutations.archiveStatement.error ??
-    mutations.closing.error;
+    mutations.closing.error ??
+    justifications.error ??
+    deliveryMethods.error;
   const statementMutationPending =
     mutations.statement.isPending || mutations.archiveStatement.isPending;
 
@@ -390,16 +395,21 @@ export function TriageDocumentsSection({
                       </label>
                       <label className="text-xs text-gray-600 dark:text-slate-300">
                         Justificativa
-                        <textarea
+                        <select
                           aria-label={`${label} Justificativa`}
                           value={documentDrafts[field].justification}
                           onChange={(event) =>
                             updateDocumentDraft(field, "justification", event.target.value)
                           }
-                          rows={2}
-                          maxLength={2000}
                           className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
-                        />
+                        >
+                          <option value="">Não definida</option>
+                          {(justifications.data ?? []).map((item) => (
+                            <option key={item.id} value={item.code}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
                       </label>
                       {documentType === "FISCAL" ? (
                         <label className="text-xs text-gray-600 dark:text-slate-300 sm:col-span-2">
@@ -418,9 +428,11 @@ export function TriageDocumentsSection({
                             className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
                           >
                             <option value="">Não definido</option>
-                            <option value="EMAIL">E-mail</option>
-                            <option value="PORTAL">Portal</option>
-                            <option value="WHATSAPP">WhatsApp</option>
+                            {(deliveryMethods.data ?? []).map((item) => (
+                              <option key={item.id} value={item.code}>
+                                {item.label}
+                              </option>
+                            ))}
                           </select>
                         </label>
                       ) : null}
@@ -449,10 +461,18 @@ export function TriageDocumentsSection({
                         <p>Nota: {record.item_notes[field].note}</p>
                       ) : null}
                       {record.item_notes[field]?.justification ? (
-                        <p>Justificativa: {record.item_notes[field].justification}</p>
+                        <p>
+                          Justificativa: {justifications.data?.find(
+                            (item) => item.code === record.item_notes[field].justification,
+                          )?.label ?? "Indisponível no catálogo ativo"}
+                        </p>
                       ) : null}
                       {record.item_notes[field]?.delivery_method ? (
-                        <p>Método: {record.item_notes[field].delivery_method}</p>
+                        <p>
+                          Método: {deliveryMethods.data?.find(
+                            (item) => item.code === record.item_notes[field].delivery_method,
+                          )?.label ?? "Indisponível no catálogo ativo"}
+                        </p>
                       ) : null}
                     </div>
                   )}

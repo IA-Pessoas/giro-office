@@ -6,7 +6,7 @@ import { getTriagemServiceEnv } from "../config/env.js";
 import { buildTriagemServiceOpenApiSpec } from "../openapi/spec.js";
 
 describe("contrato OpenAPI dos catálogos da Triagem", () => {
-  it("publica CRUD, arquivamento e os três tipos governados", () => {
+  it("publica CRUD, arquivamento e os tipos governados", () => {
     const spec = buildTriagemServiceOpenApiSpec(getTriagemServiceEnv());
     const paths = spec.paths as Record<string, Record<string, unknown>>;
 
@@ -19,6 +19,7 @@ describe("contrato OpenAPI dos catálogos da Triagem", () => {
     expect(spec.components?.schemas).toHaveProperty("TriageCatalogItem");
     expect(JSON.stringify(spec)).toContain("JUSTIFICATION");
     expect(JSON.stringify(spec)).toContain("LINK_TYPE");
+    expect(JSON.stringify(spec)).toContain("DELIVERY_METHOD");
     expect(JSON.stringify(spec)).toContain("STATE_SITE");
   });
 });

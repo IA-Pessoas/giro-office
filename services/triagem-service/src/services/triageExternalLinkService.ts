@@ -23,10 +23,10 @@ type ExternalLinkRecord = Prisma.TriageExternalLinkGetPayload<{
 
 export type TriageExternalLinkPrisma = Pick<
   PrismaClient,
-  "$executeRaw" | "$transaction" | "client" | "user" | "triageExternalLink"
+  "$executeRaw" | "$transaction" | "client" | "user" | "triageCatalogItem" | "triageExternalLink"
 >;
 
-export type ExternalLinkType = "CLOUD" | "DRIVE";
+export type ExternalLinkType = string;
 
 export interface TriageExternalLinkAuthContext {
   userId: string;
@@ -92,7 +92,7 @@ function assertCompetence(value: string): void {
 }
 
 function assertLinkValues(input: Pick<UpdateTriageExternalLinkInput, "type" | "url">): void {
-  if (input.type !== "CLOUD" && input.type !== "DRIVE") {
+  if (!input.type.trim() || input.type.length > 100) {
     throw new ServiceError(400, "Tipo de link inválido.");
   }
 
@@ -124,6 +124,7 @@ export class TriageExternalLinkService {
     assertLinkValues(input);
 
     const created = await this.withOrganization(auth, async (transaction) => {
+      await this.assertActiveCatalogItem(transaction, "LINK_TYPE", input.type, auth.organizationId);
       await this.assertClient(transaction, input.client_id, auth.organizationId);
       await this.assertResponsible(transaction, input.responsible_id, auth.organizationId);
 
@@ -178,6 +179,7 @@ export class TriageExternalLinkService {
     assertLinkValues(input);
 
     const updated = await this.withOrganization(auth, async (transaction) => {
+      await this.assertActiveCatalogItem(transaction, "LINK_TYPE", input.type, auth.organizationId);
       const existing = await transaction.triageExternalLink.findFirst({
         where: { id, organization_id: auth.organizationId },
         select: externalLinkSelect,
@@ -258,6 +260,21 @@ export class TriageExternalLinkService {
     });
     if (!responsible) {
       throw new ServiceError(404, "Responsável não encontrado na organização ativa.");
+    }
+  }
+
+  private async assertActiveCatalogItem(
+    transaction: TriageExternalLinkPrisma,
+    kind: "LINK_TYPE",
+    code: string,
+    organizationId: string,
+  ): Promise<void> {
+    const catalogItem = await transaction.triageCatalogItem.findFirst({
+      where: { organization_id: organizationId, kind, code, archived_at: null },
+      select: { id: true },
+    });
+    if (!catalogItem) {
+      throw new ServiceError(400, "Tipo de link não cadastrado ou arquivado no catálogo ativo.");
     }
   }
 

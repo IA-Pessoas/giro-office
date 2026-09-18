@@ -973,7 +973,8 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                     value: { type: "string", nullable: true, maxLength: 2000 },
                     delivery_method: {
                       type: "string",
-                      enum: ["EMAIL", "PORTAL", "WHATSAPP"],
+                      minLength: 1,
+                      maxLength: 100,
                       nullable: true,
                     },
                   },

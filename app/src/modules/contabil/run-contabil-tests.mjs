@@ -174,8 +174,6 @@ await (async () => {
 
     assert.match(competenceSource, /TriageExternalLinksSection/);
     assert.match(source, /https:\/\//);
-    assert.match(source, /DRIVE/);
-    assert.match(source, /CLOUD/);
     assert.match(source, /useTriageCatalogs/);
     assert.match(source, /LINK_TYPE/);
     assert.doesNotMatch(source, /<option value="DRIVE">/);
@@ -238,9 +236,11 @@ await (async () => {
     assert.match(pageSource, /documentType="FISCAL"/);
     assert.match(source, /UNDER_REVIEW/);
     assert.match(source, /Método de entrega/);
-    assert.match(source, /EMAIL/);
-    assert.match(source, /PORTAL/);
-    assert.match(source, /WHATSAPP/);
+    assert.match(source, /DELIVERY_METHOD/);
+    assert.doesNotMatch(source, /<option value="EMAIL">/);
+    assert.doesNotMatch(source, /<option value="PORTAL">/);
+    assert.doesNotMatch(source, /<option value="WHATSAPP">/);
+    assert.doesNotMatch(source, /<textarea\s+aria-label=\{`\$\{label\} Justificativa`\}/);
     assert.match(source, /Obrigatório/);
     assert.match(source, /prioridade/);
     assert.match(source, /const mutationError/);

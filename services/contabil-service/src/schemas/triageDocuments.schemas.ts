@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import {
-  TRIAGE_DELIVERY_METHODS,
   TRIAGE_DOCUMENT_FIELDS,
   TRIAGE_DOCUMENT_NOTE_MAX_LENGTH,
   TRIAGE_DOCUMENT_STATUSES,
@@ -43,7 +42,7 @@ export const triageDocumentItemBodySchema = z
     value: z.string().trim().max(TRIAGE_DOCUMENT_NOTE_MAX_LENGTH).nullable().optional(),
     note: z.string().trim().max(TRIAGE_DOCUMENT_NOTE_MAX_LENGTH).nullable().optional(),
     justification: z.string().trim().max(TRIAGE_DOCUMENT_NOTE_MAX_LENGTH).nullable().optional(),
-    delivery_method: z.enum(TRIAGE_DELIVERY_METHODS).nullable().optional(),
+    delivery_method: z.string().trim().min(1).max(100).nullable().optional(),
   })
   .strict()
   .superRefine((body, context) => {

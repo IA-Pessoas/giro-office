@@ -35,8 +35,6 @@ export const TRIAGE_FISCAL_CHECKLIST_FIELDS = [
 
 export const TRIAGE_FISCAL_FIELDS = [...TRIAGE_FISCAL_CHECKLIST_FIELDS, "billing_amount"] as const;
 
-export const TRIAGE_DELIVERY_METHODS = ["EMAIL", "PORTAL", "WHATSAPP"] as const;
-
 export const TRIAGE_ITEM_PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
 
 export const TRIAGE_DOCUMENT_STATUSES = [
@@ -53,7 +51,7 @@ export type TriageDocumentField = (typeof TRIAGE_DOCUMENT_FIELDS)[number];
 export type TriageFiscalChecklistField = (typeof TRIAGE_FISCAL_CHECKLIST_FIELDS)[number];
 export type TriageFiscalField = (typeof TRIAGE_FISCAL_FIELDS)[number];
 export type TriageRoutineType = "CONTABIL" | "FISCAL";
-export type TriageDeliveryMethod = (typeof TRIAGE_DELIVERY_METHODS)[number];
+export type TriageDeliveryMethod = string;
 export type TriageItemPriority = (typeof TRIAGE_ITEM_PRIORITIES)[number];
 export type TriageDocumentStatus = (typeof TRIAGE_DOCUMENT_STATUSES)[number];
 export type TriageDocumentsServicePrisma = typeof prismaClient;
@@ -138,9 +136,7 @@ function checklistFields(type: TriageRoutineType): readonly string[] {
 }
 
 function isDeliveryMethod(value: unknown): value is TriageDeliveryMethod {
-  return (
-    typeof value === "string" && TRIAGE_DELIVERY_METHODS.includes(value as TriageDeliveryMethod)
-  );
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function isItemPriority(value: unknown): value is TriageItemPriority {
@@ -390,6 +386,16 @@ export class TriageDocumentsService {
     ) {
       throw new ServiceError(400, "Método de entrega fiscal inválido.");
     }
+    await this.assertActiveCatalogItems(
+      "JUSTIFICATION",
+      justification ? [justification] : [],
+      auth.organizationId,
+    );
+    await this.assertActiveCatalogItems(
+      "DELIVERY_METHOD",
+      deliveryMethod ? [deliveryMethod] : [],
+      auth.organizationId,
+    );
 
     const { monthly, updated } = await this.prisma.$transaction(async (transaction) => {
       await transaction.$executeRaw`
@@ -738,7 +744,52 @@ export class TriageDocumentsService {
       ]),
     ) as Record<string, TriageDocumentItemNotes>;
 
+    await this.assertActiveCatalogItems(
+      "JUSTIFICATION",
+      Object.values(itemNotes)
+        .map((item) => item.justification)
+        .filter((value): value is string => typeof value === "string"),
+      organizationId,
+    );
+    await this.assertActiveCatalogItems(
+      "DELIVERY_METHOD",
+      Object.values(itemNotes)
+        .map((item) => item.delivery_method)
+        .filter((value): value is string => typeof value === "string"),
+      organizationId,
+    );
+
     return { checklist, itemNotes };
+  }
+
+  private async assertActiveCatalogItems(
+    kind: "JUSTIFICATION" | "DELIVERY_METHOD",
+    codes: readonly string[],
+    organizationId: string,
+  ): Promise<void> {
+    const uniqueCodes = [...new Set(codes.map((code) => code.trim()).filter(Boolean))];
+    if (uniqueCodes.length === 0) {
+      return;
+    }
+
+    const activeItems = await this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`SET LOCAL ROLE "giro_user_runtime"`;
+      await transaction.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
+      return transaction.triageCatalogItem.findMany({
+        where: {
+          organization_id: organizationId,
+          kind,
+          code: { in: uniqueCodes },
+          archived_at: null,
+        },
+        select: { code: true },
+      });
+    });
+    const activeCodes = new Set(activeItems.map((item) => item.code));
+    const missing = uniqueCodes.find((code) => !activeCodes.has(code));
+    if (missing) {
+      throw new ServiceError(400, `Valor ${missing} não está disponível no catálogo ativo.`);
+    }
   }
 }
 

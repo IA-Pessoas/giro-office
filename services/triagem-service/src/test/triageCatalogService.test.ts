@@ -37,6 +37,7 @@ function createMockPrisma(): TriageCatalogPrisma {
     },
     triageCompetence: { findFirst: vi.fn() },
     triageCompetenceCatalogSnapshot: {
+      findFirst: vi.fn(),
       createMany: vi.fn(),
       findMany: vi.fn(),
     },
@@ -173,6 +174,7 @@ describe("TriageCatalogService", () => {
       id: COMPETENCE_ID,
     } as never);
     vi.mocked(prisma.triageCatalogItem.findMany).mockResolvedValue([record] as never);
+    vi.mocked(prisma.triageCompetenceCatalogSnapshot.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.triageCompetenceCatalogSnapshot.findMany).mockResolvedValue([
       snapshot,
     ] as never);
@@ -199,5 +201,34 @@ describe("TriageCatalogService", () => {
       ],
       skipDuplicates: true,
     });
+  });
+
+  it("não incorpora item novo quando a competência já tem qualquer snapshot", async () => {
+    const prisma = createMockPrisma();
+    const existingSnapshot = {
+      id: "f0000000-0000-4000-8000-000000000001",
+      organization_id: ORGANIZATION_ID,
+      competence_id: COMPETENCE_ID,
+      catalog_item_id: CATALOG_ID,
+      kind: record.kind,
+      code: record.code,
+      label: record.label,
+      url: record.url,
+      created_at: record.created_at,
+    };
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({ id: COMPETENCE_ID } as never);
+    vi.mocked(prisma.triageCompetenceCatalogSnapshot.findFirst)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existingSnapshot as never);
+    vi.mocked(prisma.triageCatalogItem.findMany).mockResolvedValue([record] as never);
+    vi.mocked(prisma.triageCompetenceCatalogSnapshot.findMany).mockResolvedValue([
+      existingSnapshot,
+    ] as never);
+
+    await new TriageCatalogService(prisma).snapshotForCompetence(ORGANIZATION_ID, COMPETENCE_ID);
+    await new TriageCatalogService(prisma).snapshotForCompetence(ORGANIZATION_ID, COMPETENCE_ID);
+
+    expect(prisma.triageCatalogItem.findMany).toHaveBeenCalledOnce();
+    expect(prisma.triageCompetenceCatalogSnapshot.createMany).toHaveBeenCalledOnce();
   });
 });

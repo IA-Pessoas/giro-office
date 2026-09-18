@@ -50,7 +50,7 @@ const catalogItem = {
   required: ["id", "kind", "code", "label", "url", "archived_at", "created_at", "updated_at"],
   properties: {
     id: { type: "string", format: "uuid" },
-    kind: { type: "string", enum: ["JUSTIFICATION", "LINK_TYPE", "STATE_SITE"] },
+    kind: { type: "string", enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"] },
     code: { type: "string", minLength: 1, maxLength: 100 },
     label: { type: "string", minLength: 1, maxLength: 255 },
     url: { type: ["string", "null"], format: "uri", pattern: "^https://" },
@@ -78,7 +78,7 @@ const externalLink = {
     id: { type: "string", format: "uuid" },
     client_id: { type: "string", format: "uuid" },
     competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
-    type: { type: "string", enum: ["CLOUD", "DRIVE"] },
+    type: { type: "string", minLength: 1, maxLength: 100 },
     url: { type: "string", format: "uri", pattern: "^https://" },
     description: { type: ["string", "null"] },
     responsible_id: { type: "string", format: "uuid" },
@@ -267,7 +267,10 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
             {
               name: "kind",
               in: "query",
-              schema: { type: "string", enum: ["JUSTIFICATION", "LINK_TYPE", "STATE_SITE"] },
+              schema: {
+                type: "string",
+                enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
+              },
             },
             { name: "include_archived", in: "query", schema: { type: "boolean" } },
           ],
@@ -295,7 +298,10 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                   type: "object",
                   required: ["kind", "code", "label"],
                   properties: {
-                    kind: { type: "string", enum: ["JUSTIFICATION", "LINK_TYPE", "STATE_SITE"] },
+                    kind: {
+                      type: "string",
+                      enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
+                    },
                     code: { type: "string", minLength: 1, maxLength: 100 },
                     label: { type: "string", minLength: 1, maxLength: 255 },
                     url: { type: "string", format: "uri", pattern: "^https://" },
@@ -333,7 +339,10 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                   type: "object",
                   minProperties: 1,
                   properties: {
-                    kind: { type: "string", enum: ["JUSTIFICATION", "LINK_TYPE", "STATE_SITE"] },
+                    kind: {
+                      type: "string",
+                      enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
+                    },
                     code: { type: "string", minLength: 1, maxLength: 100 },
                     label: { type: "string", minLength: 1, maxLength: 255 },
                     url: { type: ["string", "null"], format: "uri", pattern: "^https://" },
@@ -421,7 +430,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                   properties: {
                     client_id: { type: "string", format: "uuid" },
                     competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
-                    type: { type: "string", enum: ["CLOUD", "DRIVE"] },
+                    type: { type: "string", minLength: 1, maxLength: 100 },
                     url: { type: "string", format: "uri", pattern: "^https://" },
                     description: { type: ["string", "null"] },
                     responsible_id: { type: ["string", "null"], format: "uuid" },
@@ -459,7 +468,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                   type: "object",
                   required: ["type", "url"],
                   properties: {
-                    type: { type: "string", enum: ["CLOUD", "DRIVE"] },
+                    type: { type: "string", minLength: 1, maxLength: 100 },
                     url: { type: "string", format: "uri", pattern: "^https://" },
                     description: { type: ["string", "null"] },
                     responsible_id: { type: ["string", "null"], format: "uuid" },

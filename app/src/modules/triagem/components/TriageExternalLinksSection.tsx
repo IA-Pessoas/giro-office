@@ -19,7 +19,7 @@ import type {
 type LinkFormValues = TriageExternalLinkInput & { description: string; responsible_id: string };
 
 const EMPTY_FORM: LinkFormValues = {
-  type: "DRIVE",
+  type: "",
   url: "",
   description: "",
   responsible_id: "",
@@ -50,17 +50,8 @@ function toPayload(values: LinkFormValues): TriageExternalLinkInput {
 
 function linkTypeOptions(
   catalogItems: TriageCatalogItem[] | undefined,
-  selectedType: TriageExternalLinkType,
 ): Array<{ value: TriageExternalLinkType; label: string }> {
-  const options = (catalogItems ?? [])
-    .filter((item) => item.code === "DRIVE" || item.code === "CLOUD")
-    .map((item) => ({ value: item.code as TriageExternalLinkType, label: item.label }));
-
-  if (!options.some((option) => option.value === selectedType)) {
-    options.push({ value: selectedType, label: selectedType });
-  }
-
-  return options;
+  return (catalogItems ?? []).map((item) => ({ value: item.code, label: item.label }));
 }
 
 function typeLabel(type: TriageExternalLinkType, catalogItems: TriageCatalogItem[] | undefined): string {
@@ -84,10 +75,12 @@ function LinkFormFields({
         Tipo
         <select
           aria-label="Tipo do link externo"
+          required
           value={values.type}
           onChange={(event) => onChange("type", event.target.value as TriageExternalLinkType)}
           className="mt-1 block h-10 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
         >
+          <option value="">Selecione um tipo cadastrado</option>
           {linkTypes.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -155,7 +148,7 @@ export function TriageExternalLinksSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<LinkFormValues>(EMPTY_FORM);
   const users = (usersQuery.data ?? []).map((user) => ({ id: user.id, name: user.name }));
-  const createLinkTypes = linkTypeOptions(linkTypesQuery.data, createValues.type);
+  const createLinkTypes = linkTypeOptions(linkTypesQuery.data);
   const actionError =
     linksQuery.error ??
     linkTypesQuery.error ??
@@ -256,7 +249,7 @@ export function TriageExternalLinksSection({
                   <LinkFormFields
                     values={editValues}
                     users={users}
-                    linkTypes={linkTypeOptions(linkTypesQuery.data, editValues.type)}
+                    linkTypes={linkTypeOptions(linkTypesQuery.data)}
                     onChange={updateEditValue}
                   />
                   <div className="flex flex-wrap gap-2">

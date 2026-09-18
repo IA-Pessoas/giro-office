@@ -6,9 +6,11 @@ const competenceSchema = z
 
 const clientIdSchema = z.string().uuid("Cliente inválido.");
 const responsibleIdSchema = z.string().uuid("Responsável inválido.");
-const externalLinkTypeSchema = z.enum(["CLOUD", "DRIVE"], {
-  errorMap: () => ({ message: "Tipo de link inválido." }),
-});
+const externalLinkTypeSchema = z
+  .string()
+  .trim()
+  .min(1, "Tipo de link é obrigatório.")
+  .max(100, "Tipo de link excede o limite permitido.");
 const httpsUrlSchema = z
   .string({ required_error: "URL do link é obrigatória." })
   .url("URL do link inválida.")
