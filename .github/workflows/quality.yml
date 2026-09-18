@@ -106,5 +106,14 @@ jobs:
       - name: Install frozen dependencies without lifecycle scripts
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
 
+      # `--ignore-scripts` acima e deliberado, mas impede o postinstall do
+      # playwright de baixar o navegador. Sem ele os smokes de browser do app
+      # (test:auth-session e os outros nove) morrem em "Executable doesn't
+      # exist", derrubando a cadeia `&&` inteira de `pnpm test`. Baixamos so o
+      # chromium, explicitamente, em vez de reabilitar lifecycle scripts.
+      - name: Install the Playwright browser used by the smokes
+        working-directory: app
+        run: corepack pnpm exec playwright install --with-deps chromium
+
       - name: Unit and integration tests
         run: corepack pnpm test
