@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { browserSmokeEnv } from "./testing/browserSmokeEnv.mjs";
+
 const PLAYWRIGHT_PORT = process.env.FIELD_HELP_SMOKE_PORT || "3114";
 const configuredBaseUrl = process.env.FIELD_HELP_SMOKE_BASE_URL?.replace(/\/$/, "");
 let baseUrl = configuredBaseUrl || `http://localhost:${PLAYWRIGHT_PORT}`;
@@ -222,7 +224,7 @@ async function withNextServer(run) {
       : ["exec", "next", "dev", "--webpack", "--port", PLAYWRIGHT_PORT];
   const server = spawn(command, args, {
     cwd: appRoot,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";

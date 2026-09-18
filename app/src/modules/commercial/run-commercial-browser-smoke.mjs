@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const PORT = process.env.COMMERCIAL_SMOKE_PORT || "3127";
 const baseUrl = (process.env.COMMERCIAL_SMOKE_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
@@ -630,7 +632,7 @@ async function withNextServer(test) {
     : ["corepack", ["pnpm", "exec", "next", "start", "--port", PORT]];
   const serverProcess = spawn(command, args, {
     cwd: appRoot,
-    env: { ...process.env, API_INTERNAL_URL: gatewayUrl },
+    env: browserSmokeEnv({ API_INTERNAL_URL: gatewayUrl }),
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
