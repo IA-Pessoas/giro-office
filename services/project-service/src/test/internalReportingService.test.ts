@@ -15,7 +15,7 @@ describe("InternalReportingService", () => {
     }));
     records.push({ organization_id: ORG_B, name: "Projeto 149" });
     const service = new InternalReportingService({
-      $transaction: async function (read) {
+      $transaction: async function (read: (transaction: unknown) => Promise<unknown>) {
         return read(this);
       },
       project: {

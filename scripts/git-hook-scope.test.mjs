@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   buildHookPlan,
@@ -68,8 +73,19 @@ describe("classifyChangedFiles", () => {
 describe("buildHookPlan", () => {
   it("filters by the affected graph from the pushed base", () => {
     assert.deepEqual(buildHookPlan(classifyChangedFiles(["app/src/x.tsx"]), ["abc123"]), [
-      ["pnpm", ["exec", "turbo", "run", "check", "typecheck", "--filter=...[abc123]"]],
-      ["pnpm", ["test:policies"]],
+      [
+        "pnpm",
+        [
+          "exec",
+          "turbo",
+          "run",
+          "check",
+          "typecheck",
+          "--filter=...[abc123]",
+          "--output-logs=new-only",
+        ],
+      ],
+      ["pnpm", ["test:scripts"]],
     ]);
   });
 
@@ -87,9 +103,10 @@ describe("buildHookPlan", () => {
             "typecheck",
             "--filter=...[abc123]",
             "--filter=...[def456]",
+            "--output-logs=new-only",
           ],
         ],
-        ["pnpm", ["test:policies"]],
+        ["pnpm", ["test:scripts"]],
       ],
     );
   });
@@ -99,27 +116,45 @@ describe("buildHookPlan", () => {
       ["pnpm", ["audit:ci"]],
       ["pnpm", ["check"]],
       ["pnpm", ["typecheck"]],
-      ["pnpm", ["test:policies"]],
+      ["pnpm", ["test:scripts"]],
     ]);
   });
 
-  it("checks somente os arquivos alterados antes da sequência global", () => {
-    assert.deepEqual(
-      buildHookPlan(
-        classifyChangedFiles(["infra/prisma/schema.prisma"]),
-        ["abc"],
-        ["infra/prisma/schema.prisma"],
-      ),
+  it("mantém as políticas de segurança nas mudanças globais, sem as suítes dos pacotes", () => {
+    const files = ["infra/prisma/schema.prisma"];
+    assert.deepEqual(buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files }), [
       [
-        ["pnpm", ["audit:ci"]],
-        [
-          "pnpm",
-          ["exec", "biome", "check", "--files-ignore-unknown=true", "infra/prisma/schema.prisma"],
-        ],
-        ["pnpm", ["typecheck"]],
-        ["pnpm", ["test:policies"]],
+        "pnpm",
+        ["exec", "biome", "check", "--files-ignore-unknown=true", "infra/prisma/schema.prisma"],
       ],
+      ["pnpm", ["typecheck"]],
+      ["pnpm", ["test:scripts"]],
+    ]);
+  });
+
+  it("audits dependency changes even inside an affected package", () => {
+    const files = ["services/user-service/package.json"];
+    const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
+    assert.deepEqual(commands[0], ["pnpm", ["audit:ci"]]);
+  });
+
+  it("does not contact the dependency registry for code-only pushes", () => {
+    const files = ["services/user-service/src/server.ts"];
+    const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
+    assert.equal(
+      commands.some(([, args]) => args.includes("audit:ci")),
+      false,
     );
+    assert.equal(commands.filter(([, args]) => args.includes("test:scripts")).length, 1);
+  });
+
+  it("allows explicitly running all original gates even without changed files", () => {
+    assert.deepEqual(buildHookPlan(classifyChangedFiles([]), [], { full: true }), [
+      ["pnpm", ["audit:ci"]],
+      ["pnpm", ["check"]],
+      ["pnpm", ["typecheck"]],
+      ["pnpm", ["test"]],
+    ]);
   });
 
   it("skips every command for docs-only changes", () => {
@@ -299,7 +334,6 @@ describe("runCommands", () => {
       ["cmd.exe", ["/d", "/s", "/c", "corepack", "pnpm", "audit:ci"]],
     ]);
   });
-
   it("limita a concorrência do turbo para a carga da máquina não virar vermelho falso", () => {
     const ambientes = [];
     const fakeSpawn = (_command, _args, options = {}) => {
@@ -307,7 +341,7 @@ describe("runCommands", () => {
       return { status: 0 };
     };
 
-    runCommands([["pnpm", ["test"]]], fakeSpawn, { PATH: "/usr/bin" }, "linux");
+    runCommands([["pnpm", ["test:scripts"]]], fakeSpawn, { PATH: "/usr/bin" }, "linux");
 
     assert.equal(ambientes[0].TURBO_CONCURRENCY, "50%");
     assert.equal(ambientes[0].PATH, "/usr/bin");
@@ -320,7 +354,7 @@ describe("runCommands", () => {
       return { status: 0 };
     };
 
-    runCommands([["pnpm", ["test"]]], fakeSpawn, { TURBO_CONCURRENCY: "2" }, "linux");
+    runCommands([["pnpm", ["test:scripts"]]], fakeSpawn, { TURBO_CONCURRENCY: "2" }, "linux");
 
     assert.equal(ambientes[0].TURBO_CONCURRENCY, "2");
   });

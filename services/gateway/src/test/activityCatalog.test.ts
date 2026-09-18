@@ -319,6 +319,10 @@ describe("activityCatalog", () => {
   it("não inventa descrição para rota desconhecida", () => {
     expect(classifyActivity("POST", "/unknown/action")).toEqual({ kind: "unknown" });
     expect(classifyActivity("POST", "/task/nova-acao")).toEqual({ kind: "unknown" });
+    expect(classifyActivity("POST", "/pessoal/groups/42/unknown")).toEqual({ kind: "unknown" });
+    expect(classifyActivity("GET", "/pessoal/group-assignments/unknown")).toEqual({
+      kind: "unknown",
+    });
     expect(describeActivity("POST", "/unknown/action")).toBeNull();
   });
 

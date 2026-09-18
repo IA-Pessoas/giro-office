@@ -50,7 +50,11 @@ export function createTriageDocumentsRoutes(
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(triageEditabilityRequestSchema, req.query);
-        res.json(createSuccessResponse(await service.getEditability(query.client_id, authenticatedContext(req))));
+        res.json(
+          createSuccessResponse(
+            await service.getEditability(query.client_id, authenticatedContext(req)),
+          ),
+        );
       } catch (err) {
         logError("Erro ao verificar permissão de edição da Triagem", { err });
         next(err);
@@ -65,11 +69,7 @@ export function createTriageDocumentsRoutes(
       try {
         const query = parseWithZod(triageMonthlyRequestSchema, req.query);
         const auth = authenticatedContext(req);
-        res.json(
-          createSuccessResponse(
-            await service.getMonthly(query, auth.organizationId),
-          ),
-        );
+        res.json(createSuccessResponse(await service.getMonthly(query, auth.organizationId)));
       } catch (err) {
         logError("Erro ao buscar pendência documental mensal", { err });
         next(err);
@@ -84,9 +84,7 @@ export function createTriageDocumentsRoutes(
       try {
         const body = parseWithZod(triageMonthlyRequestSchema, req.body);
         const auth = authenticatedContext(req);
-        res.json(
-          createSuccessResponse(await service.getOrCreateMonthly(body, auth)),
-        );
+        res.json(createSuccessResponse(await service.getOrCreateMonthly(body, auth)));
       } catch (err) {
         logError("Erro ao criar pendência documental mensal", { err });
         next(err);
@@ -103,11 +101,7 @@ export function createTriageDocumentsRoutes(
         const body = parseWithZod(triageDocumentItemBodySchema, req.body);
         res.json(
           createSuccessResponse(
-            await service.updateItem(
-              params.id,
-              body,
-              authenticatedContext(req),
-            ),
+            await service.updateItem(params.id, body, authenticatedContext(req)),
           ),
         );
       } catch (err) {
@@ -143,11 +137,7 @@ export function createTriageDocumentsRoutes(
       try {
         const query = parseWithZod(triageMonthlyRequestSchema, req.query);
         const auth = authenticatedContext(req);
-        res.json(
-          createSuccessResponse(
-            await service.listStatements(query, auth.organizationId),
-          ),
-        );
+        res.json(createSuccessResponse(await service.listStatements(query, auth.organizationId)));
       } catch (err) {
         logError("Erro ao listar extratos bancários", { err });
         next(err);
@@ -162,9 +152,7 @@ export function createTriageDocumentsRoutes(
       try {
         const body = parseWithZod(triageStatementBodySchema, req.body);
         res.json(
-          createSuccessResponse(
-            await service.upsertStatement(body, authenticatedContext(req)),
-          ),
+          createSuccessResponse(await service.upsertStatement(body, authenticatedContext(req))),
         );
       } catch (err) {
         logError("Erro ao atualizar extrato bancário", { err });

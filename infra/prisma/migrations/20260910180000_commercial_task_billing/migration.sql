@@ -30,7 +30,7 @@ BEGIN
   ) THEN
     ALTER TABLE "commercial.task_billing"
       ADD CONSTRAINT "commercial_task_billing_organization_id_fkey"
-      FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
   END IF;
 END $$;
 

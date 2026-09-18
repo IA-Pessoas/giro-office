@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import fs, { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -30,6 +31,45 @@ async function withFixture(files, callback) {
     await rm(root, { recursive: true, force: true });
   }
 }
+
+test("scans large nested directories without exceeding the argument limit", async () => {
+  // Virtual files exercise the real traversal without creating 150,000 files on disk.
+  const fileCount = 150_000;
+  const root = path.resolve(os.tmpdir(), "giro-supply-chain-large-fixture");
+  const directory = path.join(root, "nested");
+  const configPath = path.join(directory, "postcss.config.js");
+  const original = { readdir: fs.readdir, lstat: fs.lstat, readFile: fs.readFile };
+  const entry = (name, isDirectory) => ({ name, isDirectory: () => isDirectory });
+
+  try {
+    fs.readdir = async (target) => {
+      assert.ok(target === root || target === directory);
+      return target === root
+        ? [entry("nested", true)]
+        : Array.from({ length: fileCount }, (_, index) =>
+            entry(index === fileCount - 1 ? "postcss.config.js" : `${index}.txt`, false),
+          );
+    };
+    fs.lstat = async (target) => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => target === directory,
+      isFile: () => target !== directory,
+    });
+    fs.readFile = async (target) => Buffer.from(target === configPath ? "For only test" : "");
+    syncBuiltinESMExports();
+
+    const report = await scanRepository(root, { allowlist: [] });
+    assert.equal(report.summary.filesScanned, fileCount);
+    assert.equal(report.ok, false);
+    assert.deepEqual(
+      report.findings.map(({ path: findingPath, ruleId }) => ({ path: findingPath, ruleId })),
+      [{ path: "nested/postcss.config.js", ruleId: "ioc.incident-marker" }],
+    );
+  } finally {
+    Object.assign(fs, original);
+    syncBuiltinESMExports();
+  }
+});
 
 test("detects incident IOC families without returning source content", async () => {
   await withFixture(

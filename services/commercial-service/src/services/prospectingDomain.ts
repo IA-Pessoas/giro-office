@@ -1,6 +1,6 @@
 import { ServiceError } from "@workspace/shared";
 
-import { prospectingStatuses, type ProspectingStatus } from "../schemas/prospecting.schemas.js";
+import { type ProspectingStatus, prospectingStatuses } from "../schemas/prospecting.schemas.js";
 
 export { prospectingStatuses };
 export type { ProspectingStatus };

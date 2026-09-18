@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rodar Office"
+  short_description: "Sugere serviços pelas alterações e inicia o Office"
+  default_prompt: "Use $rodar-office para identificar os serviços pelos arquivos alterados, perguntar se houver dúvida e confirmar UI, base e serviços adicionais antes de iniciar."

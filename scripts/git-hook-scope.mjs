@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,30 +50,32 @@ const GLOBAL_PREFIXES = [
   "supabase/",
 ];
 
-/**
- * O pre-push roda apenas verificações rápidas e determinísticas: formatação, tipos,
- * auditoria de dependências e as políticas de segurança (entre elas a varredura de
- * payload em configs executáveis). As suítes de teste dos pacotes ficam de fora
- * porque falhavam de forma intermitente na máquina de quem empurra, e um gate que
- * às vezes reprova código correto deixa de ser levado a sério.
- */
+/** Modo explicito (--full): o desenvolvedor pede todos os gates, suites incluidas. */
 const GLOBAL_COMMANDS = [
   ["pnpm", ["audit:ci"]],
+  ["pnpm", ["check"]],
   ["pnpm", ["typecheck"]],
-  ["pnpm", ["test:policies"]],
+  ["pnpm", ["test"]],
 ];
 
-const AFFECTED_TASKS = ["check", "typecheck"];
+/** Sem base para comparar: roda o gate rapido inteiro, sem as suites dos pacotes. */
+const BASELESS_COMMANDS = [
+  ["pnpm", ["audit:ci"]],
+  ["pnpm", ["check"]],
+  ["pnpm", ["typecheck"]],
+  ["pnpm", ["test:scripts"]],
+];
 
-/**
- * O hook roda na máquina de quem está empurrando, normalmente com editor, containers
- * e servidores de desenvolvimento no ar. Sem teto, o turbo dispara uma tarefa por
- * núcleo e as suítes começam a falhar por disputa de CPU e de porta — falhas que
- * somem quando o pacote roda sozinho. Metade dos núcleos mantém o gate rápido sem
- * transformar carga em vermelho falso. Vale tanto para o caminho por pacote afetado
- * quanto para os comandos globais, que tambem chamam o turbo.
- */
-const HOOK_TURBO_CONCURRENCY = "50%";
+const DEPENDENCY_FILES = new Set([
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "package-lock.json",
+  "npm-shrinkwrap.json",
+  "yarn.lock",
+  ".npmrc",
+  ".pnpmfile.cjs",
+]);
 
 function normalizeGitPath(filePath) {
   return filePath
@@ -126,21 +136,50 @@ export function classifyChangedFiles(changedFiles) {
   return { mode: "affected", reason: "workspace-packages" };
 }
 
-export function buildHookPlan(classification, bases = [], changedFiles = []) {
+export function buildHookPlan(
+  classification,
+  bases = [],
+  { changedFiles = [], full = false } = {},
+) {
+  if (full) {
+    return cloneCommands(GLOBAL_COMMANDS);
+  }
+
   if (classification.mode === "skip") {
     return [];
   }
 
-  if (classification.mode === "global" || bases.length === 0) {
-    const [[auditCommand, auditArgs], ...remainingCommands] = cloneCommands(GLOBAL_COMMANDS);
-    return [[auditCommand, auditArgs], buildBiomeCheckCommand(changedFiles), ...remainingCommands];
+  if (bases.length === 0) {
+    return cloneCommands(BASELESS_COMMANDS);
   }
 
-  const filters = bases.map((base) => `--filter=...[${base}]`);
-  return [
-    ["pnpm", ["exec", "turbo", "run", ...AFFECTED_TASKS, ...filters]],
-    ["pnpm", ["test:policies"]],
-  ];
+  const global = classification.mode === "global";
+  const filters = global ? [] : bases.map((base) => `--filter=...[${base}]`);
+  const commands = [];
+
+  if (
+    changedFiles.some((file) => DEPENDENCY_FILES.has(path.posix.basename(normalizeGitPath(file))))
+  ) {
+    commands.push(["pnpm", ["audit:ci"]]);
+  }
+
+  if (global) {
+    commands.push(buildBiomeCheckCommand(changedFiles), ["pnpm", ["typecheck"]]);
+  } else {
+    commands.push([
+      "pnpm",
+      ["exec", "turbo", "run", "check", "typecheck", ...filters, "--output-logs=new-only"],
+    ]);
+  }
+
+  // As politicas de seguranca sao rapidas e deterministicas; entre elas esta a
+  // varredura de payload em configs executaveis, que detectou o comprometimento
+  // de 2026-09-17. As suites dos pacotes ficam de fora: falhavam de forma
+  // intermitente na maquina de quem empurra e um gate que as vezes mente vira
+  // motivo para --no-verify. Elas seguem em pnpm test e devem voltar ao CI.
+  commands.push(["pnpm", ["test:scripts"]]);
+
+  return commands;
 }
 
 /**
@@ -153,10 +192,10 @@ const FORCE_ESCAPE_ENV = "ALLOW_FORCE_PUSH";
 
 /**
  * Um push que reescreve historico aparece no pre-push como um remoto que nao e
- * ancestral do local: os commits que estavam publicados deixariam de existir.
- * Recusamos por padrao — foi assim que o repositorio foi comprometido, com as
- * branches reescritas por um push forcado — e so liberamos fora das branches
- * protegidas quando quem empurra declara a intencao em ALLOW_FORCE_PUSH.
+ * ancestral do local: os commits ja publicados deixariam de existir. Recusamos por
+ * padrao — foi assim que o repositorio foi comprometido em 2026-09-17, com as branches
+ * reescritas por push forcado — e so liberamos fora das branches protegidas quando
+ * quem empurra declara a intencao em ALLOW_FORCE_PUSH.
  */
 export function findHistoryRewrites(records, git = createGitRunner()) {
   const rewrites = [];
@@ -166,9 +205,7 @@ export function findHistoryRewrites(records, git = createGitRunner()) {
       continue;
     }
 
-    const isAncestor = git.isAncestor(record.remoteOid, record.localOid);
-
-    if (isAncestor === false) {
+    if (git.isAncestor(record.remoteOid, record.localOid) === false) {
       rewrites.push({
         ref: record.remoteRef,
         branch: record.remoteRef.replace(/^refs\/heads\//, ""),
@@ -187,9 +224,8 @@ export function describeForcePushBlock(rewrites, env = process.env) {
   }
 
   const protectedRewrites = rewrites.filter(({ branch }) => PROTECTED_BRANCHES.has(branch));
-  const escapeRequested = env[FORCE_ESCAPE_ENV] === "1";
 
-  if (escapeRequested && protectedRewrites.length === 0) {
+  if (env[FORCE_ESCAPE_ENV] === "1" && protectedRewrites.length === 0) {
     return null;
   }
 
@@ -439,16 +475,22 @@ function shouldFallbackToCorepack(command, result) {
   return command === "pnpm" && result.error?.code === "ENOENT";
 }
 
+/** Ver comentario em runCommands: evita que a carga da maquina reprove codigo correto. */
+const HOOK_TURBO_CONCURRENCY = "50%";
+
 export function runCommands(
   commands,
   spawn = spawnSync,
   env = process.env,
   platform = process.platform,
 ) {
+  // O hook roda na maquina de quem empurra, com editor e containers no ar; sem teto,
+  // o turbo abre uma tarefa por nucleo e a disputa por CPU vira falha intermitente.
   const hookEnv = { TURBO_CONCURRENCY: HOOK_TURBO_CONCURRENCY, ...env };
 
   for (const [command, args] of commands) {
     console.log(`$ ${formatCommand([command, args])}`);
+    const startedAt = performance.now();
 
     let result = spawn(command, args, {
       stdio: "inherit",
@@ -469,6 +511,10 @@ export function runCommands(
       }
     }
 
+    console.log(
+      `git-hook-scope: command finished in ${((performance.now() - startedAt) / 1000).toFixed(1)}s`,
+    );
+
     if (result.status !== 0) {
       return result.status ?? 1;
     }
@@ -479,13 +525,14 @@ export function runCommands(
 
 function parseCliArgs(argv) {
   const dryRun = argv.includes("--dry-run");
+  const full = argv.includes("--full");
   const hook = argv.find((arg) => !arg.startsWith("-")) ?? "pre-push";
 
-  return { dryRun, hook };
+  return { dryRun, full, hook };
 }
 
 function main() {
-  const { dryRun, hook } = parseCliArgs(process.argv.slice(2));
+  const { dryRun, full, hook } = parseCliArgs(process.argv.slice(2));
 
   if (hook !== "pre-push") {
     console.error(`Unsupported hook: ${hook}`);
@@ -501,10 +548,15 @@ function main() {
   }
 
   const resolution = resolvePrePushChangedFiles(hookInput);
-  const classification = resolution.forceGlobal
-    ? { mode: "global", reason: resolution.reason }
-    : classifyChangedFiles(resolution.files);
-  const commands = buildHookPlan(classification, resolution.bases ?? [], resolution.files);
+  const classification = full
+    ? { mode: "global", reason: "explicit-full" }
+    : resolution.forceGlobal
+      ? { mode: "global", reason: resolution.reason }
+      : classifyChangedFiles(resolution.files);
+  const commands = buildHookPlan(classification, resolution.bases ?? [], {
+    changedFiles: resolution.files,
+    full,
+  });
 
   console.log(
     `git-hook-scope: ${classification.mode} (${classification.reason}); files=${resolution.files.length}`,
