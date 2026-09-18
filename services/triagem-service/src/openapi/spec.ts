@@ -259,6 +259,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
             },
             "401": { description: "Não autenticado" },
             "403": { description: "Sem permissão" },
+            "400": { description: "Entrada inválida" },
           },
         },
       },

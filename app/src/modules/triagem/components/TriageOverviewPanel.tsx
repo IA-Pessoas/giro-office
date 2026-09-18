@@ -101,7 +101,11 @@ export function TriageOverviewPanel({ clientId }: { clientId?: string }) {
       {result ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Indicadores do painel">
           {(Object.entries(STATUS_LABELS) as Array<[TriageOverviewStatus, string]>).map(([key, label]) => (
-            <div key={key} className="rounded-lg border border-gray-200 p-3 dark:border-slate-700">
+            <div
+              key={key}
+              aria-label={`${label}: ${result.indicators[INDICATOR_KEYS[key]]}`}
+              className="rounded-lg border border-gray-200 p-3 dark:border-slate-700"
+            >
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-slate-400">{label}</p>
               <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{result.indicators[INDICATOR_KEYS[key]]}</p>
             </div>

@@ -296,13 +296,14 @@ const actionExecutionRank = {
   triagemCatalogCreate: 4470,
   triagemCompetenceList: 4480,
   triagemCompetenceCreate: 4481,
-  triagemCatalogList: 4482,
-  triagemCatalogUpdate: 4483,
-  triagemExternalLinkList: 4484,
-  triagemExternalLinkCreate: 4485,
-  triagemExternalLinkUpdate: 4486,
-  triagemExternalLinkArchive: 4487,
-  triagemCatalogArchive: 4488,
+  triagemOverviewList: 4482,
+  triagemCatalogList: 4483,
+  triagemCatalogUpdate: 4484,
+  triagemExternalLinkList: 4485,
+  triagemExternalLinkCreate: 4486,
+  triagemExternalLinkUpdate: 4487,
+  triagemExternalLinkArchive: 4488,
+  triagemCatalogArchive: 4489,
   projectDelete: 8000,
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
@@ -4537,6 +4538,18 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/triagem/competencies/${requireState("triagemCompetenceId")}/archive`,
+    });
+  },
+
+  async triagemOverviewList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-09",
+        page: "1",
+        page_size: "20",
+      },
     });
   },
 

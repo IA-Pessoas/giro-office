@@ -43,10 +43,9 @@ function overviewFor(url) {
   }
 
   const items = status === "COMPLETE"
-    ? [{ client_id: "b0000000-0000-4000-8000-000000000002", legal_name: "Cliente Completo", competence: "2026-09", status: "COMPLETE" }]
+    ? [{ client_id: "b0000000-0000-4000-8000-000000000003", legal_name: "Cliente Apenas Completo", competence: "2026-09", status: "COMPLETE" }]
     : [
         { client_id: "b0000000-0000-4000-8000-000000000001", legal_name: "Cliente Urgente", competence: "2026-09", status: "URGENT_OPEN" },
-        { client_id: "b0000000-0000-4000-8000-000000000002", legal_name: "Cliente Completo", competence: "2026-09", status: "COMPLETE" },
       ];
   return {
     items,
@@ -57,7 +56,7 @@ function overviewFor(url) {
       urgent_open: status === "COMPLETE" ? 0 : 1,
       routine_pending: 0,
       bank_pending: 0,
-      complete: status === "COMPLETE" ? 1 : 1,
+      complete: status === "COMPLETE" ? 1 : 0,
     },
   };
 }
@@ -97,6 +96,8 @@ async function runBrowserProof() {
     await page.goto("/triagem", { waitUntil: "domcontentloaded", timeout: 60_000 });
     await expect(page.getByRole("heading", { name: "Painel operacional" })).toBeVisible();
     await expect(page.getByText("Cliente Urgente")).toBeVisible();
+    await expect(page.getByLabel("Urgente aberta: 1")).toBeVisible();
+    await expect(page.getByLabel("Completa: 0")).toBeVisible();
     assert.ok(
       requestLog.some(
         ({ method, path, url }) =>
@@ -105,7 +106,9 @@ async function runBrowserProof() {
     );
 
     await page.getByLabel("Status do painel").selectOption("COMPLETE");
-    await expect(page.getByText("Cliente Completo")).toBeVisible();
+    await expect(page.getByText("Cliente Apenas Completo")).toBeVisible();
+    await expect(page.getByText("Cliente Urgente")).toHaveCount(0);
+    await expect(page.getByLabel("Completa: 1")).toBeVisible();
     assert.ok(
       requestLog.some(
         ({ method, path, url }) =>

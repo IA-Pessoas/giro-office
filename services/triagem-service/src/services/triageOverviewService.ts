@@ -1,50 +1,10 @@
 import { ServiceError } from "@workspace/shared";
 
-import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
-
-const overviewCompetenceSelect = {
-  id: true,
-  client_id: true,
-  competence: true,
-  client: { select: { name: true, company_name: true } },
-} as const;
-
-const monthlySelect = {
-  client_id: true,
-  competence: true,
-  checklist: true,
-} as const;
-
-const bankSelect = {
-  client_id: true,
-  competence: true,
-  status: true,
-} as const;
-
-const urgentSelect = {
-  client_id: true,
-  competence: true,
-  status: true,
-} as const;
-
-type OverviewCompetence = Prisma.TriageCompetenceGetPayload<{
-  select: typeof overviewCompetenceSelect;
-}>;
-type MonthlyRecord = Prisma.TriageMonthlyGetPayload<{ select: typeof monthlySelect }>;
-type BankRecord = Prisma.TriageBankStatementGetPayload<{ select: typeof bankSelect }>;
-type UrgentRecord = Prisma.TriageUrgentRequestGetPayload<{ select: typeof urgentSelect }>;
+import type { PrismaClient } from "../generated/prisma/client.js";
 
 export type TriageOverviewStatus = "URGENT_OPEN" | "ROUTINE_PENDING" | "BANK_PENDING" | "COMPLETE";
 
-export type TriageOverviewPrisma = Pick<
-  PrismaClient,
-  | "$executeRaw"
-  | "$transaction"
-  | "triageCompetence"
-  | "triageMonthly"
-  | "triageBankStatement"
-  | "triageUrgentRequest"
->;
+export type TriageOverviewPrisma = Pick<PrismaClient, "$executeRaw" | "$queryRaw" | "$transaction">;
 
 export interface TriageOverviewAuthContext {
   userId: string;
@@ -83,6 +43,21 @@ export interface TriageOverviewResult {
   indicators: TriageOverviewIndicators;
 }
 
+export interface TriageOverviewStatusSources {
+  routineChecklists: unknown[];
+  bankStatuses: unknown[];
+  urgentStatuses: unknown[];
+}
+
+interface TriageOverviewQueryRow {
+  items: unknown;
+  total: number;
+  urgent_open: number;
+  routine_pending: number;
+  bank_pending: number;
+  complete: number;
+}
+
 function requireContext(auth: TriageOverviewAuthContext): void {
   if (!auth.userId || !auth.organizationId) {
     throw new ServiceError(400, "Contexto autenticado incompleto.");
@@ -103,47 +78,59 @@ function isPendingStatus(status: unknown): boolean {
   return status !== "COMPLETED" && status !== "NOT_APPLICABLE";
 }
 
-function hasPendingRoutine(records: MonthlyRecord[]): boolean {
-  return records.some((record) => {
+function hasPendingRoutine(checklists: unknown[]): boolean {
+  return checklists.some((rawChecklist) => {
     const checklist =
-      record.checklist && typeof record.checklist === "object" && !Array.isArray(record.checklist)
-        ? record.checklist
+      rawChecklist && typeof rawChecklist === "object" && !Array.isArray(rawChecklist)
+        ? rawChecklist
         : {};
     return Object.values(checklist).some((status) => isPendingStatus(status));
   });
 }
 
-function key(clientId: string, competence: string): string {
-  return `${clientId}:${competence}`;
-}
-
-function legalName(record: OverviewCompetence): string {
-  return record.client.company_name?.trim() || record.client.name;
-}
-
-function deriveStatus(
-  monthly: MonthlyRecord[],
-  banks: BankRecord[],
-  urgentRequests: UrgentRecord[],
+export function deriveTriageOverviewStatus(
+  sources: TriageOverviewStatusSources,
 ): TriageOverviewStatus {
-  if (urgentRequests.some((request) => request.status === "OPEN")) {
+  if (sources.urgentStatuses.some((status) => status === "OPEN")) {
     return "URGENT_OPEN";
   }
-  if (hasPendingRoutine(monthly)) {
+  if (hasPendingRoutine(sources.routineChecklists)) {
     return "ROUTINE_PENDING";
   }
-  if (banks.some((statement) => isPendingStatus(statement.status))) {
+  if (sources.bankStatuses.some((status) => isPendingStatus(status))) {
     return "BANK_PENDING";
   }
   return "COMPLETE";
 }
 
-function emptyIndicators(): TriageOverviewIndicators {
-  return { urgent_open: 0, routine_pending: 0, bank_pending: 0, complete: 0 };
-}
+function overviewItems(value: unknown): TriageOverviewItem[] {
+  if (!Array.isArray(value)) {
+    throw new ServiceError(500, "Resposta inválida do painel consolidado da Triagem.");
+  }
 
-function indicatorKey(status: TriageOverviewStatus): keyof TriageOverviewIndicators {
-  return status.toLowerCase() as keyof TriageOverviewIndicators;
+  return value.map((item) => {
+    const candidate =
+      item && typeof item === "object" && !Array.isArray(item)
+        ? (item as Record<string, unknown>)
+        : null;
+    if (
+      !candidate ||
+      typeof candidate.client_id !== "string" ||
+      typeof candidate.legal_name !== "string" ||
+      typeof candidate.competence !== "string" ||
+      typeof candidate.status !== "string" ||
+      !["URGENT_OPEN", "ROUTINE_PENDING", "BANK_PENDING", "COMPLETE"].includes(candidate.status)
+    ) {
+      throw new ServiceError(500, "Resposta inválida do painel consolidado da Triagem.");
+    }
+
+    return {
+      client_id: candidate.client_id,
+      legal_name: candidate.legal_name,
+      competence: candidate.competence,
+      status: candidate.status as TriageOverviewStatus,
+    };
+  });
 }
 
 export class TriageOverviewService {
@@ -163,106 +150,104 @@ export class TriageOverviewService {
     }
 
     return this.withOrganization(auth, async (transaction) => {
-      const competences = await transaction.triageCompetence.findMany({
-        where: {
-          organization_id: auth.organizationId,
-          ...(input.clientId ? { client_id: input.clientId } : {}),
-          ...(input.competence ? { competence: input.competence } : {}),
-          archived_at: null,
-        },
-        orderBy: [{ competence: "desc" }, { created_at: "desc" }],
-        select: overviewCompetenceSelect,
-      });
+      const clientId = input.clientId ?? null;
+      const competence = input.competence ?? null;
+      const status = input.status ?? null;
+      const offset = (input.page - 1) * input.pageSize;
+      const [row] = await transaction.$queryRaw<TriageOverviewQueryRow[]>`
+        WITH eligible AS (
+          SELECT
+            competence.client_id,
+            competence.competence,
+            COALESCE(NULLIF(BTRIM(client.company_name), ''), client.name) AS legal_name
+          FROM "triagem.competences" AS competence
+          INNER JOIN clients AS client
+            ON client.id = competence.client_id
+           AND client.organization_id = competence.organization_id
+          WHERE competence.organization_id = ${auth.organizationId}
+            AND competence.archived_at IS NULL
+            AND (${clientId}::text IS NULL OR competence.client_id = ${clientId}::text)
+            AND (${competence}::text IS NULL OR competence.competence = ${competence}::text)
+        ),
+        derived AS (
+          SELECT
+            eligible.*,
+            CASE
+              WHEN EXISTS (
+                SELECT 1
+                FROM "triagem.urgent_requests" AS urgent
+                WHERE urgent.organization_id = ${auth.organizationId}
+                  AND urgent.client_id = eligible.client_id
+                  AND urgent.competence = eligible.competence
+                  AND urgent.status = 'OPEN'
+              ) THEN 'URGENT_OPEN'
+              WHEN EXISTS (
+                SELECT 1
+                FROM "triagem.monthly" AS monthly
+                CROSS JOIN LATERAL jsonb_each(
+                  CASE
+                    WHEN jsonb_typeof(monthly.checklist::jsonb) = 'object' THEN monthly.checklist::jsonb
+                    ELSE '{}'::jsonb
+                  END
+                ) AS checklist_item
+                WHERE monthly.organization_id = ${auth.organizationId}
+                  AND monthly.client_id = eligible.client_id
+                  AND monthly.competence = eligible.competence
+                  AND monthly.archived_at IS NULL
+                  AND COALESCE(checklist_item.value #>> '{}', '') NOT IN ('COMPLETED', 'NOT_APPLICABLE')
+              ) THEN 'ROUTINE_PENDING'
+              WHEN EXISTS (
+                SELECT 1
+                FROM "triagem.bank_statements" AS bank
+                WHERE bank.organization_id = ${auth.organizationId}
+                  AND bank.client_id = eligible.client_id
+                  AND bank.competence = eligible.competence
+                  AND bank.archived_at IS NULL
+                  AND COALESCE(bank.status, '') NOT IN ('COMPLETED', 'NOT_APPLICABLE')
+              ) THEN 'BANK_PENDING'
+              ELSE 'COMPLETE'
+            END AS status
+          FROM eligible
+        ),
+        filtered AS (
+          SELECT *
+          FROM derived
+          WHERE (${status}::text IS NULL OR derived.status = ${status}::text)
+        ),
+        paged AS (
+          SELECT *
+          FROM filtered
+          ORDER BY competence DESC, LOWER(legal_name), client_id
+          OFFSET ${offset}
+          LIMIT ${input.pageSize}
+        )
+        SELECT
+          COALESCE(
+            (SELECT jsonb_agg(to_jsonb(paged) ORDER BY paged.competence DESC, LOWER(paged.legal_name), paged.client_id) FROM paged),
+            '[]'::jsonb
+          ) AS items,
+          (SELECT COUNT(*)::int FROM filtered) AS total,
+          (SELECT COUNT(*)::int FROM filtered WHERE status = 'URGENT_OPEN') AS urgent_open,
+          (SELECT COUNT(*)::int FROM filtered WHERE status = 'ROUTINE_PENDING') AS routine_pending,
+          (SELECT COUNT(*)::int FROM filtered WHERE status = 'BANK_PENDING') AS bank_pending,
+          (SELECT COUNT(*)::int FROM filtered WHERE status = 'COMPLETE') AS complete
+      `;
 
-      if (competences.length === 0) {
-        return {
-          items: [],
-          total: 0,
-          page: input.page,
-          page_size: input.pageSize,
-          indicators: emptyIndicators(),
-        };
+      if (!row) {
+        throw new ServiceError(500, "Não foi possível consultar o painel consolidado da Triagem.");
       }
 
-      const clientIds = [...new Set(competences.map((record) => record.client_id))];
-      const competencesValues = [...new Set(competences.map((record) => record.competence))];
-      const scope = {
-        organization_id: auth.organizationId,
-        client_id: { in: clientIds },
-        competence: { in: competencesValues },
-      };
-      const [monthlyRecords, bankRecords, urgentRecords] = await Promise.all([
-        transaction.triageMonthly.findMany({
-          where: { ...scope, archived_at: null },
-          select: monthlySelect,
-        }),
-        transaction.triageBankStatement.findMany({
-          where: { ...scope, archived_at: null },
-          select: bankSelect,
-        }),
-        transaction.triageUrgentRequest.findMany({
-          where: scope,
-          select: urgentSelect,
-        }),
-      ]);
-
-      const monthlyByKey = new Map<string, MonthlyRecord[]>();
-      for (const record of monthlyRecords) {
-        const recordKey = key(record.client_id, record.competence);
-        const records = monthlyByKey.get(recordKey) ?? [];
-        records.push(record);
-        monthlyByKey.set(recordKey, records);
-      }
-      const banksByKey = new Map<string, BankRecord[]>();
-      for (const record of bankRecords) {
-        const recordKey = key(record.client_id, record.competence);
-        const records = banksByKey.get(recordKey) ?? [];
-        records.push(record);
-        banksByKey.set(recordKey, records);
-      }
-      const urgentByKey = new Map<string, UrgentRecord[]>();
-      for (const record of urgentRecords) {
-        const recordKey = key(record.client_id, record.competence);
-        const records = urgentByKey.get(recordKey) ?? [];
-        records.push(record);
-        urgentByKey.set(recordKey, records);
-      }
-
-      const derivedItems = competences
-        .map((record) => {
-          const recordKey = key(record.client_id, record.competence);
-          const status = deriveStatus(
-            monthlyByKey.get(recordKey) ?? [],
-            banksByKey.get(recordKey) ?? [],
-            urgentByKey.get(recordKey) ?? [],
-          );
-          return {
-            client_id: record.client_id,
-            legal_name: legalName(record),
-            competence: record.competence,
-            status,
-          } satisfies TriageOverviewItem;
-        })
-        .filter((item) => !input.status || item.status === input.status)
-        .sort(
-          (left, right) =>
-            right.competence.localeCompare(left.competence) ||
-            left.legal_name.localeCompare(right.legal_name, "pt-BR", { sensitivity: "base" }) ||
-            left.client_id.localeCompare(right.client_id),
-        );
-
-      const indicators = emptyIndicators();
-      for (const item of derivedItems) {
-        indicators[indicatorKey(item.status)] += 1;
-      }
-
-      const skip = (input.page - 1) * input.pageSize;
       return {
-        items: derivedItems.slice(skip, skip + input.pageSize),
-        total: derivedItems.length,
+        items: overviewItems(row.items),
+        total: row.total,
         page: input.page,
         page_size: input.pageSize,
-        indicators,
+        indicators: {
+          urgent_open: row.urgent_open,
+          routine_pending: row.routine_pending,
+          bank_pending: row.bank_pending,
+          complete: row.complete,
+        },
       };
     });
   }

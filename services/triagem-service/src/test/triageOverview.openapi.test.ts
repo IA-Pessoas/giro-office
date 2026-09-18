@@ -23,6 +23,7 @@ describe("contrato OpenAPI do painel consolidado da Triagem", () => {
     );
     expect(spec.components?.schemas).toHaveProperty("TriageOverviewItem");
     expect(spec.components?.schemas).toHaveProperty("TriageOverviewIndicators");
+    expect(overview.responses).toHaveProperty("400");
     expect(JSON.stringify(overview)).toContain("URGENT_OPEN");
     expect(JSON.stringify(overview)).toContain("ROUTINE_PENDING");
     expect(JSON.stringify(overview)).toContain("BANK_PENDING");
