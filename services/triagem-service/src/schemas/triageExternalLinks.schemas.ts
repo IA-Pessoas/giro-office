@@ -46,12 +46,13 @@ export const updateTriageExternalLinkBodySchema = z
 
 export const listTriageExternalLinkQuerySchema = z
   .object({
-    client_id: clientIdSchema.optional(),
-    competence: competenceSchema.optional(),
+    client_id: clientIdSchema,
+    competence: competenceSchema,
     include_archived: z
-      .preprocess((value) => value === "true" || value === "1", z.boolean())
+      .enum(["true", "false", "1", "0"])
+      .transform((value) => value === "true" || value === "1")
       .optional()
-      .default(false),
+      .default("false"),
   })
   .strict();
 

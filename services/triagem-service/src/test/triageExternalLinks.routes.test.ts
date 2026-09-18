@@ -107,6 +107,27 @@ describe("rotas de links externos da Triagem", () => {
     expect(deps.create).not.toHaveBeenCalled();
   });
 
+  it("exige cliente e competência e rejeita include_archived inválido", async () => {
+    const deps = createMockDeps();
+    const app = createTriagemApp({
+      env,
+      logger,
+      prisma: createMockPrisma(),
+      triageExternalLinkRouteDeps: deps,
+    });
+
+    const missingScope = await request(app).get("/triagem/external-links").set(authHeaders());
+    expect(missingScope.status).toBe(400);
+
+    const invalidFlag = await request(app).get("/triagem/external-links").set(authHeaders()).query({
+      client_id: CLIENT_ID,
+      competence: "2026-09",
+      include_archived: "yes",
+    });
+    expect(invalidFlag.status).toBe(400);
+    expect(deps.list).not.toHaveBeenCalled();
+  });
+
   it("expõe revisão, arquivamento e listagem com os parâmetros da competência", async () => {
     const deps = createMockDeps();
     const app = createTriagemApp({

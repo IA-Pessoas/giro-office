@@ -199,8 +199,18 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
           summary: "Listar links externos",
           security: bearer,
           parameters: [
-            { name: "client_id", in: "query", schema: { type: "string", format: "uuid" } },
-            { name: "competence", in: "query", schema: { type: "string" } },
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
             { name: "include_archived", in: "query", schema: { type: "boolean" } },
           ],
           responses: {

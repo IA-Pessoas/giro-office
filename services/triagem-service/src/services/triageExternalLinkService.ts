@@ -52,8 +52,8 @@ export interface UpdateTriageExternalLinkInput {
 }
 
 export interface ListTriageExternalLinkInput {
-  clientId?: string;
-  competence?: string;
+  clientId: string;
+  competence: string;
   includeArchived?: boolean;
 }
 
@@ -150,16 +150,14 @@ export class TriageExternalLinkService {
   ): Promise<TriageExternalLinkDto[]> {
     requireContext(auth);
     requireViewPermission(auth);
-    if (input.competence) {
-      assertCompetence(input.competence);
-    }
+    assertCompetence(input.competence);
 
     const records = await this.withOrganization(auth, (transaction) =>
       transaction.triageExternalLink.findMany({
         where: {
           organization_id: auth.organizationId,
-          ...(input.clientId ? { client_id: input.clientId } : {}),
-          ...(input.competence ? { competence: input.competence } : {}),
+          client_id: input.clientId,
+          competence: input.competence,
           ...(input.includeArchived ? {} : { archived_at: null }),
         },
         orderBy: [{ competence: "desc" }, { created_at: "desc" }],

@@ -1,3 +1,8 @@
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_clients_id_organization_id"
+  ON "clients"("id", "organization_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_users_id_organization_id"
+  ON "users"("id", "organization_id");
+
 CREATE TABLE "triagem.external_links" (
   "id" TEXT NOT NULL,
   "organization_id" TEXT NOT NULL,
@@ -21,8 +26,14 @@ CREATE TABLE "triagem.external_links" (
     FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "triagem.external_links_client_id_fkey"
     FOREIGN KEY ("client_id") REFERENCES "clients"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "triagem.external_links_client_organization_fkey"
+    FOREIGN KEY ("client_id", "organization_id")
+    REFERENCES "clients"("id", "organization_id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "triagem.external_links_responsible_id_fkey"
-    FOREIGN KEY ("responsible_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE
+    FOREIGN KEY ("responsible_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT "triagem.external_links_responsible_organization_fkey"
+    FOREIGN KEY ("responsible_id", "organization_id")
+    REFERENCES "users"("id", "organization_id") ON DELETE SET NULL ("responsible_id") ON UPDATE CASCADE
 );
 
 CREATE INDEX "idx_triagem_external_links_scope"

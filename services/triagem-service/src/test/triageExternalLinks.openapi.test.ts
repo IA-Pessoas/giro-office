@@ -10,7 +10,12 @@ describe("contrato OpenAPI de links externos da Triagem", () => {
     const paths = spec.paths as Record<string, Record<string, unknown>>;
 
     expect(paths["/triagem/external-links"]).toMatchObject({
-      get: expect.any(Object),
+      get: expect.objectContaining({
+        parameters: expect.arrayContaining([
+          expect.objectContaining({ name: "client_id", required: true }),
+          expect.objectContaining({ name: "competence", required: true }),
+        ]),
+      }),
       post: expect.any(Object),
     });
     expect(paths["/triagem/external-links/{id}"]?.put).toBeDefined();
