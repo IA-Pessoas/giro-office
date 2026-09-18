@@ -50,6 +50,16 @@ const GLOBAL_COMMANDS = [
 
 const AFFECTED_TASKS = ["check", "typecheck", "test"];
 
+/**
+ * O hook roda na máquina de quem está empurrando, normalmente com editor, containers
+ * e servidores de desenvolvimento no ar. Sem teto, o turbo dispara uma tarefa por
+ * núcleo e as suítes começam a falhar por disputa de CPU e de porta — falhas que
+ * somem quando o pacote roda sozinho. Metade dos núcleos mantém o gate rápido sem
+ * transformar carga em vermelho falso. Vale tanto para o caminho por pacote afetado
+ * quanto para os comandos globais, que tambem chamam o turbo.
+ */
+const HOOK_TURBO_CONCURRENCY = "50%";
+
 function normalizeGitPath(filePath) {
   return filePath
     .trim()
@@ -349,17 +359,19 @@ export function runCommands(
   env = process.env,
   platform = process.platform,
 ) {
+  const hookEnv = { TURBO_CONCURRENCY: HOOK_TURBO_CONCURRENCY, ...env };
+
   for (const [command, args] of commands) {
     console.log(`$ ${formatCommand([command, args])}`);
 
     let result = spawn(command, args, {
       stdio: "inherit",
-      env,
+      env: hookEnv,
     });
 
     if (shouldFallbackToCorepack(command, result)) {
       const [fallbackCommand, fallbackArgs] = buildPnpmFallback(args, platform);
-      const fallbackEnv = createPnpmShimEnv(env, platform);
+      const fallbackEnv = createPnpmShimEnv(hookEnv, platform);
 
       try {
         result = spawn(fallbackCommand, fallbackArgs, {

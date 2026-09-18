@@ -236,4 +236,29 @@ describe("runCommands", () => {
       ["cmd.exe", ["/d", "/s", "/c", "corepack", "pnpm", "audit:ci"]],
     ]);
   });
+
+  it("limita a concorrência do turbo para a carga da máquina não virar vermelho falso", () => {
+    const ambientes = [];
+    const fakeSpawn = (_command, _args, options = {}) => {
+      ambientes.push(options.env);
+      return { status: 0 };
+    };
+
+    runCommands([["pnpm", ["test"]]], fakeSpawn, { PATH: "/usr/bin" }, "linux");
+
+    assert.equal(ambientes[0].TURBO_CONCURRENCY, "50%");
+    assert.equal(ambientes[0].PATH, "/usr/bin");
+  });
+
+  it("respeita TURBO_CONCURRENCY já definido no ambiente", () => {
+    const ambientes = [];
+    const fakeSpawn = (_command, _args, options = {}) => {
+      ambientes.push(options.env);
+      return { status: 0 };
+    };
+
+    runCommands([["pnpm", ["test"]]], fakeSpawn, { TURBO_CONCURRENCY: "2" }, "linux");
+
+    assert.equal(ambientes[0].TURBO_CONCURRENCY, "2");
+  });
 });
