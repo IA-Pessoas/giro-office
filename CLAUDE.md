@@ -8,6 +8,17 @@ Instrucoes do Claude para este repositorio.
 - Antes de alterar arquivos, consulte `.codex/config.toml` e carregue as regras de `.codex/rules/` cujo `paths` combine com a tarefa.
 - Preserve as regras originais em `.cursor/rules/` e as regras adaptadas em `.codex/rules/`.
 
+## Seguranca (sempre)
+- Leia e aplique `.codex/rules/agent-safety.rules.md` em qualquer tarefa deste repositorio.
+- Nunca reescreva historico publicado: nada de `push --force`/`--force-with-lease`,
+  `rebase`, `reset --hard` ou `amend` sobre commits ja empurrados, e nunca em `main`,
+  `develop` ou `staging`. Divergiu? `git fetch` e reaplique por cima.
+- Nunca empurre com `--no-verify` nem contorne os hooks.
+- Nunca gere codigo ofuscado, minificado ou codificado em arquivo versionado, e nunca
+  anexe nada depois do fim logico de uma config executavel.
+- Achou codigo suspeito: pare antes de buildar ou instalar, preserve a evidencia, avise
+  o usuario e so entao restaure a versao limpa.
+
 ## Graphify
 - Use Graphify como ferramenta local de contexto antes de tarefas nao triviais.
 - Frontend: leia `app/graphify-out/AGENT_BRIEF.md` quando existir, depois rode `pnpm graphify:context:ui -- "<task>"`.

@@ -4,6 +4,8 @@ import { describe, it } from "node:test";
 import {
   buildHookPlan,
   classifyChangedFiles,
+  describeForcePushBlock,
+  findHistoryRewrites,
   parsePrePushInput,
   resolvePrePushChangedFiles,
   runCommands,
@@ -122,6 +124,66 @@ describe("buildHookPlan", () => {
 
   it("skips every command for docs-only changes", () => {
     assert.deepEqual(buildHookPlan(classifyChangedFiles(["docs/x.md"]), ["abc"]), []);
+  });
+});
+
+describe("bloqueio de force push", () => {
+  const gitFake = (ancestralidade) => ({
+    isAncestor: (ancestor, descendant) => ancestralidade[`${ancestor}->${descendant}`] ?? true,
+  });
+
+  const registro = (branch, remoteOid, localOid) => ({
+    localRef: `refs/heads/${branch}`,
+    localOid,
+    remoteRef: `refs/heads/${branch}`,
+    remoteOid,
+  });
+
+  it("não acusa quando o push é avanço normal", () => {
+    const rewrites = findHistoryRewrites([registro("feature/x", "aaa", "bbb")], gitFake({}));
+    assert.deepEqual(rewrites, []);
+    assert.equal(describeForcePushBlock(rewrites, {}), null);
+  });
+
+  it("acusa quando o commit publicado deixaria de existir", () => {
+    const rewrites = findHistoryRewrites(
+      [registro("feature/x", "aaa", "bbb")],
+      gitFake({ "aaa->bbb": false }),
+    );
+
+    assert.equal(rewrites.length, 1);
+    assert.match(describeForcePushBlock(rewrites, {}), /reescrita de historico/);
+    assert.match(describeForcePushBlock(rewrites, {}), /ALLOW_FORCE_PUSH=1/);
+  });
+
+  it("libera branch própria quando a intenção é declarada", () => {
+    const rewrites = findHistoryRewrites(
+      [registro("feature/x", "aaa", "bbb")],
+      gitFake({ "aaa->bbb": false }),
+    );
+
+    assert.equal(describeForcePushBlock(rewrites, { ALLOW_FORCE_PUSH: "1" }), null);
+  });
+
+  it("não libera main, develop nem staging, mesmo com a intenção declarada", () => {
+    for (const branch of ["main", "develop", "staging"]) {
+      const rewrites = findHistoryRewrites(
+        [registro(branch, "aaa", "bbb")],
+        gitFake({ "aaa->bbb": false }),
+      );
+
+      assert.match(
+        describeForcePushBlock(rewrites, { ALLOW_FORCE_PUSH: "1" }),
+        new RegExp(`Reescrever historico de ${branch}`),
+      );
+    }
+  });
+
+  it("ignora criação e remoção de branch", () => {
+    const criacao = registro("feature/nova", "0000000000000000000000000000000000000000", "bbb");
+    const remocao = registro("feature/velha", "aaa", "0000000000000000000000000000000000000000");
+
+    assert.deepEqual(findHistoryRewrites([criacao, remocao], gitFake({})), []);
   });
 });
 

@@ -143,6 +143,69 @@ export function buildHookPlan(classification, bases = [], changedFiles = []) {
   ];
 }
 
+/**
+ * Branches onde reescrever historico nunca e aceitavel, nem com a valvula de escape.
+ */
+const PROTECTED_BRANCHES = new Set(["main", "develop", "staging"]);
+
+/** Valvula de escape consciente, para rebase de branch propria. */
+const FORCE_ESCAPE_ENV = "ALLOW_FORCE_PUSH";
+
+/**
+ * Um push que reescreve historico aparece no pre-push como um remoto que nao e
+ * ancestral do local: os commits que estavam publicados deixariam de existir.
+ * Recusamos por padrao — foi assim que o repositorio foi comprometido, com as
+ * branches reescritas por um push forcado — e so liberamos fora das branches
+ * protegidas quando quem empurra declara a intencao em ALLOW_FORCE_PUSH.
+ */
+export function findHistoryRewrites(records, git = createGitRunner()) {
+  const rewrites = [];
+
+  for (const record of records) {
+    if (ZERO_OID.test(record.localOid) || ZERO_OID.test(record.remoteOid)) {
+      continue;
+    }
+
+    const isAncestor = git.isAncestor(record.remoteOid, record.localOid);
+
+    if (isAncestor === false) {
+      rewrites.push({
+        ref: record.remoteRef,
+        branch: record.remoteRef.replace(/^refs\/heads\//, ""),
+        remoteOid: record.remoteOid,
+        localOid: record.localOid,
+      });
+    }
+  }
+
+  return rewrites;
+}
+
+export function describeForcePushBlock(rewrites, env = process.env) {
+  if (rewrites.length === 0) {
+    return null;
+  }
+
+  const protectedRewrites = rewrites.filter(({ branch }) => PROTECTED_BRANCHES.has(branch));
+  const escapeRequested = env[FORCE_ESCAPE_ENV] === "1";
+
+  if (escapeRequested && protectedRewrites.length === 0) {
+    return null;
+  }
+
+  const alvos = rewrites.map(({ branch, remoteOid }) => `  ${branch} (remoto ${remoteOid.slice(0, 8)} deixaria de existir)`);
+  const motivo =
+    protectedRewrites.length > 0
+      ? `Reescrever historico de ${protectedRewrites.map(({ branch }) => branch).join(", ")} nao e permitido.`
+      : `Para reescrever historico de uma branch propria, declare a intencao: ${FORCE_ESCAPE_ENV}=1 git push --force-with-lease`;
+
+  return [
+    "git-hook-scope: push recusado — reescrita de historico detectada.",
+    ...alvos,
+    motivo,
+  ].join("\n");
+}
+
 export function parsePrePushInput(input) {
   return input
     .split(/\r?\n/)
@@ -290,6 +353,17 @@ export function resolvePrePushChangedFiles(input, git = createGitRunner()) {
 
 function createGitRunner() {
   return {
+    isAncestor(ancestorOid, descendantOid) {
+      const result = spawnSync("git", ["merge-base", "--is-ancestor", ancestorOid, descendantOid], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      if (result.status === 0) return true;
+      if (result.status === 1) return false;
+      // Objeto ausente ou erro do git: nao da para afirmar que houve reescrita.
+      return null;
+    },
     run(args) {
       const result = spawnSync("git", args, {
         encoding: "utf8",
@@ -416,7 +490,15 @@ function main() {
     process.exit(2);
   }
 
-  const resolution = resolvePrePushChangedFiles(readHookInput());
+  const hookInput = readHookInput();
+  const bloqueio = describeForcePushBlock(findHistoryRewrites(parsePrePushInput(hookInput)));
+
+  if (bloqueio) {
+    console.error(bloqueio);
+    process.exit(1);
+  }
+
+  const resolution = resolvePrePushChangedFiles(hookInput);
   const classification = resolution.forceGlobal
     ? { mode: "global", reason: resolution.reason }
     : classifyChangedFiles(resolution.files);

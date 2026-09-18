@@ -13,6 +13,17 @@ Instrucoes do Codex para este repositorio.
 - Quando houver conflito entre regra global e regra especifica, prefira a regra especifica.
 - Responda sempre em portugues neste workspace.
 
+## Seguranca (sempre)
+- Leia e aplique `.codex/rules/agent-safety.rules.md` em qualquer tarefa deste repositorio.
+- Nunca reescreva historico publicado: nada de `push --force`/`--force-with-lease`,
+  `rebase`, `reset --hard` ou `amend` sobre commits ja empurrados, e nunca em `main`,
+  `develop` ou `staging`. Divergiu? `git fetch` e reaplique por cima.
+- Nunca empurre com `--no-verify` nem contorne os hooks.
+- Nunca gere codigo ofuscado, minificado ou codificado em arquivo versionado, e nunca
+  anexe nada depois do fim logico de uma config executavel.
+- Achou codigo suspeito: pare antes de buildar ou instalar, preserve a evidencia, avise
+  o usuario e so entao restaure a versao limpa.
+
 ## Graphify
 - Use Graphify como ferramenta local de contexto antes de tarefas nao triviais.
 - O grafo e apoio de navegacao; a fonte da verdade continua sendo o codigo real, as regras do repo e os testes.
