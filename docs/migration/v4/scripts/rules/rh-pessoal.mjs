@@ -1192,7 +1192,7 @@ function classifyRequiredValue(row, field, transformation) {
     : quarantine(field, "REQUIRED_SOURCE_VALUE_EMPTY");
 }
 
-function classifyRequiredString(row, field, reasonCode) {
+function classifyRequiredString(_row, _field, _reasonCode) {
   return prepared();
 }
 

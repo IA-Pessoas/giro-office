@@ -815,7 +815,7 @@ function buildBatchDeleteWhere(step, identities, organizationId) {
       .filter(([column]) => column !== step.contract.tenantScope.column)
       .sort(([left], [right]) => compareText(left, right));
     if (entries.length === 0) throw migrationError("MIGRATION_IDENTITY_INVALID");
-    const predicates = entries.map(([column], index) => {
+    const predicates = entries.map(([column], _index) => {
       values.push(identity[column]);
       return `${quoteIdentifier(column)} = $${values.length}`;
     });
