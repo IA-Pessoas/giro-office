@@ -93,6 +93,7 @@ export function useTriageMutations(
         note,
         justification,
         delivery_method,
+        state_site,
         value,
       }: {
         id: string;
@@ -101,15 +102,20 @@ export function useTriageMutations(
         note?: string | null;
         justification?: string | null;
         delivery_method?: TriageDocumentsMonthly["item_notes"][string]["delivery_method"];
+        state_site?: TriageDocumentsMonthly["item_notes"][string]["state_site"];
         value?: string | null;
       }) => {
         const itemNotes =
-          note === undefined && justification === undefined && delivery_method === undefined
+          note === undefined &&
+          justification === undefined &&
+          delivery_method === undefined &&
+          state_site === undefined
             ? undefined
             : {
                 ...(note !== undefined ? { note } : {}),
                 ...(justification !== undefined ? { justification } : {}),
                 ...(delivery_method !== undefined ? { delivery_method } : {}),
+                ...(state_site !== undefined ? { state_site } : {}),
               } satisfies Partial<TriageDocumentItemNotes>;
         return triageDocumentsService.updateItem(id, field, status, itemNotes, type, value);
       },

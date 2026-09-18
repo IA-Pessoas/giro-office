@@ -55,7 +55,10 @@ export type TriageDeliveryMethod = string;
 export type TriageItemPriority = (typeof TRIAGE_ITEM_PRIORITIES)[number];
 export type TriageDocumentStatus = (typeof TRIAGE_DOCUMENT_STATUSES)[number];
 export type TriageDocumentsServicePrisma = typeof prismaClient;
-type TriageCatalogLookupClient = Pick<PrismaClient, "$executeRaw" | "triageCatalogItem">;
+type TriageCatalogLookupClient = Pick<
+  PrismaClient,
+  "$executeRaw" | "triageCatalogItem" | "triageCompetence" | "triageCompetenceCatalogSnapshot"
+>;
 
 type TriageDocumentsAudit = {
   logUpdateIfChanged: (params: LogUpdateParams) => Promise<void>;
@@ -82,6 +85,7 @@ export interface TriageDocumentItemUpdate {
   note?: string | null;
   justification?: string | null;
   delivery_method?: string | null;
+  state_site?: string | null;
 }
 
 export interface TriageDocumentsBulkUpdate {
@@ -117,6 +121,7 @@ export interface TriageDocumentItemNotes {
   justification: string | null;
   priority?: TriageItemPriority | null;
   delivery_method?: TriageDeliveryMethod | null;
+  state_site?: string | null;
   required?: boolean;
 }
 
@@ -178,6 +183,7 @@ function asItemNotes(
       const justification = (item as Record<string, unknown>).justification;
       const priority = (item as Record<string, unknown>).priority;
       const deliveryMethod = (item as Record<string, unknown>).delivery_method;
+      const stateSite = (item as Record<string, unknown>).state_site;
       const required = (item as Record<string, unknown>).required;
       return [
         field,
@@ -187,6 +193,7 @@ function asItemNotes(
             typeof justification === "string" && justification.trim() ? justification.trim() : null,
           ...(isItemPriority(priority) ? { priority } : {}),
           ...(isDeliveryMethod(deliveryMethod) ? { delivery_method: deliveryMethod } : {}),
+          ...(isDeliveryMethod(stateSite) ? { state_site: stateSite } : {}),
           ...(typeof required === "boolean" ? { required } : {}),
         },
       ];
@@ -205,6 +212,19 @@ function normalizeOptionalNote(value: unknown, label: string): string | null | u
     throw new ServiceError(400, `${label} inválida.`);
   }
   return value.trim() || null;
+}
+
+function normalizeOptionalCatalogCode(value: unknown, label: string): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "string" || value.trim().length === 0 || value.trim().length > 100) {
+    throw new ServiceError(400, `${label} inválido.`);
+  }
+  return value.trim();
 }
 
 function normalizeOptionalValue(value: unknown, label: string): string | null | undefined {
@@ -380,6 +400,7 @@ export class TriageDocumentsService {
       ? normalizeOptionalValue(update.value, "Valor de faturamento")
       : undefined;
     const deliveryMethod = update.delivery_method;
+    const stateSite = normalizeOptionalCatalogCode(update.state_site, "Site estadual");
     if (
       deliveryMethod !== undefined &&
       deliveryMethod !== null &&
@@ -405,12 +426,24 @@ export class TriageDocumentsService {
           "JUSTIFICATION",
           justification ? [justification] : [],
           auth.organizationId,
+          monthly.client_id,
+          monthly.competence,
         );
         await this.assertActiveCatalogItems(
           transaction,
           "DELIVERY_METHOD",
           deliveryMethod ? [deliveryMethod] : [],
           auth.organizationId,
+          monthly.client_id,
+          monthly.competence,
+        );
+        await this.assertActiveCatalogItems(
+          transaction,
+          "STATE_SITE",
+          stateSite ? [stateSite] : [],
+          auth.organizationId,
+          monthly.client_id,
+          monthly.competence,
         );
         const fields = checklistFields(type);
         const checklist = asChecklist(monthly.checklist, fields);
@@ -421,7 +454,10 @@ export class TriageDocumentsService {
         const currentNotes = itemNotes[update.field] ?? { note: null, justification: null };
         const nextItemNotes =
           isBillingAmount ||
-          (note === undefined && justification === undefined && deliveryMethod === undefined)
+          (note === undefined &&
+            justification === undefined &&
+            deliveryMethod === undefined &&
+            stateSite === undefined)
             ? undefined
             : {
                 ...itemNotes,
@@ -431,6 +467,7 @@ export class TriageDocumentsService {
                   justification:
                     justification === undefined ? currentNotes.justification : justification,
                   ...(deliveryMethod !== undefined ? { delivery_method: deliveryMethod } : {}),
+                  ...(stateSite !== undefined ? { state_site: stateSite } : {}),
                 },
               };
         const updated = await transaction.triageMonthly.update({
@@ -757,6 +794,8 @@ export class TriageDocumentsService {
           .map((item) => item.justification)
           .filter((value): value is string => typeof value === "string"),
         organizationId,
+        clientId,
+        competence,
       );
       await this.assertActiveCatalogItems(
         transaction,
@@ -765,6 +804,18 @@ export class TriageDocumentsService {
           .map((item) => item.delivery_method)
           .filter((value): value is string => typeof value === "string"),
         organizationId,
+        clientId,
+        competence,
+      );
+      await this.assertActiveCatalogItems(
+        transaction,
+        "STATE_SITE",
+        Object.values(itemNotes)
+          .map((item) => item.state_site)
+          .filter((value): value is string => typeof value === "string"),
+        organizationId,
+        clientId,
+        competence,
       );
     });
 
@@ -773,9 +824,11 @@ export class TriageDocumentsService {
 
   private async assertActiveCatalogItems(
     transaction: TriageCatalogLookupClient,
-    kind: "JUSTIFICATION" | "DELIVERY_METHOD",
+    kind: "JUSTIFICATION" | "DELIVERY_METHOD" | "STATE_SITE",
     codes: readonly string[],
     organizationId: string,
+    clientId: string,
+    competence: string,
   ): Promise<void> {
     const uniqueCodes = [...new Set(codes.map((code) => code.trim()).filter(Boolean))];
     if (uniqueCodes.length === 0) {
@@ -791,19 +844,37 @@ export class TriageDocumentsService {
         )
       `;
     }
-    const activeItems = await transaction.triageCatalogItem.findMany({
-      where: {
-        organization_id: organizationId,
-        kind,
-        code: { in: uniqueCodes },
-        archived_at: null,
-      },
-      select: { code: true },
+    const competenceRecord = await transaction.triageCompetence.findFirst({
+      where: { organization_id: organizationId, client_id: clientId, competence },
+      select: { id: true },
     });
-    const activeCodes = new Set(activeItems.map((item) => item.code));
-    const missing = uniqueCodes.find((code) => !activeCodes.has(code));
+
+    const catalogCodes = competenceRecord?.id
+      ? await transaction.triageCompetenceCatalogSnapshot.findMany({
+          where: {
+            organization_id: organizationId,
+            competence_id: competenceRecord.id,
+            kind,
+            code: { in: uniqueCodes },
+          },
+          select: { code: true },
+        })
+      : await transaction.triageCatalogItem.findMany({
+          where: {
+            organization_id: organizationId,
+            kind,
+            code: { in: uniqueCodes },
+            archived_at: null,
+          },
+          select: { code: true },
+        });
+    const availableCodes = new Set(catalogCodes.map((item) => item.code));
+    const missing = uniqueCodes.find((code) => !availableCodes.has(code));
     if (missing) {
-      throw new ServiceError(400, `Valor ${missing} não está disponível no catálogo ativo.`);
+      throw new ServiceError(
+        400,
+        `Valor ${missing} não está disponível no catálogo da competência.`,
+      );
     }
   }
 }
@@ -855,6 +926,7 @@ function fiscalSnapshotItems(value: unknown): Record<string, TriageDocumentItemN
             ...(isDeliveryMethod(record.delivery_method)
               ? { delivery_method: record.delivery_method }
               : {}),
+            ...(isDeliveryMethod(record.state_site) ? { state_site: record.state_site } : {}),
           },
         ],
       ];

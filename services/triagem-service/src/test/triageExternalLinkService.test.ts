@@ -34,6 +34,8 @@ function createMockPrisma(): TriageExternalLinkPrisma {
     ),
     client: { findFirst: vi.fn() },
     user: { findFirst: vi.fn() },
+    triageCompetence: { findFirst: vi.fn() },
+    triageCompetenceCatalogSnapshot: { findFirst: vi.fn() },
     triageCatalogItem: { findFirst: vi.fn().mockResolvedValue({ id: "catalog-link-type" }) },
     triageExternalLink: {
       findFirst: vi.fn(),
@@ -116,6 +118,39 @@ describe("TriageExternalLinkService", () => {
       orderBy: [{ competence: "desc" }, { created_at: "desc" }],
       select: expect.any(Object),
     });
+  });
+
+  it("usa o snapshot da competência para preservar um tipo após arquivamento", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({
+      id: "competence-id",
+    } as never);
+    vi.mocked(prisma.triageCompetenceCatalogSnapshot.findFirst).mockResolvedValue({
+      id: "snapshot-id",
+    } as never);
+    vi.mocked(prisma.client.findFirst).mockResolvedValue({ id: CLIENT_ID } as never);
+    vi.mocked(prisma.triageExternalLink.create).mockResolvedValue(record as never);
+
+    await new TriageExternalLinkService(prisma).create(
+      {
+        client_id: CLIENT_ID,
+        competence: "2026-09",
+        type: "DRIVE",
+        url: "https://drive.example.test/triagem",
+      },
+      editor(),
+    );
+
+    expect(prisma.triageCompetenceCatalogSnapshot.findFirst).toHaveBeenCalledWith({
+      where: {
+        organization_id: ORGANIZATION_ID,
+        competence_id: "competence-id",
+        kind: "LINK_TYPE",
+        code: "DRIVE",
+      },
+      select: { id: true },
+    });
+    expect(prisma.triageCatalogItem.findFirst).not.toHaveBeenCalled();
   });
 
   it("revisa tipo, descrição e responsável sem alterar o vínculo do cliente", async () => {

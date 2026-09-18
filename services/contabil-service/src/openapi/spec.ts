@@ -977,6 +977,12 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                       maxLength: 100,
                       nullable: true,
                     },
+                    state_site: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: 100,
+                      nullable: true,
+                    },
                   },
                 },
               },

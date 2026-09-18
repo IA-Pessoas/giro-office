@@ -237,6 +237,8 @@ await (async () => {
     assert.match(source, /UNDER_REVIEW/);
     assert.match(source, /Método de entrega/);
     assert.match(source, /DELIVERY_METHOD/);
+    assert.match(source, /Site estadual/);
+    assert.match(source, /STATE_SITE/);
     assert.doesNotMatch(source, /<option value="EMAIL">/);
     assert.doesNotMatch(source, /<option value="PORTAL">/);
     assert.doesNotMatch(source, /<option value="WHATSAPP">/);

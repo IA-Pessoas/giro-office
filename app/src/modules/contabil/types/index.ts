@@ -194,6 +194,7 @@ export interface TriageDocumentItemNotes {
   justification: string | null;
   priority?: TriageItemPriority | null;
   delivery_method?: TriageDeliveryMethod | null;
+  state_site?: string | null;
   required?: boolean;
 }
 

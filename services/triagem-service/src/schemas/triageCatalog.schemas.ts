@@ -1,11 +1,7 @@
 import { z } from "zod";
+import { TRIAGE_CATALOG_KINDS } from "../services/triageCatalog.constants.js";
 
-export const triageCatalogKindSchema = z.enum([
-  "JUSTIFICATION",
-  "LINK_TYPE",
-  "DELIVERY_METHOD",
-  "STATE_SITE",
-]);
+export const triageCatalogKindSchema = z.enum(TRIAGE_CATALOG_KINDS);
 
 const codeSchema = z
   .string({ required_error: "Código é obrigatório." })

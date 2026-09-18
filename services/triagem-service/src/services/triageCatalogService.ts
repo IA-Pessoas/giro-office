@@ -1,6 +1,7 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { TRIAGE_CATALOG_KINDS, type TriageCatalogKind } from "./triageCatalog.constants.js";
 
 const catalogItemSelect = {
   id: true,
@@ -37,8 +38,6 @@ export type TriageCatalogTransaction = Pick<
 >;
 
 export type TriageCatalogPrisma = TriageCatalogTransaction & Pick<PrismaClient, "$transaction">;
-
-export type TriageCatalogKind = "JUSTIFICATION" | "LINK_TYPE" | "DELIVERY_METHOD" | "STATE_SITE";
 
 export interface TriageCatalogAuthContext {
   userId: string;
@@ -120,10 +119,7 @@ function assertCatalogValues(input: {
   label?: string;
   url?: string | null;
 }): void {
-  if (
-    input.kind &&
-    !["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"].includes(input.kind)
-  ) {
+  if (input.kind && !TRIAGE_CATALOG_KINDS.includes(input.kind)) {
     throw new ServiceError(400, "Tipo de catálogo inválido.");
   }
   if (input.code !== undefined && (!input.code.trim() || input.code.length > 100)) {
@@ -223,6 +219,25 @@ export class TriageCatalogService {
           throw new ServiceError(404, "Item de catálogo não encontrado.");
         }
 
+        const targetKind = input.kind ?? existing.kind;
+        const targetCode = input.code?.trim() ?? existing.code;
+        const lockKeys = [
+          catalogItemLockKey(auth.organizationId, existing.kind, existing.code),
+          catalogItemLockKey(auth.organizationId, targetKind, targetCode),
+        ]
+          .filter((lockKey, index, keys) => keys.indexOf(lockKey) === index)
+          .sort();
+        for (const lockKey of lockKeys) {
+          await this.lockCatalogItem(transaction, lockKey);
+        }
+        const locked = await transaction.triageCatalogItem.findFirst({
+          where: { id, organization_id: auth.organizationId },
+          select: catalogItemSelect,
+        });
+        if (!locked) {
+          throw new ServiceError(404, "Item de catálogo não encontrado.");
+        }
+
         return transaction.triageCatalogItem.update({
           where: { id },
           data: {
@@ -260,11 +275,10 @@ export class TriageCatalogService {
         throw new ServiceError(404, "Item de catálogo não encontrado.");
       }
 
-      await transaction.$executeRaw`
-        SELECT pg_advisory_xact_lock(
-          hashtextextended(${catalogItemLockKey(auth.organizationId, existing.kind, existing.code)}, 0)
-        )
-      `;
+      await this.lockCatalogItem(
+        transaction,
+        catalogItemLockKey(auth.organizationId, existing.kind, existing.code),
+      );
       const locked = await transaction.triageCatalogItem.findFirst({
         where: { id, organization_id: auth.organizationId },
         select: catalogItemSelect,
@@ -370,5 +384,14 @@ export class TriageCatalogService {
       await transaction.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
       return callback(transaction as unknown as TriageCatalogTransaction);
     });
+  }
+
+  private async lockCatalogItem(
+    transaction: TriageCatalogTransaction,
+    lockKey: string,
+  ): Promise<void> {
+    await transaction.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
+    `;
   }
 }

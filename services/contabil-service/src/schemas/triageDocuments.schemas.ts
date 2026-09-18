@@ -43,6 +43,7 @@ export const triageDocumentItemBodySchema = z
     note: z.string().trim().max(TRIAGE_DOCUMENT_NOTE_MAX_LENGTH).nullable().optional(),
     justification: z.string().trim().max(TRIAGE_DOCUMENT_NOTE_MAX_LENGTH).nullable().optional(),
     delivery_method: z.string().trim().min(1).max(100).nullable().optional(),
+    state_site: z.string().trim().min(1).max(100).nullable().optional(),
   })
   .strict()
   .superRefine((body, context) => {
@@ -64,6 +65,13 @@ export const triageDocumentItemBodySchema = z
         code: "custom",
         path: ["delivery_method"],
         message: "método de entrega só é aceito na rotina fiscal.",
+      });
+    }
+    if (body.type !== "FISCAL" && body.state_site !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["state_site"],
+        message: "site estadual só é aceito na rotina fiscal.",
       });
     }
   });

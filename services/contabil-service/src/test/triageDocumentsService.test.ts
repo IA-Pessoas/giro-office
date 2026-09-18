@@ -18,6 +18,7 @@ const RESPONSIBLE_USER_ID = "c0000000-0000-4000-8000-000000000002";
 const CLIENT_ID = "b0000000-0000-4000-8000-000000000001";
 const MONTHLY_ID = "d0000000-0000-4000-8000-000000000001";
 const STATEMENT_ID = "e0000000-0000-4000-8000-000000000001";
+const COMPETENCE_ID = "f0000000-0000-4000-8000-000000000001";
 const COMPETENCE = "2026-09";
 
 const checklist = Object.fromEntries(TRIAGE_DOCUMENT_FIELDS.map((field) => [field, "PENDING"]));
@@ -35,6 +36,7 @@ function createMockPrisma(): TriageDocumentsServicePrisma {
     client: { findFirst: vi.fn().mockResolvedValue({ id: CLIENT_ID }) },
     triageConfig: { findFirst: vi.fn() },
     triageCompetence: { findFirst: vi.fn() },
+    triageCompetenceCatalogSnapshot: { findMany: vi.fn() },
     triageCatalogItem: {
       findMany: vi.fn(async (args: { where?: { code?: { in?: string[] } } }) =>
         (args.where?.code?.in ?? []).map((code) => ({ code })),
@@ -173,6 +175,45 @@ describe("TriageDocumentsService", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
 
     expect(prisma.triageMonthly.update).not.toHaveBeenCalled();
+  });
+
+  it("usa justificativa e site estadual do snapshot da competência", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue({
+      ...monthly,
+      type: "FISCAL",
+    } as never);
+    vi.mocked(prisma.triageMonthly.update).mockResolvedValue(monthly as never);
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({ id: COMPETENCE_ID } as never);
+    vi.mocked(prisma.triageCompetenceCatalogSnapshot.findMany).mockResolvedValue([
+      { code: "JUSTIFICATION_CODE" },
+      { code: "SP_SITE" },
+    ] as never);
+
+    await new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).updateItem(
+      MONTHLY_ID,
+      {
+        field: "nfce_documents",
+        type: "FISCAL",
+        status: "ATTENTION",
+        justification: "JUSTIFICATION_CODE",
+        state_site: "SP_SITE",
+      },
+      fiscalEditor(),
+    );
+
+    expect(prisma.triageMonthly.update).toHaveBeenCalledWith({
+      where: { id: MONTHLY_ID },
+      data: expect.objectContaining({
+        item_notes: expect.objectContaining({
+          nfce_documents: expect.objectContaining({
+            justification: "JUSTIFICATION_CODE",
+            state_site: "SP_SITE",
+          }),
+        }),
+      }),
+    });
+    expect(prisma.triageCatalogItem.findMany).not.toHaveBeenCalled();
   });
 
   it("valida o catálogo no mesmo transaction serializable que grava o mensal", async () => {

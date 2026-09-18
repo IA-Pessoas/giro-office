@@ -72,7 +72,10 @@ const CLOSING_STATUSES: Array<[TriageClosingStatus, string]> = [
 ];
 
 type TriageDocumentFieldValue = TriageDocumentField | TriageFiscalChecklistField;
-type TriageDocumentDraft = Record<string, { note: string; justification: string }>;
+type TriageDocumentDraft = Record<
+  string,
+  { note: string; justification: string; state_site: string }
+>;
 
 function buildDocumentDrafts(
   notes: Record<string, TriageDocumentItemNotes> | undefined,
@@ -84,6 +87,7 @@ function buildDocumentDrafts(
       {
         note: notes?.[field]?.note ?? "",
         justification: notes?.[field]?.justification ?? "",
+        state_site: notes?.[field]?.state_site ?? "",
       },
     ]),
   ) as TriageDocumentDraft;
@@ -115,6 +119,7 @@ export function TriageDocumentsSection({
   const monthly = useTriageMonthly(clientId, competence, documentType);
   const justifications = useTriageCatalogs("JUSTIFICATION");
   const deliveryMethods = useTriageCatalogs("DELIVERY_METHOD");
+  const stateSites = useTriageCatalogs("STATE_SITE");
   const mutations = useTriageMutations(clientId, competence, documentType);
   const statements = useTriageStatements(clientId, competence, documentType);
   const closing = useTriageClosing(clientId, competence, documentType);
@@ -127,7 +132,8 @@ export function TriageDocumentsSection({
     mutations.archiveStatement.error ??
     mutations.closing.error ??
     justifications.error ??
-    deliveryMethods.error;
+    deliveryMethods.error ??
+    stateSites.error;
   const statementMutationPending =
     mutations.statement.isPending || mutations.archiveStatement.isPending;
 
@@ -140,7 +146,7 @@ export function TriageDocumentsSection({
 
   function updateDocumentDraft(
     field: TriageDocumentFieldValue,
-    key: "note" | "justification",
+    key: "note" | "justification" | "state_site",
     value: string,
   ) {
     setDocumentDrafts((current) => ({
@@ -363,6 +369,7 @@ export function TriageDocumentsSection({
                           note: documentDrafts[field].note || null,
                           justification: documentDrafts[field].justification || null,
                           delivery_method: record.item_notes[field]?.delivery_method ?? null,
+                          state_site: documentDrafts[field].state_site || null,
                         })
                       }
                       className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
@@ -412,29 +419,49 @@ export function TriageDocumentsSection({
                         </select>
                       </label>
                       {documentType === "FISCAL" ? (
-                        <label className="text-xs text-gray-600 dark:text-slate-300 sm:col-span-2">
-                          Método de entrega
-                          <select
-                            aria-label={`${label} Método de entrega`}
-                            value={record.item_notes[field]?.delivery_method ?? ""}
-                            onChange={(event) =>
-                              mutations.item.mutate({
-                                id: record.id,
-                                field,
-                                status: record.checklist[field],
-                                delivery_method: (event.target.value || null) as TriageDeliveryMethod | null,
-                              })
-                            }
-                            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
-                          >
-                            <option value="">Não definido</option>
-                            {(deliveryMethods.data ?? []).map((item) => (
-                              <option key={item.id} value={item.code}>
-                                {item.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                        <>
+                          <label className="text-xs text-gray-600 dark:text-slate-300 sm:col-span-2">
+                            Método de entrega
+                            <select
+                              aria-label={`${label} Método de entrega`}
+                              value={record.item_notes[field]?.delivery_method ?? ""}
+                              onChange={(event) =>
+                                mutations.item.mutate({
+                                  id: record.id,
+                                  field,
+                                  status: record.checklist[field],
+                                  delivery_method: (event.target.value || null) as TriageDeliveryMethod | null,
+                                })
+                              }
+                              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
+                            >
+                              <option value="">Não definido</option>
+                              {(deliveryMethods.data ?? []).map((item) => (
+                                <option key={item.id} value={item.code}>
+                                  {item.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="text-xs text-gray-600 dark:text-slate-300 sm:col-span-2">
+                            Site estadual
+                            <select
+                              aria-label={`${label} Site estadual`}
+                              value={documentDrafts[field].state_site}
+                              onChange={(event) =>
+                                updateDocumentDraft(field, "state_site", event.target.value)
+                              }
+                              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
+                            >
+                              <option value="">Não definido</option>
+                              {(stateSites.data ?? []).map((item) => (
+                                <option key={item.id} value={item.code}>
+                                  {item.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </>
                       ) : null}
                       <button
                         type="button"
@@ -447,6 +474,7 @@ export function TriageDocumentsSection({
                             note: documentDrafts[field].note || null,
                             justification: documentDrafts[field].justification || null,
                             delivery_method: record.item_notes[field]?.delivery_method ?? null,
+                            state_site: documentDrafts[field].state_site || null,
                           })
                         }
                         disabled={mutations.item.isPending}
@@ -472,6 +500,13 @@ export function TriageDocumentsSection({
                           Método: {deliveryMethods.data?.find(
                             (item) => item.code === record.item_notes[field].delivery_method,
                           )?.label ?? "Indisponível no catálogo ativo"}
+                        </p>
+                      ) : null}
+                      {record.item_notes[field]?.state_site ? (
+                        <p>
+                          Site estadual: {stateSites.data?.find(
+                            (item) => item.code === record.item_notes[field].state_site,
+                          )?.label ?? "Indisponível no catálogo da competência"}
                         </p>
                       ) : null}
                     </div>
