@@ -10,7 +10,7 @@ Instrucoes do Claude para este repositorio.
 
 ## Seguranca (sempre)
 - Leia e aplique `.codex/rules/agent-safety.rules.md` em qualquer tarefa deste repositorio.
-- Nunca reescreva historico publicado: nada de `push --force`/`--force-with-lease`,
+- Nunca reescreva historico publicado: nada de push com flag de forca,
   `rebase`, `reset --hard` ou `amend` sobre commits ja empurrados, e nunca em `main`,
   `develop` ou `staging`. Divergiu? `git fetch` e reaplique por cima.
 - Nunca empurre com `--no-verify` nem contorne os hooks.

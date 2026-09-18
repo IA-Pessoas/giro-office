@@ -227,7 +227,7 @@ export function describeForcePushBlock(rewrites, env = process.env) {
   const motivo =
     protectedRewrites.length > 0
       ? `Reescrever historico de ${protectedRewrites.map(({ branch }) => branch).join(", ")} nao e permitido.`
-      : `Para reescrever historico de uma branch propria, declare a intencao: ${FORCE_ESCAPE_ENV}=1 git push --force-with-lease`;
+      : `Para reescrever historico de uma branch propria, declare a intencao definindo ${FORCE_ESCAPE_ENV}=1 no push.`;
 
   return [
     "git-hook-scope: push recusado — reescrita de historico detectada.",

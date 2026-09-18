@@ -10,7 +10,7 @@ repositorio: Codex, Cursor, Claude Code e afins.
 
 ## Nunca reescreva historico publicado
 
-- Nao use `git push --force`, `--force-with-lease`, `--delete` nem `+refspec`.
+- Nao empurre com as flags de forca (`--force`, `--force-with-lease`), com `--delete` nem com `+refspec`.
 - Nao use `git rebase`, `git reset --hard`, `git commit --amend`, `git filter-branch`,
   `git filter-repo` nem `git gc --prune=now` sobre commits que ja foram empurrados.
 - Nao altere `.git/config`, hooks versionados ou `core.hooksPath` para contornar o gate.
