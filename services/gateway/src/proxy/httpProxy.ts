@@ -31,12 +31,15 @@ function hasRequestBody(method: string): boolean {
   return upperMethod !== "GET" && upperMethod !== "HEAD";
 }
 
-function getRequestBody(request: Request): string | ReadableStream | undefined {
+function getRequestBody(request: Request): string | Buffer | ReadableStream | undefined {
   if (!hasRequestBody(request.method)) {
     return undefined;
   }
   if (request.headers["content-type"]?.includes("application/json")) {
-    return JSON.stringify(request.body ?? {});
+    // Reenvia os bytes originais quando express.json os preservou: sem re-serializar
+    // e sem alterar o payload. Cai para JSON.stringify se o corpo veio de outra origem
+    // (rotas que remontam request.body, testes que injetam objeto direto).
+    return request.rawBody ?? JSON.stringify(request.body ?? {});
   }
   if (request.headers["content-type"]?.includes("application/x-www-form-urlencoded")) {
     // If it was parsed by express.urlencoded
@@ -518,7 +521,7 @@ function createHttpProxy(
         ),
       };
 
-      if (body !== undefined && typeof body !== "string") {
+      if (body !== undefined && typeof body !== "string" && !Buffer.isBuffer(body)) {
         (fetchOptions as RequestInit & { duplex: "half" }).duplex = "half";
       }
 

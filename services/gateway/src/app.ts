@@ -246,6 +246,18 @@ function mountObservability(
   app.use(buildRequestLifecycleMiddleware(logger));
 }
 
+/**
+ * Guarda os bytes originais do corpo para o proxy reenviar sem re-serializar.
+ * Evita um JSON.stringify por request e preserva o payload byte a byte.
+ */
+const keepRawBody: NonNullable<Parameters<typeof express.json>[0]>["verify"] = (
+  request,
+  _response,
+  buffer,
+) => {
+  (request as Request).rawBody = buffer;
+};
+
 function mountCorsAndParsing(app: express.Express, env: GatewayEnv): void {
   const corsOptions = createServiceCorsOptions(env.allowedOrigins, "gateway");
 
@@ -253,9 +265,9 @@ function mountCorsAndParsing(app: express.Express, env: GatewayEnv): void {
   app.options("*", cors(corsOptions));
   app.post(
     PROJECT_WIZARD_EXTRACTION_PATH,
-    express.json({ limit: PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES }),
+    express.json({ limit: PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES, verify: keepRawBody }),
   );
-  app.use(express.json({ limit: env.jsonBodyLimit ?? "1mb" }));
+  app.use(express.json({ limit: env.jsonBodyLimit ?? "1mb", verify: keepRawBody }));
   app.use(normalizeJsonBodyError);
 }
 
