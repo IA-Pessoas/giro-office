@@ -35,6 +35,11 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          # git-hook-scope.test.mjs monta uma linha de pre-push com HEAD~1 para
+          # provar que o gate recusa reescrita de historico. No checkout raso
+          # padrao HEAD~1 nao existe, o sha sai vazio e o hook aprova o push:
+          # o teste falharia justamente onde ele deveria enxergar.
+          fetch-depth: 2
 
       - name: Set up Node.js 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -82,6 +87,11 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          # git-hook-scope.test.mjs monta uma linha de pre-push com HEAD~1 para
+          # provar que o gate recusa reescrita de historico. No checkout raso
+          # padrao HEAD~1 nao existe, o sha sai vazio e o hook aprova o push:
+          # o teste falharia justamente onde ele deveria enxergar.
+          fetch-depth: 2
 
       - name: Set up Node.js 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

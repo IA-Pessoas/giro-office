@@ -243,9 +243,16 @@ export function parsePrePushInput(input) {
     .filter(Boolean)
     .map((line) => {
       const [localRef, localOid, remoteRef, remoteOid] = line.split(/\s+/);
+
+      // O git sempre escreve os quatro campos. Descartar a linha incompleta
+      // deixaria `records` vazio, e o hook concluiria que nao ha nada sendo
+      // empurrado — liberando o push em vez de barra-lo.
+      if (!localRef || !localOid || !remoteRef || !remoteOid) {
+        throw new Error(`entrada do pre-push malformada: ${JSON.stringify(line)}`);
+      }
+
       return { localRef, localOid, remoteRef, remoteOid };
-    })
-    .filter((record) => record.localRef && record.localOid && record.remoteRef && record.remoteOid);
+    });
 }
 
 function splitGitOutput(output) {
@@ -576,5 +583,12 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const entrypointPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
 
 if (entrypointPath === currentFilePath) {
-  main();
+  try {
+    main();
+  } catch (error) {
+    // Um gate que nao sabe o que esta sendo empurrado precisa recusar o push,
+    // nao deixar passar com um stack trace.
+    console.error(`git-hook-scope: push recusado — ${error.message}`);
+    process.exit(1);
+  }
 }

@@ -242,6 +242,28 @@ describe("parsePrePushInput", () => {
       ],
     );
   });
+
+  // O git sempre escreve os quatro campos, inclusive ao apagar uma branch
+  // ("(delete) 000... refs/heads/x <oid>"). Uma linha com menos campos e
+  // entrada corrompida: descarta-la faria o gate concluir que nada esta sendo
+  // empurrado e liberar justamente o push que ele existe para barrar.
+  it("recusa uma linha incompleta em vez de descartar", () => {
+    assert.throws(
+      () => parsePrePushInput("refs/heads/feature  refs/heads/feature def456\n"),
+      /entrada do pre-push malformada/,
+    );
+  });
+
+  it("aceita a linha de quatro campos que apaga uma branch", () => {
+    assert.deepEqual(parsePrePushInput(`(delete) ${"0".repeat(40)} refs/heads/feature def456\n`), [
+      {
+        localRef: "(delete)",
+        localOid: "0".repeat(40),
+        remoteRef: "refs/heads/feature",
+        remoteOid: "def456",
+      },
+    ]);
+  });
 });
 
 describe("resolvePrePushChangedFiles", () => {
