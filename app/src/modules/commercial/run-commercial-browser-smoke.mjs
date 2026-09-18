@@ -137,7 +137,7 @@ async function startServer(handler) {
   const server = createServer(handler);
   await new Promise((resolve, reject) => {
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
+    server.listen(0, resolve);
   });
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Upstream de smoke não abriu uma porta.");

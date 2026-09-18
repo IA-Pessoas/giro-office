@@ -391,7 +391,7 @@ const upstream = createServer(async (request, response) => {
   reply(response, 404, "Rota de teste não encontrada.");
 });
 
-await new Promise((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+await new Promise((resolve) => upstream.listen(0, resolve));
 const upstreamPort = upstream.address().port;
 const serverProcess = spawn(
   process.execPath,

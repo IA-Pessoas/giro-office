@@ -63,7 +63,8 @@ async function startAuditIngestServer(statusCode = 201): Promise<{
   });
 
   createdServers.push(server);
-  server.listen(0, "127.0.0.1");
+  // Sem host: bind em `::`, igual ao supertest — evita dividir a mesma porta efemera com ele.
+  server.listen(0);
   await once(server, "listening");
 
   const address = server.address();

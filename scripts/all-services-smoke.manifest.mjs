@@ -3687,6 +3687,14 @@ const baseManifest = [
   }),
   op({
     service: "contabil-service",
+    method: "GET",
+    path: "/triagem/editability",
+    action: "triageEditabilityGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "contabil-service",
     method: "POST",
     path: "/triagem/monthly",
     action: "triageMonthlyCreate",
