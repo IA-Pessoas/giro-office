@@ -212,7 +212,7 @@ try {
   );
 
   await page.getByLabel("Identificador do banco").fill("001");
-  await page.getByRole("button", { name: "Adicionar" }).click();
+  await page.getByRole("button", { name: "Adicionar", exact: true }).click();
   await expect(page.getByLabel("Status do banco 001")).toHaveValue("PENDING");
   const reopenRequest = requests.find(
     (request) => request.method === "PUT" && request.path === "/triagem/statements" && request.body.status === "PENDING",
