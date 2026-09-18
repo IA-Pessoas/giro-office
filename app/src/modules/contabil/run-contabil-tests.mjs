@@ -176,6 +176,10 @@ await (async () => {
     assert.match(source, /https:\/\//);
     assert.match(source, /DRIVE/);
     assert.match(source, /CLOUD/);
+    assert.match(source, /useTriageCatalogs/);
+    assert.match(source, /LINK_TYPE/);
+    assert.doesNotMatch(source, /<option value="DRIVE">/);
+    assert.doesNotMatch(source, /<option value="CLOUD">/);
     assert.match(source, /responsible_id/);
     assert.match(source, /Arquivar/);
     assert.match(source, /window\.confirm/);

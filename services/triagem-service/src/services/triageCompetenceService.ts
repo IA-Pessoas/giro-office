@@ -28,7 +28,15 @@ export type TriageCompetencePrisma = Pick<
   | "triageCompetence"
   | "triageCompetenceHistory"
   | "triageOutboxEvent"
+  | "triageCatalogItem"
+  | "triageCompetenceCatalogSnapshot"
 >;
+
+export type TriageCompetenceCatalogSnapshotter = (
+  transaction: TriageCompetencePrisma,
+  organizationId: string,
+  competenceId: string,
+) => Promise<unknown>;
 
 export interface TriageCompetenceAuthContext {
   userId: string;
@@ -112,6 +120,7 @@ export class TriageCompetenceService {
   constructor(
     private readonly prisma: TriageCompetencePrisma,
     private readonly clock: () => Date = () => new Date(),
+    private readonly snapshotCatalog?: TriageCompetenceCatalogSnapshotter,
   ) {}
 
   async create(
@@ -177,6 +186,8 @@ export class TriageCompetenceService {
           },
           select: competenceSelect,
         });
+
+        await this.snapshotCatalog?.(transaction, auth.organizationId, createdRecord.id);
 
         await this.recordChange(transaction, {
           competence: createdRecord,

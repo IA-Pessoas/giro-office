@@ -96,6 +96,23 @@ describe("TriageCompetenceService", () => {
     expect(prisma.triageOutboxEvent.create).toHaveBeenCalledOnce();
   });
 
+  it("captura o catálogo dentro da mesma transação da competência", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.client.findFirst).mockResolvedValue({ id: CLIENT_ID } as never);
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.triageConfig.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.triageResponsible.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.triageCompetence.create).mockResolvedValue(record as never);
+    const snapshotCatalog = vi.fn().mockResolvedValue([]);
+
+    await new TriageCompetenceService(prisma, undefined, snapshotCatalog).create(
+      { client_id: CLIENT_ID, competence: COMPETENCE },
+      editor(),
+    );
+
+    expect(snapshotCatalog).toHaveBeenCalledWith(prisma, ORGANIZATION_ID, COMPETENCE_ID);
+  });
+
   it("repete criação sem duplicar competência, histórico ou outbox", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue(record as never);

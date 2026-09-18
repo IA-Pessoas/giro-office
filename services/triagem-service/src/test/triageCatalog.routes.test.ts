@@ -126,4 +126,30 @@ describe("rotas de catálogos da Triagem", () => {
     );
     expect(deps.archive).toHaveBeenCalledWith(CATALOG_ID, expect.any(Object));
   });
+
+  it("rejeita URL nula no create e corpo de update vazio", async () => {
+    const deps = createMockDeps();
+    const app = createTriagemApp({
+      env,
+      logger,
+      prisma: createMockPrisma(),
+      triageCatalogRouteDeps: deps,
+    });
+
+    const nullUrl = await request(app)
+      .post("/triagem/catalogs")
+      .set("Content-Type", "application/json")
+      .set(authHeaders())
+      .send({ kind: "LINK_TYPE", code: "DRIVE", label: "Drive", url: null });
+    const emptyUpdate = await request(app)
+      .patch(`/triagem/catalogs/${CATALOG_ID}`)
+      .set("Content-Type", "application/json")
+      .set(authHeaders())
+      .send({});
+
+    expect(nullUrl.status).toBe(400);
+    expect(emptyUpdate.status).toBe(400);
+    expect(deps.create).not.toHaveBeenCalled();
+    expect(deps.update).not.toHaveBeenCalled();
+  });
 });

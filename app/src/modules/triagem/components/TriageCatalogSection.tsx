@@ -35,12 +35,13 @@ function toInputValues(item: TriageCatalogItem): CatalogFormValues {
   return { kind: item.kind, code: item.code, label: item.label, url: item.url ?? "" };
 }
 
-function toPayload(values: CatalogFormValues): TriageCatalogInput {
+function toPayload(values: CatalogFormValues, clearUrl = false): TriageCatalogInput {
+  const url = values.url.trim();
   return {
     kind: values.kind,
     code: values.code.trim(),
     label: values.label.trim(),
-    url: values.url.trim() || null,
+    ...(url ? { url } : clearUrl ? { url: null } : {}),
   };
 }
 
@@ -140,7 +141,7 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
   async function updateCatalog(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!editingId) return;
-    await mutations.update.mutateAsync({ id: editingId, input: toPayload(editValues) });
+    await mutations.update.mutateAsync({ id: editingId, input: toPayload(editValues, true) });
     setEditingId(null);
   }
 

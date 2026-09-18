@@ -81,6 +81,49 @@ describe("TriageCatalogService", () => {
     });
   });
 
+  it("rejeita valores inválidos antes de acessar o banco", async () => {
+    const prisma = createMockPrisma();
+
+    await expect(
+      new TriageCatalogService(prisma).create(
+        { kind: "LINK_TYPE", code: " ", label: "Drive" },
+        editor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      new TriageCatalogService(prisma).create(
+        { kind: "LINK_TYPE", code: "DRIVE", label: "Drive", url: "http://insecure.test" },
+        editor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(prisma.triageCatalogItem.create).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia viewer e arquiva item ativo com sucesso", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageCatalogItem.findFirst).mockResolvedValue(record as never);
+    vi.mocked(prisma.triageCatalogItem.update).mockResolvedValue({
+      ...record,
+      archived_at: new Date("2026-09-18T01:00:00.000Z"),
+    } as never);
+
+    await expect(
+      new TriageCatalogService(prisma).create(
+        { kind: "LINK_TYPE", code: "DRIVE", label: "Drive" },
+        { ...editor(), permission: 1, modules: { triagem: 1 } },
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    const archived = await new TriageCatalogService(prisma).archive(CATALOG_ID, editor());
+    expect(archived.archived_at).toEqual(new Date("2026-09-18T01:00:00.000Z"));
+    expect(prisma.triageCatalogItem.update).toHaveBeenCalledWith({
+      where: { id: CATALOG_ID },
+      data: { archived_at: expect.any(Date) },
+      select: expect.any(Object),
+    });
+  });
+
   it("lista apenas itens ativos da organização e filtra por tipo", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageCatalogItem.findMany).mockResolvedValue([record] as never);

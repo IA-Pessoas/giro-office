@@ -68,9 +68,14 @@ export function createTriagemApp({
   triageUrgentRequestRouteDeps,
 }: CreateTriagemAppOptions): express.Express {
   const app = express();
-  const competenceService = new TriageCompetenceService(prisma);
-  const externalLinkService = new TriageExternalLinkService(prisma);
   const catalogService = new TriageCatalogService(prisma);
+  const competenceService = new TriageCompetenceService(
+    prisma,
+    undefined,
+    (transaction, organizationId, competenceId) =>
+      catalogService.snapshotForCompetence(organizationId, competenceId, transaction),
+  );
+  const externalLinkService = new TriageExternalLinkService(prisma);
   const urgentRequestService = new TriageUrgentRequestService(prisma);
 
   app.set("trust proxy", true);

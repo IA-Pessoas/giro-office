@@ -5,10 +5,12 @@ import { getContabilErrorMessage } from "@modules/contabil";
 import { useAssignableUsers } from "@modules/rh";
 
 import {
+  useTriageCatalogs,
   useTriageExternalLinkMutations,
   useTriageExternalLinks,
 } from "../hooks";
 import type {
+  TriageCatalogItem,
   TriageExternalLink,
   TriageExternalLinkInput,
   TriageExternalLinkType,
@@ -46,17 +48,34 @@ function toPayload(values: LinkFormValues): TriageExternalLinkInput {
   };
 }
 
-function typeLabel(type: TriageExternalLinkType): string {
-  return type === "DRIVE" ? "Drive" : "Nuvem";
+function linkTypeOptions(
+  catalogItems: TriageCatalogItem[] | undefined,
+  selectedType: TriageExternalLinkType,
+): Array<{ value: TriageExternalLinkType; label: string }> {
+  const options = (catalogItems ?? [])
+    .filter((item) => item.code === "DRIVE" || item.code === "CLOUD")
+    .map((item) => ({ value: item.code as TriageExternalLinkType, label: item.label }));
+
+  if (!options.some((option) => option.value === selectedType)) {
+    options.push({ value: selectedType, label: selectedType });
+  }
+
+  return options;
+}
+
+function typeLabel(type: TriageExternalLinkType, catalogItems: TriageCatalogItem[] | undefined): string {
+  return catalogItems?.find((item) => item.code === type)?.label ?? type;
 }
 
 function LinkFormFields({
   values,
   users,
+  linkTypes,
   onChange,
 }: {
   values: LinkFormValues;
   users: Array<{ id: string; name: string }>;
+  linkTypes: Array<{ value: TriageExternalLinkType; label: string }>;
   onChange: <K extends keyof LinkFormValues>(field: K, value: LinkFormValues[K]) => void;
 }) {
   return (
@@ -69,8 +88,11 @@ function LinkFormFields({
           onChange={(event) => onChange("type", event.target.value as TriageExternalLinkType)}
           className="mt-1 block h-10 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
         >
-          <option value="DRIVE">Drive</option>
-          <option value="CLOUD">Nuvem</option>
+          {linkTypes.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </label>
       <label className="text-sm font-medium text-gray-700 dark:text-slate-300 sm:col-span-2">
@@ -126,14 +148,17 @@ export function TriageExternalLinksSection({
   canEdit: boolean;
 }) {
   const linksQuery = useTriageExternalLinks(clientId, competence);
+  const linkTypesQuery = useTriageCatalogs("LINK_TYPE");
   const mutations = useTriageExternalLinkMutations(clientId, competence);
   const usersQuery = useAssignableUsers({ enabled: canEdit, module: "triagem" });
   const [createValues, setCreateValues] = useState<LinkFormValues>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<LinkFormValues>(EMPTY_FORM);
   const users = (usersQuery.data ?? []).map((user) => ({ id: user.id, name: user.name }));
+  const createLinkTypes = linkTypeOptions(linkTypesQuery.data, createValues.type);
   const actionError =
     linksQuery.error ??
+    linkTypesQuery.error ??
     usersQuery.error ??
     mutations.create.error ??
     mutations.update.error ??
@@ -205,7 +230,12 @@ export function TriageExternalLinksSection({
 
       {canEdit ? (
         <form className="mt-3 space-y-3" onSubmit={createLink}>
-          <LinkFormFields values={createValues} users={users} onChange={updateCreateValue} />
+          <LinkFormFields
+            values={createValues}
+            users={users}
+            linkTypes={createLinkTypes}
+            onChange={updateCreateValue}
+          />
           <button type="submit" disabled={isMutating} className={PRIMARY_BUTTON_CLASSNAME}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             Adicionar link
@@ -223,7 +253,12 @@ export function TriageExternalLinksSection({
             <li key={link.id} className="rounded-lg border border-gray-200 p-3 dark:border-slate-700">
               {editingId === link.id ? (
                 <form className="space-y-3" onSubmit={updateLink}>
-                  <LinkFormFields values={editValues} users={users} onChange={updateEditValue} />
+                  <LinkFormFields
+                    values={editValues}
+                    users={users}
+                    linkTypes={linkTypeOptions(linkTypesQuery.data, editValues.type)}
+                    onChange={updateEditValue}
+                  />
                   <div className="flex flex-wrap gap-2">
                     <button type="submit" disabled={isMutating} className={PRIMARY_BUTTON_CLASSNAME}>
                       <Save className="h-4 w-4" aria-hidden="true" />
@@ -248,7 +283,7 @@ export function TriageExternalLinksSection({
                       {link.url}
                     </a>
                     <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
-                      {typeLabel(link.type)} · {link.description || "Sem descrição"} · {link.responsible?.name || "Sem responsável"}
+                      {typeLabel(link.type, linkTypesQuery.data)} · {link.description || "Sem descrição"} · {link.responsible?.name || "Sem responsável"}
                     </p>
                   </div>
                   {canEdit ? (

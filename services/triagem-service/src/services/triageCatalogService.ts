@@ -31,14 +31,12 @@ type SnapshotRecord = Prisma.TriageCompetenceCatalogSnapshotGetPayload<{
   select: typeof snapshotSelect;
 }>;
 
-export type TriageCatalogPrisma = Pick<
+export type TriageCatalogTransaction = Pick<
   PrismaClient,
-  | "$executeRaw"
-  | "$transaction"
-  | "triageCatalogItem"
-  | "triageCompetence"
-  | "triageCompetenceCatalogSnapshot"
+  "$executeRaw" | "triageCatalogItem" | "triageCompetence" | "triageCompetenceCatalogSnapshot"
 >;
+
+export type TriageCatalogPrisma = TriageCatalogTransaction & Pick<PrismaClient, "$transaction">;
 
 export type TriageCatalogKind = "JUSTIFICATION" | "LINK_TYPE" | "STATE_SITE";
 
@@ -271,57 +269,70 @@ export class TriageCatalogService {
   async snapshotForCompetence(
     organizationId: string,
     competenceId: string,
+    transaction?: TriageCatalogTransaction,
   ): Promise<TriageCatalogSnapshotDto[]> {
     if (!organizationId || !competenceId) {
       throw new ServiceError(400, "Contexto da competência incompleto.");
     }
 
-    return this.withOrganization(organizationId, async (transaction) => {
-      const competence = await transaction.triageCompetence.findFirst({
-        where: { id: competenceId, organization_id: organizationId },
-        select: { id: true },
-      });
-      if (!competence) {
-        throw new ServiceError(404, "Competência da Triagem não encontrada.");
-      }
+    if (transaction) {
+      return this.snapshotForCompetenceInTransaction(transaction, organizationId, competenceId);
+    }
 
-      const items = await transaction.triageCatalogItem.findMany({
-        where: { organization_id: organizationId, archived_at: null },
-        orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
-        select: catalogItemSelect,
-      });
-      if (items.length > 0) {
-        await transaction.triageCompetenceCatalogSnapshot.createMany({
-          data: items.map((item) => ({
-            organization_id: organizationId,
-            competence_id: competenceId,
-            catalog_item_id: item.id,
-            kind: item.kind,
-            code: item.code,
-            label: item.label,
-            url: item.url,
-          })),
-          skipDuplicates: true,
-        });
-      }
+    return this.withOrganization(organizationId, (transaction) =>
+      this.snapshotForCompetenceInTransaction(transaction, organizationId, competenceId),
+    );
+  }
 
-      const snapshots = await transaction.triageCompetenceCatalogSnapshot.findMany({
-        where: { organization_id: organizationId, competence_id: competenceId },
-        orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
-        select: snapshotSelect,
-      });
-      return snapshots.map(toSnapshotDto);
+  private async snapshotForCompetenceInTransaction(
+    transaction: TriageCatalogTransaction,
+    organizationId: string,
+    competenceId: string,
+  ): Promise<TriageCatalogSnapshotDto[]> {
+    const competence = await transaction.triageCompetence.findFirst({
+      where: { id: competenceId, organization_id: organizationId },
+      select: { id: true },
     });
+    if (!competence) {
+      throw new ServiceError(404, "Competência da Triagem não encontrada.");
+    }
+
+    const items = await transaction.triageCatalogItem.findMany({
+      where: { organization_id: organizationId, archived_at: null },
+      orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
+      select: catalogItemSelect,
+    });
+    if (items.length > 0) {
+      await transaction.triageCompetenceCatalogSnapshot.createMany({
+        data: items.map((item) => ({
+          organization_id: organizationId,
+          competence_id: competenceId,
+          catalog_item_id: item.id,
+          kind: item.kind,
+          code: item.code,
+          label: item.label,
+          url: item.url,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    const snapshots = await transaction.triageCompetenceCatalogSnapshot.findMany({
+      where: { organization_id: organizationId, competence_id: competenceId },
+      orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
+      select: snapshotSelect,
+    });
+    return snapshots.map(toSnapshotDto);
   }
 
   private async withOrganization<T>(
     organizationId: string,
-    callback: (transaction: TriageCatalogPrisma) => Promise<T>,
+    callback: (transaction: TriageCatalogTransaction) => Promise<T>,
   ): Promise<T> {
     return this.prisma.$transaction(async (transaction) => {
       await transaction.$executeRaw`SET LOCAL ROLE "giro_user_runtime"`;
       await transaction.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
-      return callback(transaction as unknown as TriageCatalogPrisma);
+      return callback(transaction as unknown as TriageCatalogTransaction);
     });
   }
 }
