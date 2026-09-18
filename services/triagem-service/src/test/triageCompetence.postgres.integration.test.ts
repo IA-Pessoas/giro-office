@@ -246,8 +246,14 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
   it("isola catálogos por organização e congela os valores da competência", async () => {
     const codeA = `RLS_A_${randomUUID().slice(0, 8)}`;
     const codeB = `RLS_B_${randomUUID().slice(0, 8)}`;
-    await catalogService.create({ kind: "JUSTIFICATION", code: codeA, label: "A" }, auth(fixtureA));
-    await catalogService.create({ kind: "JUSTIFICATION", code: codeB, label: "B" }, auth(fixtureB));
+    const catalogA = await catalogService.create(
+      { kind: "JUSTIFICATION", code: codeA, label: "A" },
+      auth(fixtureA),
+    );
+    const catalogB = await catalogService.create(
+      { kind: "JUSTIFICATION", code: codeB, label: "B" },
+      auth(fixtureB),
+    );
 
     const visibleToA = await catalogService.list({ kind: "JUSTIFICATION" }, auth(fixtureA));
     expect(visibleToA.map((item) => item.code)).toEqual([codeA]);
@@ -276,6 +282,46 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
       competence.id,
     );
     expect(snapshot.map((item) => item.code)).toContain(codeA);
+
+    const visibleSnapshotsToA = await withRuntimeOrganization(
+      fixtureA.organizationId,
+      (transaction) =>
+        transaction.$queryRaw<Array<{ organization_id: string }>>`
+          SELECT organization_id
+          FROM "triagem.competence_catalog_snapshots"
+        `,
+    );
+    expect(visibleSnapshotsToA).toEqual(
+      expect.arrayContaining([{ organization_id: fixtureA.organizationId }]),
+    );
+    expect(
+      visibleSnapshotsToA.every((row) => row.organization_id === fixtureA.organizationId),
+    ).toBe(true);
+
+    const competenceB = await adminPrisma.triageCompetence.findFirstOrThrow({
+      where: {
+        organization_id: fixtureB.organizationId,
+        client_id: fixtureB.clientId,
+        competence: "2026-09",
+      },
+      select: { id: true },
+    });
+    await expect(
+      withRuntimeOrganization(
+        fixtureA.organizationId,
+        (transaction) =>
+          transaction.$executeRaw`
+          INSERT INTO "triagem.competence_catalog_snapshots" (
+            id, organization_id, competence_id, catalog_item_id,
+            kind, code, label, created_at
+          ) VALUES (
+            ${randomUUID()}, ${fixtureB.organizationId}, ${competenceB.id}, ${catalogB.id},
+            'JUSTIFICATION', ${codeB}, 'B', CURRENT_TIMESTAMP
+          )
+        `,
+      ),
+    ).rejects.toThrow(/row-level security|permission denied/u);
+    expect(catalogA.id).not.toBe(catalogB.id);
   });
 
   it("rejeita mutação direta do histórico append-only", async () => {
