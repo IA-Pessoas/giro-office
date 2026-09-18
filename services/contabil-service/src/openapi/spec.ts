@@ -968,7 +968,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                     justification: {
                       type: "string",
                       nullable: true,
-                      maxLength: 2000,
+                      maxLength: 100,
                     },
                     value: { type: "string", nullable: true, maxLength: 2000 },
                     delivery_method: {

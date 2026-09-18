@@ -273,6 +273,12 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
               },
             },
             { name: "include_archived", in: "query", schema: { type: "boolean" } },
+            { name: "client_id", in: "query", schema: { type: "string", format: "uuid" } },
+            {
+              name: "competence",
+              in: "query",
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
           ],
           responses: {
             "200": {

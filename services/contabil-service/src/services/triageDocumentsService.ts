@@ -395,7 +395,10 @@ export class TriageDocumentsService {
       throw new ServiceError(400, "Item ou status documental inválido.");
     }
     const note = normalizeOptionalNote(update.note, "Nota documental");
-    const justification = normalizeOptionalNote(update.justification, "Justificativa documental");
+    const justification = normalizeOptionalCatalogCode(
+      update.justification,
+      "Justificativa documental",
+    );
     const value = isBillingAmount
       ? normalizeOptionalValue(update.value, "Valor de faturamento")
       : undefined;

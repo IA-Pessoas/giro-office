@@ -141,6 +141,7 @@ export class TriageCompetenceService {
           select: competenceSelect,
         });
         if (existing) {
+          await this.snapshotCatalog?.(transaction, auth.organizationId, existing.id);
           return existing;
         }
 

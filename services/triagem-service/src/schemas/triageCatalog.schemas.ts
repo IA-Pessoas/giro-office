@@ -22,6 +22,7 @@ const urlSchema = z
     const url = new URL(value);
     return url.protocol === "https:" && !url.username && !url.password;
   }, "A URL deve usar HTTPS.");
+const competenceSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Competência inválida.");
 
 export const createTriageCatalogBodySchema = z
   .object({
@@ -50,8 +51,14 @@ export const listTriageCatalogQuerySchema = z
       .transform((value) => value === "true" || value === "1")
       .optional()
       .default("false"),
+    client_id: z.string().uuid("Cliente inválido.").optional(),
+    competence: competenceSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (value) => (value.client_id === undefined) === (value.competence === undefined),
+    "client_id e competence devem ser informados juntos.",
+  );
 
 export const triageCatalogIdParamsSchema = z.object({
   id: z.string().uuid("Item de catálogo inválido."),

@@ -117,9 +117,9 @@ export function TriageDocumentsSection({
     buildDocumentDrafts(undefined, documents),
   );
   const monthly = useTriageMonthly(clientId, competence, documentType);
-  const justifications = useTriageCatalogs("JUSTIFICATION");
-  const deliveryMethods = useTriageCatalogs("DELIVERY_METHOD");
-  const stateSites = useTriageCatalogs("STATE_SITE");
+  const justifications = useTriageCatalogs("JUSTIFICATION", clientId, competence);
+  const deliveryMethods = useTriageCatalogs("DELIVERY_METHOD", clientId, competence);
+  const stateSites = useTriageCatalogs("STATE_SITE", clientId, competence);
   const mutations = useTriageMutations(clientId, competence, documentType);
   const statements = useTriageStatements(clientId, competence, documentType);
   const closing = useTriageClosing(clientId, competence, documentType);

@@ -141,7 +141,7 @@ export function TriageExternalLinksSection({
   canEdit: boolean;
 }) {
   const linksQuery = useTriageExternalLinks(clientId, competence);
-  const linkTypesQuery = useTriageCatalogs("LINK_TYPE");
+  const linkTypesQuery = useTriageCatalogs("LINK_TYPE", clientId, competence);
   const mutations = useTriageExternalLinkMutations(clientId, competence);
   const usersQuery = useAssignableUsers({ enabled: canEdit, module: "triagem" });
   const [createValues, setCreateValues] = useState<LinkFormValues>(EMPTY_FORM);

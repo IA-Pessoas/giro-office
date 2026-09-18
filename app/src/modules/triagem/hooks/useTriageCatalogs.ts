@@ -7,12 +7,23 @@ import {
   type TriageCatalogKind,
 } from "../services/triagemCatalogService";
 
-export function triagemCatalogsQueryKey(kind?: TriageCatalogKind) {
-  return ["triagem", "catalogs", kind ?? "all"] as const;
+export function triagemCatalogsQueryKey(
+  kind?: TriageCatalogKind,
+  clientId?: string,
+  competence?: string,
+) {
+  return ["triagem", "catalogs", kind ?? "all", clientId ?? "all", competence ?? "all"] as const;
 }
 
-export function useTriageCatalogs(kind?: TriageCatalogKind) {
-  return useFetch(triagemCatalogsQueryKey(kind), () => triagemCatalogService.list(kind));
+export function useTriageCatalogs(
+  kind?: TriageCatalogKind,
+  clientId?: string,
+  competence?: string,
+) {
+  return useFetch(
+    triagemCatalogsQueryKey(kind, clientId, competence),
+    () => triagemCatalogService.list({ kind, clientId, competence }),
+  );
 }
 
 export function useTriageCatalogMutations() {

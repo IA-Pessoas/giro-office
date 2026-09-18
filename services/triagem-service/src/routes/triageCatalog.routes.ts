@@ -40,7 +40,12 @@ export function createTriageCatalogRoutes(
     try {
       const query = parseWithZod(listTriageCatalogQuerySchema, request.query);
       const result = await service.list(
-        { kind: query.kind, includeArchived: query.include_archived },
+        {
+          kind: query.kind,
+          includeArchived: query.include_archived,
+          clientId: query.client_id,
+          competence: query.competence,
+        },
         authContext(request),
       );
       response.json(createSuccessResponse(result));

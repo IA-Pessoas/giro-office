@@ -63,6 +63,8 @@ export interface UpdateTriageCatalogInput {
 export interface ListTriageCatalogInput {
   kind?: TriageCatalogKind;
   includeArchived?: boolean;
+  clientId?: string;
+  competence?: string;
 }
 
 export type TriageCatalogItemDto = Omit<CatalogItemRecord, "organization_id">;
@@ -113,6 +115,19 @@ function toSnapshotDto(record: SnapshotRecord): TriageCatalogSnapshotDto {
   return dto;
 }
 
+function snapshotAsCatalogItem(record: SnapshotRecord): TriageCatalogItemDto {
+  return {
+    id: record.id,
+    kind: record.kind,
+    code: record.code,
+    label: record.label,
+    url: record.url,
+    archived_at: null,
+    created_at: record.created_at,
+    updated_at: record.created_at,
+  };
+}
+
 function assertCatalogValues(input: {
   kind?: TriageCatalogKind;
   code?: string;
@@ -154,8 +169,33 @@ export class TriageCatalogService {
     requireContext(auth);
     requireViewPermission(auth);
 
-    const records = await this.withOrganization(auth.organizationId, (transaction) =>
-      transaction.triageCatalogItem.findMany({
+    return this.withOrganization(auth.organizationId, async (transaction) => {
+      if (input.clientId && input.competence) {
+        const competence = await transaction.triageCompetence.findFirst({
+          where: {
+            organization_id: auth.organizationId,
+            client_id: input.clientId,
+            competence: input.competence,
+          },
+          select: { id: true },
+        });
+        if (competence) {
+          const snapshots = await transaction.triageCompetenceCatalogSnapshot.findMany({
+            where: {
+              organization_id: auth.organizationId,
+              competence_id: competence.id,
+              ...(input.kind ? { kind: input.kind } : {}),
+            },
+            orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
+            select: snapshotSelect,
+          });
+          if (snapshots.length > 0) {
+            return snapshots.map(snapshotAsCatalogItem);
+          }
+        }
+      }
+
+      const records = await transaction.triageCatalogItem.findMany({
         where: {
           organization_id: auth.organizationId,
           ...(input.kind ? { kind: input.kind } : {}),
@@ -163,10 +203,9 @@ export class TriageCatalogService {
         },
         orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
         select: catalogItemSelect,
-      }),
-    );
-
-    return records.map(toDto);
+      });
+      return records.map(toDto);
+    });
   }
 
   async create(

@@ -20,6 +20,12 @@ export type TriageCatalogInput = {
   url?: string | null;
 };
 
+export type TriageCatalogListParams = {
+  kind?: TriageCatalogKind;
+  clientId?: string;
+  competence?: string;
+};
+
 const TRIAGEM_CATALOGS_ENDPOINT = "/triagem/catalogs";
 
 function unwrap<T>(body: unknown): T {
@@ -31,9 +37,13 @@ function unwrap<T>(body: unknown): T {
 }
 
 export const triagemCatalogService = {
-  async list(kind?: TriageCatalogKind): Promise<TriageCatalogItem[]> {
+  async list(params: TriageCatalogListParams = {}): Promise<TriageCatalogItem[]> {
     const response = await setupAPIClient().get(TRIAGEM_CATALOGS_ENDPOINT, {
-      params: kind ? { kind } : undefined,
+      params: {
+        ...(params.kind ? { kind: params.kind } : {}),
+        ...(params.clientId ? { client_id: params.clientId } : {}),
+        ...(params.competence ? { competence: params.competence } : {}),
+      },
     });
     return unwrap<TriageCatalogItem[]>(response.data);
   },

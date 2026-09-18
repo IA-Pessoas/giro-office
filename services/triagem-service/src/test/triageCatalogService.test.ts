@@ -143,6 +143,36 @@ describe("TriageCatalogService", () => {
     });
   });
 
+  it("lista os valores do snapshot quando a competência é informada", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({ id: COMPETENCE_ID } as never);
+    vi.mocked(prisma.triageCompetenceCatalogSnapshot.findMany).mockResolvedValue([
+      {
+        id: "snapshot-id",
+        organization_id: ORGANIZATION_ID,
+        competence_id: COMPETENCE_ID,
+        catalog_item_id: CATALOG_ID,
+        kind: "LINK_TYPE",
+        code: "ARCHIVED_LINK",
+        label: "Link histórico",
+        url: null,
+        created_at: record.created_at,
+      },
+    ] as never);
+
+    const result = await new TriageCatalogService(prisma).list(
+      {
+        kind: "LINK_TYPE",
+        clientId: "b0000000-0000-4000-8000-000000000001",
+        competence: "2026-09",
+      },
+      editor(),
+    );
+
+    expect(result).toEqual([expect.objectContaining({ code: "ARCHIVED_LINK", archived_at: null })]);
+    expect(prisma.triageCatalogItem.findMany).not.toHaveBeenCalled();
+  });
+
   it("arquiva logicamente e não altera item de outra organização", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageCatalogItem.findFirst).mockResolvedValue(null);
