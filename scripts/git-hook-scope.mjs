@@ -193,7 +193,9 @@ export function describeForcePushBlock(rewrites, env = process.env) {
     return null;
   }
 
-  const alvos = rewrites.map(({ branch, remoteOid }) => `  ${branch} (remoto ${remoteOid.slice(0, 8)} deixaria de existir)`);
+  const alvos = rewrites.map(
+    ({ branch, remoteOid }) => `  ${branch} (remoto ${remoteOid.slice(0, 8)} deixaria de existir)`,
+  );
   const motivo =
     protectedRewrites.length > 0
       ? `Reescrever historico de ${protectedRewrites.map(({ branch }) => branch).join(", ")} nao e permitido.`
